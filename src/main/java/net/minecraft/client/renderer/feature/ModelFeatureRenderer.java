@@ -108,6 +108,8 @@ public class ModelFeatureRenderer {
 		Model<? super S> model = modelSubmit.model();
 		VertexConsumer vertexConsumer2 = modelSubmit.sprite() == null ? vertexConsumer : modelSubmit.sprite().wrap(vertexConsumer);
 		model.setupAnim(modelSubmit.state());
+		net.minecraft.client.dev.GraphicsAuditEquipmentGeometry.observe(model, modelSubmit.state(), renderType,
+			modelSubmit.tintedColor(), modelSubmit.lightCoords(), modelSubmit.overlayCoords(), this.poseStack.last());
 		model.renderToBuffer(this.poseStack, vertexConsumer2, modelSubmit.lightCoords(), modelSubmit.overlayCoords(), modelSubmit.tintedColor());
 		if (modelSubmit.outlineColor() != 0 && (renderType.outline().isPresent() || renderType.isOutline())) {
 			outlineBufferSource.setColor(modelSubmit.outlineColor());

@@ -15,6 +15,35 @@ class GraphicsAuditHandFoilTimingTest {
         }
     }
 
+    @Test void pairedPhaseSelectionNeverRewritesObservedTicks() {
+        String key="mattmc.dev.graphicsAuditHandFoilPhaseCenter", old=System.getProperty(key);
+        try {
+            System.setProperty(key,"10188");
+            assertTrue(GraphicsAuditHandFoilTiming.pairedPhaseMatches(340172));
+            assertTrue(GraphicsAuditHandFoilTiming.pairedPhaseMatches(340204));
+            assertFalse(GraphicsAuditHandFoilTiming.pairedPhaseMatches(340171));
+            assertFalse(GraphicsAuditHandFoilTiming.pairedPhaseMatches(340205));
+            withTrace(() -> {
+                GraphicsAuditHandFoilTiming.beginFrame();
+                GraphicsAuditHandFoilTiming.observeSemanticClock(85047,.5,.5f);
+                String before=GraphicsAuditHandFoilTiming.snapshot();
+                assertTrue(GraphicsAuditHandFoilTiming.readyForCapture(10000));
+                assertEquals(before,GraphicsAuditHandFoilTiming.snapshot());
+                assertTrue(before.contains("\"scaledTicks\":[340188]"));
+            });
+            System.setProperty(key,"0");
+            assertTrue(GraphicsAuditHandFoilTiming.pairedPhaseMatches(329984));
+            assertFalse(GraphicsAuditHandFoilTiming.pairedPhaseMatches(329983));
+            assertFalse(GraphicsAuditHandFoilTiming.pairedPhaseMatches(-1));
+            for (String value : new String[]{"-1","330000","invalid"}) {
+                System.setProperty(key,value);
+                assertThrows(RuntimeException.class,() -> GraphicsAuditHandFoilTiming.pairedPhaseMatches(10000));
+            }
+        } finally {
+            if (old==null) System.clearProperty(key); else System.setProperty(key,old);
+        }
+    }
+
     @Test void ignoresWorldAndGuiTicksOutsideHandScope() {
         withTrace(() -> {
             GraphicsAuditHandFoilTiming.beginFrame();

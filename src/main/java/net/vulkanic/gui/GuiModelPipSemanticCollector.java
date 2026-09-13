@@ -2,9 +2,13 @@ package net.vulkanic.gui;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.blaze3d.vertex.DefaultVertexFormat;
 import net.sodium.api.util.NormI8;
 import net.blaze3d.vertex.PoseStack;
 import net.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexFormat;
+import net.sodium.api.util.ColorABGR;
+import net.sodium.api.vertex.buffer.VertexBufferWriter;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -21,6 +25,8 @@ import net.vulkanic.bridge.VulkanicGalBridge;
 import org.joml.Matrix4f;
 import org.joml.Matrix3f;
 import org.joml.Vector3f;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 
 /** Copies model-based GUI PIP geometry into the explicit Rust GUI mesh ABI. */
 final class GuiModelPipSemanticCollector {
@@ -48,7 +54,7 @@ final class GuiModelPipSemanticCollector {
         float scale, int guiScale, int guiWidth, int guiHeight, float[] guiPose,
         ScreenRectangle clip, ModelPose setup, int tint, int materialMode) {
 		return collectInternal(model, texture, x0, y0, x1, y1, scale, guiScale, guiWidth, guiHeight,
-			guiPose, clip, setup, tint, materialMode, 0.0F, 0.0F);
+			guiPose, clip, setup, tint, materialMode, 1.0F, 1.0F, 0.0F, 0.0F, false);
 	}
 
 	/** Copies an animated model layer with its explicit texture-matrix offset. */
@@ -59,16 +65,27 @@ final class GuiModelPipSemanticCollector {
 		if (textureWidth <= 0 || textureHeight <= 0
 			|| !Float.isFinite(uvOffsetU) || !Float.isFinite(uvOffsetV)) return null;
 		return collectInternal(model, texture, x0, y0, x1, y1, scale, guiScale, guiWidth, guiHeight,
-			guiPose, clip, setup, tint, materialMode, uvOffsetU, uvOffsetV);
+			guiPose, clip, setup, tint, materialMode, 1.0F, 1.0F, uvOffsetU, uvOffsetV, false);
+	}
+
+	/** Copies a sprite-backed model after applying Frozen's SpriteCoordinateExpander mapping. */
+	static Result collectAtlas(Model<?> model, ResourceLocation atlas, int x0, int y0, int x1, int y1,
+		float scale, int guiScale, int guiWidth, int guiHeight, float[] guiPose,
+		ScreenRectangle clip, ModelPose setup, int tint, int materialMode,
+		float u0, float u1, float v0, float v1) {
+		if (!Float.isFinite(u0) || !Float.isFinite(u1) || !Float.isFinite(v0) || !Float.isFinite(v1)
+			|| u1 <= u0 || v1 <= v0) return null;
+		return collectInternal(model, atlas, x0, y0, x1, y1, scale, guiScale, guiWidth, guiHeight,
+			guiPose, clip, setup, tint, materialMode, u1 - u0, v1 - v0, u0, v0, true);
 	}
 
 	private static Result collectInternal(Model<?> model, ResourceLocation texture, int x0, int y0, int x1, int y1,
 		float scale, int guiScale, int guiWidth, int guiHeight, float[] guiPose,
 		ScreenRectangle clip, ModelPose setup, int tint, int materialMode,
-		float uvOffsetU, float uvOffsetV) {
+		float uvScaleU, float uvScaleV, float uvOffsetU, float uvOffsetV, boolean atlasMapped) {
 		if (model == null || texture == null || x1 <= x0 || y1 <= y0 || guiScale <= 0
 			|| guiWidth <= 0 || guiHeight <= 0
-			|| materialMode < 1 || materialMode > 4
+			|| !supportedModelMaterial(materialMode)
 			|| !Float.isFinite(scale) || scale <= 0.0F || setup == null
             || guiPose == null || guiPose.length != 6) {
             return null;
@@ -81,7 +98,9 @@ final class GuiModelPipSemanticCollector {
             || clip.width() > guiWidth - clip.left() || clip.height() > guiHeight - clip.top())) {
             return null;
         }
-        RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolve(texture);
+		RustGalGuiRawImageAssets.Asset asset = atlasMapped
+			? RustGalGuiRawImageAssets.resolveAtlas(texture)
+			: RustGalGuiRawImageAssets.resolve(texture);
         if (asset == null) return null;
         long scaledWidth = (long)(x1 - x0) * guiScale + 2L;
         long scaledHeight = (long)(y1 - y0) * guiScale + 2L;
@@ -93,7 +112,7 @@ final class GuiModelPipSemanticCollector {
         float modelScale = guiScale * scale;
         pose.scale(modelScale, modelScale, -modelScale);
         setup.apply(pose);
-        CaptureConsumer capture = new CaptureConsumer(tint, uvOffsetU, uvOffsetV);
+		CaptureConsumer capture = new CaptureConsumer(tint, uvScaleU, uvScaleV, uvOffsetU, uvOffsetV);
         model.renderToBuffer(pose, capture, 15728880, OverlayTexture.NO_OVERLAY);
         if (capture.overflowed || capture.vertices.size() < 3 || capture.vertices.size() % 4 != 0) return null;
         // Admit the copied asset only after every bounded geometry check has
@@ -110,13 +129,31 @@ final class GuiModelPipSemanticCollector {
         int clipTop = clip == null ? 0 : clip.top();
         int clipWidth = clip == null ? 0 : clip.width();
         int clipHeight = clip == null ? 0 : clip.height();
+        int lightingMode = materialMode == VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL
+            || materialMode == VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL
+            || materialMode == VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL
+            ? VulkanicGalBridge.GUI_MESH_LIGHTING_ENTITY_PREVIEW : 2;
         VulkanicGalBridge.GuiMeshBatchRecord batch = new VulkanicGalBridge.GuiMeshBatchRecord(
-            GuiRenderStratum.GUI_ITEM.order(), 0, materialMode, 2, asset.assetId(), 0L, 0.0F,
+            GuiRenderStratum.GUI_ITEM.order(), 0, materialMode, lightingMode, asset.assetId(), 0L,
+			entityAlphaCutoff(materialMode),
             identity, guiPose, x0, y0, x1, y1, guiWidth, guiHeight, width, height, 1,
             clipMode, clipLeft, clipTop, clipWidth, clipHeight,
             capture.vertices, indices);
         return new Result(batch, new ScreenRectangle(x0, y0, x1 - x0, y1 - y0), List.of(asset));
     }
+
+	private static boolean supportedModelMaterial(int materialMode) {
+		return materialMode >= 1 && materialMode <= 4
+			|| materialMode == VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL
+			|| materialMode == VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL
+			|| materialMode == VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL;
+	}
+
+	private static float entityAlphaCutoff(int materialMode) {
+		return materialMode == VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL
+			|| materialMode == VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL
+			|| materialMode == VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL ? 0.1F : 0.0F;
+	}
 
     /** Copies a bounded renderer-layer item submission into explicit GUI mesh batches. */
     static List<Result> collectBakedQuads(List<BakedQuad> quads, int[] tintLayers,
@@ -234,16 +271,18 @@ final class GuiModelPipSemanticCollector {
         }
     }
 
-    private static final class CaptureConsumer implements VertexConsumer {
+    private static final class CaptureConsumer implements VertexConsumer, VertexBufferWriter {
         final List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = new ArrayList<>();
         boolean overflowed;
         float x, y, z, u, v, nx, ny, nz;
         int color;
         final int tint;
-        final float uvOffsetU, uvOffsetV;
-        CaptureConsumer(int tint, float uvOffsetU, float uvOffsetV) {
-            this.tint = tint;
-            this.uvOffsetU = uvOffsetU;
+		final float uvScaleU, uvScaleV, uvOffsetU, uvOffsetV;
+		CaptureConsumer(int tint, float uvScaleU, float uvScaleV, float uvOffsetU, float uvOffsetV) {
+			this.tint = tint;
+			this.uvScaleU = uvScaleU;
+			this.uvScaleV = uvScaleV;
+			this.uvOffsetU = uvOffsetU;
             this.uvOffsetV = uvOffsetV;
             this.color = tint;
         }
@@ -260,7 +299,7 @@ final class GuiModelPipSemanticCollector {
             return this;
         }
         @Override public VertexConsumer setUv(float u, float v) {
-            this.u=u + uvOffsetU; this.v=v + uvOffsetV;
+			this.u=u * uvScaleU + uvOffsetU; this.v=v * uvScaleV + uvOffsetV;
             return this;
         }
         @Override public VertexConsumer setUv1(int u, int v) { return this; }
@@ -271,5 +310,39 @@ final class GuiModelPipSemanticCollector {
             vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(new float[]{this.x,this.y,this.z}, new float[]{u,v}, new float[]{u,v}, color, NormI8.pack(nx, ny, nz)));
             return this;
         }
+
+		@Override
+		public void push(MemoryStack stack, long pointer, int count, VertexFormat format) {
+			if (format != DefaultVertexFormat.NEW_ENTITY && !DefaultVertexFormat.NEW_ENTITY.equals(format)) {
+				throw new IllegalArgumentException("GUI model capture requires the NEW_ENTITY vertex format");
+			}
+			if (count < 0 || count > MAX_CAPTURED_VERTICES - vertices.size()) {
+				overflowed = true;
+				return;
+			}
+			for (int index = 0; index < count; index++) {
+				long vertex = pointer + (long)index * 36L;
+				int abgr = ColorABGR.toNativeByteOrder(MemoryUtil.memGetInt(vertex + 12L));
+				int supplied = (ColorABGR.unpackAlpha(abgr) << 24)
+					| (ColorABGR.unpackRed(abgr) << 16)
+					| (ColorABGR.unpackGreen(abgr) << 8)
+					| ColorABGR.unpackBlue(abgr);
+				float sourceU = MemoryUtil.memGetFloat(vertex + 16L);
+				float sourceV = MemoryUtil.memGetFloat(vertex + 20L);
+				float mappedU = sourceU * uvScaleU + uvOffsetU;
+				float mappedV = sourceV * uvScaleV + uvOffsetV;
+				vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(
+					new float[] {
+						MemoryUtil.memGetFloat(vertex),
+						MemoryUtil.memGetFloat(vertex + 4L),
+						MemoryUtil.memGetFloat(vertex + 8L)
+					},
+					new float[] {mappedU, mappedV},
+					new float[] {mappedU, mappedV},
+					net.minecraft.util.ARGB.multiply(supplied, tint),
+					MemoryUtil.memGetInt(vertex + 32L)
+				));
+			}
+		}
     }
 }

@@ -766,6 +766,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 	public void render(DeltaTracker deltaTracker, boolean bl) {
 		net.minecraft.client.dev.GraphicsAuditHandFoilTiming.beginFrame();
+		net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.beginFrame();
+		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.beginFrame();
 		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 		if (rustWholeFrame) {
 			// Minecraft's render loop selects the Rust whole-frame shell for this
@@ -947,6 +949,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 	public boolean renderRustVulkanWholeFrameShell(DeltaTracker deltaTracker, boolean bl) {
 		net.minecraft.client.dev.GraphicsAuditHandFoilTiming.beginFrame();
+		net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.beginFrame();
+		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.beginFrame();
 		if (!net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
 			return false;
 		}
@@ -955,6 +959,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		}
 		ProfilerFiller profilerFiller = Profiler.get();
 		boolean gameLoadFinished = this.minecraft.isGameLoadFinished();
+		float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);
 		if (!System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()
 			&& this.minecraft.level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel
 			&& this.minecraft.player != null) {
@@ -967,6 +972,11 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset");
 		this.guiRenderState.reset();
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.clearFrame();
+		// Consume the lightmap-dirty flag set by GameRenderer.tick before the
+		// first semantic-world seed. The sky reads live world time directly, but
+		// terrain samples this copied 16x16 lightmap; leaving the cached snapshot
+		// untouched made a /time change brighten the sky while terrain stayed dark.
+		this.lightTexture.updateLightTexture(f);
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.primeWorldSemanticState(
 			this.minecraft.level,
 			this.mainCamera,
@@ -1000,7 +1010,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		this.minecraft.getMainRenderTarget().ensureRustSemanticRoute();
 		this.minecraft.getShaderManager().ensureRustSemanticRoute();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset");
-		float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);
 		// Match the baseline world's CPU light-update ordering before copying any
 		// terrain semantics. The selected Rust route owns rendering, while this
 		// only publishes authoritative client world state for its source snapshot.
@@ -1377,6 +1386,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				this.minecraft.options.glintStrength().get().floatValue(),
 				semanticMenuBlurRadius)
 		);
+		this.guiRenderer.finishRustGalWholeFrame();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-coordinator");
 		profilerFiller.pop();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.cursor-apply");

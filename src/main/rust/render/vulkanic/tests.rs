@@ -19,6 +19,38 @@ fn gal() -> VulkanicGal {
 }
 
 #[test]
+fn submission_usage_tracks_accepted_work_and_retained_command_copies() {
+    let mut gal = gal();
+    let usage = SubmissionUsage::default();
+    let batch = SubmissionBatch { label: "tracked commands".into(), command_lists: vec![
+        gal.create_command_list(CommandListDesc { label: "tracked list".into(),
+            operations: vec![CommandOp::TrackSubmission(usage.clone())] }).unwrap(),
+    ] };
+    assert!(usage.has_pending_commands());
+    // A failed backend attempt consumes an ID but must not publish accepted use.
+    gal.mock_backend_mut().unwrap().fail_next_submit = true;
+    assert!(gal.submit(batch.clone()).is_err());
+    assert_eq!(usage.last_submission(), SubmissionId(0));
+    assert!(usage.has_pending_commands(), "the retained retry is still pending");
+    let first = gal.submit(batch.clone()).unwrap();
+    assert_eq!(usage.last_submission(), first.submission);
+    gal.retire_through(first.submission).unwrap();
+    assert!(usage.has_pending_commands(), "completed use does not cancel a retained command copy");
+    let second = gal.submit(batch).unwrap();
+    assert!(second.submission > first.submission);
+    assert_eq!(usage.last_submission(), second.submission);
+    assert!(!usage.has_pending_commands());
+    assert_eq!(gal.poll_completed(), first.submission, "new accepted work remains in flight");
+    gal.retire_through(second.submission).unwrap();
+    assert_eq!(gal.poll_completed(), usage.last_submission());
+
+    let cancelled = CommandOp::TrackSubmission(usage.clone());
+    drop(cancelled);
+    assert!(!usage.has_pending_commands());
+    assert_eq!(usage.last_submission(), second.submission, "cancellation preserves earlier accepted use");
+}
+
+#[test]
 fn completion_wait_rejects_unsubmitted_ids_without_fabricating_progress() {
     let mut gal = gal();
     assert!(gal.retire_through(SubmissionId(1)).is_err());
@@ -4441,7 +4473,7 @@ fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
     assert_eq!(FFI_ABI_V40_VERSION, 40);
     assert_eq!(FFI_ABI_V41_VERSION, 41);
     assert_eq!(FFI_ABI_V42_VERSION, 42);
-    assert_eq!(FFI_ABI_VERSION, 54);
+    assert_eq!(FFI_ABI_VERSION, 63);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);

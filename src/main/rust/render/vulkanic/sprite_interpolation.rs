@@ -420,6 +420,19 @@ impl SpriteAnimationClock {
                     duration: current.duration_ticks,
                 })
         };
+        // A boundary may have occurred on an empty-use tick. On the next
+        // visible discrete tick, compare the selected sheet with accepted
+        // pixels, not merely with the previous clock frame. Repeated sheet
+        // entries need no upload. Commit still publishes the retained state
+        // only after the owning transaction accepts the copy.
+        let update = if !self.interpolate && (!animate_only_visible || visible) {
+            let retained_sheet = self.frames[self.retained_pixel_state.0].index;
+            let selected_sheet = self.frames[frame].index;
+            (retained_sheet != selected_sheet)
+                .then_some(SpriteFrameUpdate::Copy { index: selected_sheet })
+        } else {
+            update
+        };
         Ok(PreparedSpriteTick {
             timeline: self.frames.clone(),
             previous,
@@ -1121,6 +1134,29 @@ mod tests {
             .is_err()
         );
         assert_eq!(atlas, original);
+    }
+
+    #[test]
+    fn discrete_visible_tick_recovers_a_boundary_skipped_without_use() {
+        let mut clock = SpriteAnimationClock::new(vec![
+            SpriteAnimationFrame { index: 2, duration_ticks: 3 },
+            SpriteAnimationFrame { index: 0, duration_ticks: 5 },
+            SpriteAnimationFrame { index: 0, duration_ticks: 2 },
+        ], 3, false, 0).unwrap();
+        for tick in 1..=3 { assert_eq!(clock.tick(tick, false, true).unwrap(), None); }
+        assert_eq!(clock.diagnostic_retained_pixel_state(), (0, 2, 0, 0));
+        let retry = clock.prepare_tick(4, true, true).unwrap();
+        assert_eq!(retry.update(), Some(SpriteFrameUpdate::Copy { index: 0 }));
+        // Preparation/discard must not publish pixels or consume the semantic tick.
+        drop(retry);
+        assert_eq!(clock.diagnostic_state(), (1, 0, 0, 3));
+        assert_eq!(clock.diagnostic_retained_pixel_state(), (0, 2, 0, 0));
+        let accepted = clock.prepare_tick(4, true, true).unwrap();
+        clock.commit_tick(accepted).unwrap();
+        assert_eq!(clock.diagnostic_retained_pixel_state(), (1, 0, 1, 4));
+        for tick in 5..=9 { assert_eq!(clock.tick(tick, true, true).unwrap(), None); }
+        assert_eq!(clock.diagnostic_state(), (2, 0, 1, 9));
+        assert_eq!(clock.diagnostic_retained_pixel_state(), (1, 0, 1, 4));
     }
 
     #[test]

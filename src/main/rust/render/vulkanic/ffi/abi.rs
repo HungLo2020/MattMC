@@ -70,7 +70,8 @@ pub const FFI_ABI_V41_VERSION: u32 = 41;
 pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v53 adds immutable orb appearance assets, lowered to geometry only in Rust.
 /// v54 adds semantic orb placement to the ordered entity mesh stream.
-pub const FFI_ABI_VERSION: u32 = 54;
+/// v58 adds explicit equal-depth/write semantics for entity mesh layers.
+pub const FFI_ABI_VERSION: u32 = 63;
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
@@ -1412,6 +1413,13 @@ pub struct FfiWorldMeshInstanceRecord {
     pub item_foil_clock_millis: u64,
     pub item_foil_speed: f64,
     pub item_foil_strength: f32,
+    pub decal_foil_mode: u32,
+    pub decal_normal_mode: u32,
+    pub decal_model_pose: [f32; 16],
+    pub decal_normal_pose: [f32; 9],
+    /// Optional authored model collection order; mode 0 is absent, 1 is present.
+    pub model_submission_order_mode: u32,
+    pub model_submission_order: i32,
 }
 
 #[repr(C)]
@@ -1804,6 +1812,12 @@ pub struct FfiWholeFrameSubmitResult {
     pub gui_mesh_item_count: u64,
     pub gui_mesh_batch_count: u64,
     pub gui_mesh_draw_count: u64,
+    pub gui_entity_preview_item_count: u64,
+    pub gui_entity_preview_batch_count: u64,
+    pub gui_entity_preview_draw_count: u64,
+    pub gui_entity_preview_material_mask: u64,
+    pub gui_entity_preview_vertex_count: u64,
+    pub gui_entity_preview_index_count: u64,
     pub cache_hits: u64,
     pub cache_misses: u64,
     pub resource_creates: u64,
@@ -2007,6 +2021,12 @@ impl Default for FfiWholeFrameSubmitResult {
             gui_mesh_item_count: 0,
             gui_mesh_batch_count: 0,
             gui_mesh_draw_count: 0,
+            gui_entity_preview_item_count: 0,
+            gui_entity_preview_batch_count: 0,
+            gui_entity_preview_draw_count: 0,
+            gui_entity_preview_material_mask: 0,
+            gui_entity_preview_vertex_count: 0,
+            gui_entity_preview_index_count: 0,
             cache_hits: 0,
             cache_misses: 0,
             resource_creates: 0,

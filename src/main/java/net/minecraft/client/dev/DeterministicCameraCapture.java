@@ -14,11 +14,13 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
 import net.minecraft.util.Mth;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
@@ -32,6 +34,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.item.FallingBlockEntity;
@@ -41,9 +44,43 @@ import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.animal.Rabbit;
+import net.minecraft.world.entity.animal.camel.Camel;
+import net.minecraft.world.entity.animal.nautilus.Nautilus;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilus;
+import net.minecraft.world.entity.animal.nautilus.ZombieNautilusVariants;
+import net.minecraft.world.entity.animal.horse.Donkey;
+import net.minecraft.world.entity.animal.horse.Horse;
+import net.minecraft.world.entity.animal.horse.Markings;
+import net.minecraft.world.entity.animal.horse.Mule;
+import net.minecraft.world.entity.animal.horse.Variant;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.animal.sheep.Sheep;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.entity.animal.TropicalFish;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.monster.ZombieVillager;
+import net.minecraft.world.entity.monster.Spider;
+import net.minecraft.world.entity.monster.EnderMan;
+import net.minecraft.world.entity.monster.Phantom;
+import net.minecraft.world.entity.monster.creaking.Creaking;
+import net.minecraft.world.entity.monster.breeze.Breeze;
+import net.minecraft.world.entity.monster.Bogged;
+import net.minecraft.world.entity.monster.Stray;
+import net.minecraft.world.entity.monster.Drowned;
+import net.minecraft.world.entity.monster.Slime;
+import net.minecraft.world.entity.monster.Strider;
+import net.minecraft.world.entity.monster.warden.Warden;
+import net.minecraft.world.entity.animal.Cat;
+import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.entity.animal.SnowGolem;
+import net.minecraft.world.entity.decoration.GlowItemFrame;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.entity.animal.coppergolem.CopperGolem;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerProfession;
+import net.minecraft.world.entity.npc.VillagerType;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.projectile.Arrow;
 import net.minecraft.world.entity.projectile.EvokerFangs;
 import net.minecraft.world.entity.projectile.WitherSkull;
@@ -53,6 +90,12 @@ import net.minecraft.world.entity.player.ChatVisiblity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.MapItem;
+import net.minecraft.world.item.component.MapDecorations;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.level.saveddata.maps.MapDecoration;
+import net.minecraft.world.level.saveddata.maps.MapDecorationTypes;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.GameRules;
@@ -63,6 +106,7 @@ import net.minecraft.world.BossEvent.BossBarOverlay;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.WeatheringCopper;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.BlockHitResult;
@@ -99,6 +143,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -228,6 +273,15 @@ public final class DeterministicCameraCapture {
 		System.getProperty("mattmc.dev.rustGalWorldItemEntity.scenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final String MODEL_MESH_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalWorldMesh.modelScenario", "").trim().toLowerCase(Locale.ROOT);
+	private static final int MODEL_MESH_DESTROY_STAGE = configuredModelMeshDestroyStage();
+	private static final net.minecraft.world.level.block.CopperGolemStatueBlock.Pose MODEL_MESH_STATUE_POSE =
+		configuredModelMeshStatuePose();
+	private static final WeatheringCopper.WeatherState MODEL_MESH_STATUE_WEATHERING =
+		configuredModelMeshStatueWeathering();
+	private static final boolean MODEL_MESH_STATUE_WAXED =
+		Boolean.getBoolean("mattmc.dev.rustGalWorldMesh.statueWaxed");
+	private static final boolean ENERGY_SWIRL_OUTLINE_FIXTURE =
+		Boolean.getBoolean("mattmc.dev.graphicsAuditEnergySwirlOutline");
 	/**
 	 * Capture-only opt-in which names the existing deterministic cow so the
 	 * normal name-tag producer can prove the Rust world-text path. It never
@@ -390,6 +444,12 @@ public final class DeterministicCameraCapture {
 	private static final Path SCREENSHOT_DIR = Path.of(System.getProperty("mattmc.dev.deterministicCameraCapture.screenshotDir", "artifacts/graphics-captures/deterministic_camera_capture"));
 
 	private static final List<PoseCapture> CAPTURES = new ArrayList<>();
+	private static final GraphicsAuditModelCaptureHistory<RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic> MODEL_CAPTURE_HISTORY =
+		new GraphicsAuditModelCaptureHistory<>(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::frameIndex);
+	private static final GraphicsAuditModelCaptureHistory<RustGalWorldPrimitiveRenderer.ModelMeshRouteDecision> MODEL_ROUTE_CAPTURE_HISTORY =
+		new GraphicsAuditModelCaptureHistory<>(RustGalWorldPrimitiveRenderer.ModelMeshRouteDecision::frameIndex);
+	private static final GraphicsAuditModelCaptureHistory<RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic> MODEL_EXECUTION_CAPTURE_HISTORY =
+		new GraphicsAuditModelCaptureHistory<>(RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic::deterministicFrameIndex);
 	private static boolean initialized;
 	private static boolean complete;
 	private static boolean failed;
@@ -434,6 +494,8 @@ public final class DeterministicCameraCapture {
 	 * This is capture metadata only; it never participates in route selection.
 	 */
 	private static boolean wholeFrameAttachmentCaptureArmed;
+	private static String wholeFrameEquipmentFoilTiming = "{}";
+    private static String wholeFrameWolfInputs = "{}";
 	private static String wholeFrameGuiFoilTiming = "null";
 	private static boolean wholeFrameAttachmentCaptureRequestIssued;
 	private static boolean wholeFrameAttachmentCaptureReady;
@@ -709,10 +771,12 @@ public final class DeterministicCameraCapture {
 	private static volatile String modelMeshSetupBlockId = "";
 	private static volatile String modelMeshSetupOrigin = "";
 	private static BlockPos modelMeshSetupPosition;
+	private static long decoratedPotWobbleLastRequestedGameTime = Long.MIN_VALUE;
 	private static boolean modelMeshSetupClientBlockEntityPresent;
 	private static volatile boolean modelMeshSetupServerEntityPresent;
 	private static boolean modelMeshSetupClientEntityPresent;
 	private static volatile int modelMeshSetupServerEntityId = -1;
+	private static volatile boolean wardenTendrilEventRearmed;
 	private static int modelMeshSetupClientEntityId = -1;
 	private static String modelMeshSetupClientEntitySample = "";
 	// The integrated server and client can allocate distinct entity ids. Capture
@@ -916,7 +980,8 @@ public final class DeterministicCameraCapture {
 		}
 		wholeFrameAttachmentCaptureRequestIssued = true;
 		try {
-			if (!GraphicsAuditGuiFoilTiming.readyForCapture()) {
+			if (!GraphicsAuditGuiFoilTiming.readyForCapture() || !GraphicsAuditEquipmentFoilTiming.readyForCapture(poseIndex)
+                || !GraphicsAuditWolfInputs.readyForCapture(Minecraft.getInstance(),poseIndex)) {
 				wholeFrameAttachmentCaptureRequestIssued = false;
 				return -1L;
 			}
@@ -925,8 +990,14 @@ public final class DeterministicCameraCapture {
 			return -1L;
 		}
 		wholeFrameAttachmentCaptureDeterministicFrame = currentInProgressRenderedFrameIndex();
+		MODEL_CAPTURE_HISTORY.retain(wholeFrameAttachmentCaptureDeterministicFrame,
+			RustGalWorldPrimitiveRenderer.modelMeshDiagnostics());
+		MODEL_ROUTE_CAPTURE_HISTORY.retain(wholeFrameAttachmentCaptureDeterministicFrame,
+			RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions());
 		captureSurfaceObservations();
 		wholeFrameGuiFoilTiming = GraphicsAuditGuiFoilTiming.snapshot();
+		wholeFrameEquipmentFoilTiming = GraphicsAuditEquipmentFoilTiming.snapshot();
+        wholeFrameWolfInputs = GraphicsAuditWolfInputs.snapshot();
 		return wholeFrameAttachmentCaptureDeterministicFrame;
 	}
 
@@ -1098,6 +1169,8 @@ public final class DeterministicCameraCapture {
 	 * external desktop capture against later swapchain presentations.
 	 */
 	private static boolean captureWholeFrameFinalOutput() {
+		MODEL_EXECUTION_CAPTURE_HISTORY.retain(wholeFrameAttachmentCaptureDeterministicFrame,
+			RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics());
 		net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustFinalOutputCaptureCoverage(
 			wholeFrameAttachmentCaptureDeterministicFrame, wholeFrameAttachmentCaptureGameplayFrame
 		);
@@ -1131,6 +1204,25 @@ public final class DeterministicCameraCapture {
 			Files.createDirectories(SCREENSHOT_DIR);
 			Files.copy(source, currentScreenshotPath, StandardCopyOption.REPLACE_EXISTING);
 			Files.copy(skyFogSource, skyFogReceiptPath, StandardCopyOption.REPLACE_EXISTING);
+			Files.writeString(currentScreenshotPath.resolveSibling(fileName + ".equipment-timing.json"),
+				wholeFrameEquipmentFoilTiming, StandardCharsets.UTF_8);
+            Files.writeString(currentScreenshotPath.resolveSibling(fileName + ".wolf-inputs.json"),
+                wholeFrameWolfInputs, StandardCharsets.UTF_8);
+            Path wolfInputs = Path.of(attachmentDirectory).resolve("attachment-wolf-inputs.json");
+            if (Files.isRegularFile(wolfInputs)) {
+                Files.copy(wolfInputs, currentScreenshotPath.resolveSibling(fileName + ".wolf-native-inputs.json"),
+                    StandardCopyOption.REPLACE_EXISTING);
+            }
+			Path equipmentInputs = Path.of(attachmentDirectory).resolve("attachment-equipment-inputs.json");
+			if (Files.isRegularFile(equipmentInputs)) {
+				Files.copy(equipmentInputs, currentScreenshotPath.resolveSibling(fileName + ".equipment-inputs.json"),
+					StandardCopyOption.REPLACE_EXISTING);
+			}
+			Path decalInputs = Path.of(attachmentDirectory).resolve("attachment-decal-inputs.json");
+			if (Files.isRegularFile(decalInputs)) {
+				Files.copy(decalInputs, currentScreenshotPath.resolveSibling(fileName + ".decal-inputs.json"),
+					StandardCopyOption.REPLACE_EXISTING);
+			}
 			Files.writeString(currentScreenshotPath.resolveSibling(fileName + ".foil-timing.json"),
 				wholeFrameGuiFoilTiming, StandardCharsets.UTF_8);
 			StringBuilder json = new StringBuilder(768);
@@ -1198,6 +1290,7 @@ public final class DeterministicCameraCapture {
 			return;
 		}
 		applyFixedCaptureTime(minecraft);
+		maintainDecoratedPotWobbleFixture(minecraft);
 
 		LocalPlayer player = minecraft.player;
 		if (player == null) {
@@ -1545,6 +1638,16 @@ public final class DeterministicCameraCapture {
 			// frame under the old request.
 			return;
 		}
+        if (!GraphicsAuditInventoryEquipmentFixture.prepare(minecraft)) {
+            renderedFramesAtPose = 0;
+            writeMetadata(minecraft, "waiting_for_inventory_equipment_replication");
+            return;
+        }
+		if (!GraphicsAuditEntityPreviewFixture.prepare(minecraft)) {
+			renderedFramesAtPose = 0;
+			writeMetadata(minecraft, "waiting_for_entity_preview_fixture");
+			return;
+		}
 		if (!advanceRustGalGuiScreenCycle(minecraft)) {
 			return;
 		}
@@ -1610,9 +1713,11 @@ public final class DeterministicCameraCapture {
 			// matching attachment request. Advancing to the screenshot here would
 			// make the next frame's receipt unrelated evidence.
 			framesAwaitingWholeFrameAttachmentCapture++;
-			if (GraphicsAuditGuiFoilTiming.movingRequested() && !wholeFrameAttachmentCaptureRequestIssued) {
+			if ((GraphicsAuditGuiFoilTiming.movingRequested() || GraphicsAuditEquipmentFoilTiming.movingRequested())
+				&& !wholeFrameAttachmentCaptureRequestIssued) {
 				// Natural phase selection has its own wall-clock deadline; no
 				// submission/readback has been requested yet.
+				framesAwaitingWholeFrameAttachmentCapture = 0;
 				return;
 			}
 			if (framesAwaitingWholeFrameAttachmentCapture > ACK_TIMEOUT_FRAMES) {
@@ -5547,6 +5652,67 @@ public final class DeterministicCameraCapture {
 	 */
 	private static boolean sourceExecutionReceiptHasRequiredProducerWork(String json) {
 		if (!MODEL_MESH_SCENARIO.isEmpty() && !"hidden".equals(MODEL_MESH_SCENARIO)) {
+			if ("end-gateway".equals(MODEL_MESH_SCENARIO)) {
+				int materialStart = json.indexOf("\"source_material_execution\":");
+				return materialStart >= 0
+					&& readJsonLongField(json.substring(materialStart), "quads", 0L) >= 42L
+					&& hasCurrentEndGatewayRoute(DeterministicCameraCapture.currentRenderedFrameIndex(), movingMeshFrameTolerance());
+			}
+			if ("end-portal".equals(MODEL_MESH_SCENARIO)) {
+				int materialStart = json.indexOf("\"source_material_execution\":");
+				return materialStart >= 0
+					&& readJsonLongField(json.substring(materialStart), "quads", 0L) >= 34L
+					&& RustGalWorldPrimitiveRenderer.endPortalDiagnostics().stream().anyMatch(diagnostic ->
+						diagnostic.blockEntityId() >= 0 && diagnostic.faceCount() == 2
+							&& diagnostic.quads() == 34 && diagnostic.offsetDown() == 0.375F
+							&& diagnostic.offsetUp() == 0.75F && diagnostic.projected());
+			}
+			if (isBlockEntityItemFixtureScenario()) {
+				return RustGalWorldPrimitiveRenderer.itemEntityDiagnostics().stream().anyMatch(diagnostic ->
+					"block-entity-item".equals(diagnostic.producer())
+						&& expectedBlockEntityItemOwner().equals(diagnostic.semanticIdentity())
+						&& "minecraft:item/beef".equals(diagnostic.materialIdentity())
+						&& diagnostic.projected() && diagnostic.sectionCount() > 0
+						&& json.contains("\"mesh_key\":" + Long.toUnsignedString(diagnostic.meshKey())));
+			}
+			if (isItemFrameScenario()) {
+				if (!isInvisibleItemFrameScenario()) {
+					int semanticsStart = json.indexOf("\"source_mesh_instance_semantics\":");
+					if (semanticsStart < 0 || readJsonLongField(json.substring(semanticsStart), "opaque_geometry_instances", 0L) <= 0L) return false;
+					var backing = RustGalWorldPrimitiveRenderer.blockModelDiagnostics().stream().filter(diagnostic ->
+						itemFrameSemanticIdentity().equals(diagnostic.semanticIdentity())
+							&& json.contains("\"mesh_key\":" + Long.toUnsignedString(diagnostic.meshKey()))).findFirst();
+					if (backing.isEmpty()) return false;
+				}
+				if (isItemFrameMapScenario()) {
+					int materialStart = json.indexOf("\"source_material_execution\":");
+					boolean mapReady = materialStart >= 0 && readJsonLongField(json.substring(materialStart), "quads", 0L) > 0L
+						&& RustGalWorldPrimitiveRenderer.itemFrameMapExecutionDiagnostics().stream().anyMatch(execution ->
+							execution.entityId() == modelMeshSetupClientEntityId && execution.quads() == 1
+								&& execution.rotation() == expectedItemFrameRotation()
+								&& execution.invisibleFrame() == isInvisibleItemFrameScenario()
+								&& execution.contentOffset() == (isInvisibleItemFrameScenario() ? 0.5F : 0.4375F)
+								&& execution.submissionId() > 0L);
+					if (!mapReady || !isItemFrameDecoratedMapScenario()) return mapReady;
+					return RustGalWorldPrimitiveRenderer.itemFrameMapDecorationExecutionDiagnostics().stream().anyMatch(execution ->
+						execution.entityId() == modelMeshSetupClientEntityId
+							&& "minecraft:red_x".equals(execution.decorationIdentity())
+							&& execution.x() == 24 && execution.y() == -16 && execution.decorationRotation() == 5
+							&& execution.frameRotation() == expectedItemFrameRotation()
+							&& execution.submissionId() > 0L && execution.quads() > 0);
+				}
+				if (!isItemFrameItemScenario()) return true;
+				return RustGalWorldPrimitiveRenderer.itemEntityDiagnostics().stream().anyMatch(diagnostic ->
+					"item-frame-item".equals(diagnostic.producer())
+						&& "minecraft:diamond".equals(diagnostic.semanticIdentity())
+						&& diagnostic.itemFrameRotation() == expectedItemFrameRotation()
+						&& diagnostic.itemFrameInvisible() == isInvisibleItemFrameScenario()
+						&& diagnostic.itemFrameContentOffset() == (isInvisibleItemFrameScenario() ? 0.5F : 0.4375F)
+						&& diagnostic.entityId() == modelMeshSetupClientEntityId
+						&& (!isGlowItemFrameScenario() || net.minecraft.client.renderer.LightTexture.block(diagnostic.packedLight()) == 15
+							&& net.minecraft.client.renderer.LightTexture.sky(diagnostic.packedLight()) == 15)
+						&& json.contains("\"mesh_key\":" + Long.toUnsignedString(diagnostic.meshKey())));
+			}
 			if ("wind-charge".equals(MODEL_MESH_SCENARIO)) {
 				int materialStart = json.indexOf("\"source_material_execution\":");
 				return materialStart >= 0
@@ -5557,6 +5723,13 @@ public final class DeterministicCameraCapture {
 				return false;
 			}
 			boolean entityMatched = false;
+			if ((isBedModelScenario() || isDoubleChestModelScenario())
+				&& RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream()
+					.filter(diagnostic -> diagnostic.blockEntityId() >= 0
+						&& expectedModelMeshDiagnosticTextureId().equals(diagnostic.textureId()))
+					.map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId).distinct().count() < 2L) {
+				return false;
+			}
 			for (RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic diagnostic : RustGalWorldPrimitiveRenderer.modelMeshDiagnostics()) {
 				// A selected-source entity writer may expand a copied asset into its
 				// own immutable stream. Its mesh key is therefore an implementation
@@ -5564,6 +5737,9 @@ public final class DeterministicCameraCapture {
 				// canonical semantic entity identity instead.
 				String entityIdentity = diagnostic.semanticModelIdentity();
 				if (!entityIdentity.isBlank()
+					&& (!isSpawnerModelScenario()
+						|| diagnostic.blockEntityId() >= 0 && "minecraft:pig".equals(entityIdentity))
+					&& (!isBlockEntityModelScenario() || diagnostic.blockEntityId() >= 0)
 					&& json.contains("\"entity_identity\":\"" + entityIdentity + "\"")) {
 					entityMatched = true;
 					break;
@@ -6069,6 +6245,15 @@ public final class DeterministicCameraCapture {
 				finish(minecraft);
 			}
 		} else {
+			// The previous screenshot is acknowledged. Start the ordinary next
+			// tick step before metadata work and pose warmup consume its window.
+			try {
+				if (GraphicsAuditEquipmentTickFixture.enabled()) GraphicsAuditEquipmentTickFixture.readyForPose(minecraft, poseIndex);
+                if (GraphicsAuditWolfTickFixture.enabled()) GraphicsAuditWolfTickFixture.readyForPose(minecraft, poseIndex);
+			} catch (IllegalStateException error) {
+				fail(error.getMessage());
+				return true;
+			}
 			writeMetadata(minecraft, "running");
 		}
 		return true;
@@ -6195,6 +6380,7 @@ public final class DeterministicCameraCapture {
 			}
 		}
 		applyHotbarItemFixture(player);
+        GraphicsAuditShieldPoseFixture.apply(minecraft);
 		if (FORCE_EMPTY_SELECTED_HAND) {
 			player.getInventory().setItem(player.getInventory().getSelectedSlot(), ItemStack.EMPTY);
 		}
@@ -6265,7 +6451,8 @@ public final class DeterministicCameraCapture {
 		if (HOTBAR_ITEM_FIXTURE.isEmpty()) {
 			return;
 		}
-		List<ItemStack> items = switch (HOTBAR_ITEM_FIXTURE) {
+		if ("recovery-foil".equals(HOTBAR_ITEM_FIXTURE)) GraphicsAuditSpecialFoilFixture.applyRecoveryTarget(player);
+        List<ItemStack> items = switch (HOTBAR_ITEM_FIXTURE) {
 			case "flat-items" -> List.of(
 				new ItemStack(net.minecraft.world.item.Items.APPLE),
 				new ItemStack(net.minecraft.world.item.Items.FEATHER),
@@ -6281,6 +6468,7 @@ public final class DeterministicCameraCapture {
 			case "shield", "shield-foil" -> GraphicsAuditShieldFoilFixture.items("shield-foil".equals(HOTBAR_ITEM_FIXTURE));
 			case "shield-patterns", "shield-patterns-foil" -> GraphicsAuditPatternedShieldFixture.items("shield-patterns-foil".equals(HOTBAR_ITEM_FIXTURE));
 			case "special-foil" -> GraphicsAuditSpecialFoilFixture.items();
+            case "recovery-foil" -> GraphicsAuditSpecialFoilFixture.items(true);
 			case "standard-3d", "standard-3d-logs" -> List.of(
 				new ItemStack(Blocks.STONE),
 				new ItemStack(Blocks.GRASS_BLOCK),
@@ -6298,7 +6486,8 @@ public final class DeterministicCameraCapture {
 			if (slot > 0 && Boolean.getBoolean("mattmc.dev.graphicsAuditGuiItemFoilBlend")) {
 				items.get(slot).set(net.minecraft.core.component.DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
 			}
-			player.getInventory().setItem(slot, items.get(slot));
+			player.getInventory().setItem(slot, GraphicsAuditShieldPoseFixture.fixtureStack(
+                player.getInventory().getItem(slot), items.get(slot)));
 		}
 		if (Boolean.getBoolean("mattmc.dev.graphicsAuditGuiItemFoilBlend")) {
 			Minecraft.getInstance().options.glintSpeed().set(GraphicsAuditGuiFoilTiming.movingRequested() ? 0.5 : 0.0);
@@ -6311,6 +6500,12 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static void restoreRuntimeOverrides(Minecraft minecraft) {
+        GraphicsAuditEquipmentFixture.restore(minecraft);
+        GraphicsAuditInventoryEquipmentFixture.restore(minecraft);
+		GraphicsAuditEntityPreviewFixture.restore(minecraft);
+        GraphicsAuditWolfTickFixture.restore(minecraft);
+        GraphicsAuditShieldPoseFixture.restore(minecraft);
+        GraphicsAuditSpecialFoilFixture.restoreRecoveryTarget();
 		releaseDistantHorizonsTexturePaletteChunks(minecraft);
 		if (BLOCK_OUTLINE_PAUSE_PARITY && minecraft.screen instanceof PauseScreen) {
 			minecraft.setScreen(null);
@@ -6775,6 +6970,221 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean hasCurrentModelMeshRoute(long frameIndex, long frameTolerance) {
+		if ("test-instance-composition".equals(MODEL_MESH_SCENARIO)) {
+			return RustGalWorldPrimitiveRenderer.testInstanceCompositionDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route())
+					&& diagnostic.blockEntityId() >= 0
+					&& diagnostic.localX() == 0 && diagnostic.localY() == 1 && diagnostic.localZ() == 1
+					&& diagnostic.sizeX() == 3 && diagnostic.sizeY() == 2 && diagnostic.sizeZ() == 4
+					&& diagnostic.beamSections() == 1 && diagnostic.beamColorArgb() == 0xff808080
+					&& diagnostic.errorMarkers() == 1
+					&& diagnostic.boxSegments() == 12 && diagnostic.errorQuads() == 6
+					&& diagnostic.errorColorArgb() == 0x5fff0000
+					&& RustGalWorldPrimitiveRenderer.testInstanceCompositionExecutionDiagnostics().stream().anyMatch(execution ->
+						Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+							&& "rust-vulkan-whole-frame".equals(execution.route())
+							&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+							&& execution.blockEntityId() == diagnostic.blockEntityId()
+							&& execution.boxSegments() == 12 && execution.beamQuads() == 8
+							&& execution.errorQuads() == 6 && execution.textQuads() > 0));
+		}
+		if ("test-instance-success".equals(MODEL_MESH_SCENARIO)) {
+			return RustGalWorldPrimitiveRenderer.testInstanceCompositionDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route()) && diagnostic.blockEntityId() >= 0
+					&& diagnostic.localX() == 0 && diagnostic.localY() == 1 && diagnostic.localZ() == 1
+					&& diagnostic.sizeX() == 3 && diagnostic.sizeY() == 2 && diagnostic.sizeZ() == 4
+					&& diagnostic.beamSections() == 1 && diagnostic.beamColorArgb() == 0xff00ff00
+					&& diagnostic.errorMarkers() == 0 && diagnostic.boxSegments() == 12
+					&& diagnostic.errorQuads() == 0
+					&& RustGalWorldPrimitiveRenderer.testInstanceCompositionExecutionDiagnostics().stream().anyMatch(execution ->
+						Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+							&& "rust-vulkan-whole-frame".equals(execution.route())
+							&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+							&& execution.blockEntityId() == diagnostic.blockEntityId()
+							&& execution.boxSegments() == 12 && execution.beamQuads() == 8
+							&& execution.errorQuads() == 0 && execution.textQuads() == 0));
+		}
+		if ("test-instance-cleared".equals(MODEL_MESH_SCENARIO)) {
+			return RustGalWorldPrimitiveRenderer.testInstanceCompositionDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route()) && diagnostic.blockEntityId() >= 0
+					&& diagnostic.localX() == 0 && diagnostic.localY() == 1 && diagnostic.localZ() == 1
+					&& diagnostic.sizeX() == 3 && diagnostic.sizeY() == 2 && diagnostic.sizeZ() == 4
+					&& diagnostic.beamSections() == 0 && diagnostic.beamColorArgb() == 0
+					&& diagnostic.errorMarkers() == 0 && diagnostic.boxSegments() == 12
+					&& diagnostic.errorQuads() == 0
+					&& RustGalWorldPrimitiveRenderer.testInstanceCompositionExecutionDiagnostics().stream().anyMatch(execution ->
+						Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+							&& "rust-vulkan-whole-frame".equals(execution.route())
+							&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+							&& execution.blockEntityId() == diagnostic.blockEntityId()
+							&& execution.boxSegments() == 12 && execution.beamQuads() == 0
+							&& execution.errorQuads() == 0 && execution.textQuads() == 0));
+		}
+		if ("test-instance-required-failed".equals(MODEL_MESH_SCENARIO)) {
+			return RustGalWorldPrimitiveRenderer.testInstanceCompositionDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route()) && diagnostic.blockEntityId() >= 0
+					&& diagnostic.localX() == 0 && diagnostic.localY() == 1 && diagnostic.localZ() == 1
+					&& diagnostic.sizeX() == 3 && diagnostic.sizeY() == 2 && diagnostic.sizeZ() == 4
+					&& diagnostic.beamSections() == 1 && diagnostic.beamColorArgb() == 0xffff0000
+					&& diagnostic.errorMarkers() == 1 && diagnostic.boxSegments() == 12
+					&& diagnostic.errorQuads() == 6 && diagnostic.errorColorArgb() == 0x5fff0000
+					&& RustGalWorldPrimitiveRenderer.testInstanceCompositionExecutionDiagnostics().stream().anyMatch(execution ->
+						Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+							&& "rust-vulkan-whole-frame".equals(execution.route())
+							&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+							&& execution.blockEntityId() == diagnostic.blockEntityId()
+							&& execution.boxSegments() == 12 && execution.beamQuads() == 8
+							&& execution.errorQuads() == 6 && execution.textQuads() > 0));
+		}
+		if ("test-instance-optional-failed".equals(MODEL_MESH_SCENARIO)) {
+			return RustGalWorldPrimitiveRenderer.testInstanceCompositionDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route()) && diagnostic.blockEntityId() >= 0
+					&& diagnostic.localX() == 0 && diagnostic.localY() == 1 && diagnostic.localZ() == 1
+					&& diagnostic.sizeX() == 3 && diagnostic.sizeY() == 2 && diagnostic.sizeZ() == 4
+					&& diagnostic.beamSections() == 1 && diagnostic.beamColorArgb() == 0xffff8000
+					&& diagnostic.errorMarkers() == 1 && diagnostic.boxSegments() == 12
+					&& diagnostic.errorQuads() == 6 && diagnostic.errorColorArgb() == 0x5fff0000
+					&& RustGalWorldPrimitiveRenderer.testInstanceCompositionExecutionDiagnostics().stream().anyMatch(execution ->
+						Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+							&& "rust-vulkan-whole-frame".equals(execution.route())
+							&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+							&& execution.blockEntityId() == diagnostic.blockEntityId()
+							&& execution.boxSegments() == 12 && execution.beamQuads() == 8
+							&& execution.errorQuads() == 6 && execution.textQuads() > 0));
+		}
+		if ("structure-block-box".equals(MODEL_MESH_SCENARIO)) {
+			return RustGalWorldPrimitiveRenderer.structureBlockBoxDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route())
+					&& diagnostic.blockEntityId() >= 0
+					&& diagnostic.localX() == 1 && diagnostic.localY() == 1 && diagnostic.localZ() == 1
+					&& diagnostic.sizeX() == 3 && diagnostic.sizeY() == 2 && diagnostic.sizeZ() == 4
+					&& diagnostic.segmentCount() == 12
+					&& diagnostic.xAxisColorArgb() == 0xffe57f7f
+					&& diagnostic.yAxisColorArgb() == 0xff7fe57f
+					&& diagnostic.zAxisColorArgb() == 0xff7f7fe5
+					&& diagnostic.neutralColorArgb() == 0xffe5e5e5
+					&& diagnostic.lineWidth() == 1.0F
+					&& RustGalWorldPrimitiveRenderer.structureBlockBoxExecutionDiagnostics().stream().anyMatch(execution ->
+						Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+							&& "rust-vulkan-whole-frame".equals(execution.route())
+							&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+							&& execution.blockEntityId() == diagnostic.blockEntityId()
+							&& execution.segmentCount() == 12));
+		}
+		if ("structure-block-invisible-cells".equals(MODEL_MESH_SCENARIO)) {
+			return RustGalWorldPrimitiveRenderer.structureInvisibleCellsDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route()) && diagnostic.blockEntityId() >= 0
+					&& diagnostic.localX() == 1 && diagnostic.localY() == 1 && diagnostic.localZ() == 1
+					&& diagnostic.sizeX() == 3 && diagnostic.sizeY() == 2 && diagnostic.sizeZ() == 4
+					&& diagnostic.airCells() == 1 && diagnostic.structureVoidCells() == 1
+					&& diagnostic.barrierCells() == 1 && diagnostic.lightCells() == 1
+					&& diagnostic.segmentCount() == 48 && diagnostic.airColorArgb() == 0xff7f7fff
+					&& diagnostic.structureVoidColorArgb() == 0xffffbfbf
+					&& diagnostic.barrierColorArgb() == 0xffff0000 && diagnostic.lightColorArgb() == 0xffffff00
+					&& RustGalWorldPrimitiveRenderer.structureInvisibleCellsExecutionDiagnostics().stream().anyMatch(execution ->
+						Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+							&& "rust-vulkan-whole-frame".equals(execution.route())
+							&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+							&& execution.blockEntityId() == diagnostic.blockEntityId()
+							&& execution.airSegments() == 12 && execution.structureVoidSegments() == 12
+							&& execution.barrierSegments() == 12 && execution.lightSegments() == 12));
+		}
+		if ("end-gateway".equals(MODEL_MESH_SCENARIO)) {
+			return hasCurrentEndGatewayRoute(frameIndex, frameTolerance);
+		}
+		if ("end-portal".equals(MODEL_MESH_SCENARIO)) {
+			return RustGalWorldPrimitiveRenderer.endPortalDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route())
+					&& diagnostic.blockEntityId() >= 0 && diagnostic.faceCount() == 2
+					&& diagnostic.quads() == 34 && diagnostic.offsetDown() == 0.375F
+					&& diagnostic.offsetUp() == 0.75F && diagnostic.projected()
+					&& RustGalWorldPrimitiveRenderer.endPortalExecutionDiagnostics().stream().anyMatch(execution ->
+						Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+							&& "rust-vulkan-whole-frame".equals(execution.route())
+							&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+							&& execution.blockEntityId() == diagnostic.blockEntityId()
+							&& execution.skyQuads() == 2 && execution.portalQuads() == 32));
+		}
+		if (isBlockEntityItemFixtureScenario()) {
+			boolean projected = RustGalWorldPrimitiveRenderer.itemEntityDiagnostics().stream().anyMatch(diagnostic ->
+				"block-entity-item".equals(diagnostic.producer())
+					&& expectedBlockEntityItemOwner().equals(diagnostic.semanticIdentity())
+					&& "minecraft:item/beef".equals(diagnostic.materialIdentity())
+					&& diagnostic.projected() && diagnostic.sectionCount() > 0
+					&& Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance);
+			return projected && RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics().stream().anyMatch(diagnostic ->
+				"block-entity-item".equals(diagnostic.provenance())
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route())
+					&& diagnostic.blockEntityId() >= 0
+					&& diagnostic.instances() > 0
+					&& Math.abs(diagnostic.deterministicFrameIndex() - frameIndex) <= frameTolerance);
+		}
+		if (isBedModelScenario() || isDoubleChestModelScenario()) {
+			Set<Integer> copiedBlockEntities = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream()
+				.filter(diagnostic -> Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& expectedModelMeshDiagnosticTextureId().equals(diagnostic.textureId())
+					&& diagnostic.blockEntityId() >= 0 && diagnostic.projected() && diagnostic.sectionCount() > 0)
+				.map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId)
+				.collect(java.util.stream.Collectors.toSet());
+			if (copiedBlockEntities.size() != 2) return false;
+			Set<Integer> executedBlockEntities = RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics().stream()
+				.filter(diagnostic -> "model".equals(diagnostic.provenance())
+					&& "rust-vulkan-whole-frame".equals(diagnostic.route())
+					&& Math.abs(diagnostic.deterministicFrameIndex() - frameIndex) <= frameTolerance
+					&& diagnostic.instances() > 0 && diagnostic.submissionId() > 0L
+					&& diagnostic.blockEntityId() >= 0)
+				.map(RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic::blockEntityId)
+				.collect(java.util.stream.Collectors.toSet());
+			return executedBlockEntities.containsAll(copiedBlockEntities);
+		}
+		if (isBannerModelScenario()) {
+			var copied = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream()
+				.filter(diagnostic -> Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& expectedModelMeshDiagnosticTextureId().equals(diagnostic.textureId())
+					&& diagnostic.blockEntityId() >= 0 && diagnostic.projected() && diagnostic.sectionCount() > 0)
+				.toList();
+			int expectedModels = 3 + expectedBannerPatterns().layers().size();
+			if (copied.size() < expectedModels
+				|| copied.stream().map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId).distinct().count() != 1L) {
+				return false;
+			}
+			long baseModels = RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions().stream().filter(decision ->
+				Math.abs(decision.frameIndex() - frameIndex) <= frameTolerance
+					&& "minecraft:entity/banner_base".equals(decision.textureId())
+					&& "rust-vulkan-whole-frame".equals(decision.route())
+					&& decision.rustSelected() && decision.rustQueued() && !decision.javaDrawn()).count();
+			long dyedFlags = RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions().stream().filter(decision ->
+				Math.abs(decision.frameIndex() - frameIndex) <= frameTolerance
+					&& "minecraft:entity/banner/base".equals(decision.textureId())
+					&& "rust-vulkan-whole-frame".equals(decision.route())
+					&& decision.rustSelected() && decision.rustQueued() && !decision.javaDrawn()).count();
+			long crossPatterns = RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions().stream().filter(decision ->
+				Math.abs(decision.frameIndex() - frameIndex) <= frameTolerance
+					&& "minecraft:entity/banner/cross".equals(decision.textureId())
+					&& "rust-vulkan-whole-frame".equals(decision.route())
+					&& decision.rustSelected() && decision.rustQueued() && !decision.javaDrawn()).count();
+			long borderPatterns = RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions().stream().filter(decision ->
+				Math.abs(decision.frameIndex() - frameIndex) <= frameTolerance
+					&& "minecraft:entity/banner/border".equals(decision.textureId())
+					&& "rust-vulkan-whole-frame".equals(decision.route())
+					&& decision.rustSelected() && decision.rustQueued() && !decision.javaDrawn()).count();
+			return baseModels >= 2L && dyedFlags >= 1L && (!isPatternedBannerModelScenario() || crossPatterns >= 1L)
+				&& (!isTwoPatternBannerModelScenario() || borderPatterns >= 1L)
+				&& RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics().stream().anyMatch(diagnostic ->
+					"model".equals(diagnostic.provenance())
+						&& "rust-vulkan-whole-frame".equals(diagnostic.route())
+						&& Math.abs(diagnostic.deterministicFrameIndex() - frameIndex) <= frameTolerance
+						&& diagnostic.blockEntityId() == copied.getFirst().blockEntityId()
+						&& diagnostic.instances() >= expectedModels && diagnostic.submissionId() > 0L);
+		}
 		if ("evoker-fangs".equals(MODEL_MESH_SCENARIO)) {
 			// Fangs expose only a brief projected attack window, while the completed
 			// Rust submission receipt is recorded on the adjacent frame. Correlate
@@ -6805,20 +7215,58 @@ public final class DeterministicCameraCapture {
 					&& diagnostic.quads() > 0
 			);
 		}
-		boolean queued = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().anyMatch(diagnostic ->
+		var copied = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().filter(diagnostic ->
 			Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
 				&& expectedModelMeshDiagnosticTextureId().equals(diagnostic.textureId())
+				&& (!(isSpawnerModelScenario() || isBlockEntityModelScenario()) || diagnostic.blockEntityId() >= 0)
 				&& diagnostic.projected()
 				&& diagnostic.sectionCount() > 0
-		);
-		if (!queued) {
+		).toList();
+		if (copied.isEmpty()) {
 			return false;
+		}
+		if (isBreakingSkullModelScenario()) {
+			Set<Integer> skullScopes = copied.stream()
+				.map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId)
+				.collect(java.util.stream.Collectors.toSet());
+			boolean crumblingQueued = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& modelMeshDestroyTextureId().equals(diagnostic.textureId())
+					&& skullScopes.contains(diagnostic.blockEntityId())
+					&& diagnostic.projected() && diagnostic.sectionCount() > 0);
+			if (!crumblingQueued) return false;
 		}
 		return RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics().stream().anyMatch(diagnostic ->
 			"model".equals(diagnostic.provenance())
+				&& (!(isSpawnerModelScenario() || isBlockEntityModelScenario()) || diagnostic.blockEntityId() >= 0)
+				&& (!isBreakingSkullModelScenario()
+					|| copied.stream().anyMatch(mesh -> mesh.blockEntityId() == diagnostic.blockEntityId()))
 				&& Math.abs(diagnostic.deterministicFrameIndex() - frameIndex) <= frameTolerance
-				&& diagnostic.instances() > 0
+				&& diagnostic.instances() >= (isBreakingSkullModelScenario() ? 2 : 1)
 		);
+	}
+
+	private static boolean hasCurrentEndGatewayRoute(long frameIndex, long frameTolerance) {
+		return RustGalWorldPrimitiveRenderer.endPortalDiagnostics().stream().anyMatch(portal ->
+			Math.abs(portal.frameIndex() - frameIndex) <= frameTolerance
+				&& "rust-vulkan-whole-frame".equals(portal.route())
+				&& portal.blockEntityId() >= 0 && portal.faceCount() == 2 && portal.quads() == 34
+				&& portal.offsetDown() == 0.0F && portal.offsetUp() == 1.0F && portal.projected()
+				&& RustGalWorldPrimitiveRenderer.endPortalExecutionDiagnostics().stream().anyMatch(execution ->
+					Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+						&& execution.blockEntityId() == portal.blockEntityId()
+						&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+						&& execution.skyQuads() == 2 && execution.portalQuads() == 32)
+				&& RustGalWorldPrimitiveRenderer.endGatewayBeamDiagnostics().stream().anyMatch(beam ->
+					Math.abs(beam.frameIndex() - frameIndex) <= frameTolerance
+						&& beam.blockEntityId() == portal.blockEntityId() && beam.startY() < 0 && beam.endY() > 0
+						&& beam.beamScale() > 0.0F && beam.solidRadius() == 0.15F
+						&& beam.glowRadius() == 0.175F && beam.projected()
+						&& RustGalWorldPrimitiveRenderer.endGatewayBeamExecutionDiagnostics().stream().anyMatch(execution ->
+							Math.abs(execution.deterministicFrameIndex() - frameIndex) <= frameTolerance
+								&& execution.blockEntityId() == beam.blockEntityId()
+								&& execution.gameplayFrameId() > 0L && execution.submissionId() > 0L
+								&& execution.quads() == 8)));
 	}
 
 
@@ -6828,6 +7276,82 @@ public final class DeterministicCameraCapture {
 	 * to submit. Rust whole-frame keeps the stronger enqueue/execution proof.
 	 */
 	private static boolean hasCurrentModelMeshTraversal(long frameIndex) {
+		if (isItemFrameScenario()) {
+			long tolerance = movingMeshFrameTolerance();
+			boolean backing = RustGalWorldPrimitiveRenderer.blockModelDiagnostics().stream().anyMatch(diagnostic ->
+				itemFrameSemanticIdentity().equals(diagnostic.semanticIdentity()) && diagnostic.projected()
+					&& (!isGlowItemFrameScenario() || net.minecraft.client.renderer.LightTexture.block(diagnostic.lightCoords()) >= 5)
+					&& diagnostic.sectionCount() > 0 && Math.abs(diagnostic.frameIndex() - frameIndex) <= tolerance
+					&& RustGalWorldPrimitiveRenderer.blockModelExecutionDiagnostics().stream().anyMatch(execution ->
+						itemFrameSemanticIdentity().equals(execution.semanticIdentity()) && execution.instances() == 1
+							&& execution.meshKey() == diagnostic.meshKey()
+							&& execution.meshGeneration() == diagnostic.meshGeneration()
+							&& execution.submissionId() > 0L
+							&& Math.abs(execution.deterministicFrameIndex() - frameIndex) <= tolerance));
+			if (backing == isInvisibleItemFrameScenario()) return false;
+			if (isItemFrameMapScenario()) {
+				Minecraft minecraft = Minecraft.getInstance();
+				Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+				MapId expectedMap = entity instanceof ItemFrame frame ? frame.getItem().get(DataComponents.MAP_ID) : null;
+				if (expectedMap == null) return false;
+				boolean mapReady = RustGalWorldPrimitiveRenderer.itemFrameMapDiagnostics().stream().anyMatch(diagnostic ->
+					diagnostic.entityId() == modelMeshSetupClientEntityId && diagnostic.mapId() == expectedMap.id()
+						&& diagnostic.rotation() == expectedItemFrameRotation()
+						&& diagnostic.invisibleFrame() == isInvisibleItemFrameScenario()
+						&& diagnostic.contentOffset() == (isInvisibleItemFrameScenario() ? 0.5F : 0.4375F)
+						&& diagnostic.textureIdentity().equals("minecraft:map/" + expectedMap.id())
+						&& (!isGlowItemFrameScenario() || net.minecraft.client.renderer.LightTexture.block(diagnostic.packedLight()) == 13
+							&& net.minecraft.client.renderer.LightTexture.sky(diagnostic.packedLight()) == 15)
+						&& diagnostic.projected() && Math.abs(diagnostic.frameIndex() - frameIndex) <= tolerance
+						&& RustGalWorldPrimitiveRenderer.itemFrameMapExecutionDiagnostics().stream().anyMatch(execution ->
+							execution.entityId() == diagnostic.entityId() && execution.mapId() == diagnostic.mapId()
+								&& execution.rotation() == diagnostic.rotation()
+								&& execution.invisibleFrame() == diagnostic.invisibleFrame()
+								&& execution.contentOffset() == diagnostic.contentOffset()
+								&& execution.textureId() == diagnostic.textureId()
+								&& execution.textureIdentity().equals(diagnostic.textureIdentity())
+								&& execution.quads() == 1 && execution.submissionId() > 0L
+								&& Math.abs(execution.deterministicFrameIndex() - frameIndex) <= tolerance));
+				if (!mapReady || !isItemFrameDecoratedMapScenario()) return mapReady;
+				return RustGalWorldPrimitiveRenderer.itemFrameMapDecorationDiagnostics().stream().anyMatch(diagnostic ->
+					diagnostic.entityId() == modelMeshSetupClientEntityId && diagnostic.mapId() == expectedMap.id()
+						&& diagnostic.frameRotation() == expectedItemFrameRotation()
+						&& "minecraft:red_x".equals(diagnostic.decorationIdentity())
+						&& diagnostic.x() == 24 && diagnostic.y() == -16 && diagnostic.decorationRotation() == 5
+						&& diagnostic.projected() && Math.abs(diagnostic.frameIndex() - frameIndex) <= tolerance
+						&& RustGalWorldPrimitiveRenderer.itemFrameMapDecorationExecutionDiagnostics().stream().anyMatch(execution ->
+							execution.entityId() == diagnostic.entityId() && execution.mapId() == diagnostic.mapId()
+								&& execution.frameRotation() == diagnostic.frameRotation()
+								&& execution.decorationIdentity().equals(diagnostic.decorationIdentity())
+								&& execution.x() == diagnostic.x() && execution.y() == diagnostic.y()
+								&& execution.decorationRotation() == diagnostic.decorationRotation()
+								&& execution.textureId() == diagnostic.textureId() && execution.quads() > 0
+								&& execution.submissionId() > 0L
+								&& Math.abs(execution.deterministicFrameIndex() - frameIndex) <= tolerance));
+			}
+			if (!isItemFrameItemScenario()) return true;
+			return RustGalWorldPrimitiveRenderer.itemEntityDiagnostics().stream().anyMatch(diagnostic ->
+				"item-frame-item".equals(diagnostic.producer())
+					&& "minecraft:diamond".equals(diagnostic.semanticIdentity())
+					&& diagnostic.itemFrameRotation() == expectedItemFrameRotation()
+					&& diagnostic.itemFrameInvisible() == isInvisibleItemFrameScenario()
+					&& diagnostic.itemFrameContentOffset() == (isInvisibleItemFrameScenario() ? 0.5F : 0.4375F)
+					&& diagnostic.entityId() == modelMeshSetupClientEntityId
+					&& (!isGlowItemFrameScenario() || net.minecraft.client.renderer.LightTexture.block(diagnostic.packedLight()) == 15
+						&& net.minecraft.client.renderer.LightTexture.sky(diagnostic.packedLight()) == 15)
+					&& diagnostic.projected() && diagnostic.sectionCount() > 0
+					&& Math.abs(diagnostic.frameIndex() - frameIndex) <= tolerance
+					&& RustGalWorldPrimitiveRenderer.itemFrameItemExecutionDiagnostics().stream().anyMatch(execution ->
+						"minecraft:diamond".equals(execution.semanticIdentity())
+							&& execution.entityId() == diagnostic.entityId() && execution.rotation() == diagnostic.itemFrameRotation()
+							&& execution.invisibleFrame() == diagnostic.itemFrameInvisible()
+							&& execution.contentOffset() == diagnostic.itemFrameContentOffset()
+							&& execution.instances() > 0
+							&& execution.meshKey() == diagnostic.meshKey()
+							&& execution.meshGeneration() == diagnostic.meshGeneration()
+							&& execution.submissionId() > 0L
+							&& Math.abs(execution.deterministicFrameIndex() - frameIndex) <= tolerance));
+		}
 		if (isModelPartMeshScenario()) {
 			return hasCurrentModelPartMeshTraversal(frameIndex);
 		}
@@ -6844,7 +7368,7 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean isModelPartMeshScenario() {
-		return "decorated-pot".equals(MODEL_MESH_SCENARIO) || "conduit".equals(MODEL_MESH_SCENARIO);
+		return isDecoratedPotModelScenario() || isConduitModelScenario();
 	}
 
 	/**
@@ -6865,39 +7389,165 @@ public final class DeterministicCameraCapture {
 		if (!traversed) {
 			return false;
 		}
+		if (isDecoratedPotModelScenario()) {
+			long baseParts = RustGalWorldPrimitiveRenderer.modelPartMeshTraversalDiagnostics().stream().filter(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "eligible".equals(diagnostic.eligibility())
+					&& "minecraft:entity/decorated_pot/decorated_pot_base".equals(diagnostic.textureId())).count();
+			var sideMaterials = expectedDecoratedPotSideMaterials();
+			boolean sidesComplete = sideMaterials.stream().allMatch(material ->
+				RustGalWorldPrimitiveRenderer.modelPartMeshTraversalDiagnostics().stream().anyMatch(diagnostic ->
+					Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+						&& "eligible".equals(diagnostic.eligibility())
+						&& material.equals(diagnostic.textureId())));
+			long sideParts = RustGalWorldPrimitiveRenderer.modelPartMeshTraversalDiagnostics().stream().filter(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "eligible".equals(diagnostic.eligibility())
+					&& sideMaterials.contains(diagnostic.textureId())).count();
+			if (baseParts < 3L || sideParts < 4L || !sidesComplete) return false;
+		}
+		if (isActiveConduitModelScenario()) {
+			long cageParts = RustGalWorldPrimitiveRenderer.modelPartMeshTraversalDiagnostics().stream().filter(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "eligible".equals(diagnostic.eligibility())
+					&& "minecraft:entity/conduit/cage".equals(diagnostic.textureId())).count();
+			long windParts = RustGalWorldPrimitiveRenderer.modelPartMeshTraversalDiagnostics().stream().filter(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "eligible".equals(diagnostic.eligibility())
+					&& ("minecraft:entity/conduit/wind".equals(diagnostic.textureId())
+						|| "minecraft:entity/conduit/wind_vertical".equals(diagnostic.textureId()))).count();
+			String expectedEye = isHuntingConduitModelScenario()
+				? "minecraft:entity/conduit/open_eye" : "minecraft:entity/conduit/closed_eye";
+			boolean eyePresent = RustGalWorldPrimitiveRenderer.modelPartMeshTraversalDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& "eligible".equals(diagnostic.eligibility())
+					&& expectedEye.equals(diagnostic.textureId()));
+			if (cageParts < 1L || windParts < 2L || !eyePresent) return false;
+		}
 		if (!route.usesRustWholeFrameVulkan()) {
 			return true;
 		}
-		boolean queued = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().anyMatch(diagnostic ->
+		var copied = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().filter(diagnostic ->
 			Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
 				&& expectedModelMeshDiagnosticTextureId().equals(diagnostic.textureId())
+				&& (!isBlockEntityModelScenario() || diagnostic.blockEntityId() >= 0)
 				&& diagnostic.projected()
-				&& diagnostic.sectionCount() > 0
-		);
+				&& diagnostic.sectionCount() > 0).toList();
+		boolean queued = !copied.isEmpty();
+		if (isBreakingConduitModelScenario()) {
+			Set<Integer> conduitScopes = copied.stream()
+				.map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId)
+				.collect(java.util.stream.Collectors.toSet());
+			boolean crumblingQueued = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& modelMeshDestroyTextureId().equals(diagnostic.textureId())
+					&& conduitScopes.contains(diagnostic.blockEntityId())
+					&& diagnostic.projected() && diagnostic.sectionCount() > 0);
+			if (!crumblingQueued) return false;
+		}
+		if (isBreakingOakSignModelScenario()) {
+			Set<Integer> signScopes = copied.stream()
+				.map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId)
+				.collect(java.util.stream.Collectors.toSet());
+			boolean crumblingQueued = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& modelMeshDestroyTextureId().equals(diagnostic.textureId())
+					&& signScopes.contains(diagnostic.blockEntityId())
+					&& diagnostic.projected() && diagnostic.sectionCount() > 0);
+			if (!crumblingQueued) return false;
+		}
+		if (isDecoratedPotModelScenario()
+			&& (copied.size() < 7 || copied.stream().map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId).distinct().count() != 1L)) {
+			return false;
+		}
+		if (isActiveConduitModelScenario()
+			&& (copied.size() < 4 || copied.stream().map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId).distinct().count() != 1L)) {
+			return false;
+		}
 		return queued && RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics().stream().anyMatch(diagnostic ->
 			"model-part".equals(diagnostic.provenance())
+				&& (!isBlockEntityModelScenario() || diagnostic.blockEntityId() >= 0)
+				&& (!isBlockEntityModelScenario() || copied.stream().anyMatch(mesh -> mesh.blockEntityId() == diagnostic.blockEntityId()))
 				&& Math.abs(diagnostic.deterministicFrameIndex() - frameIndex) <= frameTolerance
-				&& diagnostic.instances() > 0
+				&& diagnostic.instances() >= (isDecoratedPotModelScenario() ? 7 : isActiveConduitModelScenario() ? 4
+					: isBreakingOakSignModelScenario() || isBreakingConduitModelScenario() ? 2 : 1)
 		);
 	}
 
 	private static String expectedModelMeshTextureId() {
+		if (isCopperGolemStatueModelScenario()) return expectedCopperGolemStatueTextureId();
 		return switch (MODEL_MESH_SCENARIO) {
-			case "decorated-pot" -> "minecraft:entity/decorated_pot/decorated_pot_base";
-			case "conduit" -> "minecraft:entity/conduit/base";
+			case "spawner", "trial-spawner", "trial-spawner-ominous", "trial-spawner-active" -> "minecraft:textures/entity/pig/temperate_pig.png";
+			case "enchanting-table", "lectern" -> "minecraft:entity/enchanting_table_book";
+			case "oak-sign", "oak-sign-glowing-back", "oak-sign-breaking" -> "minecraft:entity/signs/oak";
+			case "oak-hanging-sign", "oak-hanging-sign-attached", "oak-wall-hanging-sign" -> "minecraft:entity/signs/hanging/oak";
+			case "decorated-pot", "decorated-pot-sherds", "decorated-pot-wobble-positive", "decorated-pot-wobble-negative",
+				"decorated-pot-north", "decorated-pot-east", "decorated-pot-west" -> "minecraft:entity/decorated_pot/decorated_pot_base";
+			case "conduit", "conduit-breaking" -> "minecraft:entity/conduit/base";
+			case "conduit-active", "conduit-hunting" -> "minecraft:entity/conduit/cage";
+			case "white-banner", "white-banner-red-cross", "white-banner-two-patterns", "red-banner", "white-wall-banner", "white-wall-banner-south",
+				"white-wall-banner-east", "white-wall-banner-west" -> "minecraft:entity/banner_base";
+			case "skeleton-skull", "skeleton-skull-breaking", "skeleton-wall-skull", "skeleton-wall-skull-south",
+				"skeleton-wall-skull-east", "skeleton-wall-skull-west" -> "minecraft:textures/entity/skeleton/skeleton.png";
+			case "wither-skeleton-skull", "wither-skeleton-wall-skull" -> "minecraft:textures/entity/skeleton/wither_skeleton.png";
+			case "zombie-head", "zombie-wall-head" -> "minecraft:textures/entity/zombie/zombie.png";
+			case "creeper-head", "creeper-wall-head" -> "minecraft:textures/entity/creeper/creeper.png";
+			case "dragon-head-animated", "dragon-wall-head-animated" -> "minecraft:textures/entity/enderdragon/dragon.png";
+			case "piglin-head-animated", "piglin-wall-head-animated" -> "minecraft:textures/entity/piglin/piglin.png";
+			case "player-head-profile", "player-wall-head-profile" -> "minecraft:entity/player/wide/kai";
 			case "bed" -> "minecraft:entity/bed/red";
-			case "bell" -> "minecraft:entity/bell/bell_body";
-			case "shulker" -> "minecraft:entity/shulker/shulker_purple";
+			case "bell", "bell-shaking" -> "minecraft:entity/bell/bell_body";
+			case "shulker", "shulker-open-east" -> "minecraft:entity/shulker/shulker_purple";
+			case "shulker-default" -> "minecraft:entity/shulker/shulker";
+			case "chest-trapped" -> "minecraft:entity/chest/trapped";
+			case "chest-ender" -> "minecraft:entity/chest/ender";
 			case "llama-spit" -> "minecraft:textures/entity/llama/spit.png";
 			case "evoker-fangs" -> "minecraft:textures/entity/illager/evoker_fangs.png";
 			case "wither-skull" -> "minecraft:textures/entity/wither/wither.png";
 			case "chicken" -> "minecraft:textures/entity/chicken/temperate_chicken.png";
 			case "cow" -> "minecraft:textures/entity/cow/temperate_cow.png";
-			case "pig" -> "minecraft:textures/entity/pig/temperate_pig.png";
+			case "pig", "pig-saddled" -> "minecraft:textures/entity/pig/temperate_pig.png";
+			case "donkey-saddled", "donkey-baby-saddled", "donkey-chested-saddled", "donkey-baby-chested-saddled" -> "minecraft:textures/entity/horse/donkey.png";
+			case "mule-saddled", "mule-chested-saddled", "mule-baby-chested-saddled", "mule-baby-saddled" -> "minecraft:textures/entity/horse/mule.png";
+			case "horse-saddled", "horse-baby-saddled", "horse-baby-diamond-equipped", "horse-baby-copper-equipped", "horse-baby-iron-equipped", "horse-baby-gold-equipped", "horse-baby-netherite-equipped", "horse-baby-dyed-leather-equipped", "horse-white-dots-marked-saddled", "horse-white-marked-saddled", "horse-white-field-marked-saddled", "horse-black-dots-marked-saddled", "horse-baby-marked-saddled", "horse-baby-white-marked-saddled", "horse-baby-white-field-marked-saddled", "horse-baby-black-dots-marked-saddled", "horse-diamond-equipped", "horse-copper-equipped", "horse-iron-equipped", "horse-gold-equipped", "horse-netherite-equipped", "horse-dyed-leather-equipped" -> "minecraft:textures/entity/horse/horse_white.png";
+			case "horse-creamy-saddled", "horse-baby-creamy-saddled", "horse-creamy-white-dots-marked-saddled", "horse-creamy-white-marked-saddled", "horse-creamy-white-field-marked-saddled", "horse-creamy-black-dots-marked-saddled", "horse-baby-creamy-white-dots-marked-saddled", "horse-baby-creamy-white-marked-saddled", "horse-baby-creamy-white-field-marked-saddled", "horse-baby-creamy-black-dots-marked-saddled", "horse-creamy-diamond-equipped", "horse-creamy-copper-equipped", "horse-creamy-iron-equipped", "horse-creamy-gold-equipped", "horse-creamy-netherite-equipped", "horse-creamy-dyed-leather-equipped" -> "minecraft:textures/entity/horse/horse_creamy.png";
+			case "horse-chestnut-saddled", "horse-baby-chestnut-saddled", "horse-chestnut-white-dots-marked-saddled", "horse-chestnut-white-marked-saddled", "horse-chestnut-white-field-marked-saddled", "horse-chestnut-black-dots-marked-saddled", "horse-baby-chestnut-white-dots-marked-saddled", "horse-baby-chestnut-white-marked-saddled", "horse-baby-chestnut-white-field-marked-saddled", "horse-baby-chestnut-black-dots-marked-saddled", "horse-chestnut-diamond-equipped", "horse-chestnut-copper-equipped", "horse-chestnut-iron-equipped", "horse-chestnut-gold-equipped", "horse-chestnut-netherite-equipped", "horse-chestnut-dyed-leather-equipped" -> "minecraft:textures/entity/horse/horse_chestnut.png";
+			case "horse-brown-saddled", "horse-baby-brown-saddled", "horse-brown-white-dots-marked-saddled", "horse-brown-white-marked-saddled", "horse-brown-white-field-marked-saddled", "horse-brown-black-dots-marked-saddled", "horse-baby-brown-white-dots-marked-saddled", "horse-baby-brown-white-marked-saddled", "horse-baby-brown-white-field-marked-saddled", "horse-baby-brown-black-dots-marked-saddled" -> "minecraft:textures/entity/horse/horse_brown.png";
+			case "horse-black-saddled", "horse-baby-black-saddled", "horse-black-white-dots-marked-saddled", "horse-black-white-marked-saddled", "horse-black-white-field-marked-saddled", "horse-black-black-dots-marked-saddled", "horse-baby-black-white-dots-marked-saddled", "horse-baby-black-white-marked-saddled", "horse-baby-black-white-field-marked-saddled", "horse-baby-black-black-dots-marked-saddled" -> "minecraft:textures/entity/horse/horse_black.png";
+			case "horse-gray-saddled", "horse-baby-gray-saddled", "horse-gray-white-dots-marked-saddled", "horse-gray-white-marked-saddled", "horse-gray-white-field-marked-saddled", "horse-gray-black-dots-marked-saddled", "horse-baby-gray-white-dots-marked-saddled", "horse-baby-gray-white-marked-saddled", "horse-baby-gray-white-field-marked-saddled", "horse-baby-gray-black-dots-marked-saddled" -> "minecraft:textures/entity/horse/horse_gray.png";
+			case "horse-dark-brown-saddled", "horse-baby-dark-brown-saddled", "horse-dark-brown-white-dots-marked-saddled", "horse-dark-brown-white-marked-saddled", "horse-dark-brown-white-field-marked-saddled", "horse-dark-brown-black-dots-marked-saddled", "horse-baby-dark-brown-white-dots-marked-saddled", "horse-baby-dark-brown-white-marked-saddled", "horse-baby-dark-brown-white-field-marked-saddled", "horse-baby-dark-brown-black-dots-marked-saddled" -> "minecraft:textures/entity/horse/horse_darkbrown.png";
+			case "strider-saddled" -> "minecraft:textures/entity/strider/strider.png";
+			case "camel-saddled" -> "minecraft:textures/entity/camel/camel.png";
+			case "nautilus-equipped" -> "minecraft:textures/entity/nautilus/nautilus.png";
+			case "nautilus-baby-equipped" -> "minecraft:textures/entity/nautilus/nautilus_baby.png";
+			case "nautilus-copper-equipped", "nautilus-iron-equipped", "nautilus-gold-equipped", "nautilus-netherite-equipped" -> "minecraft:textures/entity/nautilus/nautilus.png";
+			case "zombie-nautilus-equipped" -> "minecraft:textures/entity/nautilus/zombie_nautilus.png";
+			case "zombie-nautilus-coral-equipped" -> "minecraft:textures/entity/nautilus/zombie_nautilus_coral.png";
 			case "rabbit" -> "minecraft:textures/entity/rabbit/brown.png";
-			case "sheep" -> "minecraft:textures/entity/sheep/sheep.png";
+			case "sheep", "sheep-red" -> "minecraft:textures/entity/sheep/sheep.png";
 			case "tropical-fish" -> "minecraft:textures/entity/fish/tropical_a.png";
+			case "spider" -> "minecraft:textures/entity/spider/spider.png";
+			case "enderman" -> "minecraft:textures/entity/enderman/enderman.png";
+			case "phantom" -> "minecraft:textures/entity/phantom.png";
+			case "creaking" -> "minecraft:textures/entity/creaking/creaking.png";
+			case "breeze" -> "minecraft:textures/entity/breeze/breeze.png";
+			case "bogged" -> "minecraft:textures/entity/skeleton/bogged.png";
+			case "stray" -> "minecraft:textures/entity/skeleton/stray.png";
+			case "drowned" -> "minecraft:textures/entity/zombie/drowned.png";
+			case "slime" -> "minecraft:textures/entity/slime/slime.png";
+			case "cat" -> "minecraft:textures/entity/cat/black.png";
+			case "wolf-collar" -> "minecraft:textures/entity/wolf/wolf_tame.png";
+			case "iron-golem-cracks" -> "minecraft:textures/entity/iron_golem/iron_golem.png";
+			case "snow-golem" -> "minecraft:textures/entity/snow_golem.png";
+			case "villager" -> "minecraft:textures/entity/villager/villager.png";
+			case "zombie-villager" -> "minecraft:textures/entity/zombie_villager/zombie_villager.png";
+			case "copper-golem" -> "minecraft:textures/entity/copper_golem/copper_golem.png";
+			case "warden" -> "minecraft:textures/entity/warden/warden.png";
+			case "wolf" -> "minecraft:textures/entity/wolf/wolf.png";
 			case "zombie" -> "minecraft:textures/entity/zombie/zombie.png";
+			case "powered-creeper" -> "minecraft:textures/entity/creeper/creeper.png";
+			case "powered-wither" -> "minecraft:textures/entity/wither/wither.png";
+			case "invulnerable-wither" -> "minecraft:textures/entity/wither/wither_invulnerable.png";
 			case "end-crystal" -> "minecraft:textures/entity/end_crystal/end_crystal.png";
 			case "wind-charge" -> "minecraft:textures/entity/projectiles/wind_charge.png";
 			default -> "minecraft:entity/chest/normal";
@@ -6912,12 +7562,18 @@ public final class DeterministicCameraCapture {
 	 */
 	private static String expectedModelMeshDiagnosticTextureId() {
 		return switch (MODEL_MESH_SCENARIO) {
-			case "chest" -> "minecraft:textures/atlas/chest.png";
+			case "chest", "chest-double", "chest-trapped", "chest-ender" -> "minecraft:textures/atlas/chest.png";
 			case "bed" -> "minecraft:textures/atlas/beds.png";
-			case "shulker" -> "minecraft:textures/atlas/shulker_boxes.png";
-			case "decorated-pot" -> "minecraft:textures/atlas/decorated_pot.png";
-			case "bell" -> "minecraft:textures/atlas/blocks.png";
-			case "conduit" -> "minecraft:textures/atlas/blocks.png";
+			case "shulker", "shulker-open-east", "shulker-default" -> "minecraft:textures/atlas/shulker_boxes.png";
+			case "decorated-pot", "decorated-pot-sherds", "decorated-pot-wobble-positive", "decorated-pot-wobble-negative",
+				"decorated-pot-north", "decorated-pot-east", "decorated-pot-west" -> "minecraft:textures/atlas/decorated_pot.png";
+			case "bell", "bell-shaking" -> "minecraft:textures/atlas/blocks.png";
+			case "conduit", "conduit-breaking", "conduit-active", "conduit-hunting" -> "minecraft:textures/atlas/blocks.png";
+			case "white-banner", "white-banner-red-cross", "white-banner-two-patterns", "red-banner", "white-wall-banner", "white-wall-banner-south",
+				"white-wall-banner-east", "white-wall-banner-west" -> "minecraft:textures/atlas/banner_patterns.png";
+			case "enchanting-table", "lectern" -> "minecraft:textures/atlas/blocks.png";
+			case "oak-sign", "oak-sign-glowing-back", "oak-sign-breaking" -> "minecraft:textures/atlas/signs.png";
+			case "oak-hanging-sign", "oak-hanging-sign-attached", "oak-wall-hanging-sign" -> "minecraft:textures/atlas/signs.png";
 			default -> expectedModelMeshTextureId();
 		};
 	}
@@ -7702,6 +8358,10 @@ public final class DeterministicCameraCapture {
 	 * generic copied ModelPart route has a real producer to observe.
 	 */
 	private static void setupModelMeshScenario(Minecraft minecraft, LocalPlayer player) {
+        GraphicsAuditEquipmentFixture.configureOptions(minecraft);
+        GraphicsAuditWolfArmorFixture.validateRequest();
+        if (!GraphicsAuditWolfTickFixture.prepare(minecraft)) return;
+        if (!GraphicsAuditEquipmentTickFixture.prepare(minecraft)) return;
 		if (MODEL_MESH_SCENARIO.isEmpty() || "hidden".equals(MODEL_MESH_SCENARIO)
 			|| player == null || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
 			// Keep a successfully spawned producer receipt stable while the client
@@ -7717,13 +8377,15 @@ public final class DeterministicCameraCapture {
 			}
 			return;
 		}
-		if (!"chest".equals(MODEL_MESH_SCENARIO) && !"bed".equals(MODEL_MESH_SCENARIO)
-			&& !"bell".equals(MODEL_MESH_SCENARIO) && !"shulker".equals(MODEL_MESH_SCENARIO)
-			&& !"decorated-pot".equals(MODEL_MESH_SCENARIO)
-			&& !"conduit".equals(MODEL_MESH_SCENARIO)
+		if (!isChestModelScenario() && !"bed".equals(MODEL_MESH_SCENARIO)
+			&& !isBellModelScenario() && !isShulkerModelScenario()
+			&& !isCopperGolemStatueModelScenario()
+			&& !isDecoratedPotModelScenario()
+			&& !isConduitModelScenario() && !isBannerModelScenario() && !"enchanting-table".equals(MODEL_MESH_SCENARIO) && !"lectern".equals(MODEL_MESH_SCENARIO) && !isOakSignModelScenario() && !isOakHangingSignModelScenario() && !isBlockEntityItemFixtureScenario() && !isSpawnerModelScenario() && !"end-portal".equals(MODEL_MESH_SCENARIO) && !"end-gateway".equals(MODEL_MESH_SCENARIO)
+			&& !isSkullModelScenario() && !"structure-block-box".equals(MODEL_MESH_SCENARIO) && !"structure-block-invisible-cells".equals(MODEL_MESH_SCENARIO) && !"test-instance-composition".equals(MODEL_MESH_SCENARIO) && !"test-instance-success".equals(MODEL_MESH_SCENARIO) && !"test-instance-cleared".equals(MODEL_MESH_SCENARIO) && !"test-instance-required-failed".equals(MODEL_MESH_SCENARIO) && !"test-instance-optional-failed".equals(MODEL_MESH_SCENARIO)
 			&& !"llama-spit".equals(MODEL_MESH_SCENARIO) && !"evoker-fangs".equals(MODEL_MESH_SCENARIO)
-			&& !"wither-skull".equals(MODEL_MESH_SCENARIO) && !"chicken".equals(MODEL_MESH_SCENARIO) && !"cow".equals(MODEL_MESH_SCENARIO)
-			&& !"pig".equals(MODEL_MESH_SCENARIO) && !"rabbit".equals(MODEL_MESH_SCENARIO) && !"sheep".equals(MODEL_MESH_SCENARIO) && !"tropical-fish".equals(MODEL_MESH_SCENARIO) && !"zombie".equals(MODEL_MESH_SCENARIO)
+			&& !"wither-skull".equals(MODEL_MESH_SCENARIO) && !"chicken".equals(MODEL_MESH_SCENARIO) && !"cow".equals(MODEL_MESH_SCENARIO) && !"powered-creeper".equals(MODEL_MESH_SCENARIO) && !"powered-wither".equals(MODEL_MESH_SCENARIO) && !"invulnerable-wither".equals(MODEL_MESH_SCENARIO)
+			&& !"pig".equals(MODEL_MESH_SCENARIO) && !"pig-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-baby-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO) && !"horse-diamond-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-copper-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-iron-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-gold-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-netherite-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) && !"horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) && !"donkey-saddled".equals(MODEL_MESH_SCENARIO) && !"donkey-baby-saddled".equals(MODEL_MESH_SCENARIO) && !"donkey-chested-saddled".equals(MODEL_MESH_SCENARIO) && !"donkey-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) && !"mule-saddled".equals(MODEL_MESH_SCENARIO) && !"mule-chested-saddled".equals(MODEL_MESH_SCENARIO) && !"mule-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) && !"mule-baby-saddled".equals(MODEL_MESH_SCENARIO) && !"strider-saddled".equals(MODEL_MESH_SCENARIO) && !"camel-saddled".equals(MODEL_MESH_SCENARIO) && !"nautilus-equipped".equals(MODEL_MESH_SCENARIO) && !"nautilus-baby-equipped".equals(MODEL_MESH_SCENARIO) && !"nautilus-copper-equipped".equals(MODEL_MESH_SCENARIO) && !"nautilus-iron-equipped".equals(MODEL_MESH_SCENARIO) && !"nautilus-gold-equipped".equals(MODEL_MESH_SCENARIO) && !"nautilus-netherite-equipped".equals(MODEL_MESH_SCENARIO) && !"zombie-nautilus-equipped".equals(MODEL_MESH_SCENARIO) && !"zombie-nautilus-coral-equipped".equals(MODEL_MESH_SCENARIO) && !"rabbit".equals(MODEL_MESH_SCENARIO) && !"sheep".equals(MODEL_MESH_SCENARIO) && !"sheep-red".equals(MODEL_MESH_SCENARIO) && !"tropical-fish".equals(MODEL_MESH_SCENARIO) && !"spider".equals(MODEL_MESH_SCENARIO) && !"enderman".equals(MODEL_MESH_SCENARIO) && !"phantom".equals(MODEL_MESH_SCENARIO) && !"creaking".equals(MODEL_MESH_SCENARIO) && !"breeze".equals(MODEL_MESH_SCENARIO) && !"bogged".equals(MODEL_MESH_SCENARIO) && !"stray".equals(MODEL_MESH_SCENARIO) && !"drowned".equals(MODEL_MESH_SCENARIO) && !"slime".equals(MODEL_MESH_SCENARIO) && !"cat".equals(MODEL_MESH_SCENARIO) && !"wolf-collar".equals(MODEL_MESH_SCENARIO) && !"iron-golem-cracks".equals(MODEL_MESH_SCENARIO) && !"snow-golem".equals(MODEL_MESH_SCENARIO) && !isItemFrameScenario() && !"villager".equals(MODEL_MESH_SCENARIO) && !"zombie-villager".equals(MODEL_MESH_SCENARIO) && !"copper-golem".equals(MODEL_MESH_SCENARIO) && !"warden".equals(MODEL_MESH_SCENARIO) && !"wolf".equals(MODEL_MESH_SCENARIO) && !"zombie".equals(MODEL_MESH_SCENARIO)
 			&& !"end-crystal".equals(MODEL_MESH_SCENARIO) && !"wind-charge".equals(MODEL_MESH_SCENARIO)) {
 			modelMeshSetupStatus = "unsupported-scenario";
 			return;
@@ -7744,6 +8406,13 @@ public final class DeterministicCameraCapture {
 				modelMeshSetupServerEntityPresent = false;
 				modelMeshSetupServerEntityId = -1;
 				modelMeshSetupStatus = "server-fixture-expired";
+			}
+			if ("invulnerable-wither".equals(MODEL_MESH_SCENARIO) && modelMeshSetupServerEntityId >= 0) {
+				Entity fixture = serverLevel.getEntity(modelMeshSetupServerEntityId);
+				if (fixture instanceof WitherBoss wither) {
+					wither.setInvulnerableTicks(220);
+					wither.setHealth(wither.getMaxHealth());
+				}
 			}
 			updateModelMeshClientEntityReceipt(minecraft);
 			if (modelMeshSetupServerEntityPresent || modelMeshSetupServerSpawnQueued) {
@@ -7770,13 +8439,14 @@ public final class DeterministicCameraCapture {
 			if (forward.lengthSqr() < 0.0001) {
 				forward = new Vec3(0.0, 0.0, 1.0);
 			}
-			double modelSpawnDistance = "evoker-fangs".equals(MODEL_MESH_SCENARIO) ? 2.5D : 4.0D;
+			double modelSpawnDistance = "evoker-fangs".equals(MODEL_MESH_SCENARIO) ? 2.5D
+				: ("powered-wither".equals(MODEL_MESH_SCENARIO) || "invulnerable-wither".equals(MODEL_MESH_SCENARIO)) ? 6.0D : 4.0D;
 			Vec3 origin = player.getEyePosition().add(forward.normalize().scale(modelSpawnDistance)).add(0.0, -0.25, 0.0);
 			boolean livestockScenario = "chicken".equals(MODEL_MESH_SCENARIO)
-				|| "cow".equals(MODEL_MESH_SCENARIO) || "pig".equals(MODEL_MESH_SCENARIO)
-				|| "rabbit".equals(MODEL_MESH_SCENARIO) || "sheep".equals(MODEL_MESH_SCENARIO) || "tropical-fish".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO);
+				|| "cow".equals(MODEL_MESH_SCENARIO) || "pig".equals(MODEL_MESH_SCENARIO) || "pig-saddled".equals(MODEL_MESH_SCENARIO) || ("horse-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) || "donkey-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-baby-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-chested-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-saddled".equals(MODEL_MESH_SCENARIO) || "mule-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-baby-saddled".equals(MODEL_MESH_SCENARIO) || "strider-saddled".equals(MODEL_MESH_SCENARIO) || "camel-saddled".equals(MODEL_MESH_SCENARIO) || "nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-baby-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-copper-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-iron-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-gold-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "zombie-nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "zombie-nautilus-coral-equipped".equals(MODEL_MESH_SCENARIO)
+				|| "rabbit".equals(MODEL_MESH_SCENARIO) || "sheep".equals(MODEL_MESH_SCENARIO) || "sheep-red".equals(MODEL_MESH_SCENARIO) || "tropical-fish".equals(MODEL_MESH_SCENARIO) || "spider".equals(MODEL_MESH_SCENARIO) || "enderman".equals(MODEL_MESH_SCENARIO) || "phantom".equals(MODEL_MESH_SCENARIO) || "creaking".equals(MODEL_MESH_SCENARIO) || "breeze".equals(MODEL_MESH_SCENARIO) || "bogged".equals(MODEL_MESH_SCENARIO) || "stray".equals(MODEL_MESH_SCENARIO) || "drowned".equals(MODEL_MESH_SCENARIO) || "slime".equals(MODEL_MESH_SCENARIO) || "cat".equals(MODEL_MESH_SCENARIO) || "wolf-collar".equals(MODEL_MESH_SCENARIO) || "iron-golem-cracks".equals(MODEL_MESH_SCENARIO) || "snow-golem".equals(MODEL_MESH_SCENARIO) || isItemFrameScenario() || "villager".equals(MODEL_MESH_SCENARIO) || "zombie-villager".equals(MODEL_MESH_SCENARIO) || "copper-golem".equals(MODEL_MESH_SCENARIO) || "warden".equals(MODEL_MESH_SCENARIO) || "wolf".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO) || "powered-creeper".equals(MODEL_MESH_SCENARIO) || "powered-wither".equals(MODEL_MESH_SCENARIO) || "invulnerable-wither".equals(MODEL_MESH_SCENARIO);
 			modelMeshSetupExpectedEntityPosition = livestockScenario
-				? origin.add(0.0, -1.1, 0.0)
+				? origin.add(0.0, ("powered-wither".equals(MODEL_MESH_SCENARIO) || "invulnerable-wither".equals(MODEL_MESH_SCENARIO)) ? -1.5 : -1.1, 0.0)
 				: "evoker-fangs".equals(MODEL_MESH_SCENARIO) ? origin.add(0.0, -1.0, 0.0) : origin;
 			modelMeshSetupBlockId = modelMeshEntityBlockId(MODEL_MESH_SCENARIO);
 			modelMeshSetupOrigin = String.format(Locale.ROOT, "%.3f,%.3f,%.3f", origin.x, origin.y, origin.z);
@@ -7795,22 +8465,38 @@ public final class DeterministicCameraCapture {
 		}
 		if ("llama-spit".equals(MODEL_MESH_SCENARIO) || "evoker-fangs".equals(MODEL_MESH_SCENARIO)
 			|| "wither-skull".equals(MODEL_MESH_SCENARIO) || "chicken".equals(MODEL_MESH_SCENARIO) || "cow".equals(MODEL_MESH_SCENARIO)
-				|| "pig".equals(MODEL_MESH_SCENARIO) || "rabbit".equals(MODEL_MESH_SCENARIO) || "sheep".equals(MODEL_MESH_SCENARIO) || "tropical-fish".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO)
+				|| "pig".equals(MODEL_MESH_SCENARIO) || "pig-saddled".equals(MODEL_MESH_SCENARIO) || ("horse-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) || "donkey-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-baby-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-chested-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-saddled".equals(MODEL_MESH_SCENARIO) || "mule-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-baby-saddled".equals(MODEL_MESH_SCENARIO) || "strider-saddled".equals(MODEL_MESH_SCENARIO) || "camel-saddled".equals(MODEL_MESH_SCENARIO) || "nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-baby-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-copper-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-iron-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-gold-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "zombie-nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "zombie-nautilus-coral-equipped".equals(MODEL_MESH_SCENARIO) || "rabbit".equals(MODEL_MESH_SCENARIO) || "sheep".equals(MODEL_MESH_SCENARIO) || "sheep-red".equals(MODEL_MESH_SCENARIO) || "tropical-fish".equals(MODEL_MESH_SCENARIO) || "spider".equals(MODEL_MESH_SCENARIO) || "enderman".equals(MODEL_MESH_SCENARIO) || "phantom".equals(MODEL_MESH_SCENARIO) || "creaking".equals(MODEL_MESH_SCENARIO) || "breeze".equals(MODEL_MESH_SCENARIO) || "bogged".equals(MODEL_MESH_SCENARIO) || "stray".equals(MODEL_MESH_SCENARIO) || "drowned".equals(MODEL_MESH_SCENARIO) || "slime".equals(MODEL_MESH_SCENARIO) || "cat".equals(MODEL_MESH_SCENARIO) || "wolf-collar".equals(MODEL_MESH_SCENARIO) || "iron-golem-cracks".equals(MODEL_MESH_SCENARIO) || "snow-golem".equals(MODEL_MESH_SCENARIO) || isItemFrameScenario() || "villager".equals(MODEL_MESH_SCENARIO) || "zombie-villager".equals(MODEL_MESH_SCENARIO) || "copper-golem".equals(MODEL_MESH_SCENARIO) || "warden".equals(MODEL_MESH_SCENARIO) || "wolf".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO)
 				|| "end-crystal".equals(MODEL_MESH_SCENARIO) || "wind-charge".equals(MODEL_MESH_SCENARIO)) {
 			if (("llama-spit".equals(MODEL_MESH_SCENARIO) || "wither-skull".equals(MODEL_MESH_SCENARIO)
-				|| "chicken".equals(MODEL_MESH_SCENARIO) || "cow".equals(MODEL_MESH_SCENARIO) || "pig".equals(MODEL_MESH_SCENARIO)
-					|| "rabbit".equals(MODEL_MESH_SCENARIO) || "sheep".equals(MODEL_MESH_SCENARIO) || "tropical-fish".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO)
+				|| "chicken".equals(MODEL_MESH_SCENARIO) || "cow".equals(MODEL_MESH_SCENARIO) || "pig".equals(MODEL_MESH_SCENARIO) || "pig-saddled".equals(MODEL_MESH_SCENARIO) || ("horse-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) || "donkey-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-baby-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-chested-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-saddled".equals(MODEL_MESH_SCENARIO) || "mule-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-baby-saddled".equals(MODEL_MESH_SCENARIO) || "strider-saddled".equals(MODEL_MESH_SCENARIO) || "camel-saddled".equals(MODEL_MESH_SCENARIO) || "nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-baby-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-copper-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-iron-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-gold-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "zombie-nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "zombie-nautilus-coral-equipped".equals(MODEL_MESH_SCENARIO)
+					|| "rabbit".equals(MODEL_MESH_SCENARIO) || "sheep".equals(MODEL_MESH_SCENARIO) || "sheep-red".equals(MODEL_MESH_SCENARIO) || "tropical-fish".equals(MODEL_MESH_SCENARIO) || "spider".equals(MODEL_MESH_SCENARIO) || "enderman".equals(MODEL_MESH_SCENARIO) || "phantom".equals(MODEL_MESH_SCENARIO) || "creaking".equals(MODEL_MESH_SCENARIO) || "breeze".equals(MODEL_MESH_SCENARIO) || "bogged".equals(MODEL_MESH_SCENARIO) || "stray".equals(MODEL_MESH_SCENARIO) || "drowned".equals(MODEL_MESH_SCENARIO) || "slime".equals(MODEL_MESH_SCENARIO) || "cat".equals(MODEL_MESH_SCENARIO) || "wolf-collar".equals(MODEL_MESH_SCENARIO) || "iron-golem-cracks".equals(MODEL_MESH_SCENARIO) || "snow-golem".equals(MODEL_MESH_SCENARIO) || isItemFrameScenario() || "villager".equals(MODEL_MESH_SCENARIO) || "zombie-villager".equals(MODEL_MESH_SCENARIO) || "copper-golem".equals(MODEL_MESH_SCENARIO) || "warden".equals(MODEL_MESH_SCENARIO) || "wolf".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO)
 					|| "end-crystal".equals(MODEL_MESH_SCENARIO) || "wind-charge".equals(MODEL_MESH_SCENARIO)) && modelMeshSetupServerEntityPresent) {
 				if (modelMeshSetupServerEntityId >= 0) {
 					Entity clientEntity = minecraft.level.getEntity(modelMeshSetupServerEntityId);
 					if (!isExpectedModelMeshClientEntity(clientEntity)) {
 						clientEntity = findExpectedModelMeshClientEntity(minecraft.level);
 					}
+					if (clientEntity instanceof Warden warden && warden.tickCount >= 30 && !wardenTendrilEventRearmed) {
+						wardenTendrilEventRearmed = true;
+						MinecraftServer fixtureServer = minecraft.getSingleplayerServer();
+						ResourceKey<Level> fixtureDimension = minecraft.level.dimension();
+						int fixtureEntityId = clientEntity.getId();
+						fixtureServer.execute(() -> {
+							ServerLevel fixtureLevel = fixtureServer.getLevel(fixtureDimension);
+							Entity serverEntity = fixtureLevel == null ? null : fixtureLevel.getEntity(fixtureEntityId);
+							if (serverEntity instanceof Warden serverWarden) {
+								fixtureLevel.broadcastEntityEvent(serverWarden, (byte)61);
+							}
+						});
+					}
 					int rendererEntityId = clientEntity == null
 						? observedExpectedModelMeshRendererEntityId()
 						: clientEntity.getId();
 					modelMeshSetupClientEntityPresent = rendererEntityId >= 0
-						&& GraphicsAuditCowOutlineFixture.ready(clientEntity);
+						&& modelMeshFixtureStateReady(clientEntity)
+						&& GraphicsAuditCowOutlineFixture.ready(clientEntity)
+                        && GraphicsAuditEquipmentFixture.ready(clientEntity)
+                        && GraphicsAuditWolfArmorFixture.ready(clientEntity);
 					modelMeshSetupClientEntityId = rendererEntityId;
 					modelMeshSetupStatus = modelMeshSetupClientEntityPresent ? "spawned" : "waiting-client-entity";
 				}
@@ -7826,8 +8512,8 @@ public final class DeterministicCameraCapture {
 			double modelSpawnDistance = "evoker-fangs".equals(MODEL_MESH_SCENARIO) ? 2.5D : 4.0D;
 			Vec3 origin = player.getEyePosition().add(forward.normalize().scale(modelSpawnDistance)).add(0.0, -0.25, 0.0);
 			boolean livestockScenario = "chicken".equals(MODEL_MESH_SCENARIO)
-				|| "cow".equals(MODEL_MESH_SCENARIO) || "pig".equals(MODEL_MESH_SCENARIO)
-				|| "rabbit".equals(MODEL_MESH_SCENARIO) || "sheep".equals(MODEL_MESH_SCENARIO) || "tropical-fish".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO);
+				|| "cow".equals(MODEL_MESH_SCENARIO) || "pig".equals(MODEL_MESH_SCENARIO) || "pig-saddled".equals(MODEL_MESH_SCENARIO) || ("horse-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) || "donkey-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-baby-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-chested-saddled".equals(MODEL_MESH_SCENARIO) || "donkey-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-saddled".equals(MODEL_MESH_SCENARIO) || "mule-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) || "mule-baby-saddled".equals(MODEL_MESH_SCENARIO) || "strider-saddled".equals(MODEL_MESH_SCENARIO) || "camel-saddled".equals(MODEL_MESH_SCENARIO) || "nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-baby-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-copper-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-iron-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-gold-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "zombie-nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "zombie-nautilus-coral-equipped".equals(MODEL_MESH_SCENARIO)
+				|| "rabbit".equals(MODEL_MESH_SCENARIO) || "sheep".equals(MODEL_MESH_SCENARIO) || "sheep-red".equals(MODEL_MESH_SCENARIO) || "tropical-fish".equals(MODEL_MESH_SCENARIO) || "spider".equals(MODEL_MESH_SCENARIO) || "enderman".equals(MODEL_MESH_SCENARIO) || "phantom".equals(MODEL_MESH_SCENARIO) || "creaking".equals(MODEL_MESH_SCENARIO) || "breeze".equals(MODEL_MESH_SCENARIO) || "bogged".equals(MODEL_MESH_SCENARIO) || "stray".equals(MODEL_MESH_SCENARIO) || "drowned".equals(MODEL_MESH_SCENARIO) || "slime".equals(MODEL_MESH_SCENARIO) || "cat".equals(MODEL_MESH_SCENARIO) || "wolf-collar".equals(MODEL_MESH_SCENARIO) || "iron-golem-cracks".equals(MODEL_MESH_SCENARIO) || "snow-golem".equals(MODEL_MESH_SCENARIO) || isItemFrameScenario() || "villager".equals(MODEL_MESH_SCENARIO) || "zombie-villager".equals(MODEL_MESH_SCENARIO) || "copper-golem".equals(MODEL_MESH_SCENARIO) || "warden".equals(MODEL_MESH_SCENARIO) || "wolf".equals(MODEL_MESH_SCENARIO) || "zombie".equals(MODEL_MESH_SCENARIO);
 			modelMeshSetupExpectedEntityPosition = livestockScenario
 				? origin.add(0.0, -1.1, 0.0)
 				: "evoker-fangs".equals(MODEL_MESH_SCENARIO) ? origin.add(0.0, -1.0, 0.0) : origin;
@@ -7899,6 +8585,400 @@ public final class DeterministicCameraCapture {
 				pig.setDeltaMovement(Vec3.ZERO);
 				serverLevel.addFreshEntity(pig);
 				modelMeshSetupServerEntityId = pig.getId();
+			} else if ("pig-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Pig pig = new Pig(EntityType.PIG, serverLevel);
+				pig.setPos(origin.x, origin.y - 1.1, origin.z);
+				pig.setYRot(player.getYRot() + 180.0F);
+				pig.setYHeadRot(pig.getYRot());
+				pig.setNoAi(true);
+				pig.setNoGravity(true);
+				pig.setInvisible(false);
+				pig.setBaby(false);
+				pig.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				pig.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(pig);
+				modelMeshSetupServerEntityId = pig.getId();
+			} else if ("horse-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO)) {
+				Horse horse = new Horse(EntityType.HORSE, serverLevel);
+				horse.setPos(origin.x, origin.y - 1.1, origin.z);
+				horse.setYRot(player.getYRot() + 180.0F);
+				horse.setYHeadRot(horse.getYRot());
+				horse.setNoAi(true);
+				horse.setNoGravity(true);
+				horse.setInvisible(false);
+				horse.setBaby("horse-baby-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO));
+				horse.setTamed(true);
+				configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.NONE);
+				if ("horse-creamy-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-brown-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.NONE);
+				if ("horse-black-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.NONE);
+				if ("horse-gray-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.NONE);
+				if ("horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.NONE);
+				if ("horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.NONE);
+				if ("horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.NONE);
+				if ("horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.NONE);
+				if ("horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.NONE);
+				if ("horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_DOTS);
+				if ("horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_DOTS);
+				if ("horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_DOTS);
+if ("horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_DOTS);
+if ("horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_DOTS);
+if ("horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_DOTS);
+				if ("horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_DOTS);
+				if ("horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE);
+				if ("horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE);
+if ("horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE);
+if ("horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE);
+if ("horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE);
+				if ("horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE);
+				if ("horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_FIELD);
+if ("horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_FIELD);
+if ("horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_FIELD);
+if ("horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_FIELD);
+if ("horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_FIELD);
+				if ("horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_FIELD);
+				if ("horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.BLACK_DOTS);
+if ("horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.BLACK_DOTS);
+if ("horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.BLACK_DOTS);
+if ("horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.BLACK_DOTS);
+if ("horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.BLACK_DOTS);
+				if ("horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.BLACK_DOTS);
+				if ("horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE);
+				if ("horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_FIELD);
+				if ("horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.BLACK_DOTS);
+				if ("horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_DOTS);
+				if ("horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE);
+				if ("horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_FIELD);
+				if ("horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.BLACK_DOTS);
+				if ("horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_DOTS);
+				if ("horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE);
+				if ("horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_FIELD);
+				if ("horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.BLACK_DOTS);
+				if ("horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_DOTS);
+				if ("horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE);
+				if ("horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_FIELD);
+				if ("horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.BLACK_DOTS);
+				if ("horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_DOTS);
+				if ("horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE);
+				if ("horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_FIELD);
+				if ("horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.BLACK_DOTS);
+				if ("horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_DOTS);
+				if ("horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE);
+				if ("horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_FIELD);
+				if ("horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.BLACK_DOTS);
+				if ("horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_DOTS);
+				if ("horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE);
+				if ("horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_FIELD);
+				if ("horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.BLACK_DOTS);
+				if ("horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_DOTS);
+				if ("horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE);
+				if ("horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_FIELD);
+				if ("horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.BLACK_DOTS);
+				if ("horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO)) {
+					horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_HORSE_ARMOR));
+				} else if ("horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO)) {
+					horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.COPPER_HORSE_ARMOR));
+				} else if ("horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO)) {
+					horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.IRON_HORSE_ARMOR));
+				} else if ("horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO)) {
+					horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.GOLDEN_HORSE_ARMOR));
+				} else if ("horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO)) {
+					horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.NETHERITE_HORSE_ARMOR));
+				} else if ("horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) {
+					ItemStack leatherArmor = new ItemStack(Items.LEATHER_HORSE_ARMOR);
+					leatherArmor.set(DataComponents.DYED_COLOR, new net.minecraft.world.item.component.DyedItemColor(0x3366CC));
+					horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, leatherArmor);
+				}
+				horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				horse.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(horse);
+				modelMeshSetupServerEntityId = horse.getId();
+			} else if ("donkey-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel);
+				donkey.setPos(origin.x, origin.y - 1.1, origin.z);
+				donkey.setYRot(player.getYRot() + 180.0F);
+				donkey.setYHeadRot(donkey.getYRot());
+				donkey.setNoAi(true);
+				donkey.setNoGravity(true);
+				donkey.setInvisible(false);
+				donkey.setBaby(false);
+				donkey.setTamed(true);
+				donkey.setChest(false);
+				donkey.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				donkey.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(donkey);
+				modelMeshSetupServerEntityId = donkey.getId();
+			} else if ("donkey-baby-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel);
+				donkey.setPos(origin.x, origin.y - 1.1, origin.z);
+				donkey.setYRot(player.getYRot() + 180.0F);
+				donkey.setYHeadRot(donkey.getYRot());
+				donkey.setNoAi(true);
+				donkey.setNoGravity(true);
+				donkey.setInvisible(false);
+				donkey.setBaby(true);
+				donkey.setTamed(true);
+				donkey.setChest(false);
+				donkey.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				donkey.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(donkey);
+				modelMeshSetupServerEntityId = donkey.getId();
+			} else if ("donkey-chested-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel);
+				donkey.setPos(origin.x, origin.y - 1.1, origin.z);
+				donkey.setYRot(player.getYRot() + 180.0F);
+				donkey.setYHeadRot(donkey.getYRot());
+				donkey.setNoAi(true);
+				donkey.setNoGravity(true);
+				donkey.setInvisible(false);
+				donkey.setBaby(false);
+				donkey.setTamed(true);
+				donkey.setChest(true);
+				donkey.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				donkey.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(donkey);
+				modelMeshSetupServerEntityId = donkey.getId();
+			} else if ("donkey-baby-chested-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel);
+				donkey.setPos(origin.x, origin.y - 1.1, origin.z);
+				donkey.setYRot(player.getYRot() + 180.0F);
+				donkey.setYHeadRot(donkey.getYRot());
+				donkey.setNoAi(true);
+				donkey.setNoGravity(true);
+				donkey.setInvisible(false);
+				donkey.setBaby(true);
+				donkey.setTamed(true);
+				donkey.setChest(true);
+				donkey.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				donkey.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(donkey);
+				modelMeshSetupServerEntityId = donkey.getId();
+			} else if ("mule-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Mule mule = new Mule(EntityType.MULE, serverLevel);
+				mule.setPos(origin.x, origin.y - 1.1, origin.z);
+				mule.setYRot(player.getYRot() + 180.0F);
+				mule.setYHeadRot(mule.getYRot());
+				mule.setNoAi(true);
+				mule.setNoGravity(true);
+				mule.setInvisible(false);
+				mule.setBaby(false);
+				mule.setTamed(true);
+				mule.setChest(false);
+				mule.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				mule.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(mule);
+				modelMeshSetupServerEntityId = mule.getId();
+			} else if ("mule-chested-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Mule mule = new Mule(EntityType.MULE, serverLevel);
+				mule.setPos(origin.x, origin.y - 1.1, origin.z);
+				mule.setYRot(player.getYRot() + 180.0F);
+				mule.setYHeadRot(mule.getYRot());
+				mule.setNoAi(true);
+				mule.setNoGravity(true);
+				mule.setInvisible(false);
+				mule.setBaby(false);
+				mule.setTamed(true);
+				mule.setChest(true);
+				mule.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				mule.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(mule);
+				modelMeshSetupServerEntityId = mule.getId();
+			} else if ("mule-baby-chested-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Mule mule = new Mule(EntityType.MULE, serverLevel);
+				mule.setPos(origin.x, origin.y - 1.1, origin.z);
+				mule.setYRot(player.getYRot() + 180.0F);
+				mule.setYHeadRot(mule.getYRot());
+				mule.setNoAi(true);
+				mule.setNoGravity(true);
+				mule.setInvisible(false);
+				mule.setBaby(true);
+				mule.setTamed(true);
+				mule.setChest(true);
+				mule.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				mule.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(mule);
+				modelMeshSetupServerEntityId = mule.getId();
+			} else if ("mule-baby-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Mule mule = new Mule(EntityType.MULE, serverLevel);
+				mule.setPos(origin.x, origin.y - 1.1, origin.z);
+				mule.setYRot(player.getYRot() + 180.0F);
+				mule.setYHeadRot(mule.getYRot());
+				mule.setNoAi(true);
+				mule.setNoGravity(true);
+				mule.setInvisible(false);
+				mule.setBaby(true);
+				mule.setTamed(true);
+				mule.setChest(false);
+				mule.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				mule.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(mule);
+				modelMeshSetupServerEntityId = mule.getId();
+			} else if ("strider-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Strider strider = new Strider(EntityType.STRIDER, serverLevel);
+				strider.setPos(origin.x, origin.y - 1.1, origin.z);
+				strider.setYRot(player.getYRot() + 180.0F);
+				strider.setYHeadRot(strider.getYRot());
+				strider.setNoAi(true);
+				strider.setNoGravity(true);
+				strider.setInvisible(false);
+				strider.setBaby(false);
+				strider.setSuffocating(false);
+				strider.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				strider.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(strider);
+				modelMeshSetupServerEntityId = strider.getId();
+			} else if ("camel-saddled".equals(MODEL_MESH_SCENARIO)) {
+				Camel camel = new Camel(EntityType.CAMEL, serverLevel);
+				camel.setPos(origin.x, origin.y - 1.1, origin.z);
+				camel.setYRot(player.getYRot() + 180.0F);
+				camel.setYHeadRot(camel.getYRot());
+				camel.setNoAi(true);
+				camel.setNoGravity(true);
+				camel.setInvisible(false);
+				camel.setBaby(false);
+				camel.standUpInstantly();
+				camel.setDashing(false);
+				camel.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				camel.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(camel);
+				modelMeshSetupServerEntityId = camel.getId();
+			} else if ("nautilus-equipped".equals(MODEL_MESH_SCENARIO)) {
+				Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+				nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+				nautilus.setYRot(player.getYRot() + 180.0F);
+				nautilus.setYHeadRot(nautilus.getYRot());
+				nautilus.setNoAi(true);
+				nautilus.setNoGravity(true);
+				nautilus.setInvisible(false);
+				nautilus.setBaby(false);
+				nautilus.setTame(true, true);
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_NAUTILUS_ARMOR));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				nautilus.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(nautilus);
+				modelMeshSetupServerEntityId = nautilus.getId();
+			} else if ("nautilus-copper-equipped".equals(MODEL_MESH_SCENARIO)) {
+				Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+				nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+				nautilus.setYRot(player.getYRot() + 180.0F);
+				nautilus.setYHeadRot(nautilus.getYRot());
+				nautilus.setNoAi(true);
+				nautilus.setNoGravity(true);
+				nautilus.setInvisible(false);
+				nautilus.setBaby(false);
+				nautilus.setTame(true, true);
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.COPPER_NAUTILUS_ARMOR));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				nautilus.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(nautilus);
+				modelMeshSetupServerEntityId = nautilus.getId();
+			} else if ("nautilus-iron-equipped".equals(MODEL_MESH_SCENARIO)) {
+				Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+				nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+				nautilus.setYRot(player.getYRot() + 180.0F);
+				nautilus.setYHeadRot(nautilus.getYRot());
+				nautilus.setNoAi(true);
+				nautilus.setNoGravity(true);
+				nautilus.setInvisible(false);
+				nautilus.setBaby(false);
+				nautilus.setTame(true, true);
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.IRON_NAUTILUS_ARMOR));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				nautilus.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(nautilus);
+				modelMeshSetupServerEntityId = nautilus.getId();
+			} else if ("nautilus-gold-equipped".equals(MODEL_MESH_SCENARIO)) {
+				Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+				nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+				nautilus.setYRot(player.getYRot() + 180.0F);
+				nautilus.setYHeadRot(nautilus.getYRot());
+				nautilus.setNoAi(true);
+				nautilus.setNoGravity(true);
+				nautilus.setInvisible(false);
+				nautilus.setBaby(false);
+				nautilus.setTame(true, true);
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.GOLDEN_NAUTILUS_ARMOR));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				nautilus.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(nautilus);
+				modelMeshSetupServerEntityId = nautilus.getId();
+			} else if ("nautilus-netherite-equipped".equals(MODEL_MESH_SCENARIO)) {
+				Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+				nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+				nautilus.setYRot(player.getYRot() + 180.0F);
+				nautilus.setYHeadRot(nautilus.getYRot());
+				nautilus.setNoAi(true);
+				nautilus.setNoGravity(true);
+				nautilus.setInvisible(false);
+				nautilus.setBaby(false);
+				nautilus.setTame(true, true);
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.NETHERITE_NAUTILUS_ARMOR));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				nautilus.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(nautilus);
+				modelMeshSetupServerEntityId = nautilus.getId();
+			} else if ("nautilus-baby-equipped".equals(MODEL_MESH_SCENARIO)) {
+				Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+				nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+				nautilus.setYRot(player.getYRot() + 180.0F);
+				nautilus.setYHeadRot(nautilus.getYRot());
+				nautilus.setNoAi(true);
+				nautilus.setNoGravity(true);
+				nautilus.setInvisible(false);
+				nautilus.setBaby(true);
+				nautilus.setTame(true, true);
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_NAUTILUS_ARMOR));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				nautilus.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(nautilus);
+				modelMeshSetupServerEntityId = nautilus.getId();
+			} else if ("zombie-nautilus-equipped".equals(MODEL_MESH_SCENARIO)) {
+				ZombieNautilus nautilus = new ZombieNautilus(EntityType.ZOMBIE_NAUTILUS, serverLevel);
+				nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+				nautilus.setYRot(player.getYRot() + 180.0F);
+				nautilus.setYHeadRot(nautilus.getYRot());
+				nautilus.setNoAi(true);
+				nautilus.setNoGravity(true);
+				nautilus.setInvisible(false);
+				nautilus.setBaby(false);
+				nautilus.setVariant(serverLevel.registryAccess().lookupOrThrow(Registries.ZOMBIE_NAUTILUS_VARIANT)
+					.getOrThrow(ZombieNautilusVariants.TEMPERATE));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_NAUTILUS_ARMOR));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				nautilus.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(nautilus);
+				modelMeshSetupServerEntityId = nautilus.getId();
+			} else if ("zombie-nautilus-coral-equipped".equals(MODEL_MESH_SCENARIO)) {
+				ZombieNautilus nautilus = new ZombieNautilus(EntityType.ZOMBIE_NAUTILUS, serverLevel);
+				nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+				nautilus.setYRot(player.getYRot() + 180.0F);
+				nautilus.setYHeadRot(nautilus.getYRot());
+				nautilus.setNoAi(true);
+				nautilus.setNoGravity(true);
+				nautilus.setInvisible(false);
+				nautilus.setBaby(false);
+				nautilus.setVariant(serverLevel.registryAccess().lookupOrThrow(Registries.ZOMBIE_NAUTILUS_VARIANT)
+					.getOrThrow(ZombieNautilusVariants.WARM));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_NAUTILUS_ARMOR));
+				nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+				nautilus.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(nautilus);
+				modelMeshSetupServerEntityId = nautilus.getId();
 			} else if ("rabbit".equals(MODEL_MESH_SCENARIO)) {
 				Rabbit rabbit = new Rabbit(EntityType.RABBIT, serverLevel);
 				rabbit.setPos(origin.x, origin.y - 1.1, origin.z);
@@ -7909,7 +8989,7 @@ public final class DeterministicCameraCapture {
 				rabbit.setDeltaMovement(Vec3.ZERO);
 				serverLevel.addFreshEntity(rabbit);
 				modelMeshSetupServerEntityId = rabbit.getId();
-			} else if ("sheep".equals(MODEL_MESH_SCENARIO)) {
+			} else if ("sheep".equals(MODEL_MESH_SCENARIO) || "sheep-red".equals(MODEL_MESH_SCENARIO)) {
 				Sheep sheep = new Sheep(EntityType.SHEEP, serverLevel);
 				sheep.setPos(origin.x, origin.y - 1.1, origin.z);
 				sheep.setYRot(player.getYRot() + 180.0F);
@@ -7917,11 +8997,14 @@ public final class DeterministicCameraCapture {
 				sheep.setNoAi(true);
 				sheep.setNoGravity(true);
 				sheep.setDeltaMovement(Vec3.ZERO);
-				sheep.setBaby(true);
+				sheep.setBaby("sheep".equals(MODEL_MESH_SCENARIO));
+				sheep.setSheared(false);
+				sheep.setColor("sheep-red".equals(MODEL_MESH_SCENARIO) ? DyeColor.RED : DyeColor.WHITE);
 				serverLevel.addFreshEntity(sheep);
 				modelMeshSetupServerEntityId = sheep.getId();
 			} else if ("tropical-fish".equals(MODEL_MESH_SCENARIO)) {
 				TropicalFish fish = new TropicalFish(EntityType.TROPICAL_FISH, serverLevel);
+				configureTropicalFishFixture(fish);
 				prepareModelMeshEntityCaptureSite(serverLevel, player.getEyePosition(), origin.add(0.0, -1.1, 0.0));
 				fish.setPos(origin.x, origin.y - 1.1, origin.z);
 				fish.setNoAi(true);
@@ -7929,6 +9012,248 @@ public final class DeterministicCameraCapture {
 				fish.setDeltaMovement(Vec3.ZERO);
 				serverLevel.addFreshEntity(fish);
 				modelMeshSetupServerEntityId = fish.getId();
+			} else if ("spider".equals(MODEL_MESH_SCENARIO)) {
+				Spider spider = new Spider(EntityType.SPIDER, serverLevel);
+				spider.setPos(origin.x, origin.y - 1.1, origin.z);
+				spider.setYRot(player.getYRot() + 180.0F);
+				spider.setNoAi(true);
+				spider.setNoGravity(true);
+				spider.setInvisible(false);
+				spider.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(spider);
+				modelMeshSetupServerEntityId = spider.getId();
+			} else if ("enderman".equals(MODEL_MESH_SCENARIO)) {
+				EnderMan enderman = new EnderMan(EntityType.ENDERMAN, serverLevel);
+				enderman.setPos(origin.x, origin.y - 1.1, origin.z);
+				enderman.setYRot(player.getYRot() + 180.0F);
+				enderman.setYHeadRot(enderman.getYRot());
+				enderman.setNoAi(true);
+				enderman.setNoGravity(true);
+				enderman.setInvisible(false);
+				enderman.setCarriedBlock(null);
+				enderman.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(enderman);
+				modelMeshSetupServerEntityId = enderman.getId();
+			} else if ("phantom".equals(MODEL_MESH_SCENARIO)) {
+				Phantom phantom = new Phantom(EntityType.PHANTOM, serverLevel);
+				phantom.setPos(origin.x, origin.y - 0.4, origin.z);
+				phantom.setYRot(player.getYRot() + 180.0F);
+				phantom.setYHeadRot(phantom.getYRot());
+				phantom.setNoAi(true);
+				phantom.setNoGravity(true);
+				phantom.setInvisible(false);
+				phantom.setPhantomSize(0);
+				phantom.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(phantom);
+				modelMeshSetupServerEntityId = phantom.getId();
+			} else if ("creaking".equals(MODEL_MESH_SCENARIO)) {
+				Creaking creaking = new Creaking(EntityType.CREAKING, serverLevel);
+				creaking.setPos(origin.x, origin.y - 1.1, origin.z);
+				creaking.setYRot(player.getYRot() + 180.0F);
+				creaking.setYHeadRot(creaking.getYRot());
+				creaking.setNoAi(true);
+				creaking.setNoGravity(true);
+				creaking.setInvisible(false);
+				creaking.setIsActive(true);
+				creaking.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(creaking);
+				modelMeshSetupServerEntityId = creaking.getId();
+			} else if ("breeze".equals(MODEL_MESH_SCENARIO)) {
+				Breeze breeze = new Breeze(EntityType.BREEZE, serverLevel);
+				breeze.setPos(origin.x, origin.y - 1.1, origin.z);
+				breeze.setYRot(player.getYRot() + 180.0F);
+				breeze.setYHeadRot(breeze.getYRot());
+				breeze.setPose(net.minecraft.world.entity.Pose.STANDING);
+				breeze.setNoAi(true);
+				breeze.setNoGravity(true);
+				breeze.setInvisible(false);
+				breeze.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(breeze);
+				modelMeshSetupServerEntityId = breeze.getId();
+			} else if ("bogged".equals(MODEL_MESH_SCENARIO)) {
+				Bogged bogged = new Bogged(EntityType.BOGGED, serverLevel);
+				bogged.setPos(origin.x, origin.y - 1.1, origin.z);
+				bogged.setYRot(player.getYRot() + 180.0F);
+				bogged.setYHeadRot(bogged.getYRot());
+				bogged.setNoAi(true);
+				bogged.setNoGravity(true);
+				bogged.setInvisible(false);
+				bogged.setSheared(false);
+				bogged.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+				bogged.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+				bogged.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(bogged);
+				modelMeshSetupServerEntityId = bogged.getId();
+			} else if ("stray".equals(MODEL_MESH_SCENARIO)) {
+				Stray stray = new Stray(EntityType.STRAY, serverLevel);
+				stray.setPos(origin.x, origin.y - 1.1, origin.z);
+				stray.setYRot(player.getYRot() + 180.0F);
+				stray.setYHeadRot(stray.getYRot());
+				stray.setNoAi(true);
+				stray.setNoGravity(true);
+				stray.setInvisible(false);
+				stray.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+				stray.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+				stray.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(stray);
+				modelMeshSetupServerEntityId = stray.getId();
+			} else if ("drowned".equals(MODEL_MESH_SCENARIO)) {
+				Drowned drowned = new Drowned(EntityType.DROWNED, serverLevel);
+				drowned.setPos(origin.x, origin.y - 1.1, origin.z);
+				drowned.setYRot(player.getYRot() + 180.0F);
+				drowned.setYHeadRot(drowned.getYRot());
+				drowned.setNoAi(true);
+				drowned.setNoGravity(true);
+				drowned.setInvisible(false);
+				drowned.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+				drowned.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+				drowned.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, ItemStack.EMPTY);
+				drowned.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(drowned);
+				modelMeshSetupServerEntityId = drowned.getId();
+			} else if ("slime".equals(MODEL_MESH_SCENARIO)) {
+				Slime slime = new Slime(EntityType.SLIME, serverLevel);
+				slime.setSize(2, true);
+				slime.setPos(origin.x, origin.y - 1.1, origin.z);
+				slime.setYRot(player.getYRot() + 180.0F);
+				slime.setYHeadRot(slime.getYRot());
+				slime.setNoAi(true);
+				slime.setNoGravity(true);
+				slime.setInvisible(false);
+				slime.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(slime);
+				modelMeshSetupServerEntityId = slime.getId();
+			} else if ("cat".equals(MODEL_MESH_SCENARIO)) {
+				Cat cat = new Cat(EntityType.CAT, serverLevel);
+				cat.setPos(origin.x, origin.y - 1.1, origin.z);
+				cat.setYRot(player.getYRot() + 180.0F);
+				cat.setYHeadRot(cat.getYRot());
+				cat.setNoAi(true);
+				cat.setNoGravity(true);
+				cat.setInvisible(false);
+				cat.setBaby(false);
+				cat.setTame(true, true);
+				cat.setComponent(DataComponents.CAT_COLLAR, DyeColor.RED);
+				cat.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(cat);
+				modelMeshSetupServerEntityId = cat.getId();
+			} else if ("wolf-collar".equals(MODEL_MESH_SCENARIO)) {
+				var wolf = new net.minecraft.world.entity.animal.wolf.Wolf(EntityType.WOLF, serverLevel);
+				wolf.setPos(origin.x, origin.y - 1.1, origin.z);
+				wolf.setYRot(player.getYRot() + 180.0F);
+				wolf.setYHeadRot(wolf.getYRot());
+				wolf.setNoAi(true);
+				wolf.setNoGravity(true);
+				wolf.setInvisible(false);
+				wolf.setBaby(false);
+				wolf.setTame(true, true);
+				wolf.setComponent(DataComponents.WOLF_COLLAR, DyeColor.RED);
+				wolf.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, ItemStack.EMPTY);
+				wolf.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(wolf);
+				modelMeshSetupServerEntityId = wolf.getId();
+			} else if ("iron-golem-cracks".equals(MODEL_MESH_SCENARIO)) {
+				IronGolem golem = new IronGolem(EntityType.IRON_GOLEM, serverLevel);
+				golem.setPos(origin.x, origin.y - 1.1, origin.z);
+				golem.setYRot(player.getYRot() + 180.0F);
+				golem.setYHeadRot(golem.getYRot());
+				golem.setNoAi(true);
+				golem.setNoGravity(true);
+				golem.setInvisible(false);
+				golem.setHealth(golem.getMaxHealth() * 0.2F);
+				golem.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(golem);
+				modelMeshSetupServerEntityId = golem.getId();
+			} else if ("snow-golem".equals(MODEL_MESH_SCENARIO)) {
+				SnowGolem golem = new SnowGolem(EntityType.SNOW_GOLEM, serverLevel);
+				golem.setPos(origin.x, origin.y - 1.1, origin.z);
+				golem.setYRot(player.getYRot() + 180.0F);
+				golem.setYHeadRot(golem.getYRot());
+				golem.setNoAi(true);
+				golem.setNoGravity(true);
+				golem.setInvisible(false);
+				golem.setPumpkin(true);
+				golem.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(golem);
+				modelMeshSetupServerEntityId = golem.getId();
+			} else if (isItemFrameScenario()) {
+				BlockPos framePos = BlockPos.containing(origin.add(0.0, -1.1, 0.0));
+				Direction towardCamera = Direction.getApproximateNearest(player.getEyePosition().subtract(Vec3.atCenterOf(framePos)));
+				Direction facing = towardCamera.getAxis().isHorizontal() ? towardCamera : Direction.SOUTH;
+				serverLevel.setBlock(framePos.relative(facing.getOpposite()), Blocks.STONE.defaultBlockState(), 3);
+				ItemFrame frame = isGlowItemFrameScenario()
+					? new GlowItemFrame(serverLevel, framePos, facing)
+					: new ItemFrame(serverLevel, framePos, facing);
+				frame.setInvisible(isInvisibleItemFrameScenario());
+				frame.setItem(itemFrameFixtureItem(serverLevel, framePos), false);
+				frame.setRotation(expectedItemFrameRotation());
+				serverLevel.addFreshEntity(frame);
+				modelMeshSetupExpectedEntityPosition = frame.position();
+				modelMeshSetupServerEntityId = frame.getId();
+			} else if ("villager".equals(MODEL_MESH_SCENARIO)) {
+				Villager villager = new Villager(EntityType.VILLAGER, serverLevel);
+				villager.setPos(origin.x, origin.y - 1.1, origin.z);
+				villager.setYRot(player.getYRot() + 180.0F);
+				villager.setYHeadRot(villager.getYRot());
+				villager.setNoAi(true);
+				villager.setNoGravity(true);
+				villager.setInvisible(false);
+				villager.setBaby(false);
+				villager.setVillagerData(villager.getVillagerData()
+					.withType(serverLevel.registryAccess(), VillagerType.PLAINS)
+					.withProfession(serverLevel.registryAccess(), VillagerProfession.FARMER)
+					.withLevel(5));
+				villager.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(villager);
+				modelMeshSetupServerEntityId = villager.getId();
+			} else if ("zombie-villager".equals(MODEL_MESH_SCENARIO)) {
+				ZombieVillager zombieVillager = new ZombieVillager(EntityType.ZOMBIE_VILLAGER, serverLevel);
+				zombieVillager.setPos(origin.x, origin.y - 1.1, origin.z);
+				zombieVillager.setYRot(player.getYRot() + 180.0F);
+				zombieVillager.setYHeadRot(zombieVillager.getYRot());
+				zombieVillager.setNoAi(true);
+				zombieVillager.setNoGravity(true);
+				zombieVillager.setInvisible(false);
+				zombieVillager.setBaby(false);
+				zombieVillager.setVillagerData(zombieVillager.getVillagerData()
+					.withType(serverLevel.registryAccess(), VillagerType.PLAINS)
+					.withProfession(serverLevel.registryAccess(), VillagerProfession.FARMER)
+					.withLevel(5));
+				zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+				zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+				zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, ItemStack.EMPTY);
+				zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, ItemStack.EMPTY);
+				zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.LEGS, ItemStack.EMPTY);
+				zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.FEET, ItemStack.EMPTY);
+				zombieVillager.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(zombieVillager);
+				modelMeshSetupServerEntityId = zombieVillager.getId();
+			} else if ("copper-golem".equals(MODEL_MESH_SCENARIO)) {
+				CopperGolem golem = new CopperGolem(EntityType.COPPER_GOLEM, serverLevel);
+				golem.setPos(origin.x, origin.y - 1.1, origin.z);
+				golem.setYRot(player.getYRot() + 180.0F);
+				golem.setYHeadRot(golem.getYRot());
+				golem.setNoAi(true);
+				golem.setNoGravity(true);
+				golem.setInvisible(false);
+				golem.setWeatherState(WeatheringCopper.WeatherState.UNAFFECTED);
+				golem.setItemSlot(CopperGolem.EQUIPMENT_SLOT_ANTENNA, ItemStack.EMPTY);
+				golem.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(golem);
+				modelMeshSetupServerEntityId = golem.getId();
+			} else if ("warden".equals(MODEL_MESH_SCENARIO)) {
+				Warden warden = new Warden(EntityType.WARDEN, serverLevel);
+				warden.setPos(origin.x, origin.y - 1.1, origin.z);
+				warden.setYRot(player.getYRot() + 180.0F);
+				warden.setYHeadRot(warden.getYRot());
+				warden.setPose(net.minecraft.world.entity.Pose.STANDING);
+				warden.setNoAi(true);
+				warden.setNoGravity(true);
+				warden.setInvisible(false);
+				warden.setDeltaMovement(Vec3.ZERO);
+				serverLevel.addFreshEntity(warden);
+				serverLevel.broadcastEntityEvent(warden, (byte)61);
+				modelMeshSetupServerEntityId = warden.getId();
 			} else if ("zombie".equals(MODEL_MESH_SCENARIO)) {
 				Zombie zombie = new Zombie(EntityType.ZOMBIE, serverLevel);
 				zombie.setPos(origin.x, origin.y - 1.1, origin.z);
@@ -7937,6 +9262,7 @@ public final class DeterministicCameraCapture {
 				zombie.setNoAi(true);
 				zombie.setNoGravity(true);
 				zombie.setDeltaMovement(Vec3.ZERO);
+                GraphicsAuditEquipmentFixture.configure(zombie);
 				serverLevel.addFreshEntity(zombie);
 				modelMeshSetupServerEntityId = zombie.getId();
 			} else if ("end-crystal".equals(MODEL_MESH_SCENARIO)) {
@@ -7977,7 +9303,20 @@ public final class DeterministicCameraCapture {
 				: "evoker-fangs".equals(MODEL_MESH_SCENARIO) ? "minecraft:evoker_fangs"
 				: "chicken".equals(MODEL_MESH_SCENARIO) ? "minecraft:chicken"
 				: "cow".equals(MODEL_MESH_SCENARIO) ? "minecraft:cow"
-				: "pig".equals(MODEL_MESH_SCENARIO) ? "minecraft:pig"
+				: ("pig".equals(MODEL_MESH_SCENARIO) || "pig-saddled".equals(MODEL_MESH_SCENARIO)) ? "minecraft:pig"
+				: ("horse-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) ? "minecraft:horse"
+				: "donkey-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:donkey"
+				: "donkey-baby-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:donkey"
+				: "donkey-chested-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:donkey"
+				: "donkey-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:donkey"
+				: "mule-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:mule"
+				: "mule-chested-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:mule"
+				: "mule-baby-chested-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:mule"
+				: "mule-baby-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:mule"
+				: "strider-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:strider"
+				: "camel-saddled".equals(MODEL_MESH_SCENARIO) ? "minecraft:camel"
+				: ("nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-baby-equipped".equals(MODEL_MESH_SCENARIO) || "nautilus-copper-equipped".equals(MODEL_MESH_SCENARIO)) ? "minecraft:nautilus"
+				: ("zombie-nautilus-equipped".equals(MODEL_MESH_SCENARIO) || "zombie-nautilus-coral-equipped".equals(MODEL_MESH_SCENARIO)) ? "minecraft:zombie_nautilus"
 				: "rabbit".equals(MODEL_MESH_SCENARIO) ? "minecraft:rabbit"
 				: "zombie".equals(MODEL_MESH_SCENARIO) ? "minecraft:zombie"
 				: "end-crystal".equals(MODEL_MESH_SCENARIO) ? "minecraft:end_crystal"
@@ -7989,7 +9328,242 @@ public final class DeterministicCameraCapture {
 			return;
 		}
 		if (modelMeshSetupPosition != null) {
+			if ("end-gateway".equals(MODEL_MESH_SCENARIO)
+				&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+					instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity gateway) {
+				stabilizeEndGatewayFixture(minecraft.level, modelMeshSetupPosition, gateway);
+			}
 			modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockEntity(modelMeshSetupPosition) != null;
+			if (isBellModelScenario()
+				&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+					instanceof net.minecraft.world.level.block.entity.BellBlockEntity bell) {
+				modelMeshSetupClientBlockEntityPresent = expectedBellShaking()
+					? bell.shaking && bell.clickDirection == Direction.EAST && bell.ticks > 0 && bell.ticks < 50
+					: !bell.shaking;
+			}
+			if (isCopperGolemStatueModelScenario()) {
+				BlockState statueState = minecraft.level.getBlockState(modelMeshSetupPosition);
+				modelMeshSetupClientBlockEntityPresent = statueState.is(expectedCopperGolemStatueBlock())
+					&& statueState.getValue(net.minecraft.world.level.block.CopperGolemStatueBlock.FACING) == Direction.SOUTH
+					&& statueState.getValue(net.minecraft.world.level.block.CopperGolemStatueBlock.POSE)
+						== MODEL_MESH_STATUE_POSE
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.CopperGolemStatueBlockEntity;
+			}
+			if (isBedModelScenario()) {
+				BlockPos headPosition = modelMeshSetupPosition.relative(Direction.SOUTH);
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.RED_BED)
+					&& minecraft.level.getBlockState(modelMeshSetupPosition).getValue(net.minecraft.world.level.block.BedBlock.FACING) == Direction.SOUTH
+					&& minecraft.level.getBlockState(modelMeshSetupPosition).getValue(net.minecraft.world.level.block.BedBlock.PART)
+						== net.minecraft.world.level.block.state.properties.BedPart.FOOT
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.BedBlockEntity
+					&& minecraft.level.getBlockState(headPosition).is(Blocks.RED_BED)
+					&& minecraft.level.getBlockState(headPosition).getValue(net.minecraft.world.level.block.BedBlock.FACING) == Direction.SOUTH
+					&& minecraft.level.getBlockState(headPosition).getValue(net.minecraft.world.level.block.BedBlock.PART)
+						== net.minecraft.world.level.block.state.properties.BedPart.HEAD
+					&& minecraft.level.getBlockEntity(headPosition)
+						instanceof net.minecraft.world.level.block.entity.BedBlockEntity;
+			}
+			if (isChestModelScenario()) {
+				BlockPos partner = modelMeshSetupPosition.relative(Direction.EAST);
+				boolean trapped = isTrappedChestModelScenario();
+				boolean ender = isEnderChestModelScenario();
+				var expectedBaseType = isDoubleChestModelScenario()
+					? net.minecraft.world.level.block.state.properties.ChestType.RIGHT
+					: net.minecraft.world.level.block.state.properties.ChestType.SINGLE;
+				BlockState chestState = minecraft.level.getBlockState(modelMeshSetupPosition);
+				modelMeshSetupClientBlockEntityPresent = chestState
+					.is(ender ? Blocks.ENDER_CHEST : trapped ? Blocks.TRAPPED_CHEST : Blocks.CHEST)
+					&& minecraft.level.getBlockState(modelMeshSetupPosition).getValue(ChestBlock.FACING) == Direction.SOUTH
+					&& (ender || chestState.getValue(ChestBlock.TYPE) == expectedBaseType)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.LidBlockEntity
+					&& (!trapped || minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.TrappedChestBlockEntity)
+					&& (!ender || minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.EnderChestBlockEntity)
+					&& (!isDoubleChestModelScenario()
+						|| minecraft.level.getBlockState(partner).is(Blocks.CHEST)
+						&& minecraft.level.getBlockState(partner).getValue(ChestBlock.FACING) == Direction.SOUTH
+						&& minecraft.level.getBlockState(partner).getValue(ChestBlock.TYPE)
+							== net.minecraft.world.level.block.state.properties.ChestType.LEFT
+						&& minecraft.level.getBlockEntity(partner)
+							instanceof net.minecraft.world.level.block.entity.ChestBlockEntity);
+			}
+			if (isShulkerModelScenario()) {
+				boolean openedEast = isOpenedEastShulkerModelScenario();
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition)
+					.is(isDefaultShulkerModelScenario() ? Blocks.SHULKER_BOX : Blocks.PURPLE_SHULKER_BOX)
+					&& minecraft.level.getBlockState(modelMeshSetupPosition)
+						.getValue(net.minecraft.world.level.block.ShulkerBoxBlock.FACING) == (openedEast ? Direction.EAST : Direction.UP)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity shulker
+					&& (isDefaultShulkerModelScenario() ? shulker.getColor() == null
+						: shulker.getColor() == net.minecraft.world.item.DyeColor.PURPLE)
+					&& shulker.getAnimationStatus() == (openedEast
+						? net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity.AnimationStatus.OPENED
+						: net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity.AnimationStatus.CLOSED)
+					&& shulker.getProgress(1.0F) == (openedEast ? 1.0F : 0.0F);
+			}
+			if (isDecoratedPotModelScenario()) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition)
+					.is(Blocks.DECORATED_POT)
+					&& minecraft.level.getBlockState(modelMeshSetupPosition)
+						.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING) == expectedDecoratedPotFacing()
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.DecoratedPotBlockEntity pot
+					&& pot.getDecorations().equals(expectedDecoratedPotDecorations())
+					&& decoratedPotWobbleStateReady(pot);
+			}
+			if (isConduitModelScenario()) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition)
+					.is(Blocks.CONDUIT)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.ConduitBlockEntity conduit
+					&& conduit.isActive() == isActiveConduitModelScenario()
+					&& conduit.isHunting() == isHuntingConduitModelScenario();
+				if (modelMeshSetupClientBlockEntityPresent && isBreakingConduitModelScenario()) {
+					minecraft.levelRenderer.destroyBlockProgress(-0x434f4e44, modelMeshSetupPosition, MODEL_MESH_DESTROY_STAGE);
+				}
+			}
+			if (isBannerModelScenario()) {
+				modelMeshSetupClientBlockEntityPresent = hasExpectedBannerBlockState(
+					minecraft.level.getBlockState(modelMeshSetupPosition))
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.BannerBlockEntity banner
+					&& banner.getBaseColor() == expectedBannerBaseColor()
+					&& banner.getPatterns().equals(expectedBannerPatterns());
+			}
+			if (isSkullModelScenario()) {
+				modelMeshSetupClientBlockEntityPresent = hasExpectedSkullBlockState(
+					minecraft.level.getBlockState(modelMeshSetupPosition))
+					&& minecraft.level.getBlockState(modelMeshSetupPosition)
+						.getValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED) == isAnimatedSkullModelScenario()
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.SkullBlockEntity skull
+					&& ((net.minecraft.world.level.block.AbstractSkullBlock)minecraft.level
+						.getBlockState(modelMeshSetupPosition).getBlock()).getType() == expectedSkullType()
+					&& (isAnimatedSkullModelScenario() ? skull.getAnimation(0.0F) > 0.0F
+						: skull.getAnimation(0.0F) == 0.0F)
+					&& (!isPlayerHeadModelScenario() || expectedPlayerHeadProfile().equals(skull.getOwnerProfile()));
+				if (modelMeshSetupClientBlockEntityPresent && isBreakingSkullModelScenario()) {
+					minecraft.levelRenderer.destroyBlockProgress(-0x534b554c, modelMeshSetupPosition, MODEL_MESH_DESTROY_STAGE);
+				}
+			}
+			if (isOakSignModelScenario()) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.OAK_SIGN)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign
+					&& modelMeshOakSignTextReady(sign);
+				if (modelMeshSetupClientBlockEntityPresent && isBreakingOakSignModelScenario()) {
+					minecraft.levelRenderer.destroyBlockProgress(-0x4d415454, modelMeshSetupPosition, MODEL_MESH_DESTROY_STAGE);
+				}
+			}
+			if (isOakHangingSignModelScenario()) {
+				BlockState hangingState = minecraft.level.getBlockState(modelMeshSetupPosition);
+				boolean exactAttachment = isWallOakHangingSignModelScenario()
+					? hangingState.is(Blocks.OAK_WALL_HANGING_SIGN)
+						&& hangingState.getValue(net.minecraft.world.level.block.WallHangingSignBlock.FACING) == Direction.NORTH
+						&& minecraft.level.getBlockState(modelMeshSetupPosition.east()).is(Blocks.STONE)
+					: hangingState.is(Blocks.OAK_HANGING_SIGN)
+						&& hangingState.getValue(net.minecraft.world.level.block.CeilingHangingSignBlock.ROTATION) == 8
+						&& hangingState.getValue(net.minecraft.world.level.block.CeilingHangingSignBlock.ATTACHED)
+							== isAttachedOakHangingSignModelScenario()
+						&& minecraft.level.getBlockState(modelMeshSetupPosition.above()).is(Blocks.STONE);
+				modelMeshSetupClientBlockEntityPresent = exactAttachment
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.HangingSignBlockEntity sign
+					&& "Rust Vulkan".equals(sign.getFrontText().getMessage(0, false).getString())
+					&& "Frozen parity".equals(sign.getFrontText().getMessage(1, false).getString());
+			}
+			if ("structure-block-box".equals(MODEL_MESH_SCENARIO)) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition)
+					.is(Blocks.STRUCTURE_BLOCK)
+					&& minecraft.level.getBlockState(modelMeshSetupPosition)
+						.getValue(net.minecraft.world.level.block.StructureBlock.MODE)
+						== net.minecraft.world.level.block.state.properties.StructureMode.SAVE
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.StructureBlockEntity structure
+					&& structure.getStructurePos().equals(new BlockPos(1, 1, 1))
+					&& structure.getStructureSize().equals(new Vec3i(3, 2, 4))
+					&& !structure.getShowAir() && structure.getShowBoundingBox()
+					&& structure.renderMode() == net.minecraft.world.level.block.entity.BoundingBoxRenderable.Mode.BOX;
+			}
+			if ("structure-block-invisible-cells".equals(MODEL_MESH_SCENARIO)) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.STRUCTURE_BLOCK)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition) instanceof net.minecraft.world.level.block.entity.StructureBlockEntity structure
+					&& structure.getStructurePos().equals(new BlockPos(1, 1, 1))
+					&& structure.getStructureSize().equals(new Vec3i(3, 2, 4))
+					&& structure.getShowAir() && structure.getShowBoundingBox()
+					&& structure.renderMode() == net.minecraft.world.level.block.entity.BoundingBoxRenderable.Mode.BOX_AND_INVISIBLE_BLOCKS
+					&& structureFixtureCellsReady(minecraft.level, modelMeshSetupPosition);
+			}
+			if ("test-instance-composition".equals(MODEL_MESH_SCENARIO)) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition)
+					.is(Blocks.TEST_INSTANCE_BLOCK)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.TestInstanceBlockEntity testInstance
+					&& testInstance.getSize().equals(new Vec3i(3, 2, 4))
+					&& testInstance.getRotation() == net.minecraft.world.level.block.Rotation.NONE
+					&& testInstance.getBeamSections().size() == 1
+					&& testInstance.getBeamSections().get(0).getColor() == 0xff808080
+					&& testInstance.getRenderableBox().localPos().equals(new BlockPos(0, 1, 1))
+					&& testInstance.getRenderableBox().size().equals(new Vec3i(3, 2, 4))
+					&& testInstance.getErrorMarkers().size() == 1
+					&& testInstance.getErrorMarkers().get(0).pos().equals(modelMeshSetupPosition.offset(2, 1, 2))
+					&& "Expected failure".equals(testInstance.getErrorMarkers().get(0).text().getString());
+			}
+			if ("test-instance-success".equals(MODEL_MESH_SCENARIO)) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition)
+					.is(Blocks.TEST_INSTANCE_BLOCK)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.TestInstanceBlockEntity testInstance
+					&& testInstance.getSize().equals(new Vec3i(3, 2, 4))
+					&& testInstance.getRotation() == net.minecraft.world.level.block.Rotation.NONE
+					&& testInstance.getBeamSections().size() == 1
+					&& testInstance.getBeamSections().get(0).getColor() == 0xff00ff00
+					&& testInstance.getRenderableBox().localPos().equals(new BlockPos(0, 1, 1))
+					&& testInstance.getRenderableBox().size().equals(new Vec3i(3, 2, 4))
+					&& testInstance.getErrorMarkers().isEmpty() && testInstance.errorMessage().isEmpty();
+			}
+			if ("test-instance-cleared".equals(MODEL_MESH_SCENARIO)) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition)
+					.is(Blocks.TEST_INSTANCE_BLOCK)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+						instanceof net.minecraft.world.level.block.entity.TestInstanceBlockEntity testInstance
+					&& testInstance.getSize().equals(new Vec3i(3, 2, 4))
+					&& testInstance.getRotation() == net.minecraft.world.level.block.Rotation.NONE
+					&& testInstance.getBeamSections().isEmpty()
+					&& testInstance.getRenderableBox().localPos().equals(new BlockPos(0, 1, 1))
+					&& testInstance.getRenderableBox().size().equals(new Vec3i(3, 2, 4))
+					&& testInstance.getErrorMarkers().isEmpty() && testInstance.errorMessage().isEmpty();
+			}
+			if ("test-instance-required-failed".equals(MODEL_MESH_SCENARIO)) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.TEST_INSTANCE_BLOCK)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition) instanceof net.minecraft.world.level.block.entity.TestInstanceBlockEntity testInstance
+					&& testInstance.getSize().equals(new Vec3i(3, 2, 4))
+					&& testInstance.getRotation() == net.minecraft.world.level.block.Rotation.NONE
+					&& testInstance.getBeamSections().size() == 1 && testInstance.getBeamSections().get(0).getColor() == 0xffff0000
+					&& testInstance.getErrorMarkers().size() == 1
+					&& testInstance.getErrorMarkers().get(0).pos().equals(modelMeshSetupPosition.offset(2, 1, 2))
+					&& "Expected failure".equals(testInstance.getErrorMarkers().get(0).text().getString())
+					&& testInstance.errorMessage().isPresent()
+					&& "Required failure".equals(testInstance.errorMessage().get().getString());
+			}
+			if ("test-instance-optional-failed".equals(MODEL_MESH_SCENARIO)) {
+				modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.TEST_INSTANCE_BLOCK)
+					&& minecraft.level.getBlockEntity(modelMeshSetupPosition) instanceof net.minecraft.world.level.block.entity.TestInstanceBlockEntity testInstance
+					&& testInstance.getSize().equals(new Vec3i(3, 2, 4))
+					&& testInstance.getRotation() == net.minecraft.world.level.block.Rotation.NONE
+					&& testInstance.test().map(key -> key.location().toString().equals("mattmc_model_fixture:optional_failure")).orElse(false)
+					&& testInstance.getBeamSections().size() == 1 && testInstance.getBeamSections().get(0).getColor() == 0xffff8000
+					&& testInstance.getErrorMarkers().size() == 1
+					&& testInstance.getErrorMarkers().get(0).pos().equals(modelMeshSetupPosition.offset(2, 1, 2))
+					&& "Expected failure".equals(testInstance.getErrorMarkers().get(0).text().getString())
+					&& testInstance.errorMessage().isPresent()
+					&& "Optional failure".equals(testInstance.errorMessage().get().getString());
+			}
 			modelMeshSetupStatus = modelMeshSetupClientBlockEntityPresent ? "spawned" : "waiting-client-block-entity";
 			return;
 		}
@@ -7999,22 +9573,349 @@ public final class DeterministicCameraCapture {
 		}
 		BlockPos position = BlockPos.containing(player.getEyePosition().add(forward.normalize().scale(4.0)).add(0.0, -1.25, 0.0));
 		BlockState state = switch (MODEL_MESH_SCENARIO) {
-			case "bed" -> Blocks.RED_BED.defaultBlockState();
-			case "bell" -> Blocks.BELL.defaultBlockState().setValue(net.minecraft.world.level.block.BellBlock.FACING, Direction.SOUTH);
-			case "shulker" -> Blocks.PURPLE_SHULKER_BOX.defaultBlockState();
-			case "decorated-pot" -> Blocks.DECORATED_POT.defaultBlockState();
-			case "conduit" -> Blocks.CONDUIT.defaultBlockState();
+			case "trial-spawner", "trial-spawner-ominous", "trial-spawner-active" -> Blocks.TRIAL_SPAWNER.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.TrialSpawnerBlock.STATE,
+					expectedTrialSpawnerState())
+				.setValue(net.minecraft.world.level.block.TrialSpawnerBlock.OMINOUS,
+					expectedTrialSpawnerOminous());
+			case "end-gateway" -> Blocks.END_GATEWAY.defaultBlockState();
+			case "end-portal" -> Blocks.END_PORTAL.defaultBlockState();
+			case "spawner" -> Blocks.SPAWNER.defaultBlockState();
+			case "campfire" -> Blocks.CAMPFIRE.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.CampfireBlock.FACING, Direction.SOUTH)
+				.setValue(net.minecraft.world.level.block.CampfireBlock.LIT, false);
+			case "oak-shelf" -> Blocks.OAK_SHELF.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.ShelfBlock.FACING, Direction.SOUTH);
+			case "brushable-block" -> Blocks.SUSPICIOUS_SAND.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.DUSTED, 3);
+			case "vault-unlocking" -> Blocks.VAULT.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.VaultBlock.FACING, Direction.SOUTH)
+				.setValue(net.minecraft.world.level.block.VaultBlock.STATE,
+					net.minecraft.world.level.block.entity.vault.VaultState.UNLOCKING)
+				.setValue(net.minecraft.world.level.block.VaultBlock.OMINOUS, false);
+			case "enchanting-table" -> Blocks.ENCHANTING_TABLE.defaultBlockState();
+			case "lectern" -> Blocks.LECTERN.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.LecternBlock.FACING, Direction.SOUTH)
+				.setValue(net.minecraft.world.level.block.LecternBlock.HAS_BOOK, true);
+			case "oak-sign", "oak-sign-glowing-back", "oak-sign-breaking" -> Blocks.OAK_SIGN.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.StandingSignBlock.ROTATION, 8);
+			case "oak-hanging-sign", "oak-hanging-sign-attached" -> Blocks.OAK_HANGING_SIGN.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.CeilingHangingSignBlock.ROTATION, 8)
+				.setValue(net.minecraft.world.level.block.CeilingHangingSignBlock.ATTACHED,
+					isAttachedOakHangingSignModelScenario());
+			case "oak-wall-hanging-sign" -> Blocks.OAK_WALL_HANGING_SIGN.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.WallHangingSignBlock.FACING, Direction.NORTH);
+			case "chest" -> Blocks.CHEST.defaultBlockState()
+				.setValue(ChestBlock.FACING, Direction.SOUTH)
+				.setValue(ChestBlock.TYPE, net.minecraft.world.level.block.state.properties.ChestType.SINGLE);
+			case "chest-trapped" -> Blocks.TRAPPED_CHEST.defaultBlockState()
+				.setValue(ChestBlock.FACING, Direction.SOUTH)
+				.setValue(ChestBlock.TYPE, net.minecraft.world.level.block.state.properties.ChestType.SINGLE);
+			case "chest-ender" -> Blocks.ENDER_CHEST.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.EnderChestBlock.FACING, Direction.SOUTH);
+			case "chest-double" -> Blocks.CHEST.defaultBlockState()
+				.setValue(ChestBlock.FACING, Direction.SOUTH)
+				.setValue(ChestBlock.TYPE, net.minecraft.world.level.block.state.properties.ChestType.RIGHT);
+			case "bed" -> Blocks.RED_BED.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.BedBlock.FACING, Direction.SOUTH)
+				.setValue(net.minecraft.world.level.block.BedBlock.PART,
+					net.minecraft.world.level.block.state.properties.BedPart.FOOT);
+			case "bell", "bell-shaking" -> Blocks.BELL.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.BellBlock.FACING, Direction.SOUTH)
+				.setValue(net.minecraft.world.level.block.BellBlock.ATTACHMENT,
+					 net.minecraft.world.level.block.state.properties.BellAttachType.FLOOR);
+			case "copper-golem-statue" -> expectedCopperGolemStatueBlock().defaultBlockState()
+				.setValue(net.minecraft.world.level.block.CopperGolemStatueBlock.FACING, Direction.SOUTH)
+				.setValue(net.minecraft.world.level.block.CopperGolemStatueBlock.POSE,
+					MODEL_MESH_STATUE_POSE);
+			case "shulker", "shulker-open-east" -> Blocks.PURPLE_SHULKER_BOX.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.ShulkerBoxBlock.FACING,
+					isOpenedEastShulkerModelScenario() ? Direction.EAST : Direction.UP);
+			case "shulker-default" -> Blocks.SHULKER_BOX.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.ShulkerBoxBlock.FACING, Direction.UP);
+			case "decorated-pot", "decorated-pot-sherds", "decorated-pot-wobble-positive", "decorated-pot-wobble-negative",
+				"decorated-pot-north", "decorated-pot-east", "decorated-pot-west" -> Blocks.DECORATED_POT.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING, expectedDecoratedPotFacing());
+			case "conduit", "conduit-breaking", "conduit-active", "conduit-hunting" -> Blocks.CONDUIT.defaultBlockState();
+			case "white-banner", "white-banner-red-cross", "white-banner-two-patterns" -> Blocks.WHITE_BANNER.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.BannerBlock.ROTATION, 8);
+			case "red-banner" -> Blocks.RED_BANNER.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.BannerBlock.ROTATION, 8);
+			case "white-wall-banner", "white-wall-banner-south", "white-wall-banner-east",
+				"white-wall-banner-west" -> Blocks.WHITE_WALL_BANNER.defaultBlockState()
+					.setValue(net.minecraft.world.level.block.WallBannerBlock.FACING, expectedWallBannerFacing());
+			case "skeleton-skull", "skeleton-skull-breaking" -> Blocks.SKELETON_SKULL.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.SkullBlock.ROTATION, 8)
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "wither-skeleton-skull" -> Blocks.WITHER_SKELETON_SKULL.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.SkullBlock.ROTATION, 8)
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "zombie-head" -> Blocks.ZOMBIE_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.SkullBlock.ROTATION, 8)
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "creeper-head" -> Blocks.CREEPER_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.SkullBlock.ROTATION, 8)
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "dragon-head-animated" -> Blocks.DRAGON_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.SkullBlock.ROTATION, 8)
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, true);
+			case "piglin-head-animated" -> Blocks.PIGLIN_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.SkullBlock.ROTATION, 8)
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, true);
+			case "dragon-wall-head-animated" -> Blocks.DRAGON_WALL_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.WallSkullBlock.FACING, expectedWallSkullFacing())
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, true);
+			case "piglin-wall-head-animated" -> Blocks.PIGLIN_WALL_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.WallSkullBlock.FACING, expectedWallSkullFacing())
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, true);
+			case "player-head-profile" -> Blocks.PLAYER_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.SkullBlock.ROTATION, 8)
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "player-wall-head-profile" -> Blocks.PLAYER_WALL_HEAD.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.WallSkullBlock.FACING, expectedWallSkullFacing())
+				.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "skeleton-wall-skull", "skeleton-wall-skull-south", "skeleton-wall-skull-east",
+				"skeleton-wall-skull-west" -> Blocks.SKELETON_WALL_SKULL.defaultBlockState()
+					.setValue(net.minecraft.world.level.block.WallSkullBlock.FACING, expectedWallSkullFacing())
+					.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "wither-skeleton-wall-skull" -> Blocks.WITHER_SKELETON_WALL_SKULL.defaultBlockState()
+					.setValue(net.minecraft.world.level.block.WallSkullBlock.FACING, expectedWallSkullFacing())
+					.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "zombie-wall-head" -> Blocks.ZOMBIE_WALL_HEAD.defaultBlockState()
+					.setValue(net.minecraft.world.level.block.WallSkullBlock.FACING, expectedWallSkullFacing())
+					.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "creeper-wall-head" -> Blocks.CREEPER_WALL_HEAD.defaultBlockState()
+					.setValue(net.minecraft.world.level.block.WallSkullBlock.FACING, expectedWallSkullFacing())
+					.setValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED, false);
+			case "structure-block-box" -> Blocks.STRUCTURE_BLOCK.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.StructureBlock.MODE,
+					net.minecraft.world.level.block.state.properties.StructureMode.SAVE);
+			case "structure-block-invisible-cells" -> Blocks.STRUCTURE_BLOCK.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.StructureBlock.MODE,
+					net.minecraft.world.level.block.state.properties.StructureMode.SAVE);
+			case "test-instance-composition" -> Blocks.TEST_INSTANCE_BLOCK.defaultBlockState();
+			case "test-instance-success" -> Blocks.TEST_INSTANCE_BLOCK.defaultBlockState();
+			case "test-instance-cleared" -> Blocks.TEST_INSTANCE_BLOCK.defaultBlockState();
+			case "test-instance-required-failed" -> Blocks.TEST_INSTANCE_BLOCK.defaultBlockState();
+			case "test-instance-optional-failed" -> Blocks.TEST_INSTANCE_BLOCK.defaultBlockState();
 			default -> Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.SOUTH);
 		};
 		runOnServerThreadAndWait(minecraft.getSingleplayerServer(), () -> {
 			prepareModelMeshCaptureSite(serverLevel, position);
-			serverLevel.setBlock(position, state, 3);
+			if (isOakHangingSignModelScenario()) {
+				serverLevel.setBlock(isWallOakHangingSignModelScenario() ? position.east() : position.above(),
+					Blocks.STONE.defaultBlockState(), 3);
+			}
+			if (isWallBannerModelScenario()) {
+				serverLevel.setBlock(position.relative(expectedWallBannerFacing().getOpposite()),
+					Blocks.STONE.defaultBlockState(), 3);
+			}
+			if (isWallSkullModelScenario()) {
+				serverLevel.setBlock(position.relative(expectedWallSkullFacing().getOpposite()),
+					Blocks.STONE.defaultBlockState(), 3);
+			}
+			if (isBedModelScenario()) {
+				BlockState headState = state.setValue(net.minecraft.world.level.block.BedBlock.PART,
+					net.minecraft.world.level.block.state.properties.BedPart.HEAD);
+				serverLevel.setBlock(position, state, 18);
+				serverLevel.setBlock(position.relative(Direction.SOUTH), headState, 18);
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+				serverLevel.sendBlockUpdated(position.relative(Direction.SOUTH), headState, headState, 3);
+			} else if (isDoubleChestModelScenario()) {
+				BlockState leftState = state.setValue(ChestBlock.TYPE,
+					net.minecraft.world.level.block.state.properties.ChestType.LEFT);
+				serverLevel.setBlock(position, state, 18);
+				serverLevel.setBlock(position.relative(Direction.EAST), leftState, 18);
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+				serverLevel.sendBlockUpdated(position.relative(Direction.EAST), leftState, leftState, 3);
+			} else {
+				serverLevel.setBlock(position, state, 3);
+			}
+			if (isPlayerHeadModelScenario()
+				&& serverLevel.getBlockEntity(position) instanceof net.minecraft.world.level.block.entity.SkullBlockEntity skull) {
+				var output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
+					net.minecraft.util.ProblemReporter.DISCARDING, serverLevel.registryAccess());
+				output.store("profile", net.minecraft.world.item.component.ResolvableProfile.CODEC, expectedPlayerHeadProfile());
+				skull.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(
+					net.minecraft.util.ProblemReporter.DISCARDING, serverLevel.registryAccess(), output.buildResult()));
+				skull.setChanged();
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+			}
+			if (isActiveConduitModelScenario()) {
+				prepareActiveConduitFixture(serverLevel, position);
+			}
+			if (isOpenedEastShulkerModelScenario()) {
+				serverLevel.blockEvent(position, state.getBlock(), 1, 1);
+			}
+			if (isPatternedBannerModelScenario()
+				&& serverLevel.getBlockEntity(position) instanceof net.minecraft.world.level.block.entity.BannerBlockEntity banner) {
+				var bannerItem = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WHITE_BANNER);
+				bannerItem.set(net.minecraft.core.component.DataComponents.BANNER_PATTERNS, expectedBannerPatterns());
+				banner.applyComponentsFromItemStack(bannerItem);
+				banner.setChanged();
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+			}
+			if ("lectern".equals(MODEL_MESH_SCENARIO)
+				&& serverLevel.getBlockEntity(position) instanceof net.minecraft.world.level.block.entity.LecternBlockEntity lectern) {
+				lectern.setBook(new ItemStack(Items.WRITABLE_BOOK));
+			}
+			if (isOakSignModelScenario()
+				&& serverLevel.getBlockEntity(position) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
+				var frontText = sign.getFrontText()
+					.setMessage(0, net.minecraft.network.chat.Component.literal("Rust Vulkan"))
+					.setMessage(1, net.minecraft.network.chat.Component.literal("Frozen parity"));
+				sign.setText(frontText, true);
+				if (isGlowingBackOakSignModelScenario()) {
+					var backText = sign.getBackText()
+						.setMessage(0, net.minecraft.network.chat.Component.literal("Back face"))
+						.setMessage(1, net.minecraft.network.chat.Component.literal("Glow parity"))
+						.setColor(net.minecraft.world.item.DyeColor.YELLOW)
+						.setHasGlowingText(true);
+					sign.setText(backText, false);
+				}
+			}
+			if (isOakHangingSignModelScenario()
+				&& serverLevel.getBlockEntity(position) instanceof net.minecraft.world.level.block.entity.HangingSignBlockEntity sign) {
+				var text = sign.getFrontText()
+					.setMessage(0, net.minecraft.network.chat.Component.literal("Rust Vulkan"))
+					.setMessage(1, net.minecraft.network.chat.Component.literal("Frozen parity"));
+				sign.setText(text, true);
+			}
+			if ("campfire".equals(MODEL_MESH_SCENARIO)
+				&& serverLevel.getBlockEntity(position) instanceof net.minecraft.world.level.block.entity.CampfireBlockEntity campfire) {
+				campfire.getItems().set(0, new ItemStack(Items.BEEF));
+				campfire.setChanged();
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+			}
+			if ("oak-shelf".equals(MODEL_MESH_SCENARIO)
+				&& serverLevel.getBlockEntity(position) instanceof net.minecraft.world.level.block.entity.ShelfBlockEntity shelf) {
+				shelf.getItems().set(1, new ItemStack(Items.BEEF));
+				shelf.setChanged();
+			}
+			if ("brushable-block".equals(MODEL_MESH_SCENARIO)
+				&& serverLevel.getBlockEntity(position)
+					instanceof net.minecraft.world.level.block.entity.BrushableBlockEntity brushable) {
+				var output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
+					net.minecraft.util.ProblemReporter.DISCARDING, serverLevel.registryAccess());
+				output.store("item", ItemStack.CODEC, new ItemStack(Items.BEEF));
+				output.store("hit_direction", Direction.LEGACY_ID_CODEC, Direction.SOUTH);
+				brushable.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(
+					net.minecraft.util.ProblemReporter.DISCARDING, serverLevel.registryAccess(), output.buildResult()));
+				brushable.setChanged();
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+			}
+			if ("vault-unlocking".equals(MODEL_MESH_SCENARIO)
+				&& serverLevel.getBlockEntity(position)
+					instanceof net.minecraft.world.level.block.entity.vault.VaultBlockEntity vault) {
+				var serverData = new net.minecraft.nbt.CompoundTag();
+				serverData.putLong("state_updating_resumes_at", Long.MAX_VALUE);
+				var tag = new net.minecraft.nbt.CompoundTag();
+				tag.put("server_data", serverData);
+				vault.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(
+					net.minecraft.util.ProblemReporter.DISCARDING, serverLevel.registryAccess(), tag));
+				vault.getSharedData().setDisplayItem(new ItemStack(Items.BEEF));
+				vault.setChanged();
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+			}
+			if ("bell-shaking".equals(MODEL_MESH_SCENARIO)
+				&& serverLevel.getBlockEntity(position)
+					instanceof net.minecraft.world.level.block.entity.BellBlockEntity bell) {
+				bell.onHit(Direction.EAST);
+			}
+			if (isDecoratedPotModelScenario()
+				&& serverLevel.getBlockEntity(position)
+					instanceof net.minecraft.world.level.block.entity.DecoratedPotBlockEntity pot) {
+				ItemStack potItem = net.minecraft.world.level.block.entity.DecoratedPotBlockEntity
+					.createDecoratedPotItem(expectedDecoratedPotDecorations());
+				pot.applyComponentsFromItemStack(potItem);
+				pot.setChanged();
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+				if (isDecoratedPotWobbleScenario()) {
+					pot.wobble(expectedDecoratedPotWobbleStyle());
+				}
+			}
+			if ("spawner".equals(MODEL_MESH_SCENARIO)
+				&& serverLevel.getBlockEntity(position) instanceof net.minecraft.world.level.block.entity.SpawnerBlockEntity spawner) {
+				spawner.setEntityId(EntityType.PIG, serverLevel.getRandom());
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+			}
+			if (isTrialSpawnerModelScenario()
+				&& serverLevel.getBlockEntity(position)
+					instanceof net.minecraft.world.level.block.entity.TrialSpawnerBlockEntity spawner) {
+				spawner.setEntityId(EntityType.PIG, serverLevel.getRandom());
+				spawner.getTrialSpawner().setPlayerDetector((level, selector, blockPos, range, lineOfSight) -> List.of());
+				spawner.setState(serverLevel, expectedTrialSpawnerState());
+				if (expectedTrialSpawnerOminous()) {
+					spawner.getTrialSpawner().applyOminous(serverLevel, position);
+				}
+				if (expectedTrialSpawnerState()
+					== net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerState.ACTIVE) {
+					stabilizeActiveTrialSpawner(spawner, player.getUUID());
+				}
+				BlockState finalState = serverLevel.getBlockState(position);
+				serverLevel.sendBlockUpdated(position, finalState, finalState, 3);
+			}
+			if ("end-gateway".equals(MODEL_MESH_SCENARIO)
+				&& serverLevel.getBlockEntity(position)
+					instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity gateway) {
+				stabilizeEndGatewayFixture(serverLevel, position, gateway);
+				gateway.setChanged();
+				serverLevel.sendBlockUpdated(position, state, state, 3);
+			}
+			if (("structure-block-box".equals(MODEL_MESH_SCENARIO) || "structure-block-invisible-cells".equals(MODEL_MESH_SCENARIO))
+				&& serverLevel.getBlockEntity(position)
+					instanceof net.minecraft.world.level.block.entity.StructureBlockEntity structure) {
+				structure.setMode(net.minecraft.world.level.block.state.properties.StructureMode.SAVE);
+				structure.setStructurePos(new BlockPos(1, 1, 1));
+				structure.setStructureSize(new Vec3i(3, 2, 4));
+				boolean showInvisibleCells = "structure-block-invisible-cells".equals(MODEL_MESH_SCENARIO);
+				structure.setShowAir(showInvisibleCells);
+				structure.setShowBoundingBox(true);
+				structure.setChanged();
+				BlockState finalState = serverLevel.getBlockState(position);
+				serverLevel.sendBlockUpdated(position, finalState, finalState, 3);
+				if (showInvisibleCells) {
+					BlockPos origin = position.offset(1, 1, 1);
+					for (int x = 0; x < 3; x++) for (int y = 0; y < 2; y++) for (int z = 0; z < 4; z++)
+						serverLevel.setBlock(origin.offset(x, y, z), Blocks.STONE.defaultBlockState(), 3);
+					serverLevel.setBlock(origin, Blocks.AIR.defaultBlockState(), 3);
+					serverLevel.setBlock(origin.offset(1, 0, 0), Blocks.STRUCTURE_VOID.defaultBlockState(), 3);
+					serverLevel.setBlock(origin.offset(2, 0, 0), Blocks.BARRIER.defaultBlockState(), 3);
+					serverLevel.setBlock(origin.offset(0, 1, 0), Blocks.LIGHT.defaultBlockState(), 3);
+				}
+			}
+			if (("test-instance-composition".equals(MODEL_MESH_SCENARIO) || "test-instance-success".equals(MODEL_MESH_SCENARIO) || "test-instance-cleared".equals(MODEL_MESH_SCENARIO) || "test-instance-required-failed".equals(MODEL_MESH_SCENARIO) || "test-instance-optional-failed".equals(MODEL_MESH_SCENARIO))
+				&& serverLevel.getBlockEntity(position)
+					instanceof net.minecraft.world.level.block.entity.TestInstanceBlockEntity testInstance) {
+				boolean successful = "test-instance-success".equals(MODEL_MESH_SCENARIO);
+				boolean cleared = "test-instance-cleared".equals(MODEL_MESH_SCENARIO);
+				boolean requiredFailed = "test-instance-required-failed".equals(MODEL_MESH_SCENARIO);
+				boolean optionalFailed = "test-instance-optional-failed".equals(MODEL_MESH_SCENARIO);
+				var testKey = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.TEST_INSTANCE,
+					net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("mattmc_model_fixture", "optional_failure"));
+				testInstance.set(new net.minecraft.world.level.block.entity.TestInstanceBlockEntity.Data(
+					optionalFailed ? java.util.Optional.of(testKey) : java.util.Optional.empty(), new Vec3i(3, 2, 4), net.minecraft.world.level.block.Rotation.NONE,
+					false, cleared ? net.minecraft.world.level.block.entity.TestInstanceBlockEntity.Status.CLEARED
+						: successful || requiredFailed || optionalFailed ? net.minecraft.world.level.block.entity.TestInstanceBlockEntity.Status.FINISHED
+						: net.minecraft.world.level.block.entity.TestInstanceBlockEntity.Status.RUNNING,
+					requiredFailed || optionalFailed ? java.util.Optional.of(net.minecraft.network.chat.Component.literal(
+						optionalFailed ? "Optional failure" : "Required failure")) : java.util.Optional.empty()));
+				if (!successful && !cleared) testInstance.markError(position.offset(2, 1, 2), net.minecraft.network.chat.Component.literal("Expected failure"));
+				testInstance.setChanged();
+				BlockState finalState = serverLevel.getBlockState(position);
+				serverLevel.sendBlockUpdated(position, finalState, finalState, 3);
+			}
 		});
 		modelMeshSetupPosition = position;
 		modelMeshSetupStatus = "waiting-client-block-entity";
 		modelMeshSetupBlockId = state.getBlock().builtInRegistryHolder().key().location().toString();
 		modelMeshSetupOrigin = position.toShortString();
-		modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockEntity(position) != null;
+		modelMeshSetupClientBlockEntityPresent = minecraft.level.getBlockEntity(position) != null
+			&& (!isConduitModelScenario()
+				|| minecraft.level.getBlockEntity(position)
+					instanceof net.minecraft.world.level.block.entity.ConduitBlockEntity conduit
+					&& conduit.isActive() == isActiveConduitModelScenario()
+					&& conduit.isHunting() == isHuntingConduitModelScenario());
 		if (modelMeshSetupClientBlockEntityPresent) {
 			modelMeshSetupStatus = "spawned";
 		}
@@ -8022,9 +9923,566 @@ public final class DeterministicCameraCapture {
 			MODEL_MESH_SCENARIO, position);
 	}
 
+	private static void prepareActiveConduitFixture(ServerLevel level, BlockPos position) {
+		for (int x = -1; x <= 1; x++) {
+			for (int y = -1; y <= 1; y++) {
+				for (int z = -1; z <= 1; z++) {
+					BlockPos waterPosition = position.offset(x, y, z);
+					if (!waterPosition.equals(position)) {
+						level.setBlock(waterPosition, Blocks.WATER.defaultBlockState(), 3);
+					}
+				}
+			}
+		}
+		int requiredFrameBlocks = isHuntingConduitModelScenario() ? 42 : 16;
+		int frameBlocks = 0;
+		for (int x = -2; x <= 2 && frameBlocks < requiredFrameBlocks; x++) {
+			for (int y = -2; y <= 2 && frameBlocks < requiredFrameBlocks; y++) {
+				for (int z = -2; z <= 2 && frameBlocks < requiredFrameBlocks; z++) {
+					int ax = Math.abs(x);
+					int ay = Math.abs(y);
+					int az = Math.abs(z);
+					if ((ax > 1 || ay > 1 || az > 1)
+						&& (x == 0 && (ay == 2 || az == 2)
+							|| y == 0 && (ax == 2 || az == 2)
+							|| z == 0 && (ax == 2 || ay == 2))) {
+						level.setBlock(position.offset(x, y, z), Blocks.PRISMARINE.defaultBlockState(), 3);
+						frameBlocks++;
+					}
+				}
+			}
+		}
+	}
+
+	private static void stabilizeEndGatewayFixture(
+		net.minecraft.world.level.Level level, BlockPos position,
+		net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity gateway
+	) {
+		while (gateway.isSpawning()) {
+			net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity.beamAnimationTick(
+				level, position, Blocks.END_GATEWAY.defaultBlockState(), gateway);
+		}
+		gateway.triggerEvent(1, 0);
+		for (int tick = 0; tick < 20; tick++) {
+			net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity.beamAnimationTick(
+				level, position, Blocks.END_GATEWAY.defaultBlockState(), gateway);
+		}
+	}
+
+	private static boolean isItemFrameScenario() {
+		return "item-frame".equals(MODEL_MESH_SCENARIO) || "item-frame-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-item".equals(MODEL_MESH_SCENARIO) || "item-frame-map".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-item-rotated".equals(MODEL_MESH_SCENARIO) || "item-frame-map-rotated".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-map-decorated".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-map".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item-rotated".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-map-rotated".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-map-invisible".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-map-invisible".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isSpawnerModelScenario() {
+		return "spawner".equals(MODEL_MESH_SCENARIO) || isTrialSpawnerModelScenario();
+	}
+
+	private static boolean isBlockEntityModelScenario() {
+		return isChestModelScenario() || isBellModelScenario() || isBedModelScenario()
+			|| isCopperGolemStatueModelScenario()
+			|| isShulkerModelScenario() || isDecoratedPotModelScenario() || isConduitModelScenario()
+			|| isBannerModelScenario()
+			|| isSkullModelScenario()
+			|| isOakSignModelScenario()
+			|| isOakHangingSignModelScenario();
+	}
+
+	private static boolean isConduitModelScenario() {
+		return "conduit".equals(MODEL_MESH_SCENARIO)
+			|| "conduit-breaking".equals(MODEL_MESH_SCENARIO)
+			|| isActiveConduitModelScenario();
+	}
+
+	private static boolean isBreakingConduitModelScenario() {
+		return "conduit-breaking".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isActiveConduitModelScenario() {
+		return "conduit-active".equals(MODEL_MESH_SCENARIO) || isHuntingConduitModelScenario();
+	}
+
+	private static boolean isHuntingConduitModelScenario() {
+		return "conduit-hunting".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isDecoratedPotModelScenario() {
+		return "decorated-pot".equals(MODEL_MESH_SCENARIO) || isDecoratedPotSherdsScenario()
+			|| isDecoratedPotWobbleScenario() || isDecoratedPotDirectionScenario();
+	}
+
+	private static boolean isDecoratedPotSherdsScenario() {
+		return "decorated-pot-sherds".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isDecoratedPotWobbleScenario() {
+		return "decorated-pot-wobble-positive".equals(MODEL_MESH_SCENARIO)
+			|| "decorated-pot-wobble-negative".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isDecoratedPotDirectionScenario() {
+		return "decorated-pot-north".equals(MODEL_MESH_SCENARIO)
+			|| "decorated-pot-east".equals(MODEL_MESH_SCENARIO)
+			|| "decorated-pot-west".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static Direction expectedDecoratedPotFacing() {
+		return switch (MODEL_MESH_SCENARIO) {
+			case "decorated-pot-north" -> Direction.NORTH;
+			case "decorated-pot-east" -> Direction.EAST;
+			case "decorated-pot-west" -> Direction.WEST;
+			default -> Direction.SOUTH;
+		};
+	}
+
+	private static net.minecraft.world.level.block.entity.DecoratedPotBlockEntity.WobbleStyle expectedDecoratedPotWobbleStyle() {
+		return "decorated-pot-wobble-negative".equals(MODEL_MESH_SCENARIO)
+			? net.minecraft.world.level.block.entity.DecoratedPotBlockEntity.WobbleStyle.NEGATIVE
+			: net.minecraft.world.level.block.entity.DecoratedPotBlockEntity.WobbleStyle.POSITIVE;
+	}
+
+	private static float decoratedPotWobbleProgress(
+		net.minecraft.world.level.block.entity.DecoratedPotBlockEntity pot
+	) {
+		return pot.getLevel() == null || pot.lastWobbleStyle == null ? 0.0F
+			: (float)(pot.getLevel().getGameTime() - pot.wobbleStartedAtTick)
+				/ pot.lastWobbleStyle.duration;
+	}
+
+	private static boolean decoratedPotWobbleStateReady(
+		net.minecraft.world.level.block.entity.DecoratedPotBlockEntity pot
+	) {
+		if (!isDecoratedPotWobbleScenario()) return pot.lastWobbleStyle == null;
+		float progress = decoratedPotWobbleProgress(pot);
+		return pot.lastWobbleStyle == expectedDecoratedPotWobbleStyle()
+			&& progress > 0.0F && progress <= 0.75F;
+	}
+
+	private static void maintainDecoratedPotWobbleFixture(Minecraft minecraft) {
+		if (!isDecoratedPotWobbleScenario() || minecraft.level == null || modelMeshSetupPosition == null
+			|| !(minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.DecoratedPotBlockEntity pot)) return;
+		float progress = decoratedPotWobbleProgress(pot);
+		if (pot.lastWobbleStyle == expectedDecoratedPotWobbleStyle()
+			&& progress <= 0.75F) return;
+		long gameTime = minecraft.level.getGameTime();
+		if (decoratedPotWobbleLastRequestedGameTime == gameTime) return;
+		decoratedPotWobbleLastRequestedGameTime = gameTime;
+		MinecraftServer server = minecraft.getSingleplayerServer();
+		var dimension = minecraft.level.dimension();
+		BlockPos position = modelMeshSetupPosition;
+		if (server != null) server.execute(() -> {
+			ServerLevel level = server.getLevel(dimension);
+			if (level != null && level.getBlockEntity(position)
+				instanceof net.minecraft.world.level.block.entity.DecoratedPotBlockEntity serverPot) {
+				serverPot.wobble(expectedDecoratedPotWobbleStyle());
+			}
+		});
+	}
+
+	private static net.minecraft.world.level.block.entity.PotDecorations expectedDecoratedPotDecorations() {
+		return isDecoratedPotSherdsScenario()
+			? new net.minecraft.world.level.block.entity.PotDecorations(
+				Items.ANGLER_POTTERY_SHERD, Items.ARCHER_POTTERY_SHERD,
+				Items.ARMS_UP_POTTERY_SHERD, Items.BLADE_POTTERY_SHERD)
+			: net.minecraft.world.level.block.entity.PotDecorations.EMPTY;
+	}
+
+	private static List<String> expectedDecoratedPotSideMaterials() {
+		return isDecoratedPotSherdsScenario()
+			? List.of(
+				"minecraft:entity/decorated_pot/blade_pottery_pattern",
+				"minecraft:entity/decorated_pot/angler_pottery_pattern",
+				"minecraft:entity/decorated_pot/archer_pottery_pattern",
+				"minecraft:entity/decorated_pot/arms_up_pottery_pattern")
+			: List.of("minecraft:entity/decorated_pot/decorated_pot_side");
+	}
+
+	private static boolean isShulkerModelScenario() {
+		return "shulker".equals(MODEL_MESH_SCENARIO) || isOpenedEastShulkerModelScenario()
+			|| isDefaultShulkerModelScenario();
+	}
+
+	private static boolean isOpenedEastShulkerModelScenario() {
+		return "shulker-open-east".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isDefaultShulkerModelScenario() {
+		return "shulker-default".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isBannerModelScenario() {
+		return "white-banner".equals(MODEL_MESH_SCENARIO) || "red-banner".equals(MODEL_MESH_SCENARIO)
+			|| isPatternedBannerModelScenario()
+			|| isWallBannerModelScenario();
+	}
+
+	private static boolean isPatternedBannerModelScenario() {
+		return "white-banner-red-cross".equals(MODEL_MESH_SCENARIO) || isTwoPatternBannerModelScenario();
+	}
+
+	private static boolean isTwoPatternBannerModelScenario() {
+		return "white-banner-two-patterns".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isWallBannerModelScenario() {
+		return MODEL_MESH_SCENARIO.equals("white-wall-banner")
+			|| MODEL_MESH_SCENARIO.startsWith("white-wall-banner-");
+	}
+
+	private static net.minecraft.world.item.DyeColor expectedBannerBaseColor() {
+		return "red-banner".equals(MODEL_MESH_SCENARIO)
+			? net.minecraft.world.item.DyeColor.RED : net.minecraft.world.item.DyeColor.WHITE;
+	}
+
+	private static Direction expectedWallBannerFacing() {
+		return switch (MODEL_MESH_SCENARIO) {
+			case "white-wall-banner-south" -> Direction.SOUTH;
+			case "white-wall-banner-east" -> Direction.EAST;
+			case "white-wall-banner-west" -> Direction.WEST;
+			default -> Direction.NORTH;
+		};
+	}
+
+	private static boolean hasExpectedBannerBlockState(BlockState state) {
+		return isWallBannerModelScenario()
+			? state.is(Blocks.WHITE_WALL_BANNER)
+				&& state.getValue(net.minecraft.world.level.block.WallBannerBlock.FACING) == expectedWallBannerFacing()
+			: state.is("red-banner".equals(MODEL_MESH_SCENARIO) ? Blocks.RED_BANNER : Blocks.WHITE_BANNER)
+				&& state.getValue(net.minecraft.world.level.block.BannerBlock.ROTATION) == 8;
+	}
+
+	private static net.minecraft.world.level.block.entity.BannerPatternLayers expectedBannerPatterns() {
+		if (!isPatternedBannerModelScenario()) return net.minecraft.world.level.block.entity.BannerPatternLayers.EMPTY;
+		var cross = new net.minecraft.world.level.block.entity.BannerPatternLayers.Layer(
+				net.minecraft.core.Holder.direct(new net.minecraft.world.level.block.entity.BannerPattern(
+					net.minecraft.resources.ResourceLocation.withDefaultNamespace("cross"), "block.minecraft.banner.cross")),
+				net.minecraft.world.item.DyeColor.RED);
+		if (!isTwoPatternBannerModelScenario()) {
+			return new net.minecraft.world.level.block.entity.BannerPatternLayers(List.of(cross));
+		}
+		var border = new net.minecraft.world.level.block.entity.BannerPatternLayers.Layer(
+			net.minecraft.core.Holder.direct(new net.minecraft.world.level.block.entity.BannerPattern(
+				net.minecraft.resources.ResourceLocation.withDefaultNamespace("border"), "block.minecraft.banner.border")),
+			net.minecraft.world.item.DyeColor.BLUE);
+		return new net.minecraft.world.level.block.entity.BannerPatternLayers(List.of(cross, border));
+	}
+
+	private static boolean isSkullModelScenario() {
+		return "skeleton-skull".equals(MODEL_MESH_SCENARIO)
+			|| isBreakingSkullModelScenario()
+			|| "wither-skeleton-skull".equals(MODEL_MESH_SCENARIO)
+			|| "zombie-head".equals(MODEL_MESH_SCENARIO)
+			|| "creeper-head".equals(MODEL_MESH_SCENARIO)
+			|| isAnimatedSkullModelScenario()
+			|| isPlayerHeadModelScenario()
+			|| isWallSkullModelScenario();
+	}
+
+	private static boolean isBreakingSkullModelScenario() {
+		return "skeleton-skull-breaking".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isPlayerHeadModelScenario() {
+		return "player-head-profile".equals(MODEL_MESH_SCENARIO)
+			|| "player-wall-head-profile".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isAnimatedSkullModelScenario() {
+		return "dragon-head-animated".equals(MODEL_MESH_SCENARIO)
+			|| "piglin-head-animated".equals(MODEL_MESH_SCENARIO)
+			|| "dragon-wall-head-animated".equals(MODEL_MESH_SCENARIO)
+			|| "piglin-wall-head-animated".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isWallSkullModelScenario() {
+		return MODEL_MESH_SCENARIO.equals("skeleton-wall-skull")
+			|| MODEL_MESH_SCENARIO.startsWith("skeleton-wall-skull-")
+			|| MODEL_MESH_SCENARIO.equals("wither-skeleton-wall-skull")
+			|| MODEL_MESH_SCENARIO.equals("zombie-wall-head")
+			|| MODEL_MESH_SCENARIO.equals("creeper-wall-head")
+			|| MODEL_MESH_SCENARIO.equals("dragon-wall-head-animated")
+			|| MODEL_MESH_SCENARIO.equals("piglin-wall-head-animated")
+			|| MODEL_MESH_SCENARIO.equals("player-wall-head-profile");
+	}
+
+	private static Direction expectedWallSkullFacing() {
+		return switch (MODEL_MESH_SCENARIO) {
+			case "skeleton-wall-skull-south" -> Direction.SOUTH;
+			case "skeleton-wall-skull-east" -> Direction.EAST;
+			case "skeleton-wall-skull-west" -> Direction.WEST;
+			default -> Direction.NORTH;
+		};
+	}
+
+	private static boolean hasExpectedSkullBlockState(BlockState state) {
+		return isWallSkullModelScenario()
+			? state.is(expectedWallSkullBlock())
+				&& state.getValue(net.minecraft.world.level.block.WallSkullBlock.FACING) == expectedWallSkullFacing()
+			: state.is(expectedStandingSkullBlock())
+				&& state.getValue(net.minecraft.world.level.block.SkullBlock.ROTATION) == 8;
+	}
+
+	private static net.minecraft.world.level.block.Block expectedWallSkullBlock() {
+		return switch (MODEL_MESH_SCENARIO) {
+			case "wither-skeleton-wall-skull" -> Blocks.WITHER_SKELETON_WALL_SKULL;
+			case "zombie-wall-head" -> Blocks.ZOMBIE_WALL_HEAD;
+			case "creeper-wall-head" -> Blocks.CREEPER_WALL_HEAD;
+			case "dragon-wall-head-animated" -> Blocks.DRAGON_WALL_HEAD;
+			case "piglin-wall-head-animated" -> Blocks.PIGLIN_WALL_HEAD;
+			case "player-wall-head-profile" -> Blocks.PLAYER_WALL_HEAD;
+			default -> Blocks.SKELETON_WALL_SKULL;
+		};
+	}
+
+	private static net.minecraft.world.level.block.Block expectedStandingSkullBlock() {
+		return switch (MODEL_MESH_SCENARIO) {
+			case "wither-skeleton-skull" -> Blocks.WITHER_SKELETON_SKULL;
+			case "zombie-head" -> Blocks.ZOMBIE_HEAD;
+			case "creeper-head" -> Blocks.CREEPER_HEAD;
+			case "dragon-head-animated" -> Blocks.DRAGON_HEAD;
+			case "piglin-head-animated" -> Blocks.PIGLIN_HEAD;
+			case "player-head-profile" -> Blocks.PLAYER_HEAD;
+			default -> Blocks.SKELETON_SKULL;
+		};
+	}
+
+	private static net.minecraft.world.level.block.SkullBlock.Type expectedSkullType() {
+		return switch (MODEL_MESH_SCENARIO) {
+			case "wither-skeleton-skull", "wither-skeleton-wall-skull" -> net.minecraft.world.level.block.SkullBlock.Types.WITHER_SKELETON;
+			case "zombie-head", "zombie-wall-head" -> net.minecraft.world.level.block.SkullBlock.Types.ZOMBIE;
+			case "creeper-head", "creeper-wall-head" -> net.minecraft.world.level.block.SkullBlock.Types.CREEPER;
+			case "dragon-head-animated", "dragon-wall-head-animated" -> net.minecraft.world.level.block.SkullBlock.Types.DRAGON;
+			case "piglin-head-animated", "piglin-wall-head-animated" -> net.minecraft.world.level.block.SkullBlock.Types.PIGLIN;
+			case "player-head-profile", "player-wall-head-profile" -> net.minecraft.world.level.block.SkullBlock.Types.PLAYER;
+			default -> net.minecraft.world.level.block.SkullBlock.Types.SKELETON;
+		};
+	}
+
+	private static net.minecraft.world.item.component.ResolvableProfile expectedPlayerHeadProfile() {
+		return net.minecraft.world.item.component.ResolvableProfile.createResolved(
+			net.minecraft.server.profile.PlayerProfile.createOffline("MattMCFixture"));
+	}
+
+	private static boolean isChestModelScenario() {
+		return "chest".equals(MODEL_MESH_SCENARIO) || isDoubleChestModelScenario()
+			|| isTrappedChestModelScenario() || isEnderChestModelScenario();
+	}
+
+	private static boolean isEnderChestModelScenario() {
+		return "chest-ender".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isTrappedChestModelScenario() {
+		return "chest-trapped".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isDoubleChestModelScenario() {
+		return "chest-double".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isBedModelScenario() {
+		return "bed".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isBellModelScenario() {
+		return "bell".equals(MODEL_MESH_SCENARIO) || "bell-shaking".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isCopperGolemStatueModelScenario() {
+		return "copper-golem-statue".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static net.minecraft.world.level.block.CopperGolemStatueBlock.Pose configuredModelMeshStatuePose() {
+		String value = System.getProperty("mattmc.dev.rustGalWorldMesh.statuePose", "standing").trim().toLowerCase(Locale.ROOT);
+		return switch (value) {
+			case "standing" -> net.minecraft.world.level.block.CopperGolemStatueBlock.Pose.STANDING;
+			case "running" -> net.minecraft.world.level.block.CopperGolemStatueBlock.Pose.RUNNING;
+			case "sitting" -> net.minecraft.world.level.block.CopperGolemStatueBlock.Pose.SITTING;
+			case "star" -> net.minecraft.world.level.block.CopperGolemStatueBlock.Pose.STAR;
+			default -> throw new IllegalArgumentException("invalid deterministic copper-golem statue pose: " + value);
+		};
+	}
+
+	private static WeatheringCopper.WeatherState configuredModelMeshStatueWeathering() {
+		String value = System.getProperty("mattmc.dev.rustGalWorldMesh.statueWeathering", "unaffected").trim().toLowerCase(Locale.ROOT);
+		return switch (value) {
+			case "unaffected" -> WeatheringCopper.WeatherState.UNAFFECTED;
+			case "exposed" -> WeatheringCopper.WeatherState.EXPOSED;
+			case "weathered" -> WeatheringCopper.WeatherState.WEATHERED;
+			case "oxidized" -> WeatheringCopper.WeatherState.OXIDIZED;
+			default -> throw new IllegalArgumentException("invalid deterministic copper-golem statue weathering: " + value);
+		};
+	}
+
+	private static net.minecraft.world.level.block.Block expectedCopperGolemStatueBlock() {
+		return switch (MODEL_MESH_STATUE_WEATHERING) {
+			case UNAFFECTED -> MODEL_MESH_STATUE_WAXED ? Blocks.WAXED_COPPER_GOLEM_STATUE : Blocks.COPPER_GOLEM_STATUE;
+			case EXPOSED -> MODEL_MESH_STATUE_WAXED ? Blocks.WAXED_EXPOSED_COPPER_GOLEM_STATUE : Blocks.EXPOSED_COPPER_GOLEM_STATUE;
+			case WEATHERED -> MODEL_MESH_STATUE_WAXED ? Blocks.WAXED_WEATHERED_COPPER_GOLEM_STATUE : Blocks.WEATHERED_COPPER_GOLEM_STATUE;
+			case OXIDIZED -> MODEL_MESH_STATUE_WAXED ? Blocks.WAXED_OXIDIZED_COPPER_GOLEM_STATUE : Blocks.OXIDIZED_COPPER_GOLEM_STATUE;
+		};
+	}
+
+	private static String expectedCopperGolemStatueTextureId() {
+		String name = switch (MODEL_MESH_STATUE_WEATHERING) {
+			case UNAFFECTED -> "copper_golem";
+			case EXPOSED -> "exposed_copper_golem";
+			case WEATHERED -> "weathered_copper_golem";
+			case OXIDIZED -> "oxidized_copper_golem";
+		};
+		return "minecraft:textures/entity/copper_golem/" + name + ".png";
+	}
+
+	private static boolean expectedBellShaking() {
+		return "bell-shaking".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isBlockEntityItemFixtureScenario() {
+		return "campfire".equals(MODEL_MESH_SCENARIO) || "oak-shelf".equals(MODEL_MESH_SCENARIO)
+			|| "brushable-block".equals(MODEL_MESH_SCENARIO)
+			|| "vault-unlocking".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static String expectedBlockEntityItemOwner() {
+		return switch (MODEL_MESH_SCENARIO) {
+			case "oak-shelf" -> "minecraft:oak_shelf";
+			case "brushable-block" -> "minecraft:suspicious_sand";
+			case "vault-unlocking" -> "minecraft:vault";
+			default -> "minecraft:campfire";
+		};
+	}
+
+	private static boolean isTrialSpawnerModelScenario() {
+		return "trial-spawner".equals(MODEL_MESH_SCENARIO)
+			|| "trial-spawner-ominous".equals(MODEL_MESH_SCENARIO)
+			|| "trial-spawner-active".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerState expectedTrialSpawnerState() {
+		return "trial-spawner-active".equals(MODEL_MESH_SCENARIO)
+			? net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerState.ACTIVE
+			: net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerState.WAITING_FOR_PLAYERS;
+	}
+
+	private static boolean expectedTrialSpawnerOminous() {
+		return "trial-spawner-ominous".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static void stabilizeActiveTrialSpawner(
+		net.minecraft.world.level.block.entity.TrialSpawnerBlockEntity spawner, UUID playerId
+	) {
+		var data = spawner.getTrialSpawner().getStateData();
+		var packed = data.pack();
+		data.apply(new net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerStateData.Packed(
+			Set.of(playerId), Set.of(), packed.cooldownEndsAt(), Long.MAX_VALUE, 0,
+			packed.nextSpawnData(), packed.ejectingLootTable()));
+	}
+
+	private static boolean isItemFrameItemScenario() {
+		return "item-frame-item".equals(MODEL_MESH_SCENARIO) || "item-frame-item-rotated".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item-rotated".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isInvisibleItemFrameScenario() {
+		return "item-frame-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-map-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-map-invisible".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isItemFrameMapScenario() {
+		return "item-frame-map".equals(MODEL_MESH_SCENARIO) || "item-frame-map-rotated".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-map-decorated".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-map".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-map-rotated".equals(MODEL_MESH_SCENARIO)
+			|| "item-frame-map-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-map-invisible".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isItemFrameDecoratedMapScenario() {
+		return "item-frame-map-decorated".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static int expectedItemFrameRotation() {
+		return MODEL_MESH_SCENARIO.endsWith("-rotated") ? 3 : 0;
+	}
+
+	private static boolean itemFrameFixtureItemMatches(ItemFrame frame) {
+		if (isItemFrameMapScenario()) {
+			return frame.getItem().is(Items.FILLED_MAP) && frame.getItem().get(DataComponents.MAP_ID) != null
+				&& itemFrameDecorationMatches(frame);
+		}
+		return isItemFrameItemScenario() ? frame.getItem().is(Items.DIAMOND) : frame.getItem().isEmpty();
+	}
+
+	private static boolean itemFrameDecorationMatches(ItemFrame frame) {
+		if (!isItemFrameDecoratedMapScenario()) return true;
+		MapItemSavedData data = MapItem.getSavedData(frame.getItem(), frame.level());
+		if (data == null) return false;
+		for (MapDecoration decoration : data.getDecorations()) {
+			if (decoration.getSpriteLocation().equals(ResourceLocation.withDefaultNamespace("red_x"))
+				&& decoration.x() == 24 && decoration.y() == -16 && decoration.rot() == 5
+				&& decoration.renderOnFrame()) return true;
+		}
+		return false;
+	}
+
+	private static ItemStack itemFrameFixtureItem(ServerLevel serverLevel, BlockPos framePos) {
+		if (isItemFrameMapScenario()) {
+			ItemStack map = MapItem.create(serverLevel, framePos.getX(), framePos.getZ(), (byte)0, false, false);
+			MapItemSavedData data = MapItem.getSavedData(map, serverLevel);
+			if (data == null) throw new IllegalStateException("framed-map fixture did not create saved map data");
+			for (int y = 0; y < 128; y++) {
+				for (int x = 0; x < 128; x++) data.colors[x + y * 128] = (byte)(((x / 16 + y / 16) & 1) == 0 ? 30 : 46);
+			}
+			data.setDirty();
+			if (isItemFrameDecoratedMapScenario()) {
+				map.update(DataComponents.MAP_DECORATIONS, MapDecorations.EMPTY, decorations -> decorations.withDecoration(
+					"mattmc-audit-red-x",
+					new MapDecorations.Entry(MapDecorationTypes.RED_X, data.centerX + 12.0, data.centerZ - 8.25, 112.5F)
+				));
+			}
+			return map;
+		}
+		return isItemFrameItemScenario() ? new ItemStack(Items.DIAMOND) : ItemStack.EMPTY;
+	}
+
+	private static boolean isGlowItemFrameScenario() {
+		return "glow-item-frame".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-map".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item-rotated".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-map-rotated".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
+			|| "glow-item-frame-map-invisible".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static EntityType<?> expectedItemFrameType() {
+		return isGlowItemFrameScenario() ? EntityType.GLOW_ITEM_FRAME : EntityType.ITEM_FRAME;
+	}
+
+	private static String itemFrameSemanticIdentity() {
+		return isGlowItemFrameScenario() ? "minecraft:glow_item_frame" : "minecraft:item_frame";
+	}
+
 	private static boolean isModelMeshEntityScenario() {
 		return switch (MODEL_MESH_SCENARIO) {
-			case "llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "rabbit", "sheep", "tropical-fish", "zombie", "end-crystal", "wind-charge" -> true;
+			case "llama-spit", "evoker-fangs", "wither-skull", "chicken", "cow", "pig", "pig-saddled", "horse-saddled", "horse-creamy-saddled", "horse-chestnut-saddled", "horse-brown-saddled", "horse-black-saddled", "horse-gray-saddled", "horse-dark-brown-saddled", "horse-baby-saddled", "horse-baby-creamy-saddled", "horse-baby-chestnut-saddled", "horse-baby-brown-saddled", "horse-baby-black-saddled", "horse-baby-gray-saddled", "horse-baby-dark-brown-saddled", "horse-baby-diamond-equipped", "horse-baby-copper-equipped", "horse-baby-iron-equipped", "horse-baby-gold-equipped", "horse-baby-netherite-equipped", "horse-baby-dyed-leather-equipped", "horse-white-dots-marked-saddled", "horse-white-marked-saddled", "horse-white-field-marked-saddled", "horse-black-dots-marked-saddled", "horse-creamy-white-dots-marked-saddled", "horse-brown-white-dots-marked-saddled", "horse-black-white-dots-marked-saddled", "horse-gray-white-dots-marked-saddled", "horse-dark-brown-white-dots-marked-saddled", "horse-chestnut-white-dots-marked-saddled", "horse-creamy-white-marked-saddled", "horse-brown-white-marked-saddled", "horse-black-white-marked-saddled", "horse-gray-white-marked-saddled", "horse-dark-brown-white-marked-saddled", "horse-chestnut-white-marked-saddled", "horse-creamy-white-field-marked-saddled", "horse-brown-white-field-marked-saddled", "horse-black-white-field-marked-saddled", "horse-gray-white-field-marked-saddled", "horse-dark-brown-white-field-marked-saddled", "horse-chestnut-white-field-marked-saddled", "horse-creamy-black-dots-marked-saddled", "horse-brown-black-dots-marked-saddled", "horse-black-black-dots-marked-saddled", "horse-gray-black-dots-marked-saddled", "horse-dark-brown-black-dots-marked-saddled", "horse-chestnut-black-dots-marked-saddled", "horse-baby-marked-saddled", "horse-baby-white-marked-saddled", "horse-baby-white-field-marked-saddled", "horse-baby-black-dots-marked-saddled", "horse-baby-creamy-white-dots-marked-saddled", "horse-baby-creamy-white-marked-saddled", "horse-baby-creamy-white-field-marked-saddled", "horse-baby-creamy-black-dots-marked-saddled", "horse-baby-chestnut-white-dots-marked-saddled", "horse-baby-chestnut-white-marked-saddled", "horse-baby-chestnut-white-field-marked-saddled", "horse-baby-chestnut-black-dots-marked-saddled", "horse-baby-brown-white-dots-marked-saddled", "horse-baby-brown-white-marked-saddled", "horse-baby-brown-white-field-marked-saddled", "horse-baby-brown-black-dots-marked-saddled", "horse-baby-black-white-dots-marked-saddled", "horse-baby-black-white-marked-saddled", "horse-baby-black-white-field-marked-saddled", "horse-baby-black-black-dots-marked-saddled", "horse-baby-gray-white-dots-marked-saddled", "horse-baby-gray-white-marked-saddled", "horse-baby-gray-white-field-marked-saddled", "horse-baby-gray-black-dots-marked-saddled", "horse-baby-dark-brown-white-dots-marked-saddled", "horse-baby-dark-brown-white-marked-saddled", "horse-baby-dark-brown-white-field-marked-saddled", "horse-baby-dark-brown-black-dots-marked-saddled", "horse-diamond-equipped", "horse-creamy-diamond-equipped", "horse-chestnut-diamond-equipped", "horse-chestnut-copper-equipped", "horse-chestnut-iron-equipped", "horse-chestnut-gold-equipped", "horse-chestnut-netherite-equipped", "horse-creamy-copper-equipped", "horse-creamy-iron-equipped", "horse-creamy-gold-equipped", "horse-creamy-netherite-equipped", "horse-copper-equipped", "horse-iron-equipped", "horse-gold-equipped", "horse-netherite-equipped", "horse-dyed-leather-equipped", "horse-creamy-dyed-leather-equipped", "horse-chestnut-dyed-leather-equipped", "donkey-saddled", "donkey-baby-saddled", "donkey-chested-saddled", "donkey-baby-chested-saddled", "mule-saddled", "mule-chested-saddled", "mule-baby-chested-saddled", "mule-baby-saddled", "strider-saddled", "camel-saddled", "nautilus-equipped", "nautilus-baby-equipped", "nautilus-copper-equipped", "nautilus-iron-equipped", "nautilus-gold-equipped", "nautilus-netherite-equipped", "zombie-nautilus-equipped", "zombie-nautilus-coral-equipped", "rabbit", "sheep", "sheep-red", "tropical-fish", "spider", "enderman", "phantom", "creaking", "breeze", "bogged", "stray", "drowned", "slime", "cat", "wolf-collar", "iron-golem-cracks", "snow-golem", "item-frame", "item-frame-invisible", "glow-item-frame", "glow-item-frame-invisible", "item-frame-item", "item-frame-map", "item-frame-item-rotated", "item-frame-map-rotated", "item-frame-map-decorated", "item-frame-item-invisible", "glow-item-frame-item-invisible", "glow-item-frame-item", "glow-item-frame-map", "glow-item-frame-item-rotated", "glow-item-frame-map-rotated", "item-frame-map-invisible", "glow-item-frame-map-invisible", "villager", "zombie-villager", "copper-golem", "warden", "wolf", "zombie", "powered-creeper", "powered-wither", "invulnerable-wither", "end-crystal", "wind-charge" -> true;
 			default -> false;
 		};
 	}
@@ -8035,11 +10493,49 @@ public final class DeterministicCameraCapture {
 			case "evoker-fangs" -> "minecraft:evoker_fangs";
 			case "chicken" -> "minecraft:chicken";
 			case "cow" -> "minecraft:cow";
-			case "pig" -> "minecraft:pig";
+			case "pig", "pig-saddled" -> "minecraft:pig";
+			case "horse-saddled", "horse-creamy-saddled", "horse-chestnut-saddled", "horse-brown-saddled", "horse-black-saddled", "horse-gray-saddled", "horse-dark-brown-saddled", "horse-baby-saddled", "horse-baby-creamy-saddled", "horse-baby-chestnut-saddled", "horse-baby-brown-saddled", "horse-baby-black-saddled", "horse-baby-gray-saddled", "horse-baby-dark-brown-saddled", "horse-baby-diamond-equipped", "horse-baby-copper-equipped", "horse-baby-iron-equipped", "horse-baby-gold-equipped", "horse-baby-netherite-equipped", "horse-baby-dyed-leather-equipped", "horse-white-dots-marked-saddled", "horse-white-marked-saddled", "horse-white-field-marked-saddled", "horse-black-dots-marked-saddled", "horse-creamy-white-dots-marked-saddled", "horse-brown-white-dots-marked-saddled", "horse-black-white-dots-marked-saddled", "horse-gray-white-dots-marked-saddled", "horse-dark-brown-white-dots-marked-saddled", "horse-chestnut-white-dots-marked-saddled", "horse-creamy-white-marked-saddled", "horse-brown-white-marked-saddled", "horse-black-white-marked-saddled", "horse-gray-white-marked-saddled", "horse-dark-brown-white-marked-saddled", "horse-chestnut-white-marked-saddled", "horse-creamy-white-field-marked-saddled", "horse-brown-white-field-marked-saddled", "horse-black-white-field-marked-saddled", "horse-gray-white-field-marked-saddled", "horse-dark-brown-white-field-marked-saddled", "horse-chestnut-white-field-marked-saddled", "horse-creamy-black-dots-marked-saddled", "horse-brown-black-dots-marked-saddled", "horse-black-black-dots-marked-saddled", "horse-gray-black-dots-marked-saddled", "horse-dark-brown-black-dots-marked-saddled", "horse-chestnut-black-dots-marked-saddled", "horse-baby-marked-saddled", "horse-baby-white-marked-saddled", "horse-baby-white-field-marked-saddled", "horse-baby-black-dots-marked-saddled", "horse-baby-creamy-white-dots-marked-saddled", "horse-baby-creamy-white-marked-saddled", "horse-baby-creamy-white-field-marked-saddled", "horse-baby-creamy-black-dots-marked-saddled", "horse-baby-chestnut-white-dots-marked-saddled", "horse-baby-chestnut-white-marked-saddled", "horse-baby-chestnut-white-field-marked-saddled", "horse-baby-chestnut-black-dots-marked-saddled", "horse-baby-brown-white-dots-marked-saddled", "horse-baby-brown-white-marked-saddled", "horse-baby-brown-white-field-marked-saddled", "horse-baby-brown-black-dots-marked-saddled", "horse-baby-black-white-dots-marked-saddled", "horse-baby-black-white-marked-saddled", "horse-baby-black-white-field-marked-saddled", "horse-baby-black-black-dots-marked-saddled", "horse-baby-gray-white-dots-marked-saddled", "horse-baby-gray-white-marked-saddled", "horse-baby-gray-white-field-marked-saddled", "horse-baby-gray-black-dots-marked-saddled", "horse-baby-dark-brown-white-dots-marked-saddled", "horse-baby-dark-brown-white-marked-saddled", "horse-baby-dark-brown-white-field-marked-saddled", "horse-baby-dark-brown-black-dots-marked-saddled", "horse-diamond-equipped", "horse-creamy-diamond-equipped", "horse-chestnut-diamond-equipped", "horse-chestnut-copper-equipped", "horse-chestnut-iron-equipped", "horse-chestnut-gold-equipped", "horse-chestnut-netherite-equipped", "horse-creamy-copper-equipped", "horse-creamy-iron-equipped", "horse-creamy-gold-equipped", "horse-creamy-netherite-equipped", "horse-copper-equipped", "horse-iron-equipped", "horse-gold-equipped", "horse-netherite-equipped", "horse-dyed-leather-equipped", "horse-creamy-dyed-leather-equipped", "horse-chestnut-dyed-leather-equipped" -> "minecraft:horse";
+			case "donkey-saddled" -> "minecraft:donkey";
+			case "donkey-baby-saddled" -> "minecraft:donkey";
+			case "donkey-chested-saddled" -> "minecraft:donkey";
+			case "donkey-baby-chested-saddled" -> "minecraft:donkey";
+			case "mule-saddled" -> "minecraft:mule";
+			case "mule-chested-saddled" -> "minecraft:mule";
+			case "mule-baby-chested-saddled" -> "minecraft:mule";
+			case "mule-baby-saddled" -> "minecraft:mule";
+			case "strider-saddled" -> "minecraft:strider";
+			case "camel-saddled" -> "minecraft:camel";
+			case "nautilus-equipped", "nautilus-baby-equipped", "nautilus-copper-equipped", "nautilus-iron-equipped", "nautilus-gold-equipped", "nautilus-netherite-equipped" -> "minecraft:nautilus";
+			case "zombie-nautilus-equipped", "zombie-nautilus-coral-equipped" -> "minecraft:zombie_nautilus";
 			case "rabbit" -> "minecraft:rabbit";
-			case "sheep" -> "minecraft:sheep";
+			case "sheep", "sheep-red" -> "minecraft:sheep";
 			case "tropical-fish" -> "minecraft:tropical_fish";
+			case "spider" -> "minecraft:spider";
+			case "enderman" -> "minecraft:enderman";
+			case "phantom" -> "minecraft:phantom";
+			case "creaking" -> "minecraft:creaking";
+			case "breeze" -> "minecraft:breeze";
+			case "bogged" -> "minecraft:bogged";
+			case "stray" -> "minecraft:stray";
+			case "drowned" -> "minecraft:drowned";
+			case "slime" -> "minecraft:slime";
+			case "cat" -> "minecraft:cat";
+			case "wolf-collar" -> "minecraft:wolf";
+			case "iron-golem-cracks" -> "minecraft:iron_golem";
+			case "snow-golem" -> "minecraft:snow_golem";
+			case "item-frame", "item-frame-invisible" -> "minecraft:item_frame";
+			case "glow-item-frame", "glow-item-frame-invisible" -> "minecraft:glow_item_frame";
+			case "item-frame-item", "item-frame-map", "item-frame-item-rotated", "item-frame-map-rotated", "item-frame-map-decorated", "item-frame-item-invisible", "item-frame-map-invisible" -> "minecraft:item_frame";
+			case "glow-item-frame-item", "glow-item-frame-map", "glow-item-frame-item-rotated", "glow-item-frame-map-rotated", "glow-item-frame-item-invisible", "glow-item-frame-map-invisible" -> "minecraft:glow_item_frame";
+			case "villager" -> "minecraft:villager";
+			case "zombie-villager" -> "minecraft:zombie_villager";
+			case "copper-golem" -> "minecraft:copper_golem";
+			case "warden" -> "minecraft:warden";
+			case "wolf" -> "minecraft:wolf";
 			case "zombie" -> "minecraft:zombie";
+			case "powered-creeper" -> "minecraft:creeper";
+			case "powered-wither" -> "minecraft:wither";
+			case "invulnerable-wither" -> "minecraft:wither";
 			case "end-crystal" -> "minecraft:end_crystal";
 			case "wind-charge" -> "minecraft:wind_charge";
 			case "wither-skull" -> "minecraft:wither_skull";
@@ -8066,9 +10562,10 @@ public final class DeterministicCameraCapture {
 				return;
 			}
 			prepareModelMeshScenarioDifficulty(server, scenario);
-			if ("zombie".equals(scenario) && serverLevel.getDifficulty() == Difficulty.PEACEFUL) {
-				modelMeshSetupServerSpawnFailure = "zombie-requires-non-peaceful-difficulty";
-				modelMeshSetupStatus = "zombie-requires-non-peaceful-difficulty";
+			if (("zombie".equals(scenario) || "spider".equals(scenario) || "enderman".equals(scenario) || "phantom".equals(scenario) || "creaking".equals(scenario) || "breeze".equals(scenario) || "bogged".equals(scenario) || "powered-creeper".equals(scenario) || "powered-wither".equals(scenario) || "invulnerable-wither".equals(scenario))
+				&& serverLevel.getDifficulty() == Difficulty.PEACEFUL) {
+				modelMeshSetupServerSpawnFailure = scenario + "-requires-non-peaceful-difficulty";
+				modelMeshSetupStatus = scenario + "-requires-non-peaceful-difficulty";
 				return;
 			}
 			Entity entity;
@@ -8116,6 +10613,360 @@ public final class DeterministicCameraCapture {
 					pig.setNoGravity(true);
 					entity = pig;
 				}
+				case "pig-saddled" -> {
+					Pig pig = new Pig(EntityType.PIG, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					pig.setPos(origin.x, origin.y - 1.1, origin.z);
+					pig.setNoAi(true);
+					pig.setNoGravity(true);
+					pig.setInvisible(false);
+					pig.setBaby(false);
+					pig.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = pig;
+				}
+				case "horse-saddled", "horse-creamy-saddled", "horse-chestnut-saddled", "horse-brown-saddled", "horse-black-saddled", "horse-gray-saddled", "horse-dark-brown-saddled", "horse-baby-saddled", "horse-baby-creamy-saddled", "horse-baby-chestnut-saddled", "horse-baby-brown-saddled", "horse-baby-black-saddled", "horse-baby-gray-saddled", "horse-baby-dark-brown-saddled", "horse-baby-diamond-equipped", "horse-baby-copper-equipped", "horse-baby-iron-equipped", "horse-baby-gold-equipped", "horse-baby-netherite-equipped", "horse-baby-dyed-leather-equipped", "horse-white-dots-marked-saddled", "horse-white-marked-saddled", "horse-white-field-marked-saddled", "horse-black-dots-marked-saddled", "horse-creamy-white-dots-marked-saddled", "horse-brown-white-dots-marked-saddled", "horse-black-white-dots-marked-saddled", "horse-gray-white-dots-marked-saddled", "horse-dark-brown-white-dots-marked-saddled", "horse-chestnut-white-dots-marked-saddled", "horse-creamy-white-marked-saddled", "horse-brown-white-marked-saddled", "horse-black-white-marked-saddled", "horse-gray-white-marked-saddled", "horse-dark-brown-white-marked-saddled", "horse-chestnut-white-marked-saddled", "horse-creamy-white-field-marked-saddled", "horse-brown-white-field-marked-saddled", "horse-black-white-field-marked-saddled", "horse-gray-white-field-marked-saddled", "horse-dark-brown-white-field-marked-saddled", "horse-chestnut-white-field-marked-saddled", "horse-creamy-black-dots-marked-saddled", "horse-brown-black-dots-marked-saddled", "horse-black-black-dots-marked-saddled", "horse-gray-black-dots-marked-saddled", "horse-dark-brown-black-dots-marked-saddled", "horse-chestnut-black-dots-marked-saddled", "horse-baby-marked-saddled", "horse-baby-white-marked-saddled", "horse-baby-white-field-marked-saddled", "horse-baby-black-dots-marked-saddled", "horse-baby-creamy-white-dots-marked-saddled", "horse-baby-creamy-white-marked-saddled", "horse-baby-creamy-white-field-marked-saddled", "horse-baby-creamy-black-dots-marked-saddled", "horse-baby-chestnut-white-dots-marked-saddled", "horse-baby-chestnut-white-marked-saddled", "horse-baby-chestnut-white-field-marked-saddled", "horse-baby-chestnut-black-dots-marked-saddled", "horse-baby-brown-white-dots-marked-saddled", "horse-baby-brown-white-marked-saddled", "horse-baby-brown-white-field-marked-saddled", "horse-baby-brown-black-dots-marked-saddled", "horse-baby-black-white-dots-marked-saddled", "horse-baby-black-white-marked-saddled", "horse-baby-black-white-field-marked-saddled", "horse-baby-black-black-dots-marked-saddled", "horse-baby-gray-white-dots-marked-saddled", "horse-baby-gray-white-marked-saddled", "horse-baby-gray-white-field-marked-saddled", "horse-baby-gray-black-dots-marked-saddled", "horse-baby-dark-brown-white-dots-marked-saddled", "horse-baby-dark-brown-white-marked-saddled", "horse-baby-dark-brown-white-field-marked-saddled", "horse-baby-dark-brown-black-dots-marked-saddled", "horse-diamond-equipped", "horse-creamy-diamond-equipped", "horse-chestnut-diamond-equipped", "horse-chestnut-copper-equipped", "horse-chestnut-iron-equipped", "horse-chestnut-gold-equipped", "horse-chestnut-netherite-equipped", "horse-creamy-copper-equipped", "horse-creamy-iron-equipped", "horse-creamy-gold-equipped", "horse-creamy-netherite-equipped", "horse-copper-equipped", "horse-iron-equipped", "horse-gold-equipped", "horse-netherite-equipped", "horse-dyed-leather-equipped", "horse-creamy-dyed-leather-equipped", "horse-chestnut-dyed-leather-equipped" -> {
+					Horse horse = new Horse(EntityType.HORSE, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					horse.setPos(origin.x, origin.y - 1.1, origin.z);
+					horse.setNoAi(true);
+					horse.setNoGravity(true);
+					horse.setInvisible(false);
+					horse.setBaby("horse-baby-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO) || "horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO));
+					horse.setTamed(true);
+					configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.NONE);
+				if ("horse-creamy-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-brown-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.NONE);
+				if ("horse-black-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.NONE);
+				if ("horse-gray-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.NONE);
+				if ("horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.NONE);
+				if ("horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE);
+				if ("horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE);
+				if ("horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.NONE);
+				if ("horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.NONE);
+				if ("horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.NONE);
+				if ("horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.NONE);
+					if ("horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_DOTS);
+				if ("horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_DOTS);
+				if ("horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_DOTS);
+if ("horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_DOTS);
+if ("horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_DOTS);
+if ("horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_DOTS);
+				if ("horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_DOTS);
+				if ("horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE);
+				if ("horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE);
+if ("horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE);
+if ("horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE);
+if ("horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE);
+				if ("horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE);
+				if ("horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_FIELD);
+if ("horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_FIELD);
+if ("horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_FIELD);
+if ("horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_FIELD);
+if ("horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_FIELD);
+				if ("horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_FIELD);
+				if ("horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.BLACK_DOTS);
+if ("horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.BLACK_DOTS);
+if ("horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.BLACK_DOTS);
+if ("horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.BLACK_DOTS);
+if ("horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.BLACK_DOTS);
+				if ("horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.BLACK_DOTS);
+				if ("horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE);
+				if ("horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_FIELD);
+				if ("horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.BLACK_DOTS);
+				if ("horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_DOTS);
+				if ("horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE);
+				if ("horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_FIELD);
+				if ("horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.BLACK_DOTS);
+				if ("horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_DOTS);
+				if ("horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE);
+				if ("horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_FIELD);
+				if ("horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.BLACK_DOTS);
+				if ("horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_DOTS);
+				if ("horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE);
+				if ("horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_FIELD);
+				if ("horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.BLACK_DOTS);
+				if ("horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_DOTS);
+				if ("horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE);
+				if ("horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_FIELD);
+				if ("horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.BLACK_DOTS);
+				if ("horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_DOTS);
+				if ("horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE);
+				if ("horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_FIELD);
+				if ("horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.BLACK_DOTS);
+				if ("horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_DOTS);
+				if ("horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE);
+				if ("horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_FIELD);
+				if ("horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.BLACK_DOTS);
+				if ("horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_DOTS);
+				if ("horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE);
+				if ("horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_FIELD);
+				if ("horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.BLACK_DOTS);
+					if ("horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO)) {
+						horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_HORSE_ARMOR));
+					} else if ("horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO)) {
+						horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.COPPER_HORSE_ARMOR));
+					} else if ("horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO)) {
+						horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.IRON_HORSE_ARMOR));
+					} else if ("horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO)) {
+						horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.GOLDEN_HORSE_ARMOR));
+					} else if ("horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO)) {
+						horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.NETHERITE_HORSE_ARMOR));
+					} else if ("horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO) || "horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) {
+						ItemStack leatherArmor = new ItemStack(Items.LEATHER_HORSE_ARMOR);
+						leatherArmor.set(DataComponents.DYED_COLOR, new net.minecraft.world.item.component.DyedItemColor(0x3366CC));
+						horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, leatherArmor);
+					}
+					horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = horse;
+				}
+				case "donkey-saddled" -> {
+					Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					donkey.setPos(origin.x, origin.y - 1.1, origin.z);
+					donkey.setNoAi(true);
+					donkey.setNoGravity(true);
+					donkey.setInvisible(false);
+					donkey.setBaby(false);
+					donkey.setTamed(true);
+					donkey.setChest(false);
+					donkey.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = donkey;
+				}
+				case "donkey-chested-saddled" -> {
+					Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					donkey.setPos(origin.x, origin.y - 1.1, origin.z);
+					donkey.setNoAi(true);
+					donkey.setNoGravity(true);
+					donkey.setInvisible(false);
+					donkey.setBaby(false);
+					donkey.setTamed(true);
+					donkey.setChest(true);
+					donkey.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = donkey;
+				}
+				case "donkey-baby-chested-saddled" -> {
+					Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					donkey.setPos(origin.x, origin.y - 1.1, origin.z);
+					donkey.setNoAi(true);
+					donkey.setNoGravity(true);
+					donkey.setInvisible(false);
+					donkey.setBaby(true);
+					donkey.setTamed(true);
+					donkey.setChest(true);
+					donkey.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = donkey;
+				}
+				case "donkey-baby-saddled" -> {
+					Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					donkey.setPos(origin.x, origin.y - 1.1, origin.z);
+					donkey.setNoAi(true);
+					donkey.setNoGravity(true);
+					donkey.setInvisible(false);
+					donkey.setBaby(true);
+					donkey.setTamed(true);
+					donkey.setChest(false);
+					donkey.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = donkey;
+				}
+				case "mule-saddled" -> {
+					Mule mule = new Mule(EntityType.MULE, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					mule.setPos(origin.x, origin.y - 1.1, origin.z);
+					mule.setNoAi(true);
+					mule.setNoGravity(true);
+					mule.setInvisible(false);
+					mule.setBaby(false);
+					mule.setTamed(true);
+					mule.setChest(false);
+					mule.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = mule;
+				}
+				case "mule-chested-saddled" -> {
+					Mule mule = new Mule(EntityType.MULE, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					mule.setPos(origin.x, origin.y - 1.1, origin.z);
+					mule.setNoAi(true);
+					mule.setNoGravity(true);
+					mule.setInvisible(false);
+					mule.setBaby(false);
+					mule.setTamed(true);
+					mule.setChest(true);
+					mule.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = mule;
+				}
+				case "mule-baby-chested-saddled" -> {
+					Mule mule = new Mule(EntityType.MULE, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					mule.setPos(origin.x, origin.y - 1.1, origin.z);
+					mule.setNoAi(true);
+					mule.setNoGravity(true);
+					mule.setInvisible(false);
+					mule.setBaby(true);
+					mule.setTamed(true);
+					mule.setChest(true);
+					mule.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = mule;
+				}
+				case "mule-baby-saddled" -> {
+					Mule mule = new Mule(EntityType.MULE, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					mule.setPos(origin.x, origin.y - 1.1, origin.z);
+					mule.setNoAi(true);
+					mule.setNoGravity(true);
+					mule.setInvisible(false);
+					mule.setBaby(true);
+					mule.setTamed(true);
+					mule.setChest(false);
+					mule.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = mule;
+				}
+				case "strider-saddled" -> {
+					Strider strider = new Strider(EntityType.STRIDER, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					strider.setPos(origin.x, origin.y - 1.1, origin.z);
+					strider.setNoAi(true);
+					strider.setNoGravity(true);
+					strider.setInvisible(false);
+					strider.setBaby(false);
+					strider.setSuffocating(false);
+					strider.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = strider;
+				}
+				case "camel-saddled" -> {
+					Camel camel = new Camel(EntityType.CAMEL, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					camel.setPos(origin.x, origin.y - 1.1, origin.z);
+					camel.setNoAi(true);
+					camel.setNoGravity(true);
+					camel.setInvisible(false);
+					camel.setBaby(false);
+					camel.standUpInstantly();
+					camel.setDashing(false);
+					camel.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = camel;
+				}
+				case "nautilus-equipped" -> {
+					Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+					nautilus.setNoAi(true);
+					nautilus.setNoGravity(true);
+					nautilus.setInvisible(false);
+					nautilus.setBaby(false);
+					nautilus.setTame(true, true);
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_NAUTILUS_ARMOR));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = nautilus;
+				}
+				case "nautilus-copper-equipped" -> {
+					Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+					nautilus.setNoAi(true);
+					nautilus.setNoGravity(true);
+					nautilus.setInvisible(false);
+					nautilus.setBaby(false);
+					nautilus.setTame(true, true);
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.COPPER_NAUTILUS_ARMOR));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = nautilus;
+				}
+				case "nautilus-iron-equipped" -> {
+					Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+					nautilus.setNoAi(true);
+					nautilus.setNoGravity(true);
+					nautilus.setInvisible(false);
+					nautilus.setBaby(false);
+					nautilus.setTame(true, true);
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.IRON_NAUTILUS_ARMOR));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = nautilus;
+				}
+				case "nautilus-gold-equipped" -> {
+					Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+					nautilus.setNoAi(true);
+					nautilus.setNoGravity(true);
+					nautilus.setInvisible(false);
+					nautilus.setBaby(false);
+					nautilus.setTame(true, true);
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.GOLDEN_NAUTILUS_ARMOR));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = nautilus;
+				}
+				case "nautilus-netherite-equipped" -> {
+					Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+					nautilus.setNoAi(true);
+					nautilus.setNoGravity(true);
+					nautilus.setInvisible(false);
+					nautilus.setBaby(false);
+					nautilus.setTame(true, true);
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.NETHERITE_NAUTILUS_ARMOR));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = nautilus;
+				}
+				case "nautilus-baby-equipped" -> {
+					Nautilus nautilus = new Nautilus(EntityType.NAUTILUS, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+					nautilus.setNoAi(true);
+					nautilus.setNoGravity(true);
+					nautilus.setInvisible(false);
+					nautilus.setBaby(true);
+					nautilus.setTame(true, true);
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_NAUTILUS_ARMOR));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = nautilus;
+				}
+				case "zombie-nautilus-equipped" -> {
+					ZombieNautilus nautilus = new ZombieNautilus(EntityType.ZOMBIE_NAUTILUS, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+					nautilus.setNoAi(true);
+					nautilus.setNoGravity(true);
+					nautilus.setInvisible(false);
+					nautilus.setBaby(false);
+					nautilus.setVariant(serverLevel.registryAccess().lookupOrThrow(Registries.ZOMBIE_NAUTILUS_VARIANT)
+						.getOrThrow(ZombieNautilusVariants.TEMPERATE));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_NAUTILUS_ARMOR));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = nautilus;
+				}
+				case "zombie-nautilus-coral-equipped" -> {
+					ZombieNautilus nautilus = new ZombieNautilus(EntityType.ZOMBIE_NAUTILUS, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					nautilus.setPos(origin.x, origin.y - 1.1, origin.z);
+					nautilus.setNoAi(true);
+					nautilus.setNoGravity(true);
+					nautilus.setInvisible(false);
+					nautilus.setBaby(false);
+					nautilus.setVariant(serverLevel.registryAccess().lookupOrThrow(Registries.ZOMBIE_NAUTILUS_VARIANT)
+						.getOrThrow(ZombieNautilusVariants.WARM));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_NAUTILUS_ARMOR));
+					nautilus.setItemSlot(net.minecraft.world.entity.EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE));
+					entity = nautilus;
+				}
 				case "rabbit" -> {
 					Rabbit rabbit = new Rabbit(EntityType.RABBIT, serverLevel);
 					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
@@ -8124,23 +10975,243 @@ public final class DeterministicCameraCapture {
 					rabbit.setNoGravity(true);
 					entity = rabbit;
 				}
-				case "sheep" -> {
+				case "sheep", "sheep-red" -> {
 					Sheep sheep = new Sheep(EntityType.SHEEP, serverLevel);
 					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
 					sheep.setPos(origin.x, origin.y - 1.1, origin.z);
 					sheep.setNoAi(true);
 					sheep.setNoGravity(true);
-					sheep.setBaby(true);
+					sheep.setBaby("sheep".equals(scenario));
+					sheep.setSheared(false);
+					sheep.setColor("sheep-red".equals(scenario) ? DyeColor.RED : DyeColor.WHITE);
 					entity = sheep;
 				}
 				case "tropical-fish" -> {
 					TropicalFish fish = new TropicalFish(EntityType.TROPICAL_FISH, serverLevel);
+					configureTropicalFishFixture(fish);
 					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
 					fish.setPos(origin.x, origin.y - 1.1, origin.z);
 					fish.setNoAi(true);
 					fish.setNoGravity(true);
 					entity = fish;
 				}
+				case "spider" -> {
+					Spider spider = new Spider(EntityType.SPIDER, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					spider.setPos(origin.x, origin.y - 1.1, origin.z);
+					spider.setNoAi(true);
+					spider.setNoGravity(true);
+					spider.setInvisible(false);
+					entity = spider;
+				}
+				case "enderman" -> {
+					EnderMan enderman = new EnderMan(EntityType.ENDERMAN, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					enderman.setPos(origin.x, origin.y - 1.1, origin.z);
+					enderman.setNoAi(true);
+					enderman.setNoGravity(true);
+					enderman.setInvisible(false);
+					enderman.setCarriedBlock(null);
+					entity = enderman;
+				}
+				case "phantom" -> {
+					Phantom phantom = new Phantom(EntityType.PHANTOM, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -0.4, 0.0));
+					phantom.setPos(origin.x, origin.y - 0.4, origin.z);
+					phantom.setNoAi(true);
+					phantom.setNoGravity(true);
+					phantom.setInvisible(false);
+					phantom.setPhantomSize(0);
+					entity = phantom;
+				}
+				case "creaking" -> {
+					Creaking creaking = new Creaking(EntityType.CREAKING, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					creaking.setPos(origin.x, origin.y - 1.1, origin.z);
+					creaking.setNoAi(true);
+					creaking.setNoGravity(true);
+					creaking.setInvisible(false);
+					creaking.setIsActive(true);
+					entity = creaking;
+				}
+				case "breeze" -> {
+					Breeze breeze = new Breeze(EntityType.BREEZE, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					breeze.setPos(origin.x, origin.y - 1.1, origin.z);
+					breeze.setPose(net.minecraft.world.entity.Pose.STANDING);
+					breeze.setNoAi(true);
+					breeze.setNoGravity(true);
+					breeze.setInvisible(false);
+					entity = breeze;
+				}
+				case "bogged" -> {
+					Bogged bogged = new Bogged(EntityType.BOGGED, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					bogged.setPos(origin.x, origin.y - 1.1, origin.z);
+					bogged.setNoAi(true);
+					bogged.setNoGravity(true);
+					bogged.setInvisible(false);
+					bogged.setSheared(false);
+					bogged.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+					bogged.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+					entity = bogged;
+				}
+				case "stray" -> {
+					Stray stray = new Stray(EntityType.STRAY, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					stray.setPos(origin.x, origin.y - 1.1, origin.z);
+					stray.setNoAi(true);
+					stray.setNoGravity(true);
+					stray.setInvisible(false);
+					stray.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+					stray.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+					entity = stray;
+				}
+				case "drowned" -> {
+					Drowned drowned = new Drowned(EntityType.DROWNED, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					drowned.setPos(origin.x, origin.y - 1.1, origin.z);
+					drowned.setNoAi(true);
+					drowned.setNoGravity(true);
+					drowned.setInvisible(false);
+					drowned.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+					drowned.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+					drowned.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, ItemStack.EMPTY);
+					entity = drowned;
+				}
+				case "slime" -> {
+					Slime slime = new Slime(EntityType.SLIME, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					slime.setSize(2, true);
+					slime.setPos(origin.x, origin.y - 1.1, origin.z);
+					slime.setNoAi(true);
+					slime.setNoGravity(true);
+					slime.setInvisible(false);
+					entity = slime;
+				}
+				case "cat" -> {
+					Cat cat = new Cat(EntityType.CAT, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					cat.setPos(origin.x, origin.y - 1.1, origin.z);
+					cat.setNoAi(true);
+					cat.setNoGravity(true);
+					cat.setInvisible(false);
+					cat.setBaby(false);
+					cat.setTame(true, true);
+					cat.setComponent(DataComponents.CAT_COLLAR, DyeColor.RED);
+					entity = cat;
+				}
+				case "wolf-collar" -> {
+					var wolf = new net.minecraft.world.entity.animal.wolf.Wolf(EntityType.WOLF, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					wolf.setPos(origin.x, origin.y - 1.1, origin.z);
+					wolf.setNoAi(true);
+					wolf.setNoGravity(true);
+					wolf.setInvisible(false);
+					wolf.setBaby(false);
+					wolf.setTame(true, true);
+					wolf.setComponent(DataComponents.WOLF_COLLAR, DyeColor.RED);
+					wolf.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, ItemStack.EMPTY);
+					entity = wolf;
+				}
+				case "iron-golem-cracks" -> {
+					IronGolem golem = new IronGolem(EntityType.IRON_GOLEM, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					golem.setPos(origin.x, origin.y - 1.1, origin.z);
+					golem.setNoAi(true);
+					golem.setNoGravity(true);
+					golem.setInvisible(false);
+					golem.setHealth(golem.getMaxHealth() * 0.2F);
+					entity = golem;
+				}
+				case "snow-golem" -> {
+					SnowGolem golem = new SnowGolem(EntityType.SNOW_GOLEM, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					golem.setPos(origin.x, origin.y - 1.1, origin.z);
+					golem.setNoAi(true);
+					golem.setNoGravity(true);
+					golem.setInvisible(false);
+					golem.setPumpkin(true);
+					entity = golem;
+				}
+				case "item-frame", "item-frame-invisible", "glow-item-frame", "glow-item-frame-invisible", "item-frame-item", "item-frame-map", "item-frame-item-rotated", "item-frame-map-rotated", "item-frame-map-decorated", "item-frame-item-invisible", "glow-item-frame-item-invisible", "glow-item-frame-item", "glow-item-frame-map", "glow-item-frame-item-rotated", "glow-item-frame-map-rotated", "item-frame-map-invisible", "glow-item-frame-map-invisible" -> {
+					BlockPos framePos = BlockPos.containing(origin.add(0.0, -1.1, 0.0));
+					Direction towardCamera = Direction.getApproximateNearest(eyePosition.subtract(Vec3.atCenterOf(framePos)));
+					Direction facing = towardCamera.getAxis().isHorizontal() ? towardCamera : Direction.SOUTH;
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, Vec3.atCenterOf(framePos));
+					serverLevel.setBlock(framePos.relative(facing.getOpposite()), Blocks.STONE.defaultBlockState(), 3);
+					ItemFrame frame = isGlowItemFrameScenario()
+					? new GlowItemFrame(serverLevel, framePos, facing)
+					: new ItemFrame(serverLevel, framePos, facing);
+					frame.setInvisible(isInvisibleItemFrameScenario());
+					frame.setItem(itemFrameFixtureItem(serverLevel, framePos), false);
+				frame.setRotation(expectedItemFrameRotation());
+					modelMeshSetupExpectedEntityPosition = frame.position();
+					entity = frame;
+				}
+				case "villager" -> {
+					Villager villager = new Villager(EntityType.VILLAGER, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					villager.setPos(origin.x, origin.y - 1.1, origin.z);
+					villager.setNoAi(true);
+					villager.setNoGravity(true);
+					villager.setInvisible(false);
+					villager.setBaby(false);
+					villager.setVillagerData(villager.getVillagerData()
+						.withType(serverLevel.registryAccess(), VillagerType.PLAINS)
+						.withProfession(serverLevel.registryAccess(), VillagerProfession.FARMER)
+						.withLevel(5));
+					entity = villager;
+				}
+				case "zombie-villager" -> {
+					ZombieVillager zombieVillager = new ZombieVillager(EntityType.ZOMBIE_VILLAGER, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					zombieVillager.setPos(origin.x, origin.y - 1.1, origin.z);
+					zombieVillager.setNoAi(true);
+					zombieVillager.setNoGravity(true);
+					zombieVillager.setInvisible(false);
+					zombieVillager.setBaby(false);
+					zombieVillager.setVillagerData(zombieVillager.getVillagerData()
+						.withType(serverLevel.registryAccess(), VillagerType.PLAINS)
+						.withProfession(serverLevel.registryAccess(), VillagerProfession.FARMER)
+						.withLevel(5));
+					zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+					zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+					zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, ItemStack.EMPTY);
+					zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, ItemStack.EMPTY);
+					zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.LEGS, ItemStack.EMPTY);
+					zombieVillager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.FEET, ItemStack.EMPTY);
+					entity = zombieVillager;
+				}
+				case "copper-golem" -> {
+					CopperGolem golem = new CopperGolem(EntityType.COPPER_GOLEM, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					golem.setPos(origin.x, origin.y - 1.1, origin.z);
+					golem.setNoAi(true);
+					golem.setNoGravity(true);
+					golem.setInvisible(false);
+					golem.setWeatherState(WeatheringCopper.WeatherState.UNAFFECTED);
+					golem.setItemSlot(CopperGolem.EQUIPMENT_SLOT_ANTENNA, ItemStack.EMPTY);
+					entity = golem;
+				}
+				case "warden" -> {
+					Warden warden = new Warden(EntityType.WARDEN, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					warden.setPos(origin.x, origin.y - 1.1, origin.z);
+					warden.setNoAi(true);
+					warden.setNoGravity(true);
+					warden.setInvisible(false);
+					warden.setPose(net.minecraft.world.entity.Pose.STANDING);
+					entity = warden;
+				}
+                case "wolf" -> {
+                    var wolf = new net.minecraft.world.entity.animal.wolf.Wolf(EntityType.WOLF, serverLevel);
+                    prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+                    wolf.setPos(origin.x, origin.y - 1.1, origin.z);
+                    wolf.setNoAi(true);
+                    wolf.setNoGravity(true);
+                    entity = wolf;
+                }
 				case "zombie" -> {
 					Zombie zombie = new Zombie(EntityType.ZOMBIE, serverLevel);
 					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
@@ -8148,6 +11219,39 @@ public final class DeterministicCameraCapture {
 					zombie.setNoAi(true);
 					zombie.setNoGravity(true);
 					entity = zombie;
+				}
+				case "powered-creeper" -> {
+					Creeper creeper = new Creeper(EntityType.CREEPER, serverLevel);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, origin.add(0.0, -1.1, 0.0));
+					creeper.setPos(origin.x, origin.y - 1.1, origin.z);
+					creeper.setNoAi(true);
+					creeper.setNoGravity(true);
+					creeper.thunderHit(serverLevel, new LightningBolt(EntityType.LIGHTNING_BOLT, serverLevel));
+					if (ENERGY_SWIRL_OUTLINE_FIXTURE) creeper.setGlowingTag(true);
+					entity = creeper;
+				}
+				case "powered-wither" -> {
+					WitherBoss wither = new WitherBoss(EntityType.WITHER, serverLevel);
+					Vec3 position = origin.add(0.0, -1.5, 0.0);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, position);
+					wither.setPos(position);
+					wither.setNoAi(true);
+					wither.setNoGravity(true);
+					wither.setInvulnerableTicks(0);
+					wither.setHealth(wither.getMaxHealth() * 0.25F);
+					if (ENERGY_SWIRL_OUTLINE_FIXTURE) wither.setGlowingTag(true);
+					entity = wither;
+				}
+				case "invulnerable-wither" -> {
+					WitherBoss wither = new WitherBoss(EntityType.WITHER, serverLevel);
+					Vec3 position = origin.add(0.0, -1.5, 0.0);
+					prepareModelMeshEntityCaptureSite(serverLevel, eyePosition, position);
+					wither.setPos(position);
+					wither.setNoAi(true);
+					wither.setNoGravity(true);
+					wither.setInvulnerableTicks(220);
+					wither.setHealth(wither.getMaxHealth());
+					entity = wither;
 				}
 				case "wither-skull" -> {
 					ServerPlayer serverPlayer = server.getPlayerList().getPlayer(playerId);
@@ -8183,6 +11287,8 @@ public final class DeterministicCameraCapture {
 			}
 			entity.setYRot(playerYaw + (scenario.equals("llama-spit") || scenario.equals("wither-skull") ? 0.0F : 180.0F));
 			if (entity instanceof Cow cow) GraphicsAuditCowOutlineFixture.configure(cow);
+            if (entity instanceof Zombie zombie) GraphicsAuditEquipmentFixture.configure(zombie);
+            if (entity instanceof net.minecraft.world.entity.animal.wolf.Wolf wolf) GraphicsAuditWolfArmorFixture.configure(wolf);
 			entity.setDeltaMovement(Vec3.ZERO);
 			igniteEntityFlameCarrier(entity);
 			configureEntityLeashCarrier(entity, server, playerId);
@@ -8194,6 +11300,9 @@ public final class DeterministicCameraCapture {
 				serverLevel.getChunkAt(BlockPos.containing(origin));
 			}
 			serverLevel.addFreshEntity(entity);
+			if (entity instanceof Warden warden) {
+				serverLevel.broadcastEntityEvent(warden, (byte)61);
+			}
 			modelMeshSetupServerEntityId = entity.getId();
 			modelMeshSetupServerEntityPresent = true;
 			modelMeshSetupPoseIndex = spawnPoseIndex;
@@ -8215,7 +11324,7 @@ public final class DeterministicCameraCapture {
 	private static void prepareModelMeshScenarioDifficulty(MinecraftServer server, String scenario) {
 		Difficulty before = server.getWorldData().getDifficulty();
 		modelMeshSetupDifficultyBefore = before.getKey();
-		if ("zombie".equals(scenario) && before == Difficulty.PEACEFUL) {
+		if (("zombie".equals(scenario) || "spider".equals(scenario) || "enderman".equals(scenario) || "phantom".equals(scenario) || "creaking".equals(scenario) || "breeze".equals(scenario) || "bogged".equals(scenario) || "stray".equals(scenario) || "drowned".equals(scenario) || "slime".equals(scenario) || "powered-creeper".equals(scenario) || "powered-wither".equals(scenario) || "invulnerable-wither".equals(scenario)) && before == Difficulty.PEACEFUL) {
 			server.setDifficulty(Difficulty.NORMAL, false);
 			modelMeshSetupDifficultyAdjusted = server.getWorldData().getDifficulty() != before;
 		}
@@ -8279,7 +11388,7 @@ public final class DeterministicCameraCapture {
 			&& observedExpectedEvokerFangsModelMesh()) {
 			rendererEntityId = modelMeshSetupServerEntityId;
 		}
-		modelMeshSetupClientEntityPresent = rendererEntityId >= 0;
+		modelMeshSetupClientEntityPresent = rendererEntityId >= 0 && modelMeshFixtureStateReady(clientEntity);
 		// Evoker fangs can complete their vanilla attack lifecycle between the
 		// producer frame and the final metadata write. Once a real client entity
 		// was observed, retain that receipt; route admission still requires the
@@ -8331,6 +11440,4082 @@ public final class DeterministicCameraCapture {
 		return null;
 	}
 
+	private static boolean modelMeshPoweredClientState() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.level == null) return false;
+		Entity entity = minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		return entity instanceof Creeper creeper && creeper.isPowered()
+			|| entity instanceof WitherBoss wither && wither.isPowered() && wither.getInvulnerableTicks() == 0;
+	}
+
+	private static boolean modelMeshInvulnerableWitherClientState() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.level == null) return false;
+		Entity entity = minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		return entity instanceof WitherBoss wither && !wither.isPowered() && wither.getInvulnerableTicks() > 80;
+	}
+
+	private static String modelMeshTrialSpawnerState() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (!isTrialSpawnerModelScenario()
+			|| minecraft.level == null || modelMeshSetupPosition == null
+			|| !minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.TRIAL_SPAWNER)) return "not-applicable";
+		return minecraft.level.getBlockState(modelMeshSetupPosition)
+			.getValue(net.minecraft.world.level.block.TrialSpawnerBlock.STATE).getSerializedName();
+	}
+
+	private static boolean modelMeshTrialSpawnerOminous() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isTrialSpawnerModelScenario()
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.TRIAL_SPAWNER)
+			&& minecraft.level.getBlockState(modelMeshSetupPosition)
+				.getValue(net.minecraft.world.level.block.TrialSpawnerBlock.OMINOUS);
+	}
+
+	private static boolean modelMeshBellShaking() {
+		return isBellModelScenario() && Minecraft.getInstance().level != null && modelMeshSetupPosition != null
+			&& Minecraft.getInstance().level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.BellBlockEntity bell && bell.shaking;
+	}
+
+	private static String modelMeshBellDirection() {
+		if (!isBellModelScenario() || Minecraft.getInstance().level == null || modelMeshSetupPosition == null
+			|| !(Minecraft.getInstance().level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.BellBlockEntity bell)
+			|| bell.clickDirection == null) return "none";
+		return bell.clickDirection.getSerializedName();
+	}
+
+	private static String modelMeshCopperGolemStatueFacing() {
+		if (!isCopperGolemStatueModelScenario() || Minecraft.getInstance().level == null || modelMeshSetupPosition == null) {
+			return "not-applicable";
+		}
+		BlockState state = Minecraft.getInstance().level.getBlockState(modelMeshSetupPosition);
+		return state.getBlock() instanceof net.minecraft.world.level.block.CopperGolemStatueBlock
+			? state.getValue(net.minecraft.world.level.block.CopperGolemStatueBlock.FACING).getSerializedName()
+			: "not-applicable";
+	}
+
+	private static String modelMeshCopperGolemStatuePose() {
+		if (!isCopperGolemStatueModelScenario() || Minecraft.getInstance().level == null || modelMeshSetupPosition == null) {
+			return "not-applicable";
+		}
+		BlockState state = Minecraft.getInstance().level.getBlockState(modelMeshSetupPosition);
+		return state.getBlock() instanceof net.minecraft.world.level.block.CopperGolemStatueBlock
+			? state.getValue(net.minecraft.world.level.block.CopperGolemStatueBlock.POSE).getSerializedName()
+			: "not-applicable";
+	}
+
+	private static String modelMeshCopperGolemStatueWeathering() {
+		if (!isCopperGolemStatueModelScenario() || Minecraft.getInstance().level == null || modelMeshSetupPosition == null) {
+			return "not-applicable";
+		}
+		return Minecraft.getInstance().level.getBlockState(modelMeshSetupPosition).getBlock()
+			instanceof net.minecraft.world.level.block.CopperGolemStatueBlock statue
+				? statue.getWeatheringState().getSerializedName() : "not-applicable";
+	}
+
+	private static boolean modelMeshCopperGolemStatueWaxed() {
+		return isCopperGolemStatueModelScenario() && Minecraft.getInstance().level != null && modelMeshSetupPosition != null
+			&& Minecraft.getInstance().level.getBlockState(modelMeshSetupPosition).is(expectedCopperGolemStatueBlock())
+			&& MODEL_MESH_STATUE_WAXED;
+	}
+
+	private static int modelMeshBellTicks() {
+		return isBellModelScenario() && Minecraft.getInstance().level != null && modelMeshSetupPosition != null
+			&& Minecraft.getInstance().level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.BellBlockEntity bell ? bell.ticks : -1;
+	}
+
+	private static String modelMeshDecoratedPotWobbleStyle() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (!isDecoratedPotModelScenario() || minecraft.level == null || modelMeshSetupPosition == null
+			|| !(minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.DecoratedPotBlockEntity pot)
+			|| pot.lastWobbleStyle == null) return "none";
+		return pot.lastWobbleStyle.name().toLowerCase(Locale.ROOT);
+	}
+
+	private static float modelMeshDecoratedPotWobbleProgress() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isDecoratedPotModelScenario() && minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.DecoratedPotBlockEntity pot
+			? decoratedPotWobbleProgress(pot) : -1.0F;
+	}
+
+	private static String modelMeshDecoratedPotFacing() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (!isDecoratedPotModelScenario() || minecraft.level == null || modelMeshSetupPosition == null
+			|| !minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.DECORATED_POT)) return "none";
+		return minecraft.level.getBlockState(modelMeshSetupPosition)
+			.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING)
+			.getSerializedName();
+	}
+
+	private static boolean modelMeshConduitActive() {
+		return modelMeshSetupPosition != null && Minecraft.getInstance().level != null
+			&& Minecraft.getInstance().level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.ConduitBlockEntity conduit
+			&& conduit.isActive();
+	}
+
+	private static boolean modelMeshConduitHunting() {
+		return modelMeshSetupPosition != null && Minecraft.getInstance().level != null
+			&& Minecraft.getInstance().level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.ConduitBlockEntity conduit
+			&& conduit.isHunting();
+	}
+
+	private static boolean modelMeshBannerStanding() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isBannerModelScenario()
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.WHITE_BANNER);
+	}
+
+	private static int modelMeshBannerRotation() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return modelMeshBannerStanding()
+			? minecraft.level.getBlockState(modelMeshSetupPosition)
+				.getValue(net.minecraft.world.level.block.BannerBlock.ROTATION) : -1;
+	}
+
+	private static String modelMeshBannerFacing() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isWallBannerModelScenario() && minecraft.level != null && modelMeshSetupPosition != null
+			? minecraft.level.getBlockState(modelMeshSetupPosition)
+				.getValue(net.minecraft.world.level.block.WallBannerBlock.FACING).getName()
+			: "not-applicable";
+	}
+
+	private static String modelMeshBannerBaseColor() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isBannerModelScenario()
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.BannerBlockEntity banner
+			? banner.getBaseColor().getName() : "not-applicable";
+	}
+
+	private static int modelMeshBannerPatternCount() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isBannerModelScenario()
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.BannerBlockEntity banner
+			? banner.getPatterns().layers().size() : -1;
+	}
+
+	private static boolean modelMeshSkullStanding() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isSkullModelScenario()
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& !isWallSkullModelScenario()
+			&& minecraft.level.getBlockState(modelMeshSetupPosition).is(expectedStandingSkullBlock());
+	}
+
+	private static String modelMeshSkullFacing() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isWallSkullModelScenario() && minecraft.level != null && modelMeshSetupPosition != null
+			? minecraft.level.getBlockState(modelMeshSetupPosition)
+				.getValue(net.minecraft.world.level.block.WallSkullBlock.FACING).getName()
+			: "not-applicable";
+	}
+
+	private static int modelMeshSkullRotation() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return modelMeshSkullStanding()
+			? minecraft.level.getBlockState(modelMeshSetupPosition)
+				.getValue(net.minecraft.world.level.block.SkullBlock.ROTATION) : -1;
+	}
+
+	private static String modelMeshSkullType() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (!isSkullModelScenario() || minecraft.level == null || modelMeshSetupPosition == null) return "not-applicable";
+		return ((net.minecraft.world.level.block.AbstractSkullBlock)minecraft.level
+			.getBlockState(modelMeshSetupPosition).getBlock()).getType().getSerializedName();
+	}
+
+	private static float modelMeshSkullAnimation() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isSkullModelScenario()
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.SkullBlockEntity skull
+			? skull.getAnimation(0.0F) : -1.0F;
+	}
+
+	private static boolean modelMeshSkullPowered() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isSkullModelScenario() && minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockState(modelMeshSetupPosition)
+				.getValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED);
+	}
+
+	private static String modelMeshSkullProfileName() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (!isPlayerHeadModelScenario() || minecraft.level == null || modelMeshSetupPosition == null
+			|| !(minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.SkullBlockEntity skull)
+			|| skull.getOwnerProfile() == null) return "not-applicable";
+		return skull.getOwnerProfile().partialProfile().name();
+	}
+
+	private static String modelMeshSkullProfileId() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (!isPlayerHeadModelScenario() || minecraft.level == null || modelMeshSetupPosition == null
+			|| !(minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.SkullBlockEntity skull)
+			|| skull.getOwnerProfile() == null) return "not-applicable";
+		return skull.getOwnerProfile().partialProfile().id().toString();
+	}
+
+	private static boolean isOakHangingSignModelScenario() {
+		return "oak-hanging-sign".equals(MODEL_MESH_SCENARIO)
+			|| "oak-hanging-sign-attached".equals(MODEL_MESH_SCENARIO)
+			|| isWallOakHangingSignModelScenario();
+	}
+
+	private static boolean isOakSignModelScenario() {
+		return "oak-sign".equals(MODEL_MESH_SCENARIO) || isGlowingBackOakSignModelScenario()
+			|| isBreakingOakSignModelScenario();
+	}
+
+	private static boolean isGlowingBackOakSignModelScenario() {
+		return "oak-sign-glowing-back".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isBreakingOakSignModelScenario() {
+		return "oak-sign-breaking".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static int configuredModelMeshDestroyStage() {
+		int stage = Integer.getInteger("mattmc.dev.rustGalWorldMesh.destroyStage", 5);
+		if (stage < 0 || stage > 9) {
+			throw new IllegalArgumentException("deterministic model-mesh destruction stage must be between 0 and 9");
+		}
+		return stage;
+	}
+
+	private static String modelMeshDestroyTextureId() {
+		return "minecraft:textures/block/destroy_stage_" + MODEL_MESH_DESTROY_STAGE + ".png";
+	}
+
+	private static boolean modelMeshOakSignTextReady(net.minecraft.world.level.block.entity.SignBlockEntity sign) {
+		if (!"Rust Vulkan".equals(sign.getFrontText().getMessage(0, false).getString())
+			|| !"Frozen parity".equals(sign.getFrontText().getMessage(1, false).getString())) return false;
+		return !isGlowingBackOakSignModelScenario()
+			|| "Back face".equals(sign.getBackText().getMessage(0, false).getString())
+				&& "Glow parity".equals(sign.getBackText().getMessage(1, false).getString())
+				&& sign.getBackText().getColor() == net.minecraft.world.item.DyeColor.YELLOW
+				&& sign.getBackText().hasGlowingText();
+	}
+
+	private static boolean modelMeshOakSignTextReady() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isOakSignModelScenario() && minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign
+			&& modelMeshOakSignTextReady(sign);
+	}
+
+	private static boolean isWallOakHangingSignModelScenario() {
+		return "oak-wall-hanging-sign".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isAttachedOakHangingSignModelScenario() {
+		return "oak-hanging-sign-attached".equals(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean modelMeshHangingSignCeiling() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isOakHangingSignModelScenario()
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.OAK_HANGING_SIGN);
+	}
+
+	private static boolean modelMeshHangingSignWall() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isWallOakHangingSignModelScenario() && minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockState(modelMeshSetupPosition).is(Blocks.OAK_WALL_HANGING_SIGN);
+	}
+
+	private static String modelMeshHangingSignAttachment() {
+		return modelMeshHangingSignWall() ? "wall"
+			: modelMeshHangingSignAttached() ? "ceiling_middle" : modelMeshHangingSignCeiling() ? "ceiling" : "not-applicable";
+	}
+
+	private static String modelMeshHangingSignFacing() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return modelMeshHangingSignWall()
+			? minecraft.level.getBlockState(modelMeshSetupPosition)
+				.getValue(net.minecraft.world.level.block.WallHangingSignBlock.FACING).getName()
+			: "not-applicable";
+	}
+
+	private static int modelMeshHangingSignRotation() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return modelMeshHangingSignCeiling()
+			? minecraft.level.getBlockState(modelMeshSetupPosition)
+				.getValue(net.minecraft.world.level.block.CeilingHangingSignBlock.ROTATION) : -1;
+	}
+
+	private static boolean modelMeshHangingSignAttached() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return modelMeshHangingSignCeiling()
+			&& minecraft.level.getBlockState(modelMeshSetupPosition)
+				.getValue(net.minecraft.world.level.block.CeilingHangingSignBlock.ATTACHED);
+	}
+
+	private static boolean modelMeshHangingSignTextReady() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isOakHangingSignModelScenario()
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.HangingSignBlockEntity sign
+			&& "Rust Vulkan".equals(sign.getFrontText().getMessage(0, false).getString())
+			&& "Frozen parity".equals(sign.getFrontText().getMessage(1, false).getString());
+	}
+
+	private static net.minecraft.world.level.block.entity.StructureBlockEntity modelMeshStructureBlock() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return ("structure-block-box".equals(MODEL_MESH_SCENARIO) || "structure-block-invisible-cells".equals(MODEL_MESH_SCENARIO))
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.StructureBlockEntity structure ? structure : null;
+	}
+
+	private static net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity modelMeshShulker() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return isShulkerModelScenario() && minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity shulker ? shulker : null;
+	}
+
+	private static boolean structureFixtureCellsReady(net.minecraft.world.level.Level level, BlockPos position) {
+		BlockPos origin = position.offset(1, 1, 1);
+		for (int x = 0; x < 3; x++) for (int y = 0; y < 2; y++) for (int z = 0; z < 4; z++) {
+			BlockState state = level.getBlockState(origin.offset(x, y, z));
+			if (x == 0 && y == 0 && z == 0 ? !state.isAir()
+				: x == 1 && y == 0 && z == 0 ? !state.is(Blocks.STRUCTURE_VOID)
+				: x == 2 && y == 0 && z == 0 ? !state.is(Blocks.BARRIER)
+				: x == 0 && y == 1 && z == 0 ? !state.is(Blocks.LIGHT)
+				: !state.is(Blocks.STONE)) return false;
+		}
+		return true;
+	}
+
+	private static net.minecraft.world.level.block.entity.TestInstanceBlockEntity modelMeshTestInstance() {
+		Minecraft minecraft = Minecraft.getInstance();
+		return ("test-instance-composition".equals(MODEL_MESH_SCENARIO) || "test-instance-success".equals(MODEL_MESH_SCENARIO) || "test-instance-cleared".equals(MODEL_MESH_SCENARIO) || "test-instance-required-failed".equals(MODEL_MESH_SCENARIO) || "test-instance-optional-failed".equals(MODEL_MESH_SCENARIO))
+			&& minecraft.level != null && modelMeshSetupPosition != null
+			&& minecraft.level.getBlockEntity(modelMeshSetupPosition)
+				instanceof net.minecraft.world.level.block.entity.TestInstanceBlockEntity testInstance ? testInstance : null;
+	}
+
+	private static boolean modelMeshSheepClientState() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.level == null) return false;
+		Entity entity = minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		return entity instanceof Sheep sheep
+			&& sheep.isBaby() && !sheep.isSheared() && sheep.getColor() == DyeColor.WHITE;
+	}
+
+	private static boolean modelMeshFixtureStateReady(Entity entity) {
+		if (isItemFrameScenario()) {
+			return entity instanceof ItemFrame frame && frame.isInvisible() == isInvisibleItemFrameScenario()
+				&& frame.getType() == expectedItemFrameType()
+				&& itemFrameFixtureItemMatches(frame) && frame.getRotation() == expectedItemFrameRotation();
+		}
+		if ("sheep".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Sheep sheep
+				&& sheep.isBaby() && !sheep.isSheared() && sheep.getColor() == DyeColor.WHITE;
+		}
+		if ("sheep-red".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Sheep sheep
+				&& !sheep.isBaby() && !sheep.isSheared() && sheep.getColor() == DyeColor.RED;
+		}
+		if ("strider-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Strider strider && !strider.isInvisible() && !strider.isBaby()
+				&& !strider.isSuffocating()
+				&& strider.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("pig-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Pig pig && !pig.isInvisible() && !pig.isBaby()
+				&& pig.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-creamy-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-brown-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-black-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-gray-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("donkey-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Donkey donkey && !donkey.isInvisible() && !donkey.isBaby() && donkey.isTamed()
+				&& !donkey.hasChest() && donkey.getBodyArmorItem().isEmpty()
+				&& donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("donkey-baby-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Donkey donkey && !donkey.isInvisible() && donkey.isBaby() && donkey.isTamed()
+				&& !donkey.hasChest() && donkey.getBodyArmorItem().isEmpty()
+				&& donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("donkey-chested-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Donkey donkey && !donkey.isInvisible() && !donkey.isBaby() && donkey.isTamed()
+				&& donkey.hasChest() && donkey.getBodyArmorItem().isEmpty()
+				&& donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("donkey-baby-chested-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Donkey donkey && !donkey.isInvisible() && donkey.isBaby() && donkey.isTamed()
+				&& donkey.hasChest() && donkey.getBodyArmorItem().isEmpty()
+				&& donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("mule-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Mule mule && !mule.isInvisible() && !mule.isBaby() && mule.isTamed()
+				&& !mule.hasChest() && mule.getBodyArmorItem().isEmpty()
+				&& mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("mule-chested-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Mule mule && !mule.isInvisible() && !mule.isBaby() && mule.isTamed()
+				&& mule.hasChest() && mule.getBodyArmorItem().isEmpty()
+				&& mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("mule-baby-chested-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Mule mule && !mule.isInvisible() && mule.isBaby() && mule.isTamed()
+				&& mule.hasChest() && mule.getBodyArmorItem().isEmpty()
+				&& mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("mule-baby-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Mule mule && !mule.isInvisible() && mule.isBaby() && mule.isTamed()
+				&& !mule.hasChest() && mule.getBodyArmorItem().isEmpty()
+				&& mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE_FIELD
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.BLACK_DOTS
+				&& horse.getBodyArmorItem().isEmpty()
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-diamond-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.COPPER_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-copper-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.COPPER_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.IRON_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-iron-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.IRON_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.GOLDEN_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-gold-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.GOLDEN_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.NETHERITE_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-netherite-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.NETHERITE_HORSE_ARMOR)
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.LEATHER_HORSE_ARMOR)
+				&& horse.getBodyArmorItem().get(DataComponents.DYED_COLOR) != null
+				&& horse.getBodyArmorItem().get(DataComponents.DYED_COLOR).rgb() == 0x3366CC
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+				&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+				&& horse.getBodyArmorItem().is(Items.LEATHER_HORSE_ARMOR)
+				&& horse.getBodyArmorItem().get(DataComponents.DYED_COLOR) != null
+				&& horse.getBodyArmorItem().get(DataComponents.DYED_COLOR).rgb() == 0x3366CC
+				&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("camel-saddled".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Camel camel && !camel.isInvisible() && !camel.isBaby()
+				&& camel.getPose() == net.minecraft.world.entity.Pose.STANDING
+				&& !camel.isVehicle() && !camel.isDashing() && camel.getJumpCooldown() == 0
+				&& camel.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("nautilus-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+				&& nautilus.isTame()
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.DIAMOND_NAUTILUS_ARMOR)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("nautilus-copper-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+				&& nautilus.isTame()
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.COPPER_NAUTILUS_ARMOR)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("nautilus-iron-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+				&& nautilus.isTame()
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.IRON_NAUTILUS_ARMOR)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("nautilus-gold-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+				&& nautilus.isTame()
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.GOLDEN_NAUTILUS_ARMOR)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("nautilus-netherite-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+				&& nautilus.isTame()
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.NETHERITE_NAUTILUS_ARMOR)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("nautilus-baby-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Nautilus nautilus && !nautilus.isInvisible() && nautilus.isBaby()
+				&& nautilus.isTame()
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.DIAMOND_NAUTILUS_ARMOR)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("zombie-nautilus-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof ZombieNautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+				&& nautilus.getVariant().is(ZombieNautilusVariants.TEMPERATE)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.DIAMOND_NAUTILUS_ARMOR)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("zombie-nautilus-coral-equipped".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof ZombieNautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+				&& nautilus.getVariant().is(ZombieNautilusVariants.WARM)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.DIAMOND_NAUTILUS_ARMOR)
+				&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		}
+		if ("tropical-fish".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof TropicalFish fish
+				&& fish.getPattern() == TropicalFish.Pattern.KOB
+				&& fish.getBaseColor() == DyeColor.ORANGE
+				&& fish.getPatternColor() == DyeColor.WHITE;
+		}
+		if ("spider".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Spider spider && !spider.isInvisible();
+		}
+		if ("enderman".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof EnderMan enderman && !enderman.isInvisible()
+				&& !enderman.isCreepy() && enderman.getCarriedBlock() == null;
+		}
+		if ("phantom".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Phantom phantom && !phantom.isInvisible()
+				&& phantom.getPhantomSize() == 0;
+		}
+		if ("creaking".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Creaking creaking && !creaking.isInvisible()
+				&& creaking.isActive() && !creaking.isTearingDown();
+		}
+		if ("breeze".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Breeze breeze && !breeze.isInvisible()
+				&& breeze.getPose() == net.minecraft.world.entity.Pose.STANDING;
+		}
+		if ("bogged".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Bogged bogged && !bogged.isInvisible() && !bogged.isSheared();
+		}
+		if ("stray".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Stray stray && !stray.isInvisible() && !stray.isBaby()
+				&& stray.getMainHandItem().isEmpty() && stray.getOffhandItem().isEmpty();
+		}
+		if ("drowned".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Drowned drowned && !drowned.isInvisible() && !drowned.isBaby()
+				&& drowned.getMainHandItem().isEmpty() && drowned.getOffhandItem().isEmpty()
+				&& drowned.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).isEmpty();
+		}
+		if ("slime".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Slime slime && !slime.isInvisible() && slime.getSize() == 2;
+		}
+		if ("cat".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Cat cat && !cat.isInvisible() && !cat.isBaby()
+				&& cat.isTame() && cat.getCollarColor() == DyeColor.RED;
+		}
+		if ("wolf-collar".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof net.minecraft.world.entity.animal.wolf.Wolf wolf
+				&& !wolf.isInvisible() && !wolf.isBaby() && wolf.isTame()
+				&& wolf.getCollarColor() == DyeColor.RED && wolf.getBodyArmorItem().isEmpty();
+		}
+		if ("iron-golem-cracks".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof IronGolem golem && !golem.isInvisible()
+				&& golem.getCrackiness() == net.minecraft.world.entity.Crackiness.Level.HIGH;
+		}
+		if ("snow-golem".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof SnowGolem golem && !golem.isInvisible() && golem.hasPumpkin();
+		}
+		if ("villager".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Villager villager && !villager.isInvisible() && !villager.isBaby()
+				&& villager.getVillagerData().type().is(VillagerType.PLAINS)
+				&& villager.getVillagerData().profession().is(VillagerProfession.FARMER)
+				&& villager.getVillagerData().level() == 5
+				&& villager.getMainHandItem().isEmpty() && villager.getOffhandItem().isEmpty();
+		}
+		if ("zombie-villager".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof ZombieVillager zombieVillager && !zombieVillager.isInvisible()
+				&& !zombieVillager.isBaby() && !zombieVillager.isConverting() && !zombieVillager.isAggressive()
+				&& zombieVillager.getVillagerData().type().is(VillagerType.PLAINS)
+				&& zombieVillager.getVillagerData().profession().is(VillagerProfession.FARMER)
+				&& zombieVillager.getVillagerData().level() == 5
+				&& zombieVillager.getMainHandItem().isEmpty() && zombieVillager.getOffhandItem().isEmpty()
+				&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).isEmpty()
+				&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()
+				&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS).isEmpty()
+				&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET).isEmpty();
+		}
+		if ("copper-golem".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof CopperGolem golem && !golem.isInvisible()
+				&& golem.getWeatherState() == WeatheringCopper.WeatherState.UNAFFECTED
+				&& golem.getMainHandItem().isEmpty() && golem.getOffhandItem().isEmpty()
+				&& golem.getItemBySlot(CopperGolem.EQUIPMENT_SLOT_ANTENNA).isEmpty();
+		}
+		if ("warden".equals(MODEL_MESH_SCENARIO)) {
+			return entity instanceof Warden warden && !warden.isInvisible()
+				&& warden.getPose() == net.minecraft.world.entity.Pose.STANDING
+				&& warden.isNoAi() && warden.tickCount >= 40;
+		}
+		return true;
+	}
+
+	private static void configureHorseVariantAndMarkings(Horse horse, Variant variant, Markings markings) {
+		var output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
+			net.minecraft.util.ProblemReporter.DISCARDING, horse.registryAccess());
+		horse.saveWithoutId(output);
+		var tag = output.buildResult();
+		tag.putInt("Variant", variant.getId() | markings.getId() << 8);
+		horse.load(net.minecraft.world.level.storage.TagValueInput.create(
+			net.minecraft.util.ProblemReporter.DISCARDING, horse.registryAccess(), tag));
+	}
+
+	private static void configureTropicalFishFixture(TropicalFish fish) {
+		fish.setComponent(DataComponents.TROPICAL_FISH_PATTERN, TropicalFish.Pattern.KOB);
+		fish.setComponent(DataComponents.TROPICAL_FISH_BASE_COLOR, DyeColor.ORANGE);
+		fish.setComponent(DataComponents.TROPICAL_FISH_PATTERN_COLOR, DyeColor.WHITE);
+	}
+
+	private static boolean modelMeshTropicalFishClientState() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.level == null) return false;
+		Entity entity = minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		return entity instanceof TropicalFish fish
+			&& fish.getPattern() == TropicalFish.Pattern.KOB
+			&& fish.getBaseColor() == DyeColor.ORANGE
+			&& fish.getPatternColor() == DyeColor.WHITE;
+	}
+
+	private static String tropicalFishFixtureJson() {
+		boolean requested = "tropical-fish".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = modelMeshTropicalFishClientState();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientPattern\":\"" + (entity instanceof TropicalFish fish ? fish.getPattern().getSerializedName() : "unknown") + "\""
+			+ ",\"clientBaseColor\":\"" + (entity instanceof TropicalFish fish ? fish.getBaseColor().getName() : "unknown") + "\""
+			+ ",\"clientPatternColor\":\"" + (entity instanceof TropicalFish fish ? fish.getPatternColor().getName() : "unknown") + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String spiderFixtureJson() {
+		boolean requested = "spider".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Spider spider && !spider.isInvisible();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Spider spider && spider.isInvisible())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String endermanFixtureJson() {
+		boolean requested = "enderman".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof EnderMan enderman && !enderman.isInvisible()
+			&& !enderman.isCreepy() && enderman.getCarriedBlock() == null;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof EnderMan enderman && enderman.isInvisible())
+			+ ",\"clientCreepy\":" + (entity instanceof EnderMan enderman && enderman.isCreepy())
+			+ ",\"clientCarriedBlock\":" + (entity instanceof EnderMan enderman && enderman.getCarriedBlock() != null)
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String phantomFixtureJson() {
+		boolean requested = "phantom".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Phantom phantom && !phantom.isInvisible()
+			&& phantom.getPhantomSize() == 0;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Phantom phantom && phantom.isInvisible())
+			+ ",\"clientSize\":" + (entity instanceof Phantom phantom ? phantom.getPhantomSize() : -1)
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String creakingFixtureJson() {
+		boolean requested = "creaking".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Creaking creaking && !creaking.isInvisible()
+			&& creaking.isActive() && !creaking.isTearingDown();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Creaking creaking && creaking.isInvisible())
+			+ ",\"clientActive\":" + (entity instanceof Creaking creaking && creaking.isActive())
+			+ ",\"clientTearingDown\":" + (entity instanceof Creaking creaking && creaking.isTearingDown())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String breezeFixtureJson() {
+		boolean requested = "breeze".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Breeze breeze && !breeze.isInvisible()
+			&& breeze.getPose() == net.minecraft.world.entity.Pose.STANDING;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Breeze breeze && breeze.isInvisible())
+			+ ",\"clientPose\":\"" + (entity instanceof Breeze breeze ? breeze.getPose().getSerializedName() : "unknown") + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String boggedFixtureJson() {
+		boolean requested = "bogged".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Bogged bogged && !bogged.isInvisible() && !bogged.isSheared();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Bogged bogged && bogged.isInvisible())
+			+ ",\"clientSheared\":" + (entity instanceof Bogged bogged && bogged.isSheared())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String strayFixtureJson() {
+		boolean requested = "stray".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Stray stray && !stray.isInvisible() && !stray.isBaby()
+			&& stray.getMainHandItem().isEmpty() && stray.getOffhandItem().isEmpty();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Stray stray && stray.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Stray stray && stray.isBaby())
+			+ ",\"clientMainHandEmpty\":" + (entity instanceof Stray stray && stray.getMainHandItem().isEmpty())
+			+ ",\"clientOffHandEmpty\":" + (entity instanceof Stray stray && stray.getOffhandItem().isEmpty())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String drownedFixtureJson() {
+		boolean requested = "drowned".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Drowned drowned && !drowned.isInvisible() && !drowned.isBaby()
+			&& drowned.getMainHandItem().isEmpty() && drowned.getOffhandItem().isEmpty()
+			&& drowned.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).isEmpty();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Drowned drowned && drowned.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Drowned drowned && drowned.isBaby())
+			+ ",\"clientMainHandEmpty\":" + (entity instanceof Drowned drowned && drowned.getMainHandItem().isEmpty())
+			+ ",\"clientOffHandEmpty\":" + (entity instanceof Drowned drowned && drowned.getOffhandItem().isEmpty())
+			+ ",\"clientHeadEmpty\":" + (entity instanceof Drowned drowned && drowned.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).isEmpty())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String slimeFixtureJson() {
+		boolean requested = "slime".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Slime slime && !slime.isInvisible() && slime.getSize() == 2;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Slime slime && slime.isInvisible())
+			+ ",\"clientSize\":" + (entity instanceof Slime slime ? slime.getSize() : -1)
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String catFixtureJson() {
+		boolean requested = "cat".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Cat cat && !cat.isInvisible() && !cat.isBaby()
+			&& cat.isTame() && cat.getCollarColor() == DyeColor.RED;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Cat cat && cat.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Cat cat && cat.isBaby())
+			+ ",\"clientTame\":" + (entity instanceof Cat cat && cat.isTame())
+			+ ",\"clientCollarColor\":\"" + (entity instanceof Cat cat ? cat.getCollarColor().getName() : "unknown") + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String striderSaddleFixtureJson() {
+		boolean requested = "strider-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Strider strider && !strider.isInvisible() && !strider.isBaby()
+			&& !strider.isSuffocating()
+			&& strider.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Strider strider && strider.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Strider strider && strider.isBaby())
+			+ ",\"clientSuffocating\":" + (entity instanceof Strider strider && strider.isSuffocating())
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Strider strider
+				? BuiltInRegistries.ITEM.getKey(strider.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String pigSaddleFixtureJson() {
+		boolean requested = "pig-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Pig pig && !pig.isInvisible() && !pig.isBaby()
+			&& pig.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Pig pig && pig.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Pig pig && pig.isBaby())
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Pig pig
+				? BuiltInRegistries.ITEM.getKey(pig.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseSaddleFixtureJson() {
+		boolean requested = "horse-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabySaddleFixtureJson() {
+		boolean requested = "horse-baby-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyCreamySaddleFixtureJson() {
+		boolean requested = "horse-baby-creamy-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseCreamySaddleFixtureJson() {
+		boolean requested = "horse-creamy-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseChestnutSaddleFixtureJson() {
+		boolean requested = "horse-chestnut-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBrownSaddleFixtureJson() {
+		boolean requested = "horse-brown-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBlackSaddleFixtureJson() {
+		boolean requested = "horse-black-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseGraySaddleFixtureJson() {
+		boolean requested = "horse-gray-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseDarkBrownSaddleFixtureJson() {
+		boolean requested = "horse-dark-brown-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyChestnutSaddleFixtureJson() {
+		boolean requested = "horse-baby-chestnut-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBrownSaddleFixtureJson() {
+		boolean requested = "horse-baby-brown-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBlackSaddleFixtureJson() {
+		boolean requested = "horse-baby-black-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyGraySaddleFixtureJson() {
+		boolean requested = "horse-baby-gray-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyDarkBrownSaddleFixtureJson() {
+		boolean requested = "horse-baby-dark-brown-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String donkeySaddleFixtureJson() {
+		boolean requested = "donkey-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Donkey donkey && !donkey.isInvisible() && !donkey.isBaby() && donkey.isTamed()
+			&& !donkey.hasChest() && donkey.getBodyArmorItem().isEmpty()
+			&& donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Donkey donkey && donkey.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Donkey donkey && donkey.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Donkey donkey && donkey.isTamed())
+			+ ",\"clientHasChest\":" + (entity instanceof Donkey donkey && donkey.hasChest())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Donkey donkey
+				? BuiltInRegistries.ITEM.getKey(donkey.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Donkey donkey
+				? BuiltInRegistries.ITEM.getKey(donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String donkeyBabySaddleFixtureJson() {
+		boolean requested = "donkey-baby-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Donkey donkey && !donkey.isInvisible() && donkey.isBaby() && donkey.isTamed()
+			&& !donkey.hasChest() && donkey.getBodyArmorItem().isEmpty()
+			&& donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Donkey donkey && donkey.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Donkey donkey && donkey.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Donkey donkey && donkey.isTamed())
+			+ ",\"clientHasChest\":" + (entity instanceof Donkey donkey && donkey.hasChest())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Donkey donkey
+				? BuiltInRegistries.ITEM.getKey(donkey.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Donkey donkey
+				? BuiltInRegistries.ITEM.getKey(donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String donkeyChestedSaddleFixtureJson() {
+		boolean requested = "donkey-chested-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Donkey donkey && !donkey.isInvisible() && !donkey.isBaby() && donkey.isTamed()
+			&& donkey.hasChest() && donkey.getBodyArmorItem().isEmpty()
+			&& donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Donkey donkey && donkey.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Donkey donkey && donkey.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Donkey donkey && donkey.isTamed())
+			+ ",\"clientHasChest\":" + (entity instanceof Donkey donkey && donkey.hasChest())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Donkey donkey
+				? BuiltInRegistries.ITEM.getKey(donkey.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Donkey donkey
+				? BuiltInRegistries.ITEM.getKey(donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String donkeyBabyChestedSaddleFixtureJson() {
+		boolean requested = "donkey-baby-chested-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Donkey donkey && !donkey.isInvisible() && donkey.isBaby() && donkey.isTamed()
+			&& donkey.hasChest() && donkey.getBodyArmorItem().isEmpty()
+			&& donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Donkey donkey && donkey.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Donkey donkey && donkey.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Donkey donkey && donkey.isTamed())
+			+ ",\"clientHasChest\":" + (entity instanceof Donkey donkey && donkey.hasChest())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Donkey donkey
+				? BuiltInRegistries.ITEM.getKey(donkey.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Donkey donkey
+				? BuiltInRegistries.ITEM.getKey(donkey.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String muleSaddleFixtureJson() {
+		boolean requested = "mule-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Mule mule && !mule.isInvisible() && !mule.isBaby() && mule.isTamed()
+			&& !mule.hasChest() && mule.getBodyArmorItem().isEmpty()
+			&& mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Mule mule && mule.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Mule mule && mule.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Mule mule && mule.isTamed())
+			+ ",\"clientHasChest\":" + (entity instanceof Mule mule && mule.hasChest())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Mule mule
+				? BuiltInRegistries.ITEM.getKey(mule.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Mule mule
+				? BuiltInRegistries.ITEM.getKey(mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String muleChestedSaddleFixtureJson() {
+		boolean requested = "mule-chested-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Mule mule && !mule.isInvisible() && !mule.isBaby() && mule.isTamed()
+			&& mule.hasChest() && mule.getBodyArmorItem().isEmpty()
+			&& mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Mule mule && mule.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Mule mule && mule.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Mule mule && mule.isTamed())
+			+ ",\"clientHasChest\":" + (entity instanceof Mule mule && mule.hasChest())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Mule mule
+				? BuiltInRegistries.ITEM.getKey(mule.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Mule mule
+				? BuiltInRegistries.ITEM.getKey(mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String muleBabyChestedSaddleFixtureJson() {
+		boolean requested = "mule-baby-chested-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Mule mule && !mule.isInvisible() && mule.isBaby() && mule.isTamed()
+			&& mule.hasChest() && mule.getBodyArmorItem().isEmpty()
+			&& mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Mule mule && mule.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Mule mule && mule.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Mule mule && mule.isTamed())
+			+ ",\"clientHasChest\":" + (entity instanceof Mule mule && mule.hasChest())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Mule mule
+				? BuiltInRegistries.ITEM.getKey(mule.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Mule mule
+				? BuiltInRegistries.ITEM.getKey(mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String muleBabySaddleFixtureJson() {
+		boolean requested = "mule-baby-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Mule mule && !mule.isInvisible() && mule.isBaby() && mule.isTamed()
+			&& !mule.hasChest() && mule.getBodyArmorItem().isEmpty()
+			&& mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Mule mule && mule.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Mule mule && mule.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Mule mule && mule.isTamed())
+			+ ",\"clientHasChest\":" + (entity instanceof Mule mule && mule.hasChest())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Mule mule
+				? BuiltInRegistries.ITEM.getKey(mule.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Mule mule
+				? BuiltInRegistries.ITEM.getKey(mule.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseCreamyWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBrownWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBlackWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseGrayWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseDarkBrownWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseChestnutWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseCreamyWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBrownWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBlackWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseGrayWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseDarkBrownWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseChestnutWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseCreamyWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBrownWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBlackWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseGrayWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseDarkBrownWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseChestnutWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseCreamyBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBrownBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBlackBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseGrayBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseDarkBrownBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseChestnutBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyCreamyWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-creamy-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyCreamyWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-creamy-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyCreamyWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-creamy-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyCreamyBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-creamy-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyChestnutWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-chestnut-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyChestnutWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-chestnut-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyChestnutWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-chestnut-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyChestnutBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-chestnut-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBrownWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBrownWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBrownWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBrownBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BROWN && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBlackWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-black-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBlackWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-black-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBlackWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-black-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBlackBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-black-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.BLACK && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBabyGrayWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-gray-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBabyGrayWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-gray-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBabyGrayWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-gray-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBabyGrayBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-gray-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.GRAY && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBabyDarkBrownWhiteDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-dark-brown-white-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBabyDarkBrownWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-dark-brown-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBabyDarkBrownWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-dark-brown-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+	private static String horseBabyDarkBrownBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.DARK_BROWN && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+
+
+	private static String horseBabyWhiteMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-white-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyWhiteFieldMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-white-field-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.WHITE_FIELD
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyBlackDotsMarkedSaddleFixtureJson() {
+		boolean requested = "horse-baby-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.BLACK_DOTS
+			&& horse.getBodyArmorItem().isEmpty()
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyDiamondEquipmentFixtureJson() {
+		boolean requested = "horse-baby-diamond-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseDiamondEquipmentFixtureJson() {
+		boolean requested = "horse-diamond-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseCreamyDiamondEquipmentFixtureJson() {
+		boolean requested = "horse-creamy-diamond-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseChestnutDiamondEquipmentFixtureJson() {
+		boolean requested = "horse-chestnut-diamond-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseChestnutCopperEquipmentFixtureJson() {
+		boolean requested = "horse-chestnut-copper-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.COPPER_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseChestnutIronEquipmentFixtureJson() {
+		boolean requested = "horse-chestnut-iron-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.IRON_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseChestnutGoldEquipmentFixtureJson() {
+		boolean requested = "horse-chestnut-gold-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.GOLDEN_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseChestnutNetheriteEquipmentFixtureJson() {
+		boolean requested = "horse-chestnut-netherite-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.NETHERITE_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseCreamyCopperEquipmentFixtureJson() {
+		boolean requested = "horse-creamy-copper-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.COPPER_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseCreamyIronEquipmentFixtureJson() {
+		boolean requested = "horse-creamy-iron-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.IRON_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseCreamyGoldEquipmentFixtureJson() {
+		boolean requested = "horse-creamy-gold-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.GOLDEN_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseCreamyNetheriteEquipmentFixtureJson() {
+		boolean requested = "horse-creamy-netherite-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.NETHERITE_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyCopperEquipmentFixtureJson() {
+		boolean requested = "horse-baby-copper-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.COPPER_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseCopperEquipmentFixtureJson() {
+		boolean requested = "horse-copper-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.COPPER_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyIronEquipmentFixtureJson() {
+		boolean requested = "horse-baby-iron-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.IRON_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseIronEquipmentFixtureJson() {
+		boolean requested = "horse-iron-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.IRON_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyGoldEquipmentFixtureJson() {
+		boolean requested = "horse-baby-gold-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.GOLDEN_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseGoldEquipmentFixtureJson() {
+		boolean requested = "horse-gold-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.GOLDEN_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyNetheriteEquipmentFixtureJson() {
+		boolean requested = "horse-baby-netherite-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.NETHERITE_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseNetheriteEquipmentFixtureJson() {
+		boolean requested = "horse-netherite-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.NETHERITE_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseBabyDyedLeatherEquipmentFixtureJson() {
+		boolean requested = "horse-baby-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.LEATHER_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		int dyeRgb = entity instanceof Horse horse && horse.getBodyArmorItem().get(DataComponents.DYED_COLOR) != null ? horse.getBodyArmorItem().get(DataComponents.DYED_COLOR).rgb() : -1;
+		ready = ready && dyeRgb == 0x3366CC;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientBodyDyeRgb\":" + dyeRgb
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseDyedLeatherEquipmentFixtureJson() {
+		boolean requested = "horse-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.WHITE && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.LEATHER_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		int dyeRgb = entity instanceof Horse horse && horse.getBodyArmorItem().get(DataComponents.DYED_COLOR) != null ? horse.getBodyArmorItem().get(DataComponents.DYED_COLOR).rgb() : -1;
+		ready = ready && dyeRgb == 0x3366CC;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientBodyDyeRgb\":" + dyeRgb
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseCreamyDyedLeatherEquipmentFixtureJson() {
+		boolean requested = "horse-creamy-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CREAMY && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.LEATHER_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		int dyeRgb = entity instanceof Horse horse && horse.getBodyArmorItem().get(DataComponents.DYED_COLOR) != null ? horse.getBodyArmorItem().get(DataComponents.DYED_COLOR).rgb() : -1;
+		ready = ready && dyeRgb == 0x3366CC;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientBodyDyeRgb\":" + dyeRgb
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String horseChestnutDyedLeatherEquipmentFixtureJson() {
+		boolean requested = "horse-chestnut-dyed-leather-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Horse horse && !horse.isInvisible() && !horse.isBaby() && horse.isTamed()
+			&& horse.getVariant() == Variant.CHESTNUT && horse.getMarkings() == Markings.NONE
+			&& horse.getBodyArmorItem().is(Items.LEATHER_HORSE_ARMOR)
+			&& horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		int dyeRgb = entity instanceof Horse horse && horse.getBodyArmorItem().get(DataComponents.DYED_COLOR) != null ? horse.getBodyArmorItem().get(DataComponents.DYED_COLOR).rgb() : -1;
+		ready = ready && dyeRgb == 0x3366CC;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Horse horse && horse.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Horse horse && horse.isBaby())
+			+ ",\"clientTamed\":" + (entity instanceof Horse horse && horse.isTamed())
+			+ ",\"clientVariant\":\"" + (entity instanceof Horse horse ? horse.getVariant().getSerializedName() : "missing") + "\""
+			+ ",\"clientMarkings\":\"" + (entity instanceof Horse horse ? horse.getMarkings().name().toLowerCase(Locale.ROOT) : "missing") + "\""
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getBodyArmorItem().getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientBodyDyeRgb\":" + dyeRgb
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Horse horse
+				? BuiltInRegistries.ITEM.getKey(horse.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String camelSaddleFixtureJson() {
+		boolean requested = "camel-saddled".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Camel camel && !camel.isInvisible() && !camel.isBaby()
+			&& camel.getPose() == net.minecraft.world.entity.Pose.STANDING
+			&& !camel.isVehicle() && !camel.isDashing() && camel.getJumpCooldown() == 0
+			&& camel.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Camel camel && camel.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Camel camel && camel.isBaby())
+			+ ",\"clientPose\":\"" + (entity instanceof Camel camel ? camel.getPose().getSerializedName() : "unknown") + "\""
+			+ ",\"clientRidden\":" + (entity instanceof Camel camel && camel.isVehicle())
+			+ ",\"clientDashing\":" + (entity instanceof Camel camel && camel.isDashing())
+			+ ",\"clientJumpCooldown\":" + (entity instanceof Camel camel ? camel.getJumpCooldown() : -1)
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Camel camel
+				? BuiltInRegistries.ITEM.getKey(camel.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String nautilusEquipmentFixtureJson() {
+		boolean requested = "nautilus-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+			&& nautilus.isTame()
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.DIAMOND_NAUTILUS_ARMOR)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Nautilus nautilus && nautilus.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Nautilus nautilus && nautilus.isBaby())
+			+ ",\"clientTame\":" + (entity instanceof Nautilus nautilus && nautilus.isTame())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String nautilusCopperEquipmentFixtureJson() {
+		boolean requested = "nautilus-copper-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+			&& nautilus.isTame()
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.COPPER_NAUTILUS_ARMOR)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Nautilus nautilus && nautilus.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Nautilus nautilus && nautilus.isBaby())
+			+ ",\"clientTame\":" + (entity instanceof Nautilus nautilus && nautilus.isTame())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String nautilusIronEquipmentFixtureJson() {
+		boolean requested = "nautilus-iron-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+			&& nautilus.isTame()
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.IRON_NAUTILUS_ARMOR)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Nautilus nautilus && nautilus.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Nautilus nautilus && nautilus.isBaby())
+			+ ",\"clientTame\":" + (entity instanceof Nautilus nautilus && nautilus.isTame())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String nautilusGoldEquipmentFixtureJson() {
+		boolean requested = "nautilus-gold-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+			&& nautilus.isTame()
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.GOLDEN_NAUTILUS_ARMOR)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Nautilus nautilus && nautilus.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Nautilus nautilus && nautilus.isBaby())
+			+ ",\"clientTame\":" + (entity instanceof Nautilus nautilus && nautilus.isTame())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String nautilusNetheriteEquipmentFixtureJson() {
+		boolean requested = "nautilus-netherite-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Nautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+			&& nautilus.isTame()
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.NETHERITE_NAUTILUS_ARMOR)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Nautilus nautilus && nautilus.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Nautilus nautilus && nautilus.isBaby())
+			+ ",\"clientTame\":" + (entity instanceof Nautilus nautilus && nautilus.isTame())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String nautilusBabyEquipmentFixtureJson() {
+		boolean requested = "nautilus-baby-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Nautilus nautilus && !nautilus.isInvisible() && nautilus.isBaby()
+			&& nautilus.isTame()
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.DIAMOND_NAUTILUS_ARMOR)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Nautilus nautilus && nautilus.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Nautilus nautilus && nautilus.isBaby())
+			+ ",\"clientTame\":" + (entity instanceof Nautilus nautilus && nautilus.isTame())
+			+ ",\"clientBodyItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof Nautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String zombieNautilusEquipmentFixtureJson() {
+		boolean requested = "zombie-nautilus-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof ZombieNautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+			&& nautilus.getVariant().is(ZombieNautilusVariants.TEMPERATE)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.DIAMOND_NAUTILUS_ARMOR)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof ZombieNautilus nautilus && nautilus.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof ZombieNautilus nautilus && nautilus.isBaby())
+			+ ",\"clientTemperate\":" + (entity instanceof ZombieNautilus nautilus
+				&& nautilus.getVariant().is(ZombieNautilusVariants.TEMPERATE))
+			+ ",\"clientBodyItem\":\"" + (entity instanceof ZombieNautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof ZombieNautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String zombieNautilusCoralEquipmentFixtureJson() {
+		boolean requested = "zombie-nautilus-coral-equipped".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof ZombieNautilus nautilus && !nautilus.isInvisible() && !nautilus.isBaby()
+			&& nautilus.getVariant().is(ZombieNautilusVariants.WARM)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).is(Items.DIAMOND_NAUTILUS_ARMOR)
+			&& nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).is(Items.SADDLE);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof ZombieNautilus nautilus && nautilus.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof ZombieNautilus nautilus && nautilus.isBaby())
+			+ ",\"clientCoral\":" + (entity instanceof ZombieNautilus nautilus
+				&& nautilus.getVariant().is(ZombieNautilusVariants.WARM))
+			+ ",\"clientBodyItem\":\"" + (entity instanceof ZombieNautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.BODY).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"clientSaddleItem\":\"" + (entity instanceof ZombieNautilus nautilus
+				? BuiltInRegistries.ITEM.getKey(nautilus.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.SADDLE).getItem())
+				: ResourceLocation.withDefaultNamespace("air")) + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String wolfCollarFixtureJson() {
+		boolean requested = "wolf-collar".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof net.minecraft.world.entity.animal.wolf.Wolf wolf
+			&& !wolf.isInvisible() && !wolf.isBaby() && wolf.isTame()
+			&& wolf.getCollarColor() == DyeColor.RED && wolf.getBodyArmorItem().isEmpty();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof net.minecraft.world.entity.animal.wolf.Wolf wolf && wolf.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof net.minecraft.world.entity.animal.wolf.Wolf wolf && wolf.isBaby())
+			+ ",\"clientTame\":" + (entity instanceof net.minecraft.world.entity.animal.wolf.Wolf wolf && wolf.isTame())
+			+ ",\"clientCollarColor\":\"" + (entity instanceof net.minecraft.world.entity.animal.wolf.Wolf wolf ? wolf.getCollarColor().getName() : "unknown") + "\""
+			+ ",\"clientBodyArmorEmpty\":" + (entity instanceof net.minecraft.world.entity.animal.wolf.Wolf wolf && wolf.getBodyArmorItem().isEmpty())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String ironGolemCracksFixtureJson() {
+		boolean requested = "iron-golem-cracks".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof IronGolem golem && !golem.isInvisible()
+			&& golem.getCrackiness() == net.minecraft.world.entity.Crackiness.Level.HIGH;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof IronGolem golem && golem.isInvisible())
+			+ ",\"clientCrackiness\":\"" + (entity instanceof IronGolem golem ? golem.getCrackiness().name().toLowerCase(Locale.ROOT) : "unknown") + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String snowGolemFixtureJson() {
+		boolean requested = "snow-golem".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof SnowGolem golem && !golem.isInvisible() && golem.hasPumpkin();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof SnowGolem golem && golem.isInvisible())
+			+ ",\"clientHasPumpkin\":" + (entity instanceof SnowGolem golem && golem.hasPumpkin())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String itemFrameFixtureJson() {
+		boolean requested = isItemFrameScenario();
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof ItemFrame frame && frame.isInvisible() == isInvisibleItemFrameScenario()
+			&& frame.getType() == expectedItemFrameType()
+			&& itemFrameFixtureItemMatches(frame) && frame.getRotation() == expectedItemFrameRotation();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof ItemFrame frame && frame.isInvisible())
+			+ ",\"clientGlowFrame\":" + (entity != null && entity.getType() == EntityType.GLOW_ITEM_FRAME)
+			+ ",\"clientItemEmpty\":" + (entity instanceof ItemFrame frame && frame.getItem().isEmpty())
+			+ ",\"clientItemIdentity\":\"" + (entity instanceof ItemFrame frame && !frame.getItem().isEmpty()
+				? BuiltInRegistries.ITEM.getKey(frame.getItem().getItem()) : "") + "\""
+			+ ",\"clientMapId\":" + (entity instanceof ItemFrame frame && frame.getItem().get(DataComponents.MAP_ID) instanceof MapId mapId
+				? mapId.id() : -1)
+			+ ",\"clientRotation\":" + (entity instanceof ItemFrame frame ? frame.getRotation() : -1)
+			+ ",\"clientDecorationReady\":" + (entity instanceof ItemFrame frame && itemFrameDecorationMatches(frame))
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String sheepFixtureJson() {
+		boolean requested = "sheep".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = modelMeshSheepClientState();
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientBaby\":" + (entity instanceof Sheep sheep && sheep.isBaby())
+			+ ",\"clientSheared\":" + (entity instanceof Sheep sheep ? sheep.isSheared() : "null")
+			+ ",\"clientColor\":\"" + (entity instanceof Sheep sheep ? sheep.getColor().getName() : "unknown") + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String redSheepFixtureJson() {
+		boolean requested = "sheep-red".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = entity instanceof Sheep sheep
+			&& !sheep.isBaby() && !sheep.isSheared() && sheep.getColor() == DyeColor.RED;
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientBaby\":" + (entity instanceof Sheep sheep && sheep.isBaby())
+			+ ",\"clientSheared\":" + (entity instanceof Sheep sheep ? sheep.isSheared() : "null")
+			+ ",\"clientColor\":\"" + (entity instanceof Sheep sheep ? sheep.getColor().getName() : "unknown") + "\""
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String villagerFixtureJson() {
+		boolean requested = "villager".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = modelMeshFixtureStateReady(entity);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Villager villager && villager.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof Villager villager && villager.isBaby())
+			+ ",\"clientTypePlains\":" + (entity instanceof Villager villager && villager.getVillagerData().type().is(VillagerType.PLAINS))
+			+ ",\"clientProfessionFarmer\":" + (entity instanceof Villager villager && villager.getVillagerData().profession().is(VillagerProfession.FARMER))
+			+ ",\"clientLevel\":" + (entity instanceof Villager villager ? villager.getVillagerData().level() : -1)
+			+ ",\"clientMainHandEmpty\":" + (entity instanceof Villager villager && villager.getMainHandItem().isEmpty())
+			+ ",\"clientOffHandEmpty\":" + (entity instanceof Villager villager && villager.getOffhandItem().isEmpty())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String zombieVillagerFixtureJson() {
+		boolean requested = "zombie-villager".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = modelMeshFixtureStateReady(entity);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof ZombieVillager zombieVillager && zombieVillager.isInvisible())
+			+ ",\"clientBaby\":" + (entity instanceof ZombieVillager zombieVillager && zombieVillager.isBaby())
+			+ ",\"clientConverting\":" + (entity instanceof ZombieVillager zombieVillager && zombieVillager.isConverting())
+			+ ",\"clientAggressive\":" + (entity instanceof ZombieVillager zombieVillager && zombieVillager.isAggressive())
+			+ ",\"clientTypePlains\":" + (entity instanceof ZombieVillager zombieVillager && zombieVillager.getVillagerData().type().is(VillagerType.PLAINS))
+			+ ",\"clientProfessionFarmer\":" + (entity instanceof ZombieVillager zombieVillager && zombieVillager.getVillagerData().profession().is(VillagerProfession.FARMER))
+			+ ",\"clientLevel\":" + (entity instanceof ZombieVillager zombieVillager ? zombieVillager.getVillagerData().level() : -1)
+			+ ",\"clientEquipmentEmpty\":" + (entity instanceof ZombieVillager zombieVillager
+				&& zombieVillager.getMainHandItem().isEmpty() && zombieVillager.getOffhandItem().isEmpty()
+				&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).isEmpty()
+				&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()
+				&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS).isEmpty()
+				&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET).isEmpty())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String copperGolemFixtureJson() {
+		boolean requested = "copper-golem".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = modelMeshFixtureStateReady(entity);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof CopperGolem golem && golem.isInvisible())
+			+ ",\"clientWeatherState\":\"" + (entity instanceof CopperGolem golem ? golem.getWeatherState().getSerializedName() : "unknown") + "\""
+			+ ",\"clientMainHandEmpty\":" + (entity instanceof CopperGolem golem && golem.getMainHandItem().isEmpty())
+			+ ",\"clientOffHandEmpty\":" + (entity instanceof CopperGolem golem && golem.getOffhandItem().isEmpty())
+			+ ",\"clientAntennaEmpty\":" + (entity instanceof CopperGolem golem && golem.getItemBySlot(CopperGolem.EQUIPMENT_SLOT_ANTENNA).isEmpty())
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String wardenFixtureJson() {
+		boolean requested = "warden".equals(MODEL_MESH_SCENARIO);
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean ready = modelMeshFixtureStateReady(entity);
+		return "{\"requested\":" + requested
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientInvisible\":" + (entity instanceof Warden warden && warden.isInvisible())
+			+ ",\"clientPose\":\"" + (entity instanceof Warden warden ? warden.getPose().getSerializedName() : "unknown") + "\""
+			+ ",\"clientNoAi\":" + (entity instanceof Warden warden && warden.isNoAi())
+			+ ",\"clientTickCount\":" + (entity instanceof Warden warden ? warden.tickCount : -1)
+			+ ",\"complete\":" + (requested && ready) + "}";
+	}
+
+	private static String energySwirlOutlineFixtureJson() {
+		Minecraft minecraft = Minecraft.getInstance();
+		Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId);
+		boolean supportedScenario = "powered-creeper".equals(MODEL_MESH_SCENARIO)
+			|| "powered-wither".equals(MODEL_MESH_SCENARIO);
+		boolean glowing = entity != null && entity.isCurrentlyGlowing();
+		return "{\"requested\":" + ENERGY_SWIRL_OUTLINE_FIXTURE
+			+ ",\"scenario\":\"" + MODEL_MESH_SCENARIO + "\""
+			+ ",\"entityId\":" + (entity == null ? -1 : entity.getId())
+			+ ",\"clientGlowing\":" + glowing
+			+ ",\"complete\":" + (ENERGY_SWIRL_OUTLINE_FIXTURE && supportedScenario && glowing) + "}";
+	}
+
 	private static boolean isExpectedModelMeshClientEntity(Entity entity) {
 		EntityType<?> expectedType = switch (MODEL_MESH_SCENARIO) {
 			case "llama-spit" -> EntityType.LLAMA_SPIT;
@@ -8338,11 +15523,49 @@ public final class DeterministicCameraCapture {
 			case "wither-skull" -> EntityType.WITHER_SKULL;
 			case "chicken" -> EntityType.CHICKEN;
 			case "cow" -> EntityType.COW;
-			case "pig" -> EntityType.PIG;
+			case "pig", "pig-saddled" -> EntityType.PIG;
+			case "donkey-saddled" -> EntityType.DONKEY;
+			case "donkey-baby-saddled" -> EntityType.DONKEY;
+			case "donkey-chested-saddled" -> EntityType.DONKEY;
+			case "donkey-baby-chested-saddled" -> EntityType.DONKEY;
+			case "mule-saddled" -> EntityType.MULE;
+			case "mule-chested-saddled" -> EntityType.MULE;
+			case "mule-baby-chested-saddled" -> EntityType.MULE;
+			case "mule-baby-saddled" -> EntityType.MULE;
+			case "horse-saddled", "horse-creamy-saddled", "horse-chestnut-saddled", "horse-brown-saddled", "horse-black-saddled", "horse-gray-saddled", "horse-dark-brown-saddled", "horse-baby-saddled", "horse-baby-creamy-saddled", "horse-baby-chestnut-saddled", "horse-baby-brown-saddled", "horse-baby-black-saddled", "horse-baby-gray-saddled", "horse-baby-dark-brown-saddled", "horse-baby-diamond-equipped", "horse-baby-copper-equipped", "horse-baby-iron-equipped", "horse-baby-gold-equipped", "horse-baby-netherite-equipped", "horse-baby-dyed-leather-equipped", "horse-white-dots-marked-saddled", "horse-white-marked-saddled", "horse-white-field-marked-saddled", "horse-black-dots-marked-saddled", "horse-creamy-white-dots-marked-saddled", "horse-brown-white-dots-marked-saddled", "horse-black-white-dots-marked-saddled", "horse-gray-white-dots-marked-saddled", "horse-dark-brown-white-dots-marked-saddled", "horse-chestnut-white-dots-marked-saddled", "horse-creamy-white-marked-saddled", "horse-brown-white-marked-saddled", "horse-black-white-marked-saddled", "horse-gray-white-marked-saddled", "horse-dark-brown-white-marked-saddled", "horse-chestnut-white-marked-saddled", "horse-creamy-white-field-marked-saddled", "horse-brown-white-field-marked-saddled", "horse-black-white-field-marked-saddled", "horse-gray-white-field-marked-saddled", "horse-dark-brown-white-field-marked-saddled", "horse-chestnut-white-field-marked-saddled", "horse-creamy-black-dots-marked-saddled", "horse-brown-black-dots-marked-saddled", "horse-black-black-dots-marked-saddled", "horse-gray-black-dots-marked-saddled", "horse-dark-brown-black-dots-marked-saddled", "horse-chestnut-black-dots-marked-saddled", "horse-baby-marked-saddled", "horse-baby-white-marked-saddled", "horse-baby-white-field-marked-saddled", "horse-baby-black-dots-marked-saddled", "horse-baby-creamy-white-dots-marked-saddled", "horse-baby-creamy-white-marked-saddled", "horse-baby-creamy-white-field-marked-saddled", "horse-baby-creamy-black-dots-marked-saddled", "horse-baby-chestnut-white-dots-marked-saddled", "horse-baby-chestnut-white-marked-saddled", "horse-baby-chestnut-white-field-marked-saddled", "horse-baby-chestnut-black-dots-marked-saddled", "horse-baby-brown-white-dots-marked-saddled", "horse-baby-brown-white-marked-saddled", "horse-baby-brown-white-field-marked-saddled", "horse-baby-brown-black-dots-marked-saddled", "horse-baby-black-white-dots-marked-saddled", "horse-baby-black-white-marked-saddled", "horse-baby-black-white-field-marked-saddled", "horse-baby-black-black-dots-marked-saddled", "horse-baby-gray-white-dots-marked-saddled", "horse-baby-gray-white-marked-saddled", "horse-baby-gray-white-field-marked-saddled", "horse-baby-gray-black-dots-marked-saddled", "horse-baby-dark-brown-white-dots-marked-saddled", "horse-baby-dark-brown-white-marked-saddled", "horse-baby-dark-brown-white-field-marked-saddled", "horse-baby-dark-brown-black-dots-marked-saddled", "horse-diamond-equipped", "horse-creamy-diamond-equipped", "horse-chestnut-diamond-equipped", "horse-chestnut-copper-equipped", "horse-chestnut-iron-equipped", "horse-chestnut-gold-equipped", "horse-chestnut-netherite-equipped", "horse-creamy-copper-equipped", "horse-creamy-iron-equipped", "horse-creamy-gold-equipped", "horse-creamy-netherite-equipped", "horse-copper-equipped", "horse-iron-equipped", "horse-gold-equipped", "horse-netherite-equipped", "horse-dyed-leather-equipped", "horse-creamy-dyed-leather-equipped", "horse-chestnut-dyed-leather-equipped" -> EntityType.HORSE;
+			case "strider-saddled" -> EntityType.STRIDER;
+			case "camel-saddled" -> EntityType.CAMEL;
+			case "nautilus-equipped", "nautilus-baby-equipped", "nautilus-copper-equipped", "nautilus-iron-equipped", "nautilus-gold-equipped", "nautilus-netherite-equipped" -> EntityType.NAUTILUS;
+			case "zombie-nautilus-equipped", "zombie-nautilus-coral-equipped" -> EntityType.ZOMBIE_NAUTILUS;
 			case "rabbit" -> EntityType.RABBIT;
-			case "sheep" -> EntityType.SHEEP;
+			case "sheep", "sheep-red" -> EntityType.SHEEP;
 			case "tropical-fish" -> EntityType.TROPICAL_FISH;
+			case "spider" -> EntityType.SPIDER;
+			case "enderman" -> EntityType.ENDERMAN;
+			case "phantom" -> EntityType.PHANTOM;
+			case "creaking" -> EntityType.CREAKING;
+			case "breeze" -> EntityType.BREEZE;
+			case "bogged" -> EntityType.BOGGED;
+			case "stray" -> EntityType.STRAY;
+			case "drowned" -> EntityType.DROWNED;
+			case "slime" -> EntityType.SLIME;
+			case "cat" -> EntityType.CAT;
+			case "wolf-collar" -> EntityType.WOLF;
+			case "iron-golem-cracks" -> EntityType.IRON_GOLEM;
+			case "snow-golem" -> EntityType.SNOW_GOLEM;
+			case "item-frame", "item-frame-invisible" -> EntityType.ITEM_FRAME;
+			case "glow-item-frame", "glow-item-frame-invisible" -> EntityType.GLOW_ITEM_FRAME;
+			case "item-frame-item", "item-frame-map", "item-frame-item-rotated", "item-frame-map-rotated", "item-frame-map-decorated", "item-frame-item-invisible", "item-frame-map-invisible" -> EntityType.ITEM_FRAME;
+			case "glow-item-frame-item", "glow-item-frame-map", "glow-item-frame-item-rotated", "glow-item-frame-map-rotated", "glow-item-frame-item-invisible", "glow-item-frame-map-invisible" -> EntityType.GLOW_ITEM_FRAME;
+			case "villager" -> EntityType.VILLAGER;
+			case "zombie-villager" -> EntityType.ZOMBIE_VILLAGER;
+			case "copper-golem" -> EntityType.COPPER_GOLEM;
+			case "warden" -> EntityType.WARDEN;
+			case "wolf" -> EntityType.WOLF;
 			case "zombie" -> EntityType.ZOMBIE;
+			case "powered-creeper" -> EntityType.CREEPER;
+			case "powered-wither" -> EntityType.WITHER;
+			case "invulnerable-wither" -> EntityType.WITHER;
 			case "end-crystal" -> EntityType.END_CRYSTAL;
 			case "wind-charge" -> EntityType.WIND_CHARGE;
 			default -> null;
@@ -8351,6 +15574,49 @@ public final class DeterministicCameraCapture {
 		return entity != null
 			&& expectedType != null
 			&& entity.getType() == expectedType
+			&& (!"powered-creeper".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof Creeper creeper && creeper.isPowered())
+			&& (!"powered-wither".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof WitherBoss wither && wither.isPowered() && wither.getInvulnerableTicks() == 0)
+			&& (!ENERGY_SWIRL_OUTLINE_FIXTURE
+				|| ("powered-creeper".equals(MODEL_MESH_SCENARIO) || "powered-wither".equals(MODEL_MESH_SCENARIO))
+				&& entity.isCurrentlyGlowing())
+			&& (!"invulnerable-wither".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof WitherBoss wither && !wither.isPowered() && wither.getInvulnerableTicks() > 80)
+			&& (!"sheep".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof Sheep sheep && sheep.isBaby() && !sheep.isSheared() && sheep.getColor() == DyeColor.WHITE)
+			&& (!"sheep-red".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof Sheep sheep && !sheep.isBaby() && !sheep.isSheared() && sheep.getColor() == DyeColor.RED)
+			&& (!"snow-golem".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof SnowGolem golem && !golem.isInvisible() && golem.hasPumpkin())
+			&& (!isItemFrameScenario()
+				|| entity instanceof ItemFrame frame && frame.isInvisible() == isInvisibleItemFrameScenario()
+					&& itemFrameFixtureItemMatches(frame))
+			&& (!"villager".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof Villager villager && !villager.isBaby()
+					&& villager.getVillagerData().type().is(VillagerType.PLAINS)
+					&& villager.getVillagerData().profession().is(VillagerProfession.FARMER)
+					&& villager.getVillagerData().level() == 5)
+			&& (!"zombie-villager".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof ZombieVillager zombieVillager && !zombieVillager.isInvisible()
+					&& !zombieVillager.isBaby() && !zombieVillager.isConverting() && !zombieVillager.isAggressive()
+					&& zombieVillager.getVillagerData().type().is(VillagerType.PLAINS)
+					&& zombieVillager.getVillagerData().profession().is(VillagerProfession.FARMER)
+					&& zombieVillager.getVillagerData().level() == 5
+					&& zombieVillager.getMainHandItem().isEmpty() && zombieVillager.getOffhandItem().isEmpty()
+					&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).isEmpty()
+					&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()
+					&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS).isEmpty()
+					&& zombieVillager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET).isEmpty())
+			&& (!"copper-golem".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof CopperGolem golem && !golem.isInvisible()
+					&& golem.getWeatherState() == WeatheringCopper.WeatherState.UNAFFECTED
+					&& golem.getMainHandItem().isEmpty() && golem.getOffhandItem().isEmpty()
+					&& golem.getItemBySlot(CopperGolem.EQUIPMENT_SLOT_ANTENNA).isEmpty())
+			&& (!"warden".equals(MODEL_MESH_SCENARIO)
+				|| entity instanceof Warden warden && !warden.isInvisible()
+					&& warden.getPose() == net.minecraft.world.entity.Pose.STANDING
+					&& warden.isNoAi() && warden.tickCount >= 40)
 			&& modelMeshSetupExpectedEntityPosition != null
 			&& entity.position().distanceToSqr(modelMeshSetupExpectedEntityPosition) <= positionTolerance * positionTolerance;
 	}
@@ -8359,11 +15625,45 @@ public final class DeterministicCameraCapture {
 		String expectedIdentity = switch (MODEL_MESH_SCENARIO) {
 			case "chicken" -> "minecraft:chicken";
 			case "cow" -> "minecraft:cow";
-			case "pig" -> "minecraft:pig";
+			case "pig", "pig-saddled" -> "minecraft:pig";
+			case "horse-saddled", "horse-creamy-saddled", "horse-chestnut-saddled", "horse-brown-saddled", "horse-black-saddled", "horse-gray-saddled", "horse-dark-brown-saddled", "horse-baby-saddled", "horse-baby-creamy-saddled", "horse-baby-chestnut-saddled", "horse-baby-brown-saddled", "horse-baby-black-saddled", "horse-baby-gray-saddled", "horse-baby-dark-brown-saddled", "horse-baby-diamond-equipped", "horse-baby-copper-equipped", "horse-baby-iron-equipped", "horse-baby-gold-equipped", "horse-baby-netherite-equipped", "horse-baby-dyed-leather-equipped", "horse-white-dots-marked-saddled", "horse-white-marked-saddled", "horse-white-field-marked-saddled", "horse-black-dots-marked-saddled", "horse-creamy-white-dots-marked-saddled", "horse-brown-white-dots-marked-saddled", "horse-black-white-dots-marked-saddled", "horse-gray-white-dots-marked-saddled", "horse-dark-brown-white-dots-marked-saddled", "horse-chestnut-white-dots-marked-saddled", "horse-creamy-white-marked-saddled", "horse-brown-white-marked-saddled", "horse-black-white-marked-saddled", "horse-gray-white-marked-saddled", "horse-dark-brown-white-marked-saddled", "horse-chestnut-white-marked-saddled", "horse-creamy-white-field-marked-saddled", "horse-brown-white-field-marked-saddled", "horse-black-white-field-marked-saddled", "horse-gray-white-field-marked-saddled", "horse-dark-brown-white-field-marked-saddled", "horse-chestnut-white-field-marked-saddled", "horse-creamy-black-dots-marked-saddled", "horse-brown-black-dots-marked-saddled", "horse-black-black-dots-marked-saddled", "horse-gray-black-dots-marked-saddled", "horse-dark-brown-black-dots-marked-saddled", "horse-chestnut-black-dots-marked-saddled", "horse-baby-marked-saddled", "horse-baby-white-marked-saddled", "horse-baby-white-field-marked-saddled", "horse-baby-black-dots-marked-saddled", "horse-baby-creamy-white-dots-marked-saddled", "horse-baby-creamy-white-marked-saddled", "horse-baby-creamy-white-field-marked-saddled", "horse-baby-creamy-black-dots-marked-saddled", "horse-baby-chestnut-white-dots-marked-saddled", "horse-baby-chestnut-white-marked-saddled", "horse-baby-chestnut-white-field-marked-saddled", "horse-baby-chestnut-black-dots-marked-saddled", "horse-baby-brown-white-dots-marked-saddled", "horse-baby-brown-white-marked-saddled", "horse-baby-brown-white-field-marked-saddled", "horse-baby-brown-black-dots-marked-saddled", "horse-baby-black-white-dots-marked-saddled", "horse-baby-black-white-marked-saddled", "horse-baby-black-white-field-marked-saddled", "horse-baby-black-black-dots-marked-saddled", "horse-baby-gray-white-dots-marked-saddled", "horse-baby-gray-white-marked-saddled", "horse-baby-gray-white-field-marked-saddled", "horse-baby-gray-black-dots-marked-saddled", "horse-baby-dark-brown-white-dots-marked-saddled", "horse-baby-dark-brown-white-marked-saddled", "horse-baby-dark-brown-white-field-marked-saddled", "horse-baby-dark-brown-black-dots-marked-saddled", "horse-diamond-equipped", "horse-creamy-diamond-equipped", "horse-chestnut-diamond-equipped", "horse-chestnut-copper-equipped", "horse-chestnut-iron-equipped", "horse-chestnut-gold-equipped", "horse-chestnut-netherite-equipped", "horse-creamy-copper-equipped", "horse-creamy-iron-equipped", "horse-creamy-gold-equipped", "horse-creamy-netherite-equipped", "horse-copper-equipped", "horse-iron-equipped", "horse-gold-equipped", "horse-netherite-equipped", "horse-dyed-leather-equipped", "horse-creamy-dyed-leather-equipped", "horse-chestnut-dyed-leather-equipped" -> "minecraft:horse";
+			case "donkey-saddled" -> "minecraft:donkey";
+			case "donkey-baby-saddled" -> "minecraft:donkey";
+			case "donkey-chested-saddled" -> "minecraft:donkey";
+			case "donkey-baby-chested-saddled" -> "minecraft:donkey";
+			case "mule-saddled" -> "minecraft:mule";
+			case "mule-chested-saddled" -> "minecraft:mule";
+			case "mule-baby-chested-saddled" -> "minecraft:mule";
+			case "mule-baby-saddled" -> "minecraft:mule";
+			case "strider-saddled" -> "minecraft:strider";
+			case "camel-saddled" -> "minecraft:camel";
+			case "nautilus-equipped", "nautilus-baby-equipped", "nautilus-copper-equipped", "nautilus-iron-equipped", "nautilus-gold-equipped", "nautilus-netherite-equipped" -> "minecraft:nautilus";
+			case "zombie-nautilus-equipped", "zombie-nautilus-coral-equipped" -> "minecraft:zombie_nautilus";
 			case "rabbit" -> "minecraft:rabbit";
-			case "sheep" -> "minecraft:sheep";
+			case "sheep", "sheep-red" -> "minecraft:sheep";
 			case "tropical-fish" -> "minecraft:tropical_fish";
+			case "spider" -> "minecraft:spider";
+			case "enderman" -> "minecraft:enderman";
+			case "phantom" -> "minecraft:phantom";
+			case "creaking" -> "minecraft:creaking";
+			case "breeze" -> "minecraft:breeze";
+			case "bogged" -> "minecraft:bogged";
+			case "stray" -> "minecraft:stray";
+			case "drowned" -> "minecraft:drowned";
+			case "slime" -> "minecraft:slime";
+			case "cat" -> "minecraft:cat";
+			case "wolf-collar" -> "minecraft:wolf";
+			case "iron-golem-cracks" -> "minecraft:iron_golem";
+			case "snow-golem" -> "minecraft:snow_golem";
+			case "villager" -> "minecraft:villager";
+			case "zombie-villager" -> "minecraft:zombie_villager";
+			case "copper-golem" -> "minecraft:copper_golem";
+			case "warden" -> "minecraft:warden";
+			case "wolf" -> "minecraft:wolf";
 			case "zombie" -> "minecraft:zombie";
+			case "powered-creeper" -> "minecraft:creeper";
+			case "powered-wither" -> "minecraft:wither";
+			case "invulnerable-wither" -> "minecraft:wither";
 			case "end-crystal" -> "minecraft:end_crystal";
 			case "wind-charge" -> "minecraft:wind_charge";
 			default -> "";
@@ -8426,7 +15726,7 @@ public final class DeterministicCameraCapture {
 	private static void prepareModelMeshEntityCaptureSite(ServerLevel serverLevel, Vec3 eyePosition, Vec3 entityPosition) {
 		BlockPos entityBlock = BlockPos.containing(entityPosition);
 		prepareModelMeshCaptureSite(serverLevel, entityBlock);
-		if ("zombie".equals(MODEL_MESH_SCENARIO)) {
+		if ("zombie".equals(MODEL_MESH_SCENARIO) || "powered-creeper".equals(MODEL_MESH_SCENARIO) || "powered-wither".equals(MODEL_MESH_SCENARIO) || "invulnerable-wither".equals(MODEL_MESH_SCENARIO)) {
 			// A roof only exists in the harness-owned copy. It preserves the normal
 			// adult Zombie body state by preventing the vanilla daylight-fire feature,
 			// which remains explicitly unsupported by this first direct-model route.
@@ -8905,6 +16205,11 @@ public final class DeterministicCameraCapture {
 		json.append(", \"poseIndex\": ").append(itemEntitySetupPoseIndex)
 			.append(" },\n");
 		appendItemEntityDiagnostics(json).append(",\n");
+		appendItemFrameItemExecutionDiagnostics(json).append(",\n");
+		appendItemFrameMapDiagnostics(json).append(",\n");
+		appendItemFrameMapExecutionDiagnostics(json).append(",\n");
+		appendItemFrameMapDecorationDiagnostics(json).append(",\n");
+		appendItemFrameMapDecorationExecutionDiagnostics(json).append(",\n");
 		appendItemEntityRouteDecisions(json).append(",\n");
 		appendField(json, "rustGalWorldModelMeshScenario", MODEL_MESH_SCENARIO).append(",\n");
 		json.append("  \"rustGalWorldModelMeshSetup\": { ");
@@ -8919,6 +16224,83 @@ public final class DeterministicCameraCapture {
 		json.append("\"clientBlockEntityPresent\": ").append(modelMeshSetupClientBlockEntityPresent)
 			.append(", \"serverEntityPresent\": ").append(modelMeshSetupServerEntityPresent)
 			.append(", \"clientEntityPresent\": ").append(modelMeshSetupClientEntityPresent)
+			.append(", \"powered\": ").append(modelMeshPoweredClientState())
+			.append(", \"invulnerableWither\": ").append(modelMeshInvulnerableWitherClientState())
+			.append(", \"trialSpawnerOminous\": ").append(modelMeshTrialSpawnerOminous())
+			.append(", \"bellShaking\": ").append(modelMeshBellShaking())
+			.append(", \"bellTicks\": ").append(modelMeshBellTicks()).append(", ");
+		appendField(json, "bellDirection", modelMeshBellDirection(), 0).append(", ");
+		appendField(json, "copperGolemStatueFacing", modelMeshCopperGolemStatueFacing(), 0).append(", ");
+		appendField(json, "copperGolemStatuePose", modelMeshCopperGolemStatuePose(), 0).append(", ");
+		appendField(json, "copperGolemStatueWeathering", modelMeshCopperGolemStatueWeathering(), 0).append(", ");
+		json.append("\"copperGolemStatueWaxed\": ").append(modelMeshCopperGolemStatueWaxed()).append(", ");
+		appendField(json, "decoratedPotWobbleStyle", modelMeshDecoratedPotWobbleStyle(), 0).append(", ");
+		json.append("\"decoratedPotWobbleProgress\": ").append(format(modelMeshDecoratedPotWobbleProgress())).append(", ");
+		appendField(json, "decoratedPotFacing", modelMeshDecoratedPotFacing(), 0).append(", ");
+		var shulker = modelMeshShulker();
+		appendField(json, "shulkerFacing", shulker == null ? "not-applicable"
+			: shulker.getBlockState().getValue(net.minecraft.world.level.block.ShulkerBoxBlock.FACING).getName(), 0).append(", ");
+		appendField(json, "shulkerStatus", shulker == null ? "not-applicable"
+			: shulker.getAnimationStatus().name().toLowerCase(java.util.Locale.ROOT), 0).append(", ");
+		appendField(json, "shulkerColor", shulker == null ? "not-applicable"
+			: shulker.getColor() == null ? "undyed" : shulker.getColor().getName(), 0).append(", ");
+		json.append("\"shulkerProgress\": ").append(shulker == null ? "-1" : format(shulker.getProgress(1.0F))).append(", ");
+		json.append("\"conduitActive\": ").append(modelMeshConduitActive())
+			.append(", \"conduitHunting\": ").append(modelMeshConduitHunting())
+			.append(", \"conduitBreaking\": ").append(isBreakingConduitModelScenario())
+			.append(", \"conduitDestroyStage\": ").append(isBreakingConduitModelScenario() ? MODEL_MESH_DESTROY_STAGE : -1).append(", ");
+		json.append("\"bannerStanding\": ").append(modelMeshBannerStanding())
+			.append(", \"bannerRotation\": ").append(modelMeshBannerRotation())
+			.append(", \"bannerPatternCount\": ").append(modelMeshBannerPatternCount()).append(", ");
+		appendField(json, "bannerFacing", modelMeshBannerFacing(), 0).append(", ");
+		appendField(json, "bannerBaseColor", modelMeshBannerBaseColor(), 0).append(", ");
+		json.append("\"skullStanding\": ").append(modelMeshSkullStanding())
+			.append(", \"skullRotation\": ").append(modelMeshSkullRotation())
+			.append(", \"skullAnimation\": ").append(format(modelMeshSkullAnimation()))
+			.append(", \"skullPowered\": ").append(modelMeshSkullPowered())
+			.append(", \"skullBreaking\": ").append(isBreakingSkullModelScenario())
+			.append(", \"skullDestroyStage\": ").append(isBreakingSkullModelScenario() ? MODEL_MESH_DESTROY_STAGE : -1).append(", ");
+		appendField(json, "skullFacing", modelMeshSkullFacing(), 0).append(", ");
+		appendField(json, "skullType", modelMeshSkullType(), 0).append(", ");
+		appendField(json, "skullProfileName", modelMeshSkullProfileName(), 0).append(", ");
+		appendField(json, "skullProfileId", modelMeshSkullProfileId(), 0).append(", ");
+		json.append("\"oakSignTextReady\": ").append(modelMeshOakSignTextReady())
+			.append(", \"oakSignGlowingBack\": ").append(isGlowingBackOakSignModelScenario())
+			.append(", \"oakSignBreaking\": ").append(isBreakingOakSignModelScenario())
+			.append(", \"oakSignDestroyStage\": ").append(isBreakingOakSignModelScenario() ? MODEL_MESH_DESTROY_STAGE : -1).append(", ");
+		json.append("\"hangingSignCeiling\": ").append(modelMeshHangingSignCeiling())
+			.append(", \"hangingSignWall\": ").append(modelMeshHangingSignWall())
+			.append(", \"hangingSignRotation\": ").append(modelMeshHangingSignRotation())
+			.append(", \"hangingSignAttached\": ").append(modelMeshHangingSignAttached())
+			.append(", \"hangingSignTextReady\": ").append(modelMeshHangingSignTextReady()).append(", ");
+		appendField(json, "hangingSignAttachment", modelMeshHangingSignAttachment(), 0).append(", ");
+		appendField(json, "hangingSignFacing", modelMeshHangingSignFacing(), 0).append(", ");
+		var structureBlock = modelMeshStructureBlock();
+		json.append("\"structureMode\": \"").append(structureBlock == null ? "not-applicable" : structureBlock.getMode().getSerializedName()).append("\"")
+			.append(", \"structureShowAir\": ").append(structureBlock != null && structureBlock.getShowAir())
+			.append(", \"structureShowBoundingBox\": ").append(structureBlock != null && structureBlock.getShowBoundingBox())
+			.append(", \"structureLocalPos\": ").append(structureBlock == null ? "null" : "{\"x\":" + structureBlock.getStructurePos().getX()
+				+ ",\"y\":" + structureBlock.getStructurePos().getY() + ",\"z\":" + structureBlock.getStructurePos().getZ() + "}")
+			.append(", \"structureSize\": ").append(structureBlock == null ? "null" : "{\"x\":" + structureBlock.getStructureSize().getX()
+				+ ",\"y\":" + structureBlock.getStructureSize().getY() + ",\"z\":" + structureBlock.getStructureSize().getZ() + "}").append(", ");
+		var testInstance = modelMeshTestInstance();
+		json.append("\"testInstanceStatus\": \"").append(testInstance == null ? "not-applicable"
+			: "test-instance-optional-failed".equals(MODEL_MESH_SCENARIO) ? "finished_optional_failed"
+			: "test-instance-required-failed".equals(MODEL_MESH_SCENARIO) ? "finished_required_failed"
+			: "test-instance-cleared".equals(MODEL_MESH_SCENARIO) ? "cleared"
+			: "test-instance-success".equals(MODEL_MESH_SCENARIO) ? "finished_success" : "running").append("\"")
+			.append(", \"testInstanceLocalPos\": ").append(testInstance == null ? "null" : "{\"x\":0,\"y\":1,\"z\":1}")
+			.append(", \"testInstanceSize\": ").append(testInstance == null ? "null" : "{\"x\":" + testInstance.getSize().getX()
+				+ ",\"y\":" + testInstance.getSize().getY() + ",\"z\":" + testInstance.getSize().getZ() + "}")
+			.append(", \"testInstanceBeamSections\": ").append(testInstance == null ? 0 : testInstance.getBeamSections().size())
+			.append(", \"testInstanceBeamColorArgb\": ").append(testInstance == null || testInstance.getBeamSections().isEmpty()
+				? 0 : testInstance.getBeamSections().get(0).getColor())
+			.append(", \"testInstanceErrorMarkers\": ").append(testInstance == null ? 0 : testInstance.getErrorMarkers().size())
+			.append(", \"testInstanceErrorText\": \"").append(testInstance == null || testInstance.getErrorMarkers().isEmpty()
+				? "" : escape(testInstance.getErrorMarkers().get(0).text().getString())).append("\"")
+			.append(", \"testInstanceFailureMessage\": \"").append(testInstance == null || testInstance.errorMessage().isEmpty()
+				? "" : escape(testInstance.errorMessage().get().getString())).append("\", ");
+		appendField(json, "trialSpawnerState", modelMeshTrialSpawnerState(), 0)
 			.append(", \"serverEntityId\": ").append(modelMeshSetupServerEntityId)
 			.append(", \"clientEntityId\": ").append(modelMeshSetupClientEntityId).append(", ");
 		appendField(json, "clientEntitySample", modelMeshSetupClientEntitySample, 0).append(" },\n");
@@ -8939,11 +16321,14 @@ public final class DeterministicCameraCapture {
 		appendMovingBlockDiagnostics(json).append(",\n");
 		appendMovingBlockRouteDecisions(json).append(",\n");
 		appendMovingMeshExecutionDiagnostics(json).append(",\n");
+		appendModelCompositionExecutionDiagnostics(json).append(",\n");
+		appendBlockAttachedCompositionExecutionDiagnostics(json).append(",\n");
 		appendEntityModelExecutionDiagnostics(json).append(",\n");
 		appendEntityShadowDiagnostics(json).append(",\n");
 		appendProceduralQuadExecutionDiagnostics(json).append(",\n");
 		appendMovingBlockShellScanDiagnostics(json).append(",\n");
 		appendModelMeshDiagnostics(json).append(",\n");
+		appendBlockModelDiagnostics(json).append(",\n");
 		appendModelMeshRouteDecisions(json).append(",\n");
 		appendModelPartMeshTraversalDiagnostics(json).append(",\n");
 		appendExperienceOrbDiagnostics(json).append(",\n");
@@ -8951,7 +16336,18 @@ public final class DeterministicCameraCapture {
 		appendExperienceOrbExecutionDiagnostics(json).append(",\n");
 		appendBeaconBeamDiagnostics(json).append(",\n");
 		appendBeaconBeamExecutionDiagnostics(json).append(",\n");
+		appendEndPortalDiagnostics(json).append(",\n");
+		appendStructureBlockBoxDiagnostics(json).append(",\n");
+		appendStructureBlockBoxExecutionDiagnostics(json).append(",\n");
+		appendStructureInvisibleCellsDiagnostics(json).append(",\n");
+		appendStructureInvisibleCellsExecutionDiagnostics(json).append(",\n");
+		appendTestInstanceCompositionDiagnostics(json).append(",\n");
+		appendTestInstanceCompositionExecutionDiagnostics(json).append(",\n");
+		appendEndPortalExecutionDiagnostics(json).append(",\n");
+		appendEndGatewayBeamDiagnostics(json).append(",\n");
+		appendEndGatewayBeamExecutionDiagnostics(json).append(",\n");
 		appendCrystalBeamExecutionDiagnostics(json).append(",\n");
+		appendEnergySwirlExecutionDiagnostics(json).append(",\n");
 		appendWeatherDiagnostics(json).append(",\n");
 		appendCloudDiagnostics(json).append(",\n");
 		appendDistantHorizonsRouteDiagnostics(json).append(",\n");
@@ -8985,6 +16381,141 @@ public final class DeterministicCameraCapture {
 		json.append("  \"worldWindowResize\": ").append(GraphicsAuditWorldResize.worldReceipt()).append(",\n");
 		json.append("  \"worldGuiScale\": ").append(GraphicsAuditWorldGuiScale.worldReceipt()).append(",\n");
 		json.append("  \"worldResourceReload\": ").append(GraphicsAuditResourceReload.worldReceipt()).append(",\n");
+		json.append("  \"energySwirlOutlineFixture\": ").append(energySwirlOutlineFixtureJson()).append(",\n");
+		json.append("  \"sheepFixture\": ").append(sheepFixtureJson()).append(",\n");
+		json.append("  \"redSheepFixture\": ").append(redSheepFixtureJson()).append(",\n");
+		json.append("  \"tropicalFishFixture\": ").append(tropicalFishFixtureJson()).append(",\n");
+		json.append("  \"spiderFixture\": ").append(spiderFixtureJson()).append(",\n");
+		json.append("  \"endermanFixture\": ").append(endermanFixtureJson()).append(",\n");
+		json.append("  \"phantomFixture\": ").append(phantomFixtureJson()).append(",\n");
+		json.append("  \"creakingFixture\": ").append(creakingFixtureJson()).append(",\n");
+		json.append("  \"breezeFixture\": ").append(breezeFixtureJson()).append(",\n");
+		json.append("  \"boggedFixture\": ").append(boggedFixtureJson()).append(",\n");
+		json.append("  \"strayFixture\": ").append(strayFixtureJson()).append(",\n");
+		json.append("  \"drownedFixture\": ").append(drownedFixtureJson()).append(",\n");
+		json.append("  \"slimeFixture\": ").append(slimeFixtureJson()).append(",\n");
+		json.append("  \"catFixture\": ").append(catFixtureJson()).append(",\n");
+		json.append("  \"striderSaddleFixture\": ").append(striderSaddleFixtureJson()).append(",\n");
+		json.append("  \"pigSaddleFixture\": ").append(pigSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseSaddleFixture\": ").append(horseSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseCreamySaddleFixture\": ").append(horseCreamySaddleFixtureJson()).append(",\n");
+		json.append("  \"horseChestnutSaddleFixture\": ").append(horseChestnutSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBrownSaddleFixture\": ").append(horseBrownSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBlackSaddleFixture\": ").append(horseBlackSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseGraySaddleFixture\": ").append(horseGraySaddleFixtureJson()).append(",\n");
+		json.append("  \"horseDarkBrownSaddleFixture\": ").append(horseDarkBrownSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabySaddleFixture\": ").append(horseBabySaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyCreamySaddleFixture\": ").append(horseBabyCreamySaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyChestnutSaddleFixture\": ").append(horseBabyChestnutSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBrownSaddleFixture\": ").append(horseBabyBrownSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBlackSaddleFixture\": ").append(horseBabyBlackSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyGraySaddleFixture\": ").append(horseBabyGraySaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyDarkBrownSaddleFixture\": ").append(horseBabyDarkBrownSaddleFixtureJson()).append(",\n");
+		json.append("  \"donkeySaddleFixture\": ").append(donkeySaddleFixtureJson()).append(",\n");
+		json.append("  \"donkeyBabySaddleFixture\": ").append(donkeyBabySaddleFixtureJson()).append(",\n");
+		json.append("  \"donkeyChestedSaddleFixture\": ").append(donkeyChestedSaddleFixtureJson()).append(",\n");
+		json.append("  \"donkeyBabyChestedSaddleFixture\": ").append(donkeyBabyChestedSaddleFixtureJson()).append(",\n");
+		json.append("  \"muleSaddleFixture\": ").append(muleSaddleFixtureJson()).append(",\n");
+		json.append("  \"muleChestedSaddleFixture\": ").append(muleChestedSaddleFixtureJson()).append(",\n");
+		json.append("  \"muleBabyChestedSaddleFixture\": ").append(muleBabyChestedSaddleFixtureJson()).append(",\n");
+		json.append("  \"muleBabySaddleFixture\": ").append(muleBabySaddleFixtureJson()).append(",\n");
+		json.append("  \"horseWhiteDotsMarkedSaddleFixture\": ").append(horseWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseWhiteMarkedSaddleFixture\": ").append(horseWhiteMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseWhiteFieldMarkedSaddleFixture\": ").append(horseWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBlackDotsMarkedSaddleFixture\": ").append(horseBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyWhiteDotsMarkedSaddleFixture\": ").append(horseCreamyWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseBrownWhiteDotsMarkedSaddleFixture\": ").append(horseBrownWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseBlackWhiteDotsMarkedSaddleFixture\": ").append(horseBlackWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseGrayWhiteDotsMarkedSaddleFixture\": ").append(horseGrayWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseDarkBrownWhiteDotsMarkedSaddleFixture\": ").append(horseDarkBrownWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseChestnutWhiteDotsMarkedSaddleFixture\": ").append(horseChestnutWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyWhiteMarkedSaddleFixture\": ").append(horseCreamyWhiteMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseBrownWhiteMarkedSaddleFixture\": ").append(horseBrownWhiteMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseBlackWhiteMarkedSaddleFixture\": ").append(horseBlackWhiteMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseGrayWhiteMarkedSaddleFixture\": ").append(horseGrayWhiteMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseDarkBrownWhiteMarkedSaddleFixture\": ").append(horseDarkBrownWhiteMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseChestnutWhiteMarkedSaddleFixture\": ").append(horseChestnutWhiteMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyWhiteFieldMarkedSaddleFixture\": ").append(horseCreamyWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseBrownWhiteFieldMarkedSaddleFixture\": ").append(horseBrownWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseBlackWhiteFieldMarkedSaddleFixture\": ").append(horseBlackWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseGrayWhiteFieldMarkedSaddleFixture\": ").append(horseGrayWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseDarkBrownWhiteFieldMarkedSaddleFixture\": ").append(horseDarkBrownWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseChestnutWhiteFieldMarkedSaddleFixture\": ").append(horseChestnutWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyBlackDotsMarkedSaddleFixture\": ").append(horseCreamyBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseBrownBlackDotsMarkedSaddleFixture\": ").append(horseBrownBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseBlackBlackDotsMarkedSaddleFixture\": ").append(horseBlackBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseGrayBlackDotsMarkedSaddleFixture\": ").append(horseGrayBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseDarkBrownBlackDotsMarkedSaddleFixture\": ").append(horseDarkBrownBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChestnutBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyMarkedSaddleFixture\": ").append(horseBabyMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyWhiteMarkedSaddleFixture\": ").append(horseBabyWhiteMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyWhiteFieldMarkedSaddleFixture\": ").append(horseBabyWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBlackDotsMarkedSaddleFixture\": ").append(horseBabyBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyCreamyWhiteDotsMarkedSaddleFixture\": ").append(horseBabyCreamyWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyCreamyWhiteMarkedSaddleFixture\": ").append(horseBabyCreamyWhiteMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyCreamyWhiteFieldMarkedSaddleFixture\": ").append(horseBabyCreamyWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyCreamyBlackDotsMarkedSaddleFixture\": ").append(horseBabyCreamyBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyChestnutWhiteDotsMarkedSaddleFixture\": ").append(horseBabyChestnutWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyChestnutWhiteMarkedSaddleFixture\": ").append(horseBabyChestnutWhiteMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyChestnutWhiteFieldMarkedSaddleFixture\": ").append(horseBabyChestnutWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyChestnutBlackDotsMarkedSaddleFixture\": ").append(horseBabyChestnutBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBrownWhiteDotsMarkedSaddleFixture\": ").append(horseBabyBrownWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBrownWhiteMarkedSaddleFixture\": ").append(horseBabyBrownWhiteMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBrownWhiteFieldMarkedSaddleFixture\": ").append(horseBabyBrownWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBrownBlackDotsMarkedSaddleFixture\": ").append(horseBabyBrownBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBlackWhiteDotsMarkedSaddleFixture\": ").append(horseBabyBlackWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBlackWhiteMarkedSaddleFixture\": ").append(horseBabyBlackWhiteMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBlackWhiteFieldMarkedSaddleFixture\": ").append(horseBabyBlackWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyBlackBlackDotsMarkedSaddleFixture\": ").append(horseBabyBlackBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyGrayWhiteDotsMarkedSaddleFixture\": ").append(horseBabyGrayWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyGrayWhiteMarkedSaddleFixture\": ").append(horseBabyGrayWhiteMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyGrayWhiteFieldMarkedSaddleFixture\": ").append(horseBabyGrayWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyGrayBlackDotsMarkedSaddleFixture\": ").append(horseBabyGrayBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyDarkBrownWhiteDotsMarkedSaddleFixture\": ").append(horseBabyDarkBrownWhiteDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyDarkBrownWhiteMarkedSaddleFixture\": ").append(horseBabyDarkBrownWhiteMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyDarkBrownWhiteFieldMarkedSaddleFixture\": ").append(horseBabyDarkBrownWhiteFieldMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyDarkBrownBlackDotsMarkedSaddleFixture\": ").append(horseBabyDarkBrownBlackDotsMarkedSaddleFixtureJson()).append(",\n");
+		json.append("  \"horseBabyDiamondEquipmentFixture\": ").append(horseBabyDiamondEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseDiamondEquipmentFixture\": ").append(horseDiamondEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyDiamondEquipmentFixture\": ").append(horseCreamyDiamondEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseChestnutDiamondEquipmentFixture\": ").append(horseChestnutDiamondEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseChestnutCopperEquipmentFixture\": ").append(horseChestnutCopperEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseChestnutIronEquipmentFixture\": ").append(horseChestnutIronEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseChestnutGoldEquipmentFixture\": ").append(horseChestnutGoldEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseChestnutNetheriteEquipmentFixture\": ").append(horseChestnutNetheriteEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyCopperEquipmentFixture\": ").append(horseCreamyCopperEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyIronEquipmentFixture\": ").append(horseCreamyIronEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyGoldEquipmentFixture\": ").append(horseCreamyGoldEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyNetheriteEquipmentFixture\": ").append(horseCreamyNetheriteEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseBabyCopperEquipmentFixture\": ").append(horseBabyCopperEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseCopperEquipmentFixture\": ").append(horseCopperEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseBabyIronEquipmentFixture\": ").append(horseBabyIronEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseIronEquipmentFixture\": ").append(horseIronEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseBabyGoldEquipmentFixture\": ").append(horseBabyGoldEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseGoldEquipmentFixture\": ").append(horseGoldEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseBabyNetheriteEquipmentFixture\": ").append(horseBabyNetheriteEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseNetheriteEquipmentFixture\": ").append(horseNetheriteEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseBabyDyedLeatherEquipmentFixture\": ").append(horseBabyDyedLeatherEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseDyedLeatherEquipmentFixture\": ").append(horseDyedLeatherEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseCreamyDyedLeatherEquipmentFixture\": ").append(horseCreamyDyedLeatherEquipmentFixtureJson()).append(",\n");
+		json.append("  \"horseChestnutDyedLeatherEquipmentFixture\": ").append(horseChestnutDyedLeatherEquipmentFixtureJson()).append(",\n");
+		json.append("  \"camelSaddleFixture\": ").append(camelSaddleFixtureJson()).append(",\n");
+		json.append("  \"nautilusEquipmentFixture\": ").append(nautilusEquipmentFixtureJson()).append(",\n");
+		json.append("  \"nautilusBabyEquipmentFixture\": ").append(nautilusBabyEquipmentFixtureJson()).append(",\n");
+		json.append("  \"nautilusCopperEquipmentFixture\": ").append(nautilusCopperEquipmentFixtureJson()).append(",\n");
+		json.append("  \"nautilusIronEquipmentFixture\": ").append(nautilusIronEquipmentFixtureJson()).append(",\n");
+		json.append("  \"nautilusGoldEquipmentFixture\": ").append(nautilusGoldEquipmentFixtureJson()).append(",\n");
+		json.append("  \"nautilusNetheriteEquipmentFixture\": ").append(nautilusNetheriteEquipmentFixtureJson()).append(",\n");
+		json.append("  \"zombieNautilusEquipmentFixture\": ").append(zombieNautilusEquipmentFixtureJson()).append(",\n");
+		json.append("  \"zombieNautilusCoralEquipmentFixture\": ").append(zombieNautilusCoralEquipmentFixtureJson()).append(",\n");
+		json.append("  \"wolfCollarFixture\": ").append(wolfCollarFixtureJson()).append(",\n");
+		json.append("  \"ironGolemCracksFixture\": ").append(ironGolemCracksFixtureJson()).append(",\n");
+		json.append("  \"snowGolemFixture\": ").append(snowGolemFixtureJson()).append(",\n");
+		json.append("  \"itemFrameFixture\": ").append(itemFrameFixtureJson()).append(",\n");
+		json.append("  \"villagerFixture\": ").append(villagerFixtureJson()).append(",\n");
+		json.append("  \"zombieVillagerFixture\": ").append(zombieVillagerFixtureJson()).append(",\n");
+		json.append("  \"copperGolemFixture\": ").append(copperGolemFixtureJson()).append(",\n");
+		json.append("  \"wardenFixture\": ").append(wardenFixtureJson()).append(",\n");
 		json.append("  \"mixedItemFoilFixture\": ").append(GraphicsAuditMixedItemFoilFixture.receipt(minecraft)).append(",\n");
 		json.append("  \"droppedItemFoilFixture\": ").append(GraphicsAuditDroppedItemFoilFixture.receipt(minecraft)).append(",\n");
 		json.append("  \"flowingWaterFixture\": ").append(GraphicsAuditFlowingWaterFixture.receipt(minecraft)).append(",\n");
@@ -8999,6 +16530,12 @@ public final class DeterministicCameraCapture {
 			? GraphicsAuditAnimatedItemFixture.receipt(minecraft) : "null").append(",\n");
 		json.append("  \"modelFoilFixture\": ").append("model-foil".equals(HOTBAR_ITEM_FIXTURE)
 			? GraphicsAuditModelFoilFixture.receipt(minecraft) : "null").append(",\n");
+        json.append("  \"shieldAtlasAdmission\": ").append(net.vulkanic.world.AtlasAnimationResource.shieldAdmissionReceipt()).append(",\n");
+        json.append("  \"worldDecalFoilAdmission\": ").append(net.vulkanic.world.RustGalWorldPrimitiveRenderer.worldDecalFoilAdmissionReceipt()).append(",\n");
+        json.append("  \"shieldPose\": \"").append(GraphicsAuditShieldPoseFixture.poseName()).append("\",\n");
+        json.append("  \"shieldUseHand\": \"").append(GraphicsAuditShieldPoseFixture.observedUseHand(minecraft.player)).append("\",\n");
+        json.append("  \"inventoryEquipmentFixture\": ").append(GraphicsAuditInventoryEquipmentFixture.receipt(minecraft)).append(",\n");
+		json.append("  \"entityPreviewFixture\": ").append(GraphicsAuditEntityPreviewFixture.receipt(minecraft)).append(",\n");
 		json.append("  \"shieldFoilFixture\": ").append("shield".equals(HOTBAR_ITEM_FIXTURE) || "shield-foil".equals(HOTBAR_ITEM_FIXTURE)
 			? GraphicsAuditShieldFoilFixture.receipt(minecraft, "shield-foil".equals(HOTBAR_ITEM_FIXTURE)) : "null").append(",\n");
 		json.append("  \"shieldPatternFixture\": ").append("shield-patterns".equals(HOTBAR_ITEM_FIXTURE) || "shield-patterns-foil".equals(HOTBAR_ITEM_FIXTURE)
@@ -9086,10 +16623,19 @@ public final class DeterministicCameraCapture {
 		json.append(", \"poseIndex\": ").append(itemEntitySetupPoseIndex)
 			.append(" },\n");
 		appendItemEntityDiagnostics(json).append(",\n");
+		appendItemFrameItemExecutionDiagnostics(json).append(",\n");
+		appendItemFrameMapDiagnostics(json).append(",\n");
+		appendItemFrameMapExecutionDiagnostics(json).append(",\n");
+		appendItemFrameMapDecorationDiagnostics(json).append(",\n");
+		appendItemFrameMapDecorationExecutionDiagnostics(json).append(",\n");
 		appendItemEntityRouteDecisions(json).append(",\n");
 		appendField(json, "rustGalWorldModelMeshScenario", MODEL_MESH_SCENARIO).append(",\n");
+		json.append("  \"wolfArmorFixture\": ").append(GraphicsAuditWolfArmorFixture.receipt(
+            minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId))).append(",\n");
 		json.append("  \"cowOutlineFixture\": ").append(GraphicsAuditCowOutlineFixture.receipt(
 			minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId))).append(",\n");
+		json.append("  \"equipmentFixture\": ").append(GraphicsAuditEquipmentFixture.receipt(minecraft,
+            minecraft.level == null ? null : minecraft.level.getEntity(modelMeshSetupClientEntityId))).append(",\n");
 		json.append("  \"rustGalWorldModelMeshSetup\": { ");
 		appendField(json, "status", modelMeshSetupStatus, 0).append(", ");
 		appendField(json, "blockId", modelMeshSetupBlockId, 0).append(", ");
@@ -9102,6 +16648,50 @@ public final class DeterministicCameraCapture {
 		json.append("\"clientBlockEntityPresent\": ").append(modelMeshSetupClientBlockEntityPresent)
 			.append(", \"serverEntityPresent\": ").append(modelMeshSetupServerEntityPresent)
 			.append(", \"clientEntityPresent\": ").append(modelMeshSetupClientEntityPresent)
+			.append(", \"powered\": ").append(modelMeshPoweredClientState())
+			.append(", \"invulnerableWither\": ").append(modelMeshInvulnerableWitherClientState())
+			.append(", \"trialSpawnerOminous\": ").append(modelMeshTrialSpawnerOminous())
+			.append(", \"bellShaking\": ").append(modelMeshBellShaking())
+			.append(", \"bellTicks\": ").append(modelMeshBellTicks()).append(", ");
+		appendField(json, "bellDirection", modelMeshBellDirection(), 0).append(", ");
+		appendField(json, "copperGolemStatueFacing", modelMeshCopperGolemStatueFacing(), 0).append(", ");
+		appendField(json, "copperGolemStatuePose", modelMeshCopperGolemStatuePose(), 0).append(", ");
+		appendField(json, "copperGolemStatueWeathering", modelMeshCopperGolemStatueWeathering(), 0).append(", ");
+		json.append("\"copperGolemStatueWaxed\": ").append(modelMeshCopperGolemStatueWaxed()).append(", ");
+		appendField(json, "decoratedPotWobbleStyle", modelMeshDecoratedPotWobbleStyle(), 0).append(", ");
+		json.append("\"decoratedPotWobbleProgress\": ").append(format(modelMeshDecoratedPotWobbleProgress())).append(", ");
+		appendField(json, "decoratedPotFacing", modelMeshDecoratedPotFacing(), 0).append(", ");
+		json.append("\"conduitActive\": ").append(modelMeshConduitActive())
+			.append(", \"conduitHunting\": ").append(modelMeshConduitHunting())
+			.append(", \"conduitBreaking\": ").append(isBreakingConduitModelScenario())
+			.append(", \"conduitDestroyStage\": ").append(isBreakingConduitModelScenario() ? MODEL_MESH_DESTROY_STAGE : -1).append(", ");
+		json.append("\"bannerStanding\": ").append(modelMeshBannerStanding())
+			.append(", \"bannerRotation\": ").append(modelMeshBannerRotation())
+			.append(", \"bannerPatternCount\": ").append(modelMeshBannerPatternCount()).append(", ");
+		appendField(json, "bannerFacing", modelMeshBannerFacing(), 0).append(", ");
+		appendField(json, "bannerBaseColor", modelMeshBannerBaseColor(), 0).append(", ");
+		json.append("\"skullStanding\": ").append(modelMeshSkullStanding())
+			.append(", \"skullRotation\": ").append(modelMeshSkullRotation())
+			.append(", \"skullAnimation\": ").append(format(modelMeshSkullAnimation()))
+			.append(", \"skullPowered\": ").append(modelMeshSkullPowered())
+			.append(", \"skullBreaking\": ").append(isBreakingSkullModelScenario())
+			.append(", \"skullDestroyStage\": ").append(isBreakingSkullModelScenario() ? MODEL_MESH_DESTROY_STAGE : -1).append(", ");
+		appendField(json, "skullFacing", modelMeshSkullFacing(), 0).append(", ");
+		appendField(json, "skullType", modelMeshSkullType(), 0).append(", ");
+		appendField(json, "skullProfileName", modelMeshSkullProfileName(), 0).append(", ");
+		appendField(json, "skullProfileId", modelMeshSkullProfileId(), 0).append(", ");
+		json.append("\"oakSignTextReady\": ").append(modelMeshOakSignTextReady())
+			.append(", \"oakSignGlowingBack\": ").append(isGlowingBackOakSignModelScenario())
+			.append(", \"oakSignBreaking\": ").append(isBreakingOakSignModelScenario())
+			.append(", \"oakSignDestroyStage\": ").append(isBreakingOakSignModelScenario() ? MODEL_MESH_DESTROY_STAGE : -1).append(", ");
+		json.append("\"hangingSignCeiling\": ").append(modelMeshHangingSignCeiling())
+			.append(", \"hangingSignWall\": ").append(modelMeshHangingSignWall())
+			.append(", \"hangingSignRotation\": ").append(modelMeshHangingSignRotation())
+			.append(", \"hangingSignAttached\": ").append(modelMeshHangingSignAttached())
+			.append(", \"hangingSignTextReady\": ").append(modelMeshHangingSignTextReady()).append(", ");
+		appendField(json, "hangingSignAttachment", modelMeshHangingSignAttachment(), 0).append(", ");
+		appendField(json, "hangingSignFacing", modelMeshHangingSignFacing(), 0).append(", ");
+		appendField(json, "trialSpawnerState", modelMeshTrialSpawnerState(), 0)
 			.append(", \"serverEntityId\": ").append(modelMeshSetupServerEntityId)
 			.append(", \"clientEntityId\": ").append(modelMeshSetupClientEntityId).append(", ");
 		appendField(json, "clientEntitySample", modelMeshSetupClientEntitySample, 0).append(" },\n");
@@ -9159,13 +16749,27 @@ public final class DeterministicCameraCapture {
 		appendExperienceOrbExecutionDiagnostics(json).append(",\n");
 		appendBeaconBeamDiagnostics(json).append(",\n");
 		appendBeaconBeamExecutionDiagnostics(json).append(",\n");
+		appendEndPortalDiagnostics(json).append(",\n");
+		appendStructureBlockBoxDiagnostics(json).append(",\n");
+		appendStructureBlockBoxExecutionDiagnostics(json).append(",\n");
+		appendStructureInvisibleCellsDiagnostics(json).append(",\n");
+		appendStructureInvisibleCellsExecutionDiagnostics(json).append(",\n");
+		appendTestInstanceCompositionDiagnostics(json).append(",\n");
+		appendTestInstanceCompositionExecutionDiagnostics(json).append(",\n");
+		appendEndPortalExecutionDiagnostics(json).append(",\n");
+		appendEndGatewayBeamDiagnostics(json).append(",\n");
+		appendEndGatewayBeamExecutionDiagnostics(json).append(",\n");
 		appendCrystalBeamExecutionDiagnostics(json).append(",\n");
+		appendEnergySwirlExecutionDiagnostics(json).append(",\n");
 		appendModelMeshDiagnostics(json).append(",\n");
+		appendBlockModelDiagnostics(json).append(",\n");
 		appendModelMeshRouteDecisions(json).append(",\n");
 		appendModelPartMeshTraversalDiagnostics(json).append(",\n");
 		appendMovingBlockDiagnostics(json).append(",\n");
 			appendMovingBlockRouteDecisions(json).append(",\n");
 			appendMovingMeshExecutionDiagnostics(json).append(",\n");
+			appendModelCompositionExecutionDiagnostics(json).append(",\n");
+			appendBlockAttachedCompositionExecutionDiagnostics(json).append(",\n");
 			appendEntityModelExecutionDiagnostics(json).append(",\n");
 			appendEntityShadowDiagnostics(json).append(",\n");
 			appendProceduralQuadExecutionDiagnostics(json).append(",\n");
@@ -9237,8 +16841,8 @@ public final class DeterministicCameraCapture {
 			json.append("  \"selectedHotbarSlot\": ").append(player == null ? -1 : currentSelectedHotbarSlot(player)).append(",\n");
 			appendField(json, "hotbarItemFixture", HOTBAR_ITEM_FIXTURE).append(",\n");
 			json.append("  \"guiItemPlacement\": ").append(GraphicsAuditGuiItemPlacementFixture.receipt()).append(",\n");
-			json.append("  \"specialFoilFixture\": ").append("special-foil".equals(HOTBAR_ITEM_FIXTURE)
-				? GraphicsAuditSpecialFoilFixture.receipt(minecraft) : "null").append(",\n");
+			json.append("  \"specialFoilFixture\": ").append(("special-foil".equals(HOTBAR_ITEM_FIXTURE) || "recovery-foil".equals(HOTBAR_ITEM_FIXTURE))
+				? GraphicsAuditSpecialFoilFixture.receipt(minecraft, "recovery-foil".equals(HOTBAR_ITEM_FIXTURE)) : "null").append(",\n");
 			json.append("  \"guiItemFoilSources\": ");
 			GraphicsAuditGuiFoilSource.appendJson(json);
 			json.append(",\n");
@@ -10175,6 +17779,48 @@ public final class DeterministicCameraCapture {
 		return json;
 	}
 
+	private static StringBuilder appendBlockModelDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.BlockModelDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.blockModelDiagnostics();
+		List<RustGalWorldPrimitiveRenderer.BlockModelExecutionDiagnostic> executions =
+			RustGalWorldPrimitiveRenderer.blockModelExecutionDiagnostics();
+		json.append("  \"rustGalWorldBlockModels\": { \"semantic\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var diagnostic = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"frameIndex\": ").append(diagnostic.frameIndex()).append(", ");
+			appendField(json, "route", diagnostic.route(), 0).append(", ");
+			appendField(json, "semanticIdentity", diagnostic.semanticIdentity(), 0).append(", ");
+			json.append("\"meshKey\": ").append(Long.toUnsignedString(diagnostic.meshKey()))
+				.append(", \"meshGeneration\": ").append(diagnostic.meshGeneration())
+				.append(", \"sectionCount\": ").append(diagnostic.sectionCount())
+				.append(", \"lightCoords\": ").append(diagnostic.lightCoords()).append(", ");
+			appendField(json, "textureIds", diagnostic.textureIds(), 0).append(", ");
+			json.append("\"projected\": ").append(diagnostic.projected())
+				.append(", \"screenBounds\": { \"left\": ").append(format(diagnostic.screenLeft()))
+				.append(", \"top\": ").append(format(diagnostic.screenTop()))
+				.append(", \"right\": ").append(format(diagnostic.screenRight()))
+				.append(", \"bottom\": ").append(format(diagnostic.screenBottom())).append(" } }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		json.append("], \"execution\": [");
+		for (int index = 0; index < executions.size(); index++) {
+			var execution = executions.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(execution.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", execution.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(execution.gameplayFrameId())
+				.append(", \"submissionId\": ").append(execution.submissionId()).append(", ");
+			appendField(json, "semanticIdentity", execution.semanticIdentity(), 0).append(", ");
+			json.append("\"meshKey\": ").append(Long.toUnsignedString(execution.meshKey()))
+				.append(", \"meshGeneration\": ").append(execution.meshGeneration())
+				.append(", \"instances\": ").append(execution.instances()).append(" }");
+		}
+		if (!executions.isEmpty()) json.append("\n  ");
+		json.append("] }");
+		return json;
+	}
+
 	private static StringBuilder appendWorldTextDiagnostics(StringBuilder json) {
 		RustGalWorldPrimitiveRenderer.WorldTextDiagnostic diagnostic = RustGalWorldPrimitiveRenderer.worldTextDiagnostic();
 		json.append("  \"rustGalWorldText\": { ");
@@ -10186,6 +17832,8 @@ public final class DeterministicCameraCapture {
 		json.append("\"normalSubmits\": ").append(diagnostic.normalSubmits()).append(", ");
 		json.append("\"seeThroughSubmits\": ").append(diagnostic.seeThroughSubmits()).append(", ");
 		json.append("\"polygonOffsetSubmits\": ").append(diagnostic.polygonOffsetSubmits()).append(", ");
+		json.append("\"fullBrightSubmits\": ").append(diagnostic.fullBrightSubmits()).append(", ");
+		json.append("\"outlinedSubmits\": ").append(diagnostic.outlinedSubmits()).append(", ");
 		json.append("\"emittedQuads\": ").append(diagnostic.emittedQuads()).append(", ");
 		json.append("\"emittedImages\": ").append(diagnostic.emittedImages()).append(", ");
 		json.append("\"fullySupported\": ").append(diagnostic.fullySupported()).append(", ");
@@ -10328,6 +17976,12 @@ public final class DeterministicCameraCapture {
 			json.append("\n    { ");
 			json.append("\"frameIndex\": ").append(item.frameIndex()).append(", ");
 			appendField(json, "route", item.route(), 0).append(", ");
+			appendField(json, "producer", item.producer(), 0).append(", ");
+			appendField(json, "semanticIdentity", item.semanticIdentity(), 0).append(", ");
+			json.append("\"entityId\": ").append(item.entityId()).append(", ");
+			json.append("\"itemFrameRotation\": ").append(item.itemFrameRotation()).append(", ");
+			json.append("\"itemFrameInvisible\": ").append(item.itemFrameInvisible()).append(", ");
+			json.append("\"itemFrameContentOffset\": ").append(format(item.itemFrameContentOffset())).append(", ");
 			appendField(json, "materialIdentity", item.materialIdentity(), 0).append(", ");
 			json.append("\"meshKey\": ").append(Long.toUnsignedString(item.meshKey())).append(", ");
 			json.append("\"meshGeneration\": ").append(item.meshGeneration()).append(", ");
@@ -10349,6 +18003,132 @@ public final class DeterministicCameraCapture {
 		if (!diagnostics.isEmpty()) {
 			json.append("\n  ");
 		}
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendItemFrameItemExecutionDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.ItemFrameItemExecutionDiagnostic> executions =
+			RustGalWorldPrimitiveRenderer.itemFrameItemExecutionDiagnostics();
+		json.append("  \"rustGalWorldItemFrameItems\": [");
+		for (int index = 0; index < executions.size(); index++) {
+			var execution = executions.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(execution.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", execution.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(execution.gameplayFrameId())
+				.append(", \"submissionId\": ").append(execution.submissionId()).append(", ");
+			appendField(json, "semanticIdentity", execution.semanticIdentity(), 0).append(", ");
+			json.append("\"entityId\": ").append(execution.entityId())
+				.append(", \"rotation\": ").append(execution.rotation())
+				.append(", \"invisibleFrame\": ").append(execution.invisibleFrame())
+				.append(", \"contentOffset\": ").append(format(execution.contentOffset()))
+				.append(", \"meshKey\": ").append(Long.toUnsignedString(execution.meshKey()))
+				.append(", \"meshGeneration\": ").append(execution.meshGeneration())
+				.append(", \"instances\": ").append(execution.instances()).append(" }");
+		}
+		if (!executions.isEmpty()) json.append("\n  ");
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendItemFrameMapDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.ItemFrameMapDiagnostic> diagnostics = RustGalWorldPrimitiveRenderer.itemFrameMapDiagnostics();
+		json.append("  \"rustGalWorldItemFrameMaps\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var diagnostic = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"frameIndex\": ").append(diagnostic.frameIndex()).append(", ");
+			appendField(json, "route", diagnostic.route(), 0).append(", ");
+			json.append("\"entityId\": ").append(diagnostic.entityId())
+				.append(", \"mapId\": ").append(diagnostic.mapId())
+				.append(", \"rotation\": ").append(diagnostic.rotation())
+				.append(", \"invisibleFrame\": ").append(diagnostic.invisibleFrame())
+				.append(", \"contentOffset\": ").append(format(diagnostic.contentOffset())).append(", ");
+			appendField(json, "textureIdentity", diagnostic.textureIdentity(), 0).append(", ");
+			json.append("\"textureId\": ").append(Integer.toUnsignedString(diagnostic.textureId()))
+				.append(", \"packedLight\": ").append(diagnostic.packedLight())
+				.append(", \"projected\": ").append(diagnostic.projected())
+				.append(", \"screenLeft\": ").append(diagnostic.screenLeft())
+				.append(", \"screenTop\": ").append(diagnostic.screenTop())
+				.append(", \"screenRight\": ").append(diagnostic.screenRight())
+				.append(", \"screenBottom\": ").append(diagnostic.screenBottom()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendItemFrameMapExecutionDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.ItemFrameMapExecutionDiagnostic> executions =
+			RustGalWorldPrimitiveRenderer.itemFrameMapExecutionDiagnostics();
+		json.append("  \"rustGalWorldItemFrameMapExecutions\": [");
+		for (int index = 0; index < executions.size(); index++) {
+			var execution = executions.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(execution.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", execution.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(execution.gameplayFrameId())
+				.append(", \"submissionId\": ").append(execution.submissionId())
+				.append(", \"entityId\": ").append(execution.entityId())
+				.append(", \"mapId\": ").append(execution.mapId())
+				.append(", \"rotation\": ").append(execution.rotation())
+				.append(", \"invisibleFrame\": ").append(execution.invisibleFrame())
+				.append(", \"contentOffset\": ").append(format(execution.contentOffset())).append(", ");
+			appendField(json, "textureIdentity", execution.textureIdentity(), 0).append(", ");
+			json.append("\"textureId\": ").append(Integer.toUnsignedString(execution.textureId()))
+				.append(", \"quads\": ").append(execution.quads()).append(" }");
+		}
+		if (!executions.isEmpty()) json.append("\n  ");
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendItemFrameMapDecorationDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.itemFrameMapDecorationDiagnostics();
+		json.append("  \"rustGalWorldItemFrameMapDecorations\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var diagnostic = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"frameIndex\": ").append(diagnostic.frameIndex()).append(", ");
+			appendField(json, "route", diagnostic.route(), 0).append(", ");
+			json.append("\"entityId\": ").append(diagnostic.entityId())
+				.append(", \"mapId\": ").append(diagnostic.mapId())
+				.append(", \"frameRotation\": ").append(diagnostic.frameRotation()).append(", ");
+			appendField(json, "decorationIdentity", diagnostic.decorationIdentity(), 0).append(", ");
+			json.append("\"x\": ").append(diagnostic.x()).append(", \"y\": ").append(diagnostic.y())
+				.append(", \"decorationRotation\": ").append(diagnostic.decorationRotation()).append(", ");
+			appendField(json, "atlasIdentity", diagnostic.atlasIdentity(), 0).append(", ");
+			json.append("\"textureId\": ").append(Integer.toUnsignedString(diagnostic.textureId()))
+				.append(", \"packedLight\": ").append(diagnostic.packedLight())
+				.append(", \"projected\": ").append(diagnostic.projected()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendItemFrameMapDecorationExecutionDiagnostics(StringBuilder json) {
+		var executions = RustGalWorldPrimitiveRenderer.itemFrameMapDecorationExecutionDiagnostics();
+		json.append("  \"rustGalWorldItemFrameMapDecorationExecutions\": [");
+		for (int index = 0; index < executions.size(); index++) {
+			var execution = executions.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(execution.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", execution.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(execution.gameplayFrameId())
+				.append(", \"submissionId\": ").append(execution.submissionId())
+				.append(", \"entityId\": ").append(execution.entityId())
+				.append(", \"mapId\": ").append(execution.mapId())
+				.append(", \"frameRotation\": ").append(execution.frameRotation()).append(", ");
+			appendField(json, "decorationIdentity", execution.decorationIdentity(), 0).append(", ");
+			json.append("\"x\": ").append(execution.x()).append(", \"y\": ").append(execution.y())
+				.append(", \"decorationRotation\": ").append(execution.decorationRotation()).append(", ");
+			appendField(json, "atlasIdentity", execution.atlasIdentity(), 0).append(", ");
+			json.append("\"textureId\": ").append(Integer.toUnsignedString(execution.textureId()))
+				.append(", \"quads\": ").append(execution.quads()).append(" }");
+		}
+		if (!executions.isEmpty()) json.append("\n  ");
 		json.append("]");
 		return json;
 	}
@@ -10496,6 +18276,218 @@ public final class DeterministicCameraCapture {
 		return json;
 	}
 
+	private static StringBuilder appendEndPortalDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.endPortalDiagnostics();
+		json.append("  \"rustGalWorldEndPortals\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"frameIndex\": ").append(item.frameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"faceCount\": ").append(item.faceCount())
+				.append(", \"quads\": ").append(item.quads())
+				.append(", \"offsetDown\": ").append(format(item.offsetDown()))
+				.append(", \"offsetUp\": ").append(format(item.offsetUp()))
+				.append(", \"gameTime\": ").append(format(item.gameTime()))
+				.append(", \"lightCoords\": ").append(item.lightCoords())
+				.append(", \"projected\": ").append(item.projected())
+				.append(", \"screenBounds\": { \"left\": ").append(format(item.screenLeft()))
+				.append(", \"top\": ").append(format(item.screenTop()))
+				.append(", \"right\": ").append(format(item.screenRight()))
+				.append(", \"bottom\": ").append(format(item.screenBottom())).append(" } }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
+	private static StringBuilder appendStructureBlockBoxDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.structureBlockBoxDiagnostics();
+		json.append("  \"rustGalWorldStructureBlockBoxes\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"frameIndex\": ").append(item.frameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"localPos\": { \"x\": ").append(item.localX()).append(", \"y\": ").append(item.localY())
+				.append(", \"z\": ").append(item.localZ()).append(" }, \"size\": { \"x\": ").append(item.sizeX())
+				.append(", \"y\": ").append(item.sizeY()).append(", \"z\": ").append(item.sizeZ())
+				.append(" }, \"segmentCount\": ").append(item.segmentCount())
+				.append(", \"xAxisColorArgb\": ").append(item.xAxisColorArgb())
+				.append(", \"yAxisColorArgb\": ").append(item.yAxisColorArgb())
+				.append(", \"zAxisColorArgb\": ").append(item.zAxisColorArgb())
+				.append(", \"neutralColorArgb\": ").append(item.neutralColorArgb())
+				.append(", \"lineWidth\": ").append(format(item.lineWidth())).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
+	private static StringBuilder appendStructureBlockBoxExecutionDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.structureBlockBoxExecutionDiagnostics();
+		json.append("  \"rustGalWorldStructureBlockBoxExecution\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(item.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(item.gameplayFrameId())
+				.append(", \"submissionId\": ").append(item.submissionId())
+				.append(", \"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"segmentCount\": ").append(item.segmentCount()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
+	private static StringBuilder appendStructureInvisibleCellsDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.structureInvisibleCellsDiagnostics();
+		json.append("  \"rustGalWorldStructureInvisibleCells\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"frameIndex\": ").append(item.frameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"localPos\": { \"x\": ").append(item.localX()).append(", \"y\": ").append(item.localY())
+				.append(", \"z\": ").append(item.localZ()).append(" }, \"size\": { \"x\": ").append(item.sizeX())
+				.append(", \"y\": ").append(item.sizeY()).append(", \"z\": ").append(item.sizeZ()).append(" }")
+				.append(", \"airCells\": ").append(item.airCells()).append(", \"structureVoidCells\": ").append(item.structureVoidCells())
+				.append(", \"barrierCells\": ").append(item.barrierCells()).append(", \"lightCells\": ").append(item.lightCells())
+				.append(", \"segmentCount\": ").append(item.segmentCount())
+				.append(", \"airColorArgb\": ").append(item.airColorArgb())
+				.append(", \"structureVoidColorArgb\": ").append(item.structureVoidColorArgb())
+				.append(", \"barrierColorArgb\": ").append(item.barrierColorArgb())
+				.append(", \"lightColorArgb\": ").append(item.lightColorArgb()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
+	private static StringBuilder appendStructureInvisibleCellsExecutionDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.structureInvisibleCellsExecutionDiagnostics();
+		json.append("  \"rustGalWorldStructureInvisibleCellsExecution\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(item.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(item.gameplayFrameId())
+				.append(", \"submissionId\": ").append(item.submissionId())
+				.append(", \"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"airSegments\": ").append(item.airSegments())
+				.append(", \"structureVoidSegments\": ").append(item.structureVoidSegments())
+				.append(", \"barrierSegments\": ").append(item.barrierSegments())
+				.append(", \"lightSegments\": ").append(item.lightSegments()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
+	private static StringBuilder appendTestInstanceCompositionDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.testInstanceCompositionDiagnostics();
+		json.append("  \"rustGalWorldTestInstanceComposition\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"frameIndex\": ").append(item.frameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"localPos\": { \"x\": ").append(item.localX()).append(", \"y\": ").append(item.localY())
+				.append(", \"z\": ").append(item.localZ()).append(" }, \"size\": { \"x\": ").append(item.sizeX())
+				.append(", \"y\": ").append(item.sizeY()).append(", \"z\": ").append(item.sizeZ())
+				.append(" }, \"beamSections\": ").append(item.beamSections())
+				.append(", \"beamColorArgb\": ").append(item.beamColorArgb())
+				.append(", \"errorMarkers\": ").append(item.errorMarkers())
+				.append(", \"boxSegments\": ").append(item.boxSegments())
+				.append(", \"errorQuads\": ").append(item.errorQuads())
+				.append(", \"errorColorArgb\": ").append(item.errorColorArgb()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
+	private static StringBuilder appendTestInstanceCompositionExecutionDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.testInstanceCompositionExecutionDiagnostics();
+		json.append("  \"rustGalWorldTestInstanceCompositionExecution\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(item.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(item.gameplayFrameId())
+				.append(", \"submissionId\": ").append(item.submissionId())
+				.append(", \"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"boxSegments\": ").append(item.boxSegments())
+				.append(", \"beamQuads\": ").append(item.beamQuads())
+				.append(", \"errorQuads\": ").append(item.errorQuads())
+				.append(", \"textQuads\": ").append(item.textQuads()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
+	private static StringBuilder appendEndPortalExecutionDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.endPortalExecutionDiagnostics();
+		json.append("  \"rustGalWorldEndPortalExecution\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(item.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(item.gameplayFrameId())
+				.append(", \"submissionId\": ").append(item.submissionId())
+				.append(", \"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"skyQuads\": ").append(item.skyQuads())
+				.append(", \"portalQuads\": ").append(item.portalQuads()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
+	private static StringBuilder appendEndGatewayBeamDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.endGatewayBeamDiagnostics();
+		json.append("  \"rustGalWorldEndGatewayBeams\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"frameIndex\": ").append(item.frameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"startY\": ").append(item.startY()).append(", \"endY\": ").append(item.endY())
+				.append(", \"colorArgb\": ").append(item.colorArgb())
+				.append(", \"beamScale\": ").append(format(item.beamScale()))
+				.append(", \"scroll\": ").append(format(item.scroll()))
+				.append(", \"solidRadius\": ").append(format(item.solidRadius()))
+				.append(", \"glowRadius\": ").append(format(item.glowRadius()))
+				.append(", \"projected\": ").append(item.projected())
+				.append(", \"screenBounds\": { \"left\": ").append(format(item.screenLeft()))
+				.append(", \"top\": ").append(format(item.screenTop()))
+				.append(", \"right\": ").append(format(item.screenRight()))
+				.append(", \"bottom\": ").append(format(item.screenBottom())).append(" } }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
+	private static StringBuilder appendEndGatewayBeamExecutionDiagnostics(StringBuilder json) {
+		var diagnostics = RustGalWorldPrimitiveRenderer.endGatewayBeamExecutionDiagnostics();
+		json.append("  \"rustGalWorldEndGatewayBeamExecution\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var item = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(item.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", item.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(item.gameplayFrameId())
+				.append(", \"submissionId\": ").append(item.submissionId())
+				.append(", \"blockEntityId\": ").append(item.blockEntityId())
+				.append(", \"quads\": ").append(item.quads()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		return json.append("]");
+	}
+
 	private static StringBuilder appendCrystalBeamExecutionDiagnostics(StringBuilder json) {
 		List<RustGalWorldPrimitiveRenderer.CrystalBeamExecutionDiagnostic> diagnostics =
 			RustGalWorldPrimitiveRenderer.crystalBeamExecutionDiagnostics();
@@ -10509,6 +18501,27 @@ public final class DeterministicCameraCapture {
 			json.append("\"gameplayFrameId\": ").append(diagnostic.gameplayFrameId()).append(", ");
 			json.append("\"submissionId\": ").append(diagnostic.submissionId()).append(", ");
 			json.append("\"quads\": ").append(diagnostic.quads());
+			json.append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendEnergySwirlExecutionDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.EnergySwirlExecutionDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.energySwirlExecutionDiagnostics();
+		json.append("  \"rustGalWorldEnergySwirlExecution\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var diagnostic = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { ");
+			json.append("\"deterministicFrameIndex\": ").append(diagnostic.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", diagnostic.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(diagnostic.gameplayFrameId()).append(", ");
+			json.append("\"submissionId\": ").append(diagnostic.submissionId()).append(", ");
+			json.append("\"quads\": ").append(diagnostic.quads()).append(", ");
+			json.append("\"outlinedMeshInstances\": ").append(diagnostic.outlinedMeshInstances());
 			json.append(" }");
 		}
 		if (!diagnostics.isEmpty()) json.append("\n  ");
@@ -10548,7 +18561,8 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static StringBuilder appendModelMeshDiagnostics(StringBuilder json) {
-		List<RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic> diagnostics = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics();
+		List<RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic> diagnostics = MODEL_CAPTURE_HISTORY.merge(
+			RustGalWorldPrimitiveRenderer.modelMeshDiagnostics());
 		json.append("  \"rustGalWorldModelMeshes\": [");
 		for (int index = 0; index < diagnostics.size(); index++) {
 			RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic model = diagnostics.get(index);
@@ -10559,6 +18573,7 @@ public final class DeterministicCameraCapture {
 			json.append("\"frameIndex\": ").append(model.frameIndex()).append(", ");
 			appendField(json, "route", model.route(), 0).append(", ");
 			json.append("\"entityId\": ").append(model.entityId()).append(", ");
+			json.append("\"blockEntityId\": ").append(model.blockEntityId()).append(", ");
 			appendField(json, "semanticModelIdentity", model.semanticModelIdentity(), 0).append(", ");
 			appendField(json, "textureId", model.textureId(), 0).append(", ");
 			json.append("\"meshKey\": ").append(Long.toUnsignedString(model.meshKey())).append(", ");
@@ -10587,7 +18602,7 @@ public final class DeterministicCameraCapture {
 
 	private static StringBuilder appendModelMeshRouteDecisions(StringBuilder json) {
 		List<RustGalWorldPrimitiveRenderer.ModelMeshRouteDecision> decisions =
-			RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions();
+			MODEL_ROUTE_CAPTURE_HISTORY.merge(RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions());
 		json.append("  \"rustGalWorldModelMeshRouteDecisions\": [");
 		for (int index = 0; index < decisions.size(); index++) {
 			RustGalWorldPrimitiveRenderer.ModelMeshRouteDecision decision = decisions.get(index);
@@ -10705,7 +18720,7 @@ public final class DeterministicCameraCapture {
 
 	private static StringBuilder appendMovingMeshExecutionDiagnostics(StringBuilder json) {
 		List<RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic> diagnostics =
-			RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics();
+			MODEL_EXECUTION_CAPTURE_HISTORY.merge(RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics());
 		json.append("  \"rustGalWorldMovingMeshExecution\": [");
 		for (int i = 0; i < diagnostics.size(); i++) {
 			RustGalWorldPrimitiveRenderer.MovingMeshExecutionDiagnostic receipt = diagnostics.get(i);
@@ -10718,7 +18733,8 @@ public final class DeterministicCameraCapture {
 			appendField(json, "provenance", receipt.provenance(), 0).append(", ");
 			json.append("\"gameplayFrameId\": ").append(receipt.gameplayFrameId()).append(", ");
 			json.append("\"submissionId\": ").append(receipt.submissionId()).append(", ");
-			json.append("\"instances\": ").append(receipt.instances());
+			json.append("\"instances\": ").append(receipt.instances()).append(", ");
+			json.append("\"blockEntityId\": ").append(receipt.blockEntityId());
 			json.append(" }");
 		}
 		if (!diagnostics.isEmpty()) {
@@ -10739,6 +18755,50 @@ public final class DeterministicCameraCapture {
 			appendField(json, "route", receipt.route(), 0).append(", ");
 			json.append("\"gameplayFrameId\": ").append(receipt.gameplayFrameId()).append(", \"submissionId\": ")
 				.append(receipt.submissionId()).append(", \"quads\": ").append(receipt.quads()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendModelCompositionExecutionDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.ModelCompositionExecutionDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.modelCompositionExecutionDiagnostics();
+		json.append("  \"rustGalWorldModelCompositionExecution\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var receipt = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(receipt.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", receipt.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(receipt.gameplayFrameId())
+				.append(", \"submissionId\": ").append(receipt.submissionId())
+				.append(", \"entityId\": ").append(receipt.entityId()).append(", ");
+			appendField(json, "baseSemanticIdentity", receipt.baseSemanticIdentity(), 0).append(", ");
+			json.append("\"baseInstances\": ").append(receipt.baseInstances()).append(", ");
+			appendField(json, "layerSemanticIdentity", receipt.layerSemanticIdentity(), 0).append(", ");
+			json.append("\"layerInstances\": ").append(receipt.layerInstances()).append(" }");
+		}
+		if (!diagnostics.isEmpty()) json.append("\n  ");
+		json.append("]");
+		return json;
+	}
+
+	private static StringBuilder appendBlockAttachedCompositionExecutionDiagnostics(StringBuilder json) {
+		List<RustGalWorldPrimitiveRenderer.BlockAttachedCompositionExecutionDiagnostic> diagnostics =
+			RustGalWorldPrimitiveRenderer.blockAttachedCompositionExecutionDiagnostics();
+		json.append("  \"rustGalWorldBlockAttachedCompositionExecution\": [");
+		for (int index = 0; index < diagnostics.size(); index++) {
+			var receipt = diagnostics.get(index);
+			if (index > 0) json.append(",");
+			json.append("\n    { \"deterministicFrameIndex\": ").append(receipt.deterministicFrameIndex()).append(", ");
+			appendField(json, "route", receipt.route(), 0).append(", ");
+			json.append("\"gameplayFrameId\": ").append(receipt.gameplayFrameId())
+				.append(", \"submissionId\": ").append(receipt.submissionId())
+				.append(", \"entityId\": ").append(receipt.entityId()).append(", ");
+			appendField(json, "baseSemanticIdentity", receipt.baseSemanticIdentity(), 0).append(", ");
+			appendField(json, "blockId", receipt.blockId(), 0).append(", ");
+			json.append("\"baseInstances\": ").append(receipt.baseInstances())
+				.append(", \"blockInstances\": ").append(receipt.blockInstances()).append(" }");
 		}
 		if (!diagnostics.isEmpty()) json.append("\n  ");
 		json.append("]");

@@ -21,6 +21,14 @@ use crate::render::vulkanic::world_primitive_frontend::{
 };
 use std::collections::BTreeSet;
 
+fn decode_model_submission_order(instance: &FfiWorldMeshInstanceRecord) -> GalResult<Option<i32>> {
+    match (instance.model_submission_order_mode, instance.model_submission_order) {
+        (0, 0) => Ok(None),
+        (1, order) if instance.terrain_placement_mode == 0 && instance.stratum == WORLD_STRATUM_ENTITY_MESH => Ok(Some(order)),
+        _ => Err(GalError::invalid_argument("invalid model submission order declaration")),
+    }
+}
+
 fn decode_world_item_foil(instance: &FfiWorldMeshInstanceRecord) -> GalResult<Option<super::super::item_foil::StandardItemFoil>> {
     let foil = super::super::item_foil::StandardItemFoil::decode(instance.item_foil_mode,
         instance.item_foil_clock_millis, instance.item_foil_speed, instance.item_foil_strength)?;
@@ -29,6 +37,21 @@ fn decode_world_item_foil(instance: &FfiWorldMeshInstanceRecord) -> GalResult<Op
         return Err(GalError::invalid_argument("standard foil requires an ordinary entity mesh instance"));
     }
     Ok(foil)
+}
+
+fn decode_world_decal_foil(instance: &FfiWorldMeshInstanceRecord, first_person: bool)
+    -> GalResult<Option<super::super::world_item_foil::WorldDecalFoilProjection>> {
+    let decal = super::super::world_item_foil::WorldDecalFoilProjection::decode(
+        instance.decal_foil_mode, instance.decal_normal_mode,
+        instance.decal_model_pose, instance.decal_normal_pose)?;
+    if let Some(value) = decal {
+        let foil = decode_world_item_foil(instance)?;
+        if !matches!(foil, Some(f) if f.kind == super::super::item_foil::StandardFoilKind::Item)
+            || value.first_person != first_person || value.model_pose != instance.transform {
+            return Err(GalError::invalid_argument("world decal requires item foil, matching draw pose and display context"));
+        }
+    }
+    Ok(decal)
 }
 
 fn is_world_mesh_stratum(stratum: u32) -> bool {
@@ -58,13 +81,20 @@ fn validate_mesh_instance_semantic_identity(
     label: &str,
 ) -> GalResult<()> {
     decode_mesh_instance_transform(instance)?;
+    if instance.depth_policy == WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE
+        && (instance.stratum != WORLD_STRATUM_ENTITY_MESH || instance.item_foil_mode != 0)
+    {
+        return Err(GalError::invalid_argument("equal-depth writes require a non-foil entity mesh"));
+    }
     if instance.mesh_key == 0 || instance.mesh_generation == 0 {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!("{label} key and generation must be non-zero"),
         ));
     }
-    if instance.flags & !(WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY | WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS) != 0 {
+    super::super::view_layering::validate_flags(instance.flags, instance.stratum == WORLD_STRATUM_ENTITY_MESH,
+        instance.item_foil_mode == 0 && instance.block_entity_id == -1 && instance.terrain_placement_mode == 0)?;
+    if instance.flags & !(WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY | WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS | super::super::view_layering::FLAGS) != 0 {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!("{label} contains unknown semantic flags"),
@@ -1605,6 +1635,8 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         if instance.depth_policy != WORLD_DEPTH_POLICY_DISABLED
             && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
             && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+            && !(instance.depth_policy == WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE
+                && instance.stratum == WORLD_STRATUM_ENTITY_MESH)
         {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -1631,7 +1663,9 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         let viewport_height =
             decode_world_viewport_axis(instance.viewport_height, "world mesh viewport height")?;
         mesh_instances.push(WorldMeshInstanceRequest {
+            model_submission_order: decode_model_submission_order(instance)?,
             item_foil: decode_world_item_foil(instance)?,
+            decal_foil: decode_world_decal_foil(instance, false)?,
             stratum: instance.stratum,
             mesh_key: instance.mesh_key,
             mesh_generation: instance.mesh_generation,
@@ -1944,6 +1978,8 @@ unsafe fn decode_world_first_person_mesh_instances(
         if instance.depth_policy != WORLD_DEPTH_POLICY_DISABLED
             && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
             && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+            && !(instance.depth_policy == WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE
+                && instance.stratum == WORLD_STRATUM_ENTITY_MESH)
         {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -1983,7 +2019,9 @@ unsafe fn decode_world_first_person_mesh_instances(
             "world first-person mesh viewport height",
         )?;
         instances.push(WorldMeshInstanceRequest {
+            model_submission_order: decode_model_submission_order(instance)?,
             item_foil: decode_world_item_foil(instance)?,
+            decal_foil: decode_world_decal_foil(instance, true)?,
             stratum: instance.stratum,
             mesh_key: instance.mesh_key,
             mesh_generation: instance.mesh_generation,

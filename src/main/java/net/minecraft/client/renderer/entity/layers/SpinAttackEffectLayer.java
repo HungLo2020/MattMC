@@ -27,7 +27,7 @@ public class SpinAttackEffectLayer extends RenderLayer<AvatarRenderState, Player
 		if (avatarRenderState.isAutoSpinAttack) {
 			submitNodeCollector.submitModelSemanticTexture(
 				this.model, avatarRenderState, poseStack, this.model.renderType(TEXTURE), i,
-				OverlayTexture.NO_OVERLAY, avatarRenderState.outlineColor, TEXTURE,
+				OverlayTexture.NO_OVERLAY, -1, TEXTURE,
 				avatarRenderState.outlineColor, null
 			);
 		}

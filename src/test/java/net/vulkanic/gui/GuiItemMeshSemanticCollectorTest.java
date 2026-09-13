@@ -56,7 +56,7 @@ class GuiItemMeshSemanticCollectorTest {
 		var layer = new net.minecraft.client.renderer.item.ItemStackRenderState.SemanticLayer(
 			List.of(), new int[0], null,
 			net.minecraft.client.renderer.item.ItemStackRenderState.FoilType.SPECIAL,
-			true, false, true, identityMatrix());
+			true, false, true, identityMatrix(), new float[]{1,0,0,0,1,0,0,0,1}, true);
 		var output = new java.util.ArrayList<GuiItemMeshSemanticCollector.GuiItemMeshLayer>();
 		var sources = new java.util.ArrayList<GuiItemTextureSource>();
 		var append = GuiItemMeshSemanticCollector.class.getDeclaredMethod("appendLayer",

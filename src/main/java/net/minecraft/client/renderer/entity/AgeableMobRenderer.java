@@ -22,6 +22,11 @@ public abstract class AgeableMobRenderer<T extends Mob, S extends LivingEntityRe
 	}
 
 	@Override
+	public M getModelForSemanticState(S state) {
+		return state.isBaby ? this.babyModel : this.adultModel;
+	}
+
+	@Override
 	public void submit(S livingEntityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		this.model = livingEntityRenderState.isBaby ? this.babyModel : this.adultModel;
 		super.submit(livingEntityRenderState, poseStack, submitNodeCollector, cameraRenderState);

@@ -6316,20 +6316,14 @@ public class Phase3DrawPathTest {
     public void testEnderDragonDeathDecalUsesExplicitDepthEqualSemantics() throws IOException {
         Path rendererFile = SRC_MAIN_JAVA.resolve(
             "net/minecraft/client/renderer/entity/EnderDragonRenderer.java");
-        Path meshFile = SRC_MAIN_JAVA.resolve(
-            "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
         String renderer = readSource(rendererFile);
-        String mesh = readSource(meshFile);
 
         assertTrue(renderer.contains("if (i == OverlayTexture.NO_OVERLAY)")
                 && renderer.contains("submitModelSemanticTexture"),
             "overlay-free dragon death decals must use the semantic direct-texture route");
         assertTrue(renderer.contains("entityDragonRenderState") || renderer.contains("enderDragonRenderState"),
             "dragon decal submission must retain the copied render state");
-        assertTrue(mesh.contains("entity_decal")
-                && mesh.contains("DEPTH_POLICY_TEST_NO_WRITE")
-                && mesh.contains("CULL_NONE"),
-            "entity decals must preserve equal-depth/no-write/two-sided raster semantics");
+        // Actual material extraction is checked by TranslucentMeshRasterSemanticsTest.
         assertTrue(renderer.contains("SEMANTIC_CRYSTAL_BEAM_QUADS = 8")
                 && renderer.contains("new float[SEMANTIC_CRYSTAL_BEAM_QUADS * 12]")
                 && renderer.contains("new float[SEMANTIC_CRYSTAL_BEAM_QUADS * 8]")
@@ -8449,6 +8443,47 @@ public class Phase3DrawPathTest {
                 "debug invisible-block extraction must reject oversized volumes before allocation");
         assertTrue(renderer.contains("new BlockEntityWithBoundingBoxRenderState.InvisibleBlockType[(int)cellCount]"),
                 "the bounded cell count must control the backing allocation");
+        assertTrue(renderer.contains("enqueueStructureBlockBoxSegments"),
+                "Structure Block bounds must use their producer-specific Rust semantic route");
+        assertTrue(renderer.contains("enqueueTestInstanceBoxSegments"),
+                "Test Instance bounds must preserve Vanilla's producer-specific axis colors");
+        String primitives = readSource(SRC_MAIN_JAVA.resolve(
+                "net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
+        assertTrue(primitives.contains("StructureBlockBoxDiagnostic")
+                && primitives.contains("StructureBlockBoxExecutionDiagnostic")
+                && primitives.contains("semantic.blockEntityId(), 12"),
+                "Structure Block capture evidence must correlate the exact 12-edge semantic with a completed Rust submission");
+        assertTrue(primitives.contains("0xffe57f7f") && primitives.contains("0xff7fe57f")
+                && primitives.contains("0xff7f7fe5") && primitives.contains("0xffe5e5e5"),
+                "block-entity boxes must use Frozen's truncating float-to-byte axis colors");
+        assertTrue(renderer.contains("0xff7f7fff") && !renderer.contains("0xff8080ff"),
+                "AIR marker lines must match Frozen's truncating half-intensity conversion");
+        assertTrue(renderer.contains("recordStructureInvisibleCells")
+                && primitives.contains("StructureInvisibleCellsDiagnostic")
+                && primitives.contains("StructureInvisibleCellsExecutionDiagnostic")
+                && primitives.contains("air != semantic.airCells() * 12")
+                && primitives.contains("structureVoid != semantic.structureVoidCells() * 12")
+                && primitives.contains("barrier != semantic.barrierCells() * 12")
+                && primitives.contains("light != semantic.lightCells() * 12"),
+                "Structure Block invisible-cell evidence must require every exact semantic edge in the completed Rust frame");
+        assertTrue(renderer.contains("0xffffbfbf") && renderer.contains("0xffff0000")
+                && renderer.contains("0xffffff00"),
+                "structure void, barrier, and light marker colors must match Frozen byte-for-byte");
+        assertTrue(primitives.contains("TestInstanceCompositionDiagnostic")
+                && primitives.contains("TestInstanceCompositionExecutionDiagnostic")
+                && primitives.contains("boolean successful = semantic.beamSections() == 1 && semantic.beamColorArgb() == 0xff00ff00")
+                && primitives.contains("boolean cleared = semantic.beamSections() == 0 && semantic.beamColorArgb() == 0")
+                && primitives.contains("boolean requiredFailed = semantic.beamSections() == 1 && semantic.beamColorArgb() == 0xffff0000")
+                && primitives.contains("boolean optionalFailed = semantic.beamSections() == 1 && semantic.beamColorArgb() == 0xffff8000")
+                && primitives.contains("int expectedErrors = semantic.errorMarkers() * 6")
+                && primitives.contains("int expectedBeamQuads = semantic.beamSections() * 4")
+                && primitives.contains("semantic.errorMarkers() == 0 && text != 0")
+                && primitives.contains("ARGB.color(32, semantic.beamColorArgb())"),
+                "Test Instance evidence must correlate its box, beam, error volume, and label in one completed Rust submission");
+        String testInstance = readSource(SRC_MAIN_JAVA.resolve(
+                "net/minecraft/client/renderer/blockentity/TestInstanceRenderer.java"));
+        assertTrue(testInstance.contains("0x5fff0000") && !testInstance.contains("0x60ff0000"),
+                "Test Instance error volume alpha must match Frozen's float-to-byte conversion");
     }
 
     @Test

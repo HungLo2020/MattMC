@@ -69,6 +69,17 @@ public class TestInstanceRenderer implements BlockEntityRenderer<TestInstanceBlo
 		for (ErrorMarker errorMarker : testInstanceRenderState.errorMarkers) {
 			this.submitErrorMarker(poseStack, submitNodeCollector, errorMarker, cameraRenderState);
 		}
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			&& !submitNodeCollector.isSemanticCoverageOnly()
+			&& testInstanceRenderState.blockEntityWithBoundingBoxRenderState.box != null) {
+			var renderableBox = testInstanceRenderState.blockEntityWithBoundingBoxRenderState.box;
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordTestInstanceComposition(
+				renderableBox.localPos(), renderableBox.size(),
+				testInstanceRenderState.beaconRenderState.sections.size(),
+				testInstanceRenderState.beaconRenderState.sections.isEmpty()
+					? 0 : testInstanceRenderState.beaconRenderState.sections.get(0).color(),
+				testInstanceRenderState.errorMarkers.size());
+		}
 	}
 
 	private void submitErrorMarker(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, ErrorMarker errorMarker, CameraRenderState cameraRenderState) {
@@ -90,7 +101,7 @@ public class TestInstanceRenderer implements BlockEntityRenderer<TestInstanceBlo
 			boxUvs[quad * 8 + 4] = 1.0F; boxUvs[quad * 8 + 5] = 1.0F;
 			boxUvs[quad * 8 + 6] = 0.0F; boxUvs[quad * 8 + 7] = 1.0F;
 		}
-	int[] boxColors = {0x60ff0000, 0x60ff0000, 0x60ff0000, 0x60ff0000, 0x60ff0000, 0x60ff0000};
+		int[] boxColors = {0x5fff0000, 0x5fff0000, 0x5fff0000, 0x5fff0000, 0x5fff0000, 0x5fff0000};
 		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
 			if (!submitNodeCollector.order(1).submitColoredQuadsSemantic(poseStack, RenderType.debugFilledBox(), boxVertices, boxUvs, boxColors, 15728880)) {

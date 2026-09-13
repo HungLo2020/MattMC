@@ -1402,6 +1402,7 @@ mod tests {
                 index_generation: 1,
                 vertex_layout_version: 0,
                 vertex_bytes: Vec::new(),
+                decal_normals: None,
                 source_input: None,
                 entity_identity: String::new(),
                 terrain_voxel_vertices: None,
@@ -1881,6 +1882,7 @@ mod tests {
         frontend.mesh_assets.insert(
             23,
             super::super::MeshAssetStore {
+                decal_normals: None,
                 translucent_order: Default::default(),
                 mesh_generation: asset.mesh_generation,
                 index_generation: 1,
@@ -1914,7 +1916,9 @@ mod tests {
 
     fn test_mesh_instance(mesh_key: u64) -> WorldMeshInstanceRequest {
         WorldMeshInstanceRequest {
+            model_submission_order: None,
             item_foil: None,
+            decal_foil: None,
             stratum: WORLD_STRATUM_ENTITY_MESH,
             mesh_key,
             mesh_generation: 1,
@@ -2005,7 +2009,7 @@ mod tests {
         let vertex_bytes = padding.vertex_bytes.clone();
         let index_bytes = padding.index_bytes.clone();
         frontend.ensure_mesh_geometry_resources(&mut gal,
-            MeshGeometryResourceKey { mesh_key: 9890, mesh_generation: 1 }, vertex_bytes, index_bytes).unwrap();
+            MeshGeometryResourceKey { mesh_key: 9890, mesh_generation: 1 }, vertex_bytes, index_bytes, false).unwrap();
         let mut instance = test_mesh_instance(9891);
         instance.flags = WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY;
         instance.outline_color_argb = 0xff00ff00;

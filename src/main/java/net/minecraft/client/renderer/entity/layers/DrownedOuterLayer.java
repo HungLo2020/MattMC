@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 @Environment(EnvType.CLIENT)
 public class DrownedOuterLayer extends RenderLayer<ZombieRenderState, DrownedModel> {
 	private static final ResourceLocation DROWNED_OUTER_LAYER_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/zombie/drowned_outer_layer.png");
+	private static final ResourceLocation DROWNED_OUTER_IDENTITY = ResourceLocation.withDefaultNamespace("drowned_outer");
 	private final DrownedModel model;
 	private final DrownedModel babyModel;
 
@@ -27,12 +28,31 @@ public class DrownedOuterLayer extends RenderLayer<ZombieRenderState, DrownedMod
 
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, ZombieRenderState zombieRenderState, float f, float g) {
 		DrownedModel drownedModel = zombieRenderState.isBaby ? this.babyModel : this.model;
+		RenderType renderType = RenderType.entityCutoutNoCull(DROWNED_OUTER_LAYER_LOCATION);
+		if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+			boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+				drownedModel, zombieRenderState, poseStack.last(), renderType, DROWNED_OUTER_LAYER_LOCATION,
+				DROWNED_OUTER_IDENTITY, i, LivingEntityRenderer.getOverlayCoords(zombieRenderState, 0.0F), -1
+			);
+			if (queued) {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					"rust-vulkan-whole-frame", DROWNED_OUTER_LAYER_LOCATION, drownedModel.getClass().getName(),
+					zombieRenderState.entityId, true, true, false
+				);
+				return;
+			}
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-unavailable", DROWNED_OUTER_LAYER_LOCATION, drownedModel.getClass().getName(),
+				zombieRenderState.entityId, false, false, false
+			);
+			throw new IllegalStateException("Rust whole-frame drowned-outer route has no copied semantic mesh");
+		}
 			submitNodeCollector.order(1)
 				.submitModelSemanticTexture(
 					drownedModel,
 					zombieRenderState,
 					poseStack,
-					RenderType.entityCutoutNoCull(DROWNED_OUTER_LAYER_LOCATION),
+					renderType,
 					i,
 					LivingEntityRenderer.getOverlayCoords(zombieRenderState, 0.0F),
 					-1,

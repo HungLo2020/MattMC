@@ -23,7 +23,7 @@ public final class GraphicsAuditShieldFoilFixture {
         double strength = minecraft.options.glintStrength().get();
         boolean using = player != null && player.isUsingItem();
         boolean complete = selected == 1 && stack.is(Items.SHIELD) && stack.getCount() == 1
-            && stack.hasFoil() == expectedFoil && !using && speed == 0.0 && strength == 0.5
+            && stack.hasFoil() == expectedFoil && GraphicsAuditShieldPoseFixture.matchesPose(player) && speed == 0.0 && strength == 0.5
             && stack.getOrDefault(DataComponents.BANNER_PATTERNS,
                 net.minecraft.world.level.block.entity.BannerPatternLayers.EMPTY).layers().isEmpty()
             && !stack.has(DataComponents.BASE_COLOR);

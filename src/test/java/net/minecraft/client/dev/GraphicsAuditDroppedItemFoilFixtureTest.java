@@ -49,6 +49,59 @@ class GraphicsAuditDroppedItemFoilFixtureTest {
         }
     }
     @Test
+    void specialFixtureSelectsGameItemsAndRejectsMixedConfiguration() {
+        String prior = System.getProperty(GraphicsAuditDroppedItemFoilFixture.SPECIAL_PROPERTY);
+        String count = System.getProperty(GraphicsAuditDroppedItemFoilFixture.PROPERTY);
+        try {
+            System.setProperty(GraphicsAuditDroppedItemFoilFixture.SPECIAL_PROPERTY, "true");
+            System.setProperty(GraphicsAuditDroppedItemFoilFixture.PROPERTY, "0");
+            assertEquals(1, GraphicsAuditDroppedItemFoilFixture.requestedCount());
+            ItemEntity entity = new ItemEntity(EntityType.ITEM, null);
+            entity.setId(Integer.MIN_VALUE + 4100);
+            GraphicsAuditDroppedItemFoilFixture.pinPhase(entity);
+            assertEquals((float)(Math.PI / 2), entity.bobOffs);
+            assertEquals(0, entity.tickCount);
+            assertSame(net.minecraft.world.item.Items.CLOCK, GraphicsAuditDroppedItemFoilFixture.expectedItem(0));
+            assertSame(net.minecraft.world.item.Items.COMPASS, GraphicsAuditDroppedItemFoilFixture.expectedItem(1));
+            assertThrows(IllegalArgumentException.class, () -> GraphicsAuditDroppedItemFoilFixture.expectedItem(2));
+            System.setProperty(GraphicsAuditDroppedItemFoilFixture.PROPERTY, "1");
+            assertThrows(IllegalArgumentException.class, GraphicsAuditDroppedItemFoilFixture::requestedCount);
+            System.setProperty(GraphicsAuditDroppedItemFoilFixture.SPECIAL_PROPERTY, "false");
+            assertSame(net.minecraft.world.item.Items.DIAMOND, GraphicsAuditDroppedItemFoilFixture.expectedItem(0));
+            assertSame(net.minecraft.world.item.Items.STONE, GraphicsAuditDroppedItemFoilFixture.expectedItem(1));
+        } finally {
+            if (prior == null) System.clearProperty(GraphicsAuditDroppedItemFoilFixture.SPECIAL_PROPERTY);
+            else System.setProperty(GraphicsAuditDroppedItemFoilFixture.SPECIAL_PROPERTY, prior);
+            if (count == null) System.clearProperty(GraphicsAuditDroppedItemFoilFixture.PROPERTY);
+            else System.setProperty(GraphicsAuditDroppedItemFoilFixture.PROPERTY, count);
+        }
+    }
+
+    @Test
+    void recoveryFixtureIsDistinctAndRequiresSpecialScope() {
+        String special = GraphicsAuditDroppedItemFoilFixture.SPECIAL_PROPERTY;
+        String recovery = GraphicsAuditDroppedItemFoilFixture.RECOVERY_PROPERTY;
+        String priorSpecial = System.getProperty(special), priorRecovery = System.getProperty(recovery);
+        try {
+            System.setProperty(recovery, "true");
+            System.setProperty(special, "false");
+            assertThrows(IllegalArgumentException.class, GraphicsAuditDroppedItemFoilFixture::requestedCount);
+            System.setProperty(special, "true");
+            assertEquals(1, GraphicsAuditDroppedItemFoilFixture.requestedCount());
+            assertSame(net.minecraft.world.item.Items.CLOCK, GraphicsAuditDroppedItemFoilFixture.expectedItem(0));
+            assertSame(net.minecraft.world.item.Items.RECOVERY_COMPASS, GraphicsAuditDroppedItemFoilFixture.expectedItem(1));
+            ItemEntity entity = new ItemEntity(EntityType.ITEM, null);
+            entity.setId(Integer.MIN_VALUE + 4101);
+            GraphicsAuditDroppedItemFoilFixture.pinPhase(entity);
+            assertEquals((float)(Math.PI / 2), entity.bobOffs);
+            assertEquals(0, entity.tickCount);
+        } finally {
+            if (priorSpecial == null) System.clearProperty(special); else System.setProperty(special, priorSpecial);
+            if (priorRecovery == null) System.clearProperty(recovery); else System.setProperty(recovery, priorRecovery);
+        }
+    }
+
+    @Test
     void fixturePositionsAreDistinctAndBoundedForVerticalLook() {
         assertEquals(new Vec3(1,1.65,2),
             GraphicsAuditDroppedItemFoilFixture.position(new Vec3(0,2,0),new Vec3(0,0,1),0));

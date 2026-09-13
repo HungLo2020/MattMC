@@ -48,6 +48,21 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		ArrayDeque<Integer> ids = ACTIVE_BLOCK_ENTITY_IDS.get();
 		return ids.isEmpty() ? -1 : ids.peekLast();
 	}
+    // Copied authored metadata during synchronous model extraction. This scope
+    // never sorts work or owns renderer state; each emitted record keeps a value.
+    private static final ThreadLocal<ArrayDeque<Integer>> ACTIVE_MODEL_ORDERS =
+        ThreadLocal.withInitial(ArrayDeque::new);
+    public static void beginSemanticModelOrder(int order) { ACTIVE_MODEL_ORDERS.get().addLast(order); }
+    public static void endSemanticModelOrder() {
+        var orders=ACTIVE_MODEL_ORDERS.get();
+        if (orders.isEmpty()) throw new IllegalStateException("model order scope ended without begin");
+        orders.removeLast();
+        if (orders.isEmpty()) ACTIVE_MODEL_ORDERS.remove();
+    }
+    private static Integer activeSemanticModelOrder() {
+        var orders=ACTIVE_MODEL_ORDERS.get();
+        return orders.isEmpty() ? null : orders.peekLast();
+    }
 	private static final float GUI_UV_OVERLAP_LIMIT = 1.0F / 16.0F;
 	/** Texture bytes already use VulkanicGAL's sampler-row convention. */
 	public static final int WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_VULKANIC = 0;
@@ -76,7 +91,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
-	public static final int ABI_VERSION = 54;
+	public static final int ABI_VERSION = 63;
+	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
+	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
 	/** Immutable engine inputs; Rust owns Globals normalization, packing and GPU storage. */
 	public record EngineGlobalsRecord(int screenWidth, int screenHeight, long gameTicks,
@@ -184,9 +201,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	/** GUI mesh ABI mode for a Frozen-parity panorama: unlit, no culling, no depth test. */
 	public static final int GUI_MESH_MATERIAL_PANORAMA = 5;
 	public static final int GUI_MESH_MATERIAL_MODEL_OVERLAY = 6;
+	public static final int GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL = 7;
+	public static final int GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL = 8;
+	/** Vanilla armor decal cutout: two-sided alpha test with Equal depth and depth writes. */
+	public static final int GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL = 9;
 	/** Ordinary inventory model lighting in the Y-down GUI normal space. */
 	public static final int GUI_MESH_LIGHTING_INVENTORY_BLOCK = 3;
 	public static final int GUI_MESH_LIGHTING_FRONT_MODEL = 4;
+	public static final int GUI_MESH_LIGHTING_ENTITY_PREVIEW = 5;
 
 	// Long-lived context requests use the context arena; large frame payloads
 	// are serialized in a per-submit confined arena and released immediately
@@ -1863,6 +1885,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			}
 			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 16, instance.blockEntityId());
 			encodeWorldItemFoil(item, instance.itemFoil());
+			encodeWorldDecalFoil(item, instance.decalFoil());
+            encodeModelSubmissionOrder(item, instance.modelSubmissionOrder());
 		}
 		MemorySegment firstPersonMeshInstanceArray = Struct.WORLD_MESH_INSTANCE_RECORD.array(arena, firstPersonMeshInstances.size());
 		for (int i = 0; i < firstPersonMeshInstances.size(); i++) {
@@ -1889,6 +1913,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 15, instance.flags());
 			Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 16, instance.blockEntityId());
 			encodeWorldItemFoil(item, instance.itemFoil());
+			encodeWorldDecalFoil(item, instance.decalFoil());
+            encodeModelSubmissionOrder(item, instance.modelSubmissionOrder());
 		}
 		MemorySegment worldTextQuadArray = Struct.WORLD_TEXT_QUAD_REQUEST.array(arena, worldTextQuads.size());
 		for (int i = 0; i < worldTextQuads.size(); i++) {
@@ -2169,8 +2195,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			: Native.worldPrimitivesSubmit(contextId, request, result);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("rust-gal.whole-frame.native-submit-return");
 		checkStatus(status, wholeFrame ? "whole-frame submission" : "world primitive submission");
-		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(47);
-		long profileOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(48);
+		long metricsOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(53);
+		long profileOffset = Struct.WHOLE_FRAME_SUBMIT_RESULT.offset(54);
 		BackendMetrics metrics = backendMetricsAt(result, metricsOffset);
 		WholeFrameProfile profile = wholeFrameProfileAt(result, profileOffset);
 		long ffiCalls = result.get(ValueLayout.JAVA_LONG, metricsOffset + 64);
@@ -2220,6 +2246,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 44),
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 45),
 			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 46),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 47),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 48),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 49),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 50),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 51),
+			Struct.WHOLE_FRAME_SUBMIT_RESULT.getLong(result, 52),
 			ffiCalls,
 			ffiInputBytes,
 			metrics,
@@ -4359,7 +4391,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	/** One coarse copied material layer. Backends see no Java renderer state. */
 	/** Immutable standard foil inputs; texture coordinates are computed only in Rust. */
 	public enum StandardFoilKind {
-		ITEM(1), ENTITY(2);
+		ITEM(1), ENTITY(2), ARMOR(3), ARMOR_ORTHOGRAPHIC(4);
 		private final int wireValue;
 		StandardFoilKind(int wireValue) { this.wireValue = wireValue; }
 		public int wireValue() { return this.wireValue; }
@@ -4495,6 +4527,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public GuiMeshBatchRecord {
 			if (itemCache != null && (itemRasterScale == 0 || !itemCache.animated() && itemFoil != null))
 				throw new IllegalArgumentException("Item cache requires coherent native item animation semantics");
+			if ((materialMode == GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL
+				|| materialMode == GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL
+				|| materialMode == GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL)
+				&& (lightingMode != GUI_MESH_LIGHTING_ENTITY_PREVIEW || alphaCutoff != 0.1F
+					|| itemRasterScale != 0 || itemFoil != null))
+				throw new IllegalArgumentException("entity-preview material requires native preview lighting and cutout semantics");
 			if (materialMode == GUI_MESH_MATERIAL_MODEL_OVERLAY && (itemRasterScale == 0
 				|| lightingMode != GUI_MESH_LIGHTING_FRONT_MODEL || alphaCutoff != 0.0F || itemFoil != null))
 				throw new IllegalArgumentException("model overlay requires native front-lit base geometry without cutout or foil");
@@ -4509,11 +4547,19 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			if (itemRasterScale < 0 || (itemRasterScale > 0 && ((lightingMode != 1 && lightingMode != GUI_MESH_LIGHTING_FRONT_MODEL) || renderWidth != 0
 				|| renderHeight != 0 || guardPixels != 0))) throw new IllegalArgumentException("conflicting flat item raster semantics");
 			if (itemFoil != null && materialMode != 4) throw new IllegalArgumentException("standard foil requires glint material");
+			if (itemFoil != null && itemFoil.kind() == StandardFoilKind.ARMOR)
+				throw new IllegalArgumentException("perspective armor foil is not a GUI entity-preview material");
+			if (itemFoil != null && itemFoil.kind() == StandardFoilKind.ARMOR_ORTHOGRAPHIC
+				&& (lightingMode != GUI_MESH_LIGHTING_ENTITY_PREVIEW || itemRasterScale != 0
+					|| blockItemRaster != null || decalFoil != null))
+				throw new IllegalArgumentException("orthographic armor foil requires explicit GUI entity-preview semantics");
 			if (itemFoil != null && itemFoil.kind() == StandardFoilKind.ENTITY
 				&& (itemRasterScale == 0 || blockItemRaster != null || decalFoil != null || lightingMode != 1))
 				throw new IllegalArgumentException("entity foil requires native front-lit model item layout");
-			if (assetId == 0L || layerIndex < 0 || (materialMode != 1 && materialMode != 2 && materialMode != 3 && materialMode != 4 && materialMode != GUI_MESH_MATERIAL_PANORAMA && materialMode != GUI_MESH_MATERIAL_MODEL_OVERLAY)
-				|| (lightingMode != 1 && lightingMode != 2 && lightingMode != GUI_MESH_LIGHTING_INVENTORY_BLOCK && lightingMode != GUI_MESH_LIGHTING_FRONT_MODEL) || !Float.isFinite(alphaCutoff)
+			if (assetId == 0L || layerIndex < 0 || (materialMode != 1 && materialMode != 2 && materialMode != 3 && materialMode != 4 && materialMode != GUI_MESH_MATERIAL_PANORAMA && materialMode != GUI_MESH_MATERIAL_MODEL_OVERLAY
+				&& materialMode != GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL && materialMode != GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL
+				&& materialMode != GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL)
+				|| (lightingMode != 1 && lightingMode != 2 && lightingMode != GUI_MESH_LIGHTING_INVENTORY_BLOCK && lightingMode != GUI_MESH_LIGHTING_FRONT_MODEL && lightingMode != GUI_MESH_LIGHTING_ENTITY_PREVIEW) || !Float.isFinite(alphaCutoff)
 				|| guiWidth <= 0 || guiHeight <= 0 || (itemRasterScale == 0 && blockItemRaster == null && (renderWidth <= guardPixels * 2 || renderHeight <= guardPixels * 2))
 				|| left >= right || top >= bottom) throw new IllegalArgumentException("invalid semantic GUI mesh batch");
 			if (clipMode == 0) {
@@ -4881,11 +4927,48 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 	}
 
+    private static void encodeModelSubmissionOrder(MemorySegment item,Integer order) {
+        Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item,28,order==null?0:1);
+        Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item,29,order==null?0:order);
+    }
+
 	private static void encodeWorldItemFoil(MemorySegment item, StandardItemFoilRecord foil) {
 		Struct.WORLD_MESH_INSTANCE_RECORD.setInt(item, 20, foil == null ? 0 : foil.kind().wireValue());
 		Struct.WORLD_MESH_INSTANCE_RECORD.setLong(item, 21, foil == null ? 0L : foil.clockMillis());
 		item.set(ValueLayout.JAVA_DOUBLE, Struct.WORLD_MESH_INSTANCE_RECORD.offset(22), foil == null ? 0.0 : foil.speed());
 		Struct.WORLD_MESH_INSTANCE_RECORD.setFloat(item, 23, foil == null ? 0.0F : foil.strength());
+	}
+
+	/** Original copied item poses; native code owns inverse/decal projection. */
+	public record WorldDecalFoilRecord(boolean firstPerson, boolean trustedNormals,
+		float[] modelPose, float[] normalPose) {
+		public WorldDecalFoilRecord {
+			if (modelPose.length != 16 || normalPose.length != 9) {
+				throw new IllegalArgumentException("world decal poses require 16 model and 9 normal floats");
+			}
+			for (float value : modelPose) if (!Float.isFinite(value))
+				throw new IllegalArgumentException("world decal model pose must be finite");
+			for (float value : normalPose) if (!Float.isFinite(value))
+				throw new IllegalArgumentException("world decal normal pose must be finite");
+			if (modelPose[3] != 0 || modelPose[7] != 0 || modelPose[11] != 0 || modelPose[15] != 1)
+				throw new IllegalArgumentException("world decal model pose must be affine");
+			modelPose = modelPose.clone();
+			normalPose = normalPose.clone();
+		}
+		@Override public float[] modelPose() { return modelPose.clone(); }
+		@Override public float[] normalPose() { return normalPose.clone(); }
+	}
+
+	private static void encodeWorldDecalFoil(MemorySegment item, WorldDecalFoilRecord decal) {
+		var layout = Struct.WORLD_MESH_INSTANCE_RECORD;
+		layout.setInt(item, 24, decal == null ? 0 : decal.firstPerson() ? 2 : 1);
+		layout.setInt(item, 25, decal == null || decal.trustedNormals() ? 0 : 1);
+		float[] model = decal == null ? null : decal.modelPose();
+		float[] normal = decal == null ? null : decal.normalPose();
+		for (int i = 0; i < 16; i++) item.set(ValueLayout.JAVA_FLOAT,
+			layout.offset(26) + i * Float.BYTES, model == null ? 0.0F : model[i]);
+		for (int i = 0; i < 9; i++) item.set(ValueLayout.JAVA_FLOAT,
+			layout.offset(27) + i * Float.BYTES, normal == null ? 0.0F : normal[i]);
 	}
 
 	public record WorldMeshInstanceRecord(
@@ -4906,8 +4989,45 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int flags,
 		int blockEntityId,
 		TerrainSectionPlacement terrainPlacement,
-		StandardItemFoilRecord itemFoil
+		StandardItemFoilRecord itemFoil,
+		WorldDecalFoilRecord decalFoil,
+		Integer modelSubmissionOrder
 	) {
+		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
+            int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
+            int viewportWidth, int viewportHeight, int entityId, int entityColorArgb,
+            int outlineColorArgb, int flags, int blockEntityId, TerrainSectionPlacement terrainPlacement,
+            StandardItemFoilRecord itemFoil, WorldDecalFoilRecord decalFoil) {
+            this(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,winding,colorArgb,
+                transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,flags,
+                blockEntityId,terrainPlacement,itemFoil,decalFoil,
+                stratum == WORLD_MESH_ENTITY_STRATUM ? activeSemanticModelOrder() : null);
+        }
+
+        public WorldMeshInstanceRecord withModelSubmissionOrder(Integer order) {
+            if (order != null && terrainPlacement != null)
+                throw new IllegalArgumentException("terrain placement cannot carry model submission order");
+            return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
+                winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
+                flags,blockEntityId,terrainPlacement,itemFoil,decalFoil,order);
+        }
+
+		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
+			int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
+			int viewportWidth, int viewportHeight, int entityId, int entityColorArgb,
+			int outlineColorArgb, int flags, int blockEntityId, TerrainSectionPlacement terrainPlacement,
+			StandardItemFoilRecord itemFoil) {
+			this(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,winding,colorArgb,
+				transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,flags,
+				blockEntityId,terrainPlacement,itemFoil,null);
+		}
+
+		public WorldMeshInstanceRecord withDecalFoil(WorldDecalFoilRecord decal) {
+			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
+				winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
+				flags,blockEntityId,terrainPlacement,itemFoil,Objects.requireNonNull(decal),modelSubmissionOrder);
+		}
+
 		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
 			int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
 			int viewportWidth, int viewportHeight, int entityId, int entityColorArgb,
@@ -4919,7 +5039,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public WorldMeshInstanceRecord withItemFoil(StandardItemFoilRecord foil) {
 			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
 				winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
-				flags,blockEntityId,terrainPlacement,Objects.requireNonNull(foil));
+				flags,blockEntityId,terrainPlacement,Objects.requireNonNull(foil),decalFoil,modelSubmissionOrder);
 		}
 		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
 			int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
@@ -4932,7 +5052,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public WorldMeshInstanceRecord withTerrainPlacement(TerrainSectionPlacement placement) {
 			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
 				winding,colorArgb,new float[] {1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1},viewportWidth,viewportHeight,
-				entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,Objects.requireNonNull(placement),itemFoil);
+				entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,Objects.requireNonNull(placement),itemFoil,decalFoil,modelSubmissionOrder);
 		}
 		public WorldMeshInstanceRecord(
 			int stratum,
@@ -5002,6 +5122,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		public WorldMeshInstanceRecord {
+            if (modelSubmissionOrder != null && (stratum != WORLD_MESH_ENTITY_STRATUM || terrainPlacement != null))
+                throw new IllegalArgumentException("model submission order requires an entity mesh without terrain placement");
+			if (depthPolicy < 0 || depthPolicy > 3
+				|| (depthPolicy == 3 && (stratum != WORLD_MESH_ENTITY_STRATUM || itemFoil != null))) {
+				throw new IllegalArgumentException("unsupported world mesh depth policy or equal-depth scope");
+			}
+			if (decalFoil != null && (itemFoil == null || itemFoil.kind() != StandardFoilKind.ITEM
+				|| !Arrays.equals(transform, decalFoil.modelPose()))) {
+				throw new IllegalArgumentException("world decal requires item foil and matching draw pose");
+			}
 			if (itemFoil != null && (stratum != WORLD_MESH_ENTITY_STRATUM || terrainPlacement != null || flags != 0 || blockEntityId != -1)) {
 				throw new IllegalArgumentException("standard foil requires an ordinary entity mesh instance");
 			}
@@ -5013,7 +5143,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			if (meshKey == 0L || meshGeneration == 0L) {
 				throw new IllegalArgumentException("world mesh instance key and generation must be non-zero");
 			}
-			if (flags < 0 || (flags & ~3) != 0) {
+			int viewLayerFlags = flags & (WORLD_MESH_VIEW_LAYER_PERSPECTIVE | WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC);
+			if (viewLayerFlags != 0 && (viewLayerFlags == 12 || (flags & ~12) != 0
+				|| stratum != WORLD_MESH_ENTITY_STRATUM || itemFoil != null || terrainPlacement != null || blockEntityId != -1)) {
+				throw new IllegalArgumentException("view layering requires one projection and an ordinary entity mesh");
+			}
+			if (flags < 0 || (flags & ~15) != 0) {
 				throw new IllegalArgumentException("world mesh instance contains unknown semantic flags");
 			}
 			if ((flags & 2) != 0 && (stratum != 60 || meshSectionIndex != -1 || depthPolicy < 1 || depthPolicy > 2)) {
@@ -5422,6 +5557,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long guiMeshItemCount,
 		long guiMeshBatchCount,
 		long guiMeshDrawCount,
+		long guiEntityPreviewItemCount,
+		long guiEntityPreviewBatchCount,
+		long guiEntityPreviewDrawCount,
+		long guiEntityPreviewMaterialMask,
+		long guiEntityPreviewVertexCount,
+		long guiEntityPreviewIndexCount,
 		long cacheHits,
 		long cacheMisses,
 		long resourceCreates,

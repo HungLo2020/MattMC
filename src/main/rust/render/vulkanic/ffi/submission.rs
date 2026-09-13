@@ -149,7 +149,9 @@ pub fn serialize_submission_batch_canonical(batch: &SubmissionBatch) -> Vec<u8> 
     push_u64(&mut out, batch.command_lists.len() as u64);
     for list in &batch.command_lists {
         push_str(&mut out, &list.label);
-        push_u64(&mut out, list.operations.len() as u64);
+        // CPU lifetime receipts are private Rust state, not ABI commands.
+        push_u64(&mut out, list.operations.iter()
+            .filter(|op| !matches!(op, CommandOp::TrackSubmission(_))).count() as u64);
         for op in &list.operations {
             serialize_command_op(&mut out, op);
         }
@@ -740,6 +742,7 @@ pub(crate) fn texture_usage_bits_from_desc(usages: &[TextureUsage]) -> u64 {
 
 pub(crate) fn serialize_command_op(out: &mut Vec<u8>, op: &CommandOp) {
     match op {
+        CommandOp::TrackSubmission(_) => {}
         CommandOp::BeginPass {
             pass,
             target,

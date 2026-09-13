@@ -22,6 +22,8 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from shield_animation_scenarios import SHIELD_ANIMATION_SCENARIOS, SHIELD_ANIMATION_SPRITES, shield_animation_materials, SHIELD_ANIMATION_FRAMES, shield_animation_frames
+
 import artifact_retention
 from capture_window import menu_capture_window
 
@@ -3192,10 +3194,16 @@ def flat_item_orientation_colors(index):
 
 
 def gui_resource_pack_specs(scenario: str) -> list[dict[str, object]]:
-    if scenario in ("shield-animation", "shield-animation-interpolated"):
+    if scenario in SHIELD_ANIMATION_SCENARIOS:
+        material = SHIELD_ANIMATION_SCENARIOS[scenario]
+        textures = tuple("assets/minecraft/textures/" + SHIELD_ANIMATION_SPRITES[role].removeprefix("minecraft:") + ".png"
+                         for role in shield_animation_materials(material))
         return [dict(name="mattmc-" + scenario, variant="a", shield_animation=True,
                      shield_interpolation=scenario.endswith("-interpolated"),
-                     sprites=(("assets/minecraft/textures/entity/shield_base_nopattern.png",64,192),))]
+                     shield_animation_masks=material != "plain",
+                     shield_animation_schedules={texture: shield_animation_frames(material, role)
+                         for texture, role in zip(textures, shield_animation_materials(material))},
+                     sprites=tuple((texture,64,192) for texture in textures))]
     if scenario in ("shield-alpha", "shield-alpha-zero", "shield-alpha-occlusion"):
         return [dict(name="mattmc-" + scenario, variant="a", shield_alpha=True,
                      shield_alpha_zero=scenario != "shield-alpha",
@@ -3497,11 +3505,28 @@ def shield_alpha_png(*, zero: bool = False, opaque_handle: bool = False) -> byte
 
 
 SHIELD_ANIMATION_COLORS = ((224,64,32,255), (32,208,64,255), (48,80,224,255))
-SHIELD_ANIMATION_FRAMES = ((2,3), (0,5), (2,2), (1,7))
 
 
-def shield_animation_png() -> bytes:
-    rows = b"".join((b"\0" + bytes(color)*64)*64 for color in SHIELD_ANIMATION_COLORS)
+def shield_animation_png(mask_resource: str | None = None) -> bytes:
+    if mask_resource is None:
+        rows = b"".join((b"\0" + bytes(color)*64)*64 for color in SHIELD_ANIMATION_COLORS)
+    else:
+        # Preserve the selected vanilla pattern's coverage and shading. Only
+        # its source colors animate; model, dye tint, and layer order stay authored.
+        from PIL import Image
+        source = Path(__file__).resolve().parents[2] / "src/main/resources" / mask_resource
+        with Image.open(source) as image:
+            if image.size != (64,64):
+                raise ValueError("shield pattern animation requires a 64x64 source")
+            pixels = image.convert("RGBA").tobytes()
+        rows = bytearray()
+        for color in SHIELD_ANIMATION_COLORS:
+            for y in range(64):
+                rows.append(0)
+                for x in range(64):
+                    offset = (y*64+x)*4
+                    rows.extend(pixels[offset+c]*color[c]//255 for c in range(3))
+                    rows.append(pixels[offset+3])
     return (b"\x89PNG\r\n\x1a\n"
             + png_chunk(b"IHDR",struct.pack(">IIBBBBB",64,192,8,6,0,0,0))
             + png_chunk(b"IDAT",zlib.compress(rows)) + png_chunk(b"IEND",b""))
@@ -3715,10 +3740,10 @@ def write_gui_resource_pack(pack_dir: Path, spec: dict[str, object]) -> None:
             continue
         actual_width = width + 1 if resource_path in wrong_size else width
         if spec.get("shield_animation"):
-            target.write_bytes(shield_animation_png())
+            target.write_bytes(shield_animation_png(resource_path if spec.get("shield_animation_masks") else spec.get("shield_animation_mask")))
             target.with_name(target.name + ".mcmeta").write_text(json.dumps({"animation": {
                 "width":64,"height":64,"interpolate":bool(spec.get("shield_interpolation")),
-                "frames":[{"index":index,"time":duration} for index,duration in SHIELD_ANIMATION_FRAMES]
+                "frames":[{"index":index,"time":duration} for index,duration in spec.get("shield_animation_schedules", {}).get(resource_path, SHIELD_ANIMATION_FRAMES)]
             }}),encoding="utf-8")
             continue
         if spec.get("shield_alpha"):
@@ -4175,10 +4200,19 @@ def filtered_lines(file_path: Path, pattern: str, limit: int | None = None) -> l
     if not file_path.is_file():
         return []
     regex = re.compile(pattern, re.IGNORECASE)
+    # These three ASCII event patterns contain no case-sensitive escapes.
+    # On ASCII log lines a lowercase, case-sensitive search is equivalent,
+    # and lets the regex engine skip long unrelated per-frame metrics using
+    # its literal-prefix optimization. Preserve Unicode IGNORECASE behavior
+    # and the original numbered output for every other input.
+    ascii_regex = re.compile(pattern.lower()) if pattern in (
+        SHADER_EVENT_PATTERN, VALIDATION_EVENT_PATTERN, KEY_SUMMARY_PATTERN
+    ) else None
     matches: list[str] = []
     with file_path.open("r", encoding="utf-8", errors="replace") as handle:
         for number, line in enumerate(handle, 1):
-            if regex.search(line):
+            match = ascii_regex.search(line.lower()) if ascii_regex is not None and line.isascii() else regex.search(line)
+            if match:
                 matches.append(f"{number}:{line.rstrip()}")
                 if limit and len(matches) >= limit:
                     break

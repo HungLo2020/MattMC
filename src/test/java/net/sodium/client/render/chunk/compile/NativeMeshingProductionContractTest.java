@@ -248,11 +248,15 @@ class NativeMeshingProductionContractTest {
     }
 
     @Test
-    void rustGuiMeshAggregationMatchesRustResourceBounds() throws IOException {
-        String coordinator = source("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java");
-        assertTrue(coordinator.contains("MAX_RUST_GUI_MESH_BATCHES = 1_024"));
-        assertTrue(coordinator.contains("MAX_RUST_GUI_MESH_VERTICES = 65_536"));
-        assertTrue(coordinator.contains("MAX_RUST_GUI_MESH_INDICES = 196_608"));
+	void rustGuiMeshAggregationMatchesRustResourceBounds() throws IOException {
+		String coordinator = source("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java");
+		String meshFrontend = source("src/main/rust/render/vulkanic/gui_mesh_frontend.rs");
+		String guiFrontend = source("src/main/rust/render/vulkanic/gui_frontend.rs");
+		assertTrue(coordinator.contains("MAX_RUST_GUI_MESH_BATCHES = 16_384"));
+		assertTrue(meshFrontend.contains("GUI_MESH_MAX_BATCHES: usize = 16_384"));
+		assertTrue(guiFrontend.contains("GUI_MAX_MESH_BATCHES: usize = 16_384"));
+		assertTrue(coordinator.contains("MAX_RUST_GUI_MESH_VERTICES = 1_048_576"));
+		assertTrue(coordinator.contains("MAX_RUST_GUI_MESH_INDICES = 3_145_728"));
         assertTrue(coordinator.contains("Rust whole-frame GUI mesh capacity exceeded"));
     }
 
@@ -1242,9 +1246,12 @@ class NativeMeshingProductionContractTest {
     @Test
 	void sheepBodyAndWoolLayersUseRustIndexedModelRoutesForAdultAndBabyStates() throws IOException {
         String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
-        String living = source("src/main/java/net/minecraft/client/renderer/entity/LivingEntityRenderer.java");
+		String living = source("src/main/java/net/minecraft/client/renderer/entity/LivingEntityRenderer.java");
 		String wool = source("src/main/java/net/minecraft/client/renderer/entity/layers/SheepWoolLayer.java");
 		String undercoat = source("src/main/java/net/minecraft/client/renderer/entity/layers/SheepWoolUndercoatLayer.java");
+		String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+		String harness = source("DevUtils/Common/graphics_harness.py");
+		String coordinator = source("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java");
 		int sheepStart = renderer.indexOf("isVanillaSheepModelMeshEligible");
 		int sheepEnd = renderer.indexOf("\n\tpublic static boolean", sheepStart + 1);
 		String sheepContract = renderer.substring(sheepStart, sheepEnd > sheepStart ? sheepEnd : renderer.length());
@@ -1258,8 +1265,108 @@ class NativeMeshingProductionContractTest {
         assertTrue(living.contains("isVanillaSheepModelMeshEligible"));
 		assertTrue(wool.contains("enqueueStandaloneModelMesh"));
 		assertTrue(undercoat.contains("enqueueStandaloneModelMesh"));
+		assertTrue(wool.contains("j, sheepRenderState.getWoolColor(), sheepRenderState.outlineColor"),
+			"wool must preserve vanilla overlay coordinates and put wool color in the tint slot");
+		assertTrue(undercoat.contains("LivingEntityRenderer.getOverlayCoords(sheepRenderState, 0.0F), sheepRenderState.getWoolColor()"),
+			"undercoat must preserve vanilla overlay coordinates and put wool color in the tint slot");
+		assertTrue(wool.contains("recordModelMeshRouteDecision"));
+		assertTrue(undercoat.contains("recordModelMeshRouteDecision"));
 		assertFalse(undercoat.contains("!sheepRenderState.isBaby"),
 			"baby sheep undercoat must use the same Rust indexed-model route as adult sheep");
+		assertTrue(capture.contains("sheep.setSheared(false)"));
+		assertTrue(capture.contains("sheep.setColor(\"sheep-red\".equals"));
+		assertTrue(capture.contains("\"sheep-red\""));
+		assertTrue(capture.contains("DyeColor.RED"));
+		assertTrue(capture.contains("redSheepFixtureJson"));
+		assertTrue(capture.contains("sheepFixtureJson"));
+		assertTrue(capture.contains("rustGalWorldModelCompositionExecution"));
+		assertTrue(renderer.contains("recordWholeFrameModelCompositionExecution"));
+		assertTrue(renderer.contains("countsByComposition.get(composition)"));
+		assertTrue(renderer.contains("byEntity.getOrDefault(instance.entityId()"));
+		assertTrue(coordinator.contains("recordWholeFrameModelCompositionExecution"));
+		assertTrue(harness.contains("f\"missing_{prefix}_{layer_name}_route_or_mesh\""));
+		assertTrue(harness.contains("f\"missing_{prefix}_composition_execution\""));
+		assertTrue(harness.contains("minecraft:textures/entity/sheep/sheep_wool.png"));
+		assertTrue(harness.contains("minecraft:textures/entity/sheep/sheep_wool_undercoat.png"));
+		assertTrue(harness.contains("base_undercoat_and_wool_emission_observed"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:sheep\", \"minecraft:sheep_wool\")"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:sheep\", \"minecraft:sheep_wool_undercoat\")"));
+	}
+
+	@Test
+	void villagerTypeProfessionAndLevelUseDistinctRustSemanticMeshes() throws IOException {
+		String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/VillagerProfessionLayer.java");
+		String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+		String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+		String harness = source("DevUtils/Common/graphics_harness.py");
+
+		assertTrue(layer.contains("string + \"_type\""));
+		assertTrue(layer.contains("string + \"_profession\""));
+		assertTrue(layer.contains("string + \"_profession_level\""));
+		assertTrue(layer.contains("enqueueStandaloneModelMesh"));
+		assertTrue(layer.contains("recordModelMeshRouteDecision"));
+		assertTrue(layer.contains("rust-vulkan-unavailable"));
+		assertTrue(layer.contains("throw new IllegalStateException"));
+		assertTrue(layer.contains("renderColoredCutoutModel(model, texture"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:villager\", \"minecraft:villager_type\")"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:villager\", \"minecraft:villager_profession\")"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:villager\", \"minecraft:villager_profession_level\")"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:zombie_villager\", \"minecraft:zombie_villager_type\")"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:zombie_villager\", \"minecraft:zombie_villager_profession\")"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:zombie_villager\", \"minecraft:zombie_villager_profession_level\")"));
+		assertTrue(capture.contains("VillagerType.PLAINS"));
+		assertTrue(capture.contains("VillagerProfession.FARMER"));
+		assertTrue(capture.contains("withLevel(5)"));
+		assertTrue(capture.contains("villagerFixtureJson"));
+		assertTrue(capture.contains("zombieVillagerFixtureJson"));
+		assertTrue(harness.contains("frozen_villager_emission_evidence"));
+		assertTrue(harness.contains("frozen_zombie_villager_emission_evidence"));
+		assertTrue(harness.contains("base_type_profession_and_level_emission_observed"));
+		assertTrue(harness.contains("minecraft:villager_profession_level"));
+		assertTrue(harness.contains("minecraft:zombie_villager_profession_level"));
+	}
+
+	@Test
+	void emissiveEntityLayersUseExplicitRustMaterialAndSemanticIdentities() throws IOException {
+		String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/LivingEntityEmissiveLayer.java");
+		String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+		String registry = source("src/main/rust/render/vulkanic/world_primitive_frontend/material_registry.rs");
+		String frontend = source("src/main/rust/render/vulkanic/world_primitive_frontend.rs");
+		String shaders = source("src/main/rust/render/vulkanic/shader_pack/programs.rs");
+		String warden = source("src/main/java/net/minecraft/client/renderer/entity/WardenRenderer.java");
+		String copperGolem = source("src/main/java/net/minecraft/client/renderer/entity/CopperGolemRenderer.java");
+		String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+		String harness = source("DevUtils/Common/graphics_harness.py");
+
+		assertTrue(layer.contains("enqueueStandaloneTranslucentModelMesh"));
+		assertTrue(layer.contains("this.semanticIdentity"));
+		assertTrue(layer.contains("rust-vulkan-unavailable"));
+		assertTrue(layer.contains("throw new IllegalStateException"));
+		assertTrue(renderer.contains("RenderPipelines.ENTITY_TRANSLUCENT_EMISSIVE"));
+		assertTrue(renderer.contains("MATERIAL_ID_MODEL_TRANSLUCENT_EMISSIVE"));
+		assertTrue(registry.contains("WORLD_MATERIAL_ID_MODEL_TRANSLUCENT_EMISSIVE"));
+		assertTrue(registry.contains("fullbright_with_cardinal_lighting"));
+		assertTrue(frontend.contains("{ 512 }"));
+		assertTrue(shaders.contains("(material_semantics & (128u | 512u)) != 0u"));
+		for (String identity : new String[] {"warden_bioluminescent", "warden_pulsating_spots_1",
+			"warden_pulsating_spots_2", "warden_tendrils", "warden_heart"}) {
+			assertTrue(warden.contains(identity), identity);
+		}
+		assertTrue(copperGolem.contains("copper_golem_eyes"));
+		assertTrue(capture.contains("copper-golem"));
+		assertTrue(capture.contains("WeatheringCopper.WeatherState.UNAFFECTED"));
+		assertTrue(capture.contains("copperGolemFixtureJson"));
+		assertTrue(harness.contains("frozen_copper_golem_emission_evidence"));
+		assertTrue(harness.contains("base_and_emissive_eyes_emission_observed"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:copper_golem\", \"minecraft:copper_golem_eyes\")"));
+		assertTrue(capture.contains("wardenFixtureJson"));
+		assertTrue(capture.contains("serverLevel.broadcastEntityEvent(warden, (byte)61)"));
+		assertTrue(harness.contains("frozen_warden_emission_evidence"));
+		assertTrue(harness.contains("base_and_all_five_emissive_phases_observed"));
+		for (String identity : new String[] {"warden_bioluminescent", "warden_pulsating_spots_1",
+			"warden_pulsating_spots_2", "warden_tendrils", "warden_heart"}) {
+			assertTrue(renderer.contains("new ModelComposition(\"minecraft:warden\", \"minecraft:" + identity + "\")"), identity);
+		}
 	}
 
 	@Test
@@ -1267,11 +1374,24 @@ class NativeMeshingProductionContractTest {
 		String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
 		String harness = source("DevUtils/Common/graphics_harness.py");
 		String pattern = source("src/main/java/net/minecraft/client/renderer/entity/layers/TropicalFishPatternLayer.java");
+		String renderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+		String coordinator = source("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java");
 		assertTrue(capture.contains("tropical-fish"));
 		assertTrue(capture.contains("EntityType.TROPICAL_FISH"));
+		assertTrue(capture.contains("configureTropicalFishFixture"));
+		assertTrue(capture.contains("TROPICAL_FISH_PATTERN, TropicalFish.Pattern.KOB"));
+		assertTrue(capture.contains("TROPICAL_FISH_BASE_COLOR, DyeColor.ORANGE"));
+		assertTrue(capture.contains("TROPICAL_FISH_PATTERN_COLOR, DyeColor.WHITE"));
+		assertTrue(capture.contains("tropicalFishFixtureJson"));
 		assertTrue(harness.contains("\"tropical-fish\""));
+		assertTrue(harness.contains("f\"missing_{prefix}_{layer_name}_route_or_mesh\""));
+		assertTrue(harness.contains("f\"missing_{prefix}_composition_execution\""));
+		assertTrue(harness.contains("minecraft:textures/entity/fish/tropical_a_pattern_1.png"));
 		assertTrue(pattern.contains("isVanillaTropicalFishPatternModelMeshEligible"));
 		assertTrue(pattern.contains("tropical_fish_pattern"));
+		assertTrue(renderer.contains("new ModelComposition(\"minecraft:tropical_fish\", \"minecraft:tropical_fish_pattern\")"));
+		assertTrue(renderer.contains("instance.entityId()"));
+		assertTrue(coordinator.contains("recordWholeFrameModelCompositionExecution"));
 	}
 
     @Test
@@ -1500,11 +1620,13 @@ class NativeMeshingProductionContractTest {
         assertTrue(gui.contains("tryEnqueueEntityPip"));
         assertTrue(gui.contains("getEntityRenderDispatcher()"));
         assertTrue(gui.contains("getTextureLocation"));
-        assertTrue(gui.contains("living.getModel()"));
+        assertTrue(gui.contains("living.getModelForSemanticState(livingState)"));
+        assertTrue(gui.contains("layerModel.setupAndObserve(pose.last())"));
         assertTrue(renderer.contains("GuiEntityRenderState entityPip"));
         assertTrue(renderer.contains("RustGalGuiRenderer.tryEnqueueEntityPip"));
         assertTrue(living.contains("applySemanticModelPose"));
-        assertTrue(living.contains("this.model.setupAnim(state)"));
+        assertTrue(gui.contains("this.setupModel.run()"));
+        assertTrue(gui.contains("this.observeModel.accept(sourcePose)"));
     }
 
     @Test
@@ -1671,13 +1793,70 @@ class NativeMeshingProductionContractTest {
     void snowGolemsUseRustBodyRouteWithSeparatePumpkinFeature() throws IOException {
         String renderer = source("src/main/java/net/minecraft/client/renderer/entity/LivingEntityRenderer.java");
         String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
 
         assertTrue(renderer.contains("SnowGolemModel.class"));
         assertTrue(renderer.contains("SnowGolemRenderState snowGolemRenderState"));
         assertTrue(renderer.contains("isVanillaSnowGolemModelMeshEligible"));
         assertTrue(rust.contains("model.getClass() == net.minecraft.client.model.SnowGolemModel.class"));
         assertTrue(rust.contains("textures/entity/snow_golem.png"));
+        assertTrue(capture.contains("private static String snowGolemFixtureJson()"));
+        assertTrue(capture.contains("!golem.isInvisible() && golem.hasPumpkin()"));
+        assertTrue(capture.contains("rustGalWorldBlockAttachedCompositionExecution"));
+        assertTrue(rust.contains("BlockAttachedCompositionExecutionDiagnostic"));
+        assertTrue(rust.contains("\"minecraft:snow_golem\", \"minecraft:carved_pumpkin\""));
+        assertTrue(rust.contains("instance.entityId() == body.entityId()"));
+        assertTrue(rust.contains("bodyInstances, blockInstances"));
     }
+
+	@Test
+	void itemFrameBackingUsesIdentifiedSyntheticBlockModelRoute() throws IOException {
+		String renderer = source("src/main/java/net/minecraft/client/renderer/entity/ItemFrameRenderer.java");
+		String mapRenderer = source("src/main/java/net/minecraft/client/renderer/MapRenderer.java");
+		String collector = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+		String storage = source("src/main/java/net/minecraft/client/renderer/SubmitNodeStorage.java");
+		String state = source("src/main/java/net/minecraft/client/renderer/entity/state/ItemFrameRenderState.java");
+		String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+		String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+
+		assertTrue(renderer.contains("submitBlockModelSemantic("));
+		assertTrue(renderer.contains("itemFrameRenderState.isGlowFrame ? \"glow_item_frame\" : \"item_frame\""));
+		assertTrue(renderer.contains("beginItemFrameItemSubmission("));
+		assertTrue(renderer.contains("BuiltInRegistries.ITEM.getKey(itemStack.getItem())"));
+		assertTrue(state.contains("ResourceLocation itemIdentity"));
+		assertFalse(renderer.contains("submitBlockDisplaySemantic("));
+		assertTrue(storage.contains("ResourceLocation semanticIdentity"));
+		assertTrue(collector.contains("semanticIdentity"));
+		assertTrue(rust.contains("recordBlockModelDiagnostic(submit.semanticIdentity()"));
+		assertTrue(rust.contains("BlockModelExecutionDiagnostic"));
+		assertTrue(rust.contains("PendingMeshProducer.ITEM_FRAME_ITEM"));
+		assertTrue(rust.contains("ItemFrameItemExecutionDiagnostic"));
+		assertTrue(renderer.contains("beginItemFrameMapSubmission("));
+		assertTrue(rust.contains("ItemFrameMapExecutionDiagnostic"));
+		assertTrue(rust.contains("recordWholeFrameItemFrameMapExecution("));
+		assertTrue(capture.contains("case \"item-frame\", \"item-frame-invisible\", \"glow-item-frame\", \"glow-item-frame-invisible\", \"item-frame-item\", \"item-frame-map\", \"item-frame-item-rotated\", \"item-frame-map-rotated\", \"item-frame-map-decorated\", \"item-frame-item-invisible\", \"glow-item-frame-item-invisible\", \"glow-item-frame-item\", \"glow-item-frame-map\", \"glow-item-frame-item-rotated\", \"glow-item-frame-map-rotated\", \"item-frame-map-invisible\", \"glow-item-frame-map-invisible\" ->"));
+		assertTrue(capture.contains("new ItemFrame(serverLevel, framePos, facing)"));
+		assertTrue(capture.contains("new GlowItemFrame(serverLevel, framePos, facing)"));
+		assertTrue(capture.contains("case \"glow-item-frame\", \"glow-item-frame-invisible\" -> EntityType.GLOW_ITEM_FRAME"));
+		assertTrue(capture.contains("LightTexture.block(diagnostic.lightCoords()) >= 5"));
+		assertTrue(capture.contains("\"minecraft:diamond\".equals(diagnostic.semanticIdentity())"));
+		assertTrue(capture.contains("MapItem.create(serverLevel"));
+		assertTrue(capture.contains("rustGalWorldItemFrameMapExecutions"));
+		assertTrue(renderer.contains("itemFrameRenderState.rotation"));
+		assertTrue(rust.contains("diagnostic.itemFrameRotation()"));
+		assertTrue(rust.contains("diagnostic.rotation()"));
+		assertTrue(capture.contains("expectedItemFrameRotation()"));
+		assertTrue(renderer.contains("itemFrameRenderState.isInvisible ? 0.5F : 0.4375F"));
+		assertTrue(rust.contains("diagnostic.itemFrameInvisible()"));
+		assertTrue(rust.contains("diagnostic.itemFrameContentOffset()"));
+		assertTrue(rust.contains("diagnostic.invisibleFrame()"));
+		assertTrue(rust.contains("diagnostic.contentOffset()"));
+		assertTrue(mapRenderer.contains("beginItemFrameMapDecorationSubmission("));
+		assertTrue(rust.contains("ItemFrameMapDecorationExecutionDiagnostic"));
+		assertTrue(capture.contains("minecraft:red_x"));
+		assertTrue(capture.contains("itemFrameFixtureJson"));
+		assertTrue(capture.contains("rustGalWorldBlockModels"));
+	}
 
     @Test
     void ironGolemsUseRustBodyRouteWithSeparateFeatureLayers() throws IOException {
@@ -1846,6 +2025,7 @@ class NativeMeshingProductionContractTest {
         int horseEnd = rust.indexOf("\n\tpublic static boolean", horseStart + 1);
         assertFalse(rust.substring(horseStart, horseEnd).contains("state.markings"));
         assertTrue(markings.contains("submitModelSemanticTexture"));
+        assertTrue(markings.contains("getParentModel(horseRenderState)"));
         assertTrue(markings.contains("resourceLocation"));
         assertTrue(rust.contains("textures/entity/horse/horse_"));
     }
@@ -2166,6 +2346,2635 @@ class NativeMeshingProductionContractTest {
     }
 
     @Test
+    void spiderFixtureRequiresDistinctRustBodyAndEyesComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/SpiderEyesLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("enqueueStandaloneTranslucentModelMesh"));
+        assertTrue(layer.contains("SPIDER_EYES_IDENTITY"));
+        assertTrue(layer.contains("spider_eyes"));
+        assertTrue(layer.contains("rust-vulkan-unavailable"));
+        assertTrue(capture.contains("new Spider(EntityType.SPIDER"));
+        assertTrue(capture.contains("spiderFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:spider\", \"minecraft:spider_eyes\")"));
+		assertTrue(rust.contains("MATERIAL_ID_MODEL_EYES"));
+		assertTrue(rust.contains("renderType.pipeline() == RenderPipelines.EYES"));
+        assertTrue(harness.contains("minecraft:textures/entity/spider/spider.png"));
+        assertTrue(harness.contains("minecraft:textures/entity/spider_eyes.png"));
+        assertTrue(harness.contains("base_and_eyes_emission_observed"));
+    }
+
+    @Test
+    void endermanFixtureRequiresDistinctRustBodyAndEyesComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/EnderEyesLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("enqueueStandaloneTranslucentModelMesh"));
+        assertTrue(layer.contains("ENDERMAN_EYES_IDENTITY"));
+        assertTrue(layer.contains("enderman_eyes"));
+        assertTrue(layer.contains("rust-vulkan-unavailable"));
+        assertTrue(capture.contains("new EnderMan(EntityType.ENDERMAN"));
+        assertTrue(capture.contains("endermanFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:enderman\", \"minecraft:enderman_eyes\")"));
+        assertTrue(harness.contains("minecraft:textures/entity/enderman/enderman.png"));
+        assertTrue(harness.contains("minecraft:textures/entity/enderman/enderman_eyes.png"));
+        assertTrue(harness.contains("frozen_enderman_emission_evidence"));
+    }
+
+    @Test
+    void phantomFixtureRequiresDistinctRustBodyAndEyesComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/PhantomEyesLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("enqueueStandaloneTranslucentModelMesh"));
+        assertTrue(layer.contains("PHANTOM_EYES_IDENTITY"));
+        assertTrue(layer.contains("phantom_eyes"));
+        assertTrue(layer.contains("rust-vulkan-unavailable"));
+        assertTrue(capture.contains("new Phantom(EntityType.PHANTOM"));
+        assertTrue(capture.contains("phantomFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:phantom\", \"minecraft:phantom_eyes\")"));
+        assertTrue(harness.contains("minecraft:textures/entity/phantom.png"));
+        assertTrue(harness.contains("minecraft:textures/entity/phantom_eyes.png"));
+        assertTrue(harness.contains("frozen_phantom_emission_evidence"));
+    }
+
+    @Test
+    void creakingFixtureRequiresDistinctRustBodyAndEyesComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/CreakingEyesLayer.java");
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/CreakingRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("new CreakingEyesLayer"));
+        assertTrue(layer.contains("enqueueStandaloneTranslucentModelMesh"));
+        assertTrue(layer.contains("IDENTITY"));
+        assertTrue(layer.contains("creaking_eyes"));
+        assertTrue(layer.contains("rust-vulkan-unavailable"));
+        assertTrue(capture.contains("new Creaking(EntityType.CREAKING"));
+        assertTrue(capture.contains("creakingFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:creaking\", \"minecraft:creaking_eyes\")"));
+        assertTrue(harness.contains("minecraft:textures/entity/creaking/creaking.png"));
+        assertTrue(harness.contains("minecraft:textures/entity/creaking/creaking_eyes.png"));
+        assertTrue(harness.contains("frozen_creaking_emission_evidence"));
+    }
+
+    @Test
+    void breezeFixtureRequiresBodyScrollingWindAndEyesComposition() throws IOException {
+        String wind = source("src/main/java/net/minecraft/client/renderer/entity/layers/BreezeWindLayer.java");
+        String eyes = source("src/main/java/net/minecraft/client/renderer/entity/layers/BreezeEyesLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(wind.contains("enqueueStandaloneScrollingTranslucentModelMesh"));
+        assertTrue(wind.contains("BREEZE_WIND_IDENTITY"));
+        assertTrue(wind.contains("offsetU"));
+        assertTrue(wind.contains("rust-vulkan-unavailable"));
+        assertTrue(eyes.contains("enqueueStandaloneTranslucentModelMesh"));
+        assertTrue(eyes.contains("BREEZE_EYES_IDENTITY"));
+        assertTrue(eyes.contains("rust-vulkan-unavailable"));
+        assertTrue(capture.contains("new Breeze(EntityType.BREEZE"));
+        assertTrue(capture.contains("breezeFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:breeze\", \"minecraft:breeze_wind\")"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:breeze\", \"minecraft:breeze_eyes\")"));
+        assertTrue(harness.contains("minecraft:textures/entity/breeze/breeze.png"));
+        assertTrue(harness.contains("minecraft:textures/entity/breeze/breeze_wind.png"));
+        assertTrue(harness.contains("minecraft:textures/entity/breeze/breeze_eyes.png"));
+        assertTrue(harness.contains("frozen_breeze_emission_evidence"));
+    }
+
+    @Test
+    void boggedFixtureRequiresBodyAndMossOverlayComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/SkeletonClothingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("enqueueStandaloneModelMesh"));
+        assertTrue(layer.contains("BOGGED_OVERLAY_IDENTITY"));
+        assertTrue(layer.contains("bogged_overlay"));
+        assertTrue(layer.contains("rust-vulkan-unavailable"));
+        assertTrue(capture.contains("new Bogged(EntityType.BOGGED"));
+        assertTrue(capture.contains("boggedFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:bogged\", \"minecraft:bogged_overlay\")"));
+        assertTrue(harness.contains("minecraft:textures/entity/skeleton/bogged.png"));
+        assertTrue(harness.contains("minecraft:textures/entity/skeleton/bogged_overlay.png"));
+        assertTrue(harness.contains("frozen_bogged_emission_evidence"));
+    }
+
+    @Test
+    void strayFixtureRequiresBodyAndClothingOverlayComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/SkeletonClothingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("STRAY_OVERLAY_IDENTITY"));
+        assertTrue(layer.contains("enqueueStandaloneModelMesh"));
+        assertTrue(layer.contains("Rust whole-frame stray-overlay route has no copied semantic mesh"));
+        assertTrue(capture.contains("new Stray(EntityType.STRAY"));
+        assertTrue(capture.contains("strayFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:stray\", \"minecraft:stray_overlay\")"));
+        assertTrue(harness.contains("minecraft:textures/entity/skeleton/stray.png"));
+        assertTrue(harness.contains("minecraft:textures/entity/skeleton/stray_overlay.png"));
+        assertTrue(harness.contains("frozen_stray_emission_evidence"));
+    }
+
+    @Test
+    void drownedFixtureRequiresBodyAndOuterLayerComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/DrownedOuterLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("enqueueStandaloneModelMesh"));
+        assertTrue(layer.contains("DROWNED_OUTER_IDENTITY"));
+        assertTrue(layer.contains("Rust whole-frame drowned-outer route has no copied semantic mesh"));
+        assertTrue(capture.contains("new Drowned(EntityType.DROWNED"));
+        assertTrue(capture.contains("drownedFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:drowned\", \"minecraft:drowned_outer\")"));
+        assertTrue(harness.contains("minecraft:textures/entity/zombie/drowned.png"));
+        assertTrue(harness.contains("minecraft:textures/entity/zombie/drowned_outer_layer.png"));
+        assertTrue(harness.contains("frozen_drowned_emission_evidence"));
+    }
+
+    @Test
+    void slimeFixtureRequiresBodyAndTranslucentOuterComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/SlimeOuterLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("enqueueStandaloneModelMesh"));
+        assertTrue(layer.contains("ResourceLocation.withDefaultNamespace(\"slime_outer\")"));
+        assertTrue(layer.contains("j, -1, slimeRenderState.outlineColor"),
+            "the Rust shell must preserve vanilla overlay coordinates and neutral tint");
+        assertTrue(layer.contains("recordModelMeshRouteDecision"));
+        assertTrue(capture.contains("new Slime(EntityType.SLIME"));
+        assertTrue(capture.contains("slime.setSize(2, true)"));
+        assertTrue(capture.contains("slimeFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:slime\", \"minecraft:slime_outer\")"));
+        assertTrue(harness.contains("frozen_slime_emission_evidence"));
+    }
+
+    @Test
+    void catFixtureRequiresTintedCollarComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/CatCollarLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("enqueueStandaloneModelMesh"));
+        assertTrue(layer.contains("ResourceLocation.withDefaultNamespace(\"cat_collar\")"));
+        assertTrue(layer.contains("LivingEntityRenderer.getOverlayCoords(catRenderState, 0.0F), j"));
+        assertTrue(layer.contains("recordModelMeshRouteDecision"));
+        assertTrue(capture.contains("new Cat(EntityType.CAT"));
+        assertTrue(capture.contains("DataComponents.CAT_COLLAR, DyeColor.RED"));
+        assertTrue(capture.contains("catFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:cat\", \"minecraft:cat_collar\")"));
+        assertTrue(harness.contains("frozen_cat_emission_evidence"));
+    }
+
+    @Test
+    void striderFixtureRequiresWarmAdultAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/StriderRenderer.java");
+        String equipment = source("src/main/java/net/minecraft/client/resources/model/EquipmentClientInfo.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.STRIDER_SADDLE"));
+        assertTrue(equipment.contains("textures/entity/equipment/\" + layerType.getSerializedName()"));
+        assertTrue(capture.contains("\"strider-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("strider.setSuffocating(false)"));
+        assertTrue(capture.contains("EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE)"));
+        assertTrue(capture.contains("striderSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/strider_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_strider_saddle_emission_evidence"));
+        assertTrue(harness.contains("strider_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+        assertTrue(harness.contains("-Dmattmc.dev.rustArmorFoil=true"));
+    }
+
+    @Test
+    void pigFixtureRequiresAdultAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/PigRenderer.java");
+        String equipment = source("src/main/java/net/minecraft/client/resources/model/EquipmentClientInfo.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.PIG_SADDLE"));
+        assertTrue(equipment.contains("textures/entity/equipment/\" + layerType.getSerializedName()"));
+        assertTrue(capture.contains("\"pig-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("pig.setBaby(false)"));
+        assertTrue(capture.contains("EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE)"));
+        assertTrue(capture.contains("pigSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/pig_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_pig_saddle_emission_evidence"));
+        assertTrue(harness.contains("pig_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+    }
+
+    @Test
+    void horseFixtureRequiresTamedUnarmoredWhiteAdultAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String equipment = source("src/main/java/net/minecraft/client/resources/model/EquipmentClientInfo.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(equipment.contains("textures/entity/equipment/\" + layerType.getSerializedName()"));
+        assertTrue(capture.contains("\"horse-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horse.setBaby(\"horse-baby-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-diamond-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-copper-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-iron-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gold-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-netherite-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO))"));
+        assertTrue(capture.contains("horse.setTamed(true)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.NONE)"));
+        assertTrue(capture.contains("tag.putInt(\"Variant\", variant.getId() | markings.getId() << 8)"));
+        assertTrue(capture.contains("horse.saveWithoutId(output)"));
+        assertTrue(capture.contains("horse.load(net.minecraft.world.level.storage.TagValueInput.create("));
+        assertTrue(capture.contains("horse.getVariant() == Variant.WHITE"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.NONE"));
+        assertTrue(capture.contains("EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE)"));
+        assertTrue(capture.contains("horseSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+    }
+
+    @Test
+    void babyHorseFixtureRequiresBabyModelsAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horse.setBaby(\"horse-baby-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-diamond-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-copper-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-iron-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gold-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-netherite-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO))"));
+        assertTrue(capture.contains("horseBabySaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_white.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyCreamyHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-creamy-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE)"));
+        assertTrue(capture.contains("horseBabyCreamySaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_creamy.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_creamy_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_creamy_saddle_fixture_equivalence"));
+    }
+    @Test
+    void adultCreamyHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-creamy-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("case \"horse-creamy-saddled\", \"horse-baby-creamy-saddled\""));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.NONE)"));
+        assertTrue(capture.contains("horseCreamySaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_creamy.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_saddle_fixture_equivalence"));
+    }
+    @Test
+    void adultChestnutHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-chestnut-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("case \"horse-chestnut-saddled\", \"horse-baby-chestnut-saddled\""));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE)"));
+        assertTrue(capture.contains("horseChestnutSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_saddle_fixture_equivalence"));
+    }
+    @Test
+    void adultBrownHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-brown-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("case \"horse-brown-saddled\", \"horse-baby-brown-saddled\""));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.NONE)"));
+        assertTrue(capture.contains("horseBrownSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_brown_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_brown_saddle_fixture_equivalence"));
+    }
+    @Test
+    void adultBlackHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-black-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("case \"horse-black-saddled\", \"horse-baby-black-saddled\""));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.NONE)"));
+        assertTrue(capture.contains("horseBlackSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_black_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_black_saddle_fixture_equivalence"));
+    }
+    @Test
+    void adultGrayHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-gray-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("case \"horse-gray-saddled\", \"horse-baby-gray-saddled\""));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.NONE)"));
+        assertTrue(capture.contains("horseGraySaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_gray_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_gray_saddle_fixture_equivalence"));
+    }
+    @Test
+    void adultDarkBrownHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-dark-brown-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("case \"horse-dark-brown-saddled\", \"horse-baby-dark-brown-saddled\""));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.NONE)"));
+        assertTrue(capture.contains("horseDarkBrownSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_dark_brown_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_dark_brown_saddle_fixture_equivalence"));
+    }
+    @Test
+    void babyChestnutHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-chestnut-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.NONE)"));
+        assertTrue(capture.contains("horseBabyChestnutSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_chestnut_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_chestnut_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyBrownHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-brown-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.NONE)"));
+        assertTrue(capture.contains("horseBabyBrownSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_brown_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_brown_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyBlackHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-black-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.NONE)"));
+        assertTrue(capture.contains("horseBabyBlackSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_black_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_black_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyGrayHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-gray-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.NONE)"));
+        assertTrue(capture.contains("horseBabyGraySaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_gray_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_gray_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyDarkBrownHorseFixtureRequiresExactCoatAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-dark-brown-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.NONE)"));
+        assertTrue(capture.contains("horseBabyDarkBrownSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_dark_brown_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_dark_brown_saddle_fixture_equivalence"));
+    }
+
+
+    @Test
+    void donkeyFixtureRequiresTamedUnchestedAdultAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/DonkeyRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("new DonkeyModel"));
+        assertTrue(renderer.contains("new EquineSaddleModel"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.DONKEY_SADDLE"));
+        assertTrue(capture.contains("\"donkey-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel)"));
+        assertTrue(capture.contains("donkey.setBaby(false)"));
+        assertTrue(capture.contains("donkey.setTamed(true)"));
+        assertTrue(capture.contains("donkey.setChest(false)"));
+        assertTrue(capture.contains("donkey.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("donkeySaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/donkey.png"));
+        assertTrue(rust.contains("textures/entity/equipment/donkey_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_donkey_saddle_emission_evidence"));
+        assertTrue(harness.contains("donkey_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyDonkeyFixtureRequiresBabyModelsAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/DonkeyRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.DONKEY_BABY"));
+        assertTrue(renderer.contains("ModelLayers.DONKEY_BABY_SADDLE"));
+        assertTrue(capture.contains("\"donkey-baby-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("donkey.setBaby(true)"));
+        assertTrue(capture.contains("donkey.setTamed(true)"));
+        assertTrue(capture.contains("donkey.setChest(false)"));
+        assertTrue(capture.contains("donkeyBabySaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/donkey.png"));
+        assertTrue(rust.contains("textures/entity/equipment/donkey_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_donkey_baby_saddle_emission_evidence"));
+        assertTrue(harness.contains("donkey_baby_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void chestedDonkeyFixtureRequiresAdultChestGeometryAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/DonkeyRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("new DonkeyModel"));
+        assertTrue(renderer.contains("new EquineSaddleModel"));
+        assertTrue(renderer.contains("donkeyRenderState.hasChest = abstractChestedHorse.hasChest()"));
+        assertTrue(capture.contains("\"donkey-chested-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("Donkey donkey = new Donkey(EntityType.DONKEY, serverLevel)"));
+        assertTrue(capture.contains("donkey.setBaby(false)"));
+        assertTrue(capture.contains("donkey.setTamed(true)"));
+        assertTrue(capture.contains("donkey.setChest(true)"));
+        assertTrue(capture.contains("donkey.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("donkeyChestedSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/donkey.png"));
+        assertTrue(rust.contains("textures/entity/equipment/donkey_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_donkey_chested_saddle_emission_evidence"));
+        assertTrue(harness.contains("donkey_chested_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyChestedDonkeyFixtureRequiresBabyChestGeometryAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/DonkeyRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.DONKEY_BABY"));
+        assertTrue(renderer.contains("ModelLayers.DONKEY_BABY_SADDLE"));
+        assertTrue(renderer.contains("donkeyRenderState.hasChest = abstractChestedHorse.hasChest()"));
+        assertTrue(capture.contains("\"donkey-baby-chested-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("donkey.setBaby(true)"));
+        assertTrue(capture.contains("donkey.setTamed(true)"));
+        assertTrue(capture.contains("donkey.setChest(true)"));
+        assertTrue(capture.contains("donkeyBabyChestedSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/donkey.png"));
+        assertTrue(rust.contains("textures/entity/equipment/donkey_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_donkey_baby_chested_saddle_emission_evidence"));
+        assertTrue(harness.contains("donkey_baby_chested_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void muleFixtureRequiresTamedUnchestedAdultAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/DonkeyRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("new DonkeyModel"));
+        assertTrue(renderer.contains("new EquineSaddleModel"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.MULE_SADDLE"));
+        assertTrue(capture.contains("\"mule-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("Mule mule = new Mule(EntityType.MULE, serverLevel)"));
+        assertTrue(capture.contains("mule.setBaby(false)"));
+        assertTrue(capture.contains("mule.setTamed(true)"));
+        assertTrue(capture.contains("mule.setChest(false)"));
+        assertTrue(capture.contains("mule.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("muleSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/mule.png"));
+        assertTrue(rust.contains("textures/entity/equipment/mule_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_mule_saddle_emission_evidence"));
+        assertTrue(harness.contains("mule_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void chestedMuleFixtureRequiresAdultChestGeometryAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/DonkeyRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("donkeyRenderState.hasChest = abstractChestedHorse.hasChest()"));
+        assertTrue(capture.contains("\"mule-chested-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("mule.setBaby(false)"));
+        assertTrue(capture.contains("mule.setTamed(true)"));
+        assertTrue(capture.contains("mule.setChest(true)"));
+        assertTrue(capture.contains("muleChestedSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/mule.png"));
+        assertTrue(rust.contains("textures/entity/equipment/mule_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_mule_chested_saddle_emission_evidence"));
+        assertTrue(harness.contains("mule_chested_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyChestedMuleFixtureRequiresBabyChestGeometryAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/DonkeyRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(renderer.contains("ModelLayers.MULE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.MULE_BABY_SADDLE"));
+        assertTrue(renderer.contains("donkeyRenderState.hasChest = abstractChestedHorse.hasChest()"));
+        assertTrue(capture.contains("\"mule-baby-chested-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("mule.setBaby(true)"));
+        assertTrue(capture.contains("mule.setChest(true)"));
+        assertTrue(capture.contains("muleBabyChestedSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/mule.png"));
+        assertTrue(rust.contains("textures/entity/equipment/mule_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_mule_baby_chested_saddle_emission_evidence"));
+        assertTrue(harness.contains("mule_baby_chested_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyMuleFixtureRequiresBabyModelsAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/DonkeyRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.MULE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.MULE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"mule-baby-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("mule.setBaby(true)"));
+        assertTrue(capture.contains("mule.setTamed(true)"));
+        assertTrue(capture.contains("mule.setChest(false)"));
+        assertTrue(capture.contains("muleBabySaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/horse/mule.png"));
+        assertTrue(rust.contains("textures/entity/equipment/mule_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_mule_baby_saddle_emission_evidence"));
+        assertTrue(harness.contains("mule_baby_saddle_fixture_equivalence"));
+    }
+
+    @Test
+    void babyDiamondHorseFixtureRequiresBabyBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_ARMOR"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-diamond-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horse.setBaby(\"horse-baby-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-diamond-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-copper-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-iron-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gold-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-netherite-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-creamy-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-chestnut-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-black-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-gray-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO) || \"horse-baby-dark-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO))"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseBabyDiamondEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/diamond.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_diamond_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_diamond_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void diamondHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-diamond-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseDiamondEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/diamond.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_diamond_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_diamond_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+    }
+
+    @Test
+    void creamyDiamondHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-creamy-diamond-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseCreamyDiamondEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/diamond.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_diamond_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_diamond_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-diamond-equipped\": \"horse_creamy_diamond_equipment\""));
+    }
+
+    @Test
+    void babyHorseEquipmentSetupRoutesEachMaterialToItsOwnArmorBranch() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+
+        String diamondAssignment = "horse.setItemSlot(net.minecraft.world.entity.EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_HORSE_ARMOR));";
+        int cursor = 0;
+        int diamondBranches = 0;
+        while ((cursor = capture.indexOf(diamondAssignment, cursor)) >= 0) {
+            int branchStart = capture.lastIndexOf("if (", cursor);
+            String condition = capture.substring(branchStart, cursor);
+            assertFalse(condition.contains("horse-baby-copper-equipped"));
+            assertFalse(condition.contains("horse-baby-iron-equipped"));
+            assertFalse(condition.contains("horse-baby-gold-equipped"));
+            assertFalse(condition.contains("horse-baby-netherite-equipped"));
+            assertFalse(condition.contains("horse-baby-dyed-leather-equipped"));
+            diamondBranches++;
+            cursor += diamondAssignment.length();
+        }
+        assertTrue(diamondBranches == 2);
+        assertTrue(capture.contains("\"horse-baby-copper-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-copper-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("\"horse-baby-iron-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-iron-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("\"horse-baby-gold-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-gold-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("\"horse-baby-netherite-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-netherite-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("\"horse-baby-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO) || \"horse-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO)"));
+    }
+
+    @Test
+    void chestnutDiamondHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-chestnut-diamond-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.DIAMOND_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseChestnutDiamondEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/diamond.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_diamond_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_diamond_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-diamond-equipped\": \"horse_chestnut_diamond_equipment\""));
+    }
+
+    @Test
+    void chestnutCopperHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-chestnut-copper-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.COPPER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.COPPER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseChestnutCopperEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/copper.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_copper_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_copper_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-copper-equipped\": \"horse_chestnut_copper_equipment\""));
+    }
+
+    @Test
+    void chestnutIronHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-chestnut-iron-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.IRON_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.IRON_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseChestnutIronEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/iron.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_iron_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_iron_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-iron-equipped\": \"horse_chestnut_iron_equipment\""));
+    }
+
+    @Test
+    void chestnutGoldHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-chestnut-gold-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.GOLDEN_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.GOLDEN_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseChestnutGoldEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/gold.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_gold_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_gold_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-gold-equipped\": \"horse_chestnut_gold_equipment\""));
+    }
+
+    @Test
+    void chestnutNetheriteHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-chestnut-netherite-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.NETHERITE_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.NETHERITE_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseChestnutNetheriteEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/netherite.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_netherite_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_netherite_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-netherite-equipped\": \"horse_chestnut_netherite_equipment\""));
+    }
+
+    @Test
+    void creamyCopperHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-creamy-copper-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.COPPER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.COPPER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseCreamyCopperEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/copper.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_copper_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_copper_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-copper-equipped\": \"horse_creamy_copper_equipment\""));
+    }
+
+    @Test
+    void creamyIronHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-creamy-iron-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.IRON_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.IRON_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseCreamyIronEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/iron.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_iron_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_iron_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-iron-equipped\": \"horse_creamy_iron_equipment\""));
+    }
+
+    @Test
+    void creamyGoldHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-creamy-gold-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.GOLDEN_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.GOLDEN_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseCreamyGoldEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/gold.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_gold_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_gold_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-gold-equipped\": \"horse_creamy_gold_equipment\""));
+    }
+
+    @Test
+    void creamyNetheriteHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-creamy-netherite-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.NETHERITE_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.NETHERITE_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseCreamyNetheriteEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/netherite.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_netherite_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_netherite_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-netherite-equipped\": \"horse_creamy_netherite_equipment\""));
+    }
+
+    @Test
+    void babyCopperHorseFixtureRequiresBabyBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_ARMOR"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-copper-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.COPPER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseBabyCopperEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/copper.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_copper_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_copper_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void copperHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-copper-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.COPPER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.COPPER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseCopperEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/copper.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_copper_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_copper_equipment_fixture_equivalence"));
+		assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+    }
+
+    @Test
+    void babyIronHorseFixtureRequiresBabyBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_ARMOR"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-iron-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.IRON_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseBabyIronEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/iron.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_iron_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_iron_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void ironHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-iron-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.IRON_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.IRON_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseIronEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/iron.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_iron_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_iron_equipment_fixture_equivalence"));
+		assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+    }
+
+    @Test
+    void babyGoldHorseFixtureRequiresBabyBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_ARMOR"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-gold-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.GOLDEN_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseBabyGoldEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/gold.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_gold_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_gold_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void goldHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-gold-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.GOLDEN_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.GOLDEN_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseGoldEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/gold.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_gold_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_gold_equipment_fixture_equivalence"));
+		assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+    }
+
+    @Test
+    void babyNetheriteHorseFixtureRequiresBabyBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_ARMOR"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-netherite-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.NETHERITE_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseBabyNetheriteEquipmentFixtureJson"));
+        assertTrue(capture.contains("!\"horse-baby-copper-equipped\".equals(MODEL_MESH_SCENARIO) && !\"horse-baby-iron-equipped\".equals(MODEL_MESH_SCENARIO) && !\"horse-baby-gold-equipped\".equals(MODEL_MESH_SCENARIO) && !\"horse-baby-netherite-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/netherite.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_netherite_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_netherite_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void netheriteHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-netherite-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.NETHERITE_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.NETHERITE_HORSE_ARMOR)"));
+        assertTrue(capture.contains("horseNetheriteEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/netherite.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_netherite_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_netherite_equipment_fixture_equivalence"));
+		assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+    }
+
+    @Test
+    void babyDyedLeatherHorseFixtureRequiresBabyBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_ARMOR"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(capture.contains("\"horse-baby-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("new ItemStack(Items.LEATHER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, leatherArmor"));
+        assertTrue(capture.contains("clientBodyDyeRgb"));
+        assertTrue(capture.contains("0x3366CC"));
+        assertTrue(capture.contains("horseBabyDyedLeatherEquipmentFixtureJson"));
+        assertTrue(capture.contains("!\"horse-baby-netherite-equipped\".equals(MODEL_MESH_SCENARIO) && !\"horse-baby-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/leather.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_dyed_leather_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_dyed_leather_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void babyMarkedHorseFixtureRequiresBabyMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-baby-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-marked-saddled\": \"horse_baby_marked_saddle\""));
+        assertTrue(harness.contains("else \"marking\" if scenario_name in {\"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\"}"));
+    }
+
+    @Test
+    void adultWhiteDotsMarkedHorseFixtureRequiresAdultMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-white-dots-marked-saddled\": \"horse_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultCreamyWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-creamy-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseCreamyWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_creamy.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-white-dots-marked-saddled\": \"horse_creamy_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultBrownWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseBrownWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_brown_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_brown_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-brown-white-dots-marked-saddled\": \"horse_brown_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultBlackWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-black-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseBlackWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_black_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_black_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-black-white-dots-marked-saddled\": \"horse_black_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultGrayWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-gray-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseGrayWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_gray_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_gray_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-gray-white-dots-marked-saddled\": \"horse_gray_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultDarkBrownWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-dark-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseDarkBrownWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_dark_brown_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_dark_brown_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-dark-brown-white-dots-marked-saddled\": \"horse_dark_brown_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultChestnutWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-chestnut-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseChestnutWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-white-dots-marked-saddled\": \"horse_chestnut_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultCreamyWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-creamy-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseCreamyWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_creamy.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-white-marked-saddled\": \"horse_creamy_white_marked_saddle\""));
+    }
+
+    @Test
+    void adultBrownWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseBrownWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_brown_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_brown_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-brown-white-marked-saddled\": \"horse_brown_white_marked_saddle\""));
+    }
+
+    @Test
+    void adultBlackWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-black-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseBlackWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_black_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_black_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-black-white-marked-saddled\": \"horse_black_white_marked_saddle\""));
+    }
+
+    @Test
+    void adultGrayWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-gray-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseGrayWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_gray_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_gray_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-gray-white-marked-saddled\": \"horse_gray_white_marked_saddle\""));
+    }
+
+    @Test
+    void adultDarkBrownWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-dark-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseDarkBrownWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_dark_brown_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_dark_brown_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-dark-brown-white-marked-saddled\": \"horse_dark_brown_white_marked_saddle\""));
+    }
+
+    @Test
+    void adultChestnutWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-chestnut-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseChestnutWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-white-marked-saddled\": \"horse_chestnut_white_marked_saddle\""));
+    }
+
+    @Test
+    void adultCreamyWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-creamy-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseCreamyWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_creamy.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-white-field-marked-saddled\": \"horse_creamy_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void adultBrownWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseBrownWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_brown_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_brown_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-brown-white-field-marked-saddled\": \"horse_brown_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void adultBlackWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-black-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseBlackWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_black_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_black_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-black-white-field-marked-saddled\": \"horse_black_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void adultGrayWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-gray-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseGrayWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_gray_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_gray_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-gray-white-field-marked-saddled\": \"horse_gray_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void adultDarkBrownWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-dark-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseDarkBrownWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_dark_brown_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_dark_brown_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-dark-brown-white-field-marked-saddled\": \"horse_dark_brown_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void adultChestnutWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-chestnut-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseChestnutWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-white-field-marked-saddled\": \"horse_chestnut_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void adultCreamyBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-creamy-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseCreamyBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_creamy.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-black-dots-marked-saddled\": \"horse_creamy_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultBrownBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseBrownBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_brown_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_brown_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-brown-black-dots-marked-saddled\": \"horse_brown_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultBlackBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-black-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseBlackBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_black_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_black_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-black-black-dots-marked-saddled\": \"horse_black_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultGrayBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-gray-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseGrayBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_gray_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_gray_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-gray-black-dots-marked-saddled\": \"horse_gray_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultDarkBrownBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-dark-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseDarkBrownBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_dark_brown_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_dark_brown_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-dark-brown-black-dots-marked-saddled\": \"horse_dark_brown_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void everyNonWhiteMarkedHorseFixtureSelectsItsExactCoatTexture() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        int selectorStart = capture.indexOf("private static String expectedModelMeshTextureId()");
+        int selectorEnd = capture.indexOf("private static String expectedModelMeshDiagnosticTextureId()", selectorStart);
+        assertTrue(selectorStart >= 0 && selectorEnd > selectorStart);
+        String selector = capture.substring(selectorStart, selectorEnd);
+        String[][] coats = {
+            {"creamy", "horse_creamy.png"}, {"chestnut", "horse_chestnut.png"},
+            {"brown", "horse_brown.png"}, {"black", "horse_black.png"},
+            {"gray", "horse_gray.png"}, {"dark-brown", "horse_darkbrown.png"}
+        };
+        String[] markings = {"white-dots", "white", "white-field", "black-dots"};
+        for (String[] coat : coats) {
+            String texture = "minecraft:textures/entity/horse/" + coat[1];
+            for (String agePrefix : new String[] {"horse-", "horse-baby-"}) {
+                for (String marking : markings) {
+                    String scenario = agePrefix + coat[0] + "-" + marking + "-marked-saddled";
+                    assertTrue(selector.lines().anyMatch(line -> line.contains("\"" + scenario + "\"")
+                        && line.contains("-> \"" + texture + "\";")), scenario + " must select " + texture);
+                }
+            }
+        }
+    }
+
+    @Test
+    void adultChestnutBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-chestnut-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseChestnutBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-black-dots-marked-saddled\": \"horse_chestnut_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void adultWhiteMarkedHorseFixtureRequiresAdultMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-white-marked-saddled\": \"horse_white_marked_saddle\""));
+    }
+
+    @Test
+    void adultWhiteFieldMarkedHorseFixtureRequiresAdultMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-white-field-marked-saddled\": \"horse_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void adultBlackDotsMarkedHorseFixtureRequiresAdultMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("horseBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-black-dots-marked-saddled\": \"horse_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void babyCreamyWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-baby-creamy-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyCreamyWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_creamy.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_creamy_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_creamy_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-creamy-white-dots-marked-saddled\": \"horse_baby_creamy_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void babyCreamyWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+		assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-baby-creamy-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyCreamyWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_creamy.png"));
+		assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_creamy_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_creamy_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-creamy-white-marked-saddled\": \"horse_baby_creamy_white_marked_saddle\""));
+    }
+
+    @Test
+    void babyCreamyWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-baby-creamy-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.WHITE_FIELD)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_FIELD"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyCreamyWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_creamy.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_creamy_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_creamy_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-creamy-white-field-marked-saddled\": \"horse_baby_creamy_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void babyCreamyBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-baby-creamy-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CREAMY, Markings.BLACK_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.BLACK_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyCreamyBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_creamy.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_creamy_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_creamy_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-creamy-black-dots-marked-saddled\": \"horse_baby_creamy_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void babyChestnutWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-baby-chestnut-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyChestnutWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_chestnut_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_chestnut_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-chestnut-white-dots-marked-saddled\": \"horse_baby_chestnut_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void babyChestnutWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-baby-chestnut-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyChestnutWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_chestnut_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_chestnut_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-chestnut-white-marked-saddled\": \"horse_baby_chestnut_white_marked_saddle\""));
+    }
+
+    @Test
+    void babyChestnutWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-baby-chestnut-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.WHITE_FIELD)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_FIELD"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyChestnutWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_chestnut_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_chestnut_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-chestnut-white-field-marked-saddled\": \"horse_baby_chestnut_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void babyChestnutBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-baby-chestnut-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.CHESTNUT, Markings.BLACK_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.BLACK_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyChestnutBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_chestnut.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_chestnut_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_chestnut_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-chestnut-black-dots-marked-saddled\": \"horse_baby_chestnut_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void babyBlackWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-baby-black-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyBlackWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_black_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_black_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-black-white-dots-marked-saddled\": \"horse_baby_black_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void babyBlackWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-baby-black-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyBlackWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_black_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_black_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-black-white-marked-saddled\": \"horse_baby_black_white_marked_saddle\""));
+    }
+
+    @Test
+    void babyBlackWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-baby-black-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.WHITE_FIELD)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_FIELD"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyBlackWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_black_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_black_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-black-white-field-marked-saddled\": \"horse_baby_black_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void babyBlackBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-baby-black-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BLACK, Markings.BLACK_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.BLACK_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyBlackBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_black.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_black_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_black_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-black-black-dots-marked-saddled\": \"horse_baby_black_black_dots_marked_saddle\""));
+    }
+    @Test
+    void babyGrayWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-baby-gray-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyGrayWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_gray_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_gray_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-gray-white-dots-marked-saddled\": \"horse_baby_gray_white_dots_marked_saddle\""));
+    }
+    @Test
+    void babyGrayWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-baby-gray-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyGrayWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_gray_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_gray_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-gray-white-marked-saddled\": \"horse_baby_gray_white_marked_saddle\""));
+    }
+    @Test
+    void babyGrayWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-baby-gray-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.WHITE_FIELD)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_FIELD"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyGrayWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_gray_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_gray_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-gray-white-field-marked-saddled\": \"horse_baby_gray_white_field_marked_saddle\""));
+    }
+    @Test
+    void babyGrayBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-baby-gray-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.GRAY, Markings.BLACK_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.BLACK_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyGrayBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_gray.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_gray_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_gray_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-gray-black-dots-marked-saddled\": \"horse_baby_gray_black_dots_marked_saddle\""));
+    }
+    @Test
+    void babyDarkBrownWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-baby-dark-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyDarkBrownWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_dark_brown_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_dark_brown_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-dark-brown-white-dots-marked-saddled\": \"horse_baby_dark_brown_white_dots_marked_saddle\""));
+    }
+    @Test
+    void babyDarkBrownWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-baby-dark-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyDarkBrownWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_dark_brown_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_dark_brown_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-dark-brown-white-marked-saddled\": \"horse_baby_dark_brown_white_marked_saddle\""));
+    }
+    @Test
+    void babyDarkBrownWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-baby-dark-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.WHITE_FIELD)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_FIELD"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyDarkBrownWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_dark_brown_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_dark_brown_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-dark-brown-white-field-marked-saddled\": \"horse_baby_dark_brown_white_field_marked_saddle\""));
+    }
+    @Test
+    void babyDarkBrownBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-baby-dark-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.DARK_BROWN, Markings.BLACK_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.BLACK_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyDarkBrownBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_darkbrown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_dark_brown_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_dark_brown_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-dark-brown-black-dots-marked-saddled\": \"horse_baby_dark_brown_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void babyBrownWhiteDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitedots.png"));
+        assertTrue(capture.contains("\"horse-baby-brown-white-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyBrownWhiteDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitedots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_brown_white_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_brown_white_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-brown-white-dots-marked-saddled\": \"horse_baby_brown_white_dots_marked_saddle\""));
+    }
+
+    @Test
+    void babyBrownWhiteMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-baby-brown-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyBrownWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_brown_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_brown_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-brown-white-marked-saddled\": \"horse_baby_brown_white_marked_saddle\""));
+    }
+
+    @Test
+    void babyBrownWhiteFieldMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-baby-brown-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.WHITE_FIELD)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_FIELD"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyBrownWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_brown_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_brown_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-brown-white-field-marked-saddled\": \"horse_baby_brown_white_field_marked_saddle\""));
+    }
+
+    @Test
+    void babyBrownBlackDotsMarkedHorseFixtureRequiresCoatMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-baby-brown-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.BROWN, Markings.BLACK_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.BLACK_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyBrownBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_brown.png"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_brown_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_brown_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-brown-black-dots-marked-saddled\": \"horse_baby_brown_black_dots_marked_saddle\""));
+    }
+
+    @Test
+    void babyWhiteMarkedHorseFixtureRequiresBabyMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_white.png"));
+        assertTrue(capture.contains("\"horse-baby-white-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyWhiteMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_white.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_white_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_white_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-white-marked-saddled\": \"horse_baby_white_marked_saddle\""));
+        assertTrue(harness.contains("else \"marking\" if scenario_name in {\"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\"}"));
+    }
+
+    @Test
+    void babyWhiteFieldMarkedHorseFixtureRequiresBabyMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_whitefield.png"));
+        assertTrue(capture.contains("\"horse-baby-white-field-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.WHITE_FIELD)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.WHITE_FIELD"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyWhiteFieldMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_whitefield.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_white_field_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_white_field_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-white-field-marked-saddled\": \"horse_baby_white_field_marked_saddle\""));
+        assertTrue(harness.contains("else \"marking\" if scenario_name in {\"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\"}"));
+    }
+
+    @Test
+    void babyBlackDotsMarkedHorseFixtureRequiresBabyMarkingAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String markingLayer = source("src/main/java/net/minecraft/client/renderer/entity/layers/HorseMarkingLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String worldRenderer = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY"));
+        assertTrue(renderer.contains("ModelLayers.HORSE_BABY_SADDLE"));
+        assertTrue(markingLayer.contains("horse_markings_blackdots.png"));
+        assertTrue(capture.contains("\"horse-baby-black-dots-marked-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("configureHorseVariantAndMarkings(horse, Variant.WHITE, Markings.BLACK_DOTS)"));
+        assertTrue(capture.contains("horse.getMarkings() == Markings.BLACK_DOTS"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().isEmpty()"));
+        assertTrue(capture.contains("horseBabyBlackDotsMarkedSaddleFixtureJson"));
+        assertTrue(worldRenderer.contains("textures/entity/horse/horse_markings_blackdots.png"));
+        assertTrue(worldRenderer.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_baby_black_dots_marked_saddle_emission_evidence"));
+        assertTrue(harness.contains("horse_baby_black_dots_marked_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-baby-black-dots-marked-saddled\": \"horse_baby_black_dots_marked_saddle\""));
+        assertTrue(harness.contains("else \"marking\" if scenario_name in {\"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\"}"));
+    }
+
+    @Test
+    void dyedLeatherHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("new ItemStack(Items.LEATHER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, leatherArmor"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.LEATHER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("clientBodyDyeRgb"));
+        assertTrue(capture.contains("0x3366CC"));
+        assertTrue(capture.contains("horseDyedLeatherEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/leather.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_dyed_leather_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_dyed_leather_equipment_fixture_equivalence"));
+		assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+    }
+
+    @Test
+    void creamyDyedLeatherHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-creamy-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("new ItemStack(Items.LEATHER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, leatherArmor"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.LEATHER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("clientBodyDyeRgb"));
+        assertTrue(capture.contains("0x3366CC"));
+        assertTrue(capture.contains("horseCreamyDyedLeatherEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/leather.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_creamy_dyed_leather_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_creamy_dyed_leather_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-creamy-dyed-leather-equipped\": \"horse_creamy_dyed_leather_equipment\""));
+    }
+
+    @Test
+    void chestnutDyedLeatherHorseFixtureRequiresExactBodyArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/HorseRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.HORSE_SADDLE"));
+        assertTrue(capture.contains("\"horse-chestnut-dyed-leather-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("new ItemStack(Items.LEATHER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, leatherArmor"));
+        assertTrue(capture.contains("horse.getBodyArmorItem().is(Items.LEATHER_HORSE_ARMOR)"));
+        assertTrue(capture.contains("clientBodyDyeRgb"));
+        assertTrue(capture.contains("0x3366CC"));
+        assertTrue(capture.contains("horseChestnutDyedLeatherEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_body/leather.png"));
+        assertTrue(rust.contains("textures/entity/equipment/horse_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_horse_chestnut_dyed_leather_equipment_emission_evidence"));
+        assertTrue(harness.contains("horse_chestnut_dyed_leather_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("\"horse-chestnut-dyed-leather-equipped\": \"horse_chestnut_dyed_leather_equipment\""));
+    }
+
+    @Test
+    void camelFixtureRequiresStableStandingAdultAndExactSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/CamelRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.CAMEL_SADDLE"));
+        assertTrue(renderer.contains("new CamelSaddleModel"));
+        assertTrue(capture.contains("\"camel-saddled\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("camel.standUpInstantly()"));
+        assertTrue(capture.contains("camel.setDashing(false)"));
+        assertTrue(capture.contains("camel.getJumpCooldown() == 0"));
+        assertTrue(capture.contains("camelSaddleFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/camel_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_camel_saddle_emission_evidence"));
+        assertTrue(harness.contains("camel_saddle_fixture_equivalence"));
+        assertTrue(harness.contains("args.world_mesh_model_scenario in {\"pig-saddled\", \"horse-saddled\", \"horse-creamy-saddled\", \"horse-chestnut-saddled\", \"horse-brown-saddled\", \"horse-black-saddled\", \"horse-gray-saddled\", \"horse-dark-brown-saddled\", \"horse-baby-saddled\", \"horse-baby-creamy-saddled\", \"horse-baby-chestnut-saddled\", \"horse-baby-brown-saddled\", \"horse-baby-black-saddled\", \"horse-baby-gray-saddled\", \"horse-baby-dark-brown-saddled\", \"horse-baby-diamond-equipped\", \"horse-baby-copper-equipped\", \"horse-baby-iron-equipped\", \"horse-baby-gold-equipped\", \"horse-baby-netherite-equipped\", \"horse-baby-dyed-leather-equipped\", \"horse-white-dots-marked-saddled\", \"horse-white-marked-saddled\", \"horse-white-field-marked-saddled\", \"horse-black-dots-marked-saddled\", \"horse-creamy-white-dots-marked-saddled\", \"horse-brown-white-dots-marked-saddled\", \"horse-black-white-dots-marked-saddled\", \"horse-gray-white-dots-marked-saddled\", \"horse-dark-brown-white-dots-marked-saddled\", \"horse-chestnut-white-dots-marked-saddled\", \"horse-creamy-white-marked-saddled\", \"horse-brown-white-marked-saddled\", \"horse-black-white-marked-saddled\", \"horse-gray-white-marked-saddled\", \"horse-dark-brown-white-marked-saddled\", \"horse-chestnut-white-marked-saddled\", \"horse-creamy-white-field-marked-saddled\", \"horse-brown-white-field-marked-saddled\", \"horse-black-white-field-marked-saddled\", \"horse-gray-white-field-marked-saddled\", \"horse-dark-brown-white-field-marked-saddled\", \"horse-chestnut-white-field-marked-saddled\", \"horse-creamy-black-dots-marked-saddled\", \"horse-brown-black-dots-marked-saddled\", \"horse-black-black-dots-marked-saddled\", \"horse-gray-black-dots-marked-saddled\", \"horse-dark-brown-black-dots-marked-saddled\", \"horse-chestnut-black-dots-marked-saddled\", \"horse-baby-marked-saddled\", \"horse-baby-white-marked-saddled\", \"horse-baby-white-field-marked-saddled\", \"horse-baby-black-dots-marked-saddled\", \"horse-baby-creamy-white-dots-marked-saddled\", \"horse-baby-creamy-white-marked-saddled\", \"horse-baby-creamy-white-field-marked-saddled\", \"horse-baby-creamy-black-dots-marked-saddled\", \"horse-baby-chestnut-white-dots-marked-saddled\", \"horse-baby-chestnut-white-marked-saddled\", \"horse-baby-chestnut-white-field-marked-saddled\", \"horse-baby-chestnut-black-dots-marked-saddled\", \"horse-baby-black-white-dots-marked-saddled\", \"horse-baby-black-white-marked-saddled\", \"horse-baby-black-white-field-marked-saddled\", \"horse-baby-black-black-dots-marked-saddled\", \"horse-baby-gray-white-dots-marked-saddled\", \"horse-baby-gray-white-marked-saddled\", \"horse-baby-gray-white-field-marked-saddled\", \"horse-baby-gray-black-dots-marked-saddled\", \"horse-baby-dark-brown-white-dots-marked-saddled\", \"horse-baby-dark-brown-white-marked-saddled\", \"horse-baby-dark-brown-white-field-marked-saddled\", \"horse-baby-dark-brown-black-dots-marked-saddled\", \"horse-baby-brown-white-dots-marked-saddled\", \"horse-baby-brown-white-marked-saddled\", \"horse-baby-brown-white-field-marked-saddled\", \"horse-baby-brown-black-dots-marked-saddled\", \"horse-diamond-equipped\", \"horse-creamy-diamond-equipped\", \"horse-chestnut-diamond-equipped\", \"horse-chestnut-copper-equipped\", \"horse-chestnut-iron-equipped\", \"horse-chestnut-gold-equipped\", \"horse-chestnut-netherite-equipped\", \"horse-creamy-copper-equipped\", \"horse-creamy-iron-equipped\", \"horse-creamy-gold-equipped\", \"horse-creamy-netherite-equipped\", \"horse-copper-equipped\", \"horse-iron-equipped\", \"horse-gold-equipped\", \"horse-netherite-equipped\", \"horse-dyed-leather-equipped\", \"horse-creamy-dyed-leather-equipped\", \"horse-chestnut-dyed-leather-equipped\", \"donkey-saddled\", \"donkey-baby-saddled\", \"donkey-chested-saddled\", \"donkey-baby-chested-saddled\", \"mule-saddled\", \"mule-chested-saddled\", \"mule-baby-chested-saddled\", \"mule-baby-saddled\", \"strider-saddled\", \"camel-saddled\", \"nautilus-equipped\", \"nautilus-baby-equipped\", \"nautilus-copper-equipped\", \"nautilus-iron-equipped\", \"nautilus-gold-equipped\", \"nautilus-netherite-equipped\", \"zombie-nautilus-equipped\", \"zombie-nautilus-coral-equipped\"}"));
+    }
+
+    @Test
+    void nautilusFixtureRequiresAdultTameDiamondArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/NautilusRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.NAUTILUS_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.NAUTILUS_SADDLE"));
+        assertTrue(renderer.contains("new NautilusArmorModel"));
+        assertTrue(renderer.contains("new NautilusSaddleModel"));
+        assertTrue(capture.contains("\"nautilus-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("nautilus.setTame(true, true)"));
+        assertTrue(capture.contains("EquipmentSlot.BODY, new ItemStack(Items.DIAMOND_NAUTILUS_ARMOR)"));
+        assertTrue(capture.contains("EquipmentSlot.SADDLE, new ItemStack(Items.SADDLE)"));
+        assertTrue(capture.contains("nautilusEquipmentFixtureJson"));
+        assertTrue(rust.contains("textures/entity/equipment/nautilus_body/diamond.png"));
+        assertTrue(rust.contains("textures/entity/equipment/nautilus_saddle/saddle.png"));
+        assertTrue(harness.contains("frozen_nautilus_equipment_emission_evidence"));
+        assertTrue(harness.contains("nautilus_equipment_fixture_equivalence"));
+        assertTrue(harness.contains("additional_composition_layer_identities = [layer_identity]"));
+    }
+
+    @Test
+    void babyNautilusFixtureRequiresBabyModelTextureAndEquipmentComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/NautilusRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("ModelLayers.NAUTILUS_BABY"));
+        assertTrue(renderer.contains("textures/entity/nautilus/nautilus_baby.png"));
+        assertTrue(capture.contains("\"nautilus-baby-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("nautilusBabyEquipmentFixtureJson"));
+        assertTrue(rust.contains("minecraft:textures/entity/nautilus/nautilus_baby.png"));
+        assertTrue(harness.contains("frozen_nautilus_baby_equipment_emission_evidence"));
+        assertTrue(harness.contains("nautilus_baby_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void copperNautilusFixtureRequiresExactArmorItemTextureAndComposition() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(capture.contains("\"nautilus-copper-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("Items.COPPER_NAUTILUS_ARMOR"));
+        assertTrue(capture.contains("nautilusCopperEquipmentFixtureJson"));
+        assertTrue(rust.contains("minecraft:textures/entity/equipment/nautilus_body/copper.png"));
+        assertTrue(harness.contains("frozen_nautilus_copper_equipment_emission_evidence"));
+        assertTrue(harness.contains("nautilus_copper_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void ironNautilusFixtureRequiresExactArmorItemTextureAndComposition() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(capture.contains("\"nautilus-iron-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("Items.IRON_NAUTILUS_ARMOR"));
+        assertTrue(capture.contains("nautilusIronEquipmentFixtureJson"));
+        assertTrue(rust.contains("minecraft:textures/entity/equipment/nautilus_body/iron.png"));
+        assertTrue(harness.contains("frozen_nautilus_iron_equipment_emission_evidence"));
+        assertTrue(harness.contains("nautilus_iron_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void goldNautilusFixtureRequiresGoldenItemAndGoldTextureComposition() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(capture.contains("\"nautilus-gold-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("Items.GOLDEN_NAUTILUS_ARMOR"));
+        assertTrue(capture.contains("nautilusGoldEquipmentFixtureJson"));
+        assertTrue(rust.contains("minecraft:textures/entity/equipment/nautilus_body/gold.png"));
+        assertTrue(harness.contains("minecraft:golden_nautilus_armor"));
+        assertTrue(harness.contains("frozen_nautilus_gold_equipment_emission_evidence"));
+        assertTrue(harness.contains("nautilus_gold_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void netheriteNautilusFixtureRequiresNetheriteItemAndTextureComposition() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(capture.contains("\"nautilus-netherite-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("Items.NETHERITE_NAUTILUS_ARMOR"));
+        assertTrue(capture.contains("nautilusNetheriteEquipmentFixtureJson"));
+        assertTrue(rust.contains("minecraft:textures/entity/equipment/nautilus_body/netherite.png"));
+        assertTrue(harness.contains("minecraft:netherite_nautilus_armor"));
+        assertTrue(harness.contains("frozen_nautilus_netherite_equipment_emission_evidence"));
+        assertTrue(harness.contains("nautilus_netherite_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void zombieNautilusFixtureRequiresTemperateAdultDiamondArmorAndSaddleComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/ZombieNautilusRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.NAUTILUS_BODY"));
+        assertTrue(renderer.contains("EquipmentClientInfo.LayerType.NAUTILUS_SADDLE"));
+        assertTrue(capture.contains("\"zombie-nautilus-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("ZombieNautilusVariants.TEMPERATE"));
+        assertTrue(capture.contains("zombieNautilusEquipmentFixtureJson"));
+        assertTrue(rust.contains("minecraft:textures/entity/nautilus/zombie_nautilus.png"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:zombie_nautilus\", \"minecraft:zombie_nautilus\""));
+        assertTrue(harness.contains("frozen_zombie_nautilus_equipment_emission_evidence"));
+        assertTrue(harness.contains("zombie_nautilus_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void coralZombieNautilusFixtureRequiresWarmVariantModelAndEquipmentComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/entity/ZombieNautilusRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(renderer.contains("new ZombieNautilusCoralModel"));
+        assertTrue(renderer.contains("ModelType.WARM"));
+        assertTrue(capture.contains("\"zombie-nautilus-coral-equipped\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("ZombieNautilusVariants.WARM"));
+        assertTrue(capture.contains("zombieNautilusCoralEquipmentFixtureJson"));
+        assertTrue(rust.contains("minecraft:textures/entity/nautilus/zombie_nautilus_coral.png"));
+        assertTrue(harness.contains("frozen_zombie_nautilus_coral_equipment_emission_evidence"));
+        assertTrue(harness.contains("zombie_nautilus_coral_equipment_fixture_equivalence"));
+    }
+
+    @Test
+    void wolfCollarFixtureRequiresTintedUnarmoredComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/WolfCollarLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("enqueueStandaloneModelMesh"));
+        assertTrue(layer.contains("ResourceLocation.withDefaultNamespace(\"wolf_collar\")"));
+        assertTrue(layer.contains("OverlayTexture.NO_OVERLAY, j, wolfRenderState.outlineColor"));
+        assertTrue(layer.contains("recordModelMeshRouteDecision"));
+        assertTrue(capture.contains("\"wolf-collar\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("DataComponents.WOLF_COLLAR, DyeColor.RED"));
+        assertTrue(capture.contains("wolfCollarFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:wolf\", \"minecraft:wolf_collar\")"));
+        assertTrue(harness.contains("frozen_wolf_collar_emission_evidence"));
+    }
+
+    @Test
+    void ironGolemHighCracksRequireBodyAndOverlayComposition() throws IOException {
+        String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/IronGolemCrackinessLayer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+
+        assertTrue(layer.contains("enqueueStandaloneModelMesh"));
+        assertTrue(layer.contains("ResourceLocation.withDefaultNamespace(\"iron_golem_cracks\")"));
+        assertTrue(layer.contains("LivingEntityRenderer.getOverlayCoords(ironGolemRenderState, 0.0F), -1"));
+        assertTrue(layer.contains("Rust whole-frame iron-golem-cracks route has no copied semantic mesh"));
+        assertTrue(capture.contains("new IronGolem(EntityType.IRON_GOLEM"));
+        assertTrue(capture.contains("Crackiness.Level.HIGH"));
+        assertTrue(capture.contains("ironGolemCracksFixtureJson"));
+        assertTrue(rust.contains("new ModelComposition(\"minecraft:iron_golem\", \"minecraft:iron_golem_cracks\")"));
+        assertTrue(harness.contains("frozen_iron_golem_cracks_emission_evidence"));
+    }
+
+    @Test
     void stuckInBodyProjectileLayersRetainExplicitTextureIdentity() throws IOException {
         String layer = source("src/main/java/net/minecraft/client/renderer/entity/layers/StuckInBodyLayer.java");
         String bee = source("src/main/java/net/minecraft/client/renderer/entity/layers/BeeStingerLayer.java");
@@ -2253,12 +5062,18 @@ class NativeMeshingProductionContractTest {
         String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
         String enchant = source("src/main/java/net/minecraft/client/renderer/blockentity/EnchantTableRenderer.java");
         String lectern = source("src/main/java/net/minecraft/client/renderer/blockentity/LecternRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
         assertTrue(rust.contains("model instanceof net.minecraft.client.model.BookModel"));
         assertTrue(level.contains("EnchantTableRenderState"));
         assertTrue(level.contains("LecternRenderState"));
         assertTrue(level.contains("enchanting_table_book"));
         assertTrue(enchant.contains("BOOK_LOCATION"));
         assertTrue(lectern.contains("EnchantTableRenderer.BOOK_LOCATION"));
+        assertTrue(capture.contains("case \"enchanting-table\" -> Blocks.ENCHANTING_TABLE.defaultBlockState()"));
+        assertTrue(capture.contains("case \"enchanting-table\", \"lectern\" -> \"minecraft:entity/enchanting_table_book\""));
+        assertTrue(capture.contains("case \"enchanting-table\", \"lectern\" -> \"minecraft:textures/atlas/blocks.png\""));
+        assertTrue(capture.contains("case \"lectern\" -> Blocks.LECTERN.defaultBlockState()"));
+        assertTrue(capture.contains("lectern.setBook(new ItemStack(Items.WRITABLE_BOOK))"));
     }
 
     @Test
@@ -2269,7 +5084,8 @@ class NativeMeshingProductionContractTest {
         assertTrue(equipment.contains("Sheets.armorTrimsSheet"));
         assertTrue(equipment.contains("textureAtlasSprite"));
         assertTrue(rust.contains("model instanceof net.minecraft.client.model.HumanoidModel"));
-        assertTrue(rust.contains("entity_decal"));
+        assertTrue(rust.contains("armor_decal_cutout_no_cull"));
+        assertTrue(rust.contains("RenderPipelines.ARMOR_DECAL_CUTOUT_NO_CULL"));
         assertTrue(rust.contains("sprite.sodium$hasUnknownImageContents()"));
         assertTrue(sheets.contains("ARMOR_TRIMS_SHEET"));
     }
@@ -2279,11 +5095,548 @@ class NativeMeshingProductionContractTest {
         String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
         String level = source("src/main/java/net/minecraft/client/renderer/LevelRenderer.java");
         String signs = source("src/main/java/net/minecraft/client/renderer/blockentity/AbstractSignRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
         assertTrue(rust.contains("model instanceof Model.Simple"));
         assertTrue(level.contains("state == net.minecraft.util.Unit.INSTANCE"));
         assertTrue(level.contains("entity/signs/"));
         assertTrue(level.contains("SignRenderState"));
         assertTrue(signs.contains("this.submitSignText"));
+        assertTrue(capture.contains("case \"oak-sign\", \"oak-sign-glowing-back\", \"oak-sign-breaking\" -> Blocks.OAK_SIGN.defaultBlockState()"));
+        assertTrue(capture.contains("Component.literal(\"Rust Vulkan\")"));
+        assertTrue(capture.contains("Component.literal(\"Frozen parity\")"));
+        assertTrue(capture.contains("Component.literal(\"Back face\")"));
+        assertTrue(capture.contains("Component.literal(\"Glow parity\")"));
+        assertTrue(capture.contains("setHasGlowingText(true)"));
+		assertTrue(capture.contains("destroyBlockProgress(-0x4d415454, modelMeshSetupPosition, MODEL_MESH_DESTROY_STAGE)"));
+		assertTrue(capture.contains("mattmc.dev.rustGalWorldMesh.destroyStage"));
+		assertTrue(capture.contains("stage < 0 || stage > 9"));
+		assertTrue(capture.contains("modelMeshDestroyTextureId().equals(diagnostic.textureId())"));
+        assertTrue(rust.contains("fullBrightSubmits"));
+        assertTrue(rust.contains("outlinedSubmits"));
+    }
+
+    @Test
+    void campfireItemsUseTheBlockEntityIndexedItemContract() throws IOException {
+        String dispatcher = source("src/main/java/net/minecraft/client/renderer/blockentity/BlockEntityRenderDispatcher.java");
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/CampfireRenderer.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(dispatcher.contains("beginBlockEntityItemSubmission"));
+        assertTrue(dispatcher.contains("beginBlockEntitySubmission(blockEntityId)"));
+        assertTrue(renderer.contains("itemStackRenderState.submit"));
+        assertTrue(rust.contains("PendingMeshProducer.BLOCK_ENTITY_ITEM"));
+        assertTrue(rust.contains("producerSemanticIdentity = BuiltInRegistries.BLOCK.getKey"));
+        assertTrue(rust.contains("|| \"block-entity-item\".equals(producer)"));
+        assertTrue(capture.contains("case \"campfire\" -> Blocks.CAMPFIRE.defaultBlockState()"));
+        assertTrue(capture.contains("campfire.getItems().set(0, new ItemStack(Items.BEEF))"));
+    }
+
+    @Test
+    void shelfItemsUseTheirOwnBlockEntityIdentityAndStableCenterSlot() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/ShelfRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        assertTrue(renderer.contains("itemStackRenderState.submit"));
+        assertTrue(rust.contains("PendingMeshProducer.BLOCK_ENTITY_ITEM"));
+        assertTrue(capture.contains("case \"oak-shelf\" -> Blocks.OAK_SHELF.defaultBlockState()"));
+        assertTrue(capture.contains("ShelfBlock.FACING, Direction.SOUTH"));
+        assertTrue(capture.contains("shelf.getItems().set(1, new ItemStack(Items.BEEF))"));
+        assertTrue(capture.contains("\"minecraft:oak_shelf\""));
+    }
+
+    @Test
+    void brushableItemsUseTheirOwnBlockEntityIdentityAndExposedState() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/BrushableBlockRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("brushableBlockRenderState.itemState.submit"));
+        assertTrue(capture.contains("case \"brushable-block\" -> Blocks.SUSPICIOUS_SAND.defaultBlockState()"));
+        assertTrue(capture.contains("BlockStateProperties.DUSTED, 3"));
+        assertTrue(capture.contains("output.store(\"item\", ItemStack.CODEC, new ItemStack(Items.BEEF))"));
+        assertTrue(capture.contains("output.store(\"hit_direction\", Direction.LEGACY_ID_CODEC, Direction.SOUTH)"));
+        assertTrue(capture.contains("\"minecraft:suspicious_sand\""));
+    }
+
+    @Test
+    void vaultItemsUseTheirOwnBlockEntityIdentityAndStableUnlockingState() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/VaultRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("ItemEntityRenderer.renderMultipleFromCount"));
+        assertTrue(capture.contains("case \"vault-unlocking\" -> Blocks.VAULT.defaultBlockState()"));
+        assertTrue(capture.contains("VaultState.UNLOCKING"));
+        assertTrue(capture.contains("serverData.putLong(\"state_updating_resumes_at\", Long.MAX_VALUE)"));
+        assertTrue(capture.contains("vault.getSharedData().setDisplayItem(new ItemStack(Items.BEEF))"));
+        assertTrue(capture.contains("case \"vault-unlocking\" -> \"minecraft:vault\""));
+    }
+
+    @Test
+    void bellUsesStableFloorStateAndCompletedBlockEntityScopedModelMesh() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/BellRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("submitNodeCollector.submitModelSemantic("));
+        assertTrue(capture.contains("case \"bell\", \"bell-shaking\" -> Blocks.BELL.defaultBlockState()"));
+        assertTrue(capture.contains("BellBlock.FACING, Direction.SOUTH"));
+        assertTrue(capture.contains("BellBlock.ATTACHMENT"));
+        assertTrue(capture.contains("BellAttachType.FLOOR"));
+        assertTrue(capture.contains("\"bell-shaking\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("bell.onHit(Direction.EAST)"));
+        assertTrue(capture.contains("bell.shaking && bell.clickDirection == Direction.EAST"));
+        assertTrue(capture.contains("isBlockEntityModelScenario()"));
+        assertTrue(capture.contains("!isBlockEntityModelScenario() || diagnostic.blockEntityId() >= 0"));
+    }
+
+    @Test
+    void bedFixtureRequiresRealHeadAndFootBlockEntitiesAndCompletedRustMeshes() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/BedRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("submitNodeCollector.submitModelSemantic("));
+        assertTrue(capture.contains("case \"bed\" -> Blocks.RED_BED.defaultBlockState()"));
+        assertTrue(capture.contains("BedPart.FOOT"));
+        assertTrue(capture.contains("BedPart.HEAD"));
+        assertTrue(capture.contains("position.relative(Direction.SOUTH)"));
+        assertTrue(capture.contains("copiedBlockEntities.size() != 2"));
+        assertTrue(capture.contains("executedBlockEntities.containsAll(copiedBlockEntities)"));
+    }
+
+    @Test
+    void chestFixtureRequiresClosedSingleChestAndCompletedBlockEntityScopedModel() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/ChestRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("submitNodeCollector.submitModelSemantic("));
+        assertTrue(capture.contains("case \"chest\" -> Blocks.CHEST.defaultBlockState()"));
+        assertTrue(capture.contains("ChestBlock.FACING, Direction.SOUTH"));
+        assertTrue(capture.contains("ChestBlock.TYPE, net.minecraft.world.level.block.state.properties.ChestType.SINGLE"));
+        assertTrue(capture.contains("isChestModelScenario() || isBellModelScenario() || isBedModelScenario()"));
+        assertTrue(capture.contains("!isBlockEntityModelScenario() || diagnostic.blockEntityId() >= 0"));
+    }
+
+    @Test
+    void doubleChestFixtureRequiresLinkedLeftAndRightBlockEntitiesAndCompletedRustMeshes() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/ChestRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("this.doubleLeftModel"));
+        assertTrue(renderer.contains("this.doubleRightModel"));
+        assertTrue(capture.contains("case \"chest-double\" -> Blocks.CHEST.defaultBlockState()"));
+        assertTrue(capture.contains("ChestType.RIGHT"));
+        assertTrue(capture.contains("ChestType.LEFT"));
+        assertTrue(capture.contains("position.relative(Direction.EAST)"));
+        assertTrue(capture.contains("isBedModelScenario() || isDoubleChestModelScenario()"));
+        assertTrue(capture.contains("copiedBlockEntities.size() != 2"));
+        assertTrue(capture.contains("executedBlockEntities.containsAll(copiedBlockEntities)"));
+    }
+
+    @Test
+    void trappedChestFixtureRequiresRegisteredBlockEntityAndTrappedMaterial() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/ChestRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("blockEntity instanceof TrappedChestBlockEntity"));
+        assertTrue(renderer.contains("ChestRenderState.ChestMaterialType.TRAPPED"));
+        assertTrue(capture.contains("case \"chest-trapped\" -> Blocks.TRAPPED_CHEST.defaultBlockState()"));
+        assertTrue(capture.contains("instanceof net.minecraft.world.level.block.entity.TrappedChestBlockEntity"));
+        assertTrue(capture.contains("case \"chest-trapped\" -> \"minecraft:entity/chest/trapped\""));
+        assertTrue(capture.contains("isTrappedChestModelScenario()"));
+    }
+
+    @Test
+    void enderChestFixtureRequiresRegisteredBlockEntityAndEnderMaterial() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/ChestRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("blockEntity instanceof EnderChestBlockEntity"));
+        assertTrue(renderer.contains("ChestRenderState.ChestMaterialType.ENDER_CHEST"));
+        assertTrue(capture.contains("case \"chest-ender\" -> Blocks.ENDER_CHEST.defaultBlockState()"));
+        assertTrue(capture.contains("instanceof net.minecraft.world.level.block.entity.EnderChestBlockEntity"));
+        assertTrue(capture.contains("case \"chest-ender\" -> \"minecraft:entity/chest/ender\""));
+        assertTrue(capture.contains("isEnderChestModelScenario()"));
+    }
+
+    @Test
+    void shulkerFixtureRequiresClosedPurpleBlockEntityAndCompletedScopedModel() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/ShulkerBoxRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("submitNodeCollector.submitModelSemantic("));
+        assertTrue(capture.contains("case \"shulker\", \"shulker-open-east\" -> Blocks.PURPLE_SHULKER_BOX.defaultBlockState()"));
+        assertTrue(capture.contains("case \"shulker-default\" -> Blocks.SHULKER_BOX.defaultBlockState()"));
+        assertTrue(capture.contains("isOpenedEastShulkerModelScenario() ? Direction.EAST : Direction.UP"));
+        assertTrue(capture.contains("shulker.getColor() == net.minecraft.world.item.DyeColor.PURPLE"));
+        assertTrue(capture.contains("ShulkerBoxBlockEntity.AnimationStatus.CLOSED"));
+        assertTrue(capture.contains("shulker.getProgress(1.0F) == (openedEast ? 1.0F : 0.0F)"));
+        assertTrue(capture.contains("ShulkerBoxBlockEntity.AnimationStatus.OPENED"));
+        assertTrue(capture.contains("serverLevel.blockEvent(position, state.getBlock(), 1, 1)"));
+        assertTrue(capture.contains("case \"shulker-default\" -> \"minecraft:entity/shulker/shulker\""));
+        assertTrue(capture.contains("|| isShulkerModelScenario()"));
+    }
+
+    @Test
+    void decoratedPotFixtureRequiresEmptySevenPartCompositionAndScopedCompletion() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/DecoratedPotRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("this.neck, poseStack, renderType"));
+        assertTrue(renderer.contains("this.top, poseStack, renderType"));
+        assertTrue(renderer.contains("this.bottom, poseStack, renderType"));
+        assertTrue(renderer.contains("this.frontSide, poseStack, material.renderType"));
+        assertTrue(renderer.contains("this.backSide, poseStack, material2.renderType"));
+        assertTrue(renderer.contains("this.leftSide, poseStack, material3.renderType"));
+        assertTrue(renderer.contains("this.rightSide, poseStack, material4.renderType"));
+        assertTrue(capture.contains("\"decorated-pot-north\", \"decorated-pot-east\", \"decorated-pot-west\" -> Blocks.DECORATED_POT.defaultBlockState()"));
+        assertTrue(capture.contains("BlockStateProperties.HORIZONTAL_FACING, expectedDecoratedPotFacing()"));
+        assertTrue(capture.contains("pot.getDecorations().equals(expectedDecoratedPotDecorations())"));
+        assertTrue(capture.contains("pot.lastWobbleStyle == null"));
+        assertTrue(capture.contains("baseParts < 3L || sideParts < 4L || !sidesComplete"));
+        assertTrue(capture.contains("copied.size() < 7"));
+        assertTrue(capture.contains("diagnostic.instances() >= (isDecoratedPotModelScenario() ? 7 : isActiveConduitModelScenario() ? 4"));
+        assertTrue(capture.contains("|| isDecoratedPotModelScenario()"));
+        assertTrue(capture.contains("Items.ANGLER_POTTERY_SHERD, Items.ARCHER_POTTERY_SHERD"));
+        assertTrue(capture.contains("Items.ARMS_UP_POTTERY_SHERD, Items.BLADE_POTTERY_SHERD"));
+        assertTrue(capture.contains("minecraft:entity/decorated_pot/blade_pottery_pattern"));
+        assertTrue(capture.contains("pot.applyComponentsFromItemStack(potItem)"));
+        assertTrue(capture.contains("pot.wobble(expectedDecoratedPotWobbleStyle())"));
+        assertTrue(capture.contains("WobbleStyle.NEGATIVE"));
+        assertTrue(capture.contains("WobbleStyle.POSITIVE"));
+        assertTrue(capture.contains("progress > 0.0F && progress <= 0.75F"));
+        assertTrue(capture.contains("maintainDecoratedPotWobbleFixture(minecraft)"));
+        assertTrue(capture.contains("case \"decorated-pot-north\" -> Direction.NORTH"));
+        assertTrue(capture.contains("case \"decorated-pot-east\" -> Direction.EAST"));
+        assertTrue(capture.contains("case \"decorated-pot-west\" -> Direction.WEST"));
+        assertTrue(capture.contains("decoratedPotFacing\", modelMeshDecoratedPotFacing()"));
+    }
+
+    @Test
+    void conduitFixtureRequiresRealInactiveBlockEntityAndBaseShellExecution() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/ConduitRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("this.shell,"));
+        assertTrue(renderer.contains("SHELL_TEXTURE.renderType(RenderType::entitySolid)"));
+        assertTrue(renderer.contains("submitNodeCollector.submitModelPartSemantic("));
+        assertTrue(capture.contains("case \"conduit\", \"conduit-breaking\", \"conduit-active\", \"conduit-hunting\" -> Blocks.CONDUIT.defaultBlockState()"));
+        assertTrue(capture.contains("instanceof net.minecraft.world.level.block.entity.ConduitBlockEntity conduit"));
+        assertTrue(capture.contains("conduit.isActive() == isActiveConduitModelScenario()"));
+        assertTrue(capture.contains("conduit.isHunting() == isHuntingConduitModelScenario()"));
+        assertTrue(capture.contains("modelMeshConduitActive())"));
+        assertTrue(capture.contains("modelMeshConduitHunting())"));
+        assertTrue(capture.contains("case \"conduit\", \"conduit-breaking\" -> \"minecraft:entity/conduit/base\""));
+        assertTrue(capture.contains("\"model-part\".equals(diagnostic.provenance())"));
+        assertTrue(capture.contains("|| isConduitModelScenario()"));
+    }
+
+    @Test
+    void activeConduitFixtureRequiresVanillaFrameAndFourPartClosedEyeComposition() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/ConduitRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("this.cage,"));
+        assertTrue(renderer.contains("ACTIVE_SHELL_TEXTURE.renderType(RenderType::entityCutoutNoCull)"));
+        assertTrue(renderer.contains("this.wind, poseStack, renderType"));
+        assertTrue(renderer.contains("condiutRenderState.isHunting ? OPEN_EYE_TEXTURE : CLOSED_EYE_TEXTURE"));
+        assertTrue(capture.contains("case \"conduit-active\", \"conduit-hunting\" -> \"minecraft:entity/conduit/cage\""));
+        assertTrue(capture.contains("case \"conduit\", \"conduit-breaking\", \"conduit-active\", \"conduit-hunting\" -> Blocks.CONDUIT.defaultBlockState()"));
+        assertTrue(capture.contains("prepareActiveConduitFixture(serverLevel, position)"));
+        assertTrue(capture.contains("isHuntingConduitModelScenario() ? 42 : 16"));
+        assertTrue(capture.contains("Blocks.WATER.defaultBlockState()"));
+        assertTrue(capture.contains("Blocks.PRISMARINE.defaultBlockState()"));
+        assertTrue(capture.contains("cageParts < 1L || windParts < 2L || !eyePresent"));
+        assertTrue(capture.contains("copied.size() < 4"));
+        assertTrue(capture.contains("isActiveConduitModelScenario() ? 4"));
+    }
+
+    @Test
+    void huntingConduitFixtureRequiresFortyTwoFrameBlocksAndOpenEye() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("case \"conduit-active\", \"conduit-hunting\" -> \"minecraft:entity/conduit/cage\""));
+        assertTrue(capture.contains("return \"conduit-hunting\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("conduit.isHunting() == isHuntingConduitModelScenario()"));
+        assertTrue(capture.contains("? \"minecraft:entity/conduit/open_eye\" : \"minecraft:entity/conduit/closed_eye\""));
+        assertTrue(capture.contains("int requiredFrameBlocks = isHuntingConduitModelScenario() ? 42 : 16"));
+    }
+
+    @Test
+    void plainStandingWhiteBannerRequiresThreeScopedSemanticModels() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/BannerRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("submitNodeCollector.submitModelSemantic("));
+        assertTrue(renderer.contains("ModelBakery.BANNER_BASE"));
+        assertTrue(renderer.contains("Sheets.BANNER_BASE"));
+        assertTrue(capture.contains("case \"white-banner\", \"white-banner-red-cross\", \"white-banner-two-patterns\" -> Blocks.WHITE_BANNER.defaultBlockState()"));
+        assertTrue(capture.contains("getValue(net.minecraft.world.level.block.BannerBlock.ROTATION) == 8"));
+        assertTrue(capture.contains("banner.getBaseColor() == expectedBannerBaseColor()"));
+        assertTrue(capture.contains("banner.getPatterns().equals(expectedBannerPatterns())"));
+        assertTrue(capture.contains("\"white-wall-banner-east\", \"white-wall-banner-west\" -> \"minecraft:entity/banner_base\""));
+        assertTrue(capture.contains("\"white-wall-banner-east\", \"white-wall-banner-west\" -> \"minecraft:textures/atlas/banner_patterns.png\""));
+        assertTrue(capture.contains("baseModels >= 2L && dyedFlags >= 1L"));
+        assertTrue(capture.contains("int expectedModels = 3 + expectedBannerPatterns().layers().size()"));
+        assertTrue(capture.contains("diagnostic.instances() >= expectedModels"));
+        assertTrue(capture.contains("return \"white-banner\".equals(MODEL_MESH_SCENARIO) || \"red-banner\".equals(MODEL_MESH_SCENARIO)"));
+    }
+
+    @Test
+    void patternedWhiteBannerAuthorsAndRequiresRedCrossLayer() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("return \"white-banner-red-cross\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("ResourceLocation.withDefaultNamespace(\"cross\")"));
+        assertTrue(capture.contains("net.minecraft.world.item.DyeColor.RED"));
+        assertTrue(capture.contains("bannerItem.set(net.minecraft.core.component.DataComponents.BANNER_PATTERNS, expectedBannerPatterns())"));
+        assertTrue(capture.contains("banner.applyComponentsFromItemStack(bannerItem)"));
+        assertTrue(capture.contains("\"minecraft:entity/banner/cross\".equals(decision.textureId())"));
+        assertTrue(capture.contains("!isPatternedBannerModelScenario() || crossPatterns >= 1L"));
+    }
+
+    @Test
+    void twoPatternWhiteBannerRequiresCrossThenBorderComposition() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("return \"white-banner-two-patterns\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("ResourceLocation.withDefaultNamespace(\"border\")"));
+        assertTrue(capture.contains("net.minecraft.world.item.DyeColor.BLUE"));
+        assertTrue(capture.contains("List.of(cross, border)"));
+        assertTrue(capture.contains("\"minecraft:entity/banner/border\".equals(decision.textureId())"));
+        assertTrue(capture.contains("!isTwoPatternBannerModelScenario() || borderPatterns >= 1L"));
+    }
+
+    @Test
+    void plainRedBannerRequiresRealRedBlockAndTintState() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("case \"red-banner\" -> Blocks.RED_BANNER.defaultBlockState()"));
+        assertTrue(capture.contains("return \"red-banner\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("? net.minecraft.world.item.DyeColor.RED : net.minecraft.world.item.DyeColor.WHITE"));
+        assertTrue(capture.contains("banner.getBaseColor() == expectedBannerBaseColor()"));
+        assertTrue(capture.contains("state.is(\"red-banner\".equals(MODEL_MESH_SCENARIO) ? Blocks.RED_BANNER : Blocks.WHITE_BANNER)"));
+    }
+
+    @Test
+    void northFacingWhiteWallBannerRequiresWallModelBranch() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("MODEL_MESH_SCENARIO.equals(\"white-wall-banner\")"));
+        assertTrue(capture.contains("MODEL_MESH_SCENARIO.startsWith(\"white-wall-banner-\")"));
+        assertTrue(capture.contains("case \"white-wall-banner\", \"white-wall-banner-south\", \"white-wall-banner-east\""));
+        assertTrue(capture.contains("WallBannerBlock.FACING, expectedWallBannerFacing()"));
+        assertTrue(capture.contains("position.relative(expectedWallBannerFacing().getOpposite())"));
+        assertTrue(capture.contains("state.is(Blocks.WHITE_WALL_BANNER)"));
+        assertTrue(capture.contains("WallBannerBlock.FACING) == expectedWallBannerFacing()"));
+        assertTrue(capture.contains("case \"white-wall-banner-south\" -> Direction.SOUTH"));
+        assertTrue(capture.contains("case \"white-wall-banner-east\" -> Direction.EAST"));
+        assertTrue(capture.contains("case \"white-wall-banner-west\" -> Direction.WEST"));
+        assertTrue(capture.contains("modelMeshBannerFacing()"));
+    }
+
+    @Test
+    void standingSkeletonSkullRequiresExactSemanticTextureAndBlockEntityScope() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/SkullBlockRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("submitNodeCollector.submitModelSemanticTexture("));
+        assertTrue(renderer.contains("textures/entity/skeleton/skeleton.png"));
+        assertTrue(capture.contains("case \"skeleton-skull\", \"skeleton-skull-breaking\" -> Blocks.SKELETON_SKULL.defaultBlockState()"));
+        assertTrue(capture.contains("getValue(net.minecraft.world.level.block.SkullBlock.ROTATION) == 8"));
+        assertTrue(capture.contains("getValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED)"));
+        assertTrue(capture.contains("skull.getAnimation(0.0F) == 0.0F"));
+        assertTrue(capture.contains(
+            "\"skeleton-wall-skull-east\", \"skeleton-wall-skull-west\" -> \"minecraft:textures/entity/skeleton/skeleton.png\""));
+        assertTrue(capture.contains("|| isSkullModelScenario()"));
+        assertTrue(capture.contains("skullType\", modelMeshSkullType()"));
+    }
+
+    @Test
+    void wallSkeletonSkullGridRequiresRealFacingAndSupport() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("MODEL_MESH_SCENARIO.equals(\"skeleton-wall-skull\")"));
+        assertTrue(capture.contains("MODEL_MESH_SCENARIO.startsWith(\"skeleton-wall-skull-\")"));
+        assertTrue(capture.contains("case \"skeleton-wall-skull-south\" -> Direction.SOUTH"));
+        assertTrue(capture.contains("case \"skeleton-wall-skull-east\" -> Direction.EAST"));
+        assertTrue(capture.contains("case \"skeleton-wall-skull-west\" -> Direction.WEST"));
+        assertTrue(capture.contains("Blocks.SKELETON_WALL_SKULL.defaultBlockState()"));
+        assertTrue(capture.contains("WallSkullBlock.FACING, expectedWallSkullFacing()"));
+        assertTrue(capture.contains("position.relative(expectedWallSkullFacing().getOpposite())"));
+        assertTrue(capture.contains("WallSkullBlock.FACING) == expectedWallSkullFacing()"));
+        assertTrue(capture.contains("modelMeshSkullFacing()"));
+    }
+
+    @Test
+    void staticSkullTypeGridRequiresDistinctBlocksModelsAndTextures() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("case \"wither-skeleton-skull\" -> Blocks.WITHER_SKELETON_SKULL"));
+        assertTrue(capture.contains("case \"zombie-head\" -> Blocks.ZOMBIE_HEAD"));
+        assertTrue(capture.contains("case \"creeper-head\" -> Blocks.CREEPER_HEAD"));
+        assertTrue(capture.contains("SkullBlock.Types.WITHER_SKELETON"));
+        assertTrue(capture.contains("SkullBlock.Types.ZOMBIE"));
+        assertTrue(capture.contains("SkullBlock.Types.CREEPER"));
+        assertTrue(capture.contains("minecraft:textures/entity/skeleton/wither_skeleton.png"));
+        assertTrue(capture.contains("minecraft:textures/entity/zombie/zombie.png"));
+        assertTrue(capture.contains("minecraft:textures/entity/creeper/creeper.png"));
+        assertTrue(capture.contains("getType() == expectedSkullType()"));
+    }
+
+    @Test
+    void poweredDragonAndPiglinHeadsRequireLiveAnimation() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("case \"dragon-head-animated\" -> Blocks.DRAGON_HEAD"));
+        assertTrue(capture.contains("case \"piglin-head-animated\" -> Blocks.PIGLIN_HEAD"));
+        assertTrue(capture.contains("SkullBlock.Types.DRAGON"));
+        assertTrue(capture.contains("SkullBlock.Types.PIGLIN"));
+        assertTrue(capture.contains("minecraft:textures/entity/enderdragon/dragon.png"));
+        assertTrue(capture.contains("minecraft:textures/entity/piglin/piglin.png"));
+        assertTrue(capture.contains("POWERED) == isAnimatedSkullModelScenario()"));
+        assertTrue(capture.contains("isAnimatedSkullModelScenario() ? skull.getAnimation(0.0F) > 0.0F"));
+        assertTrue(capture.contains("modelMeshSkullPowered()"));
+    }
+
+    @Test
+    void stableWallSkullTypesRequireExactBlocksModelsTexturesAndSupport() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("case \"wither-skeleton-wall-skull\" -> Blocks.WITHER_SKELETON_WALL_SKULL"));
+        assertTrue(capture.contains("case \"zombie-wall-head\" -> Blocks.ZOMBIE_WALL_HEAD"));
+        assertTrue(capture.contains("case \"creeper-wall-head\" -> Blocks.CREEPER_WALL_HEAD"));
+        assertTrue(capture.contains("state.is(expectedWallSkullBlock())"));
+        assertTrue(capture.contains("position.relative(expectedWallSkullFacing().getOpposite())"));
+        assertTrue(capture.contains("\"wither-skeleton-skull\", \"wither-skeleton-wall-skull\""));
+        assertTrue(capture.contains("\"zombie-head\", \"zombie-wall-head\""));
+        assertTrue(capture.contains("\"creeper-head\", \"creeper-wall-head\""));
+        assertTrue(capture.contains("modelMeshSkullFacing()"));
+    }
+
+    @Test
+    void poweredDragonAndPiglinWallHeadsRequireFacingSupportAndLiveAnimation() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("case \"dragon-wall-head-animated\" -> Blocks.DRAGON_WALL_HEAD"));
+        assertTrue(capture.contains("case \"piglin-wall-head-animated\" -> Blocks.PIGLIN_WALL_HEAD"));
+        assertTrue(capture.contains("\"dragon-head-animated\", \"dragon-wall-head-animated\""));
+        assertTrue(capture.contains("\"piglin-head-animated\", \"piglin-wall-head-animated\""));
+        assertTrue(capture.contains("POWERED) == isAnimatedSkullModelScenario()"));
+        assertTrue(capture.contains("isAnimatedSkullModelScenario() ? skull.getAnimation(0.0F) > 0.0F"));
+        assertTrue(capture.contains("state.is(expectedWallSkullBlock())"));
+        assertTrue(capture.contains("position.relative(expectedWallSkullFacing().getOpposite())"));
+    }
+
+    @Test
+    void playerHeadsRequireResolvedProfileAndExactDefaultSkin() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/SkullBlockRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("playerSkinRenderCache.getOrDefault(ownerProfile).playerSkin().body().texturePath()"));
+        assertTrue(renderer.contains("submitModelSemanticTexture("));
+        assertTrue(capture.contains("case \"player-head-profile\" -> Blocks.PLAYER_HEAD"));
+        assertTrue(capture.contains("case \"player-wall-head-profile\" -> Blocks.PLAYER_WALL_HEAD"));
+        assertTrue(capture.contains("PlayerProfile.createOffline(\"MattMCFixture\")"));
+        assertTrue(capture.contains("expectedPlayerHeadProfile().equals(skull.getOwnerProfile())"));
+        assertTrue(capture.contains("minecraft:entity/player/wide/kai"));
+        assertTrue(capture.contains("modelMeshSkullProfileName()"));
+        assertTrue(capture.contains("modelMeshSkullProfileId()"));
+    }
+
+    @Test
+    void oakHangingSignRequiresCeilingChainModelAuthoredTextAndScope() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/HangingSignRenderer.java");
+        String abstractRenderer = source("src/main/java/net/minecraft/client/renderer/blockentity/AbstractSignRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("HANGING_SIGN_MAPPER") || renderer.contains("getHangingSignMaterial"));
+        assertTrue(renderer.contains("AttachmentType.CEILING"));
+        assertTrue(renderer.contains("normalChains"));
+        assertTrue(abstractRenderer.contains("submitNodeCollector.submitModelSemantic("));
+        assertTrue(abstractRenderer.contains("submitNodeCollector.submitTextSemantic("));
+        assertTrue(capture.contains("case \"oak-hanging-sign\", \"oak-hanging-sign-attached\" -> Blocks.OAK_HANGING_SIGN.defaultBlockState()"));
+        assertTrue(capture.contains("CeilingHangingSignBlock.ROTATION, 8"));
+        assertTrue(capture.contains("CeilingHangingSignBlock.ATTACHED,"));
+        assertTrue(capture.contains("isAttachedOakHangingSignModelScenario()"));
+        assertTrue(capture.contains("isWallOakHangingSignModelScenario() ? position.east() : position.above()"));
+        assertTrue(capture.contains("instanceof net.minecraft.world.level.block.entity.HangingSignBlockEntity sign"));
+        assertTrue(capture.contains("case \"oak-hanging-sign\", \"oak-hanging-sign-attached\", \"oak-wall-hanging-sign\" -> \"minecraft:entity/signs/hanging/oak\""));
+        assertTrue(capture.contains("modelMeshHangingSignTextReady()"));
+        assertTrue(capture.contains("|| isOakHangingSignModelScenario()"));
+    }
+
+    @Test
+    void attachedOakHangingSignRequiresVerticalChainsAuthoredTextAndScope() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/HangingSignRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("AttachmentType.CEILING_MIDDLE"));
+        assertTrue(renderer.contains("vChains"));
+        assertTrue(capture.contains("\"oak-hanging-sign-attached\""));
+        assertTrue(capture.contains("isAttachedOakHangingSignModelScenario()"));
+        assertTrue(capture.contains("CeilingHangingSignBlock.ATTACHED,"));
+        assertTrue(capture.contains("modelMeshHangingSignAttached()"));
+        assertTrue(capture.contains("modelMeshHangingSignTextReady()"));
+    }
+
+    @Test
+    void wallOakHangingSignRequiresPlankFacingLateralSupportTextAndScope() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/HangingSignRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("AttachmentType.WALL"));
+        assertTrue(renderer.contains("\"plank\""));
+        assertTrue(renderer.contains("normalChains"));
+        assertTrue(capture.contains("case \"oak-wall-hanging-sign\" -> Blocks.OAK_WALL_HANGING_SIGN"));
+        assertTrue(capture.contains("WallHangingSignBlock.FACING, Direction.NORTH"));
+        assertTrue(capture.contains("position.east()"));
+        assertTrue(capture.contains("modelMeshHangingSignWall()"));
+        assertTrue(capture.contains("modelMeshHangingSignAttachment()"));
+        assertTrue(capture.contains("modelMeshHangingSignFacing()"));
+    }
+
+    @Test
+    void spawnersRetainNestedEntityAndBlockEntitySemantics() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/SpawnerRenderer.java");
+        String dispatcher = source("src/main/java/net/minecraft/client/renderer/entity/EntityRenderDispatcher.java");
+        String bridge = source("src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("entityRenderDispatcher.submitSemantic"));
+        assertTrue(dispatcher.contains("isSemanticSubmission()"));
+        assertTrue(bridge.contains("activeSemanticBlockEntityId()"));
+        assertTrue(rust.contains("currentBlockEntityId()"));
+        assertTrue(capture.contains("case \"spawner\" -> Blocks.SPAWNER.defaultBlockState()"));
+        assertTrue(capture.contains("spawner.setEntityId(EntityType.PIG, serverLevel.getRandom())"));
+        assertTrue(capture.contains("spawner.getTrialSpawner().setPlayerDetector"));
+        assertTrue(capture.contains("diagnostic.blockEntityId() >= 0"));
+    }
+
+    @Test
+    void trialSpawnersRetainTheirDistinctBlockEntityFixtureAndNestedPig() throws IOException {
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/TrialSpawnerRenderer.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(renderer.contains("SpawnerRenderer.submitEntityInSpawner"));
+        assertTrue(capture.contains("case \"trial-spawner\", \"trial-spawner-ominous\", \"trial-spawner-active\" -> Blocks.TRIAL_SPAWNER.defaultBlockState()"));
+        assertTrue(capture.contains("TrialSpawnerState.WAITING_FOR_PLAYERS"));
+        assertTrue(capture.contains("\"trial-spawner-ominous\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("spawner.getTrialSpawner().applyOminous(serverLevel, position)"));
+        assertTrue(capture.contains("stabilizeActiveTrialSpawner(spawner, player.getUUID())"));
+        assertTrue(capture.contains("Long.MAX_VALUE"));
+        assertTrue(capture.contains("instanceof net.minecraft.world.level.block.entity.TrialSpawnerBlockEntity spawner"));
+        assertTrue(capture.contains("spawner.setEntityId(EntityType.PIG, serverLevel.getRandom())"));
+        assertTrue(capture.contains("isSpawnerModelScenario()"));
+        int fixture = capture.indexOf("if (isTrialSpawnerModelScenario()");
+        int pig = capture.indexOf("spawner.setEntityId(EntityType.PIG, serverLevel.getRandom())", fixture);
+        int waiting = capture.indexOf("spawner.setState(serverLevel", pig);
+        assertTrue(fixture >= 0 && pig > fixture && waiting > pig,
+            "Trial spawner must restore the visible waiting state after setEntityId resets it inactive");
+        int ominous = capture.indexOf("spawner.getTrialSpawner().applyOminous(serverLevel, position)", waiting);
+        assertTrue(ominous > waiting,
+            "Ominous configuration must be applied only after the nested pig and waiting state are restored");
+    }
+
+    @Test
+    void endPortalsRetainProceduralLayerAndBlockEntityExecutionEvidence() throws IOException {
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String coordinator = source("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(rust.contains("faceCount * 17"));
+        assertTrue(rust.contains("portal != sky * 16"));
+        assertTrue(rust.contains("quad.blockEntityId()"));
+        assertTrue(rust.contains("new EndPortalExecutionDiagnostic"));
+        assertTrue(coordinator.contains("recordWholeFrameEndPortalExecution"));
+        assertTrue(capture.contains("case \"end-portal\" -> Blocks.END_PORTAL.defaultBlockState()"));
+        assertTrue(capture.contains("execution.skyQuads() == 2 && execution.portalQuads() == 32"));
+    }
+
+    @Test
+    void endGatewayCarriesFullHeightPortalAndCorrelatedBeamSemantics() throws IOException {
+        String portal = source("src/main/java/net/minecraft/client/renderer/blockentity/AbstractEndPortalRenderer.java");
+        String gateway = source("src/main/java/net/minecraft/client/renderer/blockentity/TheEndGatewayRenderer.java");
+        String collector = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String coordinator = source("src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(portal.contains("this.getOffsetDown(), this.getOffsetUp()"));
+        assertTrue(gateway.contains("return 1.0F") && gateway.contains("return 0.0F"));
+        assertTrue(collector.contains("faces, offsetDown, offsetUp, gameTime, lightCoords"));
+        assertTrue(rust.contains("{0, offsetDown, 0") && rust.contains("{0, offsetUp, 1"));
+        assertTrue(rust.contains("MATERIAL_TEXTURE_END_GATEWAY_BEAM"));
+        assertTrue(rust.contains("new EndGatewayBeamExecutionDiagnostic"));
+        assertTrue(coordinator.contains("recordWholeFrameEndGatewayBeamExecution"));
+        assertTrue(capture.contains("case \"end-gateway\" -> Blocks.END_GATEWAY.defaultBlockState()"));
+        assertTrue(capture.contains("portal.offsetDown() == 0.0F && portal.offsetUp() == 1.0F"));
     }
 
     @Test
@@ -2330,6 +5683,100 @@ class NativeMeshingProductionContractTest {
     }
 
     @Test
+    void modelDestructionOverlayUsesExplicitRustCrumblingSemantics() throws IOException {
+        String submit = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+        String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+        String resources = source("src/main/rust/render/vulkanic/resources.rs");
+        String vulkan = source("src/main/rust/render/vulkanic/backends/vulkan/resources.rs");
+        String frontend = source("src/main/rust/render/vulkanic/world_primitive_frontend.rs");
+
+        assertTrue(submit.contains("i, j, k, l, crumblingOverlay"));
+        assertTrue(rust.contains("enqueueEligibleCrumblingModelMesh"));
+        assertTrue(rust.contains("BlockMeshExtraction crumblingExtraction = crumblingOverlay == null ? null"));
+        assertTrue(rust.contains("modelPartEntityIdentity(textureIdentity) + \"/crumbling-stage-\""));
+        assertTrue(rust.contains("\"model-part-crumbling\""));
+        assertTrue(rust.contains("Direct-texture model submission plus Vanilla's optional projected destruction layer"));
+        assertTrue(rust.contains("queued && crumblingOverlay != null && renderType.affectsCrumbling()"));
+        assertTrue(submit.contains("block_entity/skull\"),\n\t\t\t\ti, j, k, l, crumblingOverlay"));
+        assertTrue(rust.contains("new CrumblingProjection(entityPose, overlay.cameraPose(), overlay.progress())"));
+        assertTrue(rust.contains("Direction.getApproximateNearest"));
+        assertTrue(rust.contains("projected.rotateY((float)Math.PI)"));
+        assertTrue(rust.contains("projected.rotateX((float)(-Math.PI / 2.0))"));
+        assertTrue(rust.contains("DEPTH_POLICY_TEST_NO_WRITE"));
+        assertTrue(resources.contains("Crumbling = 12"));
+        assertTrue(vulkan.contains("BlendMode::Crumbling"));
+        assertTrue(vulkan.contains("dst_color_blend_factor(vk::BlendFactor::SRC_COLOR)"));
+        assertTrue(frontend.contains("constant_factor: -1.0"));
+        assertTrue(frontend.contains("slope_factor: -10.0"));
+		for (int stage = 0; stage <= 9; stage++) {
+			assertTrue(rust.contains("textures/block/destroy_stage_" + stage + ".png"),
+				"Rust destruction texture inventory must include stage " + stage);
+		}
+    }
+
+	@Test
+	void dynamicModelMeshesUseGenerationGuardedFrameLifetimeRetirement() throws IOException {
+		String lifetime = source("src/main/java/net/vulkanic/world/DynamicWorldMeshLifetime.java");
+		String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
+		String nativeFrontend = source("src/main/rust/render/vulkanic/world_primitive_frontend.rs");
+
+		assertTrue(lifetime.contains("IDLE_FRAME_GRACE = 1L"));
+		assertTrue(lifetime.contains("record Retirement(long meshKey, long meshGeneration)"));
+		assertTrue(rust.contains("retireIdleDynamicWorldMeshesLocked();"));
+		assertTrue(rust.contains("DYNAMIC_WORLD_MESH_LIFETIME.observe("));
+		assertTrue(rust.contains("PENDING_WORLD_MESH_RETIREMENTS.put(retirement.meshKey(), retirement.meshGeneration())"));
+		assertTrue(rust.contains("DYNAMIC_WORLD_MESH_LIFETIME.restore(checkpoint.dynamicMeshLifetime)"));
+		assertTrue(rust.contains("PENDING_WORLD_MESH_RETIREMENTS.putAll(checkpoint.pendingMeshRetirements)"));
+		assertTrue(rust.contains("\" dynamic_meshes=\" + DYNAMIC_WORLD_MESH_LIFETIME.size()"));
+		assertTrue(rust.contains("\" pending_retirements=\" + PENDING_WORLD_MESH_RETIREMENTS.size()"));
+		assertTrue(nativeFrontend.contains("model_crumbling_mesh_replacements_stay_bounded_and_retire"));
+	}
+
+    @Test
+    void breakingConduitFixtureRequiresSelectedModelPartCrumblingStage() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("return \"conduit-breaking\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("destroyBlockProgress(-0x434f4e44, modelMeshSetupPosition, MODEL_MESH_DESTROY_STAGE)"));
+        assertTrue(capture.contains("modelMeshDestroyTextureId().equals(diagnostic.textureId())"));
+        assertTrue(capture.contains("conduitBreaking"));
+        assertTrue(capture.contains("conduitDestroyStage"));
+        assertTrue(capture.contains("isBreakingOakSignModelScenario() || isBreakingConduitModelScenario() ? 2"));
+    }
+
+    @Test
+    void breakingSkeletonSkullFixtureRequiresSelectedDirectTextureCrumblingStage() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        assertTrue(capture.contains("return \"skeleton-skull-breaking\".equals(MODEL_MESH_SCENARIO)"));
+        assertTrue(capture.contains("destroyBlockProgress(-0x534b554c, modelMeshSetupPosition, MODEL_MESH_DESTROY_STAGE)"));
+        assertTrue(capture.contains("modelMeshDestroyTextureId().equals(diagnostic.textureId())"));
+        assertTrue(capture.contains("skullBreaking"));
+        assertTrue(capture.contains("skullDestroyStage"));
+        assertTrue(capture.contains("diagnostic.instances() >= (isBreakingSkullModelScenario() ? 2 : 1)"));
+    }
+
+    @Test
+    void blockEntityDestructionForwardersReachAllThreeRustModelFamilies() throws IOException {
+        for (String renderer : new String[] {
+            "LecternRenderer.java", "EnchantTableRenderer.java", "BellRenderer.java",
+            "BedRenderer.java", "ChestRenderer.java", "BannerRenderer.java",
+            "AbstractSignRenderer.java", "ShulkerBoxRenderer.java"
+        }) {
+            String source = source("src/main/java/net/minecraft/client/renderer/blockentity/" + renderer);
+            assertTrue(source.contains("breakProgress"), renderer + " must forward its extracted destruction state");
+            assertTrue(source.contains("submitModel"), renderer + " must submit that state through a Model family");
+        }
+        String conduit = source("src/main/java/net/minecraft/client/renderer/blockentity/ConduitRenderer.java");
+        assertTrue(conduit.contains("submitModelPartSemantic("));
+        assertTrue(conduit.contains("condiutRenderState.breakProgress"));
+        String copper = source("src/main/java/net/minecraft/client/renderer/blockentity/CopperGolemStatueBlockRenderer.java");
+        String skull = source("src/main/java/net/minecraft/client/renderer/blockentity/SkullBlockRenderer.java");
+        assertTrue(copper.contains("copperGolemStatueRenderState.breakProgress"));
+        assertTrue(copper.contains("submitModelSemanticTexture("));
+        assertTrue(skull.contains("skullBlockRenderState.breakProgress"));
+        assertTrue(skull.contains("submitModelSemanticTexture("));
+    }
+
+    @Test
     void copperGolemStatuesUseOxidationAwareRustTextureMeshes() throws IOException {
         String state = source("src/main/java/net/minecraft/client/renderer/blockentity/state/CopperGolemStatueRenderState.java");
         String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/CopperGolemStatueBlockRenderer.java");
@@ -2342,6 +5789,23 @@ class NativeMeshingProductionContractTest {
         assertTrue(submit.contains("block_entity/copper_golem_statue"));
         assertTrue(level.contains("CopperGolemStatueRenderState"));
         assertTrue(rust.contains("model instanceof net.minecraft.client.model.CopperGolemStatueModel"));
+    }
+
+    @Test
+    void copperGolemStatueFixtureRequiresRegisteredVariantProducer() throws IOException {
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
+        String renderer = source("src/main/java/net/minecraft/client/renderer/blockentity/CopperGolemStatueBlockRenderer.java");
+        String harness = source("DevUtils/Common/graphics_harness.py");
+        assertTrue(capture.contains("configuredModelMeshStatuePose()"));
+        assertTrue(capture.contains("configuredModelMeshStatueWeathering()"));
+        assertTrue(capture.contains("expectedCopperGolemStatueBlock().defaultBlockState()"));
+        assertTrue(capture.contains("Blocks.WAXED_OXIDIZED_COPPER_GOLEM_STATUE"));
+        assertTrue(capture.contains("expectedCopperGolemStatueTextureId()"));
+        assertTrue(capture.contains("isCopperGolemStatueModelScenario()"));
+        assertTrue(renderer.contains("submitModelSemanticTexture("));
+        assertTrue(renderer.contains("copperGolemStatueRenderState.textureIdentity"));
+        assertTrue(harness.contains("frozen_copper_golem_statue_emission_evidence"));
+        assertTrue(harness.contains("copper_golem_statue_emission_observed"));
     }
 
     @Test
@@ -2460,7 +5924,9 @@ class NativeMeshingProductionContractTest {
         String renderer = source("src/main/java/net/minecraft/client/renderer/entity/LivingEntityRenderer.java");
         String rust = source("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java");
         String swirl = source("src/main/java/net/minecraft/client/renderer/entity/layers/EnergySwirlLayer.java");
+        String witherArmor = source("src/main/java/net/minecraft/client/renderer/entity/layers/WitherArmorLayer.java");
         String collector = source("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java");
+        String capture = source("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java");
 
         assertTrue(renderer.contains("WitherBossModel.class"));
         assertTrue(renderer.contains("WitherRenderState witherRenderState"));
@@ -2469,10 +5935,22 @@ class NativeMeshingProductionContractTest {
         assertTrue(rust.contains("wither_invulnerable.png"));
         assertTrue(rust.contains("!state.isPowered"));
         assertTrue(swirl.contains("submitAnimatedModelSemanticTexture"));
-        assertTrue(collector.contains("textures/entity/wither/wither_armor.png"));
-        assertTrue(collector.contains("witherState.invulnerableTicks <= 0.0F"));
+        assertTrue(witherArmor.contains("textures/entity/wither/wither_armor.png"));
         assertTrue(collector.contains("enqueueEnergySwirlModel"));
+        assertFalse(collector.contains("witherState.invulnerableTicks <= 0.0F"));
         assertTrue(rust.contains("uvOffsetU"));
+        assertTrue(capture.contains("case \"powered-wither\" ->"));
+        assertTrue(capture.contains("wither.setInvulnerableTicks(0)"));
+        assertTrue(capture.contains("wither.setHealth(wither.getMaxHealth() * 0.25F)"));
+        assertTrue(capture.contains("wither.isPowered() && wither.getInvulnerableTicks() == 0"));
+        assertTrue(capture.contains("case \"invulnerable-wither\" ->"));
+        assertTrue(capture.contains("wither.setInvulnerableTicks(220)"));
+        assertTrue(capture.contains("wither.setHealth(wither.getMaxHealth())"));
+        assertTrue(capture.contains("!wither.isPowered() && wither.getInvulnerableTicks() > 80"));
+        assertTrue(capture.contains("mattmc.dev.graphicsAuditEnergySwirlOutline"));
+        assertTrue(capture.contains("entity.isCurrentlyGlowing()"));
+        assertTrue(rust.contains("outlinedMeshInstances"));
+        assertTrue(collector.contains("RenderType.energySwirl declares OutlineProperty.NONE"));
     }
 
     @Test
@@ -2983,7 +6461,10 @@ class NativeMeshingProductionContractTest {
         int magmaStart = world.indexOf("public static boolean isVanillaMagmaCubeModelMeshEligible(");
         assertTrue(sheepStart >= 0 && creeperStart > sheepStart && slimeStart > creeperStart && magmaStart > slimeStart);
         String sheep = world.substring(sheepStart, creeperStart);
+        String creeper = world.substring(creeperStart, slimeStart);
         String slime = world.substring(slimeStart, magmaStart);
+        assertTrue(creeper.contains("(!state.isPowered || Boolean.getBoolean(\"mattmc.dev.rustEnergySwirl\"))"),
+            "a powered creeper base must be admitted only with its matching gated energy layer");
         assertTrue(!sheep.contains("&& !glowing"),
             "visible glowing sheep bodies must use outline metadata on the Rust mesh");
         assertTrue(!slime.contains("&& !glowing"),
@@ -3312,6 +6793,19 @@ class NativeMeshingProductionContractTest {
         assertTrue(gameRenderer.contains("this.minecraft.screen.renderWithTooltipAndSubtitles"));
         assertTrue(!gameRenderer.contains("Rust whole-frame Vulkan has no complete semantic route for screen"));
     }
+
+	@Test
+	void rustWholeFrameRefreshesDynamicLightmapBeforeSemanticWorldSeed() throws IOException {
+		String gameRenderer = source("src/main/java/net/minecraft/client/renderer/GameRenderer.java");
+		int shellStart = gameRenderer.indexOf("public boolean renderRustVulkanWholeFrameShell");
+		int partialTick = gameRenderer.indexOf("float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);", shellStart);
+		int lightmapUpdate = gameRenderer.indexOf("this.lightTexture.updateLightTexture(f);", shellStart);
+		int semanticPrime = gameRenderer.indexOf("RustGalWorldPrimitiveRenderer.primeWorldSemanticState(", shellStart);
+
+		assertTrue(shellStart >= 0 && partialTick > shellStart);
+		assertTrue(partialTick < lightmapUpdate && lightmapUpdate < semanticPrime,
+			"time-of-day lightmap changes must be visible to the first Rust semantic seed");
+	}
 
     @Test
     void legacyGameRendererEntryPointFailsClosedWhenRustOwnsWholeFrame() throws IOException {

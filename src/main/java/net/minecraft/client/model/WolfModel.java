@@ -134,5 +134,6 @@ public class WolfModel extends EntityModel<WolfRenderState> {
 		this.head.xRot = wolfRenderState.xRot * (float) (Math.PI / 180.0);
 		this.head.yRot = wolfRenderState.yRot * (float) (Math.PI / 180.0);
 		this.tail.xRot = wolfRenderState.tailAngle;
+        net.minecraft.client.dev.GraphicsAuditWolfInputs.observeModel(this.root(), wolfRenderState);
 	}
 }

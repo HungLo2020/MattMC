@@ -5,6 +5,7 @@ import net.vulkanic.bridge.RustGalFrameScheduler;
 import net.vulkanic.bridge.VulkanicGalBridge;
 
 import net.logging.LogUtils;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.minecraft.client.gui.Font;
@@ -21,6 +22,7 @@ import net.minecraft.client.gui.render.state.pip.GuiProfilerChartRenderState;
 import net.minecraft.client.gui.render.state.pip.GuiBannerResultRenderState;
 import net.minecraft.client.gui.render.state.pip.GuiEntityRenderState;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.util.Unit;
@@ -1262,38 +1264,23 @@ public final class RustGalGuiRenderer {
 			return null;
 		}
 		if (texture == null) return null;
+		@SuppressWarnings("unchecked") LivingEntityRenderState livingState =
+			(LivingEntityRenderState) entityPip.renderState();
+		@SuppressWarnings("unchecked") Model<?> baseModel = living.getModelForSemanticState(livingState);
+		if (baseModel == null) return null;
 		GuiModelPipSemanticCollector.ModelPose setup = pose -> {
 			var translation = entityPip.translation();
 			pose.translate(translation.x, translation.y, translation.z);
 			pose.mulPose(entityPip.rotation());
-			if (entityPip.overrideCameraAngle() != null) pose.mulPose(entityPip.overrideCameraAngle());
-			living.applySemanticModelPose((net.minecraft.client.renderer.entity.state.LivingEntityRenderState) entityPip.renderState(), pose);
+			// overrideCameraAngle describes camera orientation, not an additional model rotation.
+			living.applySemanticModelPose(livingState, pose);
 		};
 		// Vanilla entity PIPs also submit renderer layers (armor, capes, eyes,
 		// markings, and other semantic model layers). Capture only direct
 		// resource-identity model submissions; item/model-part/custom callbacks
 		// remain unavailable as one coherent preview rather than producing a
 		// partial Rust image or leaking into the world collector.
-		@SuppressWarnings("unchecked") LivingEntityRenderState livingState =
-			(LivingEntityRenderState) entityPip.renderState();
-		EntityPipLayerCapture layerCapture = new EntityPipLayerCapture();
-		PoseStack layerPose = new PoseStack();
-		try {
-			for (Object rawLayer : living.layers) {
-				@SuppressWarnings("rawtypes") RenderLayer layer = (RenderLayer) rawLayer;
-				layer.submit(layerPose, layerCapture, 15728880, livingState, 0.0F, 0.0F);
-			}
-		} catch (RuntimeException error) {
-			return null;
-		}
-		if (layerCapture.unsupported || layerCapture.models.size() > 32 || layerCapture.items.size() > 32) return null;
-		layerCapture.models.sort(java.util.Comparator.comparingInt(EntityPipLayerModel::layerOrder));
-		layerCapture.items.sort(java.util.Comparator.comparingInt(EntityPipLayerItem::layerOrder));
-		// Validate/copy every layer before publishing any scheduler token. This
-		// keeps a rejected preview atomic: no base mesh can remain queued after a
-		// layer declines its explicit contract.
-		List<EntityPipLayerResult> layerResults = new ArrayList<>(layerCapture.models.size() + layerCapture.items.size());
-		for (EntityPipLayerModel layerModel : layerCapture.models) {
+		java.util.function.Function<EntityPipLayerModel, GuiModelPipSemanticCollector.Result> copyModel = layerModel -> {
 			Matrix4f relativePose = new Matrix4f(layerModel.pose());
 			GuiModelPipSemanticCollector.Result result;
 			try {
@@ -1305,8 +1292,19 @@ public final class RustGalGuiRenderer {
 						new float[] {1, 0, 0, 1, 0, 0}, entityPip.scissorArea(), pose -> {
 							setup.apply(pose);
 							pose.last().pose().mul(relativePose);
-						}, 0xffffffff, layerModel.materialMode(), layerModel.uvOffsetU(), layerModel.uvOffsetV(),
+							layerModel.setupAndObserve(pose.last());
+						}, layerModel.tint(), layerModel.materialMode(), layerModel.uvOffsetU(), layerModel.uvOffsetV(),
 						layerModel.textureWidth(), layerModel.textureHeight())
+					: layerModel.atlasMapped()
+					? GuiModelPipSemanticCollector.collectAtlas(layerModel.model(), layerModel.texture(),
+						entityPip.x0(), entityPip.y0(), entityPip.x1(), entityPip.y1(), entityPip.scale(),
+						Math.max(1, Minecraft.getInstance().getWindow().getGuiScale()),
+						Minecraft.getInstance().getWindow().getGuiScaledWidth(), Minecraft.getInstance().getWindow().getGuiScaledHeight(),
+						new float[] {1, 0, 0, 1, 0, 0}, entityPip.scissorArea(), pose -> {
+							setup.apply(pose);
+							pose.last().pose().mul(relativePose);
+							layerModel.setupAndObserve(pose.last());
+						}, layerModel.tint(), layerModel.materialMode(), layerModel.u0(), layerModel.u1(), layerModel.v0(), layerModel.v1())
 					: GuiModelPipSemanticCollector.collect(layerModel.model(), layerModel.texture(),
 					entityPip.x0(), entityPip.y0(), entityPip.x1(), entityPip.y1(), entityPip.scale(),
 					Math.max(1, Minecraft.getInstance().getWindow().getGuiScale()),
@@ -1314,13 +1312,42 @@ public final class RustGalGuiRenderer {
 					new float[] {1, 0, 0, 1, 0, 0}, entityPip.scissorArea(), pose -> {
 						setup.apply(pose);
 						pose.last().pose().mul(relativePose);
-					}, 0xffffffff, layerModel.materialMode());
+						layerModel.setupAndObserve(pose.last());
+					}, layerModel.tint(), layerModel.materialMode());
 			} catch (RuntimeException error) {
 				return null;
 			}
-			if (result == null) return null;
-			layerResults.add(new EntityPipLayerResult(result, layerModel.layerOrder()));
+			if (result != null && layerModel.foil() != null) {
+				var batch = result.batch();
+				result = new GuiModelPipSemanticCollector.Result(
+					new VulkanicGalBridge.GuiMeshBatchRecord(batch.stratum(), batch.layerIndex(), batch.materialMode(),
+						VulkanicGalBridge.GUI_MESH_LIGHTING_ENTITY_PREVIEW, batch.assetId(), batch.sequence(), batch.alphaCutoff(),
+						batch.modelTransform(), batch.guiPose(), batch.left(), batch.top(), batch.right(), batch.bottom(),
+						batch.guiWidth(), batch.guiHeight(), batch.renderWidth(), batch.renderHeight(), batch.guardPixels(),
+						batch.clipMode(), batch.clipLeft(), batch.clipTop(), batch.clipWidth(), batch.clipHeight(),
+						batch.vertices(), batch.indices(), layerModel.foil(), batch.itemRasterScale(), batch.decalFoil(),
+						batch.blockItemRaster(), batch.itemCache()),
+					result.bounds(), result.assets());
+			}
+			return result;
+		};
+		EntityPipLayerCapture layerCapture = new EntityPipLayerCapture(copyModel);
+		PoseStack layerPose = new PoseStack();
+		try {
+			for (Object rawLayer : living.layers) {
+				@SuppressWarnings("rawtypes") RenderLayer layer = (RenderLayer) rawLayer;
+				layer.submit(layerPose, layerCapture, 15728880, livingState, 0.0F, 0.0F);
+			}
+		} catch (RuntimeException error) {
+			return null;
 		}
+		if (layerCapture.unsupported || layerCapture.models.size() > 32 || layerCapture.items.size() > 32) return null;
+		layerCapture.models.sort(java.util.Comparator.comparingInt(EntityPipLayerResult::layerOrder));
+		layerCapture.items.sort(java.util.Comparator.comparingInt(EntityPipLayerItem::layerOrder));
+		// Validate/copy every layer before publishing any scheduler token. This
+		// keeps a rejected preview atomic: no base mesh can remain queued after a
+		// layer declines its explicit contract.
+		List<EntityPipLayerResult> layerResults = new ArrayList<>(layerCapture.models);
 		for (EntityPipLayerItem layerItem : layerCapture.items) {
 			List<GuiModelPipSemanticCollector.Result> itemResults;
 			try {
@@ -1340,11 +1367,18 @@ public final class RustGalGuiRenderer {
 		layerResults.sort(java.util.Comparator.comparingInt(EntityPipLayerResult::layerOrder));
 		GuiModelPipSemanticCollector.Result baseResult;
 		try {
-			baseResult = GuiModelPipSemanticCollector.collect(living.getModel(), texture,
+			int baseMaterialMode = entityPipMaterialMode(baseModel.renderType(texture));
+			if (baseMaterialMode < 0) return null;
+			baseResult = GuiModelPipSemanticCollector.collect(baseModel, texture,
 				entityPip.x0(), entityPip.y0(), entityPip.x1(), entityPip.y1(), entityPip.scale(),
 				Math.max(1, Minecraft.getInstance().getWindow().getGuiScale()),
 				Minecraft.getInstance().getWindow().getGuiScaledWidth(), Minecraft.getInstance().getWindow().getGuiScaledHeight(),
-				new float[] {1, 0, 0, 1, 0, 0}, entityPip.scissorArea(), setup, 0xffffffff, 1);
+				new float[] {1, 0, 0, 1, 0, 0}, entityPip.scissorArea(), pose -> {
+					setup.apply(pose);
+					net.minecraft.client.dev.GraphicsAuditEquipmentGeometry.observeEntityPip(
+						baseModel, livingState, baseModel.renderType(texture), -1, 15728880,
+						LivingEntityRenderer.getOverlayCoords(livingState, 0.0F), pose.last(), 1);
+				}, 0xffffffff, baseMaterialMode);
 		} catch (RuntimeException error) {
 			return null;
 		}
@@ -1354,31 +1388,74 @@ public final class RustGalGuiRenderer {
 		List<GuiModelPipSemanticCollector.Result> allResults = new ArrayList<>(layerResults.size() + 1);
 		allResults.add(baseResult);
 		for (EntityPipLayerResult layerResult : layerResults) allResults.add(layerResult.result());
-		List<RustGalGuiElementRenderState> elements = new ArrayList<>(allResults.size());
+		// One entity preview is one semantic request: Rust shares its depth target
+		// across the copied layers and composites only after the final layer.
+		int layerOrder = sourceLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder(sourceLayerOrder);
+		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = entityPipBatches(allResults, layerOrder);
+		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(
+			batches, sourceLayerOrder == null ? GuiRenderStratum.GUI_ITEM.id() : dynamicLayerId(sourceLayerOrder),
+			layerOrder, System.nanoTime());
+		for (VulkanicGalBridge.GuiMeshBatchRecord batch : batches) {
+			var foil = batch.itemFoil();
+			if (foil != null && foil.kind() == VulkanicGalBridge.StandardFoilKind.ARMOR_ORTHOGRAPHIC) {
+				net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.observeGuiSemanticClock(
+					batch.sequence(), foil.clockMillis(), foil.speed(), foil.strength());
+			}
+		}
 		for (GuiModelPipSemanticCollector.Result result : allResults) {
-			int layerOrder = sourceLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder(sourceLayerOrder);
+			for (RustGalGuiRawImageAssets.Asset asset : result.assets()) RustGalGuiRawImageAssets.stage(asset);
+		}
+		ScreenRectangle bounds = baseResult.bounds();
+		return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.model-pip", -1, -1.0F,
+			GuiFillDirection.NONE, bounds.left(), bounds.top(), bounds.width(), bounds.height(),
+			Minecraft.getInstance().getWindow().getGuiScaledWidth(), Minecraft.getInstance().getWindow().getGuiScaledHeight()));
+	}
+
+	static List<VulkanicGalBridge.GuiMeshBatchRecord> entityPipBatches(
+		List<GuiModelPipSemanticCollector.Result> results, int layerOrder
+	) {
+		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>(results.size());
+		for (GuiModelPipSemanticCollector.Result result : results) {
 			VulkanicGalBridge.GuiMeshBatchRecord batch = result.batch();
-			batch = new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, batch.layerIndex(), batch.materialMode(), batch.lightingMode(),
+			batches.add(new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, batches.size(), batch.materialMode(), VulkanicGalBridge.GUI_MESH_LIGHTING_ENTITY_PREVIEW,
 				batch.assetId(), batch.sequence(), batch.alphaCutoff(), batch.modelTransform(), batch.guiPose(),
 				batch.left(), batch.top(), batch.right(), batch.bottom(), batch.guiWidth(), batch.guiHeight(),
 				batch.renderWidth(), batch.renderHeight(), batch.guardPixels(), batch.clipMode(), batch.clipLeft(), batch.clipTop(),
-				batch.clipWidth(), batch.clipHeight(), batch.vertices(), batch.indices());
-			RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(
-				List.of(batch), sourceLayerOrder == null ? GuiRenderStratum.GUI_ITEM.id() : dynamicLayerId(sourceLayerOrder),
-				layerOrder, System.nanoTime());
-			for (RustGalGuiRawImageAssets.Asset asset : result.assets()) RustGalGuiRawImageAssets.stage(asset);
-			ScreenRectangle bounds = result.bounds();
-			elements.add(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.model-pip", -1, -1.0F,
-				GuiFillDirection.NONE, bounds.left(), bounds.top(), bounds.width(), bounds.height(),
-				Minecraft.getInstance().getWindow().getGuiScaledWidth(), Minecraft.getInstance().getWindow().getGuiScaledHeight()));
+				batch.clipWidth(), batch.clipHeight(), batch.vertices(), batch.indices(), batch.itemFoil(), batch.itemRasterScale(),
+				batch.decalFoil(), batch.blockItemRaster(), batch.itemCache()));
 		}
-		return List.copyOf(elements);
+		return List.copyOf(batches);
 	}
 
-	private record EntityPipLayerModel(Model<?> model, ResourceLocation texture, Matrix4f pose, int layerOrder, int materialMode,
-		boolean animated, float uvOffsetU, float uvOffsetV, int textureWidth, int textureHeight) {
-		EntityPipLayerModel(Model<?> model, ResourceLocation texture, Matrix4f pose, int layerOrder, int materialMode) {
-			this(model, texture, pose, layerOrder, materialMode, false, 0.0F, 0.0F, 1, 1);
+	/** Maps a vanilla entity pipeline to an explicit Rust-owned GUI raster policy. */
+	static int entityPipMaterialMode(RenderType renderType) {
+		if (renderType == null) return -1;
+		if (renderType == RenderType.armorEntityGlint()) return 4;
+		var pipeline = renderType.pipeline();
+		if (pipeline == RenderPipelines.ARMOR_DECAL_CUTOUT_NO_CULL)
+			return VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL;
+		var blend = pipeline.getBlendFunction();
+		String name = renderType.toString().toLowerCase(java.util.Locale.ROOT);
+		if (name.contains("cutout")) {
+			return pipeline.isCull() ? 2 : VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL;
+		}
+		if (blend.isEmpty()) return pipeline.isCull() ? 1 : -1;
+		if (!BlendFunction.TRANSLUCENT.equals(blend.get())) return -1;
+		return pipeline.isCull() ? 3 : VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL;
+	}
+
+	private record EntityPipLayerModel(Model<?> model, ResourceLocation texture, Matrix4f pose, int layerOrder, int tint,
+		Runnable setupModel, int materialMode, boolean animated, float uvOffsetU, float uvOffsetV, int textureWidth, int textureHeight,
+		boolean atlasMapped, float u0, float u1, float v0, float v1,
+		VulkanicGalBridge.StandardItemFoilRecord foil, java.util.function.Consumer<PoseStack.Pose> observeModel) {
+		EntityPipLayerModel(Model<?> model, ResourceLocation texture, Matrix4f pose, int layerOrder, int tint,
+			Runnable setupModel, int materialMode, java.util.function.Consumer<PoseStack.Pose> observeModel) {
+			this(model, texture, pose, layerOrder, tint, setupModel, materialMode, false, 0.0F, 0.0F, 1, 1,
+				false, 0.0F, 1.0F, 0.0F, 1.0F, null, observeModel);
+		}
+		void setupAndObserve(PoseStack.Pose sourcePose) {
+			this.setupModel.run();
+			this.observeModel.accept(sourcePose);
 		}
 	}
 	private record EntityPipLayerItem(List<net.minecraft.client.renderer.block.model.BakedQuad> quads,
@@ -1390,180 +1467,230 @@ public final class RustGalGuiRenderer {
 
 	/** Strict collector used only while extracting one GUI entity PIP. */
 	private static final class EntityPipLayerCapture extends SubmitNodeCollection implements SubmitNodeCollector {
-		private final List<EntityPipLayerModel> models = new ArrayList<>();
-		private final List<EntityPipLayerItem> items = new ArrayList<>();
+		private final List<EntityPipLayerResult> models;
+		private final List<EntityPipLayerItem> items;
+		private final EntityPipLayerCapture root;
+		private final int authoredOrder;
+		private final java.util.function.Function<EntityPipLayerModel, GuiModelPipSemanticCollector.Result> copyModel;
 		private int itemQuadCount;
 		private boolean unsupported;
 
-		private EntityPipLayerCapture() {
+		private EntityPipLayerCapture(java.util.function.Function<EntityPipLayerModel, GuiModelPipSemanticCollector.Result> copyModel) {
 			super(null);
+			this.root = this;
+			this.authoredOrder = 0;
+			this.copyModel = copyModel;
+			this.models = new ArrayList<>();
+			this.items = new ArrayList<>();
+		}
+
+		private EntityPipLayerCapture(EntityPipLayerCapture root, int order) {
+			super(null);
+			this.root = root;
+			this.authoredOrder = order;
+			this.copyModel = root.copyModel;
+			this.models = root.models;
+			this.items = root.items;
 		}
 
 		@Override
-		public net.minecraft.client.renderer.OrderedSubmitNodeCollector order(int ignored) {
-			return this;
+		public net.minecraft.client.renderer.OrderedSubmitNodeCollector order(int order) {
+			return new EntityPipLayerCapture(root, order);
+		}
+
+		private void copy(EntityPipLayerModel model) {
+			// Finish bounded geometry extraction before the producer can mutate
+			// its reusable model/state. No model or state escapes this callback.
+			GuiModelPipSemanticCollector.Result result = copyModel.apply(model);
+			if (result == null) root.unsupported = true;
+			else models.add(new EntityPipLayerResult(result, model.layerOrder()));
 		}
 
 		@Override
 		public <S> void submitModelSemanticTexture(Model<? super S> model, S object, PoseStack poseStack,
-			RenderType renderType, int light, int overlay, int order, ResourceLocation textureIdentity,
+			RenderType renderType, int light, int overlay, int tint, ResourceLocation textureIdentity,
 			int outlineColor, @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
-			int materialMode = materialMode(renderType);
+			int materialMode = entityPipMaterialMode(renderType);
 			if (model == null || textureIdentity == null || materialMode < 0
 				|| crumblingOverlay != null || models.size() >= 32) {
-				unsupported = true;
+				root.unsupported = true;
 				return;
 			}
-			models.add(new EntityPipLayerModel(model, textureIdentity, new Matrix4f(poseStack.last().pose()), order, materialMode));
+			copy(new EntityPipLayerModel(model, textureIdentity, new Matrix4f(poseStack.last().pose()), authoredOrder, tint,
+				() -> model.setupAnim(object), materialMode, sourcePose -> net.minecraft.client.dev.GraphicsAuditEquipmentGeometry.observeEntityPip(
+					model, object, renderType, tint, light, overlay, sourcePose, 1)));
+		}
+
+		@Override
+		public <S> void submitModelSemantic(Model<? super S> model, S object, PoseStack poseStack,
+			RenderType renderType, int light, int overlay, int tint, @Nullable TextureAtlasSprite sprite,
+			int outlineColor, @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
+			if (sprite != null) {
+				submitModel(model, object, poseStack, renderType, light, overlay, tint, sprite, outlineColor, crumblingOverlay);
+				return;
+			}
+			if (model == null || renderType != RenderType.armorEntityGlint()
+				|| crumblingOverlay != null || models.size() >= 32) {
+				root.unsupported = true;
+				return;
+			}
+			var options = Minecraft.getInstance().options;
+			var foil = new VulkanicGalBridge.StandardItemFoilRecord(Util.getMillis(),
+				options.glintSpeed().get(), options.glintStrength().get().floatValue(),
+				VulkanicGalBridge.StandardFoilKind.ARMOR_ORTHOGRAPHIC);
+			copy(new EntityPipLayerModel(model, ItemRenderer.ENCHANTED_GLINT_ARMOR,
+				new Matrix4f(poseStack.last().pose()), authoredOrder, tint, () -> model.setupAnim(object),
+				4, false, 0.0F, 0.0F, 1, 1, false, 0.0F, 1.0F, 0.0F, 1.0F, foil,
+				sourcePose -> net.minecraft.client.dev.GraphicsAuditEquipmentGeometry.observeEntityPip(
+					model, object, renderType, tint, light, overlay, sourcePose, 1)));
 		}
 
 		@Override
 		public <S> void submitModel(Model<? super S> model, S object, PoseStack poseStack, RenderType renderType,
-			int light, int overlay, int order, @Nullable TextureAtlasSprite sprite, int outlineColor,
+			int light, int overlay, int tint, @Nullable TextureAtlasSprite sprite, int outlineColor,
 			@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
 			// Armor trims, wool overlays, and similar layers submit an atlas sprite
 			// rather than a standalone resource identity. The copied atlas is an
 			// explicit Rust image asset, so these layers can share the same bounded
 			// GUI mesh path. Glint and crumbling variants retain distinct contracts.
-			int materialMode = materialMode(renderType);
+			int materialMode = entityPipMaterialMode(renderType);
 			if (model == null || sprite == null || sprite.atlasLocation() == null || materialMode < 0
 				|| crumblingOverlay != null || (renderType != null && renderType.toString().contains("glint"))
 				|| models.size() >= 32) {
-				unsupported = true;
+				root.unsupported = true;
 				return;
 			}
-			models.add(new EntityPipLayerModel(model, sprite.atlasLocation(), new Matrix4f(poseStack.last().pose()), order, materialMode));
+			copy(new EntityPipLayerModel(model, sprite.atlasLocation(), new Matrix4f(poseStack.last().pose()), authoredOrder, tint,
+				() -> model.setupAnim(object), materialMode, false, 0.0F, 0.0F, 1, 1,
+				true, sprite.getU0(), sprite.getU1(), sprite.getV0(), sprite.getV1(), null,
+				sourcePose -> net.minecraft.client.dev.GraphicsAuditEquipmentGeometry.observeEntityPip(
+					model, object, renderType, tint, light, overlay, sourcePose, 1)));
 		}
 
 		@Override
 		public <S> void submitAnimatedModelSemanticTexture(Model<? super S> model, S object, PoseStack poseStack,
-			RenderType renderType, int light, int overlay, int order, ResourceLocation textureIdentity,
+			RenderType renderType, int light, int overlay, int tint, ResourceLocation textureIdentity,
 			int outlineColor, @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay,
 			float uvOffsetU, float uvOffsetV, int textureWidth, int textureHeight) {
-			if (model == null || textureIdentity == null || materialMode(renderType) < 0
+			if (model == null || textureIdentity == null || entityPipMaterialMode(renderType) < 0
 				|| crumblingOverlay != null || models.size() >= 32
 				|| textureWidth <= 0 || textureHeight <= 0
 				|| !Float.isFinite(uvOffsetU) || !Float.isFinite(uvOffsetV)) {
-				unsupported = true;
+				root.unsupported = true;
 				return;
 			}
-			models.add(new EntityPipLayerModel(model, textureIdentity, new Matrix4f(poseStack.last().pose()), order,
-				materialMode(renderType), true, uvOffsetU, uvOffsetV, textureWidth, textureHeight));
+			copy(new EntityPipLayerModel(model, textureIdentity, new Matrix4f(poseStack.last().pose()), authoredOrder, tint, () -> model.setupAnim(object),
+				entityPipMaterialMode(renderType), true, uvOffsetU, uvOffsetV, textureWidth, textureHeight,
+				false, 0.0F, 1.0F, 0.0F, 1.0F, null,
+				sourcePose -> net.minecraft.client.dev.GraphicsAuditEquipmentGeometry.observeEntityPip(
+					model, object, renderType, tint, light, overlay, sourcePose, 1)));
 		}
 
 		@Override
 		public void submitModelPart(net.minecraft.client.model.geom.ModelPart modelPart, PoseStack poseStack,
 			RenderType renderType, int light, int overlay, @Nullable TextureAtlasSprite sprite, boolean affectsCrumbling,
-			boolean bl, int order, @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay, int outlineColor) {
-			int materialMode = materialMode(renderType);
+			boolean bl, int tint, @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay, int outlineColor) {
+			int materialMode = entityPipMaterialMode(renderType);
 			if (modelPart == null || sprite == null || sprite.atlasLocation() == null || materialMode < 0
 				|| affectsCrumbling || bl || crumblingOverlay != null || models.size() >= 32) {
-				unsupported = true;
+				root.unsupported = true;
 				return;
 			}
-			models.add(new EntityPipLayerModel(
+			copy(new EntityPipLayerModel(
 				new Model.Simple(modelPart, RenderType::entitySolid), sprite.atlasLocation(),
-				new Matrix4f(poseStack.last().pose()), order, materialMode));
+				new Matrix4f(poseStack.last().pose()), authoredOrder, tint, () -> {}, materialMode, sourcePose -> {}));
 		}
 
 		/* Keep GUI capture isolated from SubmitNodeCollection's world storage. */
 		@Override
 		public void submitBlock(PoseStack poseStack, net.minecraft.world.level.block.state.BlockState blockState,
 			int light, int overlay, int outlineColor) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitBlockDisplay(PoseStack poseStack, net.minecraft.world.level.block.state.BlockState blockState,
 			int light, int overlay, int outlineColor) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitBlockModel(PoseStack poseStack, RenderType renderType,
 			net.minecraft.client.renderer.block.model.BlockStateModel blockStateModel, float red, float green,
 			float blue, int light, int overlay, int outlineColor) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitMovingBlock(PoseStack poseStack,
 			net.minecraft.client.renderer.block.MovingBlockRenderState movingBlockRenderState) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitHitbox(PoseStack poseStack, EntityRenderState entityRenderState,
 			net.minecraft.client.renderer.entity.state.HitboxesRenderState hitboxesRenderState) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitShadow(PoseStack poseStack, float radius, List<EntityRenderState.ShadowPiece> pieces) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitNameTag(PoseStack poseStack, @Nullable net.minecraft.world.phys.Vec3 offset,
 			int packedLight, net.minecraft.network.chat.Component text, boolean seeThrough, int width,
 			double distance, net.minecraft.client.renderer.state.CameraRenderState cameraRenderState) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitText(PoseStack poseStack, float x, float y,
 			net.minecraft.util.FormattedCharSequence text, boolean shadow,
 			Font.DisplayMode mode, int color, int backgroundColor, int packedLight, int packedOverlay) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitFlame(PoseStack poseStack, EntityRenderState entityRenderState,
 			org.joml.Quaternionf rotation) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitLeash(PoseStack poseStack, EntityRenderState.LeashState leashState) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitParticleGroup(SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
 		@Override
 		public void submitItem(PoseStack poseStack, net.minecraft.world.item.ItemDisplayContext displayContext,
 			int light, int overlay, int order, int[] tintedColors, List<net.minecraft.client.renderer.block.model.BakedQuad> quads,
 			RenderType renderType, ItemStackRenderState.FoilType foilType) {
-			int materialMode = materialMode(renderType);
+			int materialMode = entityPipMaterialMode(renderType);
 			if (displayContext == null || tintedColors == null || quads == null || quads.isEmpty()
 				|| renderType == null || materialMode < 0 || foilType == null
 				|| items.size() >= 32 || quads.size() > 256
-				|| itemQuadCount > MAX_ENTITY_PIP_ITEM_QUADS - quads.size()) {
-				unsupported = true;
+				|| root.itemQuadCount > MAX_ENTITY_PIP_ITEM_QUADS - quads.size()) {
+				root.unsupported = true;
 				return;
 			}
-			itemQuadCount += quads.size();
+			root.itemQuadCount += quads.size();
 			items.add(new EntityPipLayerItem(List.copyOf(quads), tintedColors.clone(),
-				new Matrix4f(poseStack.last().pose()), order, materialMode, foilType));
+				new Matrix4f(poseStack.last().pose()), authoredOrder, materialMode, foilType));
 		}
 
 		@Override
 		public void submitCustomGeometry(PoseStack poseStack, RenderType renderType,
 			SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) {
-			unsupported = true;
+			root.unsupported = true;
 		}
 
-		private static int materialMode(RenderType renderType) {
-			if (renderType == null) return -1;
-			var blend = renderType.pipeline().getBlendFunction();
-			String name = renderType.toString().toLowerCase(java.util.Locale.ROOT);
-			if (name.contains("cutout")) return 2;
-			if (blend.isEmpty()) return 1;
-			return BlendFunction.TRANSLUCENT.equals(blend.get()) ? 3 : -1;
-		}
 	}
 
 	private static void addProfilerTriangle(List<VulkanicGalBridge.GuiMeshVertexRecord> vertices, List<Integer> indices,

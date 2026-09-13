@@ -10,6 +10,36 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ModelPartSemanticColorMappingTest {
+    private static Integer copiedOrder() {
+        return new net.vulkanic.bridge.VulkanicGalBridge.WorldMeshInstanceRecord(67,17,1,0,1,1,0,-1,
+            new float[]{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1},128,128,0,0,0,0,-1).modelSubmissionOrder();
+    }
+    @Test void authoredCollectionOrderReachesSemanticExtractionAndRestoresAfterFailure() {
+        var model=new net.minecraft.client.model.ShieldModel(net.minecraft.client.model.ShieldModel.createLayer().bakeRoot());
+        var sprite=mock(TextureAtlasSprite.class);var pose=new PoseStack();
+        var type=RenderType.entityGlint();var state=net.minecraft.util.Unit.INSTANCE;
+        int overlay=net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY;
+        try(var nativeCalls=mockStatic(RustGalWorldPrimitiveRenderer.class);
+            var policy=mockStatic(WorldRenderRoutePolicy.class);
+            var api=mockStatic(net.vulkanic.VulkanicAPI.class)) {
+            api.when(net.vulkanic.VulkanicAPI::isVulkanBackendSelected).thenReturn(true);
+            policy.when(()->WorldRenderRoutePolicy.currentModelMeshRoute(true)).thenReturn(WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME);
+            var storage=new SubmitNodeStorage();
+            for(int order:new int[]{-2,0,3}) {
+                nativeCalls.when(()->RustGalWorldPrimitiveRenderer.enqueueAtlasGlintModelMesh(
+                    model,state,pose.last(),type,sprite,15728880,overlay,-1,0,null)).thenAnswer(call->{
+                        assertEquals(order,copiedOrder());return true;
+                    });
+                storage.order(order).submitModelSemantic(model,state,pose,type,15728880,overlay,-1,sprite,0,null);
+                assertNull(copiedOrder());
+            }
+            nativeCalls.when(()->RustGalWorldPrimitiveRenderer.enqueueAtlasGlintModelMesh(
+                model,state,pose.last(),type,sprite,15728880,overlay,-1,0,null)).thenThrow(new IllegalStateException("test extraction failure"));
+            assertThrows(IllegalStateException.class,()->storage.order(7).submitModelSemantic(
+                model,state,pose,type,15728880,overlay,-1,sprite,0,null));
+            assertNull(copiedOrder());
+        }
+    }
     @Test void atlasModelFoilSubmitsOnlyTheFoilCommandWithoutJavaQueueing() {
         var model = new net.minecraft.client.model.ShieldModel(net.minecraft.client.model.ShieldModel.createLayer().bakeRoot());
         var sprite = mock(TextureAtlasSprite.class);

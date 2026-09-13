@@ -113,7 +113,9 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			PoseStack.Pose transformPose = new PoseStack.Pose();
 			layer.transform.apply(this.displayContext.leftHand(), transformPose);
 			float[] modelTransform = new float[16];
+			float[] normalTransform = new float[9];
 			transformPose.pose().get(modelTransform);
+			transformPose.normal().get(normalTransform);
 			consumer.accept(new SemanticLayer(
 				layer.quads,
 				layer.tintLayers,
@@ -122,7 +124,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 				layer.usesBlockLight,
 				layer.specialRenderer != null,
 				layer.transform == ItemTransform.NO_TRANSFORM,
-				modelTransform
+				modelTransform, normalTransform, transformPose.trustedNormals
 			));
 		}
 	}
@@ -267,7 +269,9 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		boolean usesBlockLight,
 		boolean hasSpecialRenderer,
 		boolean identityTransform,
-		float[] modelTransform
+		float[] modelTransform,
+		float[] normalTransform,
+		boolean trustedNormals
 	) {
 		public SemanticLayer {
 			quads = List.copyOf(quads);
@@ -280,6 +284,17 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 					throw new IllegalArgumentException("semantic item layer transform must be finite");
 				}
 			}
+			// Preserve the actual vanilla normal pose independently. A consumer must
+			// not reconstruct its scaling/sign conventions from the model matrix.
+			if (normalTransform.length != 9) {
+				throw new IllegalArgumentException("semantic item layer normal transform must contain 9 floats");
+			}
+			for (float value : normalTransform) {
+				if (!Float.isFinite(value)) {
+					throw new IllegalArgumentException("semantic item layer normal transform must be finite");
+				}
+			}
+			normalTransform = normalTransform.clone();
 			modelTransform = modelTransform.clone();
 		}
 
@@ -291,6 +306,11 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		@Override
 		public float[] modelTransform() {
 			return this.modelTransform.clone();
+		}
+
+		@Override
+		public float[] normalTransform() {
+			return this.normalTransform.clone();
 		}
 	}
 

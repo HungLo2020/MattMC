@@ -4220,6 +4220,35 @@ pub fn minimal_direct_standard_item_foil_program() -> TerrainMaterialProgram {
     program
 }
 
+pub const WORLD_DECAL_FOIL_PROGRAM_ID: &str = "vulkanic:builtin/direct_world_decal_foil_v1";
+
+pub fn minimal_direct_world_decal_foil_program() -> TerrainMaterialProgram {
+    let mut program = minimal_direct_standard_item_foil_program();
+    program.identity = ProgramIdentity::new(WORLD_DECAL_FOIL_PROGRAM_ID);
+    program.vertex.label = "direct-world-decal-foil.vertex".to_string();
+    program.vertex.source = program.vertex.source.replace(
+        "    ItemFoilInstance foil_instances[];", "    uint foil_words[];");
+    let helpers = r#"
+vec4 decal_foil_vec4(uint offset) {
+    return uintBitsToFloat(uvec4(foil_words[offset], foil_words[offset+1u],
+        foil_words[offset+2u], foil_words[offset+3u]));
+}
+ItemFoilInstance load_decal_foil(uint instance_index) {
+    uint start = instance_index * 12u;
+    return ItemFoilInstance(decal_foil_vec4(start), decal_foil_vec4(start+4u), decal_foil_vec4(start+8u));
+}
+vec2 world_decal_uv(uint instance_index, uint vertex_index) {
+    uint start = foil_words[instance_index * 12u + 9u] + vertex_index * 2u;
+    return uintBitsToFloat(uvec2(foil_words[start], foil_words[start+1u]));
+}
+"#;
+    program.vertex.source = program.vertex.source.replace("void main() {", &format!("{helpers}\nvoid main() {{"))
+        .replace("foil_instances[gl_InstanceIndex]", "load_decal_foil(uint(gl_InstanceIndex))")
+        .replace("vec3 original_uv = vec3(vertex.position_uv.w, vertex.color_uv.w, 1.0);",
+            "vec3 original_uv = vec3(world_decal_uv(uint(gl_InstanceIndex), uint(gl_VertexIndex)), 1.0);");
+    program
+}
+
 pub fn minimal_terrain_material_program(
     kind: TerrainMaterialProgramKind,
 ) -> TerrainMaterialProgram {
@@ -4590,6 +4619,7 @@ struct MeshInstance {
     vec4 animation_region;
     vec4 animation_next_region;
     vec4 overlay_color;
+    vec4 texture_transform;
 };
 layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
     mat4 view;
@@ -4617,6 +4647,8 @@ layout(location = 9) out vec2 v_fog_distances;
 layout(location = 10) flat out vec4 v_fog_color_and_environmental_start;
 layout(location = 11) flat out vec4 v_fog_ranges;
 layout(location = 12) flat out uint v_terrain_material_bits;
+// 13 is foil strength; 14 is the optional clip diagnostic.
+layout(location = 15) out vec4 v_back_color;
 #ifdef VULKANIC_STANDARD_ITEM_FOIL
 // Two affine rows (xy basis, z translation) and RGB strength. Padding is
 // explicit; no reuse of terrain animation fields or packed vertex alpha.
@@ -4646,6 +4678,7 @@ void main() {
     v_uv = (material_semantics & 1u) != 0u
         ? vertex.shader_data.xy
         : vec2(vertex.position_uv.w, vertex.color_uv.w);
+    v_uv = v_uv * instance.texture_transform.xy + instance.texture_transform.zw;
     // Frozen OpenGL Sodium preserves UV2 byte coordinates (including smooth
     // lighting's fractional levels) and divides by 256 in chunk_vertex.glsl.
     // The copied vertex lane is byte/240; rescale without nibble truncation.
@@ -4661,6 +4694,7 @@ void main() {
     v_foil_strength = foil.parameters.x;
     // Frozen glint consumes ColorModulator, not baked tint or lightmap.
     v_color = instance.color;
+    v_back_color = v_color;
 #else
     vec2 light_uv = clamp(vertex.extra_data.xy, vec2(0.0), vec2(255.0 / 240.0)) * (15.0 / 16.0);
     // Frozen's standalone baked blocks use core/terrain.vsh, not Sodium's
@@ -4668,14 +4702,17 @@ void main() {
     if ((material_semantics & 8u) != 0u) {
         light_uv += vec2(0.5 / 16.0);
     }
-    vec4 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv);
+    vec4 light_color = (material_semantics & (128u | 512u)) != 0u
+        ? vec4(1.0)
+        : texture(sampler2D(LightmapTexture, LightmapSampler), light_uv);
     if ((material_semantics & 16u) != 0u) {
         ivec2 light_texel = ivec2(round(clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0)) * 15.0));
         light_color = texelFetch(sampler2D(LightmapTexture, LightmapSampler), light_texel, 0);
     }
     v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color
         * light_color;
-    if ((material_semantics & 2u) != 0u) {
+    v_back_color = v_color;
+    if ((material_semantics & 2u) != 0u && (material_semantics & (128u | 256u)) == 0u) {
         // Frozen's entity.vsh applies minecraft_mix_light before the copied
         // UV2 lightmap. ModelPart normals are semantic mesh data, so Rust
         // owns this calculation rather than borrowing Java's Lighting UBO.
@@ -4687,18 +4724,25 @@ void main() {
         // the separate frame view matrix is not part of that pose operation.
         vec3 normal = normalize(transpose(inverse(mat3(instance.model)))
             * vec3(vertex.normal_light.yz, vertex.extra_data.z));
+        bool quantize_normal = (material_semantics & 64u) != 0u;
 #ifdef VULKANIC_MODEL_TRANSLUCENT_CUTOUT
-        // Frozen BakedModelEncoder transforms then NormI8.pack truncates
-        // each component toward zero before the vertex attribute is read.
-        // Preserve that quantization in Rust's shader, not in Java extraction.
-        // Do not normalize again: the packed vector is not exactly unit length.
-        normal = trunc(clamp(normal, vec3(-1.0), vec3(1.0)) * 127.0) / 127.0;
+        quantize_normal = true;
 #endif
+        // Frozen's entity and baked encoders pack the final transformed normal.
+        // Quantize once and do not renormalize the resulting vertex attribute.
+        if (quantize_normal) {
+            normal = trunc(clamp(normal, vec3(-1.0), vec3(1.0)) * 127.0) / 127.0;
+        }
         vec2 light = max(vec2(0.0), vec2(
             dot(LIGHT0_DIRECTION, normal),
             dot((material_semantics & 4u) != 0u ? NETHER_LIGHT1_DIRECTION : LIGHT1_DIRECTION, normal)
         ));
         float diffuse = min(1.0, (light.x + light.y) * 0.6 + 0.4);
+        vec2 back_light = max(vec2(0.0), vec2(
+            dot(LIGHT0_DIRECTION, -normal),
+            dot((material_semantics & 4u) != 0u ? NETHER_LIGHT1_DIRECTION : LIGHT1_DIRECTION, -normal)
+        ));
+        v_back_color.rgb *= min(1.0, (back_light.x + back_light.y) * 0.6 + 0.4);
         v_color.rgb *= diffuse;
     }
 #endif
@@ -4746,6 +4790,7 @@ struct MeshInstance {
     vec4 animation_region;
     vec4 animation_next_region;
     vec4 overlay_color;
+    vec4 texture_transform;
 };
 layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
     mat4 view;
@@ -4770,6 +4815,7 @@ void main() {
     v_outline_color = instance.color;
     v_outline_uv = (uint(instance.material.w) & 1u) != 0u
         ? vertex.shader_data.xy : vec2(vertex.position_uv.w, vertex.color_uv.w);
+    v_outline_uv = v_outline_uv * instance.texture_transform.xy + instance.texture_transform.zw;
 }
 "#;
 
@@ -5220,7 +5266,11 @@ void main() {
         color.rgb = mix(color.rgb, v_overlay_color.rgb, v_overlay_color.a);
     }
     uint alpha_cutoff_class = (v_terrain_material_bits >> 1u) & 3u;
-    float alpha_cutoff = float[4](0.0, 0.1, 0.1, 1.0)[alpha_cutoff_class];
+    // Copied model geometry has no Sodium material bits. Its declared
+    // material carries the cutoff independently in the native instance.
+    bool model_cutout = (uint(v_material.w) & 32u) != 0u;
+    float alpha_cutoff = model_cutout ? v_material.x
+        : float[4](0.0, 0.1, 0.1, 1.0)[alpha_cutoff_class];
 #ifdef VULKANIC_TERRAIN_FRAGMENT_DISCARD
     // Match Sodium: pass culling is explicit pipeline state, never a
     // material-dependent fragment-side back-face discard.
@@ -5405,6 +5455,7 @@ layout(location = 9) in vec2 v_fog_distances;
 layout(location = 10) flat in vec4 v_fog_color_and_environmental_start;
 layout(location = 11) flat in vec4 v_fog_ranges;
 layout(location = 12) flat in uint v_terrain_material_bits;
+layout(location = 15) in vec4 v_back_color;
 layout(location = 0) out vec4 out_color;
 // Frozen Java OpenGL reported GL_MAX_TEXTURE_LOD_BIAS = 15 for the paired
 // baseline device. Keep Sodium's derivative-selected negative-bias sample;
@@ -5450,7 +5501,8 @@ void main() {
         vec4 next_color = texture(sampler2D(Tex0, Samp0), next_uv);
         color = mix(color, next_color, clamp(v_material.z, 0.0, 1.0));
     }
-    color *= v_color;
+    bool per_face_lighting = (uint(v_material.w) & 64u) != 0u;
+    color *= per_face_lighting && !gl_FrontFacing ? v_back_color : v_color;
     if (v_overlay_color.a > 0.0) {
         color.rgb = mix(color.rgb, v_overlay_color.rgb, v_overlay_color.a);
     }
@@ -5458,7 +5510,11 @@ void main() {
     if (color.a < 0.1) discard;
 #endif
     uint alpha_cutoff_class = (v_terrain_material_bits >> 1u) & 3u;
-    float alpha_cutoff = float[4](0.0, 0.1, 0.1, 1.0)[alpha_cutoff_class];
+    // Copied model geometry has no Sodium material bits. Its declared
+    // material carries the cutoff independently in the native instance.
+    bool model_cutout = (uint(v_material.w) & 32u) != 0u;
+    float alpha_cutoff = model_cutout ? v_material.x
+        : float[4](0.0, 0.1, 0.1, 1.0)[alpha_cutoff_class];
 #ifdef VULKANIC_TERRAIN_FRAGMENT_DISCARD
     // Frozen Sodium's `block_layer_*.fsh` applies only the compact material
     // alpha cutoff here. Cull state belongs to the explicit pass pipeline;
@@ -5655,6 +5711,7 @@ struct MeshInstance {
     vec4 animation_region;
     vec4 animation_next_region;
     vec4 overlay_color;
+    vec4 texture_transform;
 };
 layout(set = 0, binding = 1, std430) readonly buffer WorldMeshInstances {
     mat4 view;
@@ -5677,6 +5734,7 @@ void main() {
 #endif
     gl_Position = clip;
     v_uv = vec2(vertex.position_uv.w, vertex.color_uv.w);
+    v_uv = v_uv * instance.texture_transform.xy + instance.texture_transform.zw;
     v_color = vec4(vertex.color_uv.rgb * vertex.normal_light.x, vertex.normal_light.w) * instance.color;
     v_material = instance.material;
     v_animation_region = instance.animation_region;
@@ -6053,7 +6111,13 @@ mod tests {
             assert!(fragment.contains("uint alpha_cutoff_class = (v_terrain_material_bits >> 1u) & 3u;"));
             // Frozen Sodium leaves face selection to the raster pipeline and
             // performs no fragment-side `gl_FrontFacing` discard.
-            assert!(!fragment.contains("gl_FrontFacing"));
+            if fragment == MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT {
+                assert_eq!(fragment.matches("gl_FrontFacing").count(), 1);
+                assert!(fragment.contains("color *= per_face_lighting && !gl_FrontFacing ? v_back_color : v_color;"));
+                assert!(fragment.contains("bool per_face_lighting = (uint(v_material.w) & 64u) != 0u;"));
+            } else {
+                assert!(!fragment.contains("gl_FrontFacing"));
+            }
         }
     }
 

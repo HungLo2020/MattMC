@@ -139,6 +139,7 @@ impl UploadQueue {
         // The accepted upload and retained CPU incarnation must agree. These
         // copies cannot fail: all extents were validated before submission and
         // neither destination nor candidate can be mutated through the GAL call.
+        retained.equipment_capture_png.take();
         for patch in prepared.patches() {
             for (mip, source) in patch.mip_pixels.iter().enumerate() {
                 let stride = (retained.width >> mip).max(1) as usize * 4;
@@ -300,6 +301,7 @@ mod tests {
         mip_rgba: Vec<Vec<u8>>,
     ) -> WorldMaterialTextureAsset {
         WorldMaterialTextureAsset {
+            equipment_capture_png: std::sync::OnceLock::new(),
             sampling: None,
             requested_mip_levels: 0,
             width,
@@ -411,6 +413,10 @@ mod tests {
         let mut retained = retained_atlas(2, 1, vec![0; 8], vec![]);
         let mut queue = UploadQueue::default();
         for tick in 1..=3 {
+            let captured=super::equipment_capture::cached_texture_source(1,&retained).unwrap();
+            let cached_ptr=retained.equipment_capture_png.get().unwrap().as_ptr();
+            assert_eq!(super::equipment_capture::cached_texture_source(1,&retained).unwrap(),captured);
+            assert_eq!(retained.equipment_capture_png.get().unwrap().as_ptr(),cached_ptr);
             let mut pending = Some(
                 animation
                     .prepare_tick(2, 1, 1, tick, &BTreeSet::from([1]), true)
@@ -429,6 +435,7 @@ mod tests {
                 UploadAttempt::Accepted(Some(_))
             ));
             assert!(pending.is_none());
+            assert!(retained.equipment_capture_png.get().is_none());
         }
         assert_eq!(queue.pending.len(), 3);
         assert_eq!(queue.pending.iter().map(|entry| entry.2).sum::<u64>(), 12);
@@ -439,6 +446,7 @@ mod tests {
         );
         let creates = gal.mock_backend().unwrap().creates.len();
         let before = retained.rgba.clone();
+        let captured=super::equipment_capture::cached_texture_source(1,&retained).unwrap();
         assert_eq!(
             queue
                 .submit(
@@ -453,6 +461,7 @@ mod tests {
         );
         assert!(pending.is_some());
         assert_eq!(retained.rgba, before);
+        assert_eq!(super::equipment_capture::cached_texture_source(1,&retained).unwrap(),captured);
         assert_eq!(gal.mock_backend().unwrap().creates.len(), creates);
         gal.mock_backend_mut().unwrap().completed = queue.pending.back().unwrap().0;
         assert!(matches!(

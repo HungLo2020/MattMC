@@ -94,11 +94,13 @@ public class SmithingScreen extends ItemCombinerScreen<SmithingMenu> {
 	@Override
 	public void render(GuiGraphics guiGraphics, int i, int j, float f) {
 		super.render(guiGraphics, i, j, f);
+		net.minecraft.client.dev.GraphicsAuditInventoryPreviewInputs.observeScreenMouse("render-return", i, j, i, j);
 		this.renderOnboardingTooltips(guiGraphics, i, j);
 	}
 
 	@Override
 	protected void renderBg(GuiGraphics guiGraphics, float f, int i, int j) {
+		net.minecraft.client.dev.GraphicsAuditInventoryPreviewInputs.observeScreenMouse("background", i, j, i, j);
 		super.renderBg(guiGraphics, f, i, j);
 		this.templateIcon.render(this.menu, guiGraphics, f, this.leftPos, this.topPos);
 		this.baseIcon.render(this.menu, guiGraphics, f, this.leftPos, this.topPos);

@@ -30,6 +30,7 @@ public class HorseInventoryScreen extends AbstractContainerScreen<HorseInventory
 
 	@Override
 	protected void renderBg(GuiGraphics guiGraphics, float f, int i, int j) {
+		net.minecraft.client.dev.GraphicsAuditInventoryPreviewInputs.observeScreenMouse("background", this.xMouse, this.yMouse, i, j);
 		int k = (this.width - this.imageWidth) / 2;
 		int l = (this.height - this.imageHeight) / 2;
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, HORSE_INVENTORY_LOCATION, k, l, 0.0F, 0.0F, this.imageWidth, this.imageHeight, 256, 256);
@@ -58,6 +59,7 @@ public class HorseInventoryScreen extends AbstractContainerScreen<HorseInventory
 		this.xMouse = i;
 		this.yMouse = j;
 		super.render(guiGraphics, i, j, f);
+		net.minecraft.client.dev.GraphicsAuditInventoryPreviewInputs.observeScreenMouse("render-return", this.xMouse, this.yMouse, i, j);
 		this.renderTooltip(guiGraphics, i, j);
 	}
 }

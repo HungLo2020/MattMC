@@ -40,7 +40,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	public SubmitNodeCollection order(int i) {
-		return this.submitsPerOrder.computeIfAbsent(i, ix -> new SubmitNodeCollection(this));
+		return this.submitsPerOrder.computeIfAbsent(i, ix -> new SubmitNodeCollection(this, ix));
 	}
 	
 	// Sodium FRAPI: Ordered item submission support
@@ -324,6 +324,12 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public void submitBlockModelSemantic(PoseStack poseStack, RenderType renderType, BlockStateModel blockStateModel,
+		float red, float green, float blue, int light, int overlay, int outlineColor, ResourceLocation semanticIdentity) {
+		this.order(0).submitBlockModelSemantic(poseStack, renderType, blockStateModel, red, green, blue, light, overlay, outlineColor, semanticIdentity);
+	}
+
+	@Override
 	public void submitItem(
 		PoseStack poseStack,
 		ItemDisplayContext itemDisplayContext,
@@ -422,8 +428,13 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 
 	@Environment(EnvType.CLIENT)
 	public record BlockModelSubmit(
-		PoseStack.Pose pose, RenderType renderType, BlockStateModel model, float r, float g, float b, int lightCoords, int overlayCoords, int outlineColor
+		PoseStack.Pose pose, RenderType renderType, BlockStateModel model, float r, float g, float b,
+		int lightCoords, int overlayCoords, int outlineColor, @Nullable ResourceLocation semanticIdentity
 	) {
+		public BlockModelSubmit(PoseStack.Pose pose, RenderType renderType, BlockStateModel model, float r, float g, float b,
+			int lightCoords, int overlayCoords, int outlineColor) {
+			this(pose, renderType, model, r, g, b, lightCoords, overlayCoords, outlineColor, null);
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

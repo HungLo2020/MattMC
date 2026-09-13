@@ -16,6 +16,7 @@ import net.minecraft.util.ARGB;
 @Environment(EnvType.CLIENT)
 public class LivingEntityEmissiveLayer<S extends LivingEntityRenderState, M extends EntityModel<S>> extends RenderLayer<S, M> {
 	private final Function<S, ResourceLocation> textureProvider;
+	private final ResourceLocation semanticIdentity;
 	private final LivingEntityEmissiveLayer.AlphaFunction<S> alphaFunction;
 	private final M model;
 	private final Function<ResourceLocation, RenderType> bufferProvider;
@@ -24,6 +25,7 @@ public class LivingEntityEmissiveLayer<S extends LivingEntityRenderState, M exte
 	public LivingEntityEmissiveLayer(
 		RenderLayerParent<S, M> renderLayerParent,
 		Function<S, ResourceLocation> function,
+		ResourceLocation semanticIdentity,
 		LivingEntityEmissiveLayer.AlphaFunction<S> alphaFunction,
 		M entityModel,
 		Function<ResourceLocation, RenderType> function2,
@@ -31,6 +33,7 @@ public class LivingEntityEmissiveLayer<S extends LivingEntityRenderState, M exte
 	) {
 		super(renderLayerParent);
 		this.textureProvider = function;
+		this.semanticIdentity = semanticIdentity;
 		this.alphaFunction = alphaFunction;
 		this.model = entityModel;
 		this.bufferProvider = function2;
@@ -42,7 +45,26 @@ public class LivingEntityEmissiveLayer<S extends LivingEntityRenderState, M exte
 			float h = this.alphaFunction.apply(livingEntityRenderState, livingEntityRenderState.ageInTicks);
 			if (!(h <= 1.0E-5F)) {
 				int j = ARGB.white(h);
-				RenderType renderType = (RenderType)this.bufferProvider.apply((ResourceLocation)this.textureProvider.apply(livingEntityRenderState));
+				ResourceLocation texture = (ResourceLocation)this.textureProvider.apply(livingEntityRenderState);
+				RenderType renderType = (RenderType)this.bufferProvider.apply(texture);
+				boolean rustWholeFrame = net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan();
+				if (rustWholeFrame && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
+					this.model, livingEntityRenderState, poseStack.last(), renderType, texture, this.semanticIdentity,
+					i, LivingEntityRenderer.getOverlayCoords(livingEntityRenderState, 0.0F), j, livingEntityRenderState.outlineColor
+				)) {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+						"rust-vulkan-whole-frame", texture, this.model.getClass().getName(), livingEntityRenderState.entityId,
+						true, true, false
+					);
+					return;
+				}
+				if (rustWholeFrame) {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+						"rust-vulkan-unavailable", texture, this.model.getClass().getName(), livingEntityRenderState.entityId,
+						false, false, false
+					);
+					throw new IllegalStateException("Rust whole-frame emissive layer has no semantic mesh: " + this.semanticIdentity);
+				}
 				submitNodeCollector.order(1)
 					.submitModelSemanticTexture(
 						this.model,
@@ -52,7 +74,7 @@ public class LivingEntityEmissiveLayer<S extends LivingEntityRenderState, M exte
 						i,
 						LivingEntityRenderer.getOverlayCoords(livingEntityRenderState, 0.0F),
 						j,
-						(ResourceLocation)this.textureProvider.apply(livingEntityRenderState),
+						texture,
 						livingEntityRenderState.outlineColor,
 						null
 					);

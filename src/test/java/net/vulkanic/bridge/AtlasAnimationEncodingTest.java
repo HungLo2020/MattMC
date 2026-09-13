@@ -109,7 +109,7 @@ class AtlasAnimationEncodingTest {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment request = VulkanicGalBridge.encodeAtlasAnimationUpdate(arena, 17, 23, 41, List.of(source));
             assertEquals(48, request.byteSize());
-            assertEquals(54, request.get(ValueLayout.JAVA_INT, 0));
+			assertEquals(63, request.get(ValueLayout.JAVA_INT, 0));
             assertEquals(48, request.get(ValueLayout.JAVA_INT, 4));
             assertEquals(17, request.get(ValueLayout.JAVA_INT, 8));
             assertEquals(0, request.get(ValueLayout.JAVA_INT, 12));

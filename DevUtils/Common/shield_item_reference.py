@@ -59,7 +59,7 @@ def compare_pattern_images(baseline,current, *, foil=False):
     return _compare_images(baseline,current,PATTERN_FOIL_PROBES if foil else PATTERN_PROBES,
                            "shield-pattern-foil-pixels-v1" if foil else "shield-pattern-pixels-v1")
 
-def _compare_images(baseline, current, probes, schema):
+def _compare_images(baseline, current, probes, schema, region_boxes=None):
     if baseline.size != (1280,720) or current.size != baseline.size:
         raise ValueError("shield reference requires equivalent 1280x720 images")
     baseline, current = baseline.convert("RGB"), current.convert("RGB")
@@ -73,7 +73,7 @@ def _compare_images(baseline, current, probes, schema):
         rows.append(dict(name=name, baseline_max_channel_error=anchor,
                          pair_max_channel_error=pair, passed=anchor<=TOLERANCE and pair<=TOLERANCE))
     regions = []
-    for name,box in REGIONS.items():
+    for name,box in (REGIONS if region_boxes is None else region_boxes).items():
         stats = ImageStat.Stat(ImageChops.difference(baseline.crop(box),current.crop(box)))
         regions.append(dict(name=name, box=box, mean_rgb_abs=stats.mean,
                             rms_rgb_abs=stats.rms, passed=max(stats.mean)<=TOLERANCE))

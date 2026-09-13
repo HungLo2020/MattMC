@@ -77,9 +77,17 @@ public class MapRenderer {
 					float f = j * -0.001F;
 					float[] vertices = {-1.0F, 1.0F, f, 1.0F, 1.0F, f, 1.0F, -1.0F, f, -1.0F, -1.0F, f};
 					float[] uvs = {textureAtlasSprite.getU0(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV0(), textureAtlasSprite.getU1(), textureAtlasSprite.getV1(), textureAtlasSprite.getU0(), textureAtlasSprite.getV1()};
-					boolean decorationAccepted = submitNodeCollector.submitTranslucentTexturedQuadSemantic(
-						poseStack, RenderType.text(textureAtlasSprite.atlasLocation()), textureAtlasSprite.atlasLocation(), vertices, uvs, -1, i
-					);
+					boolean framedDecoration = net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemFrameMapDecorationSubmission(
+						textureAtlasSprite.atlasLocation(), mapDecorationRenderState.decorationIdentity,
+						mapDecorationRenderState.x, mapDecorationRenderState.y, mapDecorationRenderState.rot);
+					boolean decorationAccepted;
+					try {
+						decorationAccepted = submitNodeCollector.submitTranslucentTexturedQuadSemantic(
+							poseStack, RenderType.text(textureAtlasSprite.atlasLocation()), textureAtlasSprite.atlasLocation(), vertices, uvs, -1, i
+						);
+					} finally {
+						if (framedDecoration) net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemFrameMapDecorationSubmission();
+					}
 					// Contract marker: if (!decorationAccepted && net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 					if (!decorationAccepted && (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 						|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())) {
@@ -144,6 +152,7 @@ public class MapRenderer {
 
 	private MapRenderState.MapDecorationRenderState extractDecorationRenderState(MapDecoration mapDecoration) {
 		MapRenderState.MapDecorationRenderState mapDecorationRenderState = new MapRenderState.MapDecorationRenderState();
+		mapDecorationRenderState.decorationIdentity = mapDecoration.getSpriteLocation();
 		mapDecorationRenderState.atlasSprite = this.decorationSprites.getSprite(mapDecoration.getSpriteLocation());
 		mapDecorationRenderState.x = mapDecoration.x();
 		mapDecorationRenderState.y = mapDecoration.y();

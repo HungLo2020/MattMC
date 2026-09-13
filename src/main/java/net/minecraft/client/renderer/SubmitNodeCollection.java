@@ -67,9 +67,11 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 	/** Fabric meshes already copied into the Rust semantic item stream. */
 	private int rustFabricItemSubmits;
 
-	public SubmitNodeCollection(SubmitNodeStorage submitNodeStorage) {
-		this.submitNodeStorage = submitNodeStorage;
-	}
+    private final int modelSubmissionOrder;
+    public SubmitNodeCollection(SubmitNodeStorage storage) { this(storage,0); }
+    public SubmitNodeCollection(SubmitNodeStorage storage,int order) {
+        this.submitNodeStorage=storage;this.modelSubmissionOrder=order;
+    }
 
 	@Override
 	public void submitHitbox(PoseStack poseStack, EntityRenderState entityRenderState, HitboxesRenderState hitboxesRenderState) {
@@ -259,6 +261,8 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 	public <S> void submitModelOutlineSemanticTexture(Model<? super S> model, S state,
 		PoseStack poseStack, RenderType material, int light,
 		net.minecraft.resources.ResourceLocation textureIdentity, int outlineColor) {
+        net.vulkanic.bridge.VulkanicGalBridge.beginSemanticModelOrder(modelSubmissionOrder);
+        try {
 		if (!(state instanceof net.minecraft.client.renderer.entity.state.EntityRenderState entityState)) {
 			throw new IllegalArgumentException("outline-only model requires semantic entity identity");
 		}
@@ -269,7 +273,9 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		}
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 			"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), entityState.entityId, true, true, false);
-	}
+
+        } finally { net.vulkanic.bridge.VulkanicGalBridge.endSemanticModelOrder(); }
+    }
 
 	@Override
 	public <S> void submitModelSemanticTexture(
@@ -284,6 +290,8 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		int l,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
+        net.vulkanic.bridge.VulkanicGalBridge.beginSemanticModelOrder(modelSubmissionOrder);
+        try {
 		if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
@@ -324,7 +332,7 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 			}
 			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				model, object, poseStack.last(), renderType, textureIdentity, entityIdentity,
-				i, j, k, l
+				i, j, k, l, crumblingOverlay
 			)) {
 				throw new IllegalStateException("Rust whole-frame direct-texture model route selected without a copied indexed mesh request");
 			}
@@ -365,7 +373,8 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 				model, renderType, textureIdentity, j, l, crumblingOverlay)
 			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				model, object, poseStack.last(), renderType, textureIdentity,
-			net.minecraft.resources.ResourceLocation.withDefaultNamespace("model-part/direct-texture"), i, j, k, l
+			net.minecraft.resources.ResourceLocation.withDefaultNamespace("model-part/direct-texture"),
+				i, j, k, l, crumblingOverlay
 			)) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 				"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), true, true, false);
@@ -387,7 +396,8 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 				model, renderType, textureIdentity, j, l, crumblingOverlay)
 			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				model, object, poseStack.last(), renderType, textureIdentity,
-				net.minecraft.resources.ResourceLocation.withDefaultNamespace("particle/arrow"), i, j, k, l
+				net.minecraft.resources.ResourceLocation.withDefaultNamespace("particle/arrow"),
+				i, j, k, l, crumblingOverlay
 			)) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 				"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), true, true, false);
@@ -400,10 +410,10 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 			&& textureIdentity != null
 			&& j == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
 			&& l == 0
-			&& crumblingOverlay == null
 			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				model, object, poseStack.last(), renderType, textureIdentity,
-				net.minecraft.resources.ResourceLocation.withDefaultNamespace("block_entity/copper_golem_statue"), i, j, k
+				net.minecraft.resources.ResourceLocation.withDefaultNamespace("block_entity/copper_golem_statue"),
+				i, j, k, l, crumblingOverlay
 			)) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 				"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), true, true, false);
@@ -416,11 +426,10 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 			&& textureIdentity != null
 			&& j == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
 			&& l == 0
-			&& crumblingOverlay == null
 			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				model, object, poseStack.last(), renderType, textureIdentity,
 				net.minecraft.resources.ResourceLocation.withDefaultNamespace("block_entity/skull"),
-				i, j, k
+				i, j, k, l, crumblingOverlay
 			)) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 				"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), true, true, false);
@@ -491,25 +500,6 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 			)) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 				"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), drownedState.entityId, true, true, false
-			);
-			return;
-		}
-		if (rustWholeFramePresenterActive()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
-			&& model instanceof net.minecraft.client.model.WitherBossModel
-			&& object instanceof net.minecraft.client.renderer.entity.state.WitherRenderState witherState
-			&& witherState.isPowered
-			&& witherState.invulnerableTicks <= 0.0F
-			&& renderType != null
-			&& renderType.pipeline().getBlendFunction().isPresent()
-			&& textureIdentity != null
-			&& textureIdentity.getPath().equals("textures/entity/wither/wither_armor.png")
-			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
-				model, object, poseStack.last(), renderType, textureIdentity,
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.entityIdentity(witherState), i, j, k
-			)) {
-			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-				"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), witherState.entityId, true, true, false
 			);
 			return;
 		}
@@ -615,7 +605,8 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 				model, renderType, textureIdentity, j, l, crumblingOverlay)
 			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				model, object, poseStack.last(), renderType, textureIdentity,
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.entityIdentity(entityState), i, j, k, l
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.entityIdentity(entityState),
+				i, j, k, l, crumblingOverlay
 			)) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 				"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), entityState.entityId, true, true, false
@@ -635,7 +626,9 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 			throw new IllegalStateException("Rust whole-frame direct-texture model has no admitted semantic mesh for " + textureIdentity);
 		}
 		this.submitModelSemantic(model, object, poseStack, renderType, i, j, k, null, l, crumblingOverlay);
-	}
+
+        } finally { net.vulkanic.bridge.VulkanicGalBridge.endSemanticModelOrder(); }
+    }
 
 	public <S> void submitAnimatedModelSemanticTexture(
 		Model<? super S> model, S object, PoseStack poseStack, RenderType renderType, int i, int j, int k,
@@ -643,23 +636,27 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay,
 		float uvOffsetU, float uvOffsetV, int textureWidth, int textureHeight
 	) {
+		int semanticEntityId = object instanceof net.minecraft.client.renderer.entity.state.EntityRenderState entityState
+			? entityState.entityId : -1;
 		if (rustWholeFramePresenterActive()
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
 			&& j == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
-			&& l == 0
 			&& crumblingOverlay == null
+			// RenderType.energySwirl declares OutlineProperty.NONE. Vanilla still
+			// forwards the entity outline color here, but ModelFeatureRenderer does
+			// not emit this layer into the outline buffer; the base mesh owns the mask.
 			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueEnergySwirlModel(
 				model, object, poseStack.last(), textureIdentity, uvOffsetU, uvOffsetV,
 				textureWidth, textureHeight, i, k
 			)) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-				"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), true, true, false);
+				"rust-vulkan-whole-frame", textureIdentity, model.getClass().getName(), semanticEntityId, true, true, false);
 			return;
 		}
 		if (rustWholeFramePresenterActive()
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-				"rust-vulkan-unavailable", textureIdentity, model.getClass().getName(), false, false, false);
+				"rust-vulkan-unavailable", textureIdentity, model.getClass().getName(), semanticEntityId, false, false, false);
 			throw new IllegalStateException("Rust whole-frame animated model route has no semantic UV-animation mesh for " + textureIdentity);
 		}
 		this.submitModelSemanticTexture(model, object, poseStack, renderType, i, j, k, textureIdentity, l, crumblingOverlay);
@@ -678,8 +675,12 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		int l,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
+        net.vulkanic.bridge.VulkanicGalBridge.beginSemanticModelOrder(modelSubmissionOrder);
+        try {
 		submitModelInternal(model, object, poseStack, renderType, i, j, k, textureAtlasSprite, l, crumblingOverlay);
-	}
+
+        } finally { net.vulkanic.bridge.VulkanicGalBridge.endSemanticModelOrder(); }
+    }
 
 	@Override
 	public <S> void submitModelSemantic(
@@ -694,8 +695,12 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		int l,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
+        net.vulkanic.bridge.VulkanicGalBridge.beginSemanticModelOrder(modelSubmissionOrder);
+        try {
 		submitModelInternal(model, object, poseStack, renderType, i, j, k, textureAtlasSprite, l, crumblingOverlay);
-	}
+
+        } finally { net.vulkanic.bridge.VulkanicGalBridge.endSemanticModelOrder(); }
+    }
 
 	private <S> void submitModelInternal(
 		Model<? super S> model,
@@ -763,7 +768,8 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 				i,
 				j,
 				k,
-				l
+				l,
+				crumblingOverlay
 			)) {
 				throw new IllegalStateException("Rust whole-frame BeeStinger route selected without a copied indexed mesh request");
 			}
@@ -910,7 +916,7 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		}
 		if (rustRoute.usesRustWholeFrameVulkan()) {
 			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueModelMesh(
-				model, object, poseStack.last(), renderType, textureAtlasSprite, i, j, k, l
+				model, object, poseStack.last(), renderType, textureAtlasSprite, i, j, k, l, crumblingOverlay
 			)) {
 				throw new IllegalStateException("Rust whole-frame model route selected without a copied indexed mesh request");
 			}
@@ -969,8 +975,12 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay,
 		int l
 	) {
+        net.vulkanic.bridge.VulkanicGalBridge.beginSemanticModelOrder(modelSubmissionOrder);
+        try {
 		submitModelPartInternal(modelPart, poseStack, renderType, i, j, textureAtlasSprite, bl, bl2, k, crumblingOverlay, l);
-	}
+
+        } finally { net.vulkanic.bridge.VulkanicGalBridge.endSemanticModelOrder(); }
+    }
 
 	@Override
 	public void submitModelPartSemantic(
@@ -986,8 +996,12 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay,
 		int l
 	) {
+        net.vulkanic.bridge.VulkanicGalBridge.beginSemanticModelOrder(modelSubmissionOrder);
+        try {
 		submitModelPartInternal(modelPart, poseStack, renderType, i, j, textureAtlasSprite, bl, bl2, k, crumblingOverlay, l);
-	}
+
+        } finally { net.vulkanic.bridge.VulkanicGalBridge.endSemanticModelOrder(); }
+    }
 
 	private void submitModelPartInternal(
 		ModelPart modelPart,
@@ -1220,17 +1234,30 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 
 	@Override
 	public void submitBlockModelSemantic(PoseStack poseStack, RenderType renderType, BlockStateModel blockStateModel, float f, float g, float h, int i, int j, int k) {
-		submitBlockModelInternal(poseStack, renderType, blockStateModel, f, g, h, i, j, k);
+		submitBlockModelInternal(poseStack, renderType, blockStateModel, f, g, h, i, j, k, null);
+	}
+
+	@Override
+	public void submitBlockModelSemantic(PoseStack poseStack, RenderType renderType, BlockStateModel blockStateModel,
+		float f, float g, float h, int i, int j, int k, net.minecraft.resources.ResourceLocation semanticIdentity) {
+		submitBlockModelInternal(poseStack, renderType, blockStateModel, f, g, h, i, j, k, semanticIdentity);
 	}
 
 	private void submitBlockModelInternal(
 		PoseStack poseStack, RenderType renderType, BlockStateModel blockStateModel,
 		float f, float g, float h, int i, int j, int k
 	) {
+		submitBlockModelInternal(poseStack, renderType, blockStateModel, f, g, h, i, j, k, null);
+	}
+
+	private void submitBlockModelInternal(
+		PoseStack poseStack, RenderType renderType, BlockStateModel blockStateModel,
+		float f, float g, float h, int i, int j, int k, @Nullable net.minecraft.resources.ResourceLocation semanticIdentity
+	) {
 		if (rustWholeFramePresenterActive()
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
 			SubmitNodeStorage.BlockModelSubmit semanticSubmit = new SubmitNodeStorage.BlockModelSubmit(
-				poseStack.last().copy(), renderType, blockStateModel, f, g, h, i, j, k
+				poseStack.last().copy(), renderType, blockStateModel, f, g, h, i, j, k, semanticIdentity
 			);
 			boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueBlockModelMesh(semanticSubmit);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity(
@@ -1245,7 +1272,7 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 			throw new IllegalStateException("Rust Vulkan block-model route is unavailable; Java block-model storage is not a fallback");
 		}
 		this.wasUsed = true;
-		this.blockModelSubmits.add(new SubmitNodeStorage.BlockModelSubmit(poseStack.last().copy(), renderType, blockStateModel, f, g, h, i, j, k));
+		this.blockModelSubmits.add(new SubmitNodeStorage.BlockModelSubmit(poseStack.last().copy(), renderType, blockStateModel, f, g, h, i, j, k, semanticIdentity));
 	}
 
 	@Override
@@ -1618,22 +1645,28 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 	}
 
 	@Override
-	public boolean submitEndPortal(PoseStack poseStack, boolean[] faces, float gameTime, int lightCoords) {
-		return submitEndPortalInternal(poseStack, faces, gameTime, lightCoords);
+	public boolean submitEndPortal(
+		PoseStack poseStack, boolean[] faces, float offsetDown, float offsetUp, float gameTime, int lightCoords
+	) {
+		return submitEndPortalInternal(poseStack, faces, offsetDown, offsetUp, gameTime, lightCoords);
 	}
 
 	@Override
-	public boolean submitEndPortalSemantic(PoseStack poseStack, boolean[] faces, float gameTime, int lightCoords) {
+	public boolean submitEndPortalSemantic(
+		PoseStack poseStack, boolean[] faces, float offsetDown, float offsetUp, float gameTime, int lightCoords
+	) {
 		// Keep the semantic portal callsite independent of the legacy-named API;
 		// both share only the explicit Rust admission implementation below.
-		return submitEndPortalInternal(poseStack, faces, gameTime, lightCoords);
+		return submitEndPortalInternal(poseStack, faces, offsetDown, offsetUp, gameTime, lightCoords);
 	}
 
-	private boolean submitEndPortalInternal(PoseStack poseStack, boolean[] faces, float gameTime, int lightCoords) {
+	private boolean submitEndPortalInternal(
+		PoseStack poseStack, boolean[] faces, float offsetDown, float offsetUp, float gameTime, int lightCoords
+	) {
 		if (!rustWholeFramePresenterActive()
 			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return false;
 		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueEndPortal(
-			poseStack.last().pose(), faces, gameTime, lightCoords
+			poseStack.last().pose(), faces, offsetDown, offsetUp, gameTime, lightCoords
 		)) throw new IllegalStateException("Rust whole-frame End Portal route rejected semantic cube");
 		return true;
 	}

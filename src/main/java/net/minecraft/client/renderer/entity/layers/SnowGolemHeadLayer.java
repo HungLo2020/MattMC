@@ -44,7 +44,7 @@ public class SnowGolemHeadLayer extends RenderLayer<SnowGolemRenderState, SnowGo
 					: ItemBlockRenderTypes.getRenderType(blockState);
 				if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
 						|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-					&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+					&& net.vulkanic.world.WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustWholeFrameVulkan()) {
 					submitNodeCollector.submitBlockDisplaySemantic(poseStack, blockState, i, j, snowGolemRenderState.outlineColor);
 				} else {
 					submitNodeCollector.submitBlockModelSemantic(poseStack, renderType, blockStateModel, 0.0F, 0.0F, 0.0F, i, j, snowGolemRenderState.outlineColor);

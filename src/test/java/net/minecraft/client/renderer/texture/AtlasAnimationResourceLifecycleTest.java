@@ -43,7 +43,7 @@ class AtlasAnimationResourceLifecycleTest {
         verifyAtlasLifecycle(location, true);
     }
 
-    @Test void shieldResourceLifecycleRemainsPrivateWithoutJavaTickerFallback() throws Exception {
+    @Test void shieldResourceLifecycleWorksWithoutPrivateFlagsOrJavaTickerFallback() throws Exception {
         verifyAtlasLifecycle(net.minecraft.client.renderer.Sheets.SHIELD_SHEET, false);
     }
 
@@ -66,7 +66,8 @@ class AtlasAnimationResourceLifecycleTest {
         try {
             System.setProperty(property, "true");
             System.clearProperty(tickProperty);
-            System.setProperty(shieldProperty, Boolean.toString(shieldLifecycle));
+            if (shieldLifecycle) System.setProperty(shieldProperty, "true");
+            else System.clearProperty(shieldProperty);
             config.set(null, net.sodium.client.gui.SodiumGameOptions.defaults());
             device.set(null, new VulkanWholeFrameSemanticGpuDevice());
             atlas = new TextureAtlas(location);
@@ -77,18 +78,6 @@ class AtlasAnimationResourceLifecycleTest {
             var first = preparations(location);
             atlas.upload(first);
             var oldResource = atlas.semanticAnimationResource();
-            if (!shieldLifecycle) {
-                assertNull(oldResource);
-                assertNull(atlas.texture);
-                assertNull(atlas.textureView);
-                assertNull(first.regions().get(ResourceLocation.withDefaultNamespace("audit/animated")).semanticAnimationResource());
-                var tickers = TextureAtlas.class.getDeclaredField("animatedTextures");
-                tickers.setAccessible(true);
-                assertTrue(((List<?>)tickers.get(atlas)).isEmpty());
-                atlas.cycleAnimationFrames();
-                assertNull(atlas.semanticAnimationResource());
-                return;
-            }
             assertNotNull(oldResource);
             assertEquals(location, oldResource.atlas());
             assertEquals(location.equals(TextureAtlas.LOCATION_BLOCKS)

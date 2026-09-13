@@ -42,6 +42,58 @@ pub(crate) struct SemanticTexture {
 
 const MATERIALS: &[SemanticMaterial] = &[
     SemanticMaterial {
+        key: WORLD_MATERIAL_ID_PER_FACE_MODEL_CUTOUT_TEXTURED,
+        resource_location: "minecraft:material/per_face_model_cutout_textured",
+        mode: WORLD_MATERIAL_MODE_CUTOUT,
+        cutout_threshold: 0.1,
+        perspective_layer_scale: 1.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_PER_FACE_TRANSLUCENT_CUTOUT_TEXTURED,
+        resource_location: "minecraft:material/per_face_translucent_cutout_textured",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
+        cutout_threshold: 0.1,
+        perspective_layer_scale: 1.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_MODEL_CUTOUT_TEXTURED,
+        resource_location: "minecraft:material/model_cutout_textured",
+        mode: WORLD_MATERIAL_MODE_CUTOUT,
+        cutout_threshold: 0.1,
+        perspective_layer_scale: 1.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_MODEL_CRUMBLING,
+        resource_location: "minecraft:material/model_crumbling",
+        mode: WORLD_MATERIAL_MODE_OPAQUE,
+        cutout_threshold: 0.0,
+        perspective_layer_scale: 1.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: true,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
         key: WORLD_MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED,
         resource_location: "minecraft:material/translucent_cutout_textured",
         mode: WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
@@ -146,6 +198,58 @@ const MATERIALS: &[SemanticMaterial] = &[
         legacy_keys: &[],
     },
     SemanticMaterial {
+        key: WORLD_MATERIAL_ID_ENERGY_SWIRL,
+        perspective_layer_scale: 1.0,
+        resource_location: "minecraft:material/energy_swirl",
+        mode: WORLD_MATERIAL_MODE_CUTOUT,
+        cutout_threshold: 0.1,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: true,
+        fullbright: true,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_MODEL_EYES,
+        perspective_layer_scale: 1.0,
+        resource_location: "minecraft:material/model_eyes",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
+        cutout_threshold: 0.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: true,
+        fullbright: true,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_MODEL_TRANSLUCENT_EMISSIVE,
+        perspective_layer_scale: 1.0,
+        resource_location: "minecraft:material/model_translucent_emissive",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
+        cutout_threshold: 0.1,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: true,
+        fullbright: true,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
+        key: WORLD_MATERIAL_ID_MODEL_BREEZE_WIND,
+        perspective_layer_scale: 1.0,
+        resource_location: "minecraft:material/model_breeze_wind",
+        mode: WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
+        cutout_threshold: 0.1,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
         key: WORLD_MATERIAL_ID_WATER_TRANSLUCENT,
         perspective_layer_scale: 1.0,
         resource_location: "minecraft:material/water_translucent",
@@ -174,10 +278,17 @@ const MATERIALS: &[SemanticMaterial] = &[
 ];
 
 /// Explicit material composition, independent of texture identity. Frozen's
-/// star contract adds src.rgb * src.a and replaces alpha, unlike translucency.
+/// star contract uses an overlay while energy swirl uses one-plus-one additive
+/// composition; neither is ordinary translucency.
 pub(crate) fn blend_override(material_key: u32) -> Option<BlendMode> {
-    matches!(material_key, WORLD_MATERIAL_ID_SKY_STARS | WORLD_MATERIAL_ID_CELESTIAL)
-        .then_some(BlendMode::Overlay)
+    match material_key {
+        WORLD_MATERIAL_ID_SKY_STARS | WORLD_MATERIAL_ID_CELESTIAL => {
+            Some(BlendMode::Overlay)
+        }
+        WORLD_MATERIAL_ID_ENERGY_SWIRL => Some(BlendMode::Additive),
+        WORLD_MATERIAL_ID_MODEL_CRUMBLING => Some(BlendMode::Crumbling),
+        _ => None,
+    }
 }
 
 const TEXTURES: &[SemanticTexture] = &[
@@ -525,6 +636,24 @@ pub(crate) fn cutout_threshold(material_key: u32) -> f32 {
     material(material_key)
         .map(|entry| entry.cutout_threshold)
         .unwrap_or(0.0)
+}
+
+pub(crate) fn per_face_lighting(material_key: u32) -> bool {
+    matches!(material_key, WORLD_MATERIAL_ID_PER_FACE_MODEL_CUTOUT_TEXTURED
+        | WORLD_MATERIAL_ID_PER_FACE_TRANSLUCENT_CUTOUT_TEXTURED
+        | WORLD_MATERIAL_ID_MODEL_TRANSLUCENT_EMISSIVE)
+}
+
+pub(crate) fn fullbright_without_cardinal_lighting(material_key: u32) -> bool {
+    material_key == WORLD_MATERIAL_ID_MODEL_EYES
+}
+
+pub(crate) fn fullbright_with_cardinal_lighting(material_key: u32) -> bool {
+    material_key == WORLD_MATERIAL_ID_MODEL_TRANSLUCENT_EMISSIVE
+}
+
+pub(crate) fn lightmapped_without_cardinal_lighting(material_key: u32) -> bool {
+    material_key == WORLD_MATERIAL_ID_MODEL_BREEZE_WIND
 }
 
 #[cfg(test)]

@@ -97,7 +97,7 @@ def observed_timing(receipt, scale, viewport, phase=None):
     return [ticks_by_position[position] for position in sorted(expected)]
 
 
-def matching_sources(frozen, current):
+def matching_sources(frozen, current, *, recovery=False):
     # The unfoiled control alone cannot establish equivalent special items.
     # Require the actual selected clock/compass frames and their geometry/UVs.
     import re
@@ -105,10 +105,25 @@ def matching_sources(frozen, current):
     if (names != set(current) or len(names) != 3
             or "minecraft:item/apple" not in names
             or sum(bool(re.fullmatch(r"minecraft:item/clock_[0-9]{2}", n)) for n in names) != 1
-            or sum(bool(re.fullmatch(r"minecraft:item/compass_[0-9]{2}", n)) for n in names) != 1
+            or sum(bool(re.fullmatch(r"minecraft:item/"+("recovery_compass" if recovery else "compass")+r"_[0-9]{2}", n)) for n in names) != 1
             or frozen != current):
         raise ValueError("special foil requires matching apple, clock and compass source inputs")
     return True
+
+
+def captured_source_evidence(timing):
+    """Sources observed in the same immutable snapshot as the selected GUI draws."""
+    from gui_foil_reference import source_evidence
+    if (not isinstance(timing,dict) or timing.get("enabled") is not True
+            or timing.get("complete") is not True or type(timing.get("frameSequence")) is not int
+            or timing["frameSequence"] <= 0):
+        raise ValueError("special foil requires capture-local source timing")
+    source=timing.get("sourceEvidence")
+    if (not isinstance(source,dict) or source.get("schema") != "gui-foil-frame-sources-v1"
+            or type(source.get("frameSequence")) is not int
+            or source["frameSequence"] != timing["frameSequence"]):
+        raise ValueError("special foil source evidence is not from the captured GUI frame")
+    return source_evidence(source)
 
 
 def temporal_images(before_frozen, before_current, after_frozen, after_current, scale):
@@ -137,25 +152,28 @@ def temporal_images(before_frozen, before_current, after_frozen, after_current, 
     return dict(passed=all(row["passed"] for row in rows), probes=rows)
 
 
-def temporal_reference(reference, pair, scale, phase):
+def temporal_reference(reference, pair, scale, phase, *, context="gui", ground=False,ground_recovery=False):
     import graphics_harness as h
     from contextlib import ExitStack
+    from gui_foil_reference import source_payloads_equal
     if type(phase) is not int or phase == 10000:
         raise ValueError("temporal special foil needs a distinct second phase")
     prior = h.read_json(Path(reference)/h.MANIFEST_NAME)
     if not isinstance(prior, dict) or prior.get("success") is not True:
         raise ValueError("temporal special foil requires an accepted first-phase manifest")
     visual = prior.get("cross_repository_visual_parity", {})
-    checked = report(visual, "special-foil", 10000)
+    checked = report(visual, "recovery-foil" if context == "held-recovery-compass" else "special-foil", 10000, context=context)
     if not checked["passed"] or len(checked["pairs"]) != 1 or len(visual.get("pairs", [])) != 1:
         raise ValueError("first special foil phase no longer passes actual pixel/timing validation")
+    if ground and checked['pairs'][0].get('ground',{}).get('passed') is not True:
+        raise ValueError("moving ground reference requires accepted actual ground evidence")
     before = visual["pairs"][0]
     for key in ("baseline_artifact", "current_artifact"):
         old = h.deterministic_capture_document(Path(before[key]))
         new = h.deterministic_capture_document(Path(pair[key]))
         if h.deterministic_visual_fixture_equivalence(old, new)["status"] != "passed":
             raise ValueError("special foil world/camera/settings changed between phases")
-        if old.get("guiItemFoilSources") != new.get("guiItemFoilSources"):
+        if not source_payloads_equal(old.get("guiItemFoilSources"), new.get("guiItemFoilSources")):
             raise ValueError("special item source frames/geometry changed between phases")
         for document in (old, new):
             reload = document.get("worldResourceReload", {})
@@ -173,35 +191,85 @@ def temporal_reference(reference, pair, scale, phase):
     with ExitStack() as stack:
         images = [stack.enter_context(Image.open(row[key])) for row in (before, pair)
                   for key in ("baseline_image", "current_image")]
-        return temporal_images(*images, scale)
+        result=temporal_images(*images, scale)
+        if ground:
+            if context != 'gui' or phase != 40000:
+                raise ValueError('unsupported temporal ground scope')
+            from ground_special_foil_reference import moving_change,recovery_scopes
+            old_ground=(h.deterministic_capture_document(Path(before['baseline_artifact'])) or {}).get('droppedItemFoilFixture')
+            sprite=recovery_scopes(old_ground)['minecraft:recovery_compass']['sprite'] if ground_recovery else None
+            result['ground']=moving_change(*images,recovery=ground_recovery,recovery_sprite=sprite)
+            result['passed'] &= result['ground']['passed']
+        if context != "gui":
+            if context not in ("held-clock", "held-compass", "held-recovery-compass") or phase != 40000:
+                raise ValueError("unsupported temporal held special foil scope")
+            from held_special_foil_reference import moving_held_change
+            result["held"]=moving_held_change(*images,context=context)
+            result["passed"] &= result["held"]["passed"]
+        return result
 
 
-def report(visual_report, fixture, phase=None, reference=None):
-    if fixture != "special-foil":
+def recovery_target_evidence(fixture):
+    target = fixture.get("lastDeathTarget") if isinstance(fixture, dict) else None
+    if (not isinstance(target, dict) or fixture.get("complete") is not True
+            or target.get("matches") is not True
+            or target.get("dimension") != "minecraft:overworld"
+            or not isinstance(target.get("pos"), list)
+            or target["pos"] != [166,100,530]
+            or any(type(v) is not int for v in target["pos"])):
+        raise ValueError("recovery compass requires the observed shared Overworld death target")
+    return True
+
+
+def report(visual_report, fixture, phase=None, reference=None, *, context="gui"):
+    recovery = fixture == "recovery-foil"
+    if (context not in ("gui", "held-clock", "held-compass", "held-recovery-compass")
+            or (context != "gui" and fixture != ("recovery-foil" if context == "held-recovery-compass" else "special-foil"))
+            or (recovery and context != "held-recovery-compass")):
+        return dict(requested=True, passed=False, capability_admitted=False, pairs=[], reason="invalid special foil context")
+    if context != "gui" and phase is not None and (
+            context not in ("held-clock", "held-compass", "held-recovery-compass") or type(phase) is not int or phase not in (10000,40000)
+            or (phase == 10000 and reference is not None) or (phase == 40000 and reference is None)):
+        return dict(requested=True, passed=False, capability_admitted=False, pairs=[],reason="held moving foil requires its first phase or accepted temporal reference")
+    if fixture not in ("special-foil", "recovery-foil"):
         return dict(requested=False, passed=True, pairs=[])
     import graphics_harness as h
     from gui_foil_reference import source_evidence
     rows = []
-    expected = dict(fixture="gui-special-foil-v1", complete=True, items=[
-        dict(item="minecraft:"+("apple" if slot==0 else "clock" if slot%2 else "compass"),
+    expected = dict(fixture="gui-recovery-foil-v1" if recovery else "gui-special-foil-v1", complete=True, items=[
+        dict(item="minecraft:"+("apple" if slot==0 else "clock" if slot%2 else "recovery_compass" if recovery else "compass"),
              count=1, foil=slot>0) for slot in range(9)])
+    if recovery:
+        expected["lastDeathTarget"] = dict(dimension="minecraft:overworld", pos=[166,100,530], matches=True)
     for pair in visual_report.get("pairs", []):
         try:
             scales = []
             sources = []
+            ground_requested=False
+            ground_recovery=False
             for key in ("baseline_artifact", "current_artifact"):
                 artifact = Path(pair[key])
                 doc = h.deterministic_capture_document(artifact) or {}
+                ground=doc.get("droppedItemFoilFixture")
+                ground_recovery |= isinstance(ground,dict) and ground.get("fixture") == "dropped-recovery-special-foil-v1"
+                ground_requested |= isinstance(ground,dict) and ground.get("fixture") in (
+                    "dropped-special-foil-v1", "dropped-recovery-special-foil-v1")
+                if recovery: recovery_target_evidence(doc.get("specialFoilFixture"))
                 if (doc.get("specialFoilFixture") != expected or doc.get("hotbarItemFixture") != fixture
                         or doc.get("guiItemFoilCount") != 8 or doc.get("guiItemGlintSpeed") != (0 if phase is None else 0.5)
-                        or doc.get("guiItemGlintStrength") != 0.5 or doc.get("selectedHotbarSlot") != 1):
+                        or doc.get("guiItemGlintStrength") != 0.5
+                        or doc.get("selectedHotbarSlot") != {"gui":1, "held-clock":2, "held-compass":3, "held-recovery-compass":3}[context]):
                     raise ValueError("special foil requires actual matching inventory/settings receipts")
                 meta = h.latest_capture_meta_path(artifact.parent / "capture")
                 if meta is None: raise ValueError("missing special foil capture metadata")
                 scales.append(int(h.read_key_values(meta).get("forced_option_guiScale", "0")))
-                sources.append(source_evidence(doc.get("guiItemFoilSources")))
+                if context == "gui":
+                    sources.append(source_evidence(doc.get("guiItemFoilSources")))
+                else:
+                    image_key="baseline_image" if key == "baseline_artifact" else "current_image"
+                    sources.append(captured_source_evidence(h.read_json(Path(str(pair[image_key])+".foil-timing.json"))))
             if scales[0] != scales[1]: raise ValueError("special foil GUI scales differ")
-            matching_sources(*sources)
+            matching_sources(*sources, recovery=recovery)
             with Image.open(pair["baseline_image"]) as frozen, Image.open(pair["current_image"]) as current:
                 timings = [observed_timing(h.read_json(Path(str(pair[key])+".foil-timing.json")),
                            scales[0], frozen.size, phase) for key in ("baseline_image", "current_image")]
@@ -210,9 +278,28 @@ def report(visual_report, fixture, phase=None, reference=None):
                 row["requested_phase"] = phase
                 row["actual_fixture_sources_and_timing_verified"] = True
                 if reference is not None:
-                    row["temporal_change"] = temporal_reference(reference, pair, scales[0], phase)
+                    row["temporal_change"] = temporal_reference(reference, pair, scales[0], phase, context=context,ground=ground_requested,ground_recovery=ground_recovery)
                     row["passed"] &= row["temporal_change"]["passed"]
+                if context != "gui":
+                    from held_special_foil_reference import check_pair
+                    row["held"] = check_pair(pair, phase, context=context)
+                    row["passed"] &= row["held"]["passed"]
+                    row["capability_admitted"] = False
+                if ground_requested:
+                    if context != "gui" or (phase is None and reference is not None) or (phase is not None and (
+                            type(phase) is not int or phase not in (10000,40000)
+                            or (phase==10000 and reference is not None) or (phase==40000 and reference is None))):
+                        raise ValueError("moving ground requires its first phase or accepted temporal reference")
+                    from ground_special_foil_reference import check_pair as ground_pair
+                    row["ground"]=ground_pair(pair,phase,recovery=ground_recovery)
+                    row["passed"] &= row["ground"]["passed"]
+                    row["capability_admitted"]=False
                 rows.append(row)
         except (KeyError, OSError, TypeError, ValueError) as error:
             rows.append(dict(passed=False, reason=str(error)))
-    return dict(requested=True, passed=bool(rows) and all(row["passed"] for row in rows), pairs=rows)
+    result = dict(requested=True, passed=bool(rows) and all(row["passed"] for row in rows), pairs=rows)
+    if any("ground" in row for row in rows):
+        result["capability_admitted"]=False
+    if context != "gui":
+        result.update(context=context, capability_admitted=False)
+    return result

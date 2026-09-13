@@ -861,6 +861,9 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 		return false;
 	}
 
+	/** Read-only declaration for bounded CPU diagnostics. */
+	public Optional<ResourceLocation> auditTextureDeclaration() { return Optional.empty(); }
+
 	public abstract RenderPipeline pipeline();
 
 	public boolean affectsCrumbling() {
@@ -929,6 +932,9 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 		public VertexFormat.Mode mode() {
 			return this.renderPipeline.getVertexFormatMode();
 		}
+
+		@Override
+		public Optional<ResourceLocation> auditTextureDeclaration() { return this.state.textureState.cutoutTexture(); }
 
 		@Override
 		public RenderPipeline pipeline() {
@@ -1012,6 +1018,12 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 
 					renderPass.setIndexBuffer(gpuBuffer2, indexType);
 					renderPass.drawIndexed(0, 0, meshData.drawState().indexCount(), 1);
+					net.minecraft.client.dev.GraphicsAuditEquipmentGeometry.observeCompletedDraw(
+						this.state.textureState.cutoutTexture().orElse(null), this.renderPipeline,
+						meshData.drawState().vertexCount(), meshData.drawState().indexCount(), VulkanicAPI.getModelViewMatrix());
+					net.minecraft.client.dev.GraphicsAuditWolfInputs.observeCompletedDraw(
+						this.state.textureState.cutoutTexture().orElse(null), this.renderPipeline,
+						meshData.drawState().vertexCount(), meshData.drawState().indexCount(), VulkanicAPI.getModelViewMatrix());
 				}
 			} catch (Throwable var17) {
 				if (meshData != null) {

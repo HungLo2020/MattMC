@@ -242,6 +242,7 @@ impl OpenGlLowerer {
         op: &CommandOp,
     ) -> GalResult<()> {
         match op {
+            CommandOp::TrackSubmission(_) => Err(GalError::backend("GAL submission receipt reached OpenGL lowering")),
             CommandOp::HostWriteBuffer {
                 buffer,
                 offset,
@@ -1531,6 +1532,12 @@ fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
             src_alpha: glow::ONE,
             dst_alpha: glow::ZERO,
         }),
+        BlendMode::Crumbling => Some(OpenGlBlendFactors {
+            src_color: glow::DST_COLOR,
+            dst_color: glow::SRC_COLOR,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ZERO,
+        }),
     };
     OpenGlBlendState {
         enabled: factors.is_some(),
@@ -1759,6 +1766,23 @@ mod tests {
             Some(OpenGlBlendFactors {
                 src_color: glow::DST_COLOR,
                 dst_color: glow::ZERO,
+                src_alpha: glow::ONE,
+                dst_alpha: glow::ZERO,
+            }),
+            state.factors
+        );
+    }
+
+    #[test]
+    fn crumbling_blend_lowers_to_symmetric_source_destination_modulation() {
+        let state = opengl_blend_state(BlendMode::Crumbling);
+        assert!(state.enabled);
+        assert_eq!(glow::FUNC_ADD, state.color_op);
+        assert_eq!(glow::FUNC_ADD, state.alpha_op);
+        assert_eq!(
+            Some(OpenGlBlendFactors {
+                src_color: glow::DST_COLOR,
+                dst_color: glow::SRC_COLOR,
                 src_alpha: glow::ONE,
                 dst_alpha: glow::ZERO,
             }),

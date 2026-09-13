@@ -1,5 +1,29 @@
 use super::handles::Handle;
 use super::resources::{Extent3d, IndexType, QueueClass, TextureSubresourceRange};
+use super::sync::SubmissionId;
+use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
+
+/// CPU lifetime receipt for transient storage referenced by prepared commands.
+/// The allocator retains one owner; each command copy retains another. GAL
+/// records accepted use before releasing its command references. Discarding
+/// commands releases reservations without pretending that work was submitted.
+#[derive(Clone, Debug, Default)]
+pub struct SubmissionUsage(Arc<AtomicU64>);
+
+impl PartialEq for SubmissionUsage {
+    fn eq(&self, other: &Self) -> bool { Arc::ptr_eq(&self.0, &other.0) }
+}
+impl Eq for SubmissionUsage {}
+
+impl SubmissionUsage {
+    pub(super) fn has_pending_commands(&self) -> bool { Arc::strong_count(&self.0) > 1 }
+    pub(super) fn last_submission(&self) -> SubmissionId {
+        SubmissionId(self.0.load(Ordering::Acquire))
+    }
+    pub(super) fn accept(&self, id: SubmissionId) {
+        self.0.fetch_max(id.0, Ordering::Release);
+    }
+}
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -106,6 +130,8 @@ pub struct TextureImageCopyRegion {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandOp {
+    /// GAL consumes this CPU receipt; it is never sent to a GPU backend.
+    TrackSubmission(SubmissionUsage),
     BeginPass {
         pass: Handle,
         target: Handle,

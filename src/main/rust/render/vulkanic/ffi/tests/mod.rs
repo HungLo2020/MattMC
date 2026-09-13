@@ -1,5 +1,5 @@
 use super::*;
-use crate::render::vulkanic::resources::{BackendApi, BackendFeatureFlags, BackendLimits};
+use crate::render::vulkanic::resources::{BackendApi, BackendFeatureFlags, BackendLimits, BlendMode};
 use crate::render::vulkanic::world_primitive_frontend::world_text::WORLD_TEXT_DEPTH_POLYGON_OFFSET;
 use crate::render::vulkanic::world_primitive_frontend::{
     WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED,
@@ -44,6 +44,29 @@ fn test_capabilities() -> BackendCapabilities {
             max_dispatch_groups_per_axis: 1,
         },
     }
+}
+
+#[test]
+fn blend_mode_wire_values_cover_every_declared_mode_including_crumbling() {
+    let expected = [
+        BlendMode::Disabled,
+        BlendMode::Alpha,
+        BlendMode::Additive,
+        BlendMode::Invert,
+        BlendMode::Multiply,
+        BlendMode::Overlay,
+        BlendMode::Glint,
+        BlendMode::Vignette,
+        BlendMode::Premultiplied,
+        BlendMode::TerrainTranslucent,
+        BlendMode::AlphaPreserveAlpha,
+        BlendMode::Crumbling,
+    ];
+    for (index, expected_mode) in expected.into_iter().enumerate() {
+        assert_eq!(expected_mode, status::blend_mode(index as u32 + 1).unwrap());
+    }
+    let error = status::blend_mode(13).expect_err("unassigned blend mode must fail closed");
+    assert_eq!(StatusCode::UnknownEnum, error.code);
 }
 
 fn semantic_particle_record() -> FfiWorldParticleQuadRequest {
@@ -670,10 +693,18 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
     );
 
     let whole_result = super::layout::layout_for_struct(54).expect("whole-frame result layout");
-    assert_eq!(49, whole_result.field_count);
+    assert_eq!(55, whole_result.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitResult, gui_mesh_draw_count) as u32,
         whole_result.field_offsets[41]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitResult, gui_entity_preview_item_count) as u32,
+        whole_result.field_offsets[42]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitResult, gui_entity_preview_index_count) as u32,
+        whole_result.field_offsets[47]
     );
 
     let first_person =
@@ -897,6 +928,25 @@ fn gui_inventory_block_lighting_transport_is_explicit_and_closed() {
     assert_eq!(decoded[0].lighting_mode,
         super::super::gui_mesh_frontend::GuiMeshLightingMode::InventoryBlock);
     request.lighting_mode = 4;
+    assert!(decode(&request).is_err());
+}
+
+#[test]
+fn gui_entity_preview_decal_material_transport_is_explicit_and_closed() {
+    let vertices = gui_mesh_vertices();
+    let indices = [0_u32, 1, 2];
+    let mut request = gui_mesh_batch_request(&vertices, &indices);
+    request.material_mode = 9;
+    request.lighting_mode = 5;
+    request.alpha_cutoff = 0.1;
+    let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
+        super::gui::decode_gui_mesh_batches(FfiSlice { ptr: request, count: 1 }, 320, 180)
+    };
+    assert_eq!(
+        decode(&request).unwrap()[0].material_mode,
+        super::super::gui_mesh_frontend::GuiMeshMaterialMode::EntityDecalCutoutNoCull
+    );
+    request.material_mode = 10;
     assert!(decode(&request).is_err());
 }
 
@@ -1938,7 +1988,9 @@ fn mesh_asset<'a>(
 
 fn mesh_instance() -> FfiWorldMeshInstanceRecord {
     FfiWorldMeshInstanceRecord {
+        model_submission_order_mode: 0, model_submission_order: 0,
         item_foil_mode: 0, item_foil_clock_millis: 0, item_foil_speed: 0.0, item_foil_strength: 0.0,
+        decal_foil_mode: 0, decal_normal_mode: 0, decal_model_pose: [0.;16], decal_normal_pose: [0.;9],
         terrain_placement_mode: 0, terrain_origin: [0;3], terrain_camera: [0.0;3],
         byte_size: size_of::<FfiWorldMeshInstanceRecord>() as u32,
         stratum: WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
@@ -2266,6 +2318,72 @@ fn whole_frame_world_primitive_ffi_decode_copies_caller_memory() {
 }
 
 #[test]
+fn model_submission_order_transport_preserves_signed_values_and_rejects_invalid_scope() {
+    for first_person in [false,true] {
+        for order in [i32::MIN,-1,0,1,i32::MAX] {
+            let mut source=mesh_instance();
+            source.stratum=WORLD_STRATUM_ENTITY_MESH;
+            source.entity_id=0;source.block_entity_id=-1;
+            source.model_submission_order_mode=1;source.model_submission_order=order;
+            let mut request=whole_frame_request_with_mesh_instances(std::slice::from_ref(&source));
+            if first_person {
+                request.world_mesh_instances=FfiSlice {ptr:std::ptr::null(),count:0};
+                let identity=[1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.];
+                request.world_first_person_frame=FfiWorldFirstPersonFrame {
+                    byte_size:size_of::<FfiWorldFirstPersonFrame>() as u32,
+                    enabled:1,clear_depth_before:1,main_hand_instance_count:1,
+                    projection_matrix:identity,model_view_matrix:identity,
+                };
+                request.world_first_person_mesh_instances=FfiSlice {ptr:&source,count:1};
+            }
+            let (_,_,frame,_)=unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.unwrap();
+            let instances=if first_person {&frame.first_person_mesh_instances} else {&frame.mesh_instances};
+            assert_eq!(instances[0].model_submission_order,Some(order));
+            for mode in [2,u32::MAX] {
+                source.model_submission_order_mode=mode;
+                assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+            }
+            source.model_submission_order_mode=0;source.model_submission_order=1;
+            assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+            source.model_submission_order_mode=1;source.stratum=WORLD_STRATUM_TERRAIN;
+            assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+        }
+    }
+}
+
+#[test]
+fn equal_depth_model_policy_survives_world_and_hand_ffi_without_relaxing_scope() {
+    let mut instances = vec![mesh_instance()];
+    instances[0].stratum = WORLD_STRATUM_ENTITY_MESH;
+    instances[0].depth_policy = WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE;
+    let request = whole_frame_request_with_mesh_instances(&instances);
+    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+    assert_eq!(frame.mesh_instances[0].depth_policy, WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE);
+    for policy in [4, u32::MAX] {
+        instances[0].depth_policy = policy;
+        assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+    }
+    instances[0].depth_policy = WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE;
+    instances[0].stratum = WORLD_STRATUM_TERRAIN;
+    assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+    instances[0].stratum = WORLD_STRATUM_ENTITY_MESH;
+    instances[0].item_foil_mode = 1;
+    assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+    instances[0].item_foil_mode = 0;
+    let mut hand = whole_frame_request(&[], &[]);
+    let identity = [1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.];
+    hand.world_first_person_frame = FfiWorldFirstPersonFrame {
+        byte_size:size_of::<FfiWorldFirstPersonFrame>() as u32,
+        enabled:1, clear_depth_before:1, main_hand_instance_count:1,
+        projection_matrix:identity, model_view_matrix:identity,
+    };
+    instances[0].entity_id = 0; instances[0].block_entity_id = -1;
+    hand.world_first_person_mesh_instances = FfiSlice {ptr:instances.as_ptr(), count:1};
+    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&hand, test_vulkan_capabilities()) }.unwrap();
+    assert_eq!(frame.first_person_mesh_instances[0].depth_policy, WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE);
+}
+
+#[test]
 fn whole_frame_mesh_instance_ffi_rejects_zero_semantic_identity_before_copying() {
     let mut instances = vec![mesh_instance()];
     let mut request = whole_frame_request(&[], &[]);
@@ -2292,7 +2410,7 @@ fn whole_frame_mesh_instance_ffi_rejects_zero_semantic_identity_before_copying()
         .contains("key and generation must be non-zero"));
 
     instances[0] = mesh_instance();
-    instances[0].flags = 4;
+    instances[0].flags = 16;
     let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
         .expect_err("unknown mesh semantic flags must fail at FFI admission");
     assert_eq!(StatusCode::InvalidArgument, error.code);
@@ -2428,7 +2546,9 @@ fn whole_frame_first_person_mesh_stream_is_copied_and_requires_its_own_domain() 
         model_view_matrix: projection,
     };
     let mut hands = vec![FfiWorldMeshInstanceRecord {
+        model_submission_order_mode: 0, model_submission_order: 0,
         item_foil_mode: 0, item_foil_clock_millis: 0, item_foil_speed: 0.0, item_foil_strength: 0.0,
+        decal_foil_mode: 0, decal_normal_mode: 0, decal_model_pose: [0.;16], decal_normal_pose: [0.;9],
         terrain_placement_mode: 0, terrain_origin: [0;3], terrain_camera: [0.0;3],
         byte_size: size_of::<FfiWorldMeshInstanceRecord>() as u32,
         stratum: WORLD_STRATUM_ENTITY_MESH,
@@ -2537,6 +2657,103 @@ fn whole_frame_first_person_mesh_stream_is_copied_and_requires_its_own_domain() 
 }
 
 #[test]
+fn world_and_hand_decal_foil_transport_copies_context_and_rejects_malformed_requests() {
+    for hand in [false, true] {
+        let mut source = mesh_instance();
+        source.stratum = WORLD_STRATUM_ENTITY_MESH;
+        source.item_foil_mode = 1;
+        source.item_foil_clock_millis = 12345;
+        source.item_foil_speed = 0.125;
+        source.item_foil_strength = 0.25;
+        source.decal_foil_mode = if hand {2} else {1};
+        source.decal_normal_mode = 1;
+        source.decal_model_pose = source.transform;
+        source.decal_normal_pose = [2.,0.,0.,0.,3.,0.,0.,0.,-4.];
+        let mut request = whole_frame_request(&[], &[]);
+        if hand {
+            request.world_first_person_mesh_instances = FfiSlice {ptr: &source, count: 1};
+            request.world_first_person_frame = FfiWorldFirstPersonFrame {
+                byte_size: size_of::<FfiWorldFirstPersonFrame>() as u32,
+                enabled: 1, clear_depth_before: 1, main_hand_instance_count: 1,
+                projection_matrix: source.transform, model_view_matrix: source.transform,
+            };
+        } else {
+            request.world_mesh_instances = FfiSlice {ptr: &source, count: 1};
+        }
+        let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+        let instances = if hand {&frame.first_person_mesh_instances} else {&frame.mesh_instances};
+        let copied = instances[0].decal_foil.unwrap();
+        assert_eq!(copied.first_person,hand);
+        assert!(!copied.trusted_normals);
+        let valid = source;
+        source.decal_normal_pose[0] = 99.;
+        assert_eq!(copied.normal_pose[0],2.);
+        for invalid_case in 0..12 {
+            source = valid;
+            match invalid_case {
+                0 => source.decal_foil_mode = 3,
+                1 => source.decal_normal_mode = 2,
+                2 => source.decal_model_pose[12] = 1.,
+                3 => source.decal_normal_pose[0] = f32::NAN,
+                4 => source.decal_normal_pose = [0.;9],
+                5 => source.item_foil_mode = 2,
+                6 => {source.item_foil_mode=0; source.item_foil_clock_millis=0;
+                    source.item_foil_speed=0.; source.item_foil_strength=0.;},
+                7 => source.decal_foil_mode = if hand {1} else {2},
+                8 => source.block_entity_id = 0,
+                9 => source.decal_foil_mode = 0,
+                10 => source.decal_model_pose[15] = 0.75,
+                11 => source.byte_size -= 8,
+                _ => unreachable!(),
+            }
+            assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err(),
+                "hand={hand} case={invalid_case}");
+        }
+        source = valid;
+        source.decal_foil_mode=0; source.decal_normal_mode=0;
+        source.decal_model_pose=[0.;16]; source.decal_normal_pose=[0.;9];
+        assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_ok());
+        source.decal_normal_pose[8] = -0.;
+        assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+    }
+    let layout = super::layout::layout_for_struct(69).unwrap();
+    assert_eq!(layout.field_count,30);
+    assert_eq!(layout.field_offsets[24],std::mem::offset_of!(FfiWorldMeshInstanceRecord,decal_foil_mode) as u32);
+    assert_eq!(layout.field_offsets[27],std::mem::offset_of!(FfiWorldMeshInstanceRecord,decal_normal_pose) as u32);
+}
+
+#[test]
+fn world_and_hand_view_layering_transport_preserves_flags_and_rejects_conflicts() {
+    let mut source = mesh_instance();
+    source.stratum = WORLD_STRATUM_ENTITY_MESH;
+    let mut request = whole_frame_request(&[], &[]);
+    request.world_mesh_instances = FfiSlice { ptr: &source, count: 1 };
+    request.world_first_person_mesh_instances = FfiSlice { ptr: &source, count: 1 };
+    request.world_first_person_frame = FfiWorldFirstPersonFrame {
+        byte_size: size_of::<FfiWorldFirstPersonFrame>() as u32,
+        enabled: 1, clear_depth_before: 1, main_hand_instance_count: 1,
+        projection_matrix: source.transform, model_view_matrix: source.transform,
+    };
+    for flags in [4, 8] {
+        source.flags = flags;
+        let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+        assert_eq!(frame.mesh_instances[0].flags, flags);
+        assert_eq!(frame.first_person_mesh_instances[0].flags, flags);
+        assert_eq!(frame.mesh_instances[0].transform, source.transform);
+    }
+    for flags in [5,6,9,10,12,16] {
+        source.flags = flags;
+        assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+    }
+    source.flags = 4;
+    source.item_foil_mode = 3;
+    assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+    source.item_foil_mode = 0;
+    source.stratum = WORLD_STRATUM_TERRAIN;
+    assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+}
+
+#[test]
 fn world_and_hand_standard_foil_transport_copies_and_rejects_noncanonical_payloads() {
     let mut source = mesh_instance();
     source.stratum = WORLD_STRATUM_ENTITY_MESH;
@@ -2568,9 +2785,21 @@ fn world_and_hand_standard_foil_transport_copies_and_rejects_noncanonical_payloa
     };
     assert_eq!(entity_frame.mesh_instances[0].item_foil, Some(entity_expected));
     assert_eq!(entity_frame.first_person_mesh_instances[0].item_foil, Some(entity_expected));
+    for (mode, projection) in [(3, crate::render::vulkanic::item_foil::FoilProjection::Perspective),
+        (4, crate::render::vulkanic::item_foil::FoilProjection::Orthographic)] {
+        source.item_foil_mode = mode;
+        let (_, _, layered_frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+        for copied in [layered_frame.mesh_instances[0].item_foil.unwrap(),
+            layered_frame.first_person_mesh_instances[0].item_foil.unwrap()] {
+            assert_eq!(copied.kind.armor_projection(), Some(projection));
+            assert_eq!(copied.clock_millis, expected.clock_millis);
+            assert_eq!(copied.speed, expected.speed);
+            assert_eq!(copied.strength, expected.strength);
+        }
+    }
     for (mode, clock, speed, strength) in [
         (0, 1, 0.0, 0.0), (0, 0, -0.0, 0.0), (0, 0, 0.0, -0.0),
-        (3, 0, 0.0, 0.0), (1, u64::MAX, 0.0, 0.0),
+        (5, 0, 0.0, 0.0), (1, u64::MAX, 0.0, 0.0),
         (1, 0, f64::NAN, 0.5), (1, 0, 0.5, f32::INFINITY),
         (1, 0, 1.01, 0.5), (1, 0, 0.5, -0.01),
     ] {

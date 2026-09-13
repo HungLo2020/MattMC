@@ -29,9 +29,12 @@ use super::resources::{
 };
 use super::CullMode;
 
-pub const GUI_MESH_MAX_BATCHES: usize = 1_024;
-pub const GUI_MESH_MAX_VERTICES: usize = 65_536;
-pub const GUI_MESH_MAX_INDICES: usize = 196_608;
+/// One batch may be one independently textured baked quad. A large item-browser
+/// grid can therefore approach the aggregate quad capacity without approaching
+/// the payload-byte bound.
+pub const GUI_MESH_MAX_BATCHES: usize = 16_384;
+pub const GUI_MESH_MAX_VERTICES: usize = 1_048_576;
+pub const GUI_MESH_MAX_INDICES: usize = 3_145_728;
 pub const GUI_MESH_GPU_VERTEX_BYTES: usize = 3 * 4 * 4;
 /// Aggregate copied GUI geometry admitted for one semantic frame. This keeps
 /// nested mesh slices from multiplying the per-batch limits into an
@@ -414,6 +417,12 @@ pub enum GuiMeshMaterialMode {
     /// Vanilla entity_no_outline layers: two-sided alpha, no depth writes,
     /// and front/back directional lighting. Not ordinary translucent items.
     ModelOverlay,
+	/// Vanilla entity/armor cutout geometry: alpha-tested and two-sided.
+	EntityCutoutNoCull,
+	/// Vanilla player/entity translucent geometry: alpha-tested, blended, and two-sided.
+	EntityTranslucentNoCull,
+	/// Vanilla armor decal cutout: two-sided alpha test with Equal depth and depth writes.
+	EntityDecalCutoutNoCull,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -425,6 +434,8 @@ pub enum GuiMeshLightingMode {
     InventoryBlock,
     /// Vanilla gui_light=front models: ITEMS_FLAT directional lights, not unlit.
     FrontModel,
+    /// Ordinary entity preview lighting (Lighting.ENTITY_IN_UI).
+    EntityPreview,
 }
 
 /// One copied model vertex with the stable vanilla signed-i8 normal encoding.
@@ -1210,7 +1221,25 @@ fn gui_mesh_raster_state(
     match material_mode {
         GuiMeshMaterialMode::ModelOverlay => (CullMode::None, BlendMode::Alpha, Some(CompareOp::LessOrEqual), false),
         GuiMeshMaterialMode::Panorama => (CullMode::None, BlendMode::Disabled, None, false),
-        GuiMeshMaterialMode::Opaque | GuiMeshMaterialMode::Cutout => (
+		GuiMeshMaterialMode::EntityCutoutNoCull => (
+			CullMode::None,
+			BlendMode::Disabled,
+			Some(CompareOp::LessOrEqual),
+			true,
+		),
+		GuiMeshMaterialMode::EntityTranslucentNoCull => (
+			CullMode::None,
+			BlendMode::Alpha,
+			Some(CompareOp::LessOrEqual),
+			true,
+		),
+		GuiMeshMaterialMode::EntityDecalCutoutNoCull => (
+			CullMode::None,
+			BlendMode::Disabled,
+			Some(CompareOp::Equal),
+			true,
+		),
+		GuiMeshMaterialMode::Opaque | GuiMeshMaterialMode::Cutout => (
             CullMode::Back,
             BlendMode::Disabled,
             Some(CompareOp::LessOrEqual),
@@ -1759,12 +1788,23 @@ fn frame_uniform_bytes(
     // quantization changes the light intensity. Preserve the existing separate
     // upright mesh convention rather than silently changing unrelated routes.
     let lighting_policy = match lighting_mode {
-        GuiMeshLightingMode::InventoryBlock | GuiMeshLightingMode::FrontModel => 2.0,
+        GuiMeshLightingMode::InventoryBlock | GuiMeshLightingMode::FrontModel | GuiMeshLightingMode::EntityPreview => 2.0,
         GuiMeshLightingMode::Block => 1.0,
         GuiMeshLightingMode::Flat => 0.0,
     };
     for value in [extent[0] as f32, extent[1] as f32, alpha_cutoff, lighting_policy] {
         bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    if lighting_mode == GuiMeshLightingMode::EntityPreview {
+        // Independent semantic constants from vanilla Lighting.ENTITY_IN_UI.
+        // No Java lighting UBO or graphics state crosses this boundary.
+        for [x,y,z] in [[0.2_f32,-1.0,1.0],[-0.2,-1.0,0.0]] {
+            let length=(x*x+y*y+z*z).sqrt();
+            for value in [x/length,y/length,z/length,0.0] {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+        }
+        return bytes;
     }
     if lighting_mode == GuiMeshLightingMode::FrontModel {
         // Frozen Lighting.ITEMS_FLAT: rotationY(-pi/8).rotateX(3pi/4).
@@ -2182,6 +2222,14 @@ fn resolved_item_raster(batch: &GuiMeshBatchRequest) -> GalResult<([u32; 2], [f3
 }
 
 pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
+	if matches!(batch.material_mode,
+		GuiMeshMaterialMode::EntityCutoutNoCull | GuiMeshMaterialMode::EntityTranslucentNoCull
+			| GuiMeshMaterialMode::EntityDecalCutoutNoCull)
+		&& (batch.lighting_mode != GuiMeshLightingMode::EntityPreview
+			|| (batch.alpha_cutoff - 0.1).abs() > f32::EPSILON
+			|| batch.item_raster_scale != 0 || batch.item_foil.is_some()) {
+		return Err(GalError::invalid_argument("entity no-cull material requires an entity preview with vanilla alpha cutoff"));
+	}
     if let Some(cache) = batch.item_cache {
         if cache.identity == 0 || batch.item_raster_scale == 0
             || (!cache.animated && batch.item_foil.is_some()) {
@@ -2207,6 +2255,15 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
     }
     if let Some(foil) = batch.item_foil {
         foil.validate()?;
+        if foil.kind == super::item_foil::StandardFoilKind::Armor {
+            return Err(GalError::invalid_argument("perspective armor foil is not a GUI entity-preview material"));
+        }
+        if foil.kind == super::item_foil::StandardFoilKind::ArmorOrthographic
+            && (batch.lighting_mode != GuiMeshLightingMode::EntityPreview
+				|| batch.item_raster_scale != 0 || batch.block_item_raster.is_some()
+				|| batch.decal_foil.is_some()) {
+			return Err(GalError::invalid_argument("orthographic armor foil requires explicit GUI entity-preview semantics"));
+        }
         if foil.kind == super::item_foil::StandardFoilKind::Entity
             && (batch.item_raster_scale == 0 || batch.block_item_raster.is_some()
                 || batch.decal_foil.is_some() || batch.lighting_mode != GuiMeshLightingMode::Flat) {
@@ -2393,7 +2450,8 @@ fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
                     _ => return Err(GalError::invalid_argument("missing enchanted baked face")),
                 };
             }
-            if batch.lighting_mode == GuiMeshLightingMode::InventoryBlock && batch.block_item_raster.is_none() {
+            if (batch.lighting_mode == GuiMeshLightingMode::InventoryBlock && batch.block_item_raster.is_none())
+                || batch.lighting_mode == GuiMeshLightingMode::EntityPreview {
                 normal = packed_normal;
             }
             if batch.item_raster_scale != 0 {
@@ -2838,6 +2896,21 @@ mod tests {
         assert!(std::str::from_utf8(GUI_MESH_VERTEX_SHADER_VULKAN)
             .unwrap()
             .contains(decode));
+    }
+
+    #[test]
+    fn entity_preview_lighting_uses_inventory_directions_and_keeps_quantized_normals() {
+        let bytes=frame_uniform_bytes([150.0,212.0],0.1,GuiMeshLightingMode::EntityPreview);
+        let values: Vec<f32>=bytes.chunks_exact(4).map(|b|f32::from_le_bytes(b.try_into().unwrap())).collect();
+        assert_eq!(values[3],2.0);
+        for (actual,expected) in values[4..].iter().zip([0.14002801_f32,-0.70014006,0.70014006,0.0,-0.19611613,-0.9805807,0.0,0.0]) {
+            assert!((actual-expected).abs()<0.000001);
+        }
+        let mut source=batch();source.lighting_mode=GuiMeshLightingMode::EntityPreview;
+        for vertex in &mut source.vertices {vertex.normal_packed=0x00303030;}
+        let prepared=prepare_draw(&source).expect("entity preview copied mesh");
+        assert_eq!(prepared.vertices[0].normal,[48.0/127.0;3]);
+        assert_ne!(bytes,frame_uniform_bytes([150.0,212.0],0.1,GuiMeshLightingMode::Block));
     }
 
     #[test]
@@ -3839,9 +3912,16 @@ mod tests {
             assert_eq!(output.color, [0.375, 0.375, 0.375, 1.0]);
             assert_eq!(output.local_uv, semantics.texture_uv(input.atlas_uv).unwrap());
         }
-        let mut legacy = foil.clone();
-        legacy.item_raster_scale = 0;
-        legacy.render_extent = [48,48];
+		let mut legacy = foil.clone();
+		legacy.item_foil = Some(GuiItemFoil { kind: super::super::item_foil::StandardFoilKind::Armor, ..semantics });
+		assert!(validate_batch(&legacy).is_err(), "perspective equipment foil must not enter GUI lowering");
+		legacy.item_raster_scale = 0;
+		legacy.render_extent = [48,48];
+		legacy.lighting_mode = GuiMeshLightingMode::EntityPreview;
+		legacy.item_foil = Some(GuiItemFoil { kind: super::super::item_foil::StandardFoilKind::ArmorOrthographic, ..semantics });
+		assert!(validate_batch(&legacy).is_ok(), "orthographic equipment foil belongs to entity preview lowering");
+        legacy.item_foil = Some(semantics);
+		legacy.lighting_mode = GuiMeshLightingMode::Flat;
         assert!(validate_batch(&legacy).is_err());
         foil.decal_foil = GuiDecalFoilProjection::decode(2,[0.;16],[0.;9]).unwrap();
         assert!(validate_batch(&foil).is_err(), "entity foil is not projected item foil");
@@ -4219,6 +4299,38 @@ mod tests {
             "Frozen's panorama pipeline explicitly disables culling and depth testing",
         );
     }
+
+	#[test]
+	fn entity_preview_materials_preserve_vanilla_no_cull_alpha_policies() {
+		assert_eq!(
+			gui_mesh_raster_state(GuiMeshMaterialMode::EntityCutoutNoCull),
+			(CullMode::None, BlendMode::Disabled, Some(CompareOp::LessOrEqual), true),
+		);
+		assert_eq!(
+			gui_mesh_raster_state(GuiMeshMaterialMode::EntityTranslucentNoCull),
+			(CullMode::None, BlendMode::Alpha, Some(CompareOp::LessOrEqual), true),
+		);
+		assert_eq!(
+			gui_mesh_raster_state(GuiMeshMaterialMode::EntityDecalCutoutNoCull),
+			(CullMode::None, BlendMode::Disabled, Some(CompareOp::Equal), true),
+		);
+		for material_mode in [
+			GuiMeshMaterialMode::EntityCutoutNoCull,
+			GuiMeshMaterialMode::EntityTranslucentNoCull,
+			GuiMeshMaterialMode::EntityDecalCutoutNoCull,
+		] {
+			let mut request = batch();
+			request.material_mode = material_mode;
+			request.lighting_mode = GuiMeshLightingMode::EntityPreview;
+			request.alpha_cutoff = 0.1;
+			validate_batch(&request).expect("vanilla entity preview material is valid");
+			request.alpha_cutoff = 0.0;
+			assert!(validate_batch(&request).is_err());
+			request.alpha_cutoff = 0.1;
+			request.lighting_mode = GuiMeshLightingMode::Block;
+			assert!(validate_batch(&request).is_err());
+		}
+	}
 
     #[test]
     fn standard_3d_item_composite_preserves_the_pip_target_v_orientation() {

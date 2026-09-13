@@ -578,13 +578,14 @@ public final class RustGalGuiItemRenderer {
 		private static final int MAX_QUADS = 4096;
 		private final List<Batch> batches = new ArrayList<>();
 
-		private boolean add(ResourceLocation texture, float[] vertices, float[] uvs, int[] colors) {
+		private boolean add(ResourceLocation texture, float[] vertices, float[] uvs, @Nullable float[] normals, int[] colors) {
 			if (texture == null || vertices == null || uvs == null || colors == null) {
 				recordDiagnostic("tacz-quad-missing-array");
 				return false;
 			}
 			int quadCount = vertices.length / 12;
 			if (vertices.length == 0 || vertices.length % 12 != 0 || uvs.length != vertices.length / 3 * 2
+				|| (normals != null && normals.length != vertices.length)
 				|| (colors.length != quadCount && colors.length != quadCount * 4)
 				|| quadCount + totalQuads() > MAX_QUADS) {
 				recordDiagnostic("tacz-quad-shape=" + vertices.length + "/" + uvs.length + "/" + colors.length);
@@ -605,7 +606,7 @@ public final class RustGalGuiItemRenderer {
 					for (int vertex = 0; vertex < 4; vertex++) perVertexColors[quad * 4 + vertex] = colors[quad];
 				}
 			}
-			batches.add(new Batch(asset, vertices.clone(), uvs.clone(), perVertexColors));
+			batches.add(new Batch(asset, vertices.clone(), uvs.clone(), normals == null ? null : normals.clone(), perVertexColors));
 			return true;
 		}
 
@@ -622,6 +623,7 @@ public final class RustGalGuiItemRenderer {
 			int height = Math.max(2, (bottom - top) * guiScale + 2);
 			Matrix4f transform = new Matrix4f().translate(width / 2.0F, height / 2.0F, 0.0F)
 				.scale(guiScale * 16.0F, guiScale * 16.0F, -guiScale * 16.0F);
+			org.joml.Matrix3f normalTransform = new org.joml.Matrix3f(transform).invert().transpose();
 			RustGalGuiRawImageAssets.Asset glintAsset = null;
 			int glintColor = 0xffffffff;
 			if (foil) {
@@ -633,32 +635,48 @@ public final class RustGalGuiItemRenderer {
 			List<VulkanicGalBridge.GuiMeshBatchRecord> records = new ArrayList<>(batches.size());
 			for (Batch batch : batches) {
 				List<VulkanicGalBridge.GuiMeshVertexRecord> copied = new ArrayList<>(batch.vertices.length / 3);
-				Vector3f first = transform.transformPosition(batch.vertices[0], batch.vertices[1], batch.vertices[2], new Vector3f());
-				Vector3f second = transform.transformPosition(batch.vertices[3], batch.vertices[4], batch.vertices[5], new Vector3f());
-				Vector3f third = transform.transformPosition(batch.vertices[6], batch.vertices[7], batch.vertices[8], new Vector3f());
-				Vector3f edgeA = new Vector3f(second).sub(first);
-				Vector3f edgeB = new Vector3f(third).sub(first);
-				Vector3f normal = edgeA.cross(edgeB);
-				float normalLength = normal.length();
-				if (!Float.isFinite(normalLength) || normalLength <= 1.0e-6F) return List.of();
-				normal.mul(1.0F / normalLength);
-				int normalPacked = packGuiNormal(normal.x(), normal.y(), normal.z());
-				for (int vertex = 0; vertex < batch.vertices.length / 3; vertex++) {
-					Vector3f position = transform.transformPosition(batch.vertices[vertex * 3], batch.vertices[vertex * 3 + 1], batch.vertices[vertex * 3 + 2], new Vector3f());
-					copied.add(new VulkanicGalBridge.GuiMeshVertexRecord(
-						new float[] {position.x, position.y, position.z},
-						new float[] {batch.uvs[vertex * 2], batch.uvs[vertex * 2 + 1]},
-						new float[] {batch.uvs[vertex * 2], batch.uvs[vertex * 2 + 1]},
-						batch.colors[vertex], normalPacked));
+				List<float[]> glintUvs = new ArrayList<>(batch.vertices.length / 3);
+				for (int quad = 0; quad < batch.vertices.length / 12; quad++) {
+					int vertexOffset = quad * 4;
+					int floatOffset = quad * 12;
+					Vector3f normal = batch.normals == null
+						? reconstructedNormal(batch.vertices, floatOffset, transform)
+						: normalTransform.transform(batch.normals[floatOffset], batch.normals[floatOffset + 1], batch.normals[floatOffset + 2], new Vector3f()).normalize();
+					Vector3f first = transformedPosition(batch.vertices, floatOffset, transform);
+					Vector3f second = transformedPosition(batch.vertices, floatOffset + 3, transform);
+					Vector3f third = transformedPosition(batch.vertices, floatOffset + 6, transform);
+					float alignment = new Vector3f(second).sub(first).cross(new Vector3f(third).sub(first)).dot(normal);
+					// Bedrock permits zero-thickness cubes whose collapsed faces cannot
+					// rasterize. Frozen submits those no-op triangles; omit them before
+					// Rust's stricter copied-normal/winding validation.
+					if (!Float.isFinite(alignment)) return List.of();
+					if (Math.abs(alignment) <= 1.0e-6F) continue;
+					for (int corner = 0; corner < 4; corner++) {
+						int vertex = vertexOffset + corner;
+						Vector3f position = transformedPosition(batch.vertices, vertex * 3, transform);
+						Vector3f vertexNormal = batch.normals == null ? normal : normalTransform.transform(
+							batch.normals[vertex * 3], batch.normals[vertex * 3 + 1], batch.normals[vertex * 3 + 2], new Vector3f()).normalize();
+						if (!Float.isFinite(vertexNormal.x()) || !Float.isFinite(vertexNormal.y()) || !Float.isFinite(vertexNormal.z())) return List.of();
+						copied.add(new VulkanicGalBridge.GuiMeshVertexRecord(
+							new float[] {position.x, position.y, position.z},
+							new float[] {batch.uvs[vertex * 2], batch.uvs[vertex * 2 + 1]},
+							new float[] {batch.uvs[vertex * 2], batch.uvs[vertex * 2 + 1]},
+							batch.colors[vertex], packGuiNormal(vertexNormal.x(), vertexNormal.y(), vertexNormal.z())));
+						glintUvs.add(new float[] {-batch.vertices[vertex * 3] * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE,
+							-batch.vertices[vertex * 3 + 1] * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE});
+					}
 				}
+				if (copied.isEmpty()) continue;
 				List<Integer> indices = new ArrayList<>(batch.vertices.length / 2);
 				for (int vertex = 0; vertex < copied.size(); vertex += 4) {
 					indices.add(vertex); indices.add(vertex + 1); indices.add(vertex + 2);
 					indices.add(vertex + 2); indices.add(vertex + 3); indices.add(vertex);
 				}
 				int layerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder;
-				records.add(new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, records.size(), 1, 2,
-					batch.asset.assetId(), 0L, 0.0F, identity(), new float[] {
+				records.add(new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, records.size(),
+					VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL,
+					VulkanicGalBridge.GUI_MESH_LIGHTING_ENTITY_PREVIEW,
+					batch.asset.assetId(), 0L, 0.1F, identity(), new float[] {
 						item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()
 					},
 					left, top, right, bottom, guiWidth, guiHeight, width, height, 1, 0, 0, 0, 0, 0,
@@ -666,10 +684,8 @@ public final class RustGalGuiItemRenderer {
 				if (glintAsset != null) {
 					List<VulkanicGalBridge.GuiMeshVertexRecord> glintVertices = new ArrayList<>(copied.size());
 					for (int vertex = 0; vertex < copied.size(); vertex++) {
-						float x = batch.vertices[vertex * 3];
-						float y = batch.vertices[vertex * 3 + 1];
-						float u = -x * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE;
-						float v = -y * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE;
+						float u = glintUvs.get(vertex)[0];
+						float v = glintUvs.get(vertex)[1];
 						VulkanicGalBridge.GuiMeshVertexRecord source = copied.get(vertex);
 						glintVertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(
 							source.position(), new float[] {u, v}, new float[] {u, v}, glintColor, source.normalPacked()
@@ -700,8 +716,19 @@ public final class RustGalGuiItemRenderer {
 			return px | (py << 8) | (pz << 16);
 		}
 
+		private static Vector3f reconstructedNormal(float[] vertices, int offset, Matrix4f transform) {
+			Vector3f first = transformedPosition(vertices, offset, transform);
+			Vector3f second = transformedPosition(vertices, offset + 3, transform);
+			Vector3f third = transformedPosition(vertices, offset + 6, transform);
+			return new Vector3f(second).sub(first).cross(new Vector3f(third).sub(first)).normalize();
+		}
+
+		private static Vector3f transformedPosition(float[] vertices, int offset, Matrix4f transform) {
+			return transform.transformPosition(vertices[offset], vertices[offset + 1], vertices[offset + 2], new Vector3f());
+		}
+
 		private static float[] identity() { return new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
-		private record Batch(RustGalGuiRawImageAssets.Asset asset, float[] vertices, float[] uvs, int[] colors) {}
+		private record Batch(RustGalGuiRawImageAssets.Asset asset, float[] vertices, float[] uvs, @Nullable float[] normals, int[] colors) {}
 	}
 
 	private static final class TaczGuiSubmitCollector extends SubmitNodeCollection implements SubmitNodeCollector {
@@ -718,13 +745,19 @@ public final class RustGalGuiItemRenderer {
 		@Override
 		public boolean submitTexturedQuads(PoseStack poseStack, RenderType renderType, ResourceLocation texture,
 			float[] vertices, float[] uvs, int[] colors, int lightCoords) {
-			return capture.add(texture, vertices, uvs, colors);
+			return capture.add(texture, vertices, uvs, null, colors);
+		}
+
+		@Override
+		public boolean submitTexturedQuadsWithNormalsSemantic(PoseStack poseStack, RenderType renderType, ResourceLocation texture,
+			float[] vertices, float[] uvs, float[] normals, int[] colors, int lightCoords) {
+			return capture.add(texture, vertices, uvs, normals, colors);
 		}
 
 		@Override
 		public boolean submitTexturedQuad(PoseStack poseStack, RenderType renderType, ResourceLocation texture,
 			float[] vertices, float[] uvs, int color, int lightCoords) {
-			return capture.add(texture, vertices, uvs, new int[] {color, color, color, color});
+			return capture.add(texture, vertices, uvs, null, new int[] {color, color, color, color});
 		}
 
 

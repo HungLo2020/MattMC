@@ -34,9 +34,15 @@ import java.util.Map;
 
 public final class RustGalFrameCoordinator {
 	private static final int MAX_RUST_GUI_AFFINE_QUADS = 65_536;
-	private static final int MAX_RUST_GUI_MESH_BATCHES = 1_024;
-	private static final int MAX_RUST_GUI_MESH_VERTICES = 65_536;
-	private static final int MAX_RUST_GUI_MESH_INDICES = 196_608;
+	// A full-width JEI panel can expose hundreds of block items at once, and
+	// each copied baked face remains an independently textured mesh batch. Keep
+	// this aligned with the bounded quad capacity implied by the aggregate
+	// vertex/index limits instead of rejecting valid, low-payload GUI frames.
+	private static final int MAX_RUST_GUI_MESH_BATCHES = 16_384;
+	// A single detailed TACZ rifle contributes about 10,700 vertices. This bound
+	// accommodates a full gun-heavy item grid within the 128 MiB payload limit.
+	private static final int MAX_RUST_GUI_MESH_VERTICES = 1_048_576;
+	private static final int MAX_RUST_GUI_MESH_INDICES = 3_145_728;
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Object LOCK = new Object();
 	private static final GuiAtlasReferencePublication GUI_ATLAS_REFERENCES = new GuiAtlasReferencePublication();
@@ -966,10 +972,22 @@ public final class RustGalFrameCoordinator {
 					if (meshBatchRequests.size() + request.payload().meshBatches().size() > MAX_RUST_GUI_MESH_BATCHES
 						|| (long)meshVertexCount + incomingVertices > MAX_RUST_GUI_MESH_VERTICES
 						|| (long)meshIndexCount + incomingIndices > MAX_RUST_GUI_MESH_INDICES) {
+						long projectedBatches = (long)meshBatchRequests.size() + request.payload().meshBatches().size();
+						long projectedVertices = (long)meshVertexCount + incomingVertices;
+						long projectedIndices = (long)meshIndexCount + incomingIndices;
 						throw new IllegalStateException(
-							"Rust whole-frame GUI mesh capacity exceeded batches=" + MAX_RUST_GUI_MESH_BATCHES
-								+ " vertices=" + MAX_RUST_GUI_MESH_VERTICES + " indices=" + MAX_RUST_GUI_MESH_INDICES
-							);
+							"Rust whole-frame GUI mesh capacity exceeded"
+								+ " current=(batches=" + meshBatchRequests.size() + ",vertices=" + meshVertexCount
+								+ ",indices=" + meshIndexCount + ")"
+								+ " incoming=(batches=" + request.payload().meshBatches().size() + ",vertices=" + incomingVertices
+								+ ",indices=" + incomingIndices + ")"
+								+ " projected=(batches=" + projectedBatches + ",vertices=" + projectedVertices
+								+ ",indices=" + projectedIndices + ")"
+								+ " limits=(batches=" + MAX_RUST_GUI_MESH_BATCHES + ",vertices=" + MAX_RUST_GUI_MESH_VERTICES
+								+ ",indices=" + MAX_RUST_GUI_MESH_INDICES + ")"
+								+ " request=(token=" + request.token().batchId() + ",stratum=" + request.token().stratumId()
+								+ ",order=" + request.token().stratumOrder() + ")"
+						);
 					}
 					meshVertexCount = Math.addExact(meshVertexCount, Math.toIntExact(incomingVertices));
 					meshIndexCount = Math.addExact(meshIndexCount, Math.toIntExact(incomingIndices));
@@ -1174,6 +1192,26 @@ public final class RustGalFrameCoordinator {
 					submissionId,
 					primitiveFrame
 				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameStructureBlockBoxExecution(
+					frameId,
+					submissionId,
+					primitiveFrame
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameStructureInvisibleCellsExecution(
+					frameId,
+					submissionId,
+					primitiveFrame
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameTestInstanceCompositionExecution(
+					frameId,
+					submissionId,
+					primitiveFrame
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameModelCompositionExecution(
+					frameId,
+					submissionId,
+					primitiveFrame
+				);
 				RustGalWorldPrimitiveRenderer.recordWholeFrameWeatherExecution(
 					frameId,
 					submissionId,
@@ -1189,10 +1227,26 @@ public final class RustGalFrameCoordinator {
 					submissionId,
 					primitiveFrame.materialQuads()
 				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameEndPortalExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameEndGatewayBeamExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
 				RustGalWorldPrimitiveRenderer.recordWholeFrameCrystalBeamExecution(
 					frameId,
 					submissionId,
 					primitiveFrame.materialQuads()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameEnergySwirlExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads(),
+					primitiveFrame.meshInstances()
 				);
 				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityFlameExecution(
 					frameId,
@@ -1200,6 +1254,11 @@ public final class RustGalFrameCoordinator {
 					primitiveFrame.entityFlameQuadCount()
 				);
 				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityShadowExecution(
+					frameId,
+					submissionId,
+					primitiveFrame.materialQuads()
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameItemFrameMapExecution(
 					frameId,
 					submissionId,
 					primitiveFrame.materialQuads()
@@ -1507,6 +1566,12 @@ public final class RustGalFrameCoordinator {
 			+ "  \"gui_mesh_items\":" + result.guiMeshItemCount() + ",\n"
 			+ "  \"gui_mesh_batches\":" + result.guiMeshBatchCount() + ",\n"
 			+ "  \"gui_mesh_draws\":" + result.guiMeshDrawCount() + ",\n"
+			+ "  \"gui_entity_preview_items\":" + result.guiEntityPreviewItemCount() + ",\n"
+			+ "  \"gui_entity_preview_batches\":" + result.guiEntityPreviewBatchCount() + ",\n"
+			+ "  \"gui_entity_preview_draws\":" + result.guiEntityPreviewDrawCount() + ",\n"
+			+ "  \"gui_entity_preview_material_mask\":" + result.guiEntityPreviewMaterialMask() + ",\n"
+			+ "  \"gui_entity_preview_vertices\":" + result.guiEntityPreviewVertexCount() + ",\n"
+			+ "  \"gui_entity_preview_indices\":" + result.guiEntityPreviewIndexCount() + ",\n"
 			+ "  \"world_mesh_instances\":" + result.worldMeshInstanceCount() + ",\n"
 			+ "  \"world_mesh_batches\":" + result.worldMeshBatchCount() + ",\n"
 			+ "  \"world_mesh_draws\":" + result.worldMeshDrawCount() + ",\n"

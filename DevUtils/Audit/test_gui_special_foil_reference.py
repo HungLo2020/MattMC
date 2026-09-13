@@ -8,6 +8,53 @@ from gui_special_foil_reference import image_pair, stopped_timing, observed_timi
 
 
 class SpecialFoilReferenceTest(unittest.TestCase):
+    def test_held_second_phase_requires_a_reference_and_first_phase_cannot_recurse(self):
+        for context in ("held-clock", "held-compass", "held-recovery-compass"):
+            fixture="recovery-foil" if context == "held-recovery-compass" else "special-foil"
+            for phase,reference in ((40000,None),(10000,"first"),(True,None),(30000,None)):
+                result=report({},fixture,phase,reference,context=context)
+                self.assertFalse(result["passed"])
+                self.assertEqual("held moving foil requires its first phase or accepted temporal reference",result["reason"])
+            self.assertFalse(report({},fixture,10000,context=context)["passed"], "missing captures cannot pass")
+
+    def test_ground_fixture_cannot_pass_with_only_gui_special_foil_evidence(self):
+        from unittest.mock import patch
+        import graphics_harness as h
+        visual=dict(pairs=[dict(baseline_artifact="frozen.json",current_artifact="current.json")])
+        with patch.object(h,"deterministic_capture_document",return_value={"droppedItemFoilFixture":{"fixture":"dropped-special-foil-v1"}}):
+            result=report(visual,"special-foil")
+        self.assertFalse(result["passed"])
+        self.assertTrue(result["pairs"][0]["reason"])
+
+    def test_held_source_evidence_requires_the_selected_timing_frame(self):
+        from gui_special_foil_reference import captured_source_evidence
+        source=dict(sprite="minecraft:item/compass_07",
+            positions=[0,1,.53125,0,0,.53125,1,0,.53125,1,1,.53125],
+            atlasUvs=[0,0,0,1,1,1,1,0])
+        receipt=dict(enabled=True,complete=True,frameSequence=10,
+            sourceEvidence=dict(enabled=True,complete=True,schema="gui-foil-frame-sources-v1",
+                frameSequence=10,sources=[source]))
+        self.assertEqual({source["sprite"]:source},captured_source_evidence(receipt))
+        for key,value in (("frameSequence",9),("frameSequence",True),("complete",False),
+                          ("schema","legacy-accumulated"),("sources",[])):
+            wrong=copy.deepcopy(receipt);wrong["sourceEvidence"][key]=value
+            with self.assertRaises(ValueError):captured_source_evidence(wrong)
+        with self.assertRaises(ValueError):captured_source_evidence(dict(enabled=True,complete=True,frameSequence=10))
+
+    def test_temporal_source_comparison_preserves_contents_without_equating_frame_ids(self):
+        from gui_foil_reference import source_payloads_equal
+        source=dict(sprite="minecraft:item/compass_07",
+            positions=[0,1,.53125,0,0,.53125,1,0,.53125,1,1,.53125],atlasUvs=[0,0,0,1,1,1,1,0])
+        before=dict(enabled=True,complete=True,frameSequence=10,sources=[source])
+        after=copy.deepcopy(before);after["frameSequence"]=20
+        self.assertTrue(source_payloads_equal(before,after))
+        after["sources"][0]["sprite"]="minecraft:item/compass_08"
+        self.assertFalse(source_payloads_equal(before,after))
+        after=copy.deepcopy(before);after["sources"][0]["atlasUvs"][0]=.25
+        self.assertFalse(source_payloads_equal(before,after))
+        after=copy.deepcopy(before);after["complete"]=False
+        with self.assertRaises(ValueError):source_payloads_equal(before,after)
+
     def test_real_negative_checker_requires_pixel_failures_not_missing_evidence(self):
         from check_special_foil_negative import negative_pixels_rejected
         row=dict(actual_fixture_sources_and_timing_verified=True,
@@ -103,6 +150,47 @@ class SpecialFoilReferenceTest(unittest.TestCase):
                 self.assertEqual("3", moving["MATTMC_CAPTURE_GUI_SCALE"])
                 self.assertNotIn("rustGalGuiSpecialFoil", moving["JAVA_TOOL_OPTIONS"])
                 args.gui_resource_pack_scenario = "special-item-foil-pattern"
+
+    def test_recovery_fixture_launches_both_clients_but_cannot_silently_skip_parity(self):
+        import tempfile
+        import graphics_harness as h
+        from test_graphics_harness import fake_repo
+        from gui_special_foil_reference import report
+        args=h.parse_args(["capture", "--hotbar-item-fixture", "recovery-foil",
+                           "--gui-resource-pack-scenario", "special-item-foil-pattern"])
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for name in ("current-rust-vulkan-shaders-off", "frozen-opengl-shaders-off"):
+                target=fake_repo(root,name)
+                mode=next(m for m in h.MATRIX_MODES if m.name==name)
+                _,env=h.build_capture_command(target,mode,root/name/"capture","correctness",args,"capture")
+                self.assertIn("hotbarItemFixture=recovery-foil",env["JAVA_TOOL_OPTIONS"])
+                self.assertIn("graphicsAuditGuiItemFoilBlend=true",env["JAVA_TOOL_OPTIONS"])
+        checked=report({},"recovery-foil")
+        self.assertTrue(checked["requested"])
+        self.assertFalse(checked["passed"])
+        self.assertFalse(checked["capability_admitted"])
+
+    def test_recovery_target_rejects_missing_wrong_or_untyped_gameplay_data(self):
+        from gui_special_foil_reference import recovery_target_evidence
+        fixture=dict(complete=True,lastDeathTarget=dict(dimension="minecraft:overworld",pos=[166,100,530],matches=True))
+        self.assertTrue(recovery_target_evidence(fixture))
+        for field,value in (("pos",[167,100,530]),("pos",[166.0,100,530]),("matches",1),
+                            ("matches",False),("dimension","minecraft:the_nether")):
+            wrong=copy.deepcopy(fixture);wrong["lastDeathTarget"][field]=value
+            with self.assertRaises(ValueError): recovery_target_evidence(wrong)
+        for wrong in ({},None,dict(complete=1,lastDeathTarget=fixture["lastDeathTarget"])):
+            with self.assertRaises(ValueError): recovery_target_evidence(wrong)
+
+    def test_recovery_sources_cannot_reuse_ordinary_compass_oracle(self):
+        sources={"minecraft:item/apple":1, "minecraft:item/clock_00":2, "minecraft:item/recovery_compass_17":3}
+        self.assertTrue(matching_sources(sources,sources,recovery=True))
+        with self.assertRaises(ValueError): matching_sources(sources,sources)
+        wrong=dict(sources);wrong["minecraft:item/recovery_compass_18"]=wrong.pop("minecraft:item/recovery_compass_17")
+        with self.assertRaises(ValueError): matching_sources(sources,wrong,recovery=True)
+        for fixture,context in (("special-foil","held-recovery-compass"),("recovery-foil","held-compass")):
+            self.assertFalse(report({},fixture,context=context)["passed"])
+        self.assertFalse(report({},"recovery-foil",10000,context="held-recovery-compass")["passed"])
 
     def test_special_pack_changes_only_glint_not_item_models_or_sprites(self):
         import tempfile

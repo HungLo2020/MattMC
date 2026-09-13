@@ -379,6 +379,7 @@ pub struct VulkanicGal {
     retirement: RetirementQueue,
     next_submission: u64,
     latest_accepted_submission: SubmissionId,
+    buffer_upload_capture: super::buffer_upload_capture::BufferUploadCapture,
     completed_submission: SubmissionId,
     metrics: Metrics,
 }
@@ -420,6 +421,7 @@ impl VulkanicGal {
             retirement: RetirementQueue::new(),
             next_submission: 1,
             latest_accepted_submission: SubmissionId(0),
+            buffer_upload_capture: Default::default(),
             completed_submission: SubmissionId(0),
             metrics: Metrics::new(tracy_enabled),
         }
@@ -1719,6 +1721,7 @@ impl VulkanicGal {
 
     pub fn destroy(&mut self, handle: Handle) -> GalResult<()> {
         self.ensure_no_dependents(handle)?;
+        self.buffer_upload_capture.forget(handle);
         let owned_frame_depth = if handle.kind() == Some(HandleKind::FrameTarget) {
             self.frame_target_depth_populated.remove(&handle);
             self.frame_target_depth_pending.remove(&handle);
@@ -1836,6 +1839,17 @@ impl VulkanicGal {
                 capabilities.limits.max_command_lists_per_submission
             ));
         }
+        // Keep receipts alive through validation/encoding/submission, but do
+        // not expose CPU reservation bookkeeping to backend command lowering.
+        let mut submission_usages = Vec::new();
+        for list in &mut batch.command_lists {
+            list.operations.retain(|op| {
+                if let CommandOp::TrackSubmission(usage) = op {
+                    submission_usages.push(usage.clone());
+                    false
+                } else { true }
+            });
+        }
         for list in &batch.command_lists {
             if list.operations.len() > capabilities.limits.max_commands_per_list as usize {
                 return self.unsupported(format!(
@@ -1912,6 +1926,8 @@ impl VulkanicGal {
         submission_trace(&format!("gal.submit.queue.begin id={}", id.0));
         self.backend.submit(id, &validated)?;
         self.latest_accepted_submission = id;
+        self.buffer_upload_capture.accept(id);
+        for usage in &submission_usages { usage.accept(id); }
         submission_trace(&format!("gal.submit.queue.end id={}", id.0));
         if let Some(profile) = profile.as_deref_mut() {
             profile.backend_submit_nanos = profile
@@ -2894,6 +2910,7 @@ impl VulkanicGal {
                         }
                     }
                 }
+                CommandOp::TrackSubmission(_) => {}
                 CommandOp::EndPass => {
                     if !in_pass {
                         return self.validation_error(GalError::command(
@@ -2987,6 +3004,7 @@ impl VulkanicGal {
         batch: &SubmissionBatch,
         mut profile: Option<&mut WholeFrameProfile>,
     ) -> GalResult<()> {
+        self.buffer_upload_capture.begin();
         let mut accesses = AccessTracker::default();
         for list in &batch.command_lists {
             for op in &list.operations {
@@ -3343,6 +3361,7 @@ impl VulkanicGal {
                             },
                             profile.as_deref_mut(),
                         )?;
+                        self.buffer_upload_capture.host_write(*buffer,*offset,data);
                     }
                     CommandOp::HostReadBuffer {
                         buffer,
@@ -3394,6 +3413,7 @@ impl VulkanicGal {
                     | CommandOp::Draw { .. }
                     | CommandOp::DrawIndexed { .. }
                     | CommandOp::Dispatch { .. }
+                    | CommandOp::TrackSubmission(_)
                     | CommandOp::EndPass => {}
                 }
             }
@@ -3481,6 +3501,11 @@ impl VulkanicGal {
         event: AccessEvent,
         mut profile: Option<&mut WholeFrameProfile>,
     ) -> GalResult<()> {
+        if event.mode==AccessMode::Write {
+            if let AccessTarget::Buffer {handle,offset,size}=event.target {
+                self.buffer_upload_capture.write(handle,offset,size);
+            }
+        }
         if event.target.is_zero_sized_sampler_marker() {
             return Ok(());
         }
@@ -4220,17 +4245,49 @@ impl VulkanicGal {
 
     #[cfg(test)]
     pub(super) fn sampler_descriptor_for_test(&self, handle: Handle) -> GalResult<&SamplerDesc> {
+        self.sampler_descriptor_for_capture(handle)
+    }
+
+    pub(super) fn sampler_descriptor_for_capture(&self, handle: Handle) -> GalResult<&SamplerDesc> {
         Ok(&self.samplers.get(handle)?.desc)
+    }
+
+    pub(super) fn watch_buffer_upload_for_capture(&mut self,buffer:Handle,offset:u64,size:usize)->GalResult<()> {
+        let limit=self.buffers.get(buffer)?.desc.size;
+        if offset.checked_add(size as u64).is_none_or(|end|end>limit) {
+            return Err(GalError::invalid_argument("capture range exceeds owned buffer"));
+        }
+        self.buffer_upload_capture.watch(buffer,offset,size)
+    }
+
+    pub(super) fn buffer_upload_for_capture(&self,buffer:Handle,offset:u64,size:usize)->GalResult<(&[u8],SubmissionId)> {
+        self.buffers.get(buffer)?;
+        self.buffer_upload_capture.get(buffer,offset,size)
+            .ok_or_else(||GalError::invalid_argument("missing accepted buffer upload proof"))
+    }
+    pub(super) fn unwatch_buffer_upload_for_capture(&mut self,buffer:Handle,offset:u64,size:usize) {
+        self.buffer_upload_capture.unwatch(buffer,offset,size);
     }
 
     #[cfg(test)]
     pub(super) fn resource_set_descriptor_for_test(&self, handle: Handle) -> GalResult<&ResourceSetDesc> {
+        self.resource_set_descriptor_for_capture(handle)
+    }
+
+    /// Immutable GAL declaration for a selected submission diagnostic. This
+    /// exposes no backend descriptor, native handle, or reconstructed state.
+    pub(super) fn resource_set_descriptor_for_capture(&self, handle: Handle) -> GalResult<&ResourceSetDesc> {
         Ok(&self.resource_sets.get(handle)?.desc)
+    }
+
+    /// Immutable GAL pipeline declaration; no backend GPU state is exposed.
+    pub(super) fn graphics_pipeline_descriptor_for_capture(&self, handle: Handle) -> GalResult<&GraphicsPipelineDesc> {
+        Ok(&self.graphics_pipelines.get(handle)?.desc)
     }
 
     #[cfg(test)]
     pub(super) fn graphics_pipeline_descriptor_for_test(&self, handle: Handle) -> GalResult<&GraphicsPipelineDesc> {
-        Ok(&self.graphics_pipelines.get(handle)?.desc)
+        self.graphics_pipeline_descriptor_for_capture(handle)
     }
 
     #[cfg(test)]
@@ -4360,6 +4417,7 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
                 CommandOp::Draw { .. }
                 | CommandOp::DrawIndexed { .. }
                 | CommandOp::Dispatch { .. }
+                | CommandOp::TrackSubmission(_)
                 | CommandOp::EndPass => {}
             }
         }
@@ -4378,6 +4436,7 @@ pub(super) fn normalize_submission_batch(batch: &mut SubmissionBatch) -> Command
         let mut state = CommandStateTracker::default();
         for op in original {
             let keep = match &op {
+                CommandOp::TrackSubmission(_) => true,
                 CommandOp::BeginPass { .. } | CommandOp::EndPass | CommandOp::Barrier(_) => {
                     state.invalidate();
                     true
@@ -4497,7 +4556,8 @@ fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch)
                         profile.host_write_bytes.saturating_add(data.len() as u64);
                 }
                 CommandOp::Barrier(_) => profile.barrier_ops += 1,
-                CommandOp::EndPass
+                CommandOp::TrackSubmission(_)
+                | CommandOp::EndPass
                 | CommandOp::SetVertexBuffer { .. }
                 | CommandOp::SetIndexBuffer { .. }
                 | CommandOp::DrawIndirect { .. }

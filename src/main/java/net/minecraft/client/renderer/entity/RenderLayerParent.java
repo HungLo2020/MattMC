@@ -8,4 +8,8 @@ import net.minecraft.client.renderer.entity.state.EntityRenderState;
 @Environment(EnvType.CLIENT)
 public interface RenderLayerParent<S extends EntityRenderState, M extends EntityModel<? super S>> {
 	M getModel();
+
+	default M getModelForSemanticState(S state) {
+		return this.getModel();
+	}
 }

@@ -182,6 +182,12 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 		return this.model;
 	}
 
+	/** Returns the model variant vanilla would select before submitting this state. */
+	@Override
+	public M getModelForSemanticState(S state) {
+		return this.model;
+	}
+
 	/** Applies the copied semantic model pose used by Rust GUI entity PIPs. */
 	public void applySemanticModelPose(S state, PoseStack poseStack) {
 		float scale = state.scale;
@@ -190,7 +196,7 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
 		this.scale(state, poseStack);
 		poseStack.translate(0.0F, -1.501F, 0.0F);
-		this.model.setupAnim(state);
+		this.getModelForSemanticState(state).setupAnim(state);
 	}
 
 	public AABB getBoundingBoxForCulling(T livingEntity) {
@@ -219,6 +225,8 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
 		this.scale(livingEntityRenderState, poseStack);
 		poseStack.translate(0.0F, -1.501F, 0.0F);
+		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.observeEntityTransform(livingEntityRenderState, poseStack.last());
+        net.minecraft.client.dev.GraphicsAuditWolfInputs.observeTransform(livingEntityRenderState, poseStack.last());
 		boolean bl = this.isBodyVisible(livingEntityRenderState);
 		boolean bl2 = !bl && !livingEntityRenderState.isInvisibleToPlayer;
 		RenderType renderType = this.getRenderType(livingEntityRenderState, bl, bl2, livingEntityRenderState.appearsGlowing());

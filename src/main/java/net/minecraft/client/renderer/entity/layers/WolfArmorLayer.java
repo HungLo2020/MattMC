@@ -75,7 +75,7 @@ public class WolfArmorLayer extends RenderLayer<WolfRenderState, WolfModel> {
 			ResourceLocation resourceLocation = (ResourceLocation)ARMOR_CRACK_LOCATIONS.get(level);
 			submitNodeCollector.submitModelSemanticTexture(
 				model, wolfRenderState, poseStack, RenderType.armorTranslucent(resourceLocation), i,
-				OverlayTexture.NO_OVERLAY, wolfRenderState.outlineColor, resourceLocation,
+				OverlayTexture.NO_OVERLAY, -1, resourceLocation,
 				wolfRenderState.outlineColor, null
 			);
 		}

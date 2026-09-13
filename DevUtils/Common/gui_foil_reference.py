@@ -221,3 +221,8 @@ def source_evidence(receipt):
         source_at_pixel(sample,4,4,2)
         result[name] = sample
     return result
+
+
+def source_payloads_equal(before, after):
+    """Compare source contents across frames, not observation frame identities."""
+    return source_evidence(before) == source_evidence(after)

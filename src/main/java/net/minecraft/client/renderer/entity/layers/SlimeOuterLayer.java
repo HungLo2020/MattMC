@@ -48,14 +48,22 @@ public class SlimeOuterLayer extends RenderLayer<SlimeRenderState, SlimeModel> {
 						this.model, slimeRenderState, poseStack, RenderType.outline(SlimeRenderer.SLIME_LOCATION), i, j, -1, null, slimeRenderState.outlineColor, null
 					);
 			} else {
-				if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
-					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+				boolean rustWholeFrame = net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan();
+				if (rustWholeFrame && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 						this.model, slimeRenderState, poseStack.last(), RenderType.entityTranslucent(SlimeRenderer.SLIME_LOCATION),
 						SlimeRenderer.SLIME_LOCATION, net.minecraft.resources.ResourceLocation.withDefaultNamespace("slime_outer"), i,
-						-1, 0, slimeRenderState.outlineColor)) {
+						j, -1, slimeRenderState.outlineColor)) {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+						"rust-vulkan-whole-frame", SlimeRenderer.SLIME_LOCATION, this.model.getClass().getName(),
+						slimeRenderState.entityId, true, true, false
+					);
 					return;
 				}
-				if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+				if (rustWholeFrame) {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+						"rust-vulkan-unavailable", SlimeRenderer.SLIME_LOCATION, this.model.getClass().getName(),
+						slimeRenderState.entityId, false, false, false
+					);
 					throw new IllegalStateException("Rust whole-frame slime route has no semantic mesh");
 				}
 				submitNodeCollector.order(1)

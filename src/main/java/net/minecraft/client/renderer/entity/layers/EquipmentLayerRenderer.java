@@ -128,6 +128,9 @@ public class EquipmentLayerRenderer {
 				TextureAtlasSprite textureAtlasSprite = (TextureAtlasSprite)this.trimSpriteLookup
 					.apply(new EquipmentLayerRenderer.TrimSpriteKey(armorTrim, layerType, resourceKey));
 				RenderType renderType = Sheets.armorTrimsSheet(((TrimPattern)armorTrim.pattern().value()).decal());
+				if (!submitNodeCollector.isSemanticCoverageOnly()) {
+					net.minecraft.client.dev.GraphicsAuditEquipmentTrimSources.observe(textureAtlasSprite, renderType, layerType.toString(), resourceKey.location().toString());
+				}
 				submitNodeCollector.order(m++).submitModelSemantic(model, object, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, textureAtlasSprite, j, null);
 				
 				// Iris: Restore item context after trim

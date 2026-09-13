@@ -19,6 +19,7 @@ import net.minecraft.client.resources.model.BlockStateDefinitions;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -76,37 +77,24 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 			BlockStateModel blockStateModel = this.blockRenderer.getBlockModel(blockState);
 			poseStack.pushPose();
 			poseStack.translate(-0.5F, -0.5F, -0.5F);
-			if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
-				// The Rust block-display producer owns copied quads and texture
-				// identities; do not leave this ordinary frame backing in the Java
-				// block-model storage that the whole-frame route never replays.
-				submitNodeCollector.submitBlockDisplaySemantic(
-					poseStack, blockState, itemFrameRenderState.lightCoords,
-					OverlayTexture.NO_OVERLAY, itemFrameRenderState.outlineColor
-				);
-			} else {
-				submitNodeCollector.submitBlockModelSemantic(
-					poseStack,
-					RenderType.entitySolidZOffsetForward(TextureAtlas.LOCATION_BLOCKS),
-					blockStateModel,
-					1.0F,
-					1.0F,
-					1.0F,
-					itemFrameRenderState.lightCoords,
-					OverlayTexture.NO_OVERLAY,
-					itemFrameRenderState.outlineColor
-				);
-			}
+			submitNodeCollector.submitBlockModelSemantic(
+				poseStack,
+				RenderType.entitySolidZOffsetForward(TextureAtlas.LOCATION_BLOCKS),
+				blockStateModel,
+				1.0F,
+				1.0F,
+				1.0F,
+				itemFrameRenderState.lightCoords,
+				OverlayTexture.NO_OVERLAY,
+				itemFrameRenderState.outlineColor,
+				net.minecraft.resources.ResourceLocation.withDefaultNamespace(
+					itemFrameRenderState.isGlowFrame ? "glow_item_frame" : "item_frame")
+			);
 			poseStack.popPose();
 		}
 
-		if (itemFrameRenderState.isInvisible) {
-			poseStack.translate(0.0F, 0.0F, 0.5F);
-		} else {
-			poseStack.translate(0.0F, 0.0F, 0.4375F);
-		}
+		float contentOffset = itemFrameRenderState.isInvisible ? 0.5F : 0.4375F;
+		poseStack.translate(0.0F, 0.0F, contentOffset);
 
 		if (itemFrameRenderState.mapId != null) {
 			int i = itemFrameRenderState.rotation % 4 * 2;
@@ -117,12 +105,21 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 			poseStack.translate(-64.0F, -64.0F, 0.0F);
 			poseStack.translate(0.0F, 0.0F, -1.0F);
 			int j = this.getLightCoords(itemFrameRenderState.isGlowFrame, 15728850, itemFrameRenderState.lightCoords);
-			this.mapRenderer.render(itemFrameRenderState.mapRenderState, poseStack, submitNodeCollector, true, j);
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemFrameMapSubmission(
+				itemFrameRenderState.entityId, itemFrameRenderState.mapId.id(), itemFrameRenderState.mapRenderState.texture,
+				itemFrameRenderState.rotation, itemFrameRenderState.isInvisible, contentOffset);
+			try {
+				this.mapRenderer.render(itemFrameRenderState.mapRenderState, poseStack, submitNodeCollector, true, j);
+			} finally {
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemFrameMapSubmission();
+			}
 		} else if (!itemFrameRenderState.item.isEmpty()) {
 			poseStack.mulPose(Axis.ZP.rotationDegrees(itemFrameRenderState.rotation * 360.0F / 8.0F));
 			int i = this.getLightCoords(itemFrameRenderState.isGlowFrame, 15728880, itemFrameRenderState.lightCoords);
 			poseStack.scale(0.5F, 0.5F, 0.5F);
-			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemFrameItemSubmission(
+				itemFrameRenderState.entityId, itemFrameRenderState.itemIdentity, itemFrameRenderState.rotation,
+				itemFrameRenderState.isInvisible, contentOffset);
 			try {
 				itemFrameRenderState.item.submit(
 					poseStack,
@@ -132,7 +129,7 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 					itemFrameRenderState.outlineColor
 				);
 			} finally {
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemFrameItemSubmission();
 			}
 		}
 
@@ -166,6 +163,7 @@ public class ItemFrameRenderer<T extends ItemFrame> extends EntityRenderer<T, It
 		this.itemModelResolver.updateForNonLiving(itemFrameRenderState.item, itemStack, ItemDisplayContext.FIXED, itemFrame);
 		itemFrameRenderState.rotation = itemFrame.getRotation();
 		itemFrameRenderState.isGlowFrame = itemFrame.getType() == EntityType.GLOW_ITEM_FRAME;
+		itemFrameRenderState.itemIdentity = itemStack.isEmpty() ? null : BuiltInRegistries.ITEM.getKey(itemStack.getItem());
 		itemFrameRenderState.mapId = null;
 		if (!itemStack.isEmpty()) {
 			MapId mapId = itemFrame.getFramedMapId(itemStack);

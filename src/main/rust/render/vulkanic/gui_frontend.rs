@@ -47,7 +47,7 @@ pub(crate) const GUI_MAX_VIEWPORT_AXIS: i32 = super::SEMANTIC_MAX_VIEWPORT_AXIS;
 pub const GUI_MAX_PACKED_SPRITES: usize = 256;
 /// Hard cap for one semantic GUI submission. Java's coordinator enforces the
 /// same ceiling, but the Rust frontend must reject direct FFI callers too.
-pub(crate) const GUI_MAX_MESH_BATCHES: usize = 1_024;
+pub(crate) const GUI_MAX_MESH_BATCHES: usize = 16_384;
 pub(crate) const GUI_POST_EFFECT_INVERT_ID: u32 = 92;
 pub(crate) const GUI_POST_EFFECT_CREEPER_ID: u32 = 93;
 pub(crate) const GUI_POST_EFFECT_SPIDER_ID: u32 = 94;
@@ -734,12 +734,12 @@ struct GuiMeshCompositeKey {
 /// One private GUI-mesh stream allocation. It remains unavailable until the
 /// submission that references it has completed, then can be reused by later
 /// semantic mesh work without overwriting in-flight GPU reads.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct GuiMeshGeometryResidency {
     stream: GuiMeshStreamRange,
     vertex_bytes: u64,
     index_bytes: u64,
-    last_submission: SubmissionId,
+    usage: super::commands::SubmissionUsage,
 }
 
 #[derive(Default)]
@@ -1152,6 +1152,17 @@ pub struct GuiSubmitStats {
     pub mesh_batch_count: u64,
     /// Raster plus compose draws emitted for the mesh items.
     pub mesh_draw_count: u64,
+    /// Entity-preview items selected for owned PIP raster/composition.
+    pub entity_preview_item_count: u64,
+    /// Entity-preview layers that emitted an owned raster draw.
+    pub entity_preview_batch_count: u64,
+    /// Entity-preview raster plus compose draws emitted for this submission.
+    pub entity_preview_draw_count: u64,
+    /// Bits 1..=8 identify the semantic material modes used by emitted
+    /// entity-preview raster layers.
+    pub entity_preview_material_mask: u64,
+    pub entity_preview_vertex_count: u64,
+    pub entity_preview_index_count: u64,
     pub sprite_batch_count: u64,
     pub cache_hits: u64,
     pub cache_misses: u64,
@@ -1520,7 +1531,8 @@ impl GuiFrontend {
             .mesh_geometry_cache
             .iter()
             .filter_map(|(key, residency)| {
-                (residency.last_submission <= completed).then_some((*key, *residency))
+                (!residency.usage.has_pending_commands() && residency.usage.last_submission() <= completed)
+                    .then(|| (*key, residency.clone()))
             })
             .collect();
         for (key, residency) in released {
@@ -1557,7 +1569,6 @@ impl GuiFrontend {
         raster_key: GuiMeshRasterKey,
         vertex_bytes: u64,
         index_bytes: u64,
-        pending_submission: SubmissionId,
     ) -> GalResult<GuiMeshGeometryResidency> {
         self.mesh_geometry_free_ranges
             .entry(raster_key)
@@ -1566,7 +1577,7 @@ impl GuiFrontend {
                     stream: GuiMeshStreamRange::default(),
                     vertex_bytes: super::gui_mesh_frontend::GUI_MESH_MAX_VERTEX_BYTES,
                     index_bytes: super::gui_mesh_frontend::GUI_MESH_MAX_INDEX_BYTES,
-                    last_submission: SubmissionId(0),
+                    usage: super::commands::SubmissionUsage::default(),
                 }]
             });
         let index = self.mesh_geometry_free_ranges[&raster_key]
@@ -1584,7 +1595,8 @@ impl GuiFrontend {
                 .mesh_geometry_cache
                 .iter()
                 .filter(|((key, _, _), _)| *key == raster_key)
-                .map(|(_, residency)| residency.last_submission)
+                .filter(|(_, residency)| !residency.usage.has_pending_commands())
+                .map(|(_, residency)| residency.usage.last_submission())
                 .min()
                 .ok_or_else(|| {
                     GalError::ffi(
@@ -1592,12 +1604,6 @@ impl GuiFrontend {
                         "GUI mesh geometry request exceeds the fixed stream capacity",
                     )
                 })?;
-            if oldest >= pending_submission {
-                return Err(GalError::ffi(
-                    StatusCode::InvalidArgument,
-                    "GUI mesh frame requires more than the fixed stream capacity",
-                ));
-            }
             // This is bounded, explicit backpressure: wait for exactly the
             // oldest range that can make space, never overwrite an in-flight
             // stream and never grow the private buffers beyond their cap.
@@ -1608,14 +1614,13 @@ impl GuiFrontend {
                 raster_key,
                 vertex_bytes,
                 index_bytes,
-                pending_submission,
             );
         };
         let allocation = GuiMeshGeometryResidency {
             stream: range.stream,
             vertex_bytes,
             index_bytes,
-            last_submission: pending_submission,
+            usage: super::commands::SubmissionUsage::default(),
         };
         let remaining_vertex_bytes = range.vertex_bytes - vertex_bytes;
         let remaining_index_bytes = range.index_bytes - index_bytes;
@@ -1630,7 +1635,7 @@ impl GuiFrontend {
                     },
                     vertex_bytes: remaining_vertex_bytes,
                     index_bytes: remaining_index_bytes,
-                    last_submission: SubmissionId(0),
+                    usage: super::commands::SubmissionUsage::default(),
                 });
         }
         Ok(allocation)
@@ -2863,6 +2868,17 @@ impl GuiFrontend {
         stats.mesh_draw_count = stats
             .mesh_draw_count
             .saturating_add(after_stats.mesh_draw_count);
+        stats.entity_preview_item_count = stats.entity_preview_item_count
+            .saturating_add(after_stats.entity_preview_item_count);
+        stats.entity_preview_batch_count = stats.entity_preview_batch_count
+            .saturating_add(after_stats.entity_preview_batch_count);
+        stats.entity_preview_draw_count = stats.entity_preview_draw_count
+            .saturating_add(after_stats.entity_preview_draw_count);
+        stats.entity_preview_material_mask |= after_stats.entity_preview_material_mask;
+        stats.entity_preview_vertex_count = stats.entity_preview_vertex_count
+            .saturating_add(after_stats.entity_preview_vertex_count);
+        stats.entity_preview_index_count = stats.entity_preview_index_count
+            .saturating_add(after_stats.entity_preview_index_count);
         stats.sprite_batch_count = stats
             .sprite_batch_count
             .saturating_add(after_stats.sprite_batch_count);
@@ -5060,7 +5076,6 @@ impl GuiFrontend {
         // whose submission has completed, so animated semantic meshes cannot
         // exhaust permanent residency or overwrite in-flight vertices.
         self.reclaim_completed_mesh_geometry(gal.poll_completed());
-        let pending_submission = gal.next_submission_id();
         let color_format = gal.pass_target_color_format(render_target)?;
         let frame_pass = match render_pass {
             Some(pass) => pass,
@@ -5229,7 +5244,6 @@ impl GuiFrontend {
                         gal,
                         world.as_deref_mut(),
                         generation,
-                        pending_submission,
                         render_target,
                         color_attachment,
                         Some(frame_pass),
@@ -5302,7 +5316,6 @@ impl GuiFrontend {
         gal: &mut VulkanicGal,
         mut world: Option<&mut super::world_primitive_frontend::WorldPrimitiveFrontend>,
         generation: u64,
-        pending_submission: SubmissionId,
         render_target: Handle,
         color_attachment: Handle,
         render_pass: Option<Handle>,
@@ -5353,7 +5366,23 @@ impl GuiFrontend {
                 .unwrap_or(prepared.len());
             let item_layers = &prepared[cursor..group_end];
             validate_mesh_item_layers(item_layers)?;
+            let entity_preview = item_layers
+                .iter()
+                .all(|draw| draw.lighting_mode == GuiMeshLightingMode::EntityPreview);
+            if item_layers
+                .iter()
+                .any(|draw| draw.lighting_mode == GuiMeshLightingMode::EntityPreview)
+                && !entity_preview
+            {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    "GUI entity-preview item layers must all use entity-preview lighting",
+                ));
+            }
             stats.mesh_item_count = stats.mesh_item_count.saturating_add(1);
+            if entity_preview {
+                stats.entity_preview_item_count = stats.entity_preview_item_count.saturating_add(1);
+            }
             // Frozen submits the title panorama straight to its main frame
             // target. Keep that native-resolution semantic pass distinct from
             // standard-3D item PIP work, whose private target is part of its
@@ -5403,11 +5432,12 @@ impl GuiFrontend {
                 let vertex_bytes = (first.vertices.len() * super::gui_mesh_frontend::GUI_MESH_GPU_VERTEX_BYTES) as u64;
                 let index_bytes = (first.indices.len() * std::mem::size_of::<u32>()) as u64;
                 let (stream, reused) = if let Some(residency) = self.mesh_geometry_cache.get_mut(&geometry_key) {
-                    residency.last_submission = pending_submission;
+                    operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
                     (residency.stream, true)
                 } else {
-                    let residency = self.allocate_mesh_geometry(gal, raster_key, vertex_bytes, index_bytes, pending_submission)?;
+                    let residency = self.allocate_mesh_geometry(gal, raster_key, vertex_bytes, index_bytes)?;
                     let stream = residency.stream;
+                    operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
                     self.mesh_geometry_cache.insert(geometry_key, residency);
                     (stream, false)
                 };
@@ -5514,7 +5544,7 @@ impl GuiFrontend {
                 let index_bytes = (draw.indices.len() * std::mem::size_of::<u32>()) as u64;
                 let (stream, reused) =
                     if let Some(residency) = self.mesh_geometry_cache.get_mut(&geometry_key) {
-                        residency.last_submission = pending_submission;
+                        operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
                         (residency.stream, true)
                     } else {
                         let residency = self.allocate_mesh_geometry(
@@ -5522,9 +5552,9 @@ impl GuiFrontend {
                             raster_key,
                             vertex_bytes,
                             index_bytes,
-                            pending_submission,
                         )?;
                         let stream = residency.stream;
+                        operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
                         self.mesh_geometry_cache.insert(geometry_key, residency);
                         (stream, false)
                     };
@@ -5551,6 +5581,15 @@ impl GuiFrontend {
                 target.initialized = true;
                 stats.mesh_batch_count = stats.mesh_batch_count.saturating_add(1);
                 stats.mesh_draw_count = stats.mesh_draw_count.saturating_add(1);
+                if entity_preview {
+                    stats.entity_preview_batch_count = stats.entity_preview_batch_count.saturating_add(1);
+                    stats.entity_preview_draw_count = stats.entity_preview_draw_count.saturating_add(1);
+                    stats.entity_preview_material_mask |= gui_mesh_material_semantic_bit(draw.material_mode);
+                    stats.entity_preview_vertex_count = stats.entity_preview_vertex_count
+                        .saturating_add(draw.vertices.len() as u64);
+                    stats.entity_preview_index_count = stats.entity_preview_index_count
+                        .saturating_add(draw.indices.len() as u64);
+                }
             }
             let composite_key = GuiMeshCompositeKey {
                 item_identity,
@@ -5604,6 +5643,9 @@ impl GuiFrontend {
                     )
                 })?;
             stats.mesh_draw_count = stats.mesh_draw_count.saturating_add(1);
+            if entity_preview {
+                stats.entity_preview_draw_count = stats.entity_preview_draw_count.saturating_add(1);
+            }
             cursor = group_end;
         }
         stats.command_ops = stats.command_ops.saturating_add(operations.len() as u64);
@@ -6917,6 +6959,21 @@ impl GuiFrontend {
             z: 0.0,
         })
     }
+}
+
+fn gui_mesh_material_semantic_bit(mode: GuiMeshMaterialMode) -> u64 {
+    let semantic_mode = match mode {
+        GuiMeshMaterialMode::Opaque => 1,
+        GuiMeshMaterialMode::Cutout => 2,
+        GuiMeshMaterialMode::Translucent => 3,
+        GuiMeshMaterialMode::Glint => 4,
+        GuiMeshMaterialMode::Panorama => 5,
+        GuiMeshMaterialMode::ModelOverlay => 6,
+        GuiMeshMaterialMode::EntityCutoutNoCull => 7,
+        GuiMeshMaterialMode::EntityTranslucentNoCull => 8,
+		GuiMeshMaterialMode::EntityDecalCutoutNoCull => 9,
+    };
+    1_u64 << semantic_mode
 }
 
 fn gui_index_upload_ops(index_buffer: Handle) -> Vec<CommandOp> {
@@ -10645,14 +10702,14 @@ void main() { fragColor = texture(InSampler, texCoord); }
             lightmap_generation: 1, rgb: [1.;3],
         });
         let before = gal.metrics().resource_creates;
-        assert!(frontend.append_mesh_items_to_target(&mut gal, None, 1, SubmissionId(1),
+        assert!(frontend.append_mesh_items_to_target(&mut gal, None, 1,
             target, target, None, None, None, vec![request.clone()], &mut GuiSubmitStats::default()).is_err());
         assert_eq!(before, gal.metrics().resource_creates);
         frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload { sampling: None,
             asset_id: 7, format: GuiRawImageFormat::Rgba8, width: 2, height: 2, pixels: vec![255;16],
         }]).unwrap();
         let mut stats = GuiSubmitStats::default();
-        let ops = frontend.append_mesh_items_to_target(&mut gal, None, 1, SubmissionId(1),
+        let ops = frontend.append_mesh_items_to_target(&mut gal, None, 1,
             target, target, None, None, None, vec![request.clone()], &mut stats).unwrap();
         assert!(!ops.is_empty());
         assert_eq!(stats.mesh_item_count, 1);
@@ -10767,24 +10824,26 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let mut frontend = GuiFrontend::default();
         let mut gal = mock_gal();
         let first = frontend
-            .allocate_mesh_geometry(&mut gal, key, 1_024, 256, SubmissionId(3))
+            .allocate_mesh_geometry(&mut gal, key, 1_024, 256)
             .expect("first private stream range");
+        first.usage.accept(SubmissionId(3));
         frontend.mesh_geometry_cache.insert((key, 1, 0), first);
         let second = frontend
-            .allocate_mesh_geometry(&mut gal, key, 1_024, 256, SubmissionId(4))
+            .allocate_mesh_geometry(&mut gal, key, 1_024, 256)
             .expect("second private stream range");
+        second.usage.accept(SubmissionId(4));
         frontend.mesh_geometry_cache.insert((key, 2, 0), second);
 
         frontend.reclaim_completed_mesh_geometry(SubmissionId(2));
         let while_in_flight = frontend
-            .allocate_mesh_geometry(&mut gal, key, 1_024, 256, SubmissionId(5))
+            .allocate_mesh_geometry(&mut gal, key, 1_024, 256)
             .expect("a distinct range while earlier work is in flight");
         assert_eq!(2_048, while_in_flight.stream.vertex_offset);
         assert_eq!(512, while_in_flight.stream.index_offset);
 
         frontend.reclaim_completed_mesh_geometry(SubmissionId(3));
         let reused_after_completion = frontend
-            .allocate_mesh_geometry(&mut gal, key, 1_024, 256, SubmissionId(6))
+            .allocate_mesh_geometry(&mut gal, key, 1_024, 256)
             .expect("a completed range is reusable");
         assert_eq!(0, reused_after_completion.stream.vertex_offset);
         assert_eq!(0, reused_after_completion.stream.index_offset);
@@ -10807,21 +10866,20 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 key,
                 crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_VERTEX_BYTES,
                 crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_INDEX_BYTES,
-                reserved,
             )
             .expect("the fixed stream admits one full allocation");
+        let reservation_command = CommandOp::TrackSubmission(full.usage.clone());
         frontend.mesh_geometry_cache.insert((key, 1, 0), full);
         let accepted = gal.submit(SubmissionBatch {
             label: "accepted-stream-reservation".into(),
             command_lists: vec![CommandList::from(CommandListDesc {
-                label: "allocator-completion-fixture".into(), operations: vec![],
+                label: "allocator-completion-fixture".into(), operations: vec![reservation_command],
             })],
         }).unwrap();
         assert_eq!(reserved, accepted.submission);
-        let next = gal.next_submission_id();
 
         let after_wait = frontend
-            .allocate_mesh_geometry(&mut gal, key, 48, 4, next)
+            .allocate_mesh_geometry(&mut gal, key, 48, 4)
             .expect("the allocator retires the oldest range instead of growing or failing");
         assert_eq!(0, after_wait.stream.vertex_offset);
         assert_eq!(0, after_wait.stream.index_offset);
@@ -10843,13 +10901,13 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 key,
                 crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_VERTEX_BYTES,
                 crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_INDEX_BYTES,
-                SubmissionId(3),
             )
             .expect("the current frame can reserve the stream");
+        let _pending_command = CommandOp::TrackSubmission(reservation.usage.clone());
         frontend.mesh_geometry_cache.insert((key, 1, 0), reservation);
 
         let error = frontend
-            .allocate_mesh_geometry(&mut gal, key, 48, 4, SubmissionId(3))
+            .allocate_mesh_geometry(&mut gal, key, 48, 4)
             .expect_err("a second current-frame allocation cannot retire future work");
         assert_eq!(StatusCode::InvalidArgument, error.code);
         assert_eq!(
@@ -11042,11 +11100,11 @@ void main() { fragColor = texture(InSampler, texCoord); }
             1, target, target, Vec::new(), Vec::new(), vec![request.clone()], Vec::new(),
             400, 2, false).is_err());
         assert_eq!(before, gal.metrics().resource_creates);
-        assert!(frontend.append_mesh_items_to_target(&mut gal, None, 1, SubmissionId(2),
+        assert!(frontend.append_mesh_items_to_target(&mut gal, None, 1,
             target, target, None, None, None, vec![request.clone()], &mut GuiSubmitStats::default()).is_err());
         assert_eq!(before, gal.metrics().resource_creates);
         let mut stats = GuiSubmitStats::default();
-        let ops = frontend.append_mesh_items_to_target(&mut gal, Some(&mut world), 1, SubmissionId(2),
+        let ops = frontend.append_mesh_items_to_target(&mut gal, Some(&mut world), 1,
             target, target, None, None, None, vec![request], &mut stats).unwrap();
         assert_eq!(stats.mesh_item_count, 1);
         assert!(frontend.raw_images.is_empty());
@@ -11192,6 +11250,150 @@ void main() { fragColor = texture(InSampler, texCoord); }
             gal.retire_through(gal.latest_submission_id()).unwrap();
             assert_eq!(gal.metrics().resource_creates,gal.metrics().resource_destroys);
         }
+    }
+
+    #[test]
+    fn vulkan_pending_mesh_preparations_match_separate_submissions() {
+        use crate::render::vulkanic::gui_mesh_frontend::GuiItemCache;
+        use crate::render::vulkanic::gui_item_raster::GuiItemRasterTarget;
+        let mut reference = Vec::new();
+        for combined in [false, true] {
+            let backend = VulkanBackend::new("pending GUI stream pixel regression").unwrap();
+            let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+            let mut frontend = GuiFrontend::default();
+            let extent = Extent3d { width: 32, height: 16, depth: 1 };
+            let target = GuiItemRasterTarget::create(&mut gal, extent).unwrap();
+            let readback = gal.create_buffer(BufferDesc {
+                label: "pending-mesh.readback".into(), size: 32 * 16 * 4,
+                memory: MemoryDomain::Readback,
+                usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+            }).unwrap();
+            frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload {
+                sampling: None, asset_id: 7, format: GuiRawImageFormat::Rgba8,
+                width: 1, height: 1, pixels: vec![255; 4],
+            }]).unwrap();
+            let mut ops = vec![
+                CommandOp::Barrier(texture_barrier(target.color,
+                    TextureUsageState::Undefined, TextureUsageState::ColorAttachment)),
+                CommandOp::BeginPass {pass:target.pass,target:target.target,
+                    colors:vec![PassAttachment {view:target.view,load_op:AttachmentLoadOp::Clear,
+                        store_op:AttachmentStoreOp::Store,
+                        clear_color:Some(ClearColor {r:0.,g:0.,b:0.,a:1.})}],depth_stencil:None},
+                CommandOp::EndPass,
+            ];
+            for item in 0..2 {
+                let mut request = mesh_batch(0);
+                request.item_cache = Some(GuiItemCache { identity: item + 1, animated: true });
+                request.item_raster_scale = 1;
+                request.render_extent = [0,0]; request.guard_pixels = 0;
+                request.lighting_mode = GuiMeshLightingMode::FrontModel;
+                request.item_lighting = Some(crate::render::vulkanic::gui_item_material::GuiFlatItemLighting {
+                    lightmap_generation: 1, rgb: [1.0;3],
+                });
+                request.model_transform = [1.,0.,0.,0., 0.,1.,0.,0., 0.,0.,1.,0., 0.,0.,0.,1.];
+                for (vertex, position) in request.vertices.iter_mut().zip([
+                    [-0.5,-0.5,0.], [0.5,-0.5,0.], [-0.5,0.5,0.],
+                ]) {
+                    vertex.position = position;
+                    vertex.color_argb = if item == 0 { 0xffff0000 } else { 0xff00ff00 };
+                }
+                request.bounds = if item == 0 { [0,0,16,16] } else { [16,0,32,16] };
+                request.gui_extent = [32,16]; request.projection_extent = [32.,16.];
+                let (draws, _) = frontend.append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                    &mut gal, 1, target.target, target.view, Some(target.pass),
+                    None, None, false, vec![], vec![], vec![request]).unwrap();
+                ops.extend(draws);
+                if item == 0 {
+                    if !combined {
+                        gal.submit(SubmissionBatch { label: "separate first draw".into(),
+                            command_lists: vec![CommandList::from(CommandListDesc {
+                                label: "first draw".into(), operations: std::mem::take(&mut ops),
+                            })],
+                        }).unwrap();
+                    }
+                    // In the combined case only internal uploads have been
+                    // accepted. The first draw remains pending while they finish.
+                    gal.retire_through(gal.latest_submission_id()).unwrap();
+                }
+            }
+            ops.extend([
+                CommandOp::Barrier(texture_barrier(target.color,
+                    TextureUsageState::ColorAttachment, TextureUsageState::TransferSrc)),
+                CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
+                    buffer:readback,buffer_offset:0,bytes_per_row:32*4,rows_per_image:16,
+                    texture:target.color,texture_mip:0,texture_layer:0,
+                    texture_origin:TextureOrigin3d{x:0,y:0,z:0},extent,
+                }),
+                CommandOp::Barrier(buffer_barrier(readback,
+                    TextureUsageState::TransferDst,TextureUsageState::ShaderRead)),
+                CommandOp::HostReadBuffer{buffer:readback,offset:0,size:32*16*4},
+            ]);
+            let accepted = gal.submit(SubmissionBatch { label: "pending GUI frame".into(),
+                command_lists: vec![CommandList::from(CommandListDesc {
+                    label: "pending GUI draws".into(), operations: ops,
+                })],
+            }).unwrap();
+            gal.retire_through_for_test(accepted.submission).unwrap();
+            let pixels = gal.completed_host_reads().iter().rev()
+                .find(|read| read.buffer == readback).unwrap().bytes.clone();
+            assert!(pixels.chunks_exact(4).filter(|p| p[0] > 32 && p[1] == 0).count() > 40);
+            assert!(pixels.chunks_exact(4).filter(|p| p[1] > 32 && p[0] == 0).count() > 40);
+            if combined { assert_eq!(reference, pixels, "pending preparations must preserve both meshes"); }
+            else { reference = pixels; }
+            frontend.reset(&mut gal).unwrap();
+            target.destroy(&mut gal).unwrap();
+            gal.destroy(readback).unwrap();
+            gal.retire_through(gal.latest_submission_id()).unwrap();
+            assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        }
+    }
+
+    #[test]
+    fn pending_mesh_stream_survives_interleaved_upload_completion() {
+        let mut gal = mock_gal();
+        let target = frame_target(&mut gal);
+        let mut frontend = GuiFrontend::default();
+        frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload {
+            sampling: None, asset_id: 7, format: GuiRawImageFormat::Rgba8,
+            width: 1, height: 1, pixels: vec![255; 4],
+        }]).unwrap();
+        let prepare = |frontend: &mut GuiFrontend, gal: &mut VulkanicGal| {
+            frontend.append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                gal, 1, target, target, None, None, None, false,
+                Vec::new(), Vec::new(), vec![mesh_batch(0)]).unwrap().0
+        };
+        let first = prepare(&mut frontend, &mut gal);
+        let vertex_range = |ops: &[CommandOp]| ops.iter().find_map(|op| match op {
+            CommandOp::HostWriteBuffer { buffer, offset, data } if data.len() == 3 * 48
+                => Some((*buffer, *offset)),
+            _ => None,
+        }).expect("mesh vertex stream write");
+        let first_range = vertex_range(&first);
+        // Preparation uploads GUI assets internally, consuming submission IDs
+        // before these still-pending draw commands can be submitted.
+        let uploads = gal.latest_submission_id();
+        assert!(uploads.0 > 0, "fixture must actually submit internal uploads");
+        gal.retire_through(uploads).unwrap();
+        let second = prepare(&mut frontend, &mut gal);
+        assert_ne!(first_range, vertex_range(&second),
+            "completed asset uploads must not release a pending draw's stream");
+        drop((first, second));
+        let retry = prepare(&mut frontend, &mut gal);
+        assert_eq!(first_range, vertex_range(&retry),
+            "discarded preparations must release reservations without a fake submission");
+        let accepted = gal.submit(SubmissionBatch { label: "delayed mesh draw".into(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "delayed mesh commands".into(), operations: retry,
+            })],
+        }).unwrap();
+        assert!(accepted.submission > uploads);
+        frontend.reclaim_completed_mesh_geometry(uploads);
+        assert_eq!(frontend.mesh_geometry_cache.len(), 1,
+            "the draw's actual accepted submission must outlive the upload completion");
+        gal.retire_through(accepted.submission).unwrap();
+        frontend.reclaim_completed_mesh_geometry(gal.poll_completed());
+        assert!(frontend.mesh_geometry_cache.is_empty());
+        frontend.reset(&mut gal).unwrap();
     }
 
     #[test]
@@ -11415,6 +11617,83 @@ void main() { fragColor = texture(InSampler, texCoord); }
             })],
         })
         .expect("GAL validates ordered mesh raster and composite passes");
+        frontend.reset(&mut gal).unwrap();
+    }
+
+    #[test]
+    fn entity_preview_submission_stats_prove_body_and_armor_raster_selection() {
+        let mut gal = mock_gal();
+        let target = frame_target(&mut gal);
+        let mut frontend = GuiFrontend::default();
+        frontend
+            .apply_raw_image_update(
+                &mut gal,
+                1,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
+                    asset_id: 7,
+                    format: GuiRawImageFormat::Rgba8,
+                    width: 1,
+                    height: 1,
+                    pixels: vec![255, 255, 255, 255],
+                }],
+            )
+            .expect("stage entity-preview image");
+        let mut body = mesh_batch(0);
+        body.lighting_mode = GuiMeshLightingMode::EntityPreview;
+        body.material_mode = GuiMeshMaterialMode::EntityTranslucentNoCull;
+        body.alpha_cutoff = 0.1;
+        let mut armor = mesh_batch(1);
+        armor.lighting_mode = GuiMeshLightingMode::EntityPreview;
+        armor.material_mode = GuiMeshMaterialMode::EntityCutoutNoCull;
+        armor.alpha_cutoff = 0.1;
+        let mut decal = mesh_batch(2);
+        decal.lighting_mode = GuiMeshLightingMode::EntityPreview;
+        decal.material_mode = GuiMeshMaterialMode::EntityDecalCutoutNoCull;
+        decal.alpha_cutoff = 0.1;
+
+        let (_, stats) = frontend
+            .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                &mut gal,
+                1,
+                target,
+                target,
+                None,
+                None,
+                None,
+                false,
+                Vec::new(),
+                Vec::new(),
+                vec![body.clone(), armor, decal],
+            )
+            .expect("select entity body and armor for native raster");
+        assert_eq!(1, stats.entity_preview_item_count);
+        assert_eq!(3, stats.entity_preview_batch_count);
+        assert_eq!(4, stats.entity_preview_draw_count);
+        assert_eq!((1_u64 << 7) | (1_u64 << 8) | (1_u64 << 9), stats.entity_preview_material_mask);
+        assert_eq!(9, stats.entity_preview_vertex_count);
+        assert_eq!(9, stats.entity_preview_index_count);
+
+        let mut mixed = body.clone();
+        mixed.layer_index = 1;
+        mixed.lighting_mode = GuiMeshLightingMode::Block;
+        mixed.material_mode = GuiMeshMaterialMode::Cutout;
+        mixed.alpha_cutoff = 0.5;
+        let error = frontend
+            .append_mesh_items_to_target(
+                &mut gal,
+                None,
+                1,
+                target,
+                target,
+                None,
+                None,
+                None,
+                vec![body, mixed],
+                &mut GuiSubmitStats::default(),
+            )
+            .expect_err("mixed entity-preview lighting must fail closed");
+        assert!(error.to_string().contains("must all use entity-preview lighting"));
         frontend.reset(&mut gal).unwrap();
     }
 

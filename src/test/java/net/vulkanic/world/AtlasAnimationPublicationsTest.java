@@ -30,6 +30,24 @@ class AtlasAnimationPublicationsTest {
     }
 
     @Test
+    void diagnosticGenerationNamesOnlyTheStagedOwnedResource() {
+        var source = new SemanticAtlasAnimationSource(77, 1, 1, 1, List.of());
+        var resource = new AtlasAnimationResource(ResourceLocation.withDefaultNamespace("atlas/101"), 101, source);
+        var registry = new AtlasAnimationPublications();
+        assertEquals(0, registry.stagedGenerationForDiagnostics(resource));
+        registry.register(new AtlasAnimationPublication(texture(101, 0), resource), () -> {});
+        registry.textureAccepted(900, texture(101, 0));
+        assertEquals(0, registry.stagedGenerationForDiagnostics(resource));
+        registry.stagePending((id, generation, tick, declaration) -> null);
+        assertEquals(900, registry.stagedGenerationForDiagnostics(resource));
+        assertEquals(77, resource.source().generation());
+        registry.register(publication(101), () -> {});
+        assertEquals(0, registry.stagedGenerationForDiagnostics(resource));
+        registry.clear();
+        assertEquals(0, registry.stagedGenerationForDiagnostics(resource));
+    }
+
+    @Test
     void sourceBudgetsApplyAcrossAtlasesAndReplacementReleasesOnlyItsOwnBudget() {
         var mip = new net.minecraft.client.renderer.texture.SpriteContents.SemanticAnimationMip(
             1024, 1024, new byte[4 * 1024 * 1024]);

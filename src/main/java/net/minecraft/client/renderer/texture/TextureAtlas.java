@@ -140,7 +140,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 			this.animatedTextures = List.copyOf(list2);
 			if (rustWholeFrame && (LOCATION_BLOCKS.equals(this.location)
 				|| LOCATION_PARTICLES.equals(this.location)
-				|| net.vulkanic.world.AtlasAnimationResource.privateShieldLifecycleEnabled()
+				|| net.vulkanic.world.AtlasAnimationResource.shieldLifecycleEnabled()
 					&& net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(this.location))) {
 				// The incarnation starts with atlas upload, before any resource lookup
 				// or world publication can lose its semantic sprite-use events.

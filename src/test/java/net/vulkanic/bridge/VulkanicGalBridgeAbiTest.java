@@ -944,19 +944,31 @@ class VulkanicGalBridgeAbiTest {
 			"powered creeper/wither swirl admission must honor the Rust presenter shell during backend handoff");
 		assertTrue(body.contains("WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()"),
 			"animated energy-swirl work must remain behind the explicit Rust model-mesh route");
+		assertFalse(body.contains("&& l == 0"),
+			"vanilla ignores the forwarded outline color for an EnergySwirl RenderType; the base mesh owns the outline mask");
+		assertTrue(body.contains("RenderType.energySwirl declares OutlineProperty.NONE"),
+			"the animated route must document why a nonzero entity outline color does not alter the swirl draw");
 	}
 
 	@Test
 	void directTextureModelFamiliesHonorRustPresenterHandoffOwnership() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/SubmitNodeCollection.java"));
+		String livingRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/LivingEntityRenderer.java"));
+		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 		int start = source.indexOf("public <S> void submitModelSemanticTexture(");
 		int end = source.indexOf("public <S> void submitAnimatedModelSemanticTexture(", start);
 		String body = source.substring(start, end);
-		String[] families = {"SkullModelBase", "TridentModel", "SkeletonModel", "DrownedModel", "WitherBossModel"};
+		String[] families = {"SkullModelBase", "TridentModel", "SkeletonModel", "DrownedModel"};
 		for (String family : families) {
 			assertTrue(body.contains("model instanceof net.minecraft.client.model." + family),
 				"missing direct-texture model family: " + family);
 		}
+		assertTrue(livingRenderer.contains("this.model.getClass() == net.minecraft.client.model.WitherBossModel.class")
+			&& livingRenderer.contains("isVanillaWitherModelMeshEligible(")
+			&& worldRenderer.contains("public static boolean isVanillaWitherModelMeshEligible(")
+			&& worldRenderer.contains("textures/entity/wither/wither.png")
+			&& worldRenderer.contains("textures/entity/wither/wither_invulnerable.png"),
+			"Wither base models must use their state-aware living-model texture gate before generic direct-texture submission");
 		assertTrue(body.contains("object instanceof net.minecraft.client.model.SkullModelBase.State")
 			&& body.contains("block_entity/skull"),
 			"skull direct-texture admission must use SkullModelBase.State, the state actually emitted by SkullBlockRenderer");
@@ -1584,7 +1596,8 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(livingEntityRenderer.contains("ZombieRenderState zombieRenderState"));
 		assertTrue(worldRenderer.contains("&& !state.displayFireAnimation"));
 		assertTrue(deterministicCapture.contains("prepareModelMeshScenarioDifficulty"));
-		assertTrue(deterministicCapture.contains("zombie-requires-non-peaceful-difficulty"));
+		assertTrue(deterministicCapture.contains("scenario + \"-requires-non-peaceful-difficulty\""),
+			"hostile model fixtures must report the exact requested scenario when peaceful difficulty prevents spawning");
 		assertTrue(deterministicCapture.contains("difficultyEffective"));
 		assertTrue(deterministicCapture.contains("case \"zombie\" -> \"minecraft:textures/entity/zombie/zombie.png\""));
 		assertTrue(worldRenderer.contains("textures/entity/pig/temperate_pig.png"));
@@ -1609,7 +1622,7 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(worldRenderer.contains("\":model_part/\""));
 		assertTrue(worldRenderer.contains("if (renderType.isOutline()) return \"outline-render-type\";"),
 			"outline-only render types must remain fail-closed while regular outlined meshes use Rust metadata");
-		assertTrue(worldRenderer.contains("outlineColor\n\t\t\t\t));"),
+		assertTrue(worldRenderer.contains("outlineColor,\n\t\t\t\t\tsemantics.viewLayerFlags()\n\t\t\t\t));"),
 			"Rust ModelPart mesh instances must carry the semantic outline color");
 		assertTrue(worldRenderer.contains("resolvedModelInstanceColor(tintedColor)"));
 		assertTrue(worldRenderer.contains("tintedColor == 0 ? 0xffffffff : tintedColor"));
@@ -2525,18 +2538,21 @@ class VulkanicGalBridgeAbiTest {
 	void texturedBillboardsAdmitResourcePackPngsBeforeDynamicTextureFallback() throws Exception {
 		String worldRenderer = Files.readString(Path.of("src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
 		int enqueue = worldRenderer.indexOf("private static boolean enqueueTexturedQuadForMode");
+		int material = worldRenderer.indexOf("private static boolean enqueueTexturedQuadForMaterial", enqueue);
 		int helper = worldRenderer.indexOf("private static boolean registerSemanticTextureAsset", enqueue);
-		assertTrue(enqueue >= 0 && helper > enqueue,
+		assertTrue(enqueue >= 0 && material > enqueue && helper > material,
 			"textured billboard admission must use a dedicated semantic asset helper");
 		assertTrue(worldRenderer.contains("Rust textured billboard requires a seeded bounded world primitive frame"),
 			"textured billboard admission must reject oversized viewports before queueing material work");
-		String enqueueBody = worldRenderer.substring(enqueue, helper);
-		assertTrue(enqueueBody.contains("registerSemanticTextureAsset(textureIdentity, textureId, \"textured-billboard\")"),
+		String modeBody = worldRenderer.substring(enqueue, material);
+		String enqueueBody = worldRenderer.substring(material, helper);
+		assertTrue(modeBody.contains("sourceProgram, \"textured-billboard\"")
+			&& enqueueBody.contains("registerSemanticTextureAsset(textureIdentity, textureId, semanticName)"),
 			"generic billboard textures must admit resource-manager payloads before dynamic lookup");
 		assertTrue(enqueueBody.indexOf("PENDING_MATERIAL_QUADS.ensureCapacityFor(1)")
-			< enqueueBody.indexOf("registerSemanticTextureAsset(textureIdentity, textureId, \"textured-billboard\")"),
+			< enqueueBody.indexOf("registerSemanticTextureAsset(textureIdentity, textureId, semanticName)"),
 			"textured billboard assets must be admitted only after material capacity preflight");
-		assertTrue(enqueueBody.contains("translucent ? DEPTH_POLICY_TEST_NO_WRITE : DEPTH_POLICY_TEST_WRITE"),
+		assertTrue(modeBody.contains("translucent ? DEPTH_POLICY_TEST_NO_WRITE : DEPTH_POLICY_TEST_WRITE"),
 			"translucent billboard quads must use explicit depth-test/no-write semantics");
 		String helperBody = worldRenderer.substring(helper,
 			worldRenderer.indexOf("\n\t/** Reads a resource-pack payload", helper));
@@ -2578,6 +2594,17 @@ class VulkanicGalBridgeAbiTest {
 			assertTrue(source.contains("RustGalVulkanWholeFrameMode.enabled()"),
 				"entity layer must treat the Rust presenter shell as ownership");
 		}
+		assertTrue(snowGolem.contains("currentBlockDisplayRoute().usesRustWholeFrameVulkan()"),
+			"the snow-golem head must select the same block-display route consumed by its semantic block submission");
+		assertFalse(snowGolem.contains("currentMaterialRoute().usesRustWholeFrameVulkan()"),
+			"the snow-golem head must not select an unrelated generic-material route");
+		String itemFrame = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/ItemFrameRenderer.java"));
+		assertTrue(itemFrame.contains("submitBlockModelSemantic("),
+			"the synthetic item-frame backing must use the block-model semantic path that accepts its fake AIR-owned state");
+		assertTrue(itemFrame.contains("itemFrameRenderState.isGlowFrame ? \"glow_item_frame\" : \"item_frame\""),
+			"the synthetic item-frame backing must carry an exact resource identity independent of its AIR-owned state");
+		assertFalse(itemFrame.contains("submitBlockDisplaySemantic("),
+			"the generic block-display path rejects the synthetic item-frame state's invisible AIR render shape");
 		assertTrue(mushroomCow.contains("submitBlockDisplaySemantic")
 			&& snowGolem.contains("submitBlockDisplaySemantic")
 			&& slime.contains("enqueueStandaloneModelMeshOutlineOnly")
@@ -4118,7 +4145,7 @@ class VulkanicGalBridgeAbiTest {
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
 
-		assertEquals(54, VulkanicGalBridge.ABI_VERSION);
+		assertEquals(63, VulkanicGalBridge.ABI_VERSION);
 		assertTrue(bridge.contains("GUI_TILED_QUAD_REQUEST(101)"));
 		assertTrue(bridge.contains("Struct.WHOLE_FRAME_SUBMIT.setFloat(request, 34, guiProjection.width())"));
 		assertTrue(bridge.contains("Struct.GUI_FRAME_SUBMIT.setFloat(request, 10, guiProjection.width())"));
@@ -4382,7 +4409,12 @@ class VulkanicGalBridgeAbiTest {
 			"Rust GUI PIP extraction must bound copied inputs before model/atlas expansion");
 		assertTrue(semanticRenderer.contains("EntityPipLayerCapture")
 			&& semanticRenderer.contains("living.layers")
-			&& semanticRenderer.contains("EntityPipLayerModel::layerOrder")
+			&& semanticRenderer.contains("EntityPipLayerResult::layerOrder")
+			&& semanticRenderer.contains("layerModel.tint()")
+			&& semanticRenderer.contains("layerModel.setupAndObserve")
+			&& semanticRenderer.contains("void setupAndObserve(PoseStack.Pose sourcePose)")
+			&& semanticRenderer.contains("this.setupModel.run()")
+			&& semanticRenderer.contains("this.observeModel.accept(sourcePose)")
 			&& semanticRenderer.contains("EntityPipLayerItem")
 			&& semanticRenderer.contains("MAX_ENTITY_PIP_ITEM_QUADS = 1_024")
 			&& semanticRenderer.contains("layerItem.foilType()")
@@ -4474,11 +4506,10 @@ class VulkanicGalBridgeAbiTest {
 	void itemFrameBackingModelTreatsTheRustPresenterShellAsVulkanOwnership() throws Exception {
 		String renderer = Files.readString(Path.of(
 			"src/main/java/net/minecraft/client/renderer/entity/ItemFrameRenderer.java"));
-		assertTrue(renderer.contains("submitBlockDisplaySemantic("),
+		assertTrue(renderer.contains("submitBlockModelSemantic("),
 			"item-frame backing geometry must have an explicit Rust semantic producer");
-		assertTrue(renderer.contains("VulkanicAPI.isVulkanBackendSelected()")
-			&& renderer.contains("RustGalVulkanWholeFrameMode.enabled()"),
-			"item-frame ownership must include the Rust presenter handoff window");
+		assertTrue(renderer.contains("itemFrameRenderState.isGlowFrame ? \"glow_item_frame\" : \"item_frame\""),
+			"item-frame backing geometry must retain its identity independently of the synthetic AIR-owned state");
 	}
 
 	@Test
@@ -4535,10 +4566,24 @@ class VulkanicGalBridgeAbiTest {
 			"src/main/java/net/minecraft/client/renderer/entity/ItemFrameRenderer.java"));
 		int submit = renderer.indexOf("itemFrameRenderState.item.submit(");
 		assertTrue(submit > 0, "item-frame renderer must retain its item-state producer");
-		int begin = renderer.lastIndexOf("beginItemEntitySubmission()", submit);
-		int end = renderer.indexOf("endItemEntitySubmission()", submit);
+		int begin = renderer.lastIndexOf("beginItemFrameItemSubmission(", submit);
+		int end = renderer.indexOf("endItemFrameItemSubmission()", submit);
 		assertTrue(begin >= 0 && end > submit,
-			"item-frame item submissions must stay inside the indexed semantic scope during presenter handoff");
+			"item-frame item submissions must stay inside their identified indexed semantic scope during presenter handoff");
+		assertFalse(renderer.substring(begin, end).contains("beginItemEntitySubmission()"),
+			"framed items must not be classified as dropped-item producers");
+	}
+
+	@Test
+	void itemFrameMapSubmissionCarriesExactIdentityThroughPresenterHandoff() throws Exception {
+		String renderer = Files.readString(Path.of(
+			"src/main/java/net/minecraft/client/renderer/entity/ItemFrameRenderer.java"));
+		int submit = renderer.indexOf("this.mapRenderer.render(itemFrameRenderState.mapRenderState");
+		assertTrue(submit > 0, "item-frame renderer must retain its map producer");
+		int begin = renderer.lastIndexOf("beginItemFrameMapSubmission(", submit);
+		int end = renderer.indexOf("endItemFrameMapSubmission()", submit);
+		assertTrue(begin >= 0 && end > submit,
+			"framed maps must carry entity, map, and texture identities through semantic submission");
 	}
 
 	@Test
@@ -5528,7 +5573,11 @@ class VulkanicGalBridgeAbiTest {
 			&& levelRenderer.contains("textures/entity/sheep/sheep.png"),
 			"selected-source coverage must recognize Rust-owned zombie-villager and sheep body meshes");
 		assertTrue(levelRenderer.contains("BeaconRenderState")
+			&& levelRenderer.contains("ChestRenderState")
+			&& levelRenderer.contains("BedRenderState")
+			&& levelRenderer.contains("BellRenderState")
 			&& levelRenderer.contains("EndPortalRenderState")
+			&& levelRenderer.contains("EndGatewayRenderState")
 			&& levelRenderer.contains("CondiutRenderState")
 			&& levelRenderer.contains("SpawnerRenderState")
 			&& levelRenderer.contains("BlockEntityWithBoundingBoxRenderState")
@@ -5536,8 +5585,30 @@ class VulkanicGalBridgeAbiTest {
 			&& levelRenderer.contains("CampfireRenderState")
 			&& levelRenderer.contains("BrushableBlockRenderState")
 			&& levelRenderer.contains("ShelfRenderState")
-			&& levelRenderer.contains("VaultRenderState"),
+			&& levelRenderer.contains("VaultRenderState")
+			&& levelRenderer.contains("ShulkerBoxRenderState")
+			&& levelRenderer.contains("DecoratedPotRenderState")
+			&& levelRenderer.contains("EnchantTableRenderState")
+			&& levelRenderer.contains("LecternRenderState")
+			&& levelRenderer.contains("SignRenderState")
+			&& levelRenderer.contains("SkullBlockRenderState")
+			&& levelRenderer.contains("BannerRenderState")
+			&& levelRenderer.contains("CopperGolemStatueRenderState"),
 			"Rust whole-frame block-entity replay must admit semantic geometry and indexed-item producers");
+		String blockEntityRenderers = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/blockentity/BlockEntityRenderers.java"));
+		String[] registeredBlockEntityTypes = {
+			"SIGN", "HANGING_SIGN", "MOB_SPAWNER", "PISTON", "CHEST", "ENDER_CHEST", "TRAPPED_CHEST",
+			"ENCHANTING_TABLE", "LECTERN", "END_PORTAL", "END_GATEWAY", "BEACON", "SKULL", "BANNER",
+			"STRUCTURE_BLOCK", "TEST_INSTANCE_BLOCK", "SHULKER_BOX", "BED", "CONDUIT", "BELL", "CAMPFIRE",
+			"BRUSHABLE_BLOCK", "DECORATED_POT", "TRIAL_SPAWNER", "VAULT", "COPPER_GOLEM_STATUE", "SHELF"
+		};
+		for (String type : registeredBlockEntityTypes) {
+			assertTrue(blockEntityRenderers.contains("register(BlockEntityType." + type + ","),
+				"missing vanilla block-entity renderer registration from ownership inventory: " + type);
+		}
+		assertEquals(registeredBlockEntityTypes.length,
+			blockEntityRenderers.split("register\\(BlockEntityType\\.", -1).length - 1,
+			"new vanilla block-entity registrations require an explicit semantic ownership audit");
 		String blockEntityDispatcher = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/blockentity/BlockEntityRenderDispatcher.java"));
 		assertTrue(blockEntityDispatcher.contains("beginBlockEntityItemSubmission()")
 			&& blockEntityDispatcher.contains("endBlockEntityItemSubmission()")
@@ -5614,8 +5685,7 @@ class VulkanicGalBridgeAbiTest {
 		String itemFrameRenderer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/ItemFrameRenderer.java"));
 		String displayRendererBlock = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/DisplayRenderer.java"));
 		String carriedBlockLayer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/layers/CarriedBlockLayer.java"));
-		assertTrue(itemFrameRenderer.contains("submitBlockDisplaySemantic(")
-			&& displayRendererBlock.contains("submitBlockDisplaySemantic(")
+		assertTrue(displayRendererBlock.contains("submitBlockDisplaySemantic(")
 			&& carriedBlockLayer.contains("submitBlockSemantic("),
 			"entity block-state producers must enter explicit Rust semantic block callbacks");
 		String snowGolemHeadLayer = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/entity/layers/SnowGolemHeadLayer.java"));
@@ -9149,6 +9219,24 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
+	void equalDepthMeshPolicyRequiresAnOrdinaryEntityLayer() {
+		net.minecraft.SharedConstants.tryDetectVersion();
+		net.minecraft.server.Bootstrap.bootStrap();
+		float[] identity = new org.joml.Matrix4f().get(new float[16]);
+		var layer = new VulkanicGalBridge.WorldMeshInstanceRecord(
+			67, 41L, 2L, -1, 3, 0, 0, 0xffffffff, identity, 640, 480, 0, 0, 0, 0, -1);
+		assertEquals(3, layer.depthPolicy());
+		assertThrows(IllegalArgumentException.class, () -> layer.withItemFoil(
+			new VulkanicGalBridge.StandardItemFoilRecord(12345L, 0.5, 0.5f)));
+		assertThrows(IllegalArgumentException.class, () -> new VulkanicGalBridge.WorldMeshInstanceRecord(
+			60, 41L, 2L, -1, 3, 0, 0, 0xffffffff, identity, 640, 480, 0, 0, 0, 0, -1));
+		for (int invalid : new int[]{-1, 4, Integer.MAX_VALUE}) {
+			assertThrows(IllegalArgumentException.class, () -> new VulkanicGalBridge.WorldMeshInstanceRecord(
+				67, 41L, 2L, -1, invalid, 0, 0, 0xffffffff, identity, 640, 480, 0, 0, 0, 0, -1));
+		}
+	}
+
+	@Test
 	void terrainPlacementRetainsDoublePrecisionAndRejectsAmbiguousOwnership() {
 		net.minecraft.SharedConstants.tryDetectVersion();
 		net.minecraft.server.Bootstrap.bootStrap();
@@ -9185,22 +9273,29 @@ class VulkanicGalBridgeAbiTest {
 		net.minecraft.server.Bootstrap.bootStrap();
 		float[] transform = new org.joml.Matrix4f().translation(0.3f, -0.2f, 0.7f).get(new float[16]);
 		var plain = new VulkanicGalBridge.WorldMeshInstanceRecord(
-			67, 41L, 2L, -1, 0, 0, 0, 0xffffffff, transform, 640, 480);
+			67, 41L, 2L, -1, 0, 0, 0, 0xffffffff, transform, 640, 480).withModelSubmissionOrder(-4);
 		var foil = plain.withItemFoil(new VulkanicGalBridge.StandardItemFoilRecord(12345L, 0.25, 0.5f));
+		var worldDecal = foil.withDecalFoil(new VulkanicGalBridge.WorldDecalFoilRecord(false, false,
+			transform, new float[]{2,0,0,0,3,0,0,0,-4}));
+		var handDecal = foil.withDecalFoil(new VulkanicGalBridge.WorldDecalFoilRecord(true, true,
+			transform, new float[]{1,0,0,0,1,0,0,0,1}));
 		var frame = new RustGalWorldPrimitiveRenderer.PrimitiveFrame(640, 480, transform, transform,
 			new VulkanicGalBridge.WorldBackgroundRecord(false, 0, 0, 0, 0, 640, 480),
-			List.of(), List.of(), List.of(), List.of(), List.of(), List.of(plain, foil), List.of(),
+			List.of(), List.of(), List.of(), List.of(), List.of(), List.of(plain, foil, worldDecal), List.of(),
 			VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled(),
 			VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled(),
 			VulkanicGalBridge.WorldFeatureCoverageRecord.empty(), List.of(),
 			VulkanicGalBridge.WorldLodRenderFrameRecord.disabled(), 0,
-			VulkanicGalBridge.WorldFirstPersonFrameRecord.disabled(), List.of(plain, foil));
+			VulkanicGalBridge.WorldFirstPersonFrameRecord.disabled(), List.of(plain, foil, handDecal));
 		assertSame(frame, RustGalWorldPrimitiveRenderer.withViewport(frame, 640, 480));
 		var resized = RustGalWorldPrimitiveRenderer.withViewport(frame, 1280, 720);
+		assertSame(worldDecal.decalFoil(), resized.meshInstances().get(2).decalFoil());
+		assertSame(handDecal.decalFoil(), resized.firstPersonMeshInstances().get(2).decalFoil());
 		for (var instances : List.of(resized.meshInstances(), resized.firstPersonMeshInstances())) {
 			assertNull(instances.getFirst().itemFoil());
 			assertEquals(foil.itemFoil(), instances.get(1).itemFoil());
 			for (var instance : instances) {
+				assertEquals(-4, instance.modelSubmissionOrder());
 				assertEquals(1280, instance.viewportWidth());
 				assertEquals(720, instance.viewportHeight());
 				assertArrayEquals(transform, instance.transform());

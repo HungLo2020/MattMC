@@ -28,6 +28,7 @@ public class CopperGolemRenderer extends MobRenderer<CopperGolem, CopperGolemRen
 			new LivingEntityEmissiveLayer<>(
 				this,
 				getEyeTextureLocationProvider(),
+				ResourceLocation.withDefaultNamespace("copper_golem_eyes"),
 				(copperGolemRenderState, f) -> 1.0F,
 				new CopperGolemModel(context.bakeLayer(ModelLayers.COPPER_GOLEM)),
 				RenderType::eyes,

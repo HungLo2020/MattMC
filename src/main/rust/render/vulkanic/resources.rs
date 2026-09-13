@@ -377,6 +377,8 @@ pub enum BlendMode {
     /// Source-alpha RGB composition with destination alpha preserved:
     /// RGB factors SrcAlpha/OneMinusSrcAlpha, alpha factors Zero/One.
     AlphaPreserveAlpha = 11,
+    /// Vanilla block-destruction composition: `out.rgb = 2 * src.rgb * dst.rgb`.
+    Crumbling = 12,
 }
 
 #[repr(u32)]

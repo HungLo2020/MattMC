@@ -4,6 +4,21 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GraphicsAuditGuiFoilTimingTest {
+    @Test void alignedCaptureCanObserveAnotherNaturalCycleWithoutWideningThePhase() {
+        String key="mattmc.dev.graphicsAuditHandFoilPhaseCenter", old=System.getProperty(key);
+        try {
+            System.clearProperty(key);
+            assertEquals(110_000_000_000L,GraphicsAuditGuiFoilTiming.captureWaitBudgetNanos());
+            System.setProperty(key,"40204");
+            assertEquals(200_000_000_000L,GraphicsAuditGuiFoilTiming.captureWaitBudgetNanos());
+            assertTrue(GraphicsAuditHandFoilTiming.pairedPhaseMatches(700204));
+            assertFalse(GraphicsAuditHandFoilTiming.pairedPhaseMatches(700221));
+            assertFalse(GraphicsAuditGuiFoilTiming.phaseMatches(370513,40000));
+        } finally {
+            if (old==null) System.clearProperty(key);else System.setProperty(key,old);
+        }
+    }
+
     @Test void phaseWindowUsesObservedTicksAndBothAxisJointPeriod() {
         assertTrue(GraphicsAuditGuiFoilTiming.phaseMatches(10000,10000));
         assertTrue(GraphicsAuditGuiFoilTiming.phaseMatches(10512,10000));

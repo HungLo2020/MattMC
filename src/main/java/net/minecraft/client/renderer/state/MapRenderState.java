@@ -19,6 +19,8 @@ public class MapRenderState {
 	public static class MapDecorationRenderState {
 		@Nullable
 		public TextureAtlasSprite atlasSprite;
+		@Nullable
+		public ResourceLocation decorationIdentity;
 		public byte x;
 		public byte y;
 		public byte rot;

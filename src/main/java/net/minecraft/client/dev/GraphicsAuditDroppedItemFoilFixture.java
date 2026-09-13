@@ -14,17 +14,37 @@ import net.minecraft.world.phys.Vec3;
 /** Opt-in copied-world inputs only. Never reads or changes renderer/GPU state. */
 public final class GraphicsAuditDroppedItemFoilFixture {
     public static final String PROPERTY = "mattmc.dev.graphicsAuditDroppedItemFoil";
+    public static final String SPECIAL_PROPERTY = "mattmc.dev.graphicsAuditDroppedSpecialFoil";
+    public static final String RECOVERY_PROPERTY = "mattmc.dev.graphicsAuditDroppedSpecialFoilRecovery";
     private static final int FIRST_ID = Integer.MIN_VALUE + 4100;
     static final float BOB_OFFSET = (float) Math.PI;
     private static final JsonObject[] observed = new JsonObject[2];
     private GraphicsAuditDroppedItemFoilFixture() {}
 
     public static int requestedCount() {
+        if (recoveryRequested() && !specialRequested())
+            throw new IllegalArgumentException("ground recovery requires the special foil fixture");
         int count = Integer.parseInt(System.getProperty(PROPERTY, "0"));
+        if (specialRequested()) {
+            if (count != 0) throw new IllegalArgumentException("special and ordinary dropped foil fixtures are exclusive");
+            return 1;
+        }
         if (count != 0 && count != 1 && count != 64)
             throw new IllegalArgumentException("dropped foil fixture count must be 0, 1 or 64");
         return count;
     }
+
+    public static boolean specialRequested() { return Boolean.getBoolean(SPECIAL_PROPERTY); }
+
+    public static boolean recoveryRequested() { return Boolean.getBoolean(RECOVERY_PROPERTY); }
+
+    static net.minecraft.world.item.Item expectedItem(int index) {
+        if (index < 0 || index > 1) throw new IllegalArgumentException("invalid dropped item index");
+        return specialRequested() ? (index == 0 ? Items.CLOCK : recoveryRequested() ? Items.RECOVERY_COMPASS : Items.COMPASS)
+            : (index == 0 ? Items.DIAMOND : Items.STONE);
+    }
+
+    static float expectedBobOffset() { return specialRequested() ? (float)(Math.PI / 2) : BOB_OFFSET; }
 
     static Vec3 position(Vec3 eye, Vec3 look, int index) {
         Vec3 forward = look.lengthSqr() < .0001 ? new Vec3(0,0,1) : look.normalize();
@@ -43,11 +63,11 @@ public final class GraphicsAuditDroppedItemFoilFixture {
         try {
             Field field = ItemEntity.class.getField("bobOffs");
             field.setAccessible(true);
-            field.setFloat(entity, BOB_OFFSET);
+            field.setFloat(entity, expectedBobOffset());
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("cannot initialize deterministic item fixture phase", exception);
         }
-        if (entity.bobOffs != BOB_OFFSET) throw new IllegalStateException("fixture phase write was not observed");
+        if (entity.bobOffs != expectedBobOffset()) throw new IllegalStateException("fixture phase write was not observed");
         entity.tickCount = 0;
     }
 
@@ -74,7 +94,7 @@ public final class GraphicsAuditDroppedItemFoilFixture {
                 observed[index] = null;
                 entity = new ItemEntity(EntityType.ITEM, minecraft.level);
                 entity.setId(id);
-                ItemStack stack = new ItemStack(index == 0 ? Items.DIAMOND : Items.STONE, count);
+                ItemStack stack = new ItemStack(expectedItem(index), count);
                 stack.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
                 entity.setItem(stack);
                 entity.setNoGravity(true);
@@ -90,7 +110,7 @@ public final class GraphicsAuditDroppedItemFoilFixture {
     }
 
     /** Observes the ordinary extracted semantic input, without changing it. */
-    public static void observe(ItemEntity entity, float age, float bob, int copies, int seed, int light) {
+    public static void observe(ItemEntity entity, float age, float bob, int copies, int seed, int light, net.minecraft.client.renderer.item.ItemStackRenderState state) {
         if (requestedCount() == 0) return;
         int index = entity.getId() - FIRST_ID;
         if (index < 0 || index >= observed.length) return;
@@ -100,6 +120,7 @@ public final class GraphicsAuditDroppedItemFoilFixture {
         value.addProperty("copies", copies);
         value.addProperty("seed", seed);
         value.addProperty("light", light);
+        if (specialRequested()) value.add("sources", GraphicsAuditGroundFoilSources.capture(state));
         observed[index] = value;
     }
 
@@ -107,7 +128,7 @@ public final class GraphicsAuditDroppedItemFoilFixture {
         int count = requestedCount();
         if (count == 0) return "null";
         JsonObject result = new JsonObject();
-        result.addProperty("fixture", "dropped-item-foil-v2");
+        result.addProperty("fixture", specialRequested() ? (recoveryRequested() ? "dropped-recovery-special-foil-v1" : "dropped-special-foil-v1") : "dropped-item-foil-v2");
         result.addProperty("stackCount", count);
         boolean complete = minecraft.level != null && minecraft.player != null;
         result.addProperty("frozenSimulation", complete && minecraft.level.tickRateManager().isFrozen());
@@ -118,7 +139,7 @@ public final class GraphicsAuditDroppedItemFoilFixture {
                 var found = minecraft.level.getEntity(FIRST_ID + index);
                 if (!(found instanceof ItemEntity entity)) { complete = false; continue; }
                 JsonObject item = new JsonObject();
-                item.addProperty("item", index == 0 ? "minecraft:diamond" : "minecraft:stone");
+                item.addProperty("item", entity.getItem().getItem().builtInRegistryHolder().key().location().toString());
                 item.addProperty("count", entity.getItem().getCount());
                 item.addProperty("foil", entity.getItem().hasFoil());
                 item.addProperty("bobOffset", entity.bobOffs);
@@ -128,9 +149,9 @@ public final class GraphicsAuditDroppedItemFoilFixture {
                 item.add("position", pos);
                 item.add("extracted", observed[index]);
                 items.add(item);
-                complete &= entity.getItem().is(index == 0 ? Items.DIAMOND : Items.STONE)
+                complete &= entity.getItem().is(expectedItem(index))
                     && entity.getItem().getCount() == count && entity.getItem().hasFoil()
-                    && entity.bobOffs == BOB_OFFSET && entity.tickCount == 0 && !entity.isRemoved()
+                    && entity.bobOffs == expectedBobOffset() && entity.tickCount == 0 && !entity.isRemoved()
                     && entity.isNoGravity() && entity.getDeltaMovement().lengthSqr() == 0;
                 complete &= observed[index] != null;
             }

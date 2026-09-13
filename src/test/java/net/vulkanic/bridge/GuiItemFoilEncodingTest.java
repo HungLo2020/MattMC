@@ -8,6 +8,26 @@ import static net.vulkanic.bridge.VulkanicGalBridge.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GuiItemFoilEncodingTest {
+    @Test void entityPreviewDecalMaterialRequiresExactPreviewSemantics() {
+        var source = batch(1);
+        var decal = new GuiMeshBatchRecord(source.stratum(), source.layerIndex(),
+            GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL, GUI_MESH_LIGHTING_ENTITY_PREVIEW,
+            source.assetId(), source.sequence(), 0.1F, source.modelTransform(), source.guiPose(),
+            source.left(), source.top(), source.right(), source.bottom(), source.guiWidth(), source.guiHeight(),
+            source.renderWidth(), source.renderHeight(), source.guardPixels(), source.vertices(), source.indices());
+        assertEquals(GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL, decal.materialMode());
+        assertThrows(IllegalArgumentException.class, () -> new GuiMeshBatchRecord(
+            decal.stratum(), decal.layerIndex(), decal.materialMode(), 1, decal.assetId(), decal.sequence(),
+            decal.alphaCutoff(), decal.modelTransform(), decal.guiPose(), decal.left(), decal.top(), decal.right(),
+            decal.bottom(), decal.guiWidth(), decal.guiHeight(), decal.renderWidth(), decal.renderHeight(),
+            decal.guardPixels(), decal.vertices(), decal.indices()));
+        assertThrows(IllegalArgumentException.class, () -> new GuiMeshBatchRecord(
+            decal.stratum(), decal.layerIndex(), decal.materialMode(), decal.lightingMode(), decal.assetId(), decal.sequence(),
+            0.0F, decal.modelTransform(), decal.guiPose(), decal.left(), decal.top(), decal.right(), decal.bottom(),
+            decal.guiWidth(), decal.guiHeight(), decal.renderWidth(), decal.renderHeight(), decal.guardPixels(),
+            decal.vertices(), decal.indices()));
+    }
+
     @Test void frontModelLightingIsExplicitAndSurvivesNativeEncoding() throws Exception {
         var source=batch(1);
         var front=new GuiMeshBatchRecord(source.stratum(),source.layerIndex(),1,GUI_MESH_LIGHTING_FRONT_MODEL,
@@ -23,6 +43,19 @@ class GuiItemFoilEncodingTest {
             assertEquals(4,encoded.get(ValueLayout.JAVA_INT,Struct.GUI_MESH_BATCH_REQUEST.offset(4)));
             assertEquals(3,encoded.get(ValueLayout.JAVA_INT,Struct.GUI_MESH_BATCH_REQUEST.offset(31)));
         }
+    }
+    @Test void equipmentFoilRequiresOrthographicEntityPreview() {
+        var perspective = new StandardItemFoilRecord(12345, 0.125, 0.375F, StandardFoilKind.ARMOR);
+        var orthographic = new StandardItemFoilRecord(12345, 0.125, 0.375F, StandardFoilKind.ARMOR_ORTHOGRAPHIC);
+        assertThrows(IllegalArgumentException.class, () -> flatBatch(3,0,0).withItemFoil(perspective));
+        assertThrows(IllegalArgumentException.class, () -> flatBatch(3,0,0).withItemFoil(orthographic));
+        var source = batch(4);
+        var preview = new GuiMeshBatchRecord(source.stratum(), source.layerIndex(), 4, GUI_MESH_LIGHTING_ENTITY_PREVIEW,
+            source.assetId(), source.sequence(), source.alphaCutoff(), source.modelTransform(), source.guiPose(),
+            source.left(), source.top(), source.right(), source.bottom(), source.guiWidth(), source.guiHeight(),
+            source.renderWidth(), source.renderHeight(), source.guardPixels(), source.vertices(), source.indices());
+        assertEquals(orthographic, preview.withItemFoil(orthographic).itemFoil());
+        assertThrows(IllegalArgumentException.class, () -> preview.withItemFoil(perspective));
     }
     @Test void entityFoilTransportRequiresNativeModelRasterAndPreservesKind() throws Exception {
         var foil = new StandardItemFoilRecord(12345, 0.125, 0.375F, StandardFoilKind.ENTITY);

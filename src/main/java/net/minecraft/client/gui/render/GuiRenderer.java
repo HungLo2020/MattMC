@@ -589,6 +589,12 @@ public class GuiRenderer implements AutoCloseable {
 		}
 	}
 
+	/** Retires per-frame ownership markers after Rust has presented the GUI. */
+	public void finishRustGalWholeFrame() {
+		this.rustOwnedStandard3dItems.clear();
+		this.rustOwnedPictureInPictureStates.clear();
+	}
+
 	private void clearUnusedOversizedItemRenderers() {
 		Iterator<Entry<Object, OversizedItemRenderer>> iterator = this.oversizedItemRenderers.entrySet().iterator();
 

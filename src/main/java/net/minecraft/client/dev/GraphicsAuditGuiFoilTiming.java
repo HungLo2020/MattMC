@@ -45,6 +45,14 @@ public final class GraphicsAuditGuiFoilTiming {
             && Math.floorMod(ticks - target, 330000L) <= 512L;
     }
 
+    // The strict paired window can fall between frames. Allow more than two
+    // full natural 82.5s cycles at the fixture's speed .5; keep a finite wait.
+    static long captureWaitBudgetNanos() {
+        return System.getProperty("mattmc.dev.graphicsAuditHandFoilPhaseCenter") == null
+            && System.getProperty("mattmc.dev.graphicsAuditGroundFoilPhaseTargets") == null
+            ? 110_000_000_000L : 200_000_000_000L;
+    }
+
     /** Only delays capture selection; never substitutes a render clock. */
     public static synchronized boolean readyForCapture() {
         if (!movingRequested()) return true;
@@ -52,12 +60,14 @@ public final class GraphicsAuditGuiFoilTiming {
         if (!enabled() || target < 0 || target >= 330000)
             throw new IllegalStateException("invalid animated foil diagnostic configuration");
         if (waitStarted == 0) waitStarted = System.nanoTime();
-        if (System.nanoTime() - waitStarted > 110_000_000_000L)
+        if (System.nanoTime() - waitStarted > captureWaitBudgetNanos())
             throw new IllegalStateException("timed out observing the requested natural foil phase: guiTicks="
-                + phaseTicks + " hand=" + GraphicsAuditHandFoilTiming.snapshot());
+                + phaseTicks + " hand=" + GraphicsAuditHandFoilTiming.snapshot()
+                + " ground=" + GraphicsAuditGroundFoilTiming.snapshot());
         return complete && slot.get() == null && !phaseTicks.isEmpty()
             && phaseTicks.size() == timedItems.size() && timedItems.size()+reusedItems.size() == 8
             && GraphicsAuditHandFoilTiming.readyForCapture(target)
+            && GraphicsAuditGroundFoilTiming.readyForCapture(target)
             && phaseTicks.stream().allMatch(ticks -> phaseMatches(ticks, target));
     }
 
@@ -71,6 +81,7 @@ public final class GraphicsAuditGuiFoilTiming {
         complete = slot.get() == null;
         slot.remove();
         frameSequence++;
+        GraphicsAuditGuiFoilSource.beginFrame(frameSequence);
     }
 
     public static void beginItem(int x, int y) {
@@ -123,7 +134,9 @@ public final class GraphicsAuditGuiFoilTiming {
             + "],\"atlasWrites\":[" + String.join(",",atlasWrites.values().stream()
                 .map(p -> "{\"x\":"+p[0]+",\"y\":"+p[1]+",\"atlasX\":"+p[2]+",\"atlasY\":"+p[3]+"}").toList())
             + "],\"atlasAliases\":[" + String.join(",",atlasAliases) + "]" + (GraphicsAuditHandFoilTiming.enabled()
-                ? ",\"hand\":" + GraphicsAuditHandFoilTiming.snapshot() : "") + "}";
+                ? ",\"hand\":" + GraphicsAuditHandFoilTiming.snapshot() : "")
+            + (GraphicsAuditGroundFoilTiming.enabled() ? ",\"ground\":" + GraphicsAuditGroundFoilTiming.snapshot() : "")
+            + ",\"sourceEvidence\":" + GraphicsAuditGuiFoilSource.json() + "}";
     }
 
     static synchronized void resetForTest() {

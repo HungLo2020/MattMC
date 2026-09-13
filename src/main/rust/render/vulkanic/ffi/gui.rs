@@ -433,6 +433,9 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             4 => GuiMeshMaterialMode::Glint,
             GUI_MESH_MATERIAL_PANORAMA => GuiMeshMaterialMode::Panorama,
             6 => GuiMeshMaterialMode::ModelOverlay,
+			7 => GuiMeshMaterialMode::EntityCutoutNoCull,
+			8 => GuiMeshMaterialMode::EntityTranslucentNoCull,
+			9 => GuiMeshMaterialMode::EntityDecalCutoutNoCull,
             other => {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,
@@ -445,6 +448,7 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             2 => GuiMeshLightingMode::Block,
             3 => GuiMeshLightingMode::InventoryBlock,
             4 => GuiMeshLightingMode::FrontModel,
+            5 => GuiMeshLightingMode::EntityPreview,
             other => {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,

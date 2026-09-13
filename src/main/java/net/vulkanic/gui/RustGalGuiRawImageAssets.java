@@ -9,6 +9,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Arrays;
 import net.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -474,10 +475,16 @@ public final class RustGalGuiRawImageAssets {
 	static void stage(Asset asset) {
 		if (asset == null) return;
 		synchronized (LOCK) {
-			// Asset instances are immutable.  Reference identity distinguishes a
-			// new dynamic/resource-pack snapshot from repeated uses of this exact
-			// image, without scanning its potentially large pixel array.
-			if (STAGED_ASSETS.get(asset.assetId()) == asset) return;
+			Asset staged = STAGED_ASSETS.get(asset.assetId());
+			// Dynamic textures and animated sprites create immutable snapshots.
+			// Some producers refresh those snapshots without changing a pixel; do
+			// not turn that into a new whole-cache native upload every frame.
+			if (staged == asset || samePayload(staged, asset)) return;
+			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+				RustGalFrameCoordinator.auditMessage("Rust GUI raw image changed identity=" + asset.identity
+					+ " asset_id=" + asset.assetId + " extent=" + asset.width + "x" + asset.height
+					+ " bytes=" + asset.pixels.length);
+			}
 		}
 		// The coordinator is the admission boundary. Do not mark the asset as
 		// staged until its bounded pending-image transaction has succeeded, so a
@@ -493,6 +500,16 @@ public final class RustGalGuiRawImageAssets {
 			}
 			STAGED_ASSETS.put(asset.assetId(), asset);
 		}
+	}
+
+	static boolean samePayload(Asset first, Asset second) {
+		return first != null && second != null
+			&& first.assetId == second.assetId
+			&& first.width == second.width
+			&& first.height == second.height
+			&& first.samplingFilter == second.samplingFilter
+			&& first.samplingAddress == second.samplingAddress
+			&& Arrays.equals(first.pixels, second.pixels);
 	}
 
 	/** Stages an immutable cube-map copy at most once per resource generation. */

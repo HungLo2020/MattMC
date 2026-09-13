@@ -5,6 +5,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.state.MapRenderState;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import org.jetbrains.annotations.Nullable;
 
@@ -14,6 +15,8 @@ public class ItemFrameRenderState extends EntityRenderState {
 	public final ItemStackRenderState item = new ItemStackRenderState();
 	public int rotation;
 	public boolean isGlowFrame;
+	@Nullable
+	public ResourceLocation itemIdentity;
 	@Nullable
 	public MapId mapId;
 	public final MapRenderState mapRenderState = new MapRenderState();

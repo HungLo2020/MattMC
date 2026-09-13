@@ -10,6 +10,22 @@ use super::error::{GalError, GalResult};
 pub enum StandardFoilKind {
     Item,
     Entity,
+    /// Equipment overlay: a separate texture, UV basis and view layering.
+    /// Perspective equipment view offset.
+    Armor,
+    ArmorOrthographic,
+}
+
+pub use super::view_layering::Projection as FoilProjection;
+
+impl StandardFoilKind {
+    pub fn armor_projection(self) -> Option<FoilProjection> {
+        match self {
+            Self::Armor => Some(FoilProjection::Perspective),
+            Self::ArmorOrthographic => Some(FoilProjection::Orthographic),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -24,8 +40,13 @@ impl StandardItemFoil {
     pub fn decode(mode: u32, clock_millis: u64, speed: f64, strength: f32) -> GalResult<Option<Self>> {
         match mode {
             0 if clock_millis == 0 && speed.to_bits() == 0 && strength.to_bits() == 0 => Ok(None),
-            1 | 2 => {
-                let kind = if mode == 1 { StandardFoilKind::Item } else { StandardFoilKind::Entity };
+            1..=4 => {
+                let kind = match mode {
+                    1 => StandardFoilKind::Item,
+                    2 => StandardFoilKind::Entity,
+                    3 => StandardFoilKind::Armor,
+                    _ => StandardFoilKind::ArmorOrthographic,
+                };
                 let value = Self { kind, clock_millis, speed, strength };
                 value.validate()?;
                 Ok(Some(value))
@@ -64,6 +85,7 @@ impl StandardItemFoil {
         let scale = match self.kind {
             StandardFoilKind::Item => 8.0,
             StandardFoilKind::Entity => 0.5,
+            StandardFoilKind::Armor | StandardFoilKind::ArmorOrthographic => 0.16,
         };
         let sin = sin * scale;
         let cos = cos * scale;
@@ -85,6 +107,16 @@ impl StandardItemFoil {
         // Do not wrap here. The explicit repeating sampler owns addressing,
         // including derivatives and filtering across a repeat boundary.
         Ok(uv)
+    }
+
+    /// Native equivalent of Frozen VIEW_OFFSET_Z_LAYERING. Postmultiply the
+    /// view, before the model transform; scaling model-local coordinates alone
+    /// would miss camera-relative model translation. Projection is semantic
+    /// input, not inferred from arbitrary matrix coefficients.
+    pub fn layered_view(self, view: [f32; 16], projection: FoilProjection)
+        -> GalResult<[f32; 16]> {
+        self.validate()?;
+        super::view_layering::apply(view, self.kind.armor_projection().map(|_| projection))
     }
 
     /// std430 ItemFoilInstance: two affine rows and one parameter vector.
@@ -136,8 +168,50 @@ mod tests {
         assert!((uv[1] - 1.037008881).abs() < 0.000002);
         assert_ne!(entity.packed_instance().unwrap(), foil(12_345).packed_instance().unwrap());
         assert_eq!(StandardItemFoil::decode(2, 12_345, 0.5, 0.5).unwrap(), Some(entity));
-        assert!(StandardItemFoil::decode(3, 0, 0.0, 0.0).is_err());
+        assert!(StandardItemFoil::decode(5, 0, 0.0, 0.0).is_err());
         assert!(StandardItemFoil::decode(2, u64::MAX, 0.0, 0.0).is_err());
+    }
+
+    #[test]
+    fn armor_foil_has_independent_uv_basis_and_explicit_projection_transport() {
+        let armor = StandardItemFoil { kind: StandardFoilKind::Armor, ..foil(12_345) };
+        let matrix = armor.texture_transform().unwrap();
+        // RenderStateShard: translate(-g,h), rotateZ(PI/18), scale(0.16).
+        let expected = [[0.15756924, 0.02778371], [-0.02778371, 0.15756924],
+            [-0.448909104, 0.646000028]];
+        for column in 0..3 { for row in 0..2 {
+            assert!((matrix[column][row] - expected[column][row]).abs() < 0.000002);
+        }}
+        assert_eq!(armor.texture_uv([0.0, 0.0]).unwrap(), foil(12_345).texture_uv([0.0, 0.0]).unwrap());
+        assert_eq!(StandardItemFoil::decode(3, 12_345, 0.5, 0.5).unwrap(), Some(armor));
+        let orthographic = StandardItemFoil { kind: StandardFoilKind::ArmorOrthographic, ..armor };
+        assert_eq!(StandardItemFoil::decode(4, 12_345, 0.5, 0.5).unwrap(), Some(orthographic));
+        assert_eq!(orthographic.texture_transform().unwrap(), matrix);
+    }
+
+    #[test]
+    fn armor_layering_postmultiplies_view_and_preserves_other_foil() {
+        let armor = StandardItemFoil { kind: StandardFoilKind::Armor, ..foil(0) };
+        // Rotated view with translation: catches world-axis translateZ and
+        // accidental scaling of the view translation column.
+        let view = [0., 0., -1., 0., 0., 1., 0., 0., 1., 0., 0., 0., 7., 8., 9., 1.];
+        let s = 4095.0 / 4096.0;
+        assert_eq!(armor.layered_view(view, FoilProjection::Perspective).unwrap(),
+            [0., 0., -s, 0., 0., s, 0., 0., s, 0., 0., 0., 7., 8., 9., 1.]);
+        assert_eq!(armor.layered_view(view, FoilProjection::Orthographic).unwrap(),
+            [0., 0., -1., 0., 0., 1., 0., 0., 1., 0., 0., 0., 7. + 1./512., 8., 9., 1.]);
+        for kind in [StandardFoilKind::Item, StandardFoilKind::Entity] {
+            for projection in [FoilProjection::Perspective, FoilProjection::Orthographic] {
+                assert_eq!(StandardItemFoil { kind, ..armor }.layered_view(view, projection).unwrap(), view);
+            }
+        }
+        let mut invalid = view;
+        invalid[4] = f32::NAN;
+        assert!(armor.layered_view(invalid, FoilProjection::Perspective).is_err());
+        let mut overflow = view;
+        overflow[8] = f32::MAX;
+        overflow[12] = f32::MAX;
+        assert!(armor.layered_view(overflow, FoilProjection::Orthographic).is_err());
     }
 
     #[test]

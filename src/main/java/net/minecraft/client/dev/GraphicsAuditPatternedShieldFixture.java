@@ -44,7 +44,7 @@ public final class GraphicsAuditPatternedShieldFixture {
         String layers = actual.layers().stream().map(layer -> layer.pattern().value().assetId()
             + ":" + layer.color().getName()).collect(Collectors.joining(","));
         boolean complete = selected == 1 && stack.is(Items.SHIELD) && stack.getCount() == 1
-            && stack.hasFoil() == expectedFoil && !using && base == DyeColor.YELLOW && actual.equals(patterns())
+            && stack.hasFoil() == expectedFoil && GraphicsAuditShieldPoseFixture.matchesPose(player) && base == DyeColor.YELLOW && actual.equals(patterns())
             && (!expectedFoil || (minecraft.options.glintSpeed().get() == 0.0 && minecraft.options.glintStrength().get() == 0.5));
         return "{\"fixture\":\"" + (expectedFoil ? "held-shield-patterns-foil-v1" : "held-shield-patterns-v1") + "\",\"selectedSlot\":" + selected
             + ",\"mainHand\":\"" + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem())

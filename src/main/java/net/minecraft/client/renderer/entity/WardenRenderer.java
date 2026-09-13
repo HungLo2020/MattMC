@@ -29,13 +29,15 @@ public class WardenRenderer extends MobRenderer<Warden, WardenRenderState, Warde
 		WardenModel wardenModel4 = new WardenModel(context.bakeLayer(ModelLayers.WARDEN_HEART));
 		this.addLayer(
 			new LivingEntityEmissiveLayer<>(
-				this, wardenRenderState -> BIOLUMINESCENT_LAYER_TEXTURE, (wardenRenderState, f) -> 1.0F, wardenModel, RenderType::entityTranslucentEmissive, false
+				this, wardenRenderState -> BIOLUMINESCENT_LAYER_TEXTURE, ResourceLocation.withDefaultNamespace("warden_bioluminescent"),
+				(wardenRenderState, f) -> 1.0F, wardenModel, RenderType::entityTranslucentEmissive, false
 			)
 		);
 		this.addLayer(
 			new LivingEntityEmissiveLayer<>(
 				this,
 				wardenRenderState -> PULSATING_SPOTS_TEXTURE_1,
+				ResourceLocation.withDefaultNamespace("warden_pulsating_spots_1"),
 				(wardenRenderState, f) -> Math.max(0.0F, Mth.cos(f * 0.045F) * 0.25F),
 				wardenModel2,
 				RenderType::entityTranslucentEmissive,
@@ -46,6 +48,7 @@ public class WardenRenderer extends MobRenderer<Warden, WardenRenderState, Warde
 			new LivingEntityEmissiveLayer<>(
 				this,
 				wardenRenderState -> PULSATING_SPOTS_TEXTURE_2,
+				ResourceLocation.withDefaultNamespace("warden_pulsating_spots_2"),
 				(wardenRenderState, f) -> Math.max(0.0F, Mth.cos(f * 0.045F + (float) Math.PI) * 0.25F),
 				wardenModel2,
 				RenderType::entityTranslucentEmissive,
@@ -56,6 +59,7 @@ public class WardenRenderer extends MobRenderer<Warden, WardenRenderState, Warde
 			new LivingEntityEmissiveLayer<>(
 				this,
 				wardenRenderState -> TEXTURE,
+				ResourceLocation.withDefaultNamespace("warden_tendrils"),
 				(wardenRenderState, f) -> wardenRenderState.tendrilAnimation,
 				wardenModel3,
 				RenderType::entityTranslucentEmissive,
@@ -66,6 +70,7 @@ public class WardenRenderer extends MobRenderer<Warden, WardenRenderState, Warde
 			new LivingEntityEmissiveLayer<>(
 				this,
 				wardenRenderState -> HEART_TEXTURE,
+				ResourceLocation.withDefaultNamespace("warden_heart"),
 				(wardenRenderState, f) -> wardenRenderState.heartAnimation,
 				wardenModel4,
 				RenderType::entityTranslucentEmissive,

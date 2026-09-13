@@ -4,6 +4,35 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GraphicsAuditGuiFoilSourceTest {
+    @Test void selectedFrameSnapshotDoesNotRetainEarlierCompassFrames() {
+        String property = "mattmc.dev.guiItemRasterTrace";
+        String old = System.getProperty(property);
+        System.setProperty(property, "true");
+        GraphicsAuditGuiFoilTiming.resetForTest();
+        GraphicsAuditGuiFoilSource.resetForTest();
+        try {
+            GraphicsAuditGuiFoilTiming.beginFrame();
+            GraphicsAuditGuiFoilSource.observe(new GraphicsAuditGuiFoilSource.Sample(
+                "minecraft:item/compass_08",new float[12],new float[8]));
+            String earlier = GraphicsAuditGuiFoilTiming.snapshot();
+            GraphicsAuditGuiFoilTiming.beginFrame();
+            GraphicsAuditGuiFoilSource.observe(new GraphicsAuditGuiFoilSource.Sample(
+                "minecraft:item/compass_07",new float[12],new float[8]));
+            var current = com.google.gson.JsonParser.parseString(GraphicsAuditGuiFoilTiming.snapshot()).getAsJsonObject();
+            var source = current.getAsJsonObject("sourceEvidence");
+            assertEquals(current.get("frameSequence"),source.get("frameSequence"));
+            assertEquals(1,source.getAsJsonArray("sources").size());
+            assertTrue(source.toString().contains("compass_07"));
+            assertFalse(source.toString().contains("compass_08"));
+            assertTrue(earlier.contains("compass_08"));
+            assertFalse(earlier.contains("compass_07"));
+        } finally {
+            if (old == null) System.clearProperty(property); else System.setProperty(property,old);
+            GraphicsAuditGuiFoilTiming.resetForTest();
+            GraphicsAuditGuiFoilSource.resetForTest();
+        }
+    }
+
     @Test void observesImmutableFiniteSourceDataAndRejectsAmbiguousOrUnboundedEvidence() {
         GraphicsAuditGuiFoilSource.resetForTest();
         try {
@@ -26,4 +55,3 @@ class GraphicsAuditGuiFoilSourceTest {
         } finally { GraphicsAuditGuiFoilSource.resetForTest(); }
     }
 }
-

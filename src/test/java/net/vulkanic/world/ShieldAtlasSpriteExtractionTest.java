@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ShieldAtlasSpriteExtractionTest {
-    @Test void animatedAdmissionRequiresCurrentBoundResourceAndBothPrivateFlags() {
+    @Test void animatedAdmissionRequiresVulkanOwnershipAndCurrentBoundResource() {
         String atlasKey = "mattmc.dev.rustGalShieldAtlas", clockKey = "mattmc.dev.rustGalShieldAtlasAnimation";
         String beforeAtlas = System.getProperty(atlasKey), beforeClock = System.getProperty(clockKey);
         var name = ResourceLocation.withDefaultNamespace("entity/shield_base_nopattern");
@@ -24,9 +24,11 @@ class ShieldAtlasSpriteExtractionTest {
         var declaration = new SemanticAtlasAnimationSource(7, 1, 1, 1,
             List.of(new SemanticAtlasAnimationSource.Sprite(1, name, 0, 0, animation)));
         try (var game = mockStatic(Minecraft.class);
+             var mode = mockStatic(net.vulkanic.bridge.RustGalVulkanWholeFrameMode.class);
              var resource = new AtlasAnimationResource(Sheets.SHIELD_SHEET,
                  RustGalWorldPrimitiveRenderer.shieldAtlasTextureId(), declaration)) {
-            System.setProperty(atlasKey, "true"); System.setProperty(clockKey, "true");
+            mode.when(net.vulkanic.bridge.RustGalVulkanWholeFrameMode::enabled).thenReturn(true);
+            System.clearProperty(atlasKey); System.clearProperty(clockKey);
             var minecraft = mock(Minecraft.class, RETURNS_DEEP_STUBS);
             game.when(Minecraft::getInstance).thenReturn(minecraft);
             var atlas = mock(TextureAtlas.class);
@@ -37,19 +39,19 @@ class ShieldAtlasSpriteExtractionTest {
             when(minecraft.getTextureManager().getTexture(Sheets.SHIELD_SHEET)).thenReturn(atlas);
             when(atlas.getSprite(name)).thenReturn(sprite);
             when(atlas.semanticAnimationResource()).thenReturn(resource);
-            assertFalse(RustGalWorldPrimitiveRenderer.privateOwnedShieldSprite(sprite));
+            assertFalse(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
             when(sprite.semanticAnimationResource()).thenReturn(resource);
-            assertTrue(RustGalWorldPrimitiveRenderer.privateOwnedShieldSprite(sprite));
-            System.clearProperty(clockKey);
-            assertFalse(RustGalWorldPrimitiveRenderer.privateOwnedShieldSprite(sprite));
-            System.setProperty(clockKey, "true"); System.clearProperty(atlasKey);
-            assertFalse(RustGalWorldPrimitiveRenderer.privateOwnedShieldSprite(sprite));
-            System.setProperty(atlasKey, "true");
+            assertTrue(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
+            // Legacy flags cannot create ownership when the Vulkan frame is absent.
+            System.setProperty(clockKey, "true"); System.setProperty(atlasKey, "true");
+            mode.when(net.vulkanic.bridge.RustGalVulkanWholeFrameMode::enabled).thenReturn(false);
+            assertFalse(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
+            mode.when(net.vulkanic.bridge.RustGalVulkanWholeFrameMode::enabled).thenReturn(true);
             when(atlas.getSprite(name)).thenReturn(mock(TextureAtlasSprite.class));
-            assertFalse(RustGalWorldPrimitiveRenderer.privateOwnedShieldSprite(sprite));
+            assertFalse(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
             when(atlas.getSprite(name)).thenReturn(sprite);
             resource.close();
-            assertFalse(RustGalWorldPrimitiveRenderer.privateOwnedShieldSprite(sprite));
+            assertFalse(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
             verify(atlas, never()).semanticRawSnapshot();
         } finally {
             if (beforeAtlas == null) System.clearProperty(atlasKey); else System.setProperty(atlasKey, beforeAtlas);
@@ -62,9 +64,11 @@ class ShieldAtlasSpriteExtractionTest {
         net.minecraft.server.Bootstrap.bootStrap();
     }
 
-    @Test void privateStaticPathRejectsStaleSpritesAndAnyAtlasAnimationBeforePixelCopy() {
+    @Test void staticPathRejectsStaleSpritesAndAnyUnboundAtlasAnimationBeforePixelCopy() {
         String key = "mattmc.dev.rustGalShieldAtlas", before = System.getProperty(key);
-        try (var game = mockStatic(Minecraft.class)) {
+        try (var game = mockStatic(Minecraft.class);
+             var mode = mockStatic(net.vulkanic.bridge.RustGalVulkanWholeFrameMode.class)) {
+            mode.when(net.vulkanic.bridge.RustGalVulkanWholeFrameMode::enabled).thenReturn(true);
             System.clearProperty(key);
             assertThrows(IllegalStateException.class,
                 () -> RustGalWorldPrimitiveRenderer.requireShieldAtlasSpritePayload(null));

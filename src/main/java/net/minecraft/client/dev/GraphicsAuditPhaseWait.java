@@ -34,6 +34,14 @@ public final class GraphicsAuditPhaseWait {
                 + " renderedObservations=" + animationObservations);
         return false;
     }
+    /** One bounded wait for the complete selected snapshot, not one wait per sprite. */
+    public boolean observeAnimations(boolean[] ready, long phase, long duration) {
+        if (ready == null || ready.length < 2 || ready.length > 5)
+            throw new IllegalStateException("invalid selected animation count");
+        boolean complete = true;
+        for (boolean value : ready) complete &= value;
+        return observeAnimation(complete, phase, duration);
+    }
     public static boolean cycleBoundary(long producedTick, long duration) {
         return producedTick > 0 && duration > 0 && producedTick % duration == 0;
     }

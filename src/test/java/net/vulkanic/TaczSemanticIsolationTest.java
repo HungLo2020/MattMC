@@ -61,7 +61,7 @@ final class TaczSemanticIsolationTest {
 	void semanticBedrockBatchUsesOneColorPerQuadForRustAbi() throws Exception {
 		String source = Files.readString(Path.of(
 			"src/main/java/net/minecraft/client/renderer/special/TaczGlock17SpecialRenderer.java"));
-		int append = source.indexOf("private void append(org.joml.Matrix4f transform, BedrockPolygon polygon");
+		int append = source.indexOf("private void append(PoseStack.Pose pose, BedrockPolygon polygon");
 		int appendEnd = source.indexOf("private static final class SemanticBedrockBudget", append);
 		assertTrue(append >= 0 && appendEnd > append, "missing semantic Bedrock batch append method");
 		String body = source.substring(append, appendEnd);
@@ -69,6 +69,8 @@ final class TaczSemanticIsolationTest {
 			"semantic Bedrock batches must provide one color record for each quad");
 		assertTrue(!body.contains("for (int vertex = 0; vertex < 4; vertex++) colorList.add"),
 			"per-vertex colors violate the Rust first-person quad ABI cardinality");
+		assertTrue(body.contains("pose.transformNormal(polygon.normal"),
+			"semantic Bedrock batches must preserve producer-authored face normals for GUI entity lighting");
 	}
 
 	@Test

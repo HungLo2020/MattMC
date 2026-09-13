@@ -8,6 +8,19 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GuiRawImageDecodeParityTest {
+    @Test void immutableSnapshotsWithIdenticalPixelsDoNotRequireAnotherUpload() {
+        byte[] pixels = {1, 2, 3, 4};
+        var first = new RustGalGuiRawImageAssets.Asset(7L, "dynamic:test", 1, 1, pixels, 2, 1);
+        var identical = new RustGalGuiRawImageAssets.Asset(7L, "dynamic:test", 1, 1, pixels.clone(), 2, 1);
+        var changedPixel = new RustGalGuiRawImageAssets.Asset(7L, "dynamic:test", 1, 1, new byte[]{1, 2, 3, 5}, 2, 1);
+        var changedSampler = new RustGalGuiRawImageAssets.Asset(7L, "dynamic:test", 1, 1, pixels, 1, 1);
+
+        assertTrue(RustGalGuiRawImageAssets.samePayload(first, identical));
+        assertFalse(RustGalGuiRawImageAssets.samePayload(first, changedPixel));
+        assertFalse(RustGalGuiRawImageAssets.samePayload(first, changedSampler));
+        assertFalse(RustGalGuiRawImageAssets.samePayload(first, null));
+    }
+
     @Test void selectedResourceSamplingIsCopiedWithPixelsAndReloadMetadata() throws Exception {
         var bytes = png(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB));
         var pack = (net.minecraft.server.packs.PackResources) java.lang.reflect.Proxy.newProxyInstance(

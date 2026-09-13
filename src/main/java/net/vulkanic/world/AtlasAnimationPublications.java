@@ -94,5 +94,10 @@ final class AtlasAnimationPublications {
         var publication = publications.get(resource.semanticTextureId());
         return publication != null && publication.owns(resource);
     }
+    long stagedGenerationForDiagnostics(AtlasAnimationResource resource) {
+        var publication = publications.get(resource.semanticTextureId());
+        return publication != null && publication.owns(resource) && !publication.pending()
+            ? publication.stagedGeneration() : 0;
+    }
     void clear() { publications.clear(); retryTexture = null; }
 }

@@ -38,19 +38,18 @@ final class GuiShieldItemSemanticCollector {
         model.get(transform);
         var batches = new ArrayList<GuiMeshBatchRecord>();
         var sources = new ArrayList<GuiItemTextureSource>();
-        var cache = net.vulkanic.world.AtlasAnimationResource.privateShieldLifecycleEnabled()
-            && Boolean.getBoolean("mattmc.dev.rustGalShieldAtlas")
+        var cache = net.vulkanic.world.AtlasAnimationResource.shieldLifecycleEnabled()
             ? new GuiItemCacheRecord(GuiItemSemanticIdentities.identity(item.itemStackRenderState().getModelIdentity()),
                 item.itemStackRenderState().isAnimated()) : null;
         for (var layer : layers(shield.model(), components, foil != null)) {
             var sprite = shield.sprite(layer.material());
             if (sprite != null && sprite.contents().isAnimated()
-                    && !net.vulkanic.world.RustGalWorldPrimitiveRenderer.privateOwnedShieldSprite(sprite))
+                    && !net.vulkanic.world.RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite))
                 throw new IllegalArgumentException("animated shield requires native atlas animation semantics");
             if (sprite == null)
                 throw new IllegalArgumentException("shield semantic image is unavailable");
             GuiItemTextureSource source;
-            if (!layer.foil() && Boolean.getBoolean("mattmc.dev.rustGalShieldAtlas")) {
+            if (!layer.foil() && net.vulkanic.world.AtlasAnimationResource.shieldLifecycleEnabled()) {
                 var region = net.vulkanic.world.RustGalWorldPrimitiveRenderer.requireShieldAtlasSpritePayload(sprite);
                 long asset = RustGalGuiRawImageAssets.assetId("gui-atlas-region:" + sprite.atlasLocation() + ":" + sprite.contents().name());
                 source = new GuiItemTextureSource.Atlas(new GuiAtlasRegion(asset, region.texture(),

@@ -42,6 +42,37 @@ class SpecialItemFoilProjectionReferenceTest {
             project(pose,new float[]{1,24,50},new float[]{-1F/3F,0,0}),1.0e-6F);
     }
 
+    @Test void worldBulkDecalConsumesQuantizedEmittedNormals() {
+        // The same independent model/normal poses and local packed normals are
+        // consumed by the native world_item_foil conformance test.
+        for (boolean trusted : new boolean[]{true, false}) {
+            for (float scale : new float[]{1F, 0.75F}) {
+                var pose = new PoseStack.Pose();
+                pose.pose().scaling(2,-3,4).setTranslation(10,20,30);
+                pose.normal().scaling(1,0.25F,2);
+                pose.trustedNormals = trusted;
+                int[] normals = {0x003f4040, 0, 0x00007f00, 0x007f0000};
+                float[][] axes = {trusted ? new float[]{2,5} : new float[]{5,-3}, {-2,-3},{2,5},{2,-3}};
+                for (int i=0;i<normals.length;i++) {
+                    var sink = new UvSink();
+                    var decalPose = pose.copy();
+                    MatrixUtil.mulComponentWise(decalPose.pose(), scale);
+                    var decal = new SheetedDecalTextureGenerator(sink, decalPose, 1F/128F);
+                    int normal = net.sodium.api.math.MatrixHelper.transformNormal(
+                        pose.normal(), pose.trustedNormals, normals[i]);
+                    try (var stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                        long ptr = stack.nmalloc(net.sodium.api.vertex.format.common.EntityVertex.STRIDE);
+                        net.sodium.api.vertex.format.common.EntityVertex.write(ptr, 14,11,50,
+                            0x12345678, 99, -99, 0, 0, normal);
+                        decal.push(stack, ptr, 1, net.sodium.api.vertex.format.common.EntityVertex.FORMAT);
+                    }
+                    assertArrayEquals(new float[]{axes[i][0]/scale/128F, axes[i][1]/scale/128F},
+                        sink.uv, 1e-6F, "trusted="+trusted+" normal="+Integer.toHexString(normals[i]));
+                }
+            }
+        }
+    }
+
     private static float[] project(PoseStack.Pose pose,float[] position,float[] normal) {
         var sink=new UvSink();
         var decal=new SheetedDecalTextureGenerator(sink,pose,0.0078125F);
@@ -50,7 +81,12 @@ class SpecialItemFoilProjectionReferenceTest {
         return sink.uv;
     }
 
-    private static final class UvSink implements VertexConsumer {
+    private static final class UvSink implements VertexConsumer, net.sodium.api.vertex.buffer.VertexBufferWriter {
+        public void push(org.lwjgl.system.MemoryStack stack, long ptr, int count, net.blaze3d.vertex.VertexFormat format) {
+            int offset = format.getOffset(net.blaze3d.vertex.VertexFormatElement.UV0);
+            uv = new float[]{org.lwjgl.system.MemoryUtil.memGetFloat(ptr+offset),
+                org.lwjgl.system.MemoryUtil.memGetFloat(ptr+offset+4)};
+        }
         float[] uv;
         public VertexConsumer addVertex(float x,float y,float z) { return this; }
         public VertexConsumer setColor(int r,int g,int b,int a) { return this; }

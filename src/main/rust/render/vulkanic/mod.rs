@@ -11,11 +11,14 @@ pub mod error;
 pub mod ffi;
 pub mod frame;
 pub mod gal;
+mod buffer_upload_capture;
 pub mod gui_frontend;
 // Explicit same-context atlas references; private until native GUI sampling is wired.
 mod gui_atlas_reference;
 mod item_foil;
+mod view_layering;
 mod special_item_foil;
+mod world_item_foil;
 mod gui_item_material;
 mod gui_item_raster;
 mod gui_item_layout;

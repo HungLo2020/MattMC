@@ -676,6 +676,7 @@ impl SubmissionLowerer {
     ) -> GalResult<()> {
         unsafe {
             match op {
+                CommandOp::TrackSubmission(_) => return Err(GalError::backend("GAL submission receipt reached Vulkan lowering")),
                 CommandOp::BeginPass {
                     pass,
                     target,
@@ -2632,5 +2633,6 @@ fn command_op_kind(op: &CommandOp) -> &'static str {
         CommandOp::Present { .. } => "Present",
         CommandOp::Barrier(_) => "Barrier",
         CommandOp::EndPass => "EndPass",
+        CommandOp::TrackSubmission(_) => "TrackSubmission",
     }
 }

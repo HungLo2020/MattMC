@@ -11,8 +11,11 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.Model;
 import net.minecraft.client.model.VillagerLikeModel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.client.renderer.entity.state.VillagerDataHolderRenderState;
@@ -43,6 +46,9 @@ public class VillagerProfessionLayer<S extends LivingEntityRenderState & Village
 	private final Object2ObjectMap<ResourceKey<VillagerProfession>, VillagerMetadataSection.Hat> professionHatCache = new Object2ObjectOpenHashMap<>();
 	private final ResourceManager resourceManager;
 	private final String path;
+	private final ResourceLocation typeIdentity;
+	private final ResourceLocation professionIdentity;
+	private final ResourceLocation levelIdentity;
 	private final M noHatModel;
 	private final M noHatBabyModel;
 
@@ -50,6 +56,9 @@ public class VillagerProfessionLayer<S extends LivingEntityRenderState & Village
 		super(renderLayerParent);
 		this.resourceManager = resourceManager;
 		this.path = string;
+		this.typeIdentity = ResourceLocation.withDefaultNamespace(string + "_type");
+		this.professionIdentity = ResourceLocation.withDefaultNamespace(string + "_profession");
+		this.levelIdentity = ResourceLocation.withDefaultNamespace(string + "_profession_level");
 		this.noHatModel = entityModel;
 		this.noHatBabyModel = entityModel2;
 	}
@@ -66,19 +75,51 @@ public class VillagerProfessionLayer<S extends LivingEntityRenderState & Village
 				ResourceLocation resourceLocation = this.getResourceLocation("type", holder);
 				boolean bl = hat2 == VillagerMetadataSection.Hat.NONE || hat2 == VillagerMetadataSection.Hat.PARTIAL && hat != VillagerMetadataSection.Hat.FULL;
 				M entityModel2 = livingEntityRenderState.isBaby ? this.noHatBabyModel : this.noHatModel;
-				renderColoredCutoutModel(bl ? entityModel : entityModel2, resourceLocation, poseStack, submitNodeCollector, i, livingEntityRenderState, -1, 1);
+				this.renderSemanticLayer(bl ? entityModel : entityModel2, resourceLocation, this.typeIdentity,
+					poseStack, submitNodeCollector, i, livingEntityRenderState, 1);
 				if (!holder2.is(VillagerProfession.NONE) && !livingEntityRenderState.isBaby) {
 					ResourceLocation resourceLocation2 = this.getResourceLocation("profession", holder2);
-					renderColoredCutoutModel(entityModel, resourceLocation2, poseStack, submitNodeCollector, i, livingEntityRenderState, -1, 2);
+					this.renderSemanticLayer(entityModel, resourceLocation2, this.professionIdentity,
+						poseStack, submitNodeCollector, i, livingEntityRenderState, 2);
 					if (!holder2.is(VillagerProfession.NITWIT)) {
 						ResourceLocation resourceLocation3 = this.getResourceLocation(
 							"profession_level", LEVEL_LOCATIONS.get(Mth.clamp(villagerData.level(), 1, LEVEL_LOCATIONS.size()))
 						);
-						renderColoredCutoutModel(entityModel, resourceLocation3, poseStack, submitNodeCollector, i, livingEntityRenderState, -1, 3);
+						this.renderSemanticLayer(entityModel, resourceLocation3, this.levelIdentity,
+							poseStack, submitNodeCollector, i, livingEntityRenderState, 3);
 					}
 				}
 			}
 		}
+	}
+
+	private void renderSemanticLayer(
+		Model<? super S> model,
+		ResourceLocation texture,
+		ResourceLocation semanticIdentity,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		int light,
+		S state,
+		int order
+	) {
+		boolean rustWholeFrame = net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan();
+		if (rustWholeFrame && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+			model, state, poseStack.last(), RenderType.entityCutoutNoCull(texture), texture, semanticIdentity,
+			light, LivingEntityRenderer.getOverlayCoords(state, 0.0F), -1, state.outlineColor
+		)) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-whole-frame", texture, model.getClass().getName(), state.entityId, true, true, false
+			);
+			return;
+		}
+		if (rustWholeFrame) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-unavailable", texture, model.getClass().getName(), state.entityId, false, false, false
+			);
+			throw new IllegalStateException("Rust whole-frame villager profession layer has no semantic mesh: " + semanticIdentity);
+		}
+		renderColoredCutoutModel(model, texture, poseStack, submitNodeCollector, light, state, -1, order);
 	}
 
 	private ResourceLocation getResourceLocation(String string, ResourceLocation resourceLocation) {

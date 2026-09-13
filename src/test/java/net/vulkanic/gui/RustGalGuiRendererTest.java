@@ -16,6 +16,99 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RustGalGuiRendererTest {
 	@Test
+	void entityPreviewPreservesPlayerAndArmorNoCullMaterials() {
+		var texture = net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/player/wide/hunglo.png");
+		assertEquals(net.vulkanic.bridge.VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL,
+			RustGalGuiRenderer.entityPipMaterialMode(net.minecraft.client.renderer.RenderType.entityTranslucent(texture)));
+		assertEquals(net.vulkanic.bridge.VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL,
+			RustGalGuiRenderer.entityPipMaterialMode(net.minecraft.client.renderer.RenderType.armorCutoutNoCull(texture)));
+		assertEquals(net.vulkanic.bridge.VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL,
+			RustGalGuiRenderer.entityPipMaterialMode(net.minecraft.client.renderer.RenderType.createArmorDecalCutoutNoCull(texture)));
+		assertEquals(4, RustGalGuiRenderer.entityPipMaterialMode(net.minecraft.client.renderer.RenderType.armorEntityGlint()));
+		assertEquals(3, RustGalGuiRenderer.entityPipMaterialMode(
+			net.minecraft.client.renderer.RenderType.itemEntityTranslucentCull(texture)));
+	}
+
+	@Test
+	void entityLayerCopyConsumesStateImmediatelyAndKeepsIndependentOrderHandles() throws Exception {
+		var part = new net.minecraft.client.model.geom.ModelPart(List.of(), java.util.Map.of());
+		var model = new net.minecraft.client.model.Model<float[]>(part, net.minecraft.client.renderer.RenderType::entitySolid) {
+			@Override public void setupAnim(float[] state) { root().x = state[0]; }
+		};
+		var observed = new java.util.ArrayList<List<Number>>();
+		java.util.function.Function<Object,GuiModelPipSemanticCollector.Result> copy = input -> {
+			try {
+				var setup = input.getClass().getDeclaredMethod("setupModel"); setup.setAccessible(true);
+				((Runnable)setup.invoke(input)).run();
+				var tint = input.getClass().getDeclaredMethod("tint"); tint.setAccessible(true);
+				var order = input.getClass().getDeclaredMethod("layerOrder"); order.setAccessible(true);
+				observed.add(List.of((Integer)order.invoke(input),(Integer)tint.invoke(input),part.x));
+				var vertex = new net.vulkanic.bridge.VulkanicGalBridge.GuiMeshVertexRecord(
+					new float[] {part.x,0,0},new float[] {0,0},new float[] {0,0},(Integer)tint.invoke(input),0);
+				var batch = new net.vulkanic.bridge.VulkanicGalBridge.GuiMeshBatchRecord(
+					1,0,2,2,7L,0L,0F,new float[] {1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1},new float[] {1,0,0,1,0,0},
+					0,0,16,16,32,32,18,18,1,List.of(vertex,vertex,vertex),List.of(0,1,2));
+				return new GuiModelPipSemanticCollector.Result(batch,
+					new net.minecraft.client.gui.navigation.ScreenRectangle(0,0,16,16),List.of());
+			} catch (ReflectiveOperationException e) {throw new AssertionError(e);}
+		};
+		Class<?> type = Class.forName("net.vulkanic.gui.RustGalGuiRenderer$EntityPipLayerCapture");
+		var constructor = type.getDeclaredConstructor(java.util.function.Function.class); constructor.setAccessible(true);
+		var root = (net.minecraft.client.renderer.SubmitNodeCollector)constructor.newInstance(copy);
+		var first = root.order(7);
+		var second = root.order(-2);
+		var texture = net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/entity/equipment/humanoid/leather.png");
+		var material = net.minecraft.client.renderer.RenderType.armorCutoutNoCull(texture);
+		var pose = new net.blaze3d.vertex.PoseStack();
+		float[] state = {3F};
+		first.submitModelSemanticTexture(model,state,pose,material,15728880,655360,0xff3366cc,texture,0,null);
+		state[0]=9F;
+		second.submitModelSemanticTexture(model,state,pose,material,15728880,655360,-1,texture,0,null);
+		state[0]=12F;
+		first.submitModelSemanticTexture(model,state,pose,material,15728880,655360,0xff112233,texture,0,null);
+		state[0]=99F; part.x=99F;
+		assertEquals(List.of(List.of(7,0xff3366cc,3F),List.of(-2,-1,9F),List.of(7,0xff112233,12F)),observed);
+		for(int i=3;i<33;i++) first.submitModelSemanticTexture(model,state,pose,material,15728880,655360,-1,texture,0,null);
+		assertEquals(32,observed.size(),"the model copy bound is shared across order handles");
+		var unsupported = type.getDeclaredField("unsupported");unsupported.setAccessible(true);
+		assertTrue(unsupported.getBoolean(root));
+	}
+
+	@Test
+	void entityPreviewLayersShareOneSequenceAndRetainTheirGeometry() throws ReflectiveOperationException {
+		var vertex = new net.vulkanic.bridge.VulkanicGalBridge.GuiMeshVertexRecord(
+			new float[] {0,0,0}, new float[] {0,0}, new float[] {0,0}, 0xff3366cc, 0);
+		var bounds = new net.minecraft.client.gui.navigation.ScreenRectangle(0,0,16,16);
+		var inputs = new java.util.ArrayList<GuiModelPipSemanticCollector.Result>();
+		for (int i=0; i<3; i++) {
+			var batch = new net.vulkanic.bridge.VulkanicGalBridge.GuiMeshBatchRecord(
+				1,0, i==0 ? 1 : 2,2,7L+i,0L,0F,
+				new float[] {1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}, new float[] {1,0,0,1,0,0},
+				0,0,16,16,32,32,18,18,1,List.of(vertex,vertex,vertex),List.of(0,1,2));
+			inputs.add(new GuiModelPipSemanticCollector.Result(batch,bounds,List.of()));
+		}
+		var batches = RustGalGuiRenderer.entityPipBatches(inputs, 17);
+		var output = new java.util.ArrayList<net.vulkanic.bridge.VulkanicGalBridge.GuiMeshBatchRecord>();
+		Class<?> queued = Class.forName("net.vulkanic.gui.RustGalFrameCoordinator$QueuedGuiRequest");
+		var factory = queued.getDeclaredMethod("meshBatches",List.class);
+		factory.setAccessible(true);
+		var append = queued.getDeclaredMethod("appendTo",List.class,List.class,List.class,List.class,long.class);
+		append.setAccessible(true);
+		append.invoke(factory.invoke(null,batches),new java.util.ArrayList<>(),new java.util.ArrayList<>(),
+			output,new java.util.ArrayList<>(),42L);
+		assertEquals(3,output.size());
+		for (int i=0;i<3;i++) {
+			assertEquals(42L,output.get(i).sequence());
+			assertEquals(i,output.get(i).layerIndex());
+			assertEquals(17,output.get(i).stratum());
+			assertEquals(net.vulkanic.bridge.VulkanicGalBridge.GUI_MESH_LIGHTING_ENTITY_PREVIEW,output.get(i).lightingMode());
+			assertEquals(7L+i,output.get(i).assetId());
+			assertEquals(inputs.get(i).batch().vertices(),output.get(i).vertices());
+			assertEquals(inputs.get(i).batch().materialMode(),output.get(i).materialMode());
+		}
+	}
+
+	@Test
 	void shippedDefaultPanoramaHasSixRealDimensionMatchedFaces() throws Exception {
 		Path root = Path.of("src/main/resources/assets/minecraft/textures/gui/title/background/caves");
 		int width = -1;
@@ -610,6 +703,10 @@ class RustGalGuiRendererTest {
 		assertTrue(source.contains("item.pose().m00()"));
 		assertTrue(source.contains("glintAsset != null"));
 		assertTrue(source.contains("ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE"));
+		assertTrue(source.contains("GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL"));
+		assertTrue(source.contains("GUI_MESH_LIGHTING_ENTITY_PREVIEW"));
+		assertTrue(source.contains("submitTexturedQuadsWithNormalsSemantic"));
+		assertTrue(source.contains("Math.abs(alignment) <= 1.0e-6F"));
 		assertTrue(source.contains("new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, records.size(), 4"));
 	}
 
@@ -789,8 +886,23 @@ class RustGalGuiRendererTest {
 			&& renderer.contains("collectAnimated")
 			&& renderer.contains("layerModel.uvOffsetU()"),
 			"entity PIP energy-swirl layers must enter the semantic animated-model collector");
-		assertTrue(collector.contains("uvOffsetU") && collector.contains("this.u=u + uvOffsetU"),
+		assertTrue(collector.contains("uvOffsetU") && collector.contains("this.u=u * uvScaleU + uvOffsetU"),
 			"animated PIP UV offsets must be copied into Rust mesh vertices rather than relying on a Java texture matrix");
+	}
+
+	@Test
+	void entityPipAtlasLayersApplyTheSpriteSubrectangleBeforeRustSampling() throws Exception {
+		String renderer = Files.readString(Path.of("src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java"));
+		String collector = Files.readString(Path.of("src/main/java/net/vulkanic/gui/GuiModelPipSemanticCollector.java"));
+		assertTrue(renderer.contains("GuiModelPipSemanticCollector.collectAtlas")
+			&& renderer.contains("sprite.getU0(), sprite.getU1(), sprite.getV0(), sprite.getV1()")
+			&& renderer.contains("if (sprite != null) {")
+			&& renderer.contains("submitModel(model, object, poseStack, renderType, light, overlay, tint, sprite"),
+			"sprite-backed semantic submissions must delegate to the validated atlas-model path");
+		assertTrue(collector.contains("u1 - u0, v1 - v0, u0, v0, true")
+			&& collector.contains("RustGalGuiRawImageAssets.resolveAtlas(texture)")
+			&& collector.contains("this.u=u * uvScaleU + uvOffsetU"),
+			"sprite-backed entity layers must resolve the stitched atlas and apply its sprite UV rectangle");
 	}
 
 	@Test

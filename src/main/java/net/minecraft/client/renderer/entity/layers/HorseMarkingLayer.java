@@ -41,7 +41,7 @@ public class HorseMarkingLayer extends RenderLayer<HorseRenderState, HorseModel>
 		if (resourceLocation != INVISIBLE_TEXTURE && !horseRenderState.isInvisible) {
 			submitNodeCollector.order(1)
 				.submitModelSemanticTexture(
-					this.getParentModel(),
+					this.getParentModel(horseRenderState),
 					horseRenderState,
 					poseStack,
 					RenderType.entityTranslucent(resourceLocation),

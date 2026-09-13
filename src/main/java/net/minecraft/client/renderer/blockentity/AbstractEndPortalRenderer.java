@@ -55,7 +55,9 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 				+ net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(
 					net.minecraft.client.Minecraft.getInstance().getDeltaTracker()
 				);
-			if (submitNodeCollector.submitEndPortalSemantic(poseStack, faces, gameTime, 15728880)) return;
+			if (submitNodeCollector.submitEndPortalSemantic(
+				poseStack, faces, this.getOffsetDown(), this.getOffsetUp(), gameTime, 15728880
+			)) return;
 			throw new IllegalStateException("Rust whole-frame End Portal route unavailable for semantic cube");
 		}
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {

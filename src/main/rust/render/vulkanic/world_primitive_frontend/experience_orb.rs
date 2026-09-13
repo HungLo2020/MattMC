@@ -91,7 +91,9 @@ impl ExperienceOrbPlacement {
             ));
         }
         Ok(WorldMeshInstanceRequest {
+            model_submission_order: None,
             item_foil: None,
+            decal_foil: None,
             stratum: WORLD_STRATUM_ENTITY_MESH,
             mesh_key,
             mesh_generation,

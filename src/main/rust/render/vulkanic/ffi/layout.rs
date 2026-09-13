@@ -859,6 +859,12 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 gui_mesh_item_count,
                 gui_mesh_batch_count,
                 gui_mesh_draw_count,
+                gui_entity_preview_item_count,
+                gui_entity_preview_batch_count,
+                gui_entity_preview_draw_count,
+                gui_entity_preview_material_mask,
+                gui_entity_preview_vertex_count,
+                gui_entity_preview_index_count,
                 cache_hits,
                 cache_misses,
                 resource_creates,
@@ -1143,7 +1149,13 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 item_foil_mode,
                 item_foil_clock_millis,
                 item_foil_speed,
-                item_foil_strength
+                item_foil_strength,
+                decal_foil_mode,
+                decal_normal_mode,
+                decal_model_pose,
+                decal_normal_pose,
+                model_submission_order_mode,
+                model_submission_order
             ]
         ),
         70 => layout!(

@@ -54,6 +54,7 @@ public class InventoryScreen extends AbstractContainerScreen<InventoryMenu> {
 		this.effects.renderTooltip(guiGraphics, i, j);
 		this.xMouse = i;
 		this.yMouse = j;
+		net.minecraft.client.dev.GraphicsAuditInventoryPreviewInputs.observeScreenMouse("render-return", this.xMouse, this.yMouse, i, j);
 	}
 
 	@Override
@@ -63,6 +64,7 @@ public class InventoryScreen extends AbstractContainerScreen<InventoryMenu> {
 
 	@Override
 	protected void renderBg(GuiGraphics guiGraphics, float f, int i, int j) {
+		net.minecraft.client.dev.GraphicsAuditInventoryPreviewInputs.observeScreenMouse("background", this.xMouse, this.yMouse, i, j);
 		int k = this.leftPos;
 		int l = this.topPos;
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, INVENTORY_LOCATION, k, l, 0.0F, 0.0F, this.imageWidth, this.imageHeight, 256, 256);
@@ -121,6 +123,7 @@ public class InventoryScreen extends AbstractContainerScreen<InventoryMenu> {
 		entityRenderState.hitboxesRenderState = null;
 		entityRenderState.shadowPieces.clear();
 		entityRenderState.outlineColor = 0;
+		net.minecraft.client.dev.GraphicsAuditInventoryPreviewInputs.observe(entityRenderState, f, vector3f, quaternionf, quaternionf2, i, j, k, l);
 		guiGraphics.submitEntityRenderState(entityRenderState, f, vector3f, quaternionf, quaternionf2, i, j, k, l);
 	}
 

@@ -65,5 +65,9 @@ public abstract class RenderLayer<S extends EntityRenderState, M extends EntityM
 		return this.renderer.getModel();
 	}
 
+	protected M getParentModel(S state) {
+		return this.renderer.getModelForSemanticState(state);
+	}
+
 	public abstract void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, S entityRenderState, float f, float g);
 }

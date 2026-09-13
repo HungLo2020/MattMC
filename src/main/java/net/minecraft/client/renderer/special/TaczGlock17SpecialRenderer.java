@@ -260,8 +260,8 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		PoseStack identityPoseStack = new PoseStack();
 		for (Map.Entry<Integer, List<SemanticBedrockBatch>> entry : batches.entrySet()) {
 			for (SemanticBedrockBatch batch : entry.getValue()) {
-				if (!submitNodeCollector.submitTexturedQuadsSemantic(identityPoseStack, renderType, textureIdentity,
-					batch.vertices(), batch.uvs(), batch.colors(), entry.getKey())) return false;
+				if (!submitNodeCollector.submitTexturedQuadsWithNormalsSemantic(identityPoseStack, renderType, textureIdentity,
+					batch.vertices(), batch.uvs(), batch.normals(), batch.colors(), entry.getKey())) return false;
 			}
 		}
 		return true;
@@ -369,7 +369,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 						if (lightBatches.isEmpty() || lightBatches.get(lightBatches.size() - 1) != batch) {
 							lightBatches.add(batch);
 						}
-						batch.append(poseStack.last().pose(), polygon, budget);
+						batch.append(poseStack.last(), polygon, budget);
 					}
 				}
 			}
@@ -381,9 +381,10 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private static final class SemanticBedrockBatch {
 		private final List<Float> vertexList = new ArrayList<>();
 		private final List<Float> uvList = new ArrayList<>();
+		private final List<Float> normalList = new ArrayList<>();
 		private final List<Integer> colorList = new ArrayList<>();
 
-		private void append(org.joml.Matrix4f transform, BedrockPolygon polygon, SemanticBedrockBudget budget) {
+		private void append(PoseStack.Pose pose, BedrockPolygon polygon, SemanticBedrockBudget budget) {
 			if (isFull()) {
 				throw new IllegalStateException("Rust TACZ semantic Bedrock mesh exceeds bounded quad budget");
 			}
@@ -391,7 +392,12 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				throw new IllegalStateException("Rust TACZ aggregate semantic Bedrock mesh exceeds bounded quad budget: "
 					+ budget.quadCount + " > " + MAX_SEMANTIC_BEDROCK_QUADS);
 			}
+			Vector3f normal = pose.transformNormal(polygon.normal, new Vector3f()).normalize();
+			if (!Float.isFinite(normal.x()) || !Float.isFinite(normal.y()) || !Float.isFinite(normal.z())) {
+				throw new IllegalStateException("Rust TACZ semantic Bedrock mesh contains non-finite transformed normals");
+			}
 			for (BedrockVertex vertex : polygon.vertices) {
+				org.joml.Matrix4f transform = pose.pose();
 				Vector3f position = transform.transformPosition(vertex.x / 16.0F, vertex.y / 16.0F, vertex.z / 16.0F, new Vector3f());
 				if (!Float.isFinite(position.x()) || !Float.isFinite(position.y()) || !Float.isFinite(position.z())
 					|| !Float.isFinite(vertex.u) || !Float.isFinite(vertex.v)) {
@@ -399,6 +405,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				}
 				vertexList.add(position.x()); vertexList.add(position.y()); vertexList.add(position.z());
 				uvList.add(vertex.u); uvList.add(vertex.v);
+				normalList.add(normal.x()); normalList.add(normal.y()); normalList.add(normal.z());
 			}
 			// The Rust first-person textured-quad ABI carries one color per
 			// quad, while positions and UVs carry four vertices per quad. Keep
@@ -410,6 +417,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 
 		private float[] vertices() { float[] values = new float[vertexList.size()]; for (int i = 0; i < values.length; i++) values[i] = vertexList.get(i); return values; }
 		private float[] uvs() { float[] values = new float[uvList.size()]; for (int i = 0; i < values.length; i++) values[i] = uvList.get(i); return values; }
+		private float[] normals() { float[] values = new float[normalList.size()]; for (int i = 0; i < values.length; i++) values[i] = normalList.get(i); return values; }
 		private int[] colors() { int[] values = new int[colorList.size()]; for (int i = 0; i < values.length; i++) values[i] = colorList.get(i); return values; }
 	}
 

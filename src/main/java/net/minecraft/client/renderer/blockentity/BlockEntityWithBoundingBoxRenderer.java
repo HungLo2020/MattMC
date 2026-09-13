@@ -115,11 +115,17 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 						&& net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) {
 						// Coverage traversal admits this family but must not stage a
 						// second copy into the live Rust pending frame.
-						if (!submitNodeCollector.isSemanticCoverageOnly()
-							&& !net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(poseStack.last().pose(), boxEdges(
-							blockPos.getX(), blockPos.getY(), blockPos.getZ(), blockPos2.getX(), blockPos2.getY(), blockPos2.getZ()
-						), 0xffe6e6e6, 1.0F)) {
-							throw new IllegalStateException("Rust debug-line route rejected bounding-box semantic edges");
+						if (!submitNodeCollector.isSemanticCoverageOnly()) {
+							boolean queued = blockEntityWithBoundingBoxRenderState.blockState.is(Blocks.STRUCTURE_BLOCK)
+								? net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStructureBlockBoxSegments(
+									poseStack.last().pose(), blockPos, vec3i, 1.0F)
+								: blockEntityWithBoundingBoxRenderState.blockState.is(Blocks.TEST_INSTANCE_BLOCK)
+									? net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueTestInstanceBoxSegments(
+										poseStack.last().pose(), blockPos, vec3i, 1.0F)
+									: net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(
+										poseStack.last().pose(), boxEdges(blockPos.getX(), blockPos.getY(), blockPos.getZ(),
+											blockPos2.getX(), blockPos2.getY(), blockPos2.getZ()), 0xffe5e5e5, 1.0F);
+							if (!queued) throw new IllegalStateException("Rust debug-line route rejected bounding-box semantic edges");
 						}
 					} else {
 						if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
@@ -171,18 +177,25 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 				// The coverage collector is an admission probe, not a producer;
 				// acknowledge this already-admitted line family without enqueueing.
 				if (submitNodeCollector.isSemanticCoverageOnly()) return;
+				int air = 0, structureVoid = 0, barrier = 0, light = 0;
 				for (int i = 0; i < vec3i.getX(); i++) for (int j = 0; j < vec3i.getY(); j++) for (int k = 0; k < vec3i.getZ(); k++) {
 					int l = k * vec3i.getX() * vec3i.getY() + j * vec3i.getX() + i;
 					var type = blockEntityWithBoundingBoxRenderState.invisibleBlocks[l];
 					if (type == null) continue;
+					if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR) air++;
+					else if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.STRUCUTRE_VOID) structureVoid++;
+					else if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.BARRIER) barrier++;
+					else if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.LIGHT) light++;
 					float f = type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0.05F : 0.0F;
 					double d = blockPos3.getX() + i - blockPos2.getX() + 0.45F - f, e = blockPos3.getY() + j - blockPos2.getY() + 0.45F - f, g = blockPos3.getZ() + k - blockPos2.getZ() + 0.45F - f;
 					double h = blockPos3.getX() + i - blockPos2.getX() + 0.55F + f, m = blockPos3.getY() + j - blockPos2.getY() + 0.55F + f, n = blockPos3.getZ() + k - blockPos2.getZ() + 0.55F + f;
-						int color = type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0xff8080ff
+						int color = type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0xff7f7fff
 						: type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.STRUCUTRE_VOID ? 0xffffbfbf
 						: type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.BARRIER ? 0xffff0000 : 0xffffff00;
 					if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(poseStack.last().pose(), boxEdges((float)d, (float)e, (float)g, (float)h, (float)m, (float)n), color, 1.0F)) throw new IllegalStateException("Rust debug-line route rejected invisible-block edges");
 				}
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordStructureInvisibleCells(
+					blockPos, vec3i, air, structureVoid, barrier, light);
 				return;
 			}
 			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()

@@ -6,7 +6,9 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.model.CatModel;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.CatRenderState;
 import net.minecraft.resources.ResourceLocation;
@@ -15,6 +17,7 @@ import net.minecraft.world.item.DyeColor;
 @Environment(EnvType.CLIENT)
 public class CatCollarLayer extends RenderLayer<CatRenderState, CatModel> {
 	private static final ResourceLocation CAT_COLLAR_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/cat/cat_collar.png");
+	private static final ResourceLocation CAT_COLLAR_IDENTITY = ResourceLocation.withDefaultNamespace("cat_collar");
 	private final CatModel adultModel;
 	private final CatModel babyModel;
 
@@ -29,6 +32,27 @@ public class CatCollarLayer extends RenderLayer<CatRenderState, CatModel> {
 		if (dyeColor != null) {
 			int j = dyeColor.getTextureDiffuseColor();
 			CatModel catModel = catRenderState.isBaby ? this.babyModel : this.adultModel;
+			RenderType renderType = RenderType.entityCutoutNoCull(CAT_COLLAR_LOCATION);
+			if (!catRenderState.isInvisible
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+				boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+					catModel, catRenderState, poseStack.last(), renderType, CAT_COLLAR_LOCATION,
+					CAT_COLLAR_IDENTITY, i, LivingEntityRenderer.getOverlayCoords(catRenderState, 0.0F), j,
+					catRenderState.outlineColor
+				);
+				if (queued) {
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+						"rust-vulkan-whole-frame", CAT_COLLAR_LOCATION, catModel.getClass().getName(),
+						catRenderState.entityId, true, true, false
+					);
+					return;
+				}
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					"rust-vulkan-unavailable", CAT_COLLAR_LOCATION, catModel.getClass().getName(),
+					catRenderState.entityId, false, false, false
+				);
+				throw new IllegalStateException("Rust whole-frame cat-collar route has no copied semantic mesh");
+			}
 			coloredCutoutModelCopyLayerRender(catModel, CAT_COLLAR_LOCATION, poseStack, submitNodeCollector, i, catRenderState, j, 1);
 		}
 	}

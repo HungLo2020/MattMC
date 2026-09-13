@@ -44,6 +44,49 @@ class GraphicsAuditPhaseWaitTest {
         assertThrows(IllegalStateException.class, () -> wait.observeAnimation(true, 0, 0));
         assertThrows(IllegalStateException.class, () -> wait.observeAnimation(true, 76, 76));
     }
+    @Test void shieldObservationNamesSelectedMaterialsWithoutChangingPlayback() {
+        for (String name : new String[] {"entity/shield_base_nopattern", "entity/shield_base",
+                "entity/shield/base", "entity/shield/cross", "entity/shield/border"})
+            assertEquals(name, GraphicsAuditBlockDisplayFixture.shieldObservationSprite(name));
+        assertThrows(IllegalArgumentException.class,
+            () -> GraphicsAuditBlockDisplayFixture.shieldObservationSprite("item/feather"));
+    }
+    @Test void multiShieldObservationRejectsAmbiguousOrUnsupportedSelections() {
+        assertEquals(java.util.List.of("entity/shield/base", "entity/shield/cross", "entity/shield/border", "entity/shield_base"),
+            GraphicsAuditBlockDisplayFixture.shieldObservationSprites(
+                "entity/shield/base, entity/shield/cross,entity/shield/border,entity/shield_base"));
+        for (String names : new String[] {"", "entity/shield/base,", "entity/shield/base,entity/shield/base", "item/feather"})
+            assertThrows(IllegalArgumentException.class, () -> GraphicsAuditBlockDisplayFixture.shieldObservationSprites(names));
+        assertEquals(1, GraphicsAuditBlockDisplayFixture.shieldObservationSprites("entity/shield_base_nopattern").size());
+    }
+    @Test void uploadObservationIncludesEverySelectedShieldSprite() {
+        String enabled = System.getProperty("mattmc.dev.graphicsAuditShieldAnimation");
+        String names = System.getProperty("mattmc.dev.graphicsAuditShieldAnimationSprite");
+        try {
+            System.setProperty("mattmc.dev.graphicsAuditShieldAnimation", "true");
+            System.setProperty("mattmc.dev.graphicsAuditShieldAnimationSprite", "entity/shield/base,entity/shield/border");
+            assertTrue(GraphicsAuditBlockDisplayFixture.observesSprite(net.minecraft.resources.ResourceLocation.withDefaultNamespace("entity/shield/base")));
+            assertTrue(GraphicsAuditBlockDisplayFixture.observesSprite(net.minecraft.resources.ResourceLocation.withDefaultNamespace("entity/shield/border")));
+            assertFalse(GraphicsAuditBlockDisplayFixture.observesSprite(net.minecraft.resources.ResourceLocation.withDefaultNamespace("entity/shield/cross")));
+        } finally {
+            if (enabled == null) System.clearProperty("mattmc.dev.graphicsAuditShieldAnimation");
+            else System.setProperty("mattmc.dev.graphicsAuditShieldAnimation", enabled);
+            if (names == null) System.clearProperty("mattmc.dev.graphicsAuditShieldAnimationSprite");
+            else System.setProperty("mattmc.dev.graphicsAuditShieldAnimationSprite", names);
+        }
+    }
+    @Test void selectedAnimationWaitRequiresAllSpritesAndDoesNotResetOnPartialReadiness() {
+        var time = new java.util.concurrent.atomic.AtomicLong();
+        var wait = new GraphicsAuditPhaseWait(time::get);
+        assertFalse(wait.observeAnimations(new boolean[] {true, false, true, true}, 4, 17));
+        time.set(45_000_000_000L);
+        assertThrows(IllegalStateException.class,
+            () -> wait.observeAnimations(new boolean[] {true, true, true, false}, 4, 17));
+        assertTrue(wait.observeAnimations(new boolean[] {true, true, true, true}, 4, 17));
+        assertFalse(wait.observeAnimations(new boolean[] {false, true}, 4, 17));
+        for (boolean[] invalid : new boolean[][] {null, {}, {true}, new boolean[6]})
+            assertThrows(IllegalStateException.class, () -> wait.observeAnimations(invalid, 4, 17));
+    }
     @Test void waitsAreBoundedAndReadinessResetsTheBudget() {
         var wait = new GraphicsAuditPhaseWait();
         for (int i = 0; i < 512; i++) assertFalse(wait.observe(false));

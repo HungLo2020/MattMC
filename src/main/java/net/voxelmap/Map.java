@@ -892,11 +892,6 @@ public class Map implements Runnable, IChangeObserver {
 			}
 			RustGalGuiRawImageAssets.registerDynamicTexture(semanticMapTexture, dynamicMap);
 		}
-		// These immutable frame images are ordinary resource-pack assets. Stage
-		// their CPU bytes directly so semantic resolution does not depend on the
-		// DynamicTexture objects VoxelMap creates for its legacy renderer.
-		RustGalGuiRawImageAssets.stageVanillaResource(resourceSquareMap, minecraft.getResourceManager());
-		RustGalGuiRawImageAssets.stageVanillaResource(resourceRoundMap, minecraft.getResourceManager());
 		drawContext.pose().pushMatrix();
 		drawContext.pose().scale(scaleProj, scaleProj);
 		float semanticAngle = !this.options.rotates ? -this.northRotate * Mth.DEG_TO_RAD : this.direction * Mth.DEG_TO_RAD;

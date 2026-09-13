@@ -9,6 +9,15 @@ import net.minecraft.core.Direction;
 public final class GraphicsAuditGuiFoilSource {
     private static final Map<String, Sample> SAMPLES = new LinkedHashMap<>();
     private static boolean complete = true;
+    private static long frameSequence;
+
+    /** Clear diagnostic history, never game/model/atlas state. */
+    public static synchronized void beginFrame(long frame) {
+        if (frame <= 0) throw new IllegalArgumentException("invalid GUI source observation frame");
+        SAMPLES.clear();
+        complete = true;
+        frameSequence = frame;
+    }
 
     public record Sample(String sprite, float[] positions, float[] atlasUvs) {
         public Sample {
@@ -44,7 +53,9 @@ public final class GraphicsAuditGuiFoilSource {
 
     public static synchronized void appendJson(StringBuilder json) {
         json.append("{\"enabled\":").append(Boolean.getBoolean("mattmc.dev.guiItemRasterTrace"))
-            .append(",\"complete\":").append(complete).append(",\"sources\":[");
+            .append(",\"complete\":").append(complete)
+            .append(",\"schema\":\"gui-foil-frame-sources-v1\",\"frameSequence\":").append(frameSequence)
+            .append(",\"sources\":[");
         boolean first = true;
         for (Sample sample : SAMPLES.values()) {
             if (!first) json.append(',');
@@ -58,5 +69,5 @@ public final class GraphicsAuditGuiFoilSource {
 
     public static String json() { StringBuilder json = new StringBuilder(); appendJson(json); return json.toString(); }
 
-    static synchronized void resetForTest() { SAMPLES.clear(); complete = true; }
+    static synchronized void resetForTest() { SAMPLES.clear(); complete = true; frameSequence = 0; }
 }

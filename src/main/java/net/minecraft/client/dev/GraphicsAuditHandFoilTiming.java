@@ -63,7 +63,20 @@ public final class GraphicsAuditHandFoilTiming {
     public static synchronized boolean readyForCapture(int target) {
         if (!enabled()) return true;
         return valid && !inHand && ticks.size() == 1
-            && GraphicsAuditGuiFoilTiming.phaseMatches(ticks.getFirst(), target);
+            && GraphicsAuditGuiFoilTiming.phaseMatches(ticks.getFirst(), target)
+            && pairedPhaseMatches(ticks.getFirst());
+    }
+
+    /** Narrow only screenshot selection around the other capture's observed
+     * phase. This value never replaces a clock, texture matrix or draw input. */
+    static boolean pairedPhaseMatches(long observed) {
+        String configured = System.getProperty("mattmc.dev.graphicsAuditHandFoilPhaseCenter");
+        if (configured == null) return true;
+        int center = Integer.parseInt(configured);
+        if (center < 0 || center >= 330000) throw new IllegalStateException("invalid paired hand foil phase");
+        if (observed < 0) return false;
+        long distance = Math.floorMod(observed - center, 330000L);
+        return distance <= 16 || distance >= 330000L - 16;
     }
 
     public static synchronized String snapshot() {

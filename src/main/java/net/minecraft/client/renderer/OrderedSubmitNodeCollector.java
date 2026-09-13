@@ -71,13 +71,17 @@ public interface OrderedSubmitNodeCollector {
 	}
 
 	/** Explicit semantic End Portal cube; Rust owns the animated layer material. */
-	default boolean submitEndPortal(PoseStack poseStack, boolean[] faces, float gameTime, int lightCoords) {
+	default boolean submitEndPortal(
+		PoseStack poseStack, boolean[] faces, float offsetDown, float offsetUp, float gameTime, int lightCoords
+	) {
 		return false;
 	}
 
 	/** Explicit semantic End Portal submission for copied Rust extraction. */
-	default boolean submitEndPortalSemantic(PoseStack poseStack, boolean[] faces, float gameTime, int lightCoords) {
-		return submitEndPortal(poseStack, faces, gameTime, lightCoords);
+	default boolean submitEndPortalSemantic(
+		PoseStack poseStack, boolean[] faces, float offsetDown, float offsetUp, float gameTime, int lightCoords
+	) {
+		return submitEndPortal(poseStack, faces, offsetDown, offsetUp, gameTime, lightCoords);
 	}
 
 	<S> void submitModel(
@@ -259,6 +263,12 @@ public interface OrderedSubmitNodeCollector {
 		submitBlockModel(poseStack, renderType, blockStateModel, red, green, blue, light, overlay, outlineColor);
 	}
 
+	/** Carries a resource identity for synthetic models whose BlockState owner cannot identify the rendered model. */
+	default void submitBlockModelSemantic(PoseStack poseStack, RenderType renderType, BlockStateModel blockStateModel,
+		float red, float green, float blue, int light, int overlay, int outlineColor, ResourceLocation semanticIdentity) {
+		submitBlockModelSemantic(poseStack, renderType, blockStateModel, red, green, blue, light, overlay, outlineColor);
+	}
+
 	void submitItem(
 		PoseStack poseStack,
 		ItemDisplayContext itemDisplayContext,
@@ -343,6 +353,13 @@ public interface OrderedSubmitNodeCollector {
 	}
 	default boolean submitTexturedQuadsSemantic(PoseStack poseStack, RenderType renderType, ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords) {
 		return submitTexturedQuads(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
+	}
+	/** Semantic textured quads with producer-authored transformed normals. */
+	default boolean submitTexturedQuadsWithNormalsSemantic(
+		PoseStack poseStack, RenderType renderType, ResourceLocation textureIdentity,
+		float[] vertices, float[] uvs, float[] normals, int[] colors, int lightCoords
+	) {
+		return submitTexturedQuadsSemantic(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords);
 	}
 
 	/** Explicit first-person optical mesh batch with a Rust-owned stencil role. */
