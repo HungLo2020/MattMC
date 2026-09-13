@@ -131,6 +131,7 @@ public final class GraphicsFrameBenchmark {
 	private static final ArrayDeque<OpenPhase> PHASE_STACK = new ArrayDeque<>();
 	private static final Map<String, PhaseStats> EXCLUSIVE_PHASES = new LinkedHashMap<>();
 	private static final Map<String, PhaseStats> NESTED_PHASES = new LinkedHashMap<>();
+	private static final Map<String, PhaseStats> COUNTER_SAMPLES = new LinkedHashMap<>();
 	private static final List<FrameTimelineEvent> FRAME_TIMELINE_EVENTS = new ArrayList<>();
 	private static final Map<String, Integer> SUBMITTED_WORK_COUNTS = new LinkedHashMap<>();
 	private static final Map<String, Integer> FALLING_BLOCK_ROUTE_COUNTS = new LinkedHashMap<>();
@@ -426,11 +427,11 @@ public final class GraphicsFrameBenchmark {
 	private static void recordFrameAllocationAndGcSamples() {
 		long allocatedBytesAtEnd = currentThreadAllocatedBytes();
 		if (frameAllocatedBytesAtStart >= 0L && allocatedBytesAtEnd >= frameAllocatedBytesAtStart) {
-			recordPhaseSample("java.alloc.render-thread-bytes", allocatedBytesAtEnd - frameAllocatedBytesAtStart);
+			recordCounterSample("java.alloc.render-thread-bytes", allocatedBytesAtEnd - frameAllocatedBytesAtStart);
 		}
 		long gcCountAtFrameEnd = totalGcCount();
 		if (frameGcCountAtStart >= 0L && gcCountAtFrameEnd >= frameGcCountAtStart) {
-			recordPhaseSample("java.gc.count", gcCountAtFrameEnd - frameGcCountAtStart);
+			recordCounterSample("java.gc.count", gcCountAtFrameEnd - frameGcCountAtStart);
 		}
 		long gcTimeAtFrameEnd = totalGcTimeMillis();
 		if (frameGcTimeAtStart >= 0L && gcTimeAtFrameEnd >= frameGcTimeAtStart) {
@@ -471,6 +472,13 @@ public final class GraphicsFrameBenchmark {
 		}
 		NESTED_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()).add(nanos);
 		EXCLUSIVE_PHASES.computeIfAbsent(name, ignored -> new PhaseStats()).add(nanos);
+	}
+
+	public static void recordCounterSample(String name, long value) {
+		if (!ENABLED || !frameActive || !measurementFrame || name == null || value < 0L) {
+			return;
+		}
+		COUNTER_SAMPLES.computeIfAbsent(name, ignored -> new PhaseStats()).add(value);
 	}
 
 	public static void recordRustWholeFrameTimeline(
@@ -1688,6 +1696,8 @@ public final class GraphicsFrameBenchmark {
 		writePhaseMap(json, "exclusivePhaseNanos", EXCLUSIVE_PHASES);
 		json.append(",\n");
 		writePhaseMap(json, "nestedPhaseNanos", NESTED_PHASES);
+		json.append(",\n");
+		writePhaseMap(json, "counterSamples", COUNTER_SAMPLES);
 		json.append(",\n");
 		writeGameplayWeatherCloudDiagnostics(json);
 		json.append(",\n");

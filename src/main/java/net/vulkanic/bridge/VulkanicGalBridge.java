@@ -662,20 +662,26 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		MemorySegment batchArray = Struct.GUI_MESH_BATCH_REQUEST.array(arena, batches.size());
 		for (int i = 0; i < batches.size(); i++) {
 			GuiMeshBatchRecord batch = batches.get(i);
-			MemorySegment vertices = Struct.GUI_MESH_VERTEX.array(arena, batch.vertices().size());
-			for (int vertexIndex = 0; vertexIndex < batch.vertices().size(); vertexIndex++) {
-				GuiMeshVertexRecord vertex = batch.vertices().get(vertexIndex);
+			// These arrays and lists were defensively copied by their record constructors.
+			// The bridge is their enclosing nestmate and reads them only during this
+			// synchronous confined-arena encode, so using the immutable backing values
+			// avoids manufacturing a clone for every component written to the FFI stream.
+			List<GuiMeshVertexRecord> vertexRecords = batch.vertices;
+			List<Integer> indexRecords = batch.indices;
+			MemorySegment vertices = Struct.GUI_MESH_VERTEX.array(arena, vertexRecords.size());
+			for (int vertexIndex = 0; vertexIndex < vertexRecords.size(); vertexIndex++) {
+				GuiMeshVertexRecord vertex = vertexRecords.get(vertexIndex);
 				MemorySegment item = Abi.item(vertices, Struct.GUI_MESH_VERTEX, vertexIndex);
-				for (int component = 0; component < 3; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(0) + component * 4L, vertex.position()[component]);
-				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(1) + component * 4L, vertex.atlasUv()[component]);
-				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(2) + component * 4L, vertex.localUv()[component]);
+				for (int component = 0; component < 3; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(0) + component * 4L, vertex.position[component]);
+				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(1) + component * 4L, vertex.atlasUv[component]);
+				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(2) + component * 4L, vertex.localUv[component]);
 				Struct.GUI_MESH_VERTEX.setInt(item, 3, vertex.colorArgb());
 				Struct.GUI_MESH_VERTEX.setInt(item, 4, vertex.normalPacked());
 				Struct.GUI_MESH_VERTEX.setInt(item, 5, vertex.sourceFace());
 				Struct.GUI_MESH_VERTEX.setInt(item, 6, vertex.sourceFoilType());
 			}
-			MemorySegment indices = arena.allocate((long)batch.indices().size() * Integer.BYTES, Integer.BYTES);
-			for (int index = 0; index < batch.indices().size(); index++) indices.setAtIndex(ValueLayout.JAVA_INT, index, batch.indices().get(index));
+			MemorySegment indices = arena.allocate((long)indexRecords.size() * Integer.BYTES, Integer.BYTES);
+			for (int index = 0; index < indexRecords.size(); index++) indices.setAtIndex(ValueLayout.JAVA_INT, index, indexRecords.get(index));
 			MemorySegment item = Abi.item(batchArray, Struct.GUI_MESH_BATCH_REQUEST, i);
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 0, Struct.GUI_MESH_BATCH_REQUEST.byteSize());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 1, batch.stratum());
@@ -686,8 +692,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_MESH_BATCH_REQUEST.setLong(item, 6, batch.sequence());
 			Struct.GUI_MESH_BATCH_REQUEST.setFloat(item, 7, batch.alphaCutoff());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 8, 0);
-			for (int component = 0; component < 16; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(9) + component * 4L, batch.modelTransform()[component]);
-			for (int component = 0; component < 6; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(10) + component * 4L, batch.guiPose()[component]);
+			for (int component = 0; component < 16; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(9) + component * 4L, batch.modelTransform[component]);
+			for (int component = 0; component < 6; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_BATCH_REQUEST.offset(10) + component * 4L, batch.guiPose[component]);
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 11, batch.left());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 12, batch.top());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 13, batch.right());
@@ -702,8 +708,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 22, batch.clipTop());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 23, batch.clipWidth());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 24, batch.clipHeight());
-			Abi.writeSlice(item, Struct.GUI_MESH_BATCH_REQUEST, 25, vertices, batch.vertices().size());
-			Abi.writeSlice(item, Struct.GUI_MESH_BATCH_REQUEST, 26, indices, batch.indices().size());
+			Abi.writeSlice(item, Struct.GUI_MESH_BATCH_REQUEST, 25, vertices, vertexRecords.size());
+			Abi.writeSlice(item, Struct.GUI_MESH_BATCH_REQUEST, 26, indices, indexRecords.size());
 			StandardItemFoilRecord foil = batch.itemFoil();
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 27, foil == null ? 0 : foil.kind().wireValue());
 			Struct.GUI_MESH_BATCH_REQUEST.setLong(item, 28, foil == null ? 0 : foil.clockMillis());
@@ -711,8 +717,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.GUI_MESH_BATCH_REQUEST.setFloat(item, 30, foil == null ? 0.0F : foil.strength());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 31, batch.itemRasterScale());
 			GuiDecalFoilRecord decal = batch.decalFoil();
-			float[] decalModelPose = decal == null ? null : decal.modelPose();
-			float[] decalNormalPose = decal == null ? null : decal.normalPose();
+			float[] decalModelPose = decal == null ? null : decal.modelPose;
+			float[] decalNormalPose = decal == null ? null : decal.normalPose;
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 32, decal == null ? 0 : decal.nativeItemLayout() ? 2 : 1);
 			for (int component = 0; component < 16; component++) item.set(ValueLayout.JAVA_FLOAT,
 				Struct.GUI_MESH_BATCH_REQUEST.offset(33) + component * 4L, decalModelPose == null ? 0.0F : decalModelPose[component]);
@@ -724,7 +730,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			GuiItemCacheRecord cache = batch.itemCache();
 			Struct.GUI_MESH_BATCH_REQUEST.setLong(item, 38, cache == null ? 0 : cache.identity());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 39, cache == null ? 0 : cache.animated() ? 2 : 1);
-			double[] bounds = block == null ? null : block.modelBounds();
+			double[] bounds = block == null ? null : block.modelBounds;
 			for (int component = 0; component < 6; component++) item.set(ValueLayout.JAVA_DOUBLE,
 				Struct.GUI_MESH_BATCH_REQUEST.offset(36) + component * 8L, bounds == null ? 0.0 : bounds[component]);
 		}

@@ -3802,6 +3802,23 @@ def phase_stats_to_distribution(stats: dict[str, object]) -> dict[str, object]:
     }
 
 
+def counter_stats_to_distribution(stats: dict[str, object]) -> dict[str, object]:
+    count = parse_number(stats.get("count")) or 0.0
+    total = parse_number(stats.get("total"))
+    median = parse_number(stats.get("median"))
+    p95 = parse_number(stats.get("p95"))
+    p99 = parse_number(stats.get("p99"))
+    worst = parse_number(stats.get("worst"))
+    return {
+        "count": int(count),
+        "median": median,
+        "p95": p95,
+        "p99": p99,
+        "worst": worst,
+        "total": total,
+    }
+
+
 def phase_family_name(label: str) -> str:
     name = label.lower()
     if name.startswith("game."):
@@ -27960,6 +27977,8 @@ def normalize_capture_artifact(
             "expected_base_backend": mode.expected_attribution,
             "observed_attribution": attribution,
             "families": attribution_families,
+            "rust_profile": effective_meta.get("rust_profile") or "unknown",
+            "rust_native_sha256": effective_meta.get("rust_native_sha256") or "unknown",
         },
         "resource_packs": {
             "scenario": meta.get("gui_resource_pack_scenario", "unset"),
@@ -27975,6 +27994,7 @@ def normalize_capture_artifact(
     fps_values = fps_from_frame_nanos(frame_nanos)
     exclusive_phases = frame_doc.get("exclusivePhaseNanos") if isinstance(frame_doc, dict) else None
     nested_phases = frame_doc.get("nestedPhaseNanos") if isinstance(frame_doc, dict) else None
+    counter_samples = frame_doc.get("counterSamples") if isinstance(frame_doc, dict) else None
     cpu_phase_timings = {
         key: phase_stats_to_distribution(value)
         for key, value in (exclusive_phases.items() if isinstance(exclusive_phases, dict) else [])
@@ -27983,6 +28003,11 @@ def normalize_capture_artifact(
     nested_cpu_phase_timings = {
         key: phase_stats_to_distribution(value)
         for key, value in (nested_phases.items() if isinstance(nested_phases, dict) else [])
+        if isinstance(value, dict)
+    }
+    counter_metrics = {
+        key: counter_stats_to_distribution(value)
+        for key, value in (counter_samples.items() if isinstance(counter_samples, dict) else [])
         if isinstance(value, dict)
     }
     java_doc = frame_doc.get("java") if isinstance(frame_doc, dict) and isinstance(frame_doc.get("java"), dict) else {}
@@ -31757,6 +31782,7 @@ def normalize_capture_artifact(
             "fps": summarize_distribution(fps_values),
             "cpu_phase_timings": cpu_phase_timings,
             "nested_cpu_phase_timings": nested_cpu_phase_timings,
+            "counter_metrics": counter_metrics,
             "phase_family_timings": phase_family_timings(cpu_phase_timings),
             "nested_phase_family_timings": phase_family_timings(nested_cpu_phase_timings),
             "java_allocation_and_gc": {
@@ -34875,6 +34901,8 @@ def build_capture_command(
             mode.backend,
             "--shaders",
             mode.shaders,
+            "--rust-profile",
+            args.rust_profile,
             "--artifact-dir",
             str(capture_dir),
             "--world",
@@ -38817,6 +38845,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             help="Require a deterministic far-LOD material palette to reach the real Rust Distant Horizons route.",
         )
         subparser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
+        subparser.add_argument(
+            "--rust-profile",
+            choices=("dev", "release"),
+            default=os.environ.get("MATTMC_RUST_PROFILE", "release"),
+            help="Cargo profile used by Current's native renderer and recorded by the capture runner.",
+        )
         subparser.add_argument("--jvm-arg", action="append", default=[], help="Extra JVM option appended to JAVA_TOOL_OPTIONS for launched clients.")
         subparser.add_argument(
             "--rust-gal-gui-control",

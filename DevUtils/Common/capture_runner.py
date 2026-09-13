@@ -280,6 +280,7 @@ class CaptureConfig:
     # Capture the ordinary reload-overlay-to-title transition from launch. This
     # is diagnostic-only: it never affects client timing or rendering.
     title_screen_transition_capture: bool = False
+    rust_profile: str = "release"
 
 
 class CaptureRunner:
@@ -576,6 +577,7 @@ class CaptureRunner:
             f"start_epoch={self.start_epoch}",
             f"backend={self.config.backend}",
             f"shaders={self.config.shaders}",
+            f"rust_profile={self.config.rust_profile}",
             f"world={self.config.world}",
             f"world_profile={os.environ.get('MATTMC_GRAPHICS_WORLD_PROFILE', 'migration-gate')}",
             f"world_profile_role={os.environ.get('MATTMC_GRAPHICS_WORLD_PROFILE_ROLE', '')}",
@@ -1346,6 +1348,7 @@ class CaptureRunner:
         print(f"Starting bounded runClient capture (run_id={self.run_id}, backend={self.config.backend})")
         gradle_cmd = [*self.gradle]
         gradle_cmd.append(f"-PmattmcRunGameDir={self.run_dir}")
+        gradle_cmd.append(f"-PmattmcRustProfile={self.config.rust_profile}")
         if self.config.skip_tests:
             gradle_cmd.extend(["-x", "test"])
         if self.config.capture_meshing_corpus:
@@ -1374,6 +1377,7 @@ class CaptureRunner:
         self.configure_java_tool_options()
         gradle_cmd = self.fresh_environment_launch_command(gradle_cmd)
         gradle_cmd = self.renderdoc_wrapped_command(gradle_cmd)
+        self.append_meta("gradle_command=" + shlex.join(gradle_cmd))
 
         log_handle = self.run_log.open("wb")
         try:
@@ -2287,6 +2291,14 @@ class CaptureRunner:
         self.run_client_active = False
 
     def append_final_meta(self, exit_code: int) -> None:
+        native_candidates = sorted((self.root / "build" / "rust" / "native").glob("mattmc_rust-*"))
+        if len(native_candidates) == 1 and native_candidates[0].is_file():
+            native = native_candidates[0]
+            self.append_meta(f"rust_native_path={native}")
+            self.append_meta(f"rust_native_size_bytes={native.stat().st_size}")
+            self.append_meta(f"rust_native_sha256={file_sha256(native)}")
+        else:
+            self.append_meta(f"rust_native_identity_error=expected_one_candidate_found_{len(native_candidates)}")
         self.append_meta(f"exit_code={exit_code}")
         self.append_meta(f"deterministic_completed={str(self.deterministic_completed).lower()}")
         self.append_meta(f"title_screen_capture_completed={str(self.title_screen_capture_completed).lower()}")
@@ -4481,6 +4493,12 @@ def parse_args() -> CaptureConfig:
     )
     parser.add_argument("--backend", choices=("vulkan", "opengl", "rust-vulkan", "rust-opengl"), required=True)
     parser.add_argument("--shaders", choices=("on", "off"), required=True)
+    parser.add_argument(
+        "--rust-profile",
+        choices=("dev", "release"),
+        default=os.environ.get("MATTMC_RUST_PROFILE", "release"),
+        help="Cargo profile for the native renderer; recorded in capture metadata (default: release).",
+    )
     parser.add_argument("--max-secs", type=int, default=int_env("MAX_SECS", 120))
     parser.add_argument("--dump-secs", type=int, default=int_env("DUMP_SECS", 45))
     parser.add_argument("--validation", choices=("off", "standard"), default=os.environ.get("VALIDATION_MODE", "off"))
@@ -4630,6 +4648,7 @@ def parse_args() -> CaptureConfig:
         poi_validation=bool(args.poi_validation),
         title_screen_capture=bool(args.title_screen_capture),
         title_screen_transition_capture=bool(args.title_screen_transition_capture),
+        rust_profile=args.rust_profile,
         deterministic_shutdown_grace_secs=int_env(
             "MATTMC_DETERMINISTIC_SHUTDOWN_GRACE_SECS",
             180 if args.region_validation else 20,

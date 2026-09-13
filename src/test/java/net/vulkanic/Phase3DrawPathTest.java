@@ -5610,8 +5610,9 @@ public class Phase3DrawPathTest {
         String trackingItemStackRenderStateSource = readSource(trackingItemStackRenderStateFile);
         assertTrue(trackingItemStackRenderStateSource.contains("this.modelIdentityElements.clear();"),
             "TrackingItemStackRenderState should clear model identity elements when state is cleared so GUI item identity does not leak across updates");
-        assertTrue(trackingItemStackRenderStateSource.contains("return List.copyOf(this.modelIdentityElements);"),
-            "TrackingItemStackRenderState should return immutable identity snapshots so GUI atlas cache keys cannot be mutated after insertion");
+        assertTrue(trackingItemStackRenderStateSource.contains("this.cachedModelIdentity = List.copyOf(this.modelIdentityElements);")
+                && trackingItemStackRenderStateSource.contains("this.cachedModelIdentity = null;"),
+            "TrackingItemStackRenderState should cache an immutable identity snapshot and invalidate it whenever the mutable state changes");
     }
 
     @Test

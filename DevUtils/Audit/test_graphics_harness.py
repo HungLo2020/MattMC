@@ -24425,6 +24425,49 @@ else:
             self.assertEqual("off", clean_command[clean_command.index("--validation") + 1])
             self.assertNotIn("VK_INSTANCE_LAYERS", clean_env)
 
+    def test_gameplay_capture_declares_native_rust_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(
+                mode for mode in harness.MATRIX_MODES
+                if mode.name == "current-rust-vulkan-shaders-off"
+            )
+            release_args = harness.parse_args(
+                ["gameplay", "--mode", mode.name, "--world", "Origin", "--dry-run"]
+            )
+            release_command, _ = harness.build_capture_command(
+                target, mode, root / "release", "gameplay", release_args, "gameplay"
+            )
+            self.assertEqual(
+                "release", release_command[release_command.index("--rust-profile") + 1]
+            )
+
+            dev_args = harness.parse_args(
+                [
+                    "gameplay", "--mode", mode.name, "--world", "Origin",
+                    "--rust-profile", "dev", "--dry-run",
+                ]
+            )
+            dev_command, _ = harness.build_capture_command(
+                target, mode, root / "dev", "gameplay", dev_args, "gameplay"
+            )
+            self.assertEqual("dev", dev_command[dev_command.index("--rust-profile") + 1])
+
+    def test_counter_distributions_are_not_scaled_as_nanoseconds(self) -> None:
+        stats = {"count": 3, "total": 48, "median": 16, "p95": 20, "p99": 21, "worst": 24}
+        self.assertEqual(
+            {
+                "count": 3,
+                "total": 48.0,
+                "median": 16.0,
+                "p95": 20.0,
+                "p99": 21.0,
+                "worst": 24.0,
+            },
+            harness.counter_stats_to_distribution(stats),
+        )
+
     def test_renderdoc_preflight_layer_does_not_enable_khronos_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

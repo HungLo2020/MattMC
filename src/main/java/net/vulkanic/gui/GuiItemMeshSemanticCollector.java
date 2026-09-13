@@ -1,7 +1,9 @@
 package net.vulkanic.gui;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.render.state.GuiItemRenderState;
@@ -23,7 +25,19 @@ import net.sodium.client.model.quad.BakedQuadView;
  * Rust owns raster layout, normal selection, lighting and GPU execution.
  */
 public final class GuiItemMeshSemanticCollector {
+	private static final int MAX_CACHED_TOPOLOGIES = 256;
+	private static final Map<TopologyKey, CachedTopology> TOPOLOGY_CACHE = new LinkedHashMap<>(64, 0.75F, true) {
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<TopologyKey, CachedTopology> eldest) {
+			return this.size() > MAX_CACHED_TOPOLOGIES;
+		}
+	};
+
 	private GuiItemMeshSemanticCollector() {
+	}
+
+	static synchronized void invalidateCache() {
+		TOPOLOGY_CACHE.clear();
 	}
 
 	/**
@@ -45,25 +59,39 @@ public final class GuiItemMeshSemanticCollector {
 		}
 		AABB modelBounds = item.itemStackRenderState().getModelBoundingBox();
 		if (modelBounds == null) return CollectionResult.rejected("model-bounds");
-		var blockRaster = new net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord(
-			guiScale, new double[] {modelBounds.minX, modelBounds.minY, modelBounds.minZ,
-				modelBounds.maxX, modelBounds.maxY, modelBounds.maxZ},item.itemStackRenderState().isOversizedInGui());
-		List<GuiItemMeshLayer> layers = new ArrayList<>();
-		List<GuiItemTextureSource> sources = new ArrayList<>();
-		String[] rejection = new String[1];
-		item.itemStackRenderState().forEachSemanticLayer(layer -> {
-			if (rejection[0] != null) {
-				return;
-			}
-			rejection[0] = appendLayer(layer, layers, sources);
-		});
-		if (rejection[0] != null || layers.isEmpty()) {
-			return CollectionResult.rejected(rejection[0] == null ? "empty-mesh" : rejection[0]);
+		Object modelIdentity = item.itemStackRenderState().getModelIdentity();
+		TopologyKey cacheKey = !item.itemStackRenderState().isAnimated()
+			&& modelIdentity instanceof List<?> identityElements && !identityElements.isEmpty()
+			? new TopologyKey(modelIdentity, guiScale) : null;
+		CachedTopology topology = cacheKey == null ? null : cachedTopology(cacheKey);
+		if (cacheKey != null) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+				topology == null ? "gui.item-topology-cache.miss" : "gui.item-topology-cache.hit", 1L
+			);
 		}
-		for (GuiItemMeshLayer layer : layers) for (GuiItemMeshQuad quad : layer.quads()) {
-			RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolveAssetId(quad.assetId());
-			if (asset != null && sources.stream().noneMatch(existing -> existing.assetId() == asset.assetId()))
-				sources.add(new GuiItemTextureSource.Raw(asset));
+		if (topology == null) {
+			var blockRaster = new net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord(
+				guiScale, new double[] {modelBounds.minX, modelBounds.minY, modelBounds.minZ,
+					modelBounds.maxX, modelBounds.maxY, modelBounds.maxZ},item.itemStackRenderState().isOversizedInGui());
+			List<GuiItemMeshLayer> layers = new ArrayList<>();
+			List<GuiItemTextureSource> sources = new ArrayList<>();
+			String[] rejection = new String[1];
+			item.itemStackRenderState().forEachSemanticLayer(layer -> {
+				if (rejection[0] != null) {
+					return;
+				}
+				rejection[0] = appendLayer(layer, layers, sources);
+			});
+			if (rejection[0] != null || layers.isEmpty()) {
+				return CollectionResult.rejected(rejection[0] == null ? "empty-mesh" : rejection[0]);
+			}
+			for (GuiItemMeshLayer layer : layers) for (GuiItemMeshQuad quad : layer.quads()) {
+				RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolveAssetId(quad.assetId());
+				if (asset != null && sources.stream().noneMatch(existing -> existing.assetId() == asset.assetId()))
+					sources.add(new GuiItemTextureSource.Raw(asset));
+			}
+			topology = new CachedTopology(layers, sources, blockRaster);
+			if (cacheKey != null) cacheTopology(cacheKey, topology);
 		}
 		// Native layout receives the original logical item origin/box; Rust
 		// derives oversized placement before applying the copied GUI pose.
@@ -74,8 +102,30 @@ public final class GuiItemMeshSemanticCollector {
 		return CollectionResult.accepted(new GuiItemMesh(
 			item.name(), item.x(), item.y(), left, top, right, bottom,
 			new float[] {item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()},
-			layers, sources, blockRaster
+			topology.layers(), topology.sources(), topology.blockRaster()
 		));
+	}
+
+	private static synchronized CachedTopology cachedTopology(TopologyKey key) {
+		return TOPOLOGY_CACHE.get(key);
+	}
+
+	private static synchronized void cacheTopology(TopologyKey key, CachedTopology topology) {
+		TOPOLOGY_CACHE.putIfAbsent(key, topology);
+	}
+
+	private record TopologyKey(Object modelIdentity, int guiScale) {
+	}
+
+	private record CachedTopology(
+		List<GuiItemMeshLayer> layers,
+		List<GuiItemTextureSource> sources,
+		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockRaster
+	) {
+		private CachedTopology {
+			layers = List.copyOf(layers);
+			sources = List.copyOf(sources);
+		}
 	}
 
 	private static String appendLayer(ItemStackRenderState.SemanticLayer layer, List<GuiItemMeshLayer> output,

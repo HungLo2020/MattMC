@@ -10,6 +10,25 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GuiFlatItemMeshCollectorTest {
+    @Test void modelIdentitySnapshotIsReusedUntilTheTrackedStateChanges() {
+        var state = new TrackingItemStackRenderState();
+        Object firstElement = new Object();
+        state.appendModelIdentityElement(firstElement);
+        Object first = state.getModelIdentity();
+        assertSame(first, state.getModelIdentity());
+        assertEquals(List.of(firstElement), first);
+
+        Object secondElement = new Object();
+        state.appendModelIdentityElement(secondElement);
+        Object second = state.getModelIdentity();
+        assertNotSame(first, second);
+        assertEquals(List.of(firstElement, secondElement), second);
+
+        state.clear();
+        assertEquals(List.of(), state.getModelIdentity());
+        assertNotSame(second, state.getModelIdentity());
+    }
+
     @Test void nonFoilMeshPreservesAllFourAuthoredCornersAndRequestsNativeItemLighting() {
         var item=new GuiItemRenderState("non-affine",new Matrix3x2f(),new TrackingItemStackRenderState(),0,0,null);
         float[] transform={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};

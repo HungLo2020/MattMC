@@ -143,6 +143,7 @@ public final class RustGalGuiRawImageAssets {
 	}
 
 	static void invalidate() {
+		GuiItemMeshSemanticCollector.invalidateCache();
 		GuiItemSemanticIdentities.clear();
 		RustGalFrameCoordinator.invalidateGuiRawImages();
 		RustGalGuiRenderer.invalidateTextAtlasMetadata();

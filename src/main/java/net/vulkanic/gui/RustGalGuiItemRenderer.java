@@ -881,21 +881,28 @@ public final class RustGalGuiItemRenderer {
 		GuiItemMeshSemanticCollector.GuiItemMesh mesh = collected.mesh();
 		var clip = item.scissorArea();
 		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>();
+		float[] guiPose = mesh.guiPose();
 		int requestLayerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order()
 			: RustGalGuiRenderer.dynamicLayerOrder(dynamicLayerOrder);
 		int batchLayerIndex = 0;
 		for (int layerIndex = 0; layerIndex < mesh.layers().size(); layerIndex++) {
 			GuiItemMeshSemanticCollector.GuiItemMeshLayer layer = mesh.layers().get(layerIndex);
+			float[] modelTransform = layer.modelTransform();
 			for (GuiItemMeshSemanticCollector.GuiItemMeshQuad quad : layer.quads()) {
+				float[] positions = quad.positions();
+				float[] atlasUvs = quad.atlasUvs();
+				float[] localUvs = quad.localUvs();
+				int[] colorsArgb = quad.colorsArgb();
+				int[] packedNormals = quad.packedNormals();
 				List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = new ArrayList<>(4);
 				for (int vertex = 0; vertex < 4; vertex++) {
 					int position = vertex * 3;
 					int uv = vertex * 2;
 					vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(
-						new float[] {quad.positions()[position], quad.positions()[position + 1], quad.positions()[position + 2]},
-						new float[] {quad.atlasUvs()[uv], quad.atlasUvs()[uv + 1]},
-						new float[] {quad.localUvs()[uv], quad.localUvs()[uv + 1]},
-						quad.colorsArgb()[vertex], quad.packedNormals()[vertex],
+						new float[] {positions[position], positions[position + 1], positions[position + 2]},
+						new float[] {atlasUvs[uv], atlasUvs[uv + 1]},
+						new float[] {localUvs[uv], localUvs[uv + 1]},
+						colorsArgb[vertex], packedNormals[vertex],
 						quad.lightFace() + 1, layer.sourceFoilType()
 					));
 				}
@@ -906,7 +913,7 @@ public final class RustGalGuiItemRenderer {
 					layer.blockLight() ? VulkanicGalBridge.GUI_MESH_LIGHTING_INVENTORY_BLOCK : 1, quad.assetId(), 0L,
 					(layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.CUTOUT
 						|| layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.GLINT) ? 0.1F : 0.0F,
-					layer.modelTransform(), mesh.guiPose(), mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
+					modelTransform, guiPose, mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
 					guiWidth, guiHeight, 0, 0, 0,
 					clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
 					clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(),

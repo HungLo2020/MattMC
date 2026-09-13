@@ -238,6 +238,21 @@ class GuiItemMeshSemanticCollectorTest {
 		assertTrue(source.contains("normals[index] = quad.getAccurateNormal(index)"));
 	}
 
+	@Test
+	void immutableTopologyCacheIsBoundedAndFollowsResourceLifetime() throws Exception {
+		String collector = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/java/net/vulkanic/gui/GuiItemMeshSemanticCollector.java"));
+		String assets = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalGuiRawImageAssets.java"));
+		assertTrue(collector.contains("MAX_CACHED_TOPOLOGIES = 256"));
+		assertTrue(collector.contains("!item.itemStackRenderState().isAnimated()"),
+			"animated item geometry must remain frame-local");
+		assertTrue(collector.contains("new TopologyKey(modelIdentity, guiScale)"),
+			"cache identity must include vanilla model semantics and raster scale");
+		assertTrue(assets.contains("GuiItemMeshSemanticCollector.invalidateCache();"),
+			"resource reload must retire cached topology before new atlas identities are used");
+	}
+
 	private static float[] identityMatrix() {
 		return new float[] {
 			1.0F, 0.0F, 0.0F, 0.0F,
