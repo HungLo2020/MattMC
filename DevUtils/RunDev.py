@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -130,7 +131,13 @@ def main() -> int:
 
     root = repo_root()
     gradle = gradle_command(root, platform_name)
-    return subprocess.run([*gradle, "runClient"], cwd=root).returncode
+    environment = os.environ.copy()
+    environment.setdefault("MATTMC_RUST_VULKAN_GPU_TIMESTAMPS", "true")
+    return subprocess.run(
+        [*gradle, "-PmattmcRustProfile=release", "runClient"],
+        cwd=root,
+        env=environment,
+    ).returncode
 
 
 if __name__ == "__main__":

@@ -3894,8 +3894,12 @@ def load_capture_files(capture_dir: Path) -> dict[str, Path | None]:
         "latest_tail": same_run("latest_tail_*.log"),
         "run_log": same_run("runClient_*.log"),
         "deterministic": declared_capture("deterministic_metadata", "deterministic_camera_capture_*.json"),
-        "frame_benchmark": same_run("graphics_frame_benchmark_*.json"),
-        "subsystem_benchmark": same_run("graphics_subsystem_benchmark_*.json"),
+        "frame_benchmark": declared_capture(
+            "graphics_frame_benchmark_status", "graphics_frame_benchmark_*.json"
+        ),
+        "subsystem_benchmark": declared_capture(
+            "graphics_subsystem_status", "graphics_subsystem_benchmark_*.json"
+        ),
         "system_snapshot": same_run("system_snapshot_*.txt"),
         "process_snapshot": same_run("process_snapshot_*.txt"),
         "renderdoc_summary": same_run("renderdoc_summary_*.json"),
@@ -36566,6 +36570,12 @@ def build_capture_command(
             )
     if frame_benchmark_requested(args, tool_kind):
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
+        if mode.backend == "rust-vulkan":
+            # Frame benchmarks need the device-side duration in addition to
+            # Java and FFI phase timings. The Vulkan lowerer keeps timestamp
+            # queries opt-in for ordinary launches, so enable them only for
+            # this explicit benchmark workload.
+            env["MATTMC_RUST_VULKAN_GPU_TIMESTAMPS"] = "true"
         # Gameplay probes normally avoid filesystem diagnostics, but an
         # explicitly requested Rust selected-source run must retain the same
         # bounded admission receipt as correctness captures.  Without this

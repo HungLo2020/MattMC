@@ -609,6 +609,7 @@ class CaptureRunner:
             f"validation_mode={self.config.validation_mode}",
             f"graphics_run_type={os.environ.get('MATTMC_GRAPHICS_RUN_TYPE', 'clean-performance')}",
             f"graphics_audit_enabled={os.environ.get('MATTMC_GRAPHICS_AUDIT', 'false')}",
+            f"graphics_frame_benchmark_status={self.frame_benchmark_status_path or ''}",
             f"graphics_subsystem_benchmark={os.environ.get('MATTMC_GRAPHICS_SUBSYSTEM_BENCHMARK', 'false')}",
             f"graphics_subsystem_status={self.subsystem_status_path or ''}",
             f"validation_profile={os.environ.get('MATTMC_GRAPHICS_VALIDATION_PROFILE', self.config.validation_mode)}",

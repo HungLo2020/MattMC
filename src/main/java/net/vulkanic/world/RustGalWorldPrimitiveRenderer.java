@@ -5255,7 +5255,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					+ " mesh_key=" + extraction.meshKey()
 					+ " mesh_generation=" + meshGeneration
 					+ " vertices=" + extraction.asset().vertices().size()
-					+ " index_bytes=" + extraction.asset().indexBytes().length
+					+ " index_bytes=" + extraction.asset().indexByteLength()
 					+ " sections=" + extraction.asset().sections().size()
 					+ " result=queued");
 			}
@@ -9815,7 +9815,7 @@ public final class RustGalWorldPrimitiveRenderer {
 						+ " mesh_generation=" + meshGeneration
 						+ " block=" + metricValue(blockState.getBlockHolder().getRegisteredName())
 						+ " vertices=" + extraction.asset().vertices().size()
-						+ " index_bytes=" + extraction.asset().indexBytes().length
+						+ " index_bytes=" + extraction.asset().indexByteLength()
 						+ " sections=" + extraction.asset().sections().size()
 						+ " viewport=" + viewportWidth + "x" + viewportHeight
 						+ " result=queued");
@@ -9842,14 +9842,20 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static long projectedWorldMeshTexturePayloadBytesLocked(
 		Collection<VulkanicGalBridge.WorldMeshTextureAssetRecord> incoming
 	) {
-		Map<Integer, Integer> projected = new LinkedHashMap<>(WORLD_MESH_TEXTURES.size() + incoming.size());
+		long projectedBytes = 0L;
 		for (VulkanicGalBridge.WorldMeshTextureAssetRecord existing : WORLD_MESH_TEXTURES.values()) {
-			projected.put(existing.textureId(), existing.pngBytes().length);
+			projectedBytes += existing.pngByteLength();
 		}
+		Map<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> replacements = new LinkedHashMap<>(incoming.size());
 		for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : incoming) {
-			projected.put(texture.textureId(), texture.pngBytes().length);
+			replacements.put(texture.textureId(), texture);
 		}
-		return projected.values().stream().mapToLong(Integer::longValue).sum();
+		for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : replacements.values()) {
+			VulkanicGalBridge.WorldMeshTextureAssetRecord existing = WORLD_MESH_TEXTURES.get(texture.textureId());
+			if (existing != null) projectedBytes -= existing.pngByteLength();
+			projectedBytes += texture.pngByteLength();
+		}
+		return projectedBytes;
 	}
 
 	private static void ensureWorldQueueCapacityLocked(int current, int additional, int maximum, String kind) {
@@ -9863,7 +9869,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (texture == null) {
 			throw new IllegalArgumentException("Rust VulkanicGAL " + source + " texture asset must not be null");
 		}
-		int payloadBytes = texture.pngBytes().length;
+		int payloadBytes = texture.pngByteLength();
 		if (payloadBytes == 0 || payloadBytes > MAX_WORLD_MESH_TEXTURE_PNG_BYTES) {
 			throw new IllegalArgumentException("Rust VulkanicGAL " + source + " texture payload must contain 1.."
 				+ MAX_WORLD_MESH_TEXTURE_PNG_BYTES + " bytes, got " + payloadBytes);
@@ -9906,7 +9912,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (sortedIndex == null) {
 			throw new IllegalArgumentException("Rust VulkanicGAL sorted index asset must not be null");
 		}
-		int bytes = sortedIndex.indexBytes().length;
+		int bytes = sortedIndex.indexByteLength();
 		int stride = sortedIndex.indexType() == VulkanicGalBridge.INDEX_U16 ? Short.BYTES
 			: sortedIndex.indexType() == VulkanicGalBridge.INDEX_U32 ? Integer.BYTES : 0;
 		if (bytes == 0 || bytes > MAX_WORLD_MESH_INDEX_BYTES || stride == 0 || bytes % stride != 0) {
@@ -9915,13 +9921,17 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	private static void validateWorldMeshAsset(VulkanicGalBridge.WorldMeshAssetRecord asset, String source) {
+	private static void validateWorldMeshIdentity(VulkanicGalBridge.WorldMeshAssetRecord asset, String source) {
 		if (asset == null || asset.meshKey() == 0 || asset.meshGeneration() == 0
 			|| (asset.vertexLayoutVersion() != MESH_VERTEX_LAYOUT_V2 && asset.vertexLayoutVersion() != MESH_VERTEX_LAYOUT_V3)) {
 			throw new IllegalArgumentException("Rust VulkanicGAL " + source + " mesh identity/layout is invalid");
 		}
+	}
+
+	private static void validateWorldMeshAsset(VulkanicGalBridge.WorldMeshAssetRecord asset, String source) {
+		validateWorldMeshIdentity(asset, source);
 		int vertexCount = asset.vertices().size();
-		int indexBytes = asset.indexBytes().length;
+		int indexBytes = asset.indexByteLength();
 		int indexStride = asset.indexType() == VulkanicGalBridge.INDEX_U16 ? Short.BYTES
 			: asset.indexType() == VulkanicGalBridge.INDEX_U32 ? Integer.BYTES : 0;
 		if (vertexCount == 0 || vertexCount > MAX_WORLD_MESH_VERTICES
@@ -9938,17 +9948,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				throw new IllegalArgumentException("Rust VulkanicGAL " + source + " mesh contains non-finite vertex data");
 			}
 		}
-		byte[] encodedIndices = asset.indexBytes();
-		for (int index = 0; index < indexCount; index++) {
-			int offset = index * indexStride;
-			long vertexIndex = indexStride == Short.BYTES
-				? (encodedIndices[offset] & 0xffL) | ((encodedIndices[offset + 1] & 0xffL) << 8)
-				: (encodedIndices[offset] & 0xffL) | ((encodedIndices[offset + 1] & 0xffL) << 8)
-					| ((encodedIndices[offset + 2] & 0xffL) << 16) | ((encodedIndices[offset + 3] & 0xffL) << 24);
-			if (vertexIndex >= vertexCount) {
-				throw new IllegalArgumentException("Rust VulkanicGAL " + source
-					+ " mesh index references vertex " + vertexIndex + " but has " + vertexCount + " vertices");
-			}
+		if (!asset.indicesFitVertexCount(vertexCount)) {
+			throw new IllegalArgumentException("Rust VulkanicGAL " + source
+				+ " mesh index references vertex outside its " + vertexCount + " vertices");
 		}
 		for (VulkanicGalBridge.WorldMeshSectionRecord section : asset.sections()) {
 			boolean opticalMode = section != null
@@ -9986,9 +9988,10 @@ public final class RustGalWorldPrimitiveRenderer {
 		// texture payloads before publishing anything; otherwise an entity/item
 		// producer that exceeds the mesh budget could leave texture residency
 		// behind even though its mesh was never admitted.
-		validateWorldMeshAsset(extraction.asset(), "mesh");
+		validateWorldMeshIdentity(extraction.asset(), "mesh");
 		VulkanicGalBridge.WorldMeshAssetRecord previousAsset = WORLD_MESH_ASSETS.get(extraction.meshKey());
 		if (previousAsset == null) {
+			validateWorldMeshAsset(extraction.asset(), "mesh");
 			ensureWorldMeshRegistryCapacityLocked(WORLD_MESH_ASSETS, extraction.meshKey(),
 				MAX_WORLD_MESH_ASSET_RESIDENCY, "mesh");
 		}
@@ -9996,7 +9999,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		Set<Integer> newTextureIds = new LinkedHashSet<>();
 		Map<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> batchTexturePayloads = new LinkedHashMap<>();
 		for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : extraction.textures()) {
-			validateWorldMeshTextureAsset(texture, "mesh");
+			VulkanicGalBridge.WorldMeshTextureAssetRecord resident = WORLD_MESH_TEXTURES.get(texture.textureId());
+			if (!texture.sameContent(resident)) validateWorldMeshTextureAsset(texture, "mesh");
 			var priorBatchPayload = batchTexturePayloads.putIfAbsent(texture.textureId(), texture);
 			if (priorBatchPayload != null && !priorBatchPayload.sameContent(texture)) {
 				throw new IllegalStateException("Rust VulkanicGAL mesh batch contains conflicting payloads for texture "
@@ -10023,7 +10027,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				|| extraction.asset().entityIdentity().contains("textures/entity/player"))) {
 			auditMessage("Rust VulkanicGAL hand texture registration"
 				+ " texture_ids=" + extraction.textures().stream().map(VulkanicGalBridge.WorldMeshTextureAssetRecord::textureId).toList()
-				+ " payload_bytes=" + extraction.textures().stream().mapToInt(texture -> texture.pngBytes().length).sum()
+				+ " payload_bytes=" + extraction.textures().stream().mapToInt(texture -> texture.pngByteLength()).sum()
 				+ " mesh_generation=" + extraction.asset().meshGeneration());
 		}
 		if (previousAsset == null) {
@@ -10102,12 +10106,14 @@ public final class RustGalWorldPrimitiveRenderer {
 			return;
 		}
 		 synchronized (LOCK) {
-			validateWorldMeshAsset(asset, "static terrain");
+			validateWorldMeshIdentity(asset, "static terrain");
 			// Preflight the complete batch before publishing any texture. A static
 			// terrain asset is one semantic transaction; if its residency budget is
 			// exceeded, reject the batch without leaving a partially registered Rust
 			// texture set behind.
 			VulkanicGalBridge.WorldMeshAssetRecord previous = WORLD_MESH_ASSETS.get(asset.meshKey());
+			boolean sameMeshPayload = previous != null && sameStaticTerrainPayload(previous, asset);
+			if (!sameMeshPayload) validateWorldMeshAsset(asset, "static terrain");
 			if (previous == null) {
 				ensureWorldMeshRegistryCapacityLocked(WORLD_MESH_ASSETS, asset.meshKey(),
 					MAX_WORLD_MESH_ASSET_RESIDENCY, "mesh");
@@ -10116,7 +10122,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			Set<Integer> newTextureIds = new LinkedHashSet<>();
 			Map<Integer, VulkanicGalBridge.WorldMeshTextureAssetRecord> batchTexturePayloads = new LinkedHashMap<>();
 			for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : textures) {
-				validateWorldMeshTextureAsset(texture, "static terrain");
+				VulkanicGalBridge.WorldMeshTextureAssetRecord resident = WORLD_MESH_TEXTURES.get(texture.textureId());
+				if (!texture.sameContent(resident)) validateWorldMeshTextureAsset(texture, "static terrain");
 				var priorBatchPayload = batchTexturePayloads.putIfAbsent(texture.textureId(), texture);
 				if (priorBatchPayload != null && !priorBatchPayload.sameContent(texture)) {
 					throw new IllegalStateException("Rust VulkanicGAL static terrain batch contains conflicting payloads for texture "
@@ -10144,12 +10151,13 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			DYNAMIC_WORLD_MESH_LIFETIME.forget(asset.meshKey());
 			STATIC_TERRAIN_MESH_RESIDENCY.put(asset.meshKey(), new StaticTerrainMeshResidency(
-				previous != null && sameStaticTerrainPayload(previous, asset)
-					? previous.meshGeneration() : asset.meshGeneration(),
+				// sameMeshPayload caches sameStaticTerrainPayload(previous, asset),
+				// including its potentially large vertex and index comparison.
+				sameMeshPayload ? previous.meshGeneration() : asset.meshGeneration(),
 				textureIds(asset), retainCpuPayloadForDynamicSort
 			));
 			PENDING_WORLD_MESH_RETIREMENTS.remove(asset.meshKey());
-			if (previous != null && sameStaticTerrainPayload(previous, asset)) {
+			if (sameMeshPayload) {
 				if (changed) {
 					markWorldMeshAssetsChangedLocked();
 				}
@@ -10168,7 +10176,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					+ " mesh_key=" + asset.meshKey()
 					+ " mesh_generation=" + asset.meshGeneration()
 					+ " vertices=" + asset.vertices().size()
-					+ " index_bytes=" + asset.indexBytes().length
+					+ " index_bytes=" + asset.indexByteLength()
 					+ " sections=" + asset.sections().size()
 					+ " textures=" + textures.size()
 					+ sourceSemantics
@@ -10184,7 +10192,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		return left.vertexLayoutVersion() == right.vertexLayoutVersion()
 			&& left.indexType() == right.indexType()
 			&& left.vertices().equals(right.vertices())
-			&& Arrays.equals(left.indexBytes(), right.indexBytes())
+			&& left.hasSameIndexPayload(right)
 			&& left.sections().equals(right.sections())
 			&& left.entityIdentity().equals(right.entityIdentity());
 	}
@@ -10308,8 +10316,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (!rustWholeFrame || texture == null) {
 			return;
 		}
-		validateWorldMeshTextureAsset(texture, source == null || source.isBlank() ? "world mesh" : source);
 		synchronized (LOCK) {
+			VulkanicGalBridge.WorldMeshTextureAssetRecord resident = WORLD_MESH_TEXTURES.get(texture.textureId());
+			if (!texture.sameContent(resident)) {
+				validateWorldMeshTextureAsset(texture, source == null || source.isBlank() ? "world mesh" : source);
+			}
 			if (projectedWorldMeshTexturePayloadBytesLocked(List.of(texture)) > MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL) {
 				throw new IllegalStateException("Rust VulkanicGAL world texture payload residency bound exceeded "
 					+ MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL);
@@ -10321,7 +10332,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			auditMessage(
 				"Rust VulkanicGAL world mesh texture registered"
 					+ " texture_id=" + texture.textureId()
-					+ " payload_bytes=" + texture.pngBytes().length
+					+ " payload_bytes=" + texture.pngByteLength()
 					+ " source=" + (source == null || source.isBlank() ? "unknown" : source)
 					+ " route=rust-vulkan-whole-frame"
 			);
@@ -10352,7 +10363,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					+ " mesh_key=" + sortedIndex.meshKey()
 					+ " mesh_generation=" + sortedIndex.meshGeneration()
 					+ " index_generation=" + sortedIndex.indexGeneration()
-					+ " index_bytes=" + sortedIndex.indexBytes().length
+					+ " index_bytes=" + sortedIndex.indexByteLength()
 					+ " route=rust-vulkan-whole-frame"
 			);
 		}
@@ -10364,7 +10375,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (sortedIndex == null) {
 				return null;
 			}
-			byte[] indexBytes = sortedIndex.indexBytes().clone();
+			byte[] indexBytes = sortedIndex.indexBytes();
 			return new StaticTerrainSortedIndexSnapshot(
 				sortedIndex.meshKey(),
 				sortedIndex.meshGeneration(),
@@ -10565,7 +10576,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (mesh == null) {
 				continue;
 			}
-			lastWorldMeshAssetPayloadBytes += mesh.indexBytes().length;
+			lastWorldMeshAssetPayloadBytes += mesh.indexByteLength();
 			lastWorldMeshAssetPayloadBytes += (long)mesh.vertices().size() * VulkanicGalBridge.Struct.WORLD_MESH_VERTEX.byteSize();
 		}
 		for (long meshKey : DIRTY_WORLD_MESH_SORTED_INDICES) {
@@ -10573,14 +10584,14 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (sortedIndex == null) {
 				continue;
 			}
-			lastWorldMeshAssetPayloadBytes += sortedIndex.indexBytes().length;
+			lastWorldMeshAssetPayloadBytes += sortedIndex.indexByteLength();
 		}
 		for (int textureId : DIRTY_WORLD_MESH_TEXTURES) {
 			VulkanicGalBridge.WorldMeshTextureAssetRecord texture = WORLD_MESH_TEXTURES.get(textureId);
 			if (texture == null) {
 				continue;
 			}
-			lastWorldMeshAssetPayloadBytes += texture.pngBytes().length;
+			lastWorldMeshAssetPayloadBytes += texture.pngByteLength();
 		}
 	}
 
@@ -10677,7 +10688,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	private static long worldMeshAssetPayloadBytes(VulkanicGalBridge.WorldMeshAssetRecord mesh) {
-		return mesh.indexBytes().length + (long)mesh.vertices().size() * VulkanicGalBridge.Struct.WORLD_MESH_VERTEX.byteSize();
+		return mesh.indexByteLength() + (long)mesh.vertices().size() * VulkanicGalBridge.Struct.WORLD_MESH_VERTEX.byteSize();
 	}
 
 	private static long worldMeshAssetPayloadBytes(
@@ -10690,10 +10701,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			bytes += worldMeshAssetPayloadBytes(mesh);
 		}
 		for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : textures) {
-			bytes += texture.pngBytes().length;
+			bytes += texture.pngByteLength();
 		}
 		for (VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex : sortedIndices) {
-			bytes += sortedIndex.indexBytes().length;
+			bytes += sortedIndex.indexByteLength();
 		}
 		return bytes;
 	}
@@ -12807,7 +12818,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			asset.vertexLayoutVersion(),
 			asset.indexType(),
 			asset.vertices().size(),
-			asset.indexBytes().length,
+			asset.indexByteLength(),
 			sectionCount,
 			textureIds,
 			materialMode,
@@ -12865,7 +12876,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			asset.vertexLayoutVersion(),
 			asset.indexType(),
 			asset.vertices().size(),
-			asset.indexBytes().length,
+			asset.indexByteLength(),
 			asset.sections().size(),
 			materialMode,
 			packedLight,
@@ -12943,7 +12954,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		ITEM_ENTITY_DIAGNOSTICS.add(new ItemEntityDiagnostic(
 			DeterministicCameraCapture.currentRenderedFrameIndex(), route, producer, semanticIdentity, entityId, itemFrameRotation,
 			itemFrameInvisible, itemFrameContentOffset, materialIdentity, meshKey, meshGeneration,
-			asset.vertexLayoutVersion(), asset.indexType(), asset.vertices().size(), asset.indexBytes().length,
+			asset.vertexLayoutVersion(), asset.indexType(), asset.vertices().size(), asset.indexByteLength(),
 			asset.sections().size(), packedLight, viewportWidth, viewportHeight,
 			projectedBounds.valid(), projectedBounds.left(), projectedBounds.top(), projectedBounds.right(), projectedBounds.bottom()
 		));
@@ -13123,7 +13134,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			asset.vertexLayoutVersion(),
 			asset.indexType(),
 			asset.vertices().size(),
-			asset.indexBytes().length,
+			asset.indexByteLength(),
 			asset.sections().size(),
 			uniformMeshSectionCullPolicy(asset.sections()),
 			viewportWidth,
@@ -13318,7 +13329,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			asset.vertexLayoutVersion(),
 			asset.indexType(),
 			asset.vertices().size(),
-			asset.indexBytes().length,
+			asset.indexByteLength(),
 			asset.sections().size(),
 			textureIds,
 			materialMode,

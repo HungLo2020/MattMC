@@ -2582,7 +2582,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				MemorySegment item = Abi.item(textureArray, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD, i);
 				item.set(ValueLayout.JAVA_INT, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.offset(0), Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.byteSize());
 				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 1, texture.textureId());
-				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD, 2, texture.pngBytes());
+				// The record already owns an immutable defensive copy. The confined
+				// FFI arena copies it synchronously, so cloning it once more here only
+				// doubles transient allocation at the publication boundary.
+				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD, 2, texture.pngBytes);
 				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 3, texture.frameWidth());
 				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 4, texture.frameHeight());
 				Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD.setInt(item, 5, texture.frameCount());
@@ -2601,7 +2604,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					Struct.WORLD_MESH_ANIMATION_FRAME_RECORD.setInt(frameItem, 3, 0);
 				}
 				Abi.writeSlice(item, Struct.WORLD_MESH_TEXTURE_ASSET_PAYLOAD, 11, animationFrameArray, texture.animationFrames().size());
-				List<byte[]> mipPngBytes = texture.mipPngBytes();
+				List<byte[]> mipPngBytes = texture.mipPngBytes;
 				MemorySegment mipPngArray = Struct.BYTES.array(updateArena, mipPngBytes.size());
 				for (int mipIndex = 0; mipIndex < mipPngBytes.size(); mipIndex++) {
 					Abi.writeBytes(updateArena, Abi.item(mipPngArray, Struct.BYTES, mipIndex), Struct.BYTES, 0, mipPngBytes.get(mipIndex));
@@ -2642,7 +2645,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					Struct.WORLD_MESH_VERTEX.setInt(vertexItem, 14, vertex.midBlockPacked());
 				}
 				Abi.writeSlice(item, Struct.WORLD_MESH_ASSET_RECORD, 6, vertexArray, mesh.vertices().size());
-				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_ASSET_RECORD, 7, mesh.indexBytes());
+				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_ASSET_RECORD, 7, mesh.indexBytes);
 				MemorySegment sectionArray = Struct.WORLD_MESH_SECTION_RECORD.array(updateArena, mesh.sections().size());
 				for (int sectionIndex = 0; sectionIndex < mesh.sections().size(); sectionIndex++) {
 					WorldMeshSectionRecord section = mesh.sections().get(sectionIndex);
@@ -2669,7 +2672,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				Struct.WORLD_MESH_SORTED_INDEX_RECORD.setLong(item, 3, sortedIndex.meshKey());
 				Struct.WORLD_MESH_SORTED_INDEX_RECORD.setLong(item, 4, sortedIndex.meshGeneration());
 				Struct.WORLD_MESH_SORTED_INDEX_RECORD.setLong(item, 5, sortedIndex.indexGeneration());
-				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_SORTED_INDEX_RECORD, 6, sortedIndex.indexBytes());
+				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_SORTED_INDEX_RECORD, 6, sortedIndex.indexBytes);
 			}
 			MemorySegment retirementArray = Struct.WORLD_MESH_ASSET_RETIREMENT_RECORD.array(updateArena, retirements.size());
 			for (int i = 0; i < retirements.size(); i++) {
@@ -3343,6 +3346,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return mipPngBytes.stream().map(byte[]::clone).toList();
 		}
 
+		public int pngByteLength() {
+			return pngBytes.length;
+		}
+
 		/** Content identity of the complete semantic texture, not just mip zero. */
 		public boolean sameContent(WorldMeshTextureAssetRecord other) {
 			if (other == null || textureId != other.textureId
@@ -3390,6 +3397,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		@Override
 		public byte[] indexBytes() {
 			return indexBytes.clone();
+		}
+
+		public int indexByteLength() {
+			return indexBytes.length;
 		}
 	}
 
@@ -3529,6 +3540,27 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		@Override
 		public byte[] indexBytes() {
 			return indexBytes.clone();
+		}
+
+		public int indexByteLength() {
+			return indexBytes.length;
+		}
+
+		public boolean indicesFitVertexCount(int vertexCount) {
+			int stride = indexType == INDEX_U16 ? Short.BYTES : indexType == INDEX_U32 ? Integer.BYTES : 0;
+			if (stride == 0 || indexBytes.length % stride != 0) return false;
+			for (int offset = 0; offset < indexBytes.length; offset += stride) {
+				long vertexIndex = stride == Short.BYTES
+					? (indexBytes[offset] & 0xffL) | ((indexBytes[offset + 1] & 0xffL) << 8)
+					: (indexBytes[offset] & 0xffL) | ((indexBytes[offset + 1] & 0xffL) << 8)
+						| ((indexBytes[offset + 2] & 0xffL) << 16) | ((indexBytes[offset + 3] & 0xffL) << 24);
+				if (vertexIndex >= vertexCount) return false;
+			}
+			return true;
+		}
+
+		public boolean hasSameIndexPayload(WorldMeshAssetRecord other) {
+			return other != null && java.util.Arrays.equals(indexBytes, other.indexBytes);
 		}
 	}
 

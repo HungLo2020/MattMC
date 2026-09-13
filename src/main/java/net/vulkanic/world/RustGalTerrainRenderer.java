@@ -131,6 +131,7 @@ public final class RustGalTerrainRenderer {
 	private static final AtomicLong failedLayerSubmissions = new AtomicLong();
 	private static final AtomicLong lastVisibleSubmissionFrameId = new AtomicLong(-1L);
 	private static final AtomicLong currentFrameVisibleLayerSubmissions = new AtomicLong();
+	private static final AtomicLong currentFrameVisibleFingerprint = new AtomicLong();
 	private static final AtomicLong lastExecutedStaticTerrainFrameId = new AtomicLong(-1L);
 	private static final AtomicLong lastExecutedStaticTerrainSubmissionId = new AtomicLong(-1L);
 	private static final AtomicLong lastExecutedStaticTerrainInstances = new AtomicLong();
@@ -1004,11 +1005,13 @@ public final class RustGalTerrainRenderer {
 			long currentFrameId = currentGameplayFrameId();
 			long currentVisibleSubmissions =
 				lastVisibleSubmissionFrameId.get() == currentFrameId ? currentFrameVisibleLayerSubmissions.get() : 0L;
+			long visibleFingerprint = currentVisibleSubmissions > 0L ? currentFrameVisibleFingerprint.get() : 0L;
 			return new TerrainDiagnostics(
 				SECTION_ASSETS.size(),
 				SECTION_ASSETS.size(),
 				SECTION_ASSETS.size(),
 				currentVisibleSubmissions,
+				visibleFingerprint,
 				atlasGeneration,
 				registeredAtlasGeneration,
 				activeTerrainVertexStride(),
@@ -2972,7 +2975,8 @@ public final class RustGalTerrainRenderer {
 						sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
 				}
 			}
-			recordCurrentFrameVisibleSubmission(enqueueFrameId);
+			recordCurrentFrameVisibleSubmission(enqueueFrameId, section.getPosition().asLong(), layer,
+				asset.meshKey(), visibleGeneration);
 			recordVisibleSubmissionIdentity(section.getPosition().asLong(), layer, visibleGeneration);
 			if (layer == ChunkSectionLayer.TRANSLUCENT) {
 				retainTranslucentExecutionMetadata(asset.meshKey(), new TranslucentExecutionMetadata(
@@ -3143,7 +3147,8 @@ public final class RustGalTerrainRenderer {
 		);
 		if (submitted) {
 			visibleLayerSubmissions.incrementAndGet();
-			recordCurrentFrameVisibleSubmission(enqueueFrameId);
+			recordCurrentFrameVisibleSubmission(enqueueFrameId, lastWorldUnloadSectionPos,
+				lastWorldUnloadLayer, stale.meshKey(), stale.meshGeneration());
 			recordEvent(
 				lastWorldUnloadSectionPos,
 				lastWorldUnloadLayer,
@@ -3190,7 +3195,8 @@ public final class RustGalTerrainRenderer {
 		return false;
 	}
 
-	private static void recordCurrentFrameVisibleSubmission(long fallbackFrameId) {
+	private static void recordCurrentFrameVisibleSubmission(long fallbackFrameId, long sectionPos,
+		ChunkSectionLayer layer, long meshKey, long meshGeneration) {
 		long frameId = currentGameplayFrameId();
 		if (frameId <= 0L) {
 			frameId = fallbackFrameId;
@@ -3200,7 +3206,22 @@ public final class RustGalTerrainRenderer {
 			currentFrameVisibleLayerSubmissions.incrementAndGet();
 		} else {
 			currentFrameVisibleLayerSubmissions.set(1L);
+			currentFrameVisibleFingerprint.set(0xcbf29ce484222325L);
 		}
+		long fingerprint = currentFrameVisibleFingerprint.get();
+		fingerprint = terrainFingerprintLong(fingerprint, sectionPos);
+		fingerprint = terrainFingerprintLong(fingerprint, meshKey);
+		fingerprint = terrainFingerprintLong(fingerprint, meshGeneration);
+		fingerprint = terrainFingerprintLong(fingerprint, layer.ordinal());
+		currentFrameVisibleFingerprint.set(fingerprint);
+	}
+
+	private static long terrainFingerprintLong(long hash, long value) {
+		for (int shift = 0; shift < 64; shift += 8) {
+			hash ^= (value >>> shift) & 0xffL;
+			hash *= 0x100000001b3L;
+		}
+		return hash;
 	}
 
 	private static boolean finiteBounds(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
@@ -4581,6 +4602,7 @@ public final class RustGalTerrainRenderer {
 		int activeTerrainLayers,
 		int activeSectionAssets,
 		long currentFrameVisibleLayerSubmissions,
+		long currentFrameVisibleFingerprint,
 		long atlasGeneration,
 		long registeredAtlasGeneration,
 		int activeNativeVertexStride,

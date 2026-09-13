@@ -910,36 +910,11 @@ public final class GraphicsFrameBenchmark {
 		return new TerrainPerfSnapshot(
 			diagnostics,
 			meshMetrics,
-			latestVisibleFingerprint(diagnostics.recentEvents()),
+			diagnostics.currentFrameVisibleFingerprint(),
 			loadedChunks,
 			renderDistance,
 			cameraSignature
 		);
-	}
-
-	private static long latestVisibleFingerprint(List<RustGalTerrainRenderer.TerrainDiagnosticEvent> events) {
-		long latestFrame = Long.MIN_VALUE;
-		for (RustGalTerrainRenderer.TerrainDiagnosticEvent event : events) {
-			if ("visible-submit".equals(event.reason())) {
-				latestFrame = Math.max(latestFrame, event.gameplayFrameId());
-			}
-		}
-		if (latestFrame == Long.MIN_VALUE) {
-			return 0L;
-		}
-		long hash = 0xcbf29ce484222325L;
-		int count = 0;
-		for (RustGalTerrainRenderer.TerrainDiagnosticEvent event : events) {
-			if ("visible-submit".equals(event.reason()) && event.gameplayFrameId() == latestFrame) {
-				hash = fnv64Long(hash, event.sectionPos());
-				hash = fnv64Long(hash, event.meshKey());
-				hash = fnv64Long(hash, event.meshGeneration());
-				hash = fnv64Long(hash, event.contentHash());
-				hash = fnv64String(hash, event.layer());
-				count++;
-			}
-		}
-		return count == 0 ? 0L : fnv64Long(hash, count);
 	}
 
 	private static void updateStaticTerrainLoadMarkers(TerrainPerfSnapshot snapshot) {
@@ -1017,25 +992,6 @@ public final class GraphicsFrameBenchmark {
 				.append(":content=").append(event.contentHash());
 		}
 		return builder.toString();
-	}
-
-	private static long fnv64String(long hash, String value) {
-		if (value == null) {
-			return fnv64Long(hash, 0L);
-		}
-		for (int i = 0; i < value.length(); i++) {
-			hash ^= value.charAt(i);
-			hash *= 0x100000001b3L;
-		}
-		return hash;
-	}
-
-	private static long fnv64Long(long hash, long value) {
-		for (int shift = 0; shift < 64; shift += 8) {
-			hash ^= (value >>> shift) & 0xffL;
-			hash *= 0x100000001b3L;
-		}
-		return hash;
 	}
 
 	private static boolean scenarioRequiresProducerTraversal(String scenario) {
@@ -2806,12 +2762,15 @@ public final class GraphicsFrameBenchmark {
 		boolean mutationCountersNonZero() {
 			return this.acceptedBuildOutputs() > 0L
 				|| this.registeredMeshes() > 0L
-				|| this.meshMetrics.generation() > 0L
-				|| this.meshMetrics.payloadCount() > 0L
 				|| this.visibleFingerprint != 0L;
 		}
 
 		boolean quiescenceKeyEquals(TerrainPerfSnapshot other) {
+			// This benchmark measures a quiescent static-terrain cache while the
+			// rest of the world continues normally. Global mesh generations and
+			// cache sizes include posed entities and other dynamic producers, so
+			// they cannot define terrain stability. Queue cleanliness below still
+			// proves that all work admitted before this snapshot was uploaded.
 			return other != null
 				&& this.acceptedBuildOutputs() == other.acceptedBuildOutputs()
 				&& this.registeredMeshes() == other.registeredMeshes()
@@ -2826,13 +2785,7 @@ public final class GraphicsFrameBenchmark {
 				&& this.cachedLayerAssets() == other.cachedLayerAssets()
 				&& this.activeTerrainLayers() == other.activeTerrainLayers()
 				&& this.activeSectionAssets() == other.activeSectionAssets()
-				&& this.meshMetrics.generation() == other.meshMetrics.generation()
-				&& this.meshMetrics.uploadedGeneration() == other.meshMetrics.uploadedGeneration()
-				&& this.meshMetrics.payloadCount() == other.meshMetrics.payloadCount()
-				&& this.meshMetrics.payloadBytes() == other.meshMetrics.payloadBytes()
 				&& this.meshMetrics.failures() == other.meshMetrics.failures()
-				&& this.meshMetrics.cachedMeshes() == other.meshMetrics.cachedMeshes()
-				&& this.meshMetrics.cachedTextures() == other.meshMetrics.cachedTextures()
 				&& this.meshMetrics.dirtyMeshes() == other.meshMetrics.dirtyMeshes()
 				&& this.meshMetrics.dirtyTextures() == other.meshMetrics.dirtyTextures()
 				&& this.meshMetrics.pendingInstances() == other.meshMetrics.pendingInstances()
@@ -2860,13 +2813,7 @@ public final class GraphicsFrameBenchmark {
 			appendChange(builder, "cachedLayerAssets", other.cachedLayerAssets(), this.cachedLayerAssets());
 			appendChange(builder, "activeTerrainLayers", other.activeTerrainLayers(), this.activeTerrainLayers());
 			appendChange(builder, "activeSectionAssets", other.activeSectionAssets(), this.activeSectionAssets());
-			appendChange(builder, "worldMeshGeneration", other.meshMetrics.generation(), this.meshMetrics.generation());
-			appendChange(builder, "worldMeshUploadedGeneration", other.meshMetrics.uploadedGeneration(), this.meshMetrics.uploadedGeneration());
-			appendChange(builder, "payloadCount", other.meshMetrics.payloadCount(), this.meshMetrics.payloadCount());
-			appendChange(builder, "payloadBytes", other.meshMetrics.payloadBytes(), this.meshMetrics.payloadBytes());
 			appendChange(builder, "meshFailures", other.meshMetrics.failures(), this.meshMetrics.failures());
-			appendChange(builder, "cachedMeshes", other.meshMetrics.cachedMeshes(), this.meshMetrics.cachedMeshes());
-			appendChange(builder, "cachedTextures", other.meshMetrics.cachedTextures(), this.meshMetrics.cachedTextures());
 			appendChange(builder, "dirtyMeshes", other.meshMetrics.dirtyMeshes(), this.meshMetrics.dirtyMeshes());
 			appendChange(builder, "dirtyTextures", other.meshMetrics.dirtyTextures(), this.meshMetrics.dirtyTextures());
 			appendChange(builder, "pendingInstances", other.meshMetrics.pendingInstances(), this.meshMetrics.pendingInstances());

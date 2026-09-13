@@ -717,6 +717,22 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             meta.write_text("deterministic_metadata=../outside.json\n", encoding="utf-8")
             self.assertIsNone(harness.load_capture_files(root)["deterministic"])
 
+    def test_capture_files_use_declared_benchmark_status_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            frame = root / "graphics_frame_benchmark_harness-clock.json"
+            subsystem = root / "graphics_subsystem_benchmark_harness-clock.json"
+            frame.write_text("{}", encoding="utf-8")
+            subsystem.write_text("{}", encoding="utf-8")
+            (root / "meta_run-id.txt").write_text(
+                f"graphics_frame_benchmark_status={frame}\n"
+                f"graphics_subsystem_status={subsystem}\n",
+                encoding="utf-8",
+            )
+            files = harness.load_capture_files(root)
+            self.assertEqual(frame, files["frame_benchmark"])
+            self.assertEqual(subsystem, files["subsystem_benchmark"])
+
     def test_creeper_override_changes_only_resolution_and_rejects_bundled_output(self):
         from PIL import Image
         with tempfile.TemporaryDirectory() as temp:
@@ -24113,6 +24129,7 @@ else:
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.settleFrames=3", java_options)
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.warmupFrames=4", java_options)
             self.assertIn("-Dmattmc.dev.graphicsFrameBenchmark.measureFrames=5", java_options)
+            self.assertEqual("true", env["MATTMC_RUST_VULKAN_GPU_TIMESTAMPS"])
             self.assertTrue(harness.frame_benchmark_requested(args, "capture"))
             self.assertEqual(
                 str(root / "capture" / next(part.split("=", 1)[1] for part in java_options.split() if part.startswith("-Dmattmc.dev.graphicsFrameBenchmark.status="))),
