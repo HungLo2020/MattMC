@@ -733,6 +733,16 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertEqual(frame, files["frame_benchmark"])
             self.assertEqual(subsystem, files["subsystem_benchmark"])
 
+    def test_capture_files_accept_one_run_local_legacy_frozen_benchmark(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "meta_20260913_161805.txt").write_text("", encoding="utf-8")
+            frame = root / "graphics_frame_benchmark_20260913-161805.json"
+            frame.write_text("{}", encoding="utf-8")
+            self.assertEqual(frame, harness.load_capture_files(root)["frame_benchmark"])
+            (root / "graphics_frame_benchmark_other.json").write_text("{}", encoding="utf-8")
+            self.assertIsNone(harness.load_capture_files(root)["frame_benchmark"])
+
     def test_creeper_override_changes_only_resolution_and_rejects_bundled_output(self):
         from PIL import Image
         with tempfile.TemporaryDirectory() as temp:

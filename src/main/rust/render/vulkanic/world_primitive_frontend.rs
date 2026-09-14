@@ -82,7 +82,7 @@ use super::shader_pack::runtime::{
     DistantHorizonsTranslucentSourceCandidate, EntitySourceDraw, ShaderPackRuntimeExecutor,
     ShaderPackSourceColorFrameTransaction, TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES,
     TerrainCompositeUniforms, TerrainDepthHistoryPlan, TerrainDepthHistoryTargets,
-    TerrainForwardMaterialDraw, TerrainMaterialPassMode, TerrainMeshDraw, TerrainRuntimeFrame,
+    TerrainForwardMaterialDraw, TerrainIndexedIndirect, TerrainMaterialPassMode, TerrainMeshDraw, TerrainRuntimeFrame,
     TerrainRuntimeTargets, TerrainTranslucentCaptureTargets, TerrainShaderResourceSet, TerrainShadowDraw, TerrainShadowParticipation,
     TerrainSourceColorPassPhase, TerrainSourceColorPassTargets, TerrainSourceMainDepthInput,
     TerrainSourceMaterialTextureInput, TerrainSourceProgramCandidate,
@@ -484,7 +484,12 @@ const WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES: u64 = WORLD_MESH_INSTANCE_
 /// buffers.  This bounds native buffer-object churn without asking a backend
 /// to infer ownership or reconstruct a hidden mesh heap.
 const WORLD_MESH_GEOMETRY_PAGE_BYTES: u64 = 16 * 1024 * 1024;
-const WORLD_MESH_GEOMETRY_ALIGNMENT: u64 = 256;
+// Page-relative indexed draws address vertices in whole records while storage
+// descriptors retain Vulkan's 256-byte dynamic-offset compatibility. 1280 is
+// the least common multiple of those two requirements (80-byte vertices and
+// 256-byte descriptor alignment).
+const WORLD_MESH_GEOMETRY_ALIGNMENT: u64 = 1_280;
+const WORLD_MESH_INDEXED_INDIRECT_COMMAND_BYTES: u64 = 20;
 const SOURCE_TERRAIN_FRAME_STREAM_SLOT_COUNT: usize = 3;
 const SOURCE_TERRAIN_FRAME_STREAM_MIN_BYTES: u64 = 64 * 1024;
 /// Hard cap for one completion-gated lowered-source frame stream.  A source
@@ -3280,6 +3285,16 @@ struct MeshResources {
     resource_set: Handle,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct MeshPageResourceSetKey {
+    resource_layout: Handle,
+    vertex_buffer: Handle,
+    instance_buffer: Handle,
+    texture_view: Handle,
+    sampler: Handle,
+    observation_buffer: Option<Handle>,
+}
+
 struct MeshGeometryResources {
     vertex_buffer: Handle,
     vertex_offset: u64,
@@ -3546,6 +3561,13 @@ struct MeshInstanceStreamBinding {
     buffer: Handle,
     capacity: u64,
     grew: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MeshIndirectStreamSlot {
+    buffer: Handle,
+    capacity: u64,
+    initialized: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -4752,6 +4774,13 @@ impl MeshResources {
 }
 
 impl MeshGeometryArena {
+    fn vertex_page_capacity(&self, buffer: Handle) -> Option<u64> {
+        self.vertex_pages
+            .iter()
+            .find(|page| page.buffer == buffer)
+            .map(|page| page.capacity)
+    }
+
     fn reclaim_completed(&mut self, gal: &mut VulkanicGal) {
         let completed = gal.poll_completed();
         let mut retained = Vec::new();
@@ -4823,7 +4852,7 @@ impl MeshGeometryArena {
         usage: BufferUsage,
         kind: &str,
     ) -> GalResult<(Handle, u64)> {
-        let bytes = align_up_u64(bytes, WORLD_MESH_GEOMETRY_ALIGNMENT)?;
+        let bytes = align_up_multiple_u64(bytes, WORLD_MESH_GEOMETRY_ALIGNMENT)?;
         if bytes == 0 {
             return Err(GalError::invalid_argument(
                 "world mesh geometry range cannot be empty",
@@ -4880,7 +4909,7 @@ impl MeshGeometryArena {
         let Some(page) = pages.iter_mut().find(|page| page.buffer == buffer) else {
             return;
         };
-        let bytes = align_up_u64(bytes, WORLD_MESH_GEOMETRY_ALIGNMENT)
+        let bytes = align_up_multiple_u64(bytes, WORLD_MESH_GEOMETRY_ALIGNMENT)
             .expect("geometry range was validated on allocation");
         debug_assert!(
             offset
@@ -5254,6 +5283,10 @@ pub struct WorldPrimitiveFrontend {
     // retain insertion order nowhere in this cache, so hash lookup avoids a
     // logarithmic tree walk during streamed-terrain preparation.
     mesh_resources: HashMap<MeshResourceKey, MeshResources>,
+    /// Shared page-wide bindings used only by the builtin indexed route. The
+    /// legacy per-section sets remain available to source, foil, layered and
+    /// diagnostic paths whose addressing contracts differ.
+    mesh_page_resource_sets: HashMap<MeshPageResourceSetKey, Handle>,
     source_mesh_resources: BTreeMap<SourceMeshResourceKey, SourceMeshResources>,
     /// Replaced streamed resources remain live until the next explicit frame
     /// submission has validated all semantic batches that may still reference
@@ -5321,6 +5354,7 @@ pub struct WorldPrimitiveFrontend {
         LoweredTexturedMaterialSourceLocalTextureResources,
     >,
     mesh_instance_stream_slots: Vec<MeshInstanceStreamSlot>,
+    mesh_indirect_stream: Option<MeshIndirectStreamSlot>,
     world_text: world_text::WorldTextFrontend,
     source_terrain_frame_stream_slots: Vec<SourceTerrainFrameStreamSlot>,
     /// Asset-generation uploads discovered while preparing a private lowered
@@ -11044,6 +11078,9 @@ impl WorldPrimitiveFrontend {
             self.discard_all_unsubmitted_source_terrain_frames(gal);
             self.discard_unsubmitted_source_material_textures(gal, &replaced_texture_ids);
         }
+        if !stale_resource_keys.is_empty() || !replaced_texture_ids.is_empty() {
+            self.destroy_mesh_page_resource_sets(gal);
+        }
         self.destroy_mesh_resources_for_keys(gal, stale_resource_keys);
         self.destroy_lowered_source_terrain_resources_for_keys(gal, stale_lowered_source_keys);
         self.destroy_material_resources_for_texture_ids(gal, &replaced_texture_ids);
@@ -11106,7 +11143,11 @@ impl WorldPrimitiveFrontend {
             let _ = gal.destroy(handle);
         }
         let submission = gal.latest_submission_id();
-        for resources in std::mem::take(&mut self.deferred_mesh_geometry_range_releases) {
+        let deferred_ranges = std::mem::take(&mut self.deferred_mesh_geometry_range_releases);
+        if !deferred_ranges.is_empty() {
+            self.destroy_mesh_page_resource_sets(gal);
+        }
+        for resources in deferred_ranges {
             gal.unwatch_buffer_upload_for_capture(resources.vertex_buffer,resources.vertex_offset,resources.vertex_range as usize);
             gal.unwatch_buffer_upload_for_capture(resources.index_buffer,resources.index_offset,resources.index_range as usize);
             self.mesh_geometry_arena
@@ -14487,6 +14528,7 @@ impl WorldPrimitiveFrontend {
                     index_type: IndexType::U32,
                     index_count: section.index_count,
                     instance_count,
+                    indexed_indirect: None,
                     // This draw is the source-derived replacement for the
                     // vanilla terrain section.  Keep its semantic stratum as
                     // terrain so the explicit pass graph writes the main
@@ -24404,6 +24446,7 @@ impl WorldPrimitiveFrontend {
                 CommandOp::Draw { .. }
                     | CommandOp::DrawIndexed { .. }
                     | CommandOp::DrawIndirect { .. }
+                    | CommandOp::DrawIndexedIndirect { .. }
             );
 			// Once a draw has completed, the pass can safely continue in a new
 			// list before the next state change. Waiting for the next draw can
@@ -25660,6 +25703,7 @@ impl WorldPrimitiveFrontend {
                 CommandOp::Draw { .. }
                     | CommandOp::DrawIndexed { .. }
                     | CommandOp::DrawIndirect { .. }
+                    | CommandOp::DrawIndexedIndirect { .. }
             )
         });
         if has_render_pass && !has_draw {
@@ -26073,6 +26117,7 @@ impl WorldPrimitiveFrontend {
                 index_type: prepared.index_type,
                 index_count: prepared.index_count,
                 instance_count: 1,
+                indexed_indirect: None,
                 stratum: WORLD_STRATUM_TERRAIN,
                 material_mode: TerrainMaterialPassMode::Opaque,
                 shadow_participation: TerrainShadowParticipation::Unavailable,
@@ -26114,6 +26159,7 @@ impl WorldPrimitiveFrontend {
                     index_type: prepared.index_type,
                     index_count: prepared.index_count,
                     instance_count: 1,
+                    indexed_indirect: None,
                     stratum: WORLD_STRATUM_TERRAIN,
                     material_mode: TerrainMaterialPassMode::Opaque,
                     shadow_participation: TerrainShadowParticipation::Unavailable,
@@ -26139,6 +26185,7 @@ impl WorldPrimitiveFrontend {
                 index_type: prepared.index_type,
                 index_count: prepared.index_count,
                 instance_count: 1,
+                indexed_indirect: None,
                 stratum: WORLD_STRATUM_TERRAIN,
                 material_mode: TerrainMaterialPassMode::Translucent,
                 shadow_participation: TerrainShadowParticipation::Unavailable,
@@ -26163,6 +26210,7 @@ impl WorldPrimitiveFrontend {
                 index_type: prepared.index_type,
                 index_count: prepared.index_count,
                 instance_count: 1,
+                indexed_indirect: None,
                 stratum: WORLD_STRATUM_TERRAIN,
                 material_mode: TerrainMaterialPassMode::Translucent,
                 shadow_participation: TerrainShadowParticipation::Unavailable,
@@ -27502,18 +27550,19 @@ impl WorldPrimitiveFrontend {
                 (Vec::new(), None)
             } else {
                 let mesh_pack_started = std::time::Instant::now();
-                let (mesh_stream_payload, mesh_stream_offsets) = packed_mesh_uniforms_for_batches(
+                let packed_stream = packed_mesh_draw_stream(
                     &frame,
                     self,
                     &mesh_batches,
                     stats.profile.world_prepare_mesh_stream_required_bytes,
+                    use_g_buffer_mesh_path && source_terrain_programs.is_none(),
                 )?;
                 stats.profile.world_mesh_stream_payload_pack_nanos =
                     elapsed_nanos_u64(mesh_pack_started);
-                stats.profile.world_mesh_stream_payload_bytes = mesh_stream_payload.len() as u64;
-                stats.profile.world_mesh_dynamic_offset_count = mesh_stream_offsets.len() as u64;
+                stats.profile.world_mesh_stream_payload_bytes = packed_stream.payload.len() as u64;
+                stats.profile.world_mesh_dynamic_offset_count = packed_stream.dynamic_offsets.len() as u64;
                 let mesh_stream_binding =
-                    self.ensure_mesh_instance_stream(gal, mesh_stream_payload.len() as u64)?;
+                    self.ensure_mesh_instance_stream(gal, packed_stream.payload.len() as u64)?;
                 ops.push(CommandOp::Barrier(buffer_barrier(
                     mesh_stream_binding.buffer,
                     TextureUsageState::ShaderRead,
@@ -27522,13 +27571,29 @@ impl WorldPrimitiveFrontend {
                 ops.push(CommandOp::HostWriteBuffer {
                     buffer: mesh_stream_binding.buffer,
                     offset: 0,
-                    data: mesh_stream_payload,
+                    data: packed_stream.payload,
                 });
                 ops.push(CommandOp::Barrier(buffer_barrier(
                     mesh_stream_binding.buffer,
                     TextureUsageState::TransferDst,
                     TextureUsageState::ShaderRead,
                 )));
+                let indirect_draw_count = if source_terrain_programs.is_none() {
+                    packed_stream.first_instances.iter().filter(|value| value.is_some()).count()
+                } else {
+                    0
+                };
+                let indirect_stream = if indirect_draw_count == 0 {
+                    None
+                } else {
+                    Some(self.ensure_mesh_indirect_stream(
+                        gal,
+                        indirect_draw_count as u64 * WORLD_MESH_INDEXED_INDIRECT_COMMAND_BYTES,
+                    )?)
+                };
+                let mut indirect_payload = Vec::with_capacity(
+                    indirect_draw_count * WORLD_MESH_INDEXED_INDIRECT_COMMAND_BYTES as usize,
+                );
                 let mut draws = Vec::new();
                 let mesh_draw_record_started = std::time::Instant::now();
                 for (batch_index, batch) in mesh_batches.iter().enumerate() {
@@ -27545,9 +27610,11 @@ impl WorldPrimitiveFrontend {
                         .ok_or_else(|| {
                             GalError::backend("world mesh index buffer vanished before submit")
                         })?;
-                    let asset = self.mesh_assets.get(&batch.key.mesh_key).ok_or_else(|| {
+                    let index_type = self.mesh_assets.get(&batch.key.mesh_key).ok_or_else(|| {
                         GalError::backend("world mesh asset vanished before submit")
-                    })?;
+                    })?.index_type;
+                    let use_indirect = source_terrain_programs.is_none()
+                        && packed_stream.first_instances[batch_index].is_some();
                     let (
                         shadow_pipeline,
                         pipeline,
@@ -27580,35 +27647,106 @@ impl WorldPrimitiveFrontend {
                             builtin_terrain_lightmap_resource_set,
                         )
                     };
+                    let (resource_set, dynamic_offsets, draw_index_offset, indexed_indirect) =
+                        if use_indirect {
+                            let page_set = self.ensure_mesh_page_resource_set(
+                                gal,
+                                batch.key,
+                                mesh_stream_binding,
+                            )?;
+                            let index_size = match index_type { IndexType::U16 => 2u64, IndexType::U32 => 4u64 };
+                            let absolute_index_offset = geometry_index_offset
+                                .checked_add(batch.index_offset)
+                                .ok_or_else(|| GalError::invalid_argument("world mesh index offset overflow"))?;
+                            if absolute_index_offset % index_size != 0
+                                || vertex_offset % WORLD_MESH_GPU_VERTEX_BYTES as u64 != 0
+                            {
+                                return Err(GalError::invalid_argument(
+                                    "page-addressed mesh geometry is not record aligned",
+                                ));
+                            }
+                            let first_index = u32::try_from(absolute_index_offset / index_size)
+                                .map_err(|_| GalError::invalid_argument("world mesh first index exceeds u32"))?;
+                            let vertex_offset_records = i32::try_from(
+                                vertex_offset / WORLD_MESH_GPU_VERTEX_BYTES as u64,
+                            ).map_err(|_| GalError::invalid_argument("world mesh vertex offset exceeds i32"))?;
+                            let command_offset = indirect_payload.len() as u64;
+                            indirect_payload.extend_from_slice(&batch.index_count.to_le_bytes());
+                            indirect_payload.extend_from_slice(&(batch.count() as u32).to_le_bytes());
+                            indirect_payload.extend_from_slice(&first_index.to_le_bytes());
+                            indirect_payload.extend_from_slice(&vertex_offset_records.to_le_bytes());
+                            indirect_payload.extend_from_slice(
+                                &packed_stream.first_instances[batch_index]
+                                    .expect("indirect batch has first instance")
+                                    .to_le_bytes(),
+                            );
+                            (
+                                page_set,
+                                vec![0, 0],
+                                0,
+                                indirect_stream.map(|stream| TerrainIndexedIndirect {
+                                    buffer: stream.buffer,
+                                    offset: command_offset,
+                                }),
+                            )
+                        } else {
+                            (
+                                resource_set,
+                                mesh_stream_dynamic_offsets(
+                                    batch,
+                                    vertex_offset,
+                                    packed_stream.dynamic_offsets[batch_index],
+                                )?,
+                                geometry_index_offset.checked_add(batch.index_offset).ok_or_else(|| {
+                                    GalError::invalid_argument("world mesh index offset overflow")
+                                })?,
+                                None,
+                            )
+                        };
                     draws.push(TerrainMeshDraw {
                         shadow: shadow_pipeline.map(|pipeline| TerrainShadowDraw {
                             pipeline,
                             pipeline_layout,
                             resource_set,
-                            resource_set_dynamic_offsets: vec![
-                                vertex_offset,
-                                mesh_stream_offsets[batch_index],
-                            ],
+                            resource_set_dynamic_offsets: dynamic_offsets.clone(),
                             shader_resource_set,
                         }),
                         pipeline,
                         pipeline_layout,
                         resource_set,
-                        resource_set_dynamic_offsets: mesh_stream_dynamic_offsets(batch, vertex_offset, mesh_stream_offsets[batch_index])?,
+                        resource_set_dynamic_offsets: dynamic_offsets,
                         shader_resource_set,
                         index_buffer,
-                        index_offset: geometry_index_offset
-                            .checked_add(batch.index_offset)
-                            .ok_or_else(|| {
-                                GalError::invalid_argument("world mesh index offset overflow")
-                            })?,
-                        index_type: asset.index_type,
+                        index_offset: draw_index_offset,
+                        index_type,
                         index_count: batch.index_count,
                         instance_count: batch.count() as u32,
+                        indexed_indirect,
                         stratum: batch.key.stratum,
                         material_mode: terrain_material_pass_mode(batch.key.material_mode)?,
                         shadow_participation: TerrainShadowParticipation::Required,
                     });
+                }
+                if let Some(stream) = indirect_stream {
+                    debug_assert_eq!(indirect_payload.len(), indirect_draw_count * 20);
+                    ops.push(CommandOp::Barrier(buffer_barrier(
+                        stream.buffer,
+                        if stream.initialized { TextureUsageState::IndirectRead } else { TextureUsageState::Undefined },
+                        TextureUsageState::TransferDst,
+                    )));
+                    ops.push(CommandOp::HostWriteBuffer {
+                        buffer: stream.buffer,
+                        offset: 0,
+                        data: indirect_payload,
+                    });
+                    ops.push(CommandOp::Barrier(buffer_barrier(
+                        stream.buffer,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::IndirectRead,
+                    )));
+                    if let Some(slot) = self.mesh_indirect_stream.as_mut() {
+                        slot.initialized = true;
+                    }
                 }
                 stats.profile.world_mesh_draw_record_nanos =
                     elapsed_nanos_u64(mesh_draw_record_started);
@@ -30214,6 +30352,7 @@ impl WorldPrimitiveFrontend {
                 vertex_buffer,
                 vertex_range,
                 stream_binding.buffer,
+                WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES,
                 texture_view,
                 sampler,
                 key.standard_item_foil,
@@ -30264,6 +30403,9 @@ impl WorldPrimitiveFrontend {
             "world-mesh-geometry-{}-gen{}",
             key.mesh_key, key.mesh_generation
         );
+        // Reclamation may retire an empty page. Page-wide descriptor sets
+        // must be retired first; GAL keeps any in-flight use alive.
+        self.destroy_mesh_page_resource_sets(gal);
         self.mesh_geometry_arena.reclaim_completed(gal);
         let result = (|| -> GalResult<MeshGeometryResources> {
             let vertex_range = vertex_bytes.len() as u64;
@@ -30405,6 +30547,7 @@ impl WorldPrimitiveFrontend {
             vertex_buffer,
             vertex_range,
             stream_binding.buffer,
+            WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES,
             texture_view,
             sampler,
             false,
@@ -30482,12 +30625,98 @@ impl WorldPrimitiveFrontend {
     /// retires old stream buffers through GAL and lets the existing immutable
     /// geometry, material, and pipeline caches rebuild against the replacement.
     fn invalidate_mesh_instance_stream_bindings(&mut self, gal: &mut VulkanicGal) {
+        self.destroy_mesh_page_resource_sets(gal);
         for (_, resources) in std::mem::take(&mut self.mesh_resources) {
             let _ = gal.destroy(resources.resource_set);
         }
         for (_, resources) in std::mem::take(&mut self.source_mesh_resources) {
             let _ = gal.destroy(resources.resource_set);
         }
+    }
+
+    fn destroy_mesh_page_resource_sets(&mut self, gal: &mut VulkanicGal) {
+        for (_, set) in std::mem::take(&mut self.mesh_page_resource_sets) {
+            let _ = gal.destroy(set);
+        }
+    }
+
+    fn ensure_mesh_page_resource_set(
+        &mut self,
+        gal: &mut VulkanicGal,
+        mesh_key: MeshResourceKey,
+        stream: MeshInstanceStreamBinding,
+    ) -> GalResult<Handle> {
+        let vertex_buffer = self.mesh_resources.get(&mesh_key).ok_or_else(|| {
+            GalError::backend("world mesh resources missing before page binding")
+        })?.vertex_buffer;
+        let mut pipeline_key = mesh_pipeline_key(mesh_key)?;
+        pipeline_key.shader_resource_layout = Some(self.ensure_builtin_terrain_lightmap_layout(gal)?);
+        let pipeline = self.mesh_pipeline_resources.get(&pipeline_key).ok_or_else(|| {
+            GalError::backend("world mesh pipeline missing before page binding")
+        })?;
+        if pipeline.vertex_observation.is_some() {
+            return Err(GalError::unsupported_feature(
+                "page-wide indexed draws are disabled while vertex observation is active",
+            ));
+        }
+        let texture = self.mesh_texture_resources.get(&mesh_key.texture_id).ok_or_else(|| {
+            GalError::backend("world mesh texture missing before page binding")
+        })?;
+        let key = MeshPageResourceSetKey {
+            resource_layout: pipeline.resource_layout,
+            vertex_buffer,
+            instance_buffer: stream.buffer,
+            texture_view: texture.view,
+            sampler: texture.sampler,
+            observation_buffer: None,
+        };
+        if let Some(set) = self.mesh_page_resource_sets.get(&key) {
+            return Ok(*set);
+        }
+        let vertex_range = self.mesh_geometry_arena.vertex_page_capacity(vertex_buffer)
+            .ok_or_else(|| GalError::backend("world mesh vertex page vanished before binding"))?;
+        let set = create_mesh_resource_set(
+            gal,
+            "world-mesh.page",
+            key.resource_layout,
+            vertex_buffer,
+            vertex_range,
+            stream.buffer,
+            stream.capacity,
+            key.texture_view,
+            key.sampler,
+            false,
+            None,
+        )?;
+        self.mesh_page_resource_sets.insert(key, set);
+        Ok(set)
+    }
+
+    fn ensure_mesh_indirect_stream(
+        &mut self,
+        gal: &mut VulkanicGal,
+        required_bytes: u64,
+    ) -> GalResult<MeshIndirectStreamSlot> {
+        if let Some(slot) = self.mesh_indirect_stream {
+            if slot.capacity >= required_bytes {
+                return Ok(slot);
+            }
+        }
+        let capacity = align_up_u64(required_bytes.max(4_096), 256)?;
+        let buffer = gal.create_buffer(BufferDesc {
+            label: "world-mesh.indexed-indirect-stream".to_string(),
+            size: capacity,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::Indirect, BufferUsage::HostWrite, BufferUsage::TransferDst],
+        })?;
+        if let Some(previous) = self.mesh_indirect_stream.replace(MeshIndirectStreamSlot {
+            buffer,
+            capacity,
+            initialized: false,
+        }) {
+            let _ = gal.destroy(previous.buffer);
+        }
+        Ok(self.mesh_indirect_stream.expect("installed indirect stream"))
     }
 
     /// Reserves one bounded source-program frame-data range. The allocation is
@@ -32521,6 +32750,7 @@ impl WorldPrimitiveFrontend {
     }
 
     fn destroy_mesh_resources(&mut self, gal: &mut VulkanicGal) {
+        self.destroy_mesh_page_resource_sets(gal);
         self.destroy_lowered_textured_material_source_resources(gal);
         self.destroy_lowered_entity_source_resources(gal);
         self.destroy_lowered_source_terrain_resources(gal);
@@ -32817,8 +33047,12 @@ impl WorldPrimitiveFrontend {
     }
 
     fn destroy_mesh_instance_streams(&mut self, gal: &mut VulkanicGal) {
+        self.destroy_mesh_page_resource_sets(gal);
         let slots = std::mem::take(&mut self.mesh_instance_stream_slots);
         for slot in slots.into_iter().rev() {
+            let _ = gal.destroy(slot.buffer);
+        }
+        if let Some(slot) = self.mesh_indirect_stream.take() {
             let _ = gal.destroy(slot.buffer);
         }
     }
@@ -32839,6 +33073,7 @@ impl WorldPrimitiveFrontend {
     }
 
     fn destroy_mesh_pipeline_resources(&mut self, gal: &mut VulkanicGal) {
+        self.destroy_mesh_page_resource_sets(gal);
         let resources = std::mem::take(&mut self.mesh_pipeline_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
@@ -38163,6 +38398,7 @@ fn create_mesh_resource_set(
     vertex_buffer: Handle,
     vertex_range: u64,
     instance_buffer: Handle,
+    instance_range: u64,
     texture_view: Handle,
     sampler: Handle,
     standard_foil: bool,
@@ -38188,7 +38424,7 @@ fn create_mesh_resource_set(
                 kind: ResourceBindingKind::StorageBuffer,
                 access: AccessFlags::READ,
                 dynamic_offsets: vec![0],
-                buffer_range: Some(WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES),
+                buffer_range: Some(instance_range),
             },
             ResourceBinding {
                 binding: 2,
@@ -38215,7 +38451,7 @@ fn create_mesh_resource_set(
             kind: ResourceBindingKind::StorageBuffer,
             access: AccessFlags::READ,
             dynamic_offsets: vec![0],
-            buffer_range: Some(WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES),
+            buffer_range: Some(instance_range),
         })).chain(observation_buffer.map(vertex_observation::binding)).collect(),
     })
 }
@@ -38911,6 +39147,90 @@ fn packed_mesh_uniforms_for_batches(
     Ok((out, offsets))
 }
 
+struct PackedMeshDrawStream {
+    payload: Vec<u8>,
+    dynamic_offsets: Vec<u64>,
+    first_instances: Vec<Option<u32>>,
+}
+
+fn mesh_batch_supports_page_indirect(batch: &MeshBatch) -> bool {
+    batch.key.stratum == WORLD_STRATUM_TERRAIN
+        && matches!(batch.key.material_mode, WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT)
+        && !batch.key.standard_item_foil
+        && batch.key.view_layering.is_none()
+        && batch.key.decal_vertex_count == 0
+}
+
+/// Packs one common header and a contiguous instance array for ordinary
+/// opaque/cutout terrain. Other semantic routes retain their existing aligned
+/// per-batch ABI, so source shaders, foil, entities and ordered translucency
+/// are unaffected by the page-addressed indirect path.
+fn packed_mesh_draw_stream(
+    frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
+    mesh_batches: &[MeshBatch],
+    capacity_hint: u64,
+    enable_page_indirect: bool,
+) -> GalResult<PackedMeshDrawStream> {
+    let mut payload = Vec::with_capacity(capacity_hint as usize);
+    let mut dynamic_offsets = vec![0; mesh_batches.len()];
+    let mut first_instances = vec![None; mesh_batches.len()];
+    let header = packed_mesh_uniform_header(frame);
+    let mut next_instance = 0u32;
+    if enable_page_indirect && mesh_batches.iter().any(mesh_batch_supports_page_indirect) {
+        payload.extend_from_slice(&header);
+        for (index, batch) in mesh_batches.iter().enumerate() {
+            if enable_page_indirect && mesh_batch_supports_page_indirect(batch) {
+                first_instances[index] = Some(next_instance);
+                next_instance = next_instance.checked_add(batch.count() as u32).ok_or_else(|| {
+                    GalError::invalid_argument("world mesh indirect instance index overflow")
+                })?;
+                append_mesh_instances(frame, frontend, batch, &mut payload)?;
+            }
+        }
+    }
+    for (index, batch) in mesh_batches.iter().enumerate() {
+        if first_instances[index].is_some() {
+            continue;
+        }
+        let aligned = align_up_u64(payload.len() as u64, WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64)?;
+        payload.resize(aligned as usize, 0);
+        dynamic_offsets[index] = aligned;
+        if batch.indices.is_empty() || batch.indices.iter().any(|instance| {
+            frame.mesh_instances.get(*instance).map(mesh_view_layering) != Some(batch.key.view_layering)
+        }) {
+            return Err(GalError::invalid_argument("missing or mixed view layering in mesh batch"));
+        }
+        if let Some(projection) = batch.key.view_layering {
+            let view = super::view_layering::apply(frame.view_matrix, Some(projection))?;
+            for value in view { push_f32(&mut payload, value); }
+            payload.extend_from_slice(&header[64..]);
+        } else {
+            payload.extend_from_slice(&header);
+        }
+        append_mesh_instances(frame, frontend, batch, &mut payload)?;
+        if batch.key.standard_item_foil {
+            let (start, end) = item_foil_stream_range(
+                payload.len() as u64,
+                batch.count(),
+                batch.key.decal_vertex_count,
+            )?;
+            let foil = if batch.key.decal_vertex_count == 0 {
+                packed_standard_item_foil_instances(&frame.mesh_instances, &batch.indices)?
+            } else {
+                packed_decal_item_foil_instances(frame, frontend, batch)?
+            };
+            payload.resize(start as usize, 0);
+            payload.extend_from_slice(&foil);
+            debug_assert_eq!(payload.len() as u64, end);
+        }
+    }
+    if payload.len() as u64 > LOWERED_SOURCE_FRAME_STREAM_MAX_BYTES {
+        return Err(GalError::invalid_argument("world mesh packed draw stream exceeds bounded frame bytes"));
+    }
+    Ok(PackedMeshDrawStream { payload, dynamic_offsets, first_instances })
+}
+
 fn packed_mesh_uniform_header(frame: &WorldPrimitiveFrame) -> Vec<u8> {
     let mut out = Vec::with_capacity(WORLD_MESH_BATCH_HEADER_BYTES);
     for value in frame.view_matrix {
@@ -39406,6 +39726,20 @@ fn align_up_u64(value: u64, alignment: u64) -> GalResult<u64> {
         .checked_add(mask)
         .map(|value| value & !mask)
         .ok_or_else(|| GalError::invalid_argument("aligned byte count overflow"))
+}
+
+fn align_up_multiple_u64(value: u64, alignment: u64) -> GalResult<u64> {
+    if alignment == 0 {
+        return Err(GalError::invalid_argument("alignment cannot be zero"));
+    }
+    let remainder = value % alignment;
+    if remainder == 0 {
+        Ok(value)
+    } else {
+        value.checked_add(alignment - remainder).ok_or_else(|| {
+            GalError::invalid_argument("aligned byte range overflow")
+        })
+    }
 }
 
 fn buffer_barrier(

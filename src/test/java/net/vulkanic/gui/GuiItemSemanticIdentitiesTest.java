@@ -8,22 +8,22 @@ class GuiItemSemanticIdentitiesTest {
     @Test void equalityNotHashCollisionsNamesModelsAndReloadNeverReusesNames() {
         GuiItemSemanticIdentities.clear();
         try {
-            long first = GuiItemSemanticIdentities.identity(List.of("Aa"));
-            assertEquals(first, GuiItemSemanticIdentities.identity(List.of("Aa")));
+            long first = GuiItemSemanticIdentities.identityOrZero(List.of("Aa"));
+            assertEquals(first, GuiItemSemanticIdentities.identityOrZero(List.of("Aa")));
             assertEquals("Aa".hashCode(), "BB".hashCode());
-            assertNotEquals(first, GuiItemSemanticIdentities.identity(List.of("BB")));
+            assertNotEquals(first, GuiItemSemanticIdentities.identityOrZero(List.of("BB")));
             GuiItemSemanticIdentities.clear();
-            assertNotEquals(first, GuiItemSemanticIdentities.identity(List.of("Aa")));
+            assertNotEquals(first, GuiItemSemanticIdentities.identityOrZero(List.of("Aa")));
         } finally { GuiItemSemanticIdentities.clear(); }
     }
 
-    @Test void capacityRejectsBeforePublicationAndExistingNamesRemainUsable() {
+    @Test void capacityFallsBackWithoutPublishingAndExistingNamesRemainUsable() {
         GuiItemSemanticIdentities.clear();
         try {
-            long first = GuiItemSemanticIdentities.identity(List.of(0));
-            for (int i = 1; i < 64; i++) GuiItemSemanticIdentities.identity(List.of(i));
-            assertThrows(IllegalStateException.class, () -> GuiItemSemanticIdentities.identity(List.of(64)));
-            assertEquals(first, GuiItemSemanticIdentities.identity(List.of(0)));
+            long first = GuiItemSemanticIdentities.identityOrZero(List.of(0));
+            for (int i = 1; i < 63; i++) assertNotEquals(0, GuiItemSemanticIdentities.identityOrZero(List.of(i)));
+            assertEquals(0, GuiItemSemanticIdentities.identityOrZero(List.of(63)));
+            assertEquals(first, GuiItemSemanticIdentities.identityOrZero(List.of(0)));
         } finally { GuiItemSemanticIdentities.clear(); }
     }
 }

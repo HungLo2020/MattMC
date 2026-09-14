@@ -1072,6 +1072,20 @@ impl SubmissionLowerer {
                         std::mem::size_of::<vk::DrawIndirectCommand>() as u32,
                     );
                 }
+                CommandOp::DrawIndexedIndirect {
+                    buffer,
+                    offset,
+                    draw_count,
+                } => {
+                    let buffer = objects.buffer(*buffer)?;
+                    self.context.device.cmd_draw_indexed_indirect(
+                        command_buffer,
+                        buffer.buffer,
+                        *offset,
+                        *draw_count,
+                        std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as u32,
+                    );
+                }
                 CommandOp::Dispatch {
                     groups_x,
                     groups_y,
@@ -2330,6 +2344,7 @@ pub(super) fn image_layout(state: TextureUsageState) -> vk::ImageLayout {
         TextureUsageState::Present => vk::ImageLayout::PRESENT_SRC_KHR,
         TextureUsageState::IndexRead => vk::ImageLayout::UNDEFINED,
         TextureUsageState::ShaderStorageRead => vk::ImageLayout::GENERAL,
+        TextureUsageState::IndirectRead => vk::ImageLayout::UNDEFINED,
     }
 }
 
@@ -2413,6 +2428,7 @@ pub(super) fn stage_mask(state: TextureUsageState) -> vk::PipelineStageFlags2 {
             vk::PipelineStageFlags2::TRANSFER
         }
         TextureUsageState::IndexRead => vk::PipelineStageFlags2::INDEX_INPUT,
+        TextureUsageState::IndirectRead => vk::PipelineStageFlags2::DRAW_INDIRECT,
         TextureUsageState::Present => vk::PipelineStageFlags2::NONE,
     }
 }
@@ -2455,6 +2471,7 @@ pub(super) fn access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
         TextureUsageState::TransferSrc => vk::AccessFlags2::TRANSFER_READ,
         TextureUsageState::TransferDst => vk::AccessFlags2::TRANSFER_WRITE,
         TextureUsageState::IndexRead => vk::AccessFlags2::INDEX_READ,
+        TextureUsageState::IndirectRead => vk::AccessFlags2::INDIRECT_COMMAND_READ,
     }
 }
 
@@ -2619,6 +2636,7 @@ fn command_op_kind(op: &CommandOp) -> &'static str {
         CommandOp::Draw { .. } => "Draw",
         CommandOp::DrawIndexed { .. } => "DrawIndexed",
         CommandOp::DrawIndirect { .. } => "DrawIndirect",
+        CommandOp::DrawIndexedIndirect { .. } => "DrawIndexedIndirect",
         CommandOp::Dispatch { .. } => "Dispatch",
         CommandOp::DispatchIndirect { .. } => "DispatchIndirect",
         CommandOp::CopyBuffer { .. } => "CopyBuffer",

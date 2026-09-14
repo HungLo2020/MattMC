@@ -564,6 +564,7 @@ impl OpenGlLowerer {
             CommandOp::Barrier(barrier) => self.apply_resource_barrier(barrier),
             CommandOp::DispatchIndirect { .. }
             | CommandOp::DrawIndirect { .. }
+            | CommandOp::DrawIndexedIndirect { .. }
             | CommandOp::CopyFrameTargetToTexture { .. }
             | CommandOp::CopyTextureToFrameTarget { .. }
             | CommandOp::Present { .. }
@@ -1585,6 +1586,9 @@ fn gl_memory_barrier_bits(before: TextureUsageState, after: TextureUsageState) -
         }
         (TextureUsageState::TransferDst, TextureUsageState::IndexRead) => {
             glow::ELEMENT_ARRAY_BARRIER_BIT
+        }
+        (TextureUsageState::TransferDst, TextureUsageState::IndirectRead) => {
+            glow::COMMAND_BARRIER_BIT
         }
         (TextureUsageState::TransferDst, TextureUsageState::TransferSrc)
         | (TextureUsageState::TransferSrc, TextureUsageState::TransferDst) => {

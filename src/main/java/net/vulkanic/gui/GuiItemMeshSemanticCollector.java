@@ -64,9 +64,9 @@ public final class GuiItemMeshSemanticCollector {
 			&& modelIdentity instanceof List<?> identityElements && !identityElements.isEmpty()
 			? new TopologyKey(modelIdentity, guiScale) : null;
 		CachedTopology topology = cacheKey == null ? null : cachedTopology(cacheKey);
-		if (cacheKey != null) {
+		if (topology != null) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
-				topology == null ? "gui.item-topology-cache.miss" : "gui.item-topology-cache.hit", 1L
+				"gui.item-topology-cache.hit", 1L
 			);
 		}
 		if (topology == null) {
@@ -75,12 +75,13 @@ public final class GuiItemMeshSemanticCollector {
 					modelBounds.maxX, modelBounds.maxY, modelBounds.maxZ},item.itemStackRenderState().isOversizedInGui());
 			List<GuiItemMeshLayer> layers = new ArrayList<>();
 			List<GuiItemTextureSource> sources = new ArrayList<>();
+			List<GuiItemAtlasUse> atlasUses = new ArrayList<>();
 			String[] rejection = new String[1];
 			item.itemStackRenderState().forEachSemanticLayer(layer -> {
 				if (rejection[0] != null) {
 					return;
 				}
-				rejection[0] = appendLayer(layer, layers, sources);
+				rejection[0] = appendLayer(layer, layers, sources, atlasUses);
 			});
 			if (rejection[0] != null || layers.isEmpty()) {
 				return CollectionResult.rejected(rejection[0] == null ? "empty-mesh" : rejection[0]);
@@ -90,8 +91,16 @@ public final class GuiItemMeshSemanticCollector {
 				if (asset != null && sources.stream().noneMatch(existing -> existing.assetId() == asset.assetId()))
 					sources.add(new GuiItemTextureSource.Raw(asset));
 			}
-			topology = new CachedTopology(layers, sources, blockRaster);
-			if (cacheKey != null) cacheTopology(cacheKey, topology);
+			topology = new CachedTopology(layers, sources, atlasUses, blockRaster);
+			// Standard foil carries a frame clock. Keep the entire item frame-local
+			// until that animated material is represented separately from topology.
+			boolean reusable = cacheKey != null && layers.stream().noneMatch(layer -> layer.itemFoil() != null);
+			if (reusable) {
+				cacheTopology(cacheKey, topology);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-topology-cache.miss", 1L);
+			} else {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-topology-cache.bypass", 1L);
+			}
 		}
 		// Native layout receives the original logical item origin/box; Rust
 		// derives oversized placement before applying the copied GUI pose.
@@ -102,7 +111,7 @@ public final class GuiItemMeshSemanticCollector {
 		return CollectionResult.accepted(new GuiItemMesh(
 			item.name(), item.x(), item.y(), left, top, right, bottom,
 			new float[] {item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()},
-			topology.layers(), topology.sources(), topology.blockRaster()
+			topology.layers(), topology.sources(), topology.atlasUses(), topology.blockRaster()
 		));
 	}
 
@@ -120,16 +129,18 @@ public final class GuiItemMeshSemanticCollector {
 	private record CachedTopology(
 		List<GuiItemMeshLayer> layers,
 		List<GuiItemTextureSource> sources,
+		List<GuiItemAtlasUse> atlasUses,
 		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockRaster
 	) {
 		private CachedTopology {
 			layers = List.copyOf(layers);
 			sources = List.copyOf(sources);
+			atlasUses = List.copyOf(atlasUses);
 		}
 	}
 
 	private static String appendLayer(ItemStackRenderState.SemanticLayer layer, List<GuiItemMeshLayer> output,
-		List<GuiItemTextureSource> sources) {
+		List<GuiItemTextureSource> sources, List<GuiItemAtlasUse> atlasUses) {
 		if (layer == null) return "missing-layer";
 		if (layer.hasSpecialRenderer()) return "special-renderer";
 		if (layer.foilType() == ItemStackRenderState.FoilType.SPECIAL) {
@@ -141,7 +152,7 @@ public final class GuiItemMeshSemanticCollector {
 
 		List<GuiItemMeshQuad> quads = new ArrayList<>(layer.quads().size());
 		for (BakedQuad quad : layer.quads()) {
-			GuiItemMeshQuad copied = copyQuad(quad, layer.tintLayers(), sources);
+			GuiItemMeshQuad copied = copyQuad(quad, layer.tintLayers(), sources, atlasUses);
 			if (copied == null) return "unsupported-quad";
 			quads.add(copied);
 		}
@@ -163,6 +174,13 @@ public final class GuiItemMeshSemanticCollector {
 		return null;
 	}
 
+	// Retain the focused validation seam used to prove special-foil rejection
+	// before any client resource access.
+	private static String appendLayer(ItemStackRenderState.SemanticLayer layer, List<GuiItemMeshLayer> output,
+		List<GuiItemTextureSource> sources) {
+		return appendLayer(layer, output, sources, new ArrayList<>());
+	}
+
 	/** Copies the original geometry/UVs; native material preparation owns foil math. */
 	private static GuiItemMeshQuad glintQuad(GuiItemMeshQuad source, long glintAssetId) {
 		int[] colors = new int[] {
@@ -180,11 +198,16 @@ public final class GuiItemMeshSemanticCollector {
 	}
 
 	private static GuiItemMeshQuad copyQuad(BakedQuad bakedQuad, int[] tintLayers,
-		List<GuiItemTextureSource> sources) {
+		List<GuiItemTextureSource> sources, List<GuiItemAtlasUse> atlasUses) {
 		if (!(bakedQuad instanceof BakedQuadView quad)) return null;
 		TextureAtlasSprite sprite = quad.getSprite();
 		ResourceLocation spriteIdentity = sprite == null ? null : sprite.contents().name();
 		if (sprite == null || spriteIdentity == null) return null;
+		var animationResource = sprite.semanticAnimationResource();
+		if (animationResource != null && atlasUses.stream().noneMatch(use -> use.resource() == animationResource
+			&& use.atlas().equals(sprite.atlasLocation()) && use.name().equals(spriteIdentity))) {
+			atlasUses.add(new GuiItemAtlasUse(animationResource, sprite.atlasLocation(), spriteIdentity));
+		}
 		long assetId;
 		if (net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS.equals(sprite.atlasLocation())) {
 			var region = net.vulkanic.world.RustGalTerrainRenderer.requireGuiAtlasSpritePayload(sprite);
@@ -291,14 +314,23 @@ public final class GuiItemMeshSemanticCollector {
 	public record GuiItemMesh(
 		String itemIdentity, int itemX, int itemY, int left, int top, int right, int bottom,
 		float[] guiPose,
-		List<GuiItemMeshLayer> layers, List<GuiItemTextureSource> sources,
+		List<GuiItemMeshLayer> layers, List<GuiItemTextureSource> sources, List<GuiItemAtlasUse> atlasUses,
 		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockItemRaster
 	) {
+		public GuiItemMesh(
+			String itemIdentity, int itemX, int itemY, int left, int top, int right, int bottom,
+			float[] guiPose, List<GuiItemMeshLayer> layers, List<GuiItemTextureSource> sources,
+			net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockItemRaster
+		) {
+			this(itemIdentity, itemX, itemY, left, top, right, bottom, guiPose, layers, sources, List.of(), blockItemRaster);
+		}
+
 		public GuiItemMesh {
 			guiPose = checkedCopy(guiPose, 6, "GUI item pose");
 			if (blockItemRaster == null) throw new IllegalArgumentException("GUI block mesh requires native model bounds and scale");
 			layers = List.copyOf(layers);
 			sources = List.copyOf(sources);
+			atlasUses = List.copyOf(atlasUses);
 		}
 
 		@Override
@@ -306,6 +338,16 @@ public final class GuiItemMeshSemanticCollector {
 			return this.guiPose.clone();
 		}
 
+	}
+
+	public record GuiItemAtlasUse(
+		net.vulkanic.world.AtlasAnimationResource resource,
+		ResourceLocation atlas,
+		ResourceLocation name
+	) {
+		public GuiItemAtlasUse {
+			if (resource == null || atlas == null || name == null) throw new IllegalArgumentException("invalid GUI atlas animation use");
+		}
 	}
 
 	public record GuiItemMeshLayer(MaterialMode materialMode, boolean blockLight, float[] modelTransform, List<GuiItemMeshQuad> quads,
@@ -332,8 +374,16 @@ public final class GuiItemMeshSemanticCollector {
 
 	public record GuiItemMeshQuad(
 		long assetId, String materialIdentity, float[] positions, float[] atlasUvs, float[] localUvs, int[] colorsArgb, int[] packedNormals,
-		int lightFace, boolean shade
+		int lightFace, boolean shade,
+		List<net.vulkanic.bridge.VulkanicGalBridge.GuiMeshVertexRecord> bridgeVertices,
+		List<net.vulkanic.bridge.VulkanicGalBridge.GuiMeshVertexRecord> bridgeFoilVertices
 	) {
+		public GuiItemMeshQuad(long assetId, String materialIdentity, float[] positions, float[] atlasUvs,
+			float[] localUvs, int[] colorsArgb, int[] packedNormals, int lightFace, boolean shade) {
+			this(assetId, materialIdentity, positions, atlasUvs, localUvs, colorsArgb, packedNormals,
+				lightFace, shade, null, null);
+		}
+
 		public GuiItemMeshQuad {
 			if (assetId == 0L) {
 				throw new IllegalArgumentException("GUI item mesh quad requires a non-zero semantic image asset id");
@@ -346,6 +396,28 @@ public final class GuiItemMeshSemanticCollector {
 			if (colorsArgb.length != 4 || packedNormals.length != 4) {
 				throw new IllegalArgumentException("GUI item mesh quad requires four colors and item-lighting-space normals");
 			}
+			bridgeVertices = bridgeVertices == null
+				? bridgeVertices(positions, atlasUvs, localUvs, colorsArgb, packedNormals, lightFace, 0)
+				: List.copyOf(bridgeVertices);
+			bridgeFoilVertices = bridgeFoilVertices == null
+				? bridgeVertices(positions, atlasUvs, localUvs, colorsArgb, packedNormals, lightFace, 1)
+				: List.copyOf(bridgeFoilVertices);
+		}
+
+		private static List<net.vulkanic.bridge.VulkanicGalBridge.GuiMeshVertexRecord> bridgeVertices(
+			float[] positions, float[] atlasUvs, float[] localUvs, int[] colorsArgb, int[] packedNormals,
+			int lightFace, int sourceFoilType) {
+			var result = new ArrayList<net.vulkanic.bridge.VulkanicGalBridge.GuiMeshVertexRecord>(4);
+			for (int vertex = 0; vertex < 4; vertex++) {
+				int position = vertex * 3;
+				int uv = vertex * 2;
+				result.add(new net.vulkanic.bridge.VulkanicGalBridge.GuiMeshVertexRecord(
+					new float[] {positions[position], positions[position + 1], positions[position + 2]},
+					new float[] {atlasUvs[uv], atlasUvs[uv + 1]},
+					new float[] {localUvs[uv], localUvs[uv + 1]}, colorsArgb[vertex], packedNormals[vertex],
+					lightFace + 1, sourceFoilType));
+			}
+			return List.copyOf(result);
 		}
 
 		@Override

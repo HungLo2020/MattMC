@@ -1921,7 +1921,8 @@ pub struct GuiMeshOffscreenTargetCache {
     targets: BTreeMap<OffscreenTargetKey, GuiMeshOffscreenTarget>,
 }
 
-const GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION: usize = 64;
+const GUI_MESH_MAX_NAMED_ITEM_TARGETS_PER_GENERATION: usize = 63;
+const GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION: usize = 256;
 impl GuiMeshOffscreenTargetCache {
     pub(crate) fn len(&self) -> usize {
         self.targets.len()
@@ -1964,6 +1965,13 @@ impl GuiMeshOffscreenTargetCache {
             return Ok(target);
         }
         self.destroy_other_generations(gal, generation);
+        if item_identity != 0 && self.targets.keys().filter(|key| key.item_identity != 0).count()
+            >= GUI_MESH_MAX_NAMED_ITEM_TARGETS_PER_GENERATION
+        {
+            return Err(GalError::unsupported_feature(format!(
+                "GUI mesh named item target cache exceeds bounded limit {GUI_MESH_MAX_NAMED_ITEM_TARGETS_PER_GENERATION}"
+            )));
+        }
         if self.targets.len() >= GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION {
             return Err(GalError::unsupported_feature(format!(
                 "GUI mesh offscreen target cache exceeds bounded limit {GUI_MESH_MAX_OFFSCREEN_TARGETS_PER_GENERATION}"
@@ -2231,7 +2239,8 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
 		return Err(GalError::invalid_argument("entity no-cull material requires an entity preview with vanilla alpha cutoff"));
 	}
     if let Some(cache) = batch.item_cache {
-        if cache.identity == 0 || batch.item_raster_scale == 0
+        if cache.identity == 0
+            || (batch.item_raster_scale == 0 && batch.block_item_raster.is_none())
             || (!cache.animated && batch.item_foil.is_some()) {
             return Err(GalError::invalid_argument("GUI item caching requires a native item raster and coherent animation semantics"));
         }
@@ -3050,6 +3059,20 @@ mod tests {
         let mut request = batch();
         request.item_cache = GuiItemCache::decode(9, 1).unwrap();
         assert!(prepare_draws(&[request]).is_err(), "unnamed raster scale must not admit a pixel cache");
+
+        let mut block = batch();
+        block.item_cache = GuiItemCache::decode(10, 1).unwrap();
+        block.block_item_raster = GuiBlockItemRaster::decode(
+            3,
+            [-0.5, -0.5, -0.5, 0.5, 0.5, 0.5],
+            1,
+        )
+        .unwrap();
+        block.render_extent = [0, 0];
+        block.guard_pixels = 0;
+        block.lighting_mode = GuiMeshLightingMode::InventoryBlock;
+        block.resolve_item_lighting(Some(flat_lightmap())).unwrap();
+        assert!(prepare_draws(&[block]).is_ok(), "named block-item raster may retain immutable pixels");
     }
 
     #[test]

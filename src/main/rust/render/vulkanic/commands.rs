@@ -40,6 +40,10 @@ pub enum TextureUsageState {
     /// Read-only access through a storage-image descriptor. Unlike sampled
     /// reads this remains in Vulkan GENERAL layout.
     ShaderStorageRead = 10,
+    /// Read by an indirect draw/dispatch command processor. This is distinct
+    /// from shader and index input so explicit backends can publish host or
+    /// transfer writes to the correct command-processing stage.
+    IndirectRead = 11,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -165,6 +169,14 @@ pub enum CommandOp {
         instances: u32,
     },
     DrawIndirect {
+        buffer: Handle,
+        offset: u64,
+        draw_count: u32,
+    },
+    /// Draws indexed command records from a GAL-owned indirect buffer. Each
+    /// record uses the backend-neutral five-lane indexed layout: index count,
+    /// instance count, first index, signed vertex offset, and first instance.
+    DrawIndexedIndirect {
         buffer: Handle,
         offset: u64,
         draw_count: u32,

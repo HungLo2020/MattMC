@@ -247,6 +247,8 @@ class GuiItemMeshSemanticCollectorTest {
 		assertTrue(collector.contains("MAX_CACHED_TOPOLOGIES = 256"));
 		assertTrue(collector.contains("!item.itemStackRenderState().isAnimated()"),
 			"animated item geometry must remain frame-local");
+		assertTrue(collector.contains("layers.stream().noneMatch(layer -> layer.itemFoil() != null)"),
+			"clock-driven standard foil must remain frame-local until material animation is separated from topology");
 		assertTrue(collector.contains("new TopologyKey(modelIdentity, guiScale)"),
 			"cache identity must include vanilla model semantics and raster scale");
 		assertTrue(assets.contains("GuiItemMeshSemanticCollector.invalidateCache();"),

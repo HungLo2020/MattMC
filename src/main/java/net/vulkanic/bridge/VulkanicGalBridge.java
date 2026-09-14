@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.ArrayDeque;
 import java.util.LinkedHashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -214,12 +215,18 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	// are serialized in a per-submit confined arena and released immediately
 	// after the synchronous native call returns.
 	private Arena arena;
+	private final Arena contextArena;
 	private final long contextId;
 	private final long negotiatedFeatures;
+	private static final int MAX_PERSISTENT_GUI_MESH_TOPOLOGIES = 4096;
+	private final IdentityHashMap<List<GuiMeshVertexRecord>, IdentityHashMap<List<Integer>, PackedGuiMeshTopology>>
+		persistentGuiMeshTopologies = new IdentityHashMap<>();
+	private int persistentGuiMeshTopologyCount;
 	private boolean closed;
 
 	private VulkanicGalBridge(Arena arena, long contextId, long negotiatedFeatures) {
 		this.arena = arena;
+		this.contextArena = arena;
 		this.contextId = contextId;
 		this.negotiatedFeatures = negotiatedFeatures;
 	}
@@ -668,20 +675,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			// avoids manufacturing a clone for every component written to the FFI stream.
 			List<GuiMeshVertexRecord> vertexRecords = batch.vertices;
 			List<Integer> indexRecords = batch.indices;
-			MemorySegment vertices = Struct.GUI_MESH_VERTEX.array(arena, vertexRecords.size());
-			for (int vertexIndex = 0; vertexIndex < vertexRecords.size(); vertexIndex++) {
-				GuiMeshVertexRecord vertex = vertexRecords.get(vertexIndex);
-				MemorySegment item = Abi.item(vertices, Struct.GUI_MESH_VERTEX, vertexIndex);
-				for (int component = 0; component < 3; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(0) + component * 4L, vertex.position[component]);
-				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(1) + component * 4L, vertex.atlasUv[component]);
-				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(2) + component * 4L, vertex.localUv[component]);
-				Struct.GUI_MESH_VERTEX.setInt(item, 3, vertex.colorArgb());
-				Struct.GUI_MESH_VERTEX.setInt(item, 4, vertex.normalPacked());
-				Struct.GUI_MESH_VERTEX.setInt(item, 5, vertex.sourceFace());
-				Struct.GUI_MESH_VERTEX.setInt(item, 6, vertex.sourceFoilType());
-			}
-			MemorySegment indices = arena.allocate((long)indexRecords.size() * Integer.BYTES, Integer.BYTES);
-			for (int index = 0; index < indexRecords.size(); index++) indices.setAtIndex(ValueLayout.JAVA_INT, index, indexRecords.get(index));
+			PackedGuiMeshTopology persistent = persistentGuiMeshTopology(batch, vertexRecords, indexRecords);
+			MemorySegment vertices = persistent == null
+				? encodeGuiMeshVertices(arena, vertexRecords) : persistent.vertices();
+			MemorySegment indices = persistent == null
+				? encodeGuiMeshIndices(arena, indexRecords) : persistent.indices();
 			MemorySegment item = Abi.item(batchArray, Struct.GUI_MESH_BATCH_REQUEST, i);
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 0, Struct.GUI_MESH_BATCH_REQUEST.byteSize());
 			Struct.GUI_MESH_BATCH_REQUEST.setInt(item, 1, batch.stratum());
@@ -736,6 +734,52 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 		return batchArray;
 	}
+
+	private PackedGuiMeshTopology persistentGuiMeshTopology(
+		GuiMeshBatchRecord batch, List<GuiMeshVertexRecord> vertices, List<Integer> indices
+	) {
+		GuiItemCacheRecord cache = batch.itemCache;
+		if (cache == null || cache.animated() || batch.itemFoil != null) return null;
+		IdentityHashMap<List<Integer>, PackedGuiMeshTopology> byIndices = persistentGuiMeshTopologies.get(vertices);
+		if (byIndices != null) {
+			PackedGuiMeshTopology existing = byIndices.get(indices);
+			if (existing != null) return existing;
+		}
+		if (persistentGuiMeshTopologyCount >= MAX_PERSISTENT_GUI_MESH_TOPOLOGIES) return null;
+		if (byIndices == null) {
+			byIndices = new IdentityHashMap<>();
+			persistentGuiMeshTopologies.put(vertices, byIndices);
+		}
+		PackedGuiMeshTopology packed = new PackedGuiMeshTopology(
+			encodeGuiMeshVertices(contextArena, vertices), encodeGuiMeshIndices(contextArena, indices));
+		byIndices.put(indices, packed);
+		persistentGuiMeshTopologyCount++;
+		return packed;
+	}
+
+	private static MemorySegment encodeGuiMeshVertices(Arena targetArena, List<GuiMeshVertexRecord> records) {
+		MemorySegment vertices = Struct.GUI_MESH_VERTEX.array(targetArena, records.size());
+		for (int vertexIndex = 0; vertexIndex < records.size(); vertexIndex++) {
+			GuiMeshVertexRecord vertex = records.get(vertexIndex);
+			MemorySegment item = Abi.item(vertices, Struct.GUI_MESH_VERTEX, vertexIndex);
+			for (int component = 0; component < 3; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(0) + component * 4L, vertex.position[component]);
+			for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(1) + component * 4L, vertex.atlasUv[component]);
+			for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT, Struct.GUI_MESH_VERTEX.offset(2) + component * 4L, vertex.localUv[component]);
+			Struct.GUI_MESH_VERTEX.setInt(item, 3, vertex.colorArgb());
+			Struct.GUI_MESH_VERTEX.setInt(item, 4, vertex.normalPacked());
+			Struct.GUI_MESH_VERTEX.setInt(item, 5, vertex.sourceFace());
+			Struct.GUI_MESH_VERTEX.setInt(item, 6, vertex.sourceFoilType());
+		}
+		return vertices;
+	}
+
+	private static MemorySegment encodeGuiMeshIndices(Arena targetArena, List<Integer> records) {
+		MemorySegment indices = targetArena.allocate((long)records.size() * Integer.BYTES, Integer.BYTES);
+		for (int index = 0; index < records.size(); index++) indices.setAtIndex(ValueLayout.JAVA_INT, index, records.get(index));
+		return indices;
+	}
+
+	private record PackedGuiMeshTopology(MemorySegment vertices, MemorySegment indices) {}
 
 	static MemorySegment encodeParticleQuads(Arena arena, List<WorldParticleQuadRecord> particles) {
 		if (particles.size() > 65_536) throw new IllegalArgumentException("too many particle semantics");
@@ -3911,6 +3955,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		closed = true;
 		MemorySegment status = Struct.STATUS.allocate(arena);
 		Native.contextDestroy(contextId, status);
+		persistentGuiMeshTopologies.clear();
 		arena.close();
 	}
 
@@ -4061,7 +4106,9 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			profileLong(segment, offset, 115),
 			profileLong(segment, offset, 116),
 			profileLong(segment, offset, 117),
-			profileLong(segment, offset, 118)
+			profileLong(segment, offset, 118),
+			profileLong(segment, offset, 119),
+			profileLong(segment, offset, 120)
 		);
 	}
 
@@ -4563,7 +4610,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		public GuiMeshBatchRecord {
-			if (itemCache != null && (itemRasterScale == 0 || !itemCache.animated() && itemFoil != null))
+			if (itemCache != null && (itemRasterScale == 0 && blockItemRaster == null
+				|| !itemCache.animated() && itemFoil != null))
 				throw new IllegalArgumentException("Item cache requires coherent native item animation semantics");
 			if ((materialMode == GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL
 				|| materialMode == GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL
@@ -5735,11 +5783,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long worldMeshStreamPayloadPackNanos,
 		long worldMeshDrawRecordNanos,
 		long worldMeshStreamPayloadBytes,
-		long worldMeshDynamicOffsetCount
+		long worldMeshDynamicOffsetCount,
+		long guiMeshPrepareNanos,
+		long guiMeshLowerNanos
 	) {
 		public static WholeFrameProfile empty() {
-			return new WholeFrameProfile(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
-			);
+			return wholeFrameProfileAt(MemorySegment.ofArray(new long[121]), 0L);
 		}
 	}
 

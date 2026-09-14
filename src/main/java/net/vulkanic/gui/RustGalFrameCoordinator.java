@@ -1819,6 +1819,15 @@ public final class RustGalFrameCoordinator {
 	private static void recordWholeFrameMetrics(VulkanicGalBridge.WholeFrameSubmitResult result) {
 		METRICS.spriteBatchesExecuted += result.spriteBatchCount();
 		METRICS.packedSpritesExecuted += result.spriteCount();
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.frame.world-mesh-instances", result.worldMeshInstanceCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.frame.world-mesh-batches", result.worldMeshBatchCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.frame.world-mesh-draws", result.worldMeshDrawCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.frame.gui-sprites", result.spriteCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.frame.gui-sprite-batches", result.spriteBatchCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.frame.gui-mesh-items", result.guiMeshItemCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.frame.gui-mesh-batches", result.guiMeshBatchCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.frame.gui-mesh-draws", result.guiMeshDrawCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.frame.command-ops", result.commandOps());
 		recordWorldMetrics(result);
 		recordWholeFrameProfile(result.profile());
 		METRICS.worldBackgroundClearsExecuted += result.worldBackgroundClearCount();
@@ -1907,6 +1916,8 @@ public final class RustGalFrameCoordinator {
 	private static void recordWholeFrameProfilePhaseSamples(VulkanicGalBridge.WholeFrameProfile profile) {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.ffi-decode", profile.ffiDecodeNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gui-frontend", profile.guiFrontendNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gui-mesh-prepare", profile.guiMeshPrepareNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gui-mesh-lower", profile.guiMeshLowerNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-frontend", profile.worldFrontendTotalNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-validate-frame", profile.worldValidateFrameNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-batching", profile.worldBatchingNanos());
@@ -1978,6 +1989,18 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.backend-encode", profile.backendEncodeNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.backend-submit", profile.backendSubmitNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.backend-retire", profile.backendRetireNanos());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.host-write-ops", profile.hostWriteOps());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.host-write-bytes", profile.hostWriteBytes());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.barrier-ops", profile.barrierOps());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.pass-count", profile.passCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.draw-ops", profile.drawOps());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.draw-indexed-ops", profile.drawIndexedOps());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.pipeline-binds", profile.pipelineBinds());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.resource-set-binds", profile.resourceSetBinds());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.resource-creates", profile.resourceCreatesDelta());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.resource-destroys", profile.resourceDestroysDelta());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.vulkan-command-buffers-allocated", profile.vulkanCommandBuffersAllocated());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.vulkan-command-buffers-freed", profile.vulkanCommandBuffersFreed());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-command-buffer-alloc", profile.vulkanCommandBufferAllocNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-command-buffer-begin", profile.vulkanCommandBufferBeginNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.vulkan-command-recording", profile.vulkanCommandRecordingNanos());

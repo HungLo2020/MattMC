@@ -2901,7 +2901,6 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                     }
                     let ffi_decode_nanos =
                         crate::render::vulkanic::metrics::elapsed_nanos_u64(decode_started);
-                    let gui_started = std::time::Instant::now();
                     context
                         .world_primitive_frontend
                         .validate_post_effect_request_with_globals(&post_effect_id, world_frame.engine_globals)?;
@@ -2953,10 +2952,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         eprintln!("whole-frame.gui-tiles.submitted frame={} parents={} children={}",
                             world_frame_id, parents, children);
                     }
-                    let gui_frontend_nanos =
-                        crate::render::vulkanic::metrics::elapsed_nanos_u64(gui_started);
                     world_stats.profile.ffi_decode_nanos = ffi_decode_nanos;
-                    world_stats.profile.gui_frontend_nanos = gui_frontend_nanos;
+                    world_stats.profile.gui_frontend_nanos = gui_stats.frontend_nanos;
+                    world_stats.profile.gui_mesh_prepare_nanos = gui_stats.mesh_prepare_nanos;
+                    world_stats.profile.gui_mesh_lower_nanos = gui_stats.mesh_lower_nanos;
                     whole_frame_trace(&format!(
                         "whole-frame.stale-targets.begin generation={} frame={}",
                         generation, world_frame_id

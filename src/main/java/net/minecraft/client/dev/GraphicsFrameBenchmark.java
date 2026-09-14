@@ -3,6 +3,7 @@ package net.minecraft.client.dev;
 import net.minecraft.util.profiling.TracyCompat;
 import net.minecraft.util.profiling.TracyCompat.Zone;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -66,6 +67,8 @@ public final class GraphicsFrameBenchmark {
 	private static final long POSITIVE_CONTROL_DELAY_NANOS = Math.max(0L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.positiveControlDelayNanos", 0L));
 	private static final boolean GC_BEFORE_MEASUREMENT =
 		Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.gcBeforeMeasurement", "false"));
+	private static final boolean INVENTORY_SCREEN =
+		Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.inventoryScreen");
 	private static final long GC_BEFORE_MEASUREMENT_OFFSET_FRAMES =
 		Math.max(0L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.gcBeforeMeasurementOffsetFrames", 30L));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.stopAfterComplete", "true"));
@@ -667,6 +670,9 @@ public final class GraphicsFrameBenchmark {
 				setupBlockDisplayScenario(minecraft, player);
 				setupFallingBlockScenario(minecraft, player);
 				setupPistonScenario(minecraft, player);
+				if (INVENTORY_SCREEN) {
+					minecraft.setScreen(new InventoryScreen(player));
+				}
 				dimension = minecraft.level.dimension().location().toString();
 				writeStatus(minecraft, "initialized");
 				return true;
@@ -691,8 +697,12 @@ public final class GraphicsFrameBenchmark {
 			&& minecraft.player != null
 			&& minecraft.getConnection() != null
 			&& minecraft.getOverlay() == null
-			&& (minecraft.screen == null || isStaleStartupScreen(minecraft))
+			&& (minecraft.screen == null || isStaleStartupScreen(minecraft) || isRequestedInventoryScreen(minecraft))
 			&& minecraft.level.getChunkSource().getLoadedChunksCount() > 0;
+	}
+
+	private static boolean isRequestedInventoryScreen(Minecraft minecraft) {
+		return INVENTORY_SCREEN && minecraft.screen instanceof InventoryScreen;
 	}
 
 	private static boolean isStaleStartupScreen(Minecraft minecraft) {

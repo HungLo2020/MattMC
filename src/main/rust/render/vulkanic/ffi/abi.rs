@@ -1949,6 +1949,8 @@ pub struct FfiWholeFrameProfileSnapshot {
     pub world_mesh_draw_record_nanos: u64,
     pub world_mesh_stream_payload_bytes: u64,
     pub world_mesh_dynamic_offset_count: u64,
+    pub gui_mesh_prepare_nanos: u64,
+    pub gui_mesh_lower_nanos: u64,
 }
 
 impl Default for FfiGuiFrameSubmitResult {
@@ -2587,6 +2589,8 @@ pub enum FfiCommandOpKind {
     Present = 17,
     Barrier = 18,
     EndPass = 19,
+    // Append-only: stable ABI values 1..19 are already public.
+    DrawIndexedIndirect = 20,
 }
 
 #[repr(C)]

@@ -3895,7 +3895,15 @@ def load_capture_files(capture_dir: Path) -> dict[str, Path | None]:
         # by mtime or fall back when the declared file is absent.
         declared = metadata.get(key)
         if not declared:
-            return same_run(pattern)
+            matched = same_run(pattern)
+            if matched is not None:
+                return matched
+            # Older Frozen launchers write the requested benchmark with a
+            # hyphenated timestamp but do not copy its path into metadata.
+            # Each run has an isolated capture directory, so one exact
+            # artifact is still unambiguous run-local evidence.
+            candidates = sorted(capture_dir.glob(pattern))
+            return candidates[0] if len(candidates) == 1 else None
         path = Path(declared)
         if not path.is_absolute():
             path = capture_dir / path
@@ -34902,7 +34910,7 @@ def build_capture_command(
             "--shaders",
             mode.shaders,
             "--rust-profile",
-            args.rust_profile,
+            getattr(args, "rust_profile", "release"),
             "--artifact-dir",
             str(capture_dir),
             "--world",
@@ -35239,6 +35247,12 @@ def build_capture_command(
                 "-Dmattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleHoldFrames=1",
             ]
         )
+        if tool_kind == "gameplay":
+            # Keep the ordinary InventoryScreen open through the benchmark's
+            # warmup and sample window. The Java sampler explicitly records
+            # the active screen, so an artifact cannot mistake this for the
+            # world-only workload.
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.inventoryScreen=true")
     if level_loading_screen_capture:
         # Both repositories retain one frame from the real LevelLoadingScreen.
         # This diagnostic only delays that screen's close until the external

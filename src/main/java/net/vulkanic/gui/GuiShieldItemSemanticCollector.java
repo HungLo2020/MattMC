@@ -38,9 +38,10 @@ final class GuiShieldItemSemanticCollector {
         model.get(transform);
         var batches = new ArrayList<GuiMeshBatchRecord>();
         var sources = new ArrayList<GuiItemTextureSource>();
-        var cache = net.vulkanic.world.AtlasAnimationResource.shieldLifecycleEnabled()
-            ? new GuiItemCacheRecord(GuiItemSemanticIdentities.identity(item.itemStackRenderState().getModelIdentity()),
-                item.itemStackRenderState().isAnimated()) : null;
+        long cacheIdentity = net.vulkanic.world.AtlasAnimationResource.shieldLifecycleEnabled()
+            ? GuiItemSemanticIdentities.identityOrZero(item.itemStackRenderState().getModelIdentity()) : 0;
+        var cache = cacheIdentity != 0
+            ? new GuiItemCacheRecord(cacheIdentity, item.itemStackRenderState().isAnimated()) : null;
         for (var layer : layers(shield.model(), components, foil != null)) {
             var sprite = shield.sprite(layer.material());
             if (sprite != null && sprite.contents().isAnimated()

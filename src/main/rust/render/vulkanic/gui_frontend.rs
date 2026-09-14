@@ -1142,6 +1142,12 @@ pub struct GuiSpriteRequest {
 
 #[derive(Clone, Debug, Default)]
 pub struct GuiSubmitStats {
+    /// Time spent lowering GUI semantics into backend-neutral GAL operations.
+    pub frontend_nanos: u64,
+    /// Subset of frontend time spent validating and preparing GUI mesh vertices.
+    pub mesh_prepare_nanos: u64,
+    /// Subset of frontend time spent resolving GUI mesh resources and recording operations.
+    pub mesh_lower_nanos: u64,
     pub submission_id: u64,
     pub sprite_count: u64,
     pub affine_quad_count: u64,
@@ -5032,6 +5038,7 @@ impl GuiFrontend {
         requests: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
         mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
+        let frontend_started = std::time::Instant::now();
         preflight_tiled_affine_count(&tiled_quads, affine_quads.len())?;
         let has_atlases = self.preflight_owned_atlas_commands(world.as_deref(), &affine_quads, &tiled_quads)?;
         self.preflight_mesh_atlas_commands(world.as_deref(), &mesh_batches)?;
@@ -5052,7 +5059,7 @@ impl GuiFrontend {
         };
         let render_pass = if infer_depth { None } else { render_pass };
         if mesh_batches.is_empty() && tiled_quads.is_empty() && !has_atlases {
-            return self.append_frame_ops_with_affine_quads_to_target(
+            let (ops, mut stats) = self.append_frame_ops_with_affine_quads_to_target(
                 gal,
                 generation,
                 render_target,
@@ -5063,7 +5070,9 @@ impl GuiFrontend {
                 pre_present_y_flip,
                 requests,
                 affine_quads,
-            );
+            )?;
+            stats.frontend_nanos = super::metrics::elapsed_nanos_u64(frontend_started);
+            return Ok((ops, stats));
         }
         let ordered = order_gui_requests_with_tiles(requests, affine_quads, mesh_batches, tiled_quads)?;
         self.mesh_geometry_transaction = self.mesh_geometry_transaction.checked_add(1)
@@ -5275,6 +5284,7 @@ impl GuiFrontend {
         stats.command_lists = 1;
         stats.command_ops = ops.len() as u64;
         Self::require_gui_draw_receipt(&stats, &ops)?;
+        stats.frontend_nanos = super::metrics::elapsed_nanos_u64(frontend_started);
         Ok((ops, stats))
     }
 
@@ -5324,6 +5334,7 @@ impl GuiFrontend {
         mesh_batches: Vec<GuiMeshBatchRequest>,
         stats: &mut GuiSubmitStats,
     ) -> GalResult<Vec<CommandOp>> {
+        let prepare_started = std::time::Instant::now();
         self.preflight_mesh_atlas_commands(world.as_deref(), &mesh_batches)?;
         if generation != self.generation {
             self.destroy_render_resources(gal);
@@ -5346,9 +5357,13 @@ impl GuiFrontend {
             }
         }
         prepared.sort_by_key(|draw| (draw.stratum, draw.sequence, draw.layer_index));
+        stats.mesh_prepare_nanos = stats.mesh_prepare_nanos.saturating_add(
+            super::metrics::elapsed_nanos_u64(prepare_started)
+        );
         if prepared.is_empty() {
             return Ok(Vec::new());
         }
+        let lower_started = std::time::Instant::now();
         let frame_pass = match render_pass {
             Some(pass) => pass,
             None => self.frame_pass(gal, render_target, depth_format)?,
@@ -5649,6 +5664,9 @@ impl GuiFrontend {
             cursor = group_end;
         }
         stats.command_ops = stats.command_ops.saturating_add(operations.len() as u64);
+        stats.mesh_lower_nanos = stats.mesh_lower_nanos.saturating_add(
+            super::metrics::elapsed_nanos_u64(lower_started)
+        );
         Ok(operations)
     }
 

@@ -270,6 +270,7 @@ fn ensure_geometry_unwritten(gal:&VulkanicGal,ops:&[CommandOp],buffer:Handle,sta
             | CommandOp::BindGraphicsPipeline(_) | CommandOp::BindComputePipeline(_)
             | CommandOp::SetVertexBuffer {..} | CommandOp::SetIndexBuffer {..}
             | CommandOp::Draw {..} | CommandOp::DrawIndexed {..} | CommandOp::DrawIndirect {..}
+            | CommandOp::DrawIndexedIndirect {..}
             | CommandOp::Dispatch {..} | CommandOp::DispatchIndirect {..}
             | CommandOp::CopyBufferToTexture(_) | CommandOp::CopyTexture(_)
             | CommandOp::CopyFrameTargetToTexture {..} | CommandOp::CopyTextureToFrameTarget {..}

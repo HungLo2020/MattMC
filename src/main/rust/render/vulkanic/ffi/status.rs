@@ -367,6 +367,8 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
             world_mesh_draw_record_nanos: profile.world_mesh_draw_record_nanos,
             world_mesh_stream_payload_bytes: profile.world_mesh_stream_payload_bytes,
             world_mesh_dynamic_offset_count: profile.world_mesh_dynamic_offset_count,
+            gui_mesh_prepare_nanos: profile.gui_mesh_prepare_nanos,
+            gui_mesh_lower_nanos: profile.gui_mesh_lower_nanos,
         }
     }
 }
@@ -1307,6 +1309,7 @@ pub(crate) fn texture_usage_state(raw: u32) -> GalResult<TextureUsageState> {
         8 => Ok(TextureUsageState::Present),
         9 => Ok(TextureUsageState::IndexRead),
         10 => Ok(TextureUsageState::ShaderStorageRead),
+        11 => Ok(TextureUsageState::IndirectRead),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown texture usage state {raw}"),

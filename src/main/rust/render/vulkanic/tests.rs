@@ -494,6 +494,27 @@ fn unsupported_indirect_and_presentation_commands_reject_before_backend_encoding
         }),
         "indirect draw",
     );
+    assert_unsupported(
+        gal.create_command_list(CommandListDesc {
+            label: "unsupported-indexed-indirect".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(_color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::DrawIndexedIndirect {
+                    buffer: indirect,
+                    offset: 0,
+                    draw_count: 1,
+                },
+                CommandOp::EndPass,
+            ],
+        }),
+        "indexed indirect draw",
+    );
     let present_texture = gal
         .create_texture(texture(
             "ordinary-color",
@@ -3242,6 +3263,81 @@ fn indirect_host_and_malformed_ranges_are_validated_semantically() {
         ],
     })
     .unwrap();
+
+    let index = gal
+        .create_buffer(buffer("indexed-indirect-index", vec![BufferUsage::Index]))
+        .unwrap();
+    gal.create_command_list(CommandListDesc {
+        label: "indexed-indirect-draw".to_owned(),
+        operations: vec![
+            CommandOp::BeginPass {
+                pass,
+                target,
+                colors: vec![color_attachment(color_view)],
+                depth_stencil: None,
+            },
+            CommandOp::BindGraphicsPipeline(pipeline),
+            CommandOp::SetIndexBuffer {
+                buffer: index,
+                offset: 0,
+                index_type: IndexType::U16,
+            },
+            CommandOp::DrawIndexedIndirect {
+                buffer: indirect,
+                offset: 0,
+                draw_count: 2,
+            },
+            CommandOp::EndPass,
+        ],
+    })
+    .unwrap();
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "indexed-indirect-missing-index".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::DrawIndexedIndirect {
+                    buffer: indirect,
+                    offset: 0,
+                    draw_count: 1,
+                },
+                CommandOp::EndPass,
+            ],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
+    assert_code(
+        gal.create_command_list(CommandListDesc {
+            label: "indexed-indirect-misaligned".to_owned(),
+            operations: vec![
+                CommandOp::BeginPass {
+                    pass,
+                    target,
+                    colors: vec![color_attachment(color_view)],
+                    depth_stencil: None,
+                },
+                CommandOp::BindGraphicsPipeline(pipeline),
+                CommandOp::SetIndexBuffer {
+                    buffer: index,
+                    offset: 0,
+                    index_type: IndexType::U16,
+                },
+                CommandOp::DrawIndexedIndirect {
+                    buffer: indirect,
+                    offset: 2,
+                    draw_count: 1,
+                },
+                CommandOp::EndPass,
+            ],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
 
     let host_wrong_memory = gal
         .create_buffer(buffer("host-wrong-memory", vec![BufferUsage::HostWrite]))

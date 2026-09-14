@@ -75,6 +75,7 @@ import org.joml.Vector3f;
  * renderer, atlas object or backend GPU state crosses into Rust.
  */
 public final class RustGalGuiItemRenderer {
+	private static final List<Integer> QUAD_INDICES = List.of(0, 1, 2, 2, 3, 0);
 	private static final boolean STANDARD_3D_ROUTE_DISABLED = Boolean.getBoolean("mattmc.rustGal.gui.standard3d.disabled");
 	private static final boolean DEBUG_STANDARD_3D_ITEM_ENABLED = Boolean.getBoolean("mattmc.rustGal.gui.standard3d.debugItem");
 	private static final int MAX_DIAGNOSTIC_ENTRIES = 256;
@@ -879,6 +880,12 @@ public final class RustGalGuiItemRenderer {
 			return List.of();
 		}
 		GuiItemMeshSemanticCollector.GuiItemMesh mesh = collected.mesh();
+		boolean cacheableRaster = !item.itemStackRenderState().isAnimated()
+			&& mesh.layers().stream().noneMatch(layer -> layer.itemFoil() != null);
+		long cacheIdentity = cacheableRaster
+			? GuiItemSemanticIdentities.identityOrZero(item.itemStackRenderState().getModelIdentity()) : 0;
+		VulkanicGalBridge.GuiItemCacheRecord itemCache = cacheIdentity != 0
+			? new VulkanicGalBridge.GuiItemCacheRecord(cacheIdentity, false) : null;
 		var clip = item.scissorArea();
 		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>();
 		float[] guiPose = mesh.guiPose();
@@ -889,23 +896,8 @@ public final class RustGalGuiItemRenderer {
 			GuiItemMeshSemanticCollector.GuiItemMeshLayer layer = mesh.layers().get(layerIndex);
 			float[] modelTransform = layer.modelTransform();
 			for (GuiItemMeshSemanticCollector.GuiItemMeshQuad quad : layer.quads()) {
-				float[] positions = quad.positions();
-				float[] atlasUvs = quad.atlasUvs();
-				float[] localUvs = quad.localUvs();
-				int[] colorsArgb = quad.colorsArgb();
-				int[] packedNormals = quad.packedNormals();
-				List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = new ArrayList<>(4);
-				for (int vertex = 0; vertex < 4; vertex++) {
-					int position = vertex * 3;
-					int uv = vertex * 2;
-					vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(
-						new float[] {positions[position], positions[position + 1], positions[position + 2]},
-						new float[] {atlasUvs[uv], atlasUvs[uv + 1]},
-						new float[] {localUvs[uv], localUvs[uv + 1]},
-						colorsArgb[vertex], packedNormals[vertex],
-						quad.lightFace() + 1, layer.sourceFoilType()
-					));
-				}
+				List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = layer.sourceFoilType() == 0
+					? quad.bridgeVertices() : quad.bridgeFoilVertices();
 				batches.add(new VulkanicGalBridge.GuiMeshBatchRecord(
 					requestLayerOrder, batchLayerIndex++,
 					guiMaterialMode(layer.materialMode()),
@@ -917,8 +909,8 @@ public final class RustGalGuiItemRenderer {
 					guiWidth, guiHeight, 0, 0, 0,
 					clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
 					clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(),
-					vertices, List.of(0, 1, 2, 2, 3, 0),
-					layer.itemFoil(), 0, null, mesh.blockItemRaster()
+					vertices, QUAD_INDICES,
+					layer.itemFoil(), 0, null, mesh.blockItemRaster(), itemCache
 				));
 			}
 		}
@@ -938,14 +930,15 @@ public final class RustGalGuiItemRenderer {
 				break;
 			}
 		}
-		item.itemStackRenderState().forEachSemanticLayer(layer -> {
-			for (BakedQuad face : layer.quads()) {
-				net.minecraft.client.dev.GraphicsAuditGuiFoilSource.record(face);
-				var sprite = ((BakedQuadView)(Object)face).getSprite();
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
-					sprite.semanticAnimationResource(),sprite.atlasLocation(),sprite.contents().name());
-			}
-		});
+		for (var use : mesh.atlasUses()) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+				use.resource(), use.atlas(), use.name());
+		}
+		if (Boolean.getBoolean("mattmc.dev.guiItemRasterTrace")) {
+			item.itemStackRenderState().forEachSemanticLayer(layer -> {
+				for (BakedQuad face : layer.quads()) net.minecraft.client.dev.GraphicsAuditGuiFoilSource.record(face);
+			});
+		}
 		recordDiagnostic("mesh-accepted-layers=" + batches.size());
 		return List.of(new RustGalGuiElementRenderState(
 			token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.item.standard3d", -1, -1.0F, GuiFillDirection.NONE,

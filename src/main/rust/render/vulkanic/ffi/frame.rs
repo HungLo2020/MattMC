@@ -217,19 +217,17 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
                 correlation_id: FrameCorrelationId(request.correlation_id),
                 wait_for: SubmissionId(request.wait_submission_id),
             })?;
-            // Presentation has synchronized the submitted frame.  Retire the complete
-            // Rust-owned submission prefix at this ownership boundary as well: resource
-            // uploads and the whole-frame submission can be newer than the frame token,
-            // and polling alone is allowed to lag behind the explicit timeline wait on
-            // drivers.  Using the latest Rust submission keeps command buffers,
-            // descriptor-backed resources, and deferred GAL destroys bounded without
-            // introducing a second presenter or borrowing Java/Iris state.
-            let latest_submission = context.gal.latest_submission_id();
-            context.gal.retire_through(latest_submission)?;
+            // `present_frame` has already waited for this frame's declared
+            // submission. Retire exactly that completed prefix. Waiting for
+            // the latest unrelated upload here serializes the producer and
+            // turns presentation into a hidden queue-idle boundary.
+            context.gal.retire_through(presented.completed_submission)?;
             if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
                 println!(
                     "vulkan.submission.present-retire frame={} waited={} retired_through={}",
-                    presented.frame.0, request.wait_submission_id, latest_submission.0,
+                    presented.frame.0,
+                    request.wait_submission_id,
+                    presented.completed_submission.0,
                 );
             }
             Ok(FfiFramePresentResult {

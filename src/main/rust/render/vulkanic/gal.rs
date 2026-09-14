@@ -2566,7 +2566,62 @@ impl VulkanicGal {
                             draw_count, capabilities.name, capabilities.limits.max_draw_count
                         ));
                     }
-                    self.validate_buffer_range(*buffer, *offset, 1, BufferUsage::Indirect)?;
+                    if *offset % 4 != 0 {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indirect draw offset must be four-byte aligned",
+                        ));
+                    }
+                    let bytes = u64::from(*draw_count).checked_mul(16).ok_or_else(|| {
+                        GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indirect draw byte range overflows",
+                        )
+                    })?;
+                    self.validate_buffer_range(*buffer, *offset, bytes, BufferUsage::Indirect)?;
+                }
+                CommandOp::DrawIndexedIndirect {
+                    buffer,
+                    offset,
+                    draw_count,
+                } => {
+                    if !capabilities.supports(BackendFeature::IndirectDraw) {
+                        return self.unsupported(format!(
+                            "backend '{}' does not support indexed indirect draw commands",
+                            capabilities.name
+                        ));
+                    }
+                    if !in_pass || graphics_pipeline.is_none() || *draw_count == 0 {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indexed indirect draw requires active pass, graphics pipeline, index buffer, and non-zero draw count",
+                        ));
+                    }
+                    if index_buffer.is_none() {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indexed indirect draw requires active index buffer",
+                        ));
+                    }
+                    if *draw_count > capabilities.limits.max_draw_count {
+                        return self.unsupported(format!(
+                            "indexed indirect draw count {} exceeds backend '{}' limit {}",
+                            draw_count, capabilities.name, capabilities.limits.max_draw_count
+                        ));
+                    }
+                    if *offset % 4 != 0 {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indexed indirect draw offset must be four-byte aligned",
+                        ));
+                    }
+                    let bytes = u64::from(*draw_count).checked_mul(20).ok_or_else(|| {
+                        GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indexed indirect draw byte range overflows",
+                        )
+                    })?;
+                    self.validate_buffer_range(*buffer, *offset, bytes, BufferUsage::Indirect)?;
                 }
                 CommandOp::Dispatch {
                     groups_x,
@@ -3119,6 +3174,11 @@ impl VulkanicGal {
                         )?;
                     }
                     CommandOp::DrawIndirect {
+                        buffer,
+                        offset,
+                        draw_count: _,
+                    }
+                    | CommandOp::DrawIndexedIndirect {
                         buffer,
                         offset,
                         draw_count: _,
@@ -4366,6 +4426,7 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
                 CommandOp::BindGraphicsPipeline(handle)
                 | CommandOp::BindComputePipeline(handle)
                 | CommandOp::DrawIndirect { buffer: handle, .. }
+                | CommandOp::DrawIndexedIndirect { buffer: handle, .. }
                 | CommandOp::DispatchIndirect { buffer: handle, .. }
                 | CommandOp::SetIndexBuffer { buffer: handle, .. }
                 | CommandOp::HostWriteBuffer { buffer: handle, .. }
@@ -4526,6 +4587,7 @@ pub(super) fn normalize_submission_batch(batch: &mut SubmissionBatch) -> Command
                 CommandOp::Draw { .. }
                 | CommandOp::DrawIndexed { .. }
                 | CommandOp::DrawIndirect { .. }
+                | CommandOp::DrawIndexedIndirect { .. }
                 | CommandOp::Dispatch { .. }
                 | CommandOp::DispatchIndirect { .. } => true,
             };
@@ -4549,7 +4611,9 @@ fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch)
                 }
                 CommandOp::BindResourceSet { .. } => profile.resource_set_binds += 1,
                 CommandOp::Draw { .. } => profile.draw_ops += 1,
-                CommandOp::DrawIndexed { .. } => profile.draw_indexed_ops += 1,
+                CommandOp::DrawIndexed { .. } | CommandOp::DrawIndexedIndirect { .. } => {
+                    profile.draw_indexed_ops += 1
+                }
                 CommandOp::HostWriteBuffer { data, .. } => {
                     profile.host_write_ops += 1;
                     profile.host_write_bytes =

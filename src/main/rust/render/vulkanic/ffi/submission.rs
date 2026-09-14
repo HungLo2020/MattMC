@@ -506,6 +506,18 @@ pub(crate) fn decode_command_op(
                 draw_count: op.count0,
             })
         }
+        20 => {
+            require_feature(capabilities, BackendFeature::IndirectDraw, "indexed indirect draw")?;
+            Ok(CommandOp::DrawIndexedIndirect {
+                buffer: require_handle(
+                    op.primary,
+                    HandleKind::Buffer,
+                    "indexed indirect draw buffer",
+                )?,
+                offset: op.offset,
+                draw_count: op.count0,
+            })
+        }
         10 => Ok(CommandOp::Dispatch {
             groups_x: op.count0,
             groups_y: op.count1,
@@ -819,6 +831,16 @@ pub(crate) fn serialize_command_op(out: &mut Vec<u8>, op: &CommandOp) {
             draw_count,
         } => {
             push_u32(out, FfiCommandOpKind::DrawIndirect as u32);
+            push_u64(out, buffer.raw());
+            push_u64(out, *offset);
+            push_u32(out, *draw_count);
+        }
+        CommandOp::DrawIndexedIndirect {
+            buffer,
+            offset,
+            draw_count,
+        } => {
+            push_u32(out, FfiCommandOpKind::DrawIndexedIndirect as u32);
             push_u64(out, buffer.raw());
             push_u64(out, *offset);
             push_u32(out, *draw_count);

@@ -126,6 +126,8 @@ pub struct WholeFrameProfile {
     pub world_mesh_draw_record_nanos: u64,
     pub world_mesh_stream_payload_bytes: u64,
     pub world_mesh_dynamic_offset_count: u64,
+    pub gui_mesh_prepare_nanos: u64,
+    pub gui_mesh_lower_nanos: u64,
 }
 
 #[inline]

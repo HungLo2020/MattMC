@@ -360,6 +360,10 @@ pub(crate) struct TerrainMeshDraw {
     pub index_type: IndexType,
     pub index_count: u32,
     pub instance_count: u32,
+    /// Optional address of one packed VkDrawIndexedIndirectCommand-compatible
+    /// record. Consecutive draws with identical bindings are coalesced by the
+    /// runtime into one backend-neutral multidraw command.
+    pub indexed_indirect: Option<TerrainIndexedIndirect>,
     /// Semantic producer stratum.  The terrain graph uses this to keep
     /// translucent entity meshes out of the deferred capture when Fabulous
     /// owns their named `item_entity` attachment.
@@ -370,6 +374,12 @@ pub(crate) struct TerrainMeshDraw {
     /// route declares that omission up front; missing shadow bindings for
     /// ordinary terrain remain a hard error.
     pub shadow_participation: TerrainShadowParticipation,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct TerrainIndexedIndirect {
+    pub buffer: Handle,
+    pub offset: u64,
 }
 
 /// A direct world-material batch which must be composed after deferred terrain
@@ -6659,6 +6669,7 @@ impl ShaderPackRuntimeExecutor {
                 draw.index_type,
                 draw.index_count,
                 draw.instance_count,
+                draw.indexed_indirect,
             );
         }
         ops.push(CommandOp::EndPass);
@@ -6863,6 +6874,7 @@ impl ShaderPackRuntimeExecutor {
                 draw.index_type,
                 draw.index_count,
                 draw.instance_count,
+                None,
             );
         }
         ops.push(CommandOp::EndPass);
@@ -7104,6 +7116,7 @@ impl ShaderPackRuntimeExecutor {
                 draw.index_type,
                 draw.index_count,
                 draw.instance_count,
+                draw.indexed_indirect,
             );
         }
         ops.push(CommandOp::EndPass);
@@ -7238,6 +7251,7 @@ impl ShaderPackRuntimeExecutor {
                     draw.index_type,
                     draw.index_count,
                     draw.instance_count,
+                    draw.indexed_indirect,
                 );
             }
             ops.push(CommandOp::EndPass);
@@ -7459,6 +7473,7 @@ impl ShaderPackRuntimeExecutor {
                     draw.index_type,
                     draw.index_count,
                     draw.instance_count,
+                    draw.indexed_indirect,
                 );
             }
             ops.push(CommandOp::EndPass);
@@ -7535,6 +7550,7 @@ impl ShaderPackRuntimeExecutor {
                 draw.index_type,
                 draw.index_count,
                 draw.instance_count,
+                draw.indexed_indirect,
             );
         }
         ops.push(CommandOp::EndPass);
@@ -7619,6 +7635,7 @@ impl ShaderPackRuntimeExecutor {
                 draw.index_type,
                 draw.index_count,
                 draw.instance_count,
+                None,
             );
         }
         ops.push(CommandOp::EndPass);
@@ -7830,6 +7847,7 @@ fn append_indexed_draw(
     index_type: IndexType,
     index_count: u32,
     instance_count: u32,
+    indexed_indirect: Option<TerrainIndexedIndirect>,
 ) {
     if state.pipeline != Some(pipeline) {
         ops.push(CommandOp::BindGraphicsPipeline(pipeline));
@@ -7874,10 +7892,25 @@ fn append_indexed_draw(
         });
         state.index_buffer = Some(index_binding);
     }
-    ops.push(CommandOp::DrawIndexed {
-        indices: index_count,
-        instances: instance_count,
-    });
+    if let Some(indirect) = indexed_indirect {
+        if let Some(CommandOp::DrawIndexedIndirect { buffer, offset, draw_count }) = ops.last_mut() {
+            let expected = offset.saturating_add(u64::from(*draw_count) * 20);
+            if *buffer == indirect.buffer && expected == indirect.offset {
+                *draw_count = draw_count.saturating_add(1);
+                return;
+            }
+        }
+        ops.push(CommandOp::DrawIndexedIndirect {
+            buffer: indirect.buffer,
+            offset: indirect.offset,
+            draw_count: 1,
+        });
+    } else {
+        ops.push(CommandOp::DrawIndexed {
+            indices: index_count,
+            instances: instance_count,
+        });
+    }
 }
 
 fn buffer_barrier(
@@ -7974,6 +8007,7 @@ mod tests {
             index_type: IndexType::U32,
             index_count: 3,
             instance_count: 1,
+            indexed_indirect: None,
             stratum,
             material_mode: TerrainMaterialPassMode::Translucent,
             shadow_participation: TerrainShadowParticipation::Unavailable,
@@ -11065,6 +11099,7 @@ mod tests {
             IndexType::U32,
             6,
             1,
+            None,
         );
         append_indexed_draw(
             &mut ops,
@@ -11079,6 +11114,7 @@ mod tests {
             IndexType::U32,
             6,
             2,
+            None,
         );
         append_indexed_draw(
             &mut ops,
@@ -11093,6 +11129,7 @@ mod tests {
             IndexType::U32,
             6,
             3,
+            None,
         );
         append_indexed_draw(
             &mut ops,
@@ -11107,6 +11144,7 @@ mod tests {
             IndexType::U32,
             6,
             4,
+            None,
         );
         append_indexed_draw(
             &mut ops,
@@ -11121,6 +11159,7 @@ mod tests {
             IndexType::U32,
             6,
             5,
+            None,
         );
 
         let pipeline_binds = ops
@@ -11147,6 +11186,33 @@ mod tests {
     }
 
     #[test]
+    fn indexed_indirect_emission_coalesces_contiguous_compatible_records() {
+        let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+        let layout = test_handle(HandleKind::PipelineLayout, 2);
+        let set = test_handle(HandleKind::ResourceSet, 3);
+        let index = test_handle(HandleKind::Buffer, 4);
+        let indirect = test_handle(HandleKind::Buffer, 5);
+        let mut ops = Vec::new();
+        let mut state = IndexedDrawState::default();
+        for offset in [0, 20, 40] {
+            append_indexed_draw(
+                &mut ops, &mut state, pipeline, layout, set, &[0, 0], None,
+                index, 0, IndexType::U32, 6, 1,
+                Some(TerrainIndexedIndirect { buffer: indirect, offset }),
+            );
+        }
+        assert!(matches!(
+            ops.last(),
+            Some(CommandOp::DrawIndexedIndirect { buffer, offset: 0, draw_count: 3 })
+                if *buffer == indirect
+        ));
+        assert_eq!(
+            1,
+            ops.iter().filter(|op| matches!(op, CommandOp::DrawIndexedIndirect { .. })).count()
+        );
+    }
+
+    #[test]
     fn indexed_draw_emission_distinguishes_static_and_dynamic_set_bindings() {
         let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
         let layout = test_handle(HandleKind::PipelineLayout, 2);
@@ -11168,6 +11234,7 @@ mod tests {
             IndexType::U32,
             6,
             1,
+            None,
         );
         append_indexed_draw(
             &mut ops,
@@ -11182,6 +11249,7 @@ mod tests {
             IndexType::U32,
             6,
             1,
+            None,
         );
         append_indexed_draw(
             &mut ops,
@@ -11196,6 +11264,7 @@ mod tests {
             IndexType::U32,
             6,
             1,
+            None,
         );
 
         let dynamic_offsets = ops
@@ -11248,6 +11317,7 @@ mod tests {
                 IndexType::U32,
                 6,
                 1,
+                None,
             );
         }
         let shader_binds = ops
