@@ -38,7 +38,9 @@ pub(crate) struct PreparedAtlasTick {
 }
 
 impl PreparedAtlasTick {
-    pub(crate) fn texture_id(&self) -> u32 { self.texture_id }
+    pub(crate) fn texture_id(&self) -> u32 {
+        self.texture_id
+    }
     pub(crate) fn patches(&self) -> &[SpriteAtlasPatch] {
         &self.patches
     }
@@ -46,16 +48,27 @@ impl PreparedAtlasTick {
 
 impl OwnedAtlasAnimationUpdate {
     pub(crate) fn source_metadata_counts(&self) -> GalResult<(usize, usize)> {
-        self.sprites.iter().try_fold((0usize, 0usize), |(frames, mips), sprite| {
-            let invalid = || GalError::invalid_argument("animation metadata count overflow");
-            Ok((frames.checked_add(sprite.clock.frames.len()).ok_or_else(invalid)?,
-                mips.checked_add(sprite.sheets.len()).ok_or_else(invalid)?))
-        })
+        self.sprites
+            .iter()
+            .try_fold((0usize, 0usize), |(frames, mips), sprite| {
+                let invalid = || GalError::invalid_argument("animation metadata count overflow");
+                Ok((
+                    frames
+                        .checked_add(sprite.clock.frames.len())
+                        .ok_or_else(invalid)?,
+                    mips.checked_add(sprite.sheets.len()).ok_or_else(invalid)?,
+                ))
+            })
     }
     pub(crate) fn source_payload_bytes(&self) -> GalResult<usize> {
-        self.sprites.iter().flat_map(|sprite| &sprite.sheets).try_fold(0usize, |total, sheet|
-            total.checked_add(sheet.rgba.len())
-                .ok_or_else(|| GalError::invalid_argument("animation source byte count overflow")))
+        self.sprites
+            .iter()
+            .flat_map(|sprite| &sprite.sheets)
+            .try_fold(0usize, |total, sheet| {
+                total.checked_add(sheet.rgba.len()).ok_or_else(|| {
+                    GalError::invalid_argument("animation source byte count overflow")
+                })
+            })
     }
     pub(crate) fn prepare_tick(
         &self,
@@ -322,7 +335,12 @@ impl PreparedSpriteTick {
 impl SpriteAnimationClock {
     /// Observation only: declared frame position, sheet frame, subframe and accepted tick.
     pub(crate) fn diagnostic_state(&self) -> (usize, u32, u32, u64) {
-        (self.frame, self.frames[self.frame].index, self.subframe, self.last_tick)
+        (
+            self.frame,
+            self.frames[self.frame].index,
+            self.subframe,
+            self.last_tick,
+        )
     }
 
     pub(crate) fn diagnostic_retained_pixel_state(&self) -> (usize, u32, u32, u64) {
@@ -428,8 +446,9 @@ impl SpriteAnimationClock {
         let update = if !self.interpolate && (!animate_only_visible || visible) {
             let retained_sheet = self.frames[self.retained_pixel_state.0].index;
             let selected_sheet = self.frames[frame].index;
-            (retained_sheet != selected_sheet)
-                .then_some(SpriteFrameUpdate::Copy { index: selected_sheet })
+            (retained_sheet != selected_sheet).then_some(SpriteFrameUpdate::Copy {
+                index: selected_sheet,
+            })
         } else {
             update
         };
@@ -755,22 +774,42 @@ mod tests {
     fn retained_pixel_phase_changes_only_when_an_upload_transition_is_committed() {
         let mut atlas = two_sprite_atlas();
         let visible = std::collections::BTreeSet::from([1]);
-        assert_eq!(atlas.sprites[0].clock.diagnostic_retained_pixel_state(), (0, 0, 0, 0));
+        assert_eq!(
+            atlas.sprites[0].clock.diagnostic_retained_pixel_state(),
+            (0, 0, 0, 0)
+        );
         let rejected = atlas.prepare_tick(2, 1, 1, 1, &visible, true).unwrap();
         drop(rejected);
-        assert_eq!(atlas.sprites[0].clock.diagnostic_retained_pixel_state(), (0, 0, 0, 0));
+        assert_eq!(
+            atlas.sprites[0].clock.diagnostic_retained_pixel_state(),
+            (0, 0, 0, 0)
+        );
         let accepted = atlas.prepare_tick(2, 1, 1, 1, &visible, true).unwrap();
         atlas.commit_tick(accepted).unwrap();
-        assert_eq!(atlas.sprites[0].clock.diagnostic_retained_pixel_state(), (0, 0, 1, 1));
-        assert_eq!(atlas.sprites[1].clock.diagnostic_retained_pixel_state(), (0, 0, 0, 0));
-        let invisible = atlas.prepare_tick(2, 1, 1, 2, &Default::default(), true).unwrap();
+        assert_eq!(
+            atlas.sprites[0].clock.diagnostic_retained_pixel_state(),
+            (0, 0, 1, 1)
+        );
+        assert_eq!(
+            atlas.sprites[1].clock.diagnostic_retained_pixel_state(),
+            (0, 0, 0, 0)
+        );
+        let invisible = atlas
+            .prepare_tick(2, 1, 1, 2, &Default::default(), true)
+            .unwrap();
         atlas.commit_tick(invisible).unwrap();
         assert_eq!(atlas.sprites[0].clock.diagnostic_state(), (1, 1, 0, 2));
-        assert_eq!(atlas.sprites[0].clock.diagnostic_retained_pixel_state(), (0, 0, 1, 1));
+        assert_eq!(
+            atlas.sprites[0].clock.diagnostic_retained_pixel_state(),
+            (0, 0, 1, 1)
+        );
         let mut other = two_sprite_atlas();
         let foreign = other.prepare_tick(2, 1, 1, 1, &visible, true).unwrap();
         assert!(atlas.commit_tick(foreign).is_err());
-        assert_eq!(atlas.sprites[0].clock.diagnostic_retained_pixel_state(), (0, 0, 1, 1));
+        assert_eq!(
+            atlas.sprites[0].clock.diagnostic_retained_pixel_state(),
+            (0, 0, 1, 1)
+        );
         // The single-clock transaction path follows the same acceptance rule.
         let clock = &mut other.sprites[0].clock;
         let step = clock.prepare_tick(1, true, true).unwrap();
@@ -828,12 +867,10 @@ mod tests {
         assert_eq!(candidate.patches()[0].sprite_id, 1);
         assert_eq!(candidate.patches()[0].region.x, 0);
         assert_eq!(candidate.patches()[0].mip_pixels, vec![vec![60, 70, 80, 7]]);
-        assert!(
-            atlas
-                .sprites
-                .iter()
-                .all(|sprite| sprite.clock.last_tick == 0)
-        );
+        assert!(atlas
+            .sprites
+            .iter()
+            .all(|sprite| sprite.clock.last_tick == 0));
         assert_eq!(
             atlas.sprites[0].sheets[0].rgba,
             [10, 20, 30, 7, 110, 120, 130, 99]
@@ -841,35 +878,27 @@ mod tests {
         drop(candidate); // upload rejected/cancelled: same tick remains retryable
         let retry = atlas.prepare_tick(2, 1, 1, 1, &visible, true).unwrap();
         atlas.commit_tick(retry).unwrap();
-        assert!(
-            atlas
-                .sprites
-                .iter()
-                .all(|sprite| sprite.clock.last_tick == 1)
-        );
-        assert!(
-            atlas
-                .prepare_tick(2, 1, 1, 1, &visible, true)
-                .unwrap()
-                .patches()
-                .is_empty()
-        );
+        assert!(atlas
+            .sprites
+            .iter()
+            .all(|sprite| sprite.clock.last_tick == 1));
+        assert!(atlas
+            .prepare_tick(2, 1, 1, 1, &visible, true)
+            .unwrap()
+            .patches()
+            .is_empty());
         let invisible = atlas
             .prepare_tick(2, 1, 1, 2, &std::collections::BTreeSet::new(), true)
             .unwrap();
         assert!(invisible.patches().is_empty());
         atlas.commit_tick(invisible).unwrap();
-        assert!(
-            atlas
-                .sprites
-                .iter()
-                .all(|sprite| sprite.clock.last_tick == 2)
-        );
-        assert!(
-            atlas
-                .prepare_tick(2, 1, 1, 3, &std::collections::BTreeSet::from([99]), true)
-                .is_err()
-        );
+        assert!(atlas
+            .sprites
+            .iter()
+            .all(|sprite| sprite.clock.last_tick == 2));
+        assert!(atlas
+            .prepare_tick(2, 1, 1, 3, &std::collections::BTreeSet::from([99]), true)
+            .is_err());
     }
 
     #[test]
@@ -887,12 +916,10 @@ mod tests {
         let mut replacement = two_sprite_atlas();
         let pending = original.prepare_tick(2, 1, 1, 1, &visible, true).unwrap();
         assert!(replacement.commit_tick(pending).is_err());
-        assert!(
-            replacement
-                .sprites
-                .iter()
-                .all(|sprite| sprite.clock.last_tick == 0)
-        );
+        assert!(replacement
+            .sprites
+            .iter()
+            .all(|sprite| sprite.clock.last_tick == 0));
     }
 
     #[test]
@@ -933,11 +960,9 @@ mod tests {
         let stale = clock.prepare_tick(41, true, true).unwrap();
         // Identical metadata on a new atlas incarnation is not the same clock.
         let mut replacement = make_clock();
-        assert!(
-            replacement
-                .commit_tick(clock.prepare_tick(41, true, true).unwrap())
-                .is_err()
-        );
+        assert!(replacement
+            .commit_tick(clock.prepare_tick(41, true, true).unwrap())
+            .is_err());
         assert!(replacement.prepare_tick(42, true, true).is_err());
         clock.commit_tick(retry).unwrap();
         assert!(clock.commit_tick(stale).is_err());
@@ -950,9 +975,16 @@ mod tests {
 
     #[test]
     fn diagnostic_clock_observation_does_not_commit_prepared_ticks() {
-        let mut clock = SpriteAnimationClock::new(vec![SpriteAnimationFrame {
-            index: 2, duration_ticks: 4,
-        }], 3, true, 0).unwrap();
+        let mut clock = SpriteAnimationClock::new(
+            vec![SpriteAnimationFrame {
+                index: 2,
+                duration_ticks: 4,
+            }],
+            3,
+            true,
+            0,
+        )
+        .unwrap();
         assert_eq!(clock.diagnostic_state(), (0, 2, 0, 0));
         let pending = clock.prepare_tick(1, true, true).unwrap();
         assert_eq!(clock.diagnostic_state(), (0, 2, 0, 0));
@@ -992,17 +1024,15 @@ mod tests {
         };
         let mut atlas = vec![vec![0; 3]];
         let candidate = clock.prepare_tick(1, true, true).unwrap();
-        assert!(
-            apply_sprite_sheet_update(
-                1,
-                1,
-                &mut atlas,
-                &region,
-                &sheets,
-                candidate.update().unwrap()
-            )
-            .is_err()
-        );
+        assert!(apply_sprite_sheet_update(
+            1,
+            1,
+            &mut atlas,
+            &region,
+            &sheets,
+            candidate.update().unwrap()
+        )
+        .is_err());
         drop(candidate);
         atlas[0].push(0);
         let retry = clock.prepare_tick(1, true, true).unwrap();
@@ -1105,45 +1135,58 @@ mod tests {
         };
         let mut atlas = vec![vec![9; 16], vec![8; 4]];
         let original = atlas.clone();
-        assert!(
-            apply_sprite_sheet_update(
-                2,
-                2,
-                &mut atlas,
-                &region,
-                &sheets,
-                SpriteFrameUpdate::Copy { index: 0 }
-            )
-            .is_err()
-        );
+        assert!(apply_sprite_sheet_update(
+            2,
+            2,
+            &mut atlas,
+            &region,
+            &sheets,
+            SpriteFrameUpdate::Copy { index: 0 }
+        )
+        .is_err());
         assert_eq!(atlas, original);
         sheets[1] = SpriteMipSheet {
             width: 2,
             height: 1,
             rgba: vec![0; 8],
         };
-        assert!(
-            apply_sprite_sheet_update(
-                2,
-                2,
-                &mut atlas,
-                &region,
-                &sheets,
-                SpriteFrameUpdate::Copy { index: 2 }
-            )
-            .is_err()
-        );
+        assert!(apply_sprite_sheet_update(
+            2,
+            2,
+            &mut atlas,
+            &region,
+            &sheets,
+            SpriteFrameUpdate::Copy { index: 2 }
+        )
+        .is_err());
         assert_eq!(atlas, original);
     }
 
     #[test]
     fn discrete_visible_tick_recovers_a_boundary_skipped_without_use() {
-        let mut clock = SpriteAnimationClock::new(vec![
-            SpriteAnimationFrame { index: 2, duration_ticks: 3 },
-            SpriteAnimationFrame { index: 0, duration_ticks: 5 },
-            SpriteAnimationFrame { index: 0, duration_ticks: 2 },
-        ], 3, false, 0).unwrap();
-        for tick in 1..=3 { assert_eq!(clock.tick(tick, false, true).unwrap(), None); }
+        let mut clock = SpriteAnimationClock::new(
+            vec![
+                SpriteAnimationFrame {
+                    index: 2,
+                    duration_ticks: 3,
+                },
+                SpriteAnimationFrame {
+                    index: 0,
+                    duration_ticks: 5,
+                },
+                SpriteAnimationFrame {
+                    index: 0,
+                    duration_ticks: 2,
+                },
+            ],
+            3,
+            false,
+            0,
+        )
+        .unwrap();
+        for tick in 1..=3 {
+            assert_eq!(clock.tick(tick, false, true).unwrap(), None);
+        }
         assert_eq!(clock.diagnostic_retained_pixel_state(), (0, 2, 0, 0));
         let retry = clock.prepare_tick(4, true, true).unwrap();
         assert_eq!(retry.update(), Some(SpriteFrameUpdate::Copy { index: 0 }));
@@ -1154,7 +1197,9 @@ mod tests {
         let accepted = clock.prepare_tick(4, true, true).unwrap();
         clock.commit_tick(accepted).unwrap();
         assert_eq!(clock.diagnostic_retained_pixel_state(), (1, 0, 1, 4));
-        for tick in 5..=9 { assert_eq!(clock.tick(tick, true, true).unwrap(), None); }
+        for tick in 5..=9 {
+            assert_eq!(clock.tick(tick, true, true).unwrap(), None);
+        }
         assert_eq!(clock.diagnostic_state(), (2, 0, 1, 9));
         assert_eq!(clock.diagnostic_retained_pixel_state(), (1, 0, 1, 4));
     }
@@ -1302,12 +1347,10 @@ mod tests {
             }
         }
         assert_eq!(&atlas[1][20..28], &[127, 128, 55, 99].repeat(2));
-        assert!(
-            atlas[1][..20]
-                .iter()
-                .chain(&atlas[1][28..])
-                .all(|byte| *byte == 8)
-        );
+        assert!(atlas[1][..20]
+            .iter()
+            .chain(&atlas[1][28..])
+            .all(|byte| *byte == 8));
         assert_eq!(
             pointers,
             atlas.iter().map(|mip| mip.as_ptr()).collect::<Vec<_>>()
@@ -1357,23 +1400,21 @@ mod tests {
         }
         let mut atlas = vec![vec![11; 64], vec![12; 15]];
         let original = atlas.clone();
-        assert!(
-            interpolate_sprite_into_atlas(
-                4,
-                4,
-                &mut atlas,
-                &SpriteAtlasRegion {
-                    x: 0,
-                    y: 0,
-                    width: 2,
-                    height: 2
-                },
-                1,
-                2,
-                &frames
-            )
-            .is_err()
-        );
+        assert!(interpolate_sprite_into_atlas(
+            4,
+            4,
+            &mut atlas,
+            &SpriteAtlasRegion {
+                x: 0,
+                y: 0,
+                width: 2,
+                height: 2
+            },
+            1,
+            2,
+            &frames
+        )
+        .is_err());
         assert_eq!(atlas, original);
     }
 
@@ -1472,25 +1513,23 @@ mod tests {
         }
         assert!(interpolate_sprite_mips(1, 1, 0, 1, &[]).is_err());
         let base = [0; 16];
-        assert!(
-            interpolate_sprite_mips(
-                2,
-                2,
-                0,
-                1,
-                &[
-                    SpriteMipFrames {
-                        current_rgba: &base,
-                        next_rgba: &base
-                    },
-                    SpriteMipFrames {
-                        current_rgba: &pixel,
-                        next_rgba: &[]
-                    },
-                ]
-            )
-            .is_err()
-        );
+        assert!(interpolate_sprite_mips(
+            2,
+            2,
+            0,
+            1,
+            &[
+                SpriteMipFrames {
+                    current_rgba: &base,
+                    next_rgba: &base
+                },
+                SpriteMipFrames {
+                    current_rgba: &pixel,
+                    next_rgba: &[]
+                },
+            ]
+        )
+        .is_err());
     }
 }
 /// One semantic texture-manager tick, independent of presentation cadence.

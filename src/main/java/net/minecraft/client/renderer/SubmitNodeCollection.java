@@ -910,8 +910,11 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 					"rust-vulkan-unavailable", textureAtlasSprite == null ? null : textureAtlasSprite.contents().name(),
 					model.getClass().getName(), false, false, false);
+			String semanticReason = net.vulkanic.world.RustGalWorldPrimitiveRenderer.modelMeshIneligibilityReason(
+				model, renderType, textureAtlasSprite, j, l, crumblingOverlay);
 			throw new IllegalStateException(
 				"Rust whole-frame model route has no semantic mesh for " + model.getClass().getName()
+					+ " (reason=" + semanticReason + ")"
 			);
 		}
 		if (rustRoute.usesRustWholeFrameVulkan()) {

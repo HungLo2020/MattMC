@@ -30,8 +30,24 @@ import java.util.concurrent.CompletableFuture;
 public class ColumnRenderBufferBuilder
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+	private static final String DISABLE_CAPTURE_HORIZONTAL_CONTRIBUTOR_BOXES =
+		"MATTMC_CAPTURE_DH_DISABLE_HORIZONTAL_CONTRIBUTOR_BOXES";
 	
 	public static final PhantomArrayListPool ARRAY_LIST_POOL = new PhantomArrayListPool("Column Buffer Builder");
+
+	/**
+	 * Keeps the heterogeneous coarse-cell geometry probe capture-only. Exact
+	 * material topology may emit contributor boxes; this switch can isolate
+	 * their raster coverage from copied material and compositor stages while
+	 * comparing against Frozen's legacy coarse box.
+	 */
+	private static boolean horizontalContributorBoxesEnabled()
+	{
+		return !(Boolean.parseBoolean(System.getenv().getOrDefault(
+			"MATTMC_GRAPHICS_AUDIT", "false"))
+			&& Boolean.parseBoolean(System.getenv().getOrDefault(
+				DISABLE_CAPTURE_HORIZONTAL_CONTRIBUTOR_BOXES, "false")));
+	}
 	
 	
 	
@@ -615,7 +631,9 @@ public class ColumnRenderBufferBuilder
 				throw new IllegalArgumentException("Unknown debug mode: " + debugging);
 		}
 		
-		if (detailLevel > 0 && emitHorizontalContributorBoxes(
+		if (detailLevel > 0
+			&& net.vulkanic.world.DistantHorizonsSemanticCollector.usesExactMaterialTopologyBuild()
+			&& horizontalContributorBoxesEnabled() && emitHorizontalContributorBoxes(
 			quadBuilder, renderSource, phantomArrayCheckout, clientLevel, blockMinX, blockMinY, blockMinZ, blockWidth, blockMaxY,
 							color, blockMaterialId, RenderDataPointUtil.getLightSky(renderData),
 							fullBright ? LodUtil.MAX_MC_LIGHT : RenderDataPointUtil.getLightBlock(renderData),

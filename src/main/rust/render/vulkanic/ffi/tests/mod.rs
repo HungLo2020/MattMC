@@ -1,5 +1,7 @@
 use super::*;
-use crate::render::vulkanic::resources::{BackendApi, BackendFeatureFlags, BackendLimits, BlendMode};
+use crate::render::vulkanic::resources::{
+    BackendApi, BackendFeatureFlags, BackendLimits, BlendMode,
+};
 use crate::render::vulkanic::world_primitive_frontend::world_text::WORLD_TEXT_DEPTH_POLYGON_OFFSET;
 use crate::render::vulkanic::world_primitive_frontend::{
     WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED,
@@ -9,8 +11,9 @@ use crate::render::vulkanic::world_primitive_frontend::{
     WORLD_MATERIAL_SOURCE_PARTICLES, WORLD_MATERIAL_SOURCE_TEXTURED,
     WORLD_MATERIAL_SOURCE_UNSPECIFIED, WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
     WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS, WORLD_MATERIAL_SOURCE_WEATHER,
-    WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB, WORLD_MATERIAL_TEXTURE_STONE, WORLD_MAX_MESH_VERTICES,
-    WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
+    WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB, WORLD_MATERIAL_TEXTURE_GENERATED_WHITE,
+    WORLD_MATERIAL_TEXTURE_STONE, WORLD_MAX_MESH_VERTICES, WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
+    WORLD_STRATUM_DH_GENERIC,
 };
 
 fn test_capabilities() -> BackendCapabilities {
@@ -61,95 +64,185 @@ fn blend_mode_wire_values_cover_every_declared_mode_including_crumbling() {
         BlendMode::TerrainTranslucent,
         BlendMode::AlphaPreserveAlpha,
         BlendMode::Crumbling,
+        BlendMode::AlphaSource,
     ];
     for (index, expected_mode) in expected.into_iter().enumerate() {
         assert_eq!(expected_mode, status::blend_mode(index as u32 + 1).unwrap());
     }
-    let error = status::blend_mode(13).expect_err("unassigned blend mode must fail closed");
+    let error = status::blend_mode(14).expect_err("unassigned blend mode must fail closed");
     assert_eq!(StatusCode::UnknownEnum, error.code);
 }
 
 fn semantic_particle_record() -> FfiWorldParticleQuadRequest {
     FfiWorldParticleQuadRequest {
         byte_size: size_of::<FfiWorldParticleQuadRequest>() as u32,
-        texture_id: 0x50415254, surface_kind: 1, material_index: 0,
-        center: [1.0,2.0,3.0], rotation: [0.0,0.0,0.0,1.0], size: 0.5,
-        uv_bounds: [0.0,1.0,0.0,1.0], color_argb: 0x80ffffff, packed_light: 240,
+        texture_id: 0x50415254,
+        surface_kind: 1,
+        material_index: 0,
+        center: [1.0, 2.0, 3.0],
+        rotation: [0.0, 0.0, 0.0, 1.0],
+        size: 0.5,
+        uv_bounds: [0.0, 1.0, 0.0, 1.0],
+        color_argb: 0x80ffffff,
+        packed_light: 240,
     }
 }
 
 fn semantic_orb_instance() -> FfiWorldExperienceOrbInstanceRecord {
     FfiWorldExperienceOrbInstanceRecord {
-        byte_size:size_of::<FfiWorldExperienceOrbInstanceRecord>() as u32,
-        mesh_index:0, mesh_key:0x0b01, mesh_generation:2,
-        entity_transform:[1.0,0.0,0.0,0.0, 0.0,1.0,0.0,0.0,
-            0.0,0.0,1.0,0.0, 1.25,-0.7,2.5,1.0],
-        camera_orientation:[0.0,0.0,0.0,1.0], entity_id:42, reserved0:0,
+        byte_size: size_of::<FfiWorldExperienceOrbInstanceRecord>() as u32,
+        mesh_index: 0,
+        mesh_key: 0x0b01,
+        mesh_generation: 2,
+        entity_transform: [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.25, -0.7, 2.5, 1.0,
+        ],
+        camera_orientation: [0.0, 0.0, 0.0, 1.0],
+        entity_id: 42,
+        reserved0: 0,
     }
 }
 
 #[test]
 fn experience_orb_frame_transport_lowers_placement_and_preserves_mesh_order() {
-    let meshes = [mesh_instance(), FfiWorldMeshInstanceRecord {mesh_key:45,..mesh_instance()}];
-    let mut orbs = [semantic_orb_instance(), FfiWorldExperienceOrbInstanceRecord {
-        mesh_key:0x0b02, mesh_index:1,..semantic_orb_instance()
-    }, FfiWorldExperienceOrbInstanceRecord {
-        mesh_key:0x0b03, mesh_index:1,..semantic_orb_instance()
-    }, FfiWorldExperienceOrbInstanceRecord {
-        mesh_key:0x0b04, mesh_index:2,..semantic_orb_instance()
-    }];
+    let meshes = [
+        mesh_instance(),
+        FfiWorldMeshInstanceRecord {
+            mesh_key: 45,
+            ..mesh_instance()
+        },
+    ];
+    let mut orbs = [
+        semantic_orb_instance(),
+        FfiWorldExperienceOrbInstanceRecord {
+            mesh_key: 0x0b02,
+            mesh_index: 1,
+            ..semantic_orb_instance()
+        },
+        FfiWorldExperienceOrbInstanceRecord {
+            mesh_key: 0x0b03,
+            mesh_index: 1,
+            ..semantic_orb_instance()
+        },
+        FfiWorldExperienceOrbInstanceRecord {
+            mesh_key: 0x0b04,
+            mesh_index: 2,
+            ..semantic_orb_instance()
+        },
+    ];
     let mut request = whole_frame_request_with_mesh_instances(&meshes);
-    request.world_experience_orbs = FfiSlice { ptr:orbs.as_ptr(), count:4 };
-    let (_,_,frame,_) = unsafe {decode_whole_frame_submit(&request, test_vulkan_capabilities())}.unwrap();
-    assert_eq!(frame.mesh_instances.iter().map(|i|i.mesh_key).collect::<Vec<_>>(),
-        vec![0x0b01,44,0x0b02,0x0b03,45,0x0b04]);
+    request.world_experience_orbs = FfiSlice {
+        ptr: orbs.as_ptr(),
+        count: 4,
+    };
+    let (_, _, frame, _) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+    assert_eq!(
+        frame
+            .mesh_instances
+            .iter()
+            .map(|i| i.mesh_key)
+            .collect::<Vec<_>>(),
+        vec![0x0b01, 44, 0x0b02, 0x0b03, 45, 0x0b04]
+    );
     let instance = &frame.mesh_instances[0];
     assert_eq!(instance.depth_policy, WORLD_DEPTH_POLICY_TEST_WRITE);
     assert_eq!(instance.stratum, WORLD_STRATUM_ENTITY_MESH);
     assert_eq!(instance.cull_policy, WORLD_CULL_BACK);
-    assert_eq!(instance.entity_id,42);
-    assert_eq!(instance.transform[0],0.3);
-    assert!((instance.transform[13]+0.6).abs()<1e-6);
+    assert_eq!(instance.entity_id, 42);
+    assert_eq!(instance.transform[0], 0.3);
+    assert!((instance.transform[13] + 0.6).abs() < 1e-6);
     orbs[0].entity_transform[12] = 999.0;
-    assert_eq!(instance.transform[12],1.25);
-    assert_eq!(orbs[0].entity_transform[12],999.0);
+    assert_eq!(instance.transform[12], 1.25);
+    assert_eq!(orbs[0].entity_transform[12], 999.0);
     let layout = super::layout::layout_for_struct(110).unwrap();
-    assert_eq!(layout.byte_size,112);
-    assert_eq!(&layout.field_offsets[..8],&[0,4,8,16,24,88,104,108]);
+    assert_eq!(layout.byte_size, 112);
+    assert_eq!(&layout.field_offsets[..8], &[0, 4, 8, 16, 24, 88, 104, 108]);
     let layout = super::layout::layout_for_struct(53).unwrap();
-    assert_eq!(layout.field_offsets[45],std::mem::offset_of!(FfiWholeFrameSubmitRequest,world_experience_orbs) as u32);
+    assert_eq!(
+        layout.field_offsets[45],
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32
+    );
 }
 
 #[test]
 fn experience_orb_frame_transport_rejects_bad_placement_order_and_bounds() {
     let good = semantic_orb_instance();
     for bad in [
-        FfiWorldExperienceOrbInstanceRecord {byte_size:0,..good},
-        FfiWorldExperienceOrbInstanceRecord {mesh_key:0,..good},
-        FfiWorldExperienceOrbInstanceRecord {mesh_index:1,..good},
-        FfiWorldExperienceOrbInstanceRecord {reserved0:1,..good},
-        FfiWorldExperienceOrbInstanceRecord {camera_orientation:[0.0;4],..good},
-        FfiWorldExperienceOrbInstanceRecord {entity_transform:[f32::NAN;16],..good},
+        FfiWorldExperienceOrbInstanceRecord {
+            byte_size: 0,
+            ..good
+        },
+        FfiWorldExperienceOrbInstanceRecord {
+            mesh_key: 0,
+            ..good
+        },
+        FfiWorldExperienceOrbInstanceRecord {
+            mesh_index: 1,
+            ..good
+        },
+        FfiWorldExperienceOrbInstanceRecord {
+            reserved0: 1,
+            ..good
+        },
+        FfiWorldExperienceOrbInstanceRecord {
+            camera_orientation: [0.0; 4],
+            ..good
+        },
+        FfiWorldExperienceOrbInstanceRecord {
+            entity_transform: [f32::NAN; 16],
+            ..good
+        },
     ] {
-        let mut request = whole_frame_request(&[],&[]);
-        request.world_experience_orbs = FfiSlice {ptr:&bad,count:1};
-        assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+        let mut request = whole_frame_request(&[], &[]);
+        request.world_experience_orbs = FfiSlice {
+            ptr: &bad,
+            count: 1,
+        };
+        assert!(
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err()
+        );
     }
     let meshes = [mesh_instance()];
-    let descending = [FfiWorldExperienceOrbInstanceRecord {mesh_index:1,..good},good];
+    let descending = [
+        FfiWorldExperienceOrbInstanceRecord {
+            mesh_index: 1,
+            ..good
+        },
+        good,
+    ];
     let mut request = whole_frame_request_with_mesh_instances(&meshes);
-    request.world_experience_orbs = FfiSlice {ptr:descending.as_ptr(),count:2};
-    assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
-    request.world_experience_orbs = FfiSlice {ptr:ptr::null(),count:u64::MAX};
-    assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+    request.world_experience_orbs = FfiSlice {
+        ptr: descending.as_ptr(),
+        count: 2,
+    };
+    assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+    request.world_experience_orbs = FfiSlice {
+        ptr: ptr::null(),
+        count: u64::MAX,
+    };
+    assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
 }
 
 #[test]
 fn experience_orb_frame_transport_rejects_old_header_before_reading_extended_fields() {
-    for header in [FfiHeader {version:53,byte_size:8},
-        FfiHeader {version:FFI_ABI_VERSION,byte_size:8}] {
-        assert!(unsafe {decode_whole_frame_submit(
-            (&header as *const FfiHeader).cast(),test_vulkan_capabilities())}.is_err());
+    for header in [
+        FfiHeader {
+            version: 53,
+            byte_size: 8,
+        },
+        FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: 8,
+        },
+    ] {
+        assert!(unsafe {
+            decode_whole_frame_submit(
+                (&header as *const FfiHeader).cast(),
+                test_vulkan_capabilities(),
+            )
+        }
+        .is_err());
     }
 }
 
@@ -158,10 +251,19 @@ fn particle_semantic_transport_lowers_owned_geometry_in_the_whole_frame() {
     let mut p = semantic_particle_record();
     let mut request = whole_frame_request(&[], &[]);
     request.world_particle_quads = FfiSlice { ptr: &p, count: 1 };
-    let mut capabilities = test_capabilities(); capabilities.api = BackendApi::Vulkan;
+    let mut capabilities = test_capabilities();
+    capabilities.api = BackendApi::Vulkan;
     let decoded = unsafe { decode_whole_frame_submit(&request, capabilities) }.unwrap();
     let quad = &decoded.2.material_quads[0];
-    assert_eq!(quad.vertices, [[1.5,1.5,3.0],[1.5,2.5,3.0],[0.5,2.5,3.0],[0.5,1.5,3.0]]);
+    assert_eq!(
+        quad.vertices,
+        [
+            [1.5, 1.5, 3.0],
+            [1.5, 2.5, 3.0],
+            [0.5, 2.5, 3.0],
+            [0.5, 1.5, 3.0]
+        ]
+    );
     assert_eq!(quad.source_program, WORLD_MATERIAL_SOURCE_PARTICLES);
     assert_eq!(quad.color_argb, 0x80ffffff);
     p.center[0] = 100.0;
@@ -169,69 +271,107 @@ fn particle_semantic_transport_lowers_owned_geometry_in_the_whole_frame() {
     assert_eq!(p.center[0], 100.0);
     let layout = super::layout::layout_for_struct(108).unwrap();
     assert_eq!(layout.field_count, 10);
-    assert_eq!(layout.byte_size, size_of::<FfiWorldParticleQuadRequest>() as u32);
-    assert_eq!(layout.field_offsets[5], std::mem::offset_of!(FfiWorldParticleQuadRequest, rotation) as u32);
+    assert_eq!(
+        layout.byte_size,
+        size_of::<FfiWorldParticleQuadRequest>() as u32
+    );
+    assert_eq!(
+        layout.field_offsets[5],
+        std::mem::offset_of!(FfiWorldParticleQuadRequest, rotation) as u32
+    );
     let layout = super::layout::layout_for_struct(53).unwrap();
-    assert_eq!(layout.field_offsets[44], std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_particle_quads) as u32);
+    assert_eq!(
+        layout.field_offsets[44],
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_particle_quads) as u32
+    );
 }
 
 #[test]
 fn terrain_surface_transport_uses_rust_block_atlas_and_cutout_policy() {
     use crate::render::vulkanic::world_primitive_frontend::{
-        WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_CUTOUT, WORLD_MATERIAL_MODE_TRANSLUCENT};
-    for surface_kind in [2,3,4] {
+        WORLD_MATERIAL_MODE_CUTOUT, WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_TRANSLUCENT,
+    };
+    for surface_kind in [2, 3, 4] {
         let mut p = semantic_particle_record();
         p.surface_kind = surface_kind;
-        p.uv_bounds = [0.5,0.25,0.25,0.5];
+        p.uv_bounds = [0.5, 0.25, 0.25, 0.5];
         let mut request = whole_frame_request(&[], &[]);
         request.world_particle_quads = FfiSlice { ptr: &p, count: 1 };
-        let mut capabilities = test_capabilities(); capabilities.api = BackendApi::Vulkan;
+        let mut capabilities = test_capabilities();
+        capabilities.api = BackendApi::Vulkan;
         let decoded = unsafe { decode_whole_frame_submit(&request, capabilities) }.unwrap();
         let quad = &decoded.2.material_quads[0];
-        assert_eq!(quad.source_uv_space, WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS);
-        assert_eq!(quad.material_mode, match surface_kind {
-            3 => WORLD_MATERIAL_MODE_CUTOUT, 4 => WORLD_MATERIAL_MODE_TRANSLUCENT,
-            _ => WORLD_MATERIAL_MODE_OPAQUE });
-        assert_eq!(quad.uvs, [[0.25,0.5],[0.25,0.25],[0.5,0.25],[0.5,0.5]]);
-        assert_eq!(quad.vertex_packed_light, [240;4]);
+        assert_eq!(
+            quad.source_uv_space,
+            WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS
+        );
+        assert_eq!(
+            quad.material_mode,
+            match surface_kind {
+                3 => WORLD_MATERIAL_MODE_CUTOUT,
+                4 => WORLD_MATERIAL_MODE_TRANSLUCENT,
+                _ => WORLD_MATERIAL_MODE_OPAQUE,
+            }
+        );
+        assert_eq!(
+            quad.uvs,
+            [[0.25, 0.5], [0.25, 0.25], [0.5, 0.25], [0.5, 0.5]]
+        );
+        assert_eq!(quad.vertex_packed_light, [240; 4]);
         request.header.version = 51;
-        assert!(unsafe { decode_whole_frame_submit(&request, capabilities) }.is_err(),
-            "old particle surface contract must not cross ABI 52");
+        assert!(
+            unsafe { decode_whole_frame_submit(&request, capabilities) }.is_err(),
+            "old particle surface contract must not cross ABI 52"
+        );
     }
 }
 
 #[test]
 fn particle_semantic_transport_preserves_interleaving_and_equal_index_order() {
     let base = semantic_particle_record();
-    let materials = super::world::merge_particle_semantics(vec![], &[base,base], [1280,720]).unwrap();
-    let mut particles = [base;4];
-    for (p,(index,color)) in particles.iter_mut().zip([(0,1),(1,2),(1,3),(2,4)]) {
-        p.material_index=index; p.color_argb=color;
+    let materials =
+        super::world::merge_particle_semantics(vec![], &[base, base], [1280, 720]).unwrap();
+    let mut particles = [base; 4];
+    for (p, (index, color)) in particles.iter_mut().zip([(0, 1), (1, 2), (1, 3), (2, 4)]) {
+        p.material_index = index;
+        p.color_argb = color;
     }
-    let result = super::world::merge_particle_semantics(materials.clone(), &particles, [1280,720]).unwrap();
-    assert_eq!(result.iter().map(|q| q.color_argb).collect::<Vec<_>>(),
-        vec![1,base.color_argb,2,3,base.color_argb,4]);
+    let result =
+        super::world::merge_particle_semantics(materials.clone(), &particles, [1280, 720]).unwrap();
+    assert_eq!(
+        result.iter().map(|q| q.color_argb).collect::<Vec<_>>(),
+        vec![1, base.color_argb, 2, 3, base.color_argb, 4]
+    );
     particles[2].material_index = 0;
-    assert!(super::world::merge_particle_semantics(materials.clone(), &particles, [1280,720]).is_err());
+    assert!(
+        super::world::merge_particle_semantics(materials.clone(), &particles, [1280, 720]).is_err()
+    );
     particles[2].material_index = 3;
-    assert!(super::world::merge_particle_semantics(materials, &particles, [1280,720]).is_err());
+    assert!(super::world::merge_particle_semantics(materials, &particles, [1280, 720]).is_err());
 }
 
 #[test]
 fn particle_semantic_transport_rejects_bad_records_and_bounds_before_reading() {
     let good = semantic_particle_record();
     let mut request = whole_frame_request(&[], &[]);
-    let mut capabilities = test_capabilities(); capabilities.api = BackendApi::Vulkan;
-    let mut bads = [good;4];
+    let mut capabilities = test_capabilities();
+    capabilities.api = BackendApi::Vulkan;
+    let mut bads = [good; 4];
     bads[0].byte_size -= 4;
     bads[1].surface_kind = 5;
-    bads[2].rotation = [0.0;4];
+    bads[2].rotation = [0.0; 4];
     bads[3].material_index = 1;
     for bad in bads {
-        request.world_particle_quads = FfiSlice { ptr: &bad, count: 1 };
+        request.world_particle_quads = FfiSlice {
+            ptr: &bad,
+            count: 1,
+        };
         assert!(unsafe { decode_whole_frame_submit(&request, capabilities) }.is_err());
     }
-    request.world_particle_quads = FfiSlice { ptr: std::ptr::NonNull::dangling().as_ptr(), count: u64::MAX };
+    request.world_particle_quads = FfiSlice {
+        ptr: std::ptr::NonNull::dangling().as_ptr(),
+        count: u64::MAX,
+    };
     assert_eq!(input_bytes_for_whole_frame(&request), u64::MAX);
     assert!(unsafe { decode_whole_frame_submit(&request, capabilities) }.is_err());
     request.world_particle_quads.count = FFI_MAX_BATCH_ITEMS as u64 + 1;
@@ -240,33 +380,73 @@ fn particle_semantic_transport_rejects_bad_records_and_bounds_before_reading() {
 
 #[test]
 fn gui_atlas_reference_transport_is_owned_bounded_and_layout_described() {
-    let mut item = FfiGuiAtlasReference { byte_size: size_of::<FfiGuiAtlasReference>() as u32,
-        texture_id: 17, asset_id: 101, atlas_generation: 7, atlas_width: 8, atlas_height: 8,
-        x: 2, y: 3, width: 4, height: 2 };
-    let mut request = FfiGuiAtlasReferenceUpdate {
-        header: FfiHeader { version: FFI_ABI_VERSION, byte_size: size_of::<FfiGuiAtlasReferenceUpdate>() as u32 },
-        revision: 1, references: FfiSlice { ptr: &item, count: 1 }, negotiated_feature_bits: 0,
+    let mut item = FfiGuiAtlasReference {
+        byte_size: size_of::<FfiGuiAtlasReference>() as u32,
+        texture_id: 17,
+        asset_id: 101,
+        atlas_generation: 7,
+        atlas_width: 8,
+        atlas_height: 8,
+        x: 2,
+        y: 3,
+        width: 4,
+        height: 2,
     };
-    let (revision, copied) = unsafe { decode_gui_atlas_reference_update(&request, test_capabilities()) }.unwrap();
+    let mut request = FfiGuiAtlasReferenceUpdate {
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiGuiAtlasReferenceUpdate>() as u32,
+        },
+        revision: 1,
+        references: FfiSlice {
+            ptr: &item,
+            count: 1,
+        },
+        negotiated_feature_bits: 0,
+    };
+    let (revision, copied) =
+        unsafe { decode_gui_atlas_reference_update(&request, test_capabilities()) }.unwrap();
     item.x = 0;
     assert_eq!(revision, 1);
-    assert_eq!(copied[0].x, 2, "decoded declaration cannot borrow producer memory");
+    assert_eq!(
+        copied[0].x, 2,
+        "decoded declaration cannot borrow producer memory"
+    );
     assert_eq!(48, size_of::<FfiGuiAtlasReference>());
     assert_eq!(40, size_of::<FfiGuiAtlasReferenceUpdate>());
     assert!(super::layout::layout_for_struct(105).is_ok());
     assert!(super::layout::layout_for_struct(106).is_ok());
     for count in [4097, u64::MAX] {
-        request.references = FfiSlice { ptr: 1usize as *const FfiGuiAtlasReference, count };
-        assert!(unsafe { decode_gui_atlas_reference_update(&request, test_capabilities()) }.is_err());
+        request.references = FfiSlice {
+            ptr: 1usize as *const FfiGuiAtlasReference,
+            count,
+        };
+        assert!(
+            unsafe { decode_gui_atlas_reference_update(&request, test_capabilities()) }.is_err()
+        );
     }
     let duplicate = [item, item];
-    request.references = FfiSlice { ptr: duplicate.as_ptr(), count: 2 };
+    request.references = FfiSlice {
+        ptr: duplicate.as_ptr(),
+        count: 2,
+    };
     assert!(unsafe { decode_gui_atlas_reference_update(&request, test_capabilities()) }.is_err());
-    request.references = FfiSlice { ptr: &item, count: 1 };
+    request.references = FfiSlice {
+        ptr: &item,
+        count: 1,
+    };
     item.width = u32::MAX;
     assert!(unsafe { decode_gui_atlas_reference_update(&request, test_capabilities()) }.is_err());
-    request.references = FfiSlice { ptr: ptr::null(), count: 0 };
-    assert!(unsafe { decode_gui_atlas_reference_update(&request, test_capabilities()) }.unwrap().1.is_empty());
+    request.references = FfiSlice {
+        ptr: ptr::null(),
+        count: 0,
+    };
+    assert!(
+        unsafe { decode_gui_atlas_reference_update(&request, test_capabilities()) }
+            .unwrap()
+            .1
+            .is_empty()
+    );
     request.revision = 0;
     assert!(unsafe { decode_gui_atlas_reference_update(&request, test_capabilities()) }.is_err());
 }
@@ -276,54 +456,137 @@ fn gui_submit_ffi_consumes_context_owned_atlas_declarations_without_raw_images()
     // Registry/FFI integration uses the mock presentation surface; real Vulkan
     // region readback is covered by the mixed GUI encoder tests.
     let create = FfiContextCreateRequest {
-        header: FfiHeader { version: FFI_ABI_VERSION, byte_size: size_of::<FfiContextCreateRequest>() as u32 },
-        backend_kind: 1, tracy_enabled: 0, label: FfiBytes { ptr: b"GUI submit FFI".as_ptr(), len: 14 },
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiContextCreateRequest>() as u32,
+        },
+        backend_kind: 1,
+        tracy_enabled: 0,
+        label: FfiBytes {
+            ptr: b"GUI submit FFI".as_ptr(),
+            len: 14,
+        },
     };
     let mut result = FfiContextResult::default();
-    assert_eq!(unsafe { mattmc_vulkanic_gal_context_create(&create, &mut result) }, 0);
+    assert_eq!(
+        unsafe { mattmc_vulkanic_gal_context_create(&create, &mut result) },
+        0
+    );
     let id = result.context_id;
     let mut encoded = Vec::new();
     {
         let mut encoder = png::Encoder::new(&mut encoded, 2, 2);
-        encoder.set_color(png::ColorType::Rgba); encoder.set_depth(png::BitDepth::Eight);
-        encoder.write_header().unwrap().write_image_data(&[255; 16]).unwrap();
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder
+            .write_header()
+            .unwrap()
+            .write_image_data(&[255; 16])
+            .unwrap();
     }
     let target = with_registry_mut(|registry| {
         let context = registry.contexts.get_mut(&id).unwrap();
         let mut capabilities = test_capabilities();
         capabilities.features.blended_pass = true;
-        context.gal = VulkanicGal::new_with_backend(Box::new(
-            crate::render::vulkanic::backends::mock::MockBackend::with_capabilities(capabilities)), false);
-        context.world_primitive_frontend.apply_world_mesh_asset_update(&mut context.gal, 1, Vec::new(),
-            vec![WorldMeshTextureAssetPayload {
-                texture_id: 17, png_bytes: encoded, mip_png_bytes: Vec::new(),
-                frame_width: 0, frame_height: 0, frame_count: 1, frame_ticks: 1,
-                animation_flags: 0, frame_row_size: 0, interpolation_policy: 0,
-                animation_frames: Vec::new(), coordinate_origin: 0, sampling: None, requested_mip_levels: 1,
-            }]).unwrap();
-        let extent = Extent3d { width: 320, height: 180, depth: 1 };
-        context.gal.configure_frame_surface(FrameSurfaceDesc { label: "FFI test surface".into(),
-            extent, color_format: TextureFormat::Rgba8Unorm, present_mode: PresentMode::Fifo,
-            max_frames_in_flight: 2 }).unwrap();
-        context.gal.create_frame_target(FrameTargetDesc { label: "FFI test target".into(),
-            frame_id: 11, render_target: FrameRenderTargetId(1), extent,
-            color_format: TextureFormat::Rgba8Unorm }).unwrap()
+        context.gal = VulkanicGal::new_with_backend(
+            Box::new(
+                crate::render::vulkanic::backends::mock::MockBackend::with_capabilities(
+                    capabilities,
+                ),
+            ),
+            false,
+        );
+        context
+            .world_primitive_frontend
+            .apply_world_mesh_asset_update(
+                &mut context.gal,
+                1,
+                Vec::new(),
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: 17,
+                    png_bytes: encoded,
+                    mip_png_bytes: Vec::new(),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
+                    coordinate_origin: 0,
+                    sampling: None,
+                    requested_mip_levels: 1,
+                }],
+            )
+            .unwrap();
+        let extent = Extent3d {
+            width: 320,
+            height: 180,
+            depth: 1,
+        };
+        context
+            .gal
+            .configure_frame_surface(FrameSurfaceDesc {
+                label: "FFI test surface".into(),
+                extent,
+                color_format: TextureFormat::Rgba8Unorm,
+                present_mode: PresentMode::Fifo,
+                max_frames_in_flight: 2,
+            })
+            .unwrap();
+        context
+            .gal
+            .create_frame_target(FrameTargetDesc {
+                label: "FFI test target".into(),
+                frame_id: 11,
+                render_target: FrameRenderTargetId(1),
+                extent,
+                color_format: TextureFormat::Rgba8Unorm,
+            })
+            .unwrap()
     });
     let quad = affine_quad_request();
-    let reference = FfiGuiAtlasReference { byte_size: size_of::<FfiGuiAtlasReference>() as u32,
-        texture_id: 17, asset_id: quad.asset_id, atlas_generation: 1, atlas_width: 2, atlas_height: 2,
-        x: 0, y: 0, width: 2, height: 2 };
-    let declaration = FfiGuiAtlasReferenceUpdate {
-        header: FfiHeader { version: FFI_ABI_VERSION, byte_size: size_of::<FfiGuiAtlasReferenceUpdate>() as u32 },
-        revision: 1, references: FfiSlice { ptr: &reference, count: 1 }, negotiated_feature_bits: 0,
+    let reference = FfiGuiAtlasReference {
+        byte_size: size_of::<FfiGuiAtlasReference>() as u32,
+        texture_id: 17,
+        asset_id: quad.asset_id,
+        atlas_generation: 1,
+        atlas_width: 2,
+        atlas_height: 2,
+        x: 0,
+        y: 0,
+        width: 2,
+        height: 2,
     };
-    assert_eq!(unsafe { mattmc_vulkanic_gal_gui_update_atlas_references(id, &declaration, ptr::null_mut()) }, 0);
+    let declaration = FfiGuiAtlasReferenceUpdate {
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiGuiAtlasReferenceUpdate>() as u32,
+        },
+        revision: 1,
+        references: FfiSlice {
+            ptr: &reference,
+            count: 1,
+        },
+        negotiated_feature_bits: 0,
+    };
+    assert_eq!(
+        unsafe {
+            mattmc_vulkanic_gal_gui_update_atlas_references(id, &declaration, ptr::null_mut())
+        },
+        0
+    );
     let mut frame = frame_request(&[]);
     frame.frame_target = FfiHandle::from(target);
-    frame.affine_quads = FfiSlice { ptr: &quad, count: 1 };
+    frame.affine_quads = FfiSlice {
+        ptr: &quad,
+        count: 1,
+    };
     let mut submitted = FfiGuiFrameSubmitResult::default();
     let status = unsafe { mattmc_vulkanic_gal_gui_submit_frame(id, &frame, &mut submitted) };
-    let error = with_registry_mut(|registry| registry.contexts.get(&id).unwrap().last_error.clone());
+    let error =
+        with_registry_mut(|registry| registry.contexts.get(&id).unwrap().last_error.clone());
     assert_eq!(status, 0, "{error}");
     assert!(submitted.submission_id > 0);
     with_registry_mut(|registry| {
@@ -331,18 +594,35 @@ fn gui_submit_ffi_consumes_context_owned_atlas_declarations_without_raw_images()
         context.gui_frontend.reset(&mut context.gal).unwrap();
         context.world_primitive_frontend.reset(&mut context.gal);
         context.gal.destroy(target).unwrap();
-        context.gal.retire_through(context.gal.latest_submission_id()).unwrap();
-        assert_eq!(context.gal.metrics().resource_creates, context.gal.metrics().resource_destroys);
+        context
+            .gal
+            .retire_through(context.gal.latest_submission_id())
+            .unwrap();
+        assert_eq!(
+            context.gal.metrics().resource_creates,
+            context.gal.metrics().resource_destroys
+        );
     });
-    assert_eq!(unsafe { mattmc_vulkanic_gal_context_destroy(id, ptr::null_mut()) }, 0);
+    assert_eq!(
+        unsafe { mattmc_vulkanic_gal_context_destroy(id, ptr::null_mut()) },
+        0
+    );
 }
 
 fn gui_tiled_record() -> FfiGuiTiledQuadRequest {
     FfiGuiTiledQuadRequest {
         byte_size: size_of::<FfiGuiTiledQuadRequest>() as u32,
-        stratum: 3, asset_id: 41, bounds: [7, 11, 77, 50], tile_extent: [32, 32],
-        uv: [0.25, 0.5, 0.75, 1.0], pose: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
-        z: 0.25, color_argb: 0xffaabbcc, sequence: 11, clip_mode: 1, clip: [1, 2, 100, 50],
+        stratum: 3,
+        asset_id: 41,
+        bounds: [7, 11, 77, 50],
+        tile_extent: [32, 32],
+        uv: [0.25, 0.5, 0.75, 1.0],
+        pose: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+        z: 0.25,
+        color_argb: 0xffaabbcc,
+        sequence: 11,
+        clip_mode: 1,
+        clip: [1, 2, 100, 50],
     }
 }
 
@@ -351,19 +631,35 @@ fn semantic_gui_tiled_private_decoder_copies_without_expanding() {
     let mut record = gui_tiled_record();
     record.bounds = [0, 0, 3840, 2160];
     record.uv = [0.0, 0.0, 1.0, 1.0];
-    let decoded = unsafe { decode_gui_tiled_quads(
-        FfiSlice { ptr: &record, count: 1 }, [320, 180], [319.75, 179.5], 0,
-    ) }.unwrap();
+    let decoded = unsafe {
+        decode_gui_tiled_quads(
+            FfiSlice {
+                ptr: &record,
+                count: 1,
+            },
+            [320, 180],
+            [319.75, 179.5],
+            0,
+        )
+    }
+    .unwrap();
     record.bounds[2] = 1;
     record.pose[0] = 0.0;
     record.clip[0] = 90;
-    assert_eq!(1, decoded.len(), "transport must retain a typed parent, not 8160 Java-style quads");
+    assert_eq!(
+        1,
+        decoded.len(),
+        "transport must retain a typed parent, not 8160 Java-style quads"
+    );
     assert_eq!([0, 0, 3840, 2160], decoded[0].geometry.bounds);
     assert_eq!(1.0, decoded[0].geometry.pose[0]);
     assert_eq!(Some([1, 2, 100, 50]), decoded[0].clip);
     assert_eq!([319.75, 179.5], decoded[0].projection_extent);
     assert_eq!(11, decoded[0].sequence);
-    assert_eq!(8160, crate::render::vulkanic::gui_tiling::tile_segment_count(decoded[0].geometry).unwrap());
+    assert_eq!(
+        8160,
+        crate::render::vulkanic::gui_tiling::tile_segment_count(decoded[0].geometry).unwrap()
+    );
     assert_eq!(1, record.bounds[2]);
 }
 
@@ -371,23 +667,80 @@ fn semantic_gui_tiled_private_decoder_copies_without_expanding() {
 fn semantic_gui_tiled_private_decoder_rejects_malformed_records_and_duplicates() {
     let good = gui_tiled_record();
     for bad in [
-        FfiGuiTiledQuadRequest { byte_size: 1, ..good },
-        FfiGuiTiledQuadRequest { sequence: 0, ..good },
-        FfiGuiTiledQuadRequest { asset_id: 0, ..good },
-        FfiGuiTiledQuadRequest { tile_extent: [0, 32], ..good },
-        FfiGuiTiledQuadRequest { clip_mode: 2, ..good },
-        FfiGuiTiledQuadRequest { clip_mode: 0, ..good },
-        FfiGuiTiledQuadRequest { clip: [319, 0, 2, 1], ..good },
-        FfiGuiTiledQuadRequest { pose: [f32::NAN; 6], ..good },
+        FfiGuiTiledQuadRequest {
+            byte_size: 1,
+            ..good
+        },
+        FfiGuiTiledQuadRequest {
+            sequence: 0,
+            ..good
+        },
+        FfiGuiTiledQuadRequest {
+            asset_id: 0,
+            ..good
+        },
+        FfiGuiTiledQuadRequest {
+            tile_extent: [0, 32],
+            ..good
+        },
+        FfiGuiTiledQuadRequest {
+            clip_mode: 2,
+            ..good
+        },
+        FfiGuiTiledQuadRequest {
+            clip_mode: 0,
+            ..good
+        },
+        FfiGuiTiledQuadRequest {
+            clip: [319, 0, 2, 1],
+            ..good
+        },
+        FfiGuiTiledQuadRequest {
+            pose: [f32::NAN; 6],
+            ..good
+        },
     ] {
-        assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: &bad, count: 1 },
-            [320, 180], [320.0, 180.0], 0) }.is_err(), "{bad:?}");
+        assert!(
+            unsafe {
+                decode_gui_tiled_quads(
+                    FfiSlice {
+                        ptr: &bad,
+                        count: 1,
+                    },
+                    [320, 180],
+                    [320.0, 180.0],
+                    0,
+                )
+            }
+            .is_err(),
+            "{bad:?}"
+        );
     }
     let duplicate = [good, good];
-    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: duplicate.as_ptr(), count: 2 },
-        [320, 180], [320.0, 180.0], 0) }.is_err());
-    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: &good, count: 1 },
-        [320, 180], [f32::NAN, 180.0], 0) }.is_err());
+    assert!(unsafe {
+        decode_gui_tiled_quads(
+            FfiSlice {
+                ptr: duplicate.as_ptr(),
+                count: 2,
+            },
+            [320, 180],
+            [320.0, 180.0],
+            0,
+        )
+    }
+    .is_err());
+    assert!(unsafe {
+        decode_gui_tiled_quads(
+            FfiSlice {
+                ptr: &good,
+                count: 1,
+            },
+            [320, 180],
+            [f32::NAN, 180.0],
+            0,
+        )
+    }
+    .is_err());
 }
 
 #[test]
@@ -398,43 +751,100 @@ fn semantic_gui_tiled_private_decoder_preflights_aggregate_budget_and_hostile_co
         record.bounds = [0, 0, 4096, 4096];
         record.uv = [0.0, 0.0, 1.0, 1.0];
     }
-    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: records.as_ptr(), count: 4 },
-        [320, 180], [320.0, 180.0], 0) }.is_ok());
-    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: records.as_ptr(), count: 4 },
-        [320, 180], [320.0, 180.0], 1) }.is_err());
-    assert!(unsafe { decode_gui_tiled_quads(FfiSlice { ptr: records.as_ptr(), count: 5 },
-        [320, 180], [320.0, 180.0], 0) }.is_err());
+    assert!(unsafe {
+        decode_gui_tiled_quads(
+            FfiSlice {
+                ptr: records.as_ptr(),
+                count: 4,
+            },
+            [320, 180],
+            [320.0, 180.0],
+            0,
+        )
+    }
+    .is_ok());
+    assert!(unsafe {
+        decode_gui_tiled_quads(
+            FfiSlice {
+                ptr: records.as_ptr(),
+                count: 4,
+            },
+            [320, 180],
+            [320.0, 180.0],
+            1,
+        )
+    }
+    .is_err());
+    assert!(unsafe {
+        decode_gui_tiled_quads(
+            FfiSlice {
+                ptr: records.as_ptr(),
+                count: 5,
+            },
+            [320, 180],
+            [320.0, 180.0],
+            0,
+        )
+    }
+    .is_err());
     // Must reject the count before attempting to form/read a caller slice.
-    assert!(unsafe { decode_gui_tiled_quads(FfiSlice {
-        ptr: std::ptr::NonNull::dangling().as_ptr(), count: u64::MAX,
-    }, [320, 180], [320.0, 180.0], 0) }.is_err());
+    assert!(unsafe {
+        decode_gui_tiled_quads(
+            FfiSlice {
+                ptr: std::ptr::NonNull::dangling().as_ptr(),
+                count: u64::MAX,
+            },
+            [320, 180],
+            [320.0, 180.0],
+            0,
+        )
+    }
+    .is_err());
 }
 
 #[test]
 fn semantic_gui_tiled_frame_transport_forwards_owned_parents_and_rejects_collisions() {
     let tile = gui_tiled_record();
     let mut frame = frame_request(&[]);
-    frame.tiled_quads = FfiSlice { ptr: &tile, count: 1 };
+    frame.tiled_quads = FfiSlice {
+        ptr: &tile,
+        count: 1,
+    };
     frame.gui_projection_width = 319.75;
     frame.gui_projection_height = 179.5;
-    let decoded = unsafe { decode_gui_frame_submit_with_tiles(&frame, test_capabilities()) }.unwrap();
+    let decoded =
+        unsafe { decode_gui_frame_submit_with_tiles(&frame, test_capabilities()) }.unwrap();
     assert_eq!(1, decoded.5.len());
     assert_eq!([319.75, 179.5], decoded.5[0].projection_extent);
-    assert!(unsafe { decode_gui_frame_submit_with_mesh(&frame, test_capabilities()) }.is_err(),
-        "a legacy consumer must not silently discard typed tiles");
+    assert!(
+        unsafe { decode_gui_frame_submit_with_mesh(&frame, test_capabilities()) }.is_err(),
+        "a legacy consumer must not silently discard typed tiles"
+    );
     let mut sprite = sprite_request();
     sprite.sequence = tile.sequence;
-    frame.sprites = FfiSlice { ptr: &sprite, count: 1 };
+    frame.sprites = FfiSlice {
+        ptr: &sprite,
+        count: 1,
+    };
     assert!(unsafe { decode_gui_frame_submit_with_tiles(&frame, test_capabilities()) }.is_err());
 
     let mut whole = whole_frame_request(&[], &[]);
-    whole.gui_tiled_quads = FfiSlice { ptr: &tile, count: 1 };
+    whole.gui_tiled_quads = FfiSlice {
+        ptr: &tile,
+        count: 1,
+    };
     let mut capabilities = test_capabilities();
     capabilities.api = BackendApi::Vulkan;
-    let decoded = unsafe { decode_whole_frame_submit_with_tiled_gui(&whole, capabilities) }.unwrap();
+    let decoded =
+        unsafe { decode_whole_frame_submit_with_tiled_gui(&whole, capabilities) }.unwrap();
     assert_eq!(tile.sequence, decoded.9[0].sequence);
     assert!(unsafe { decode_whole_frame_submit_with_gui(&whole, capabilities) }.is_err());
-    assert!(unsafe { decode_world_primitive_submit(&whole, capabilities) }.unwrap_err().to_string().contains("does not accept GUI work"));
+    assert!(
+        unsafe { decode_world_primitive_submit(&whole, capabilities) }
+            .unwrap_err()
+            .to_string()
+            .contains("does not accept GUI work")
+    );
 }
 
 #[test]
@@ -522,7 +932,7 @@ fn affine_quad_request() -> FfiGuiAffineQuadRequest {
     FfiGuiAffineQuadRequest {
         item_raster_layers: FfiSlice::default(),
         item_raster_scale: 0,
-        item_raster_corners: [0.0,0.0,16.0,0.0,0.0,16.0],
+        item_raster_corners: [0.0, 0.0, 16.0, 0.0, 0.0, 16.0],
         material_mode: 0,
         byte_size: size_of::<FfiGuiAffineQuadRequest>() as u32,
         stratum: 50,
@@ -557,21 +967,27 @@ fn gui_mesh_vertices() -> [FfiGuiMeshVertex; 3] {
             atlas_uv: [0.25, 0.25],
             local_uv: [0.0, 0.0],
             color_argb: 0xffff_ffff,
-            normal_packed: 0, source_face: 0, source_foil_type: 0,
+            normal_packed: 0,
+            source_face: 0,
+            source_foil_type: 0,
         },
         FfiGuiMeshVertex {
             position: [1.0, 0.0, 0.0],
             atlas_uv: [0.75, 0.25],
             local_uv: [1.0, 0.0],
             color_argb: 0xffff_ffff,
-            normal_packed: 0, source_face: 0, source_foil_type: 0,
+            normal_packed: 0,
+            source_face: 0,
+            source_foil_type: 0,
         },
         FfiGuiMeshVertex {
             position: [0.0, 1.0, 0.0],
             atlas_uv: [0.25, 0.75],
             local_uv: [0.0, 1.0],
             color_argb: 0xffff_ffff,
-            normal_packed: 0, source_face: 0, source_foil_type: 0,
+            normal_packed: 0,
+            source_face: 0,
+            source_foil_type: 0,
         },
     ]
 }
@@ -584,10 +1000,10 @@ fn gui_mesh_batch_request(
         item_cache_identity: 0,
         item_cache_mode: 0,
         decal_foil_mode: 0,
-        decal_model_pose: [0.;16],
-        decal_normal_pose: [0.;9],
+        decal_model_pose: [0.; 16],
+        decal_normal_pose: [0.; 9],
         block_item_scale: 0,
-        block_model_bounds: [0.;6],
+        block_model_bounds: [0.; 6],
         block_item_layout: 0,
         item_raster_scale: 0,
         item_foil_mode: 0,
@@ -646,15 +1062,21 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
     assert_eq!(152, size_of::<FfiGuiAffineQuadRequest>());
     assert_eq!(136, affine.field_offsets[26]);
     let layer = super::layout::layout_for_struct(107).unwrap();
-    assert_eq!(7,layer.field_count);
-    assert_eq!(128,size_of::<FfiGuiItemRasterLayer>());
-    assert_eq!(60,layer.field_offsets[6]);
-    assert_eq!(std::mem::offset_of!(FfiGuiAffineQuadRequest, item_raster_corners) as u32,
-        affine.field_offsets[25]);
-    assert_eq!(std::mem::offset_of!(FfiGuiAffineQuadRequest, item_raster_scale) as u32,
-        affine.field_offsets[24]);
-    assert_eq!(std::mem::offset_of!(FfiGuiAffineQuadRequest, material_mode) as u32,
-        affine.field_offsets[23]);
+    assert_eq!(7, layer.field_count);
+    assert_eq!(128, size_of::<FfiGuiItemRasterLayer>());
+    assert_eq!(60, layer.field_offsets[6]);
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiAffineQuadRequest, item_raster_corners) as u32,
+        affine.field_offsets[25]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiAffineQuadRequest, item_raster_scale) as u32,
+        affine.field_offsets[24]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiAffineQuadRequest, material_mode) as u32,
+        affine.field_offsets[23]
+    );
     assert_eq!(
         std::mem::offset_of!(FfiGuiAffineQuadRequest, sequence) as u32,
         affine.field_offsets[17]
@@ -666,27 +1088,72 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
 
     let mesh_vertex = super::layout::layout_for_struct(96).expect("GUI mesh vertex layout");
     assert_eq!(7, mesh_vertex.field_count);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshVertex, source_face) as u32, mesh_vertex.field_offsets[5]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshVertex, source_foil_type) as u32, mesh_vertex.field_offsets[6]);
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshVertex, source_face) as u32,
+        mesh_vertex.field_offsets[5]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshVertex, source_foil_type) as u32,
+        mesh_vertex.field_offsets[6]
+    );
     assert_eq!(
         std::mem::offset_of!(FfiGuiMeshVertex, local_uv) as u32,
         mesh_vertex.field_offsets[2]
     );
     let mesh_batch = super::layout::layout_for_struct(97).expect("GUI mesh batch layout");
     assert_eq!(40, mesh_batch.field_count);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, item_cache_identity) as u32, mesh_batch.field_offsets[38]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, item_cache_mode) as u32, mesh_batch.field_offsets[39]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, block_item_scale) as u32, mesh_batch.field_offsets[35]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, block_model_bounds) as u32, mesh_batch.field_offsets[36]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, block_item_layout) as u32, mesh_batch.field_offsets[37]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, decal_foil_mode) as u32, mesh_batch.field_offsets[32]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, decal_model_pose) as u32, mesh_batch.field_offsets[33]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, decal_normal_pose) as u32, mesh_batch.field_offsets[34]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, item_raster_scale) as u32, mesh_batch.field_offsets[31]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, item_foil_mode) as u32, mesh_batch.field_offsets[27]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, item_foil_clock_millis) as u32, mesh_batch.field_offsets[28]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, item_foil_speed) as u32, mesh_batch.field_offsets[29]);
-    assert_eq!(std::mem::offset_of!(FfiGuiMeshBatchRequest, item_foil_strength) as u32, mesh_batch.field_offsets[30]);
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, item_cache_identity) as u32,
+        mesh_batch.field_offsets[38]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, item_cache_mode) as u32,
+        mesh_batch.field_offsets[39]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, block_item_scale) as u32,
+        mesh_batch.field_offsets[35]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, block_model_bounds) as u32,
+        mesh_batch.field_offsets[36]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, block_item_layout) as u32,
+        mesh_batch.field_offsets[37]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, decal_foil_mode) as u32,
+        mesh_batch.field_offsets[32]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, decal_model_pose) as u32,
+        mesh_batch.field_offsets[33]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, decal_normal_pose) as u32,
+        mesh_batch.field_offsets[34]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, item_raster_scale) as u32,
+        mesh_batch.field_offsets[31]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, item_foil_mode) as u32,
+        mesh_batch.field_offsets[27]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, item_foil_clock_millis) as u32,
+        mesh_batch.field_offsets[28]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, item_foil_speed) as u32,
+        mesh_batch.field_offsets[29]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiMeshBatchRequest, item_foil_strength) as u32,
+        mesh_batch.field_offsets[30]
+    );
     assert_eq!(
         std::mem::offset_of!(FfiGuiMeshBatchRequest, indices) as u32,
         mesh_batch.field_offsets[26]
@@ -721,35 +1188,71 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
     let whole_frame = super::layout::layout_for_struct(53).expect("whole-frame layout");
     let texture = super::layout::layout_for_struct(67).expect("mesh texture layout");
     assert_eq!(16, texture.field_count);
-    assert_eq!(std::mem::offset_of!(FfiWorldMeshTextureAssetPayload, requested_mip_levels) as u32,
-        texture.field_offsets[15]);
-    assert_eq!(46, whole_frame.field_count);
-    assert_eq!(std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32,
-        whole_frame.field_offsets[45]);
-    assert_eq!(std::mem::offset_of!(FfiWholeFrameSubmitRequest, engine_globals_present) as u32,
-        whole_frame.field_offsets[37]);
-    assert_eq!(std::mem::offset_of!(FfiWholeFrameSubmitRequest, engine_menu_blur_radius) as u32,
-        whole_frame.field_offsets[43]);
-    assert_eq!(std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_tiled_quads) as u32,
-        whole_frame.field_offsets[36]);
-    assert_eq!(std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_projection_width) as u32,
-        whole_frame.field_offsets[34]);
-    assert_eq!(std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_projection_height) as u32,
-        whole_frame.field_offsets[35]);
+    assert_eq!(
+        std::mem::offset_of!(FfiWorldMeshTextureAssetPayload, requested_mip_levels) as u32,
+        texture.field_offsets[15]
+    );
+    assert_eq!(47, whole_frame.field_count);
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32,
+        whole_frame.field_offsets[45]
+    );
+    assert_eq!(
+        std::mem::offset_of!(
+            FfiWholeFrameSubmitRequest,
+            world_distant_horizons_generic_boxes
+        ) as u32,
+        whole_frame.field_offsets[46]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, engine_globals_present) as u32,
+        whole_frame.field_offsets[37]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, engine_menu_blur_radius) as u32,
+        whole_frame.field_offsets[43]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_tiled_quads) as u32,
+        whole_frame.field_offsets[36]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_projection_width) as u32,
+        whole_frame.field_offsets[34]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_projection_height) as u32,
+        whole_frame.field_offsets[35]
+    );
     let gui_frame = super::layout::layout_for_struct(45).unwrap();
     assert_eq!(13, gui_frame.field_count);
-    assert_eq!(std::mem::offset_of!(FfiGuiFrameSubmitRequest, tiled_quads) as u32,
-        gui_frame.field_offsets[12]);
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiFrameSubmitRequest, tiled_quads) as u32,
+        gui_frame.field_offsets[12]
+    );
     let tiled = super::layout::layout_for_struct(101).unwrap();
     assert_eq!(12, tiled.field_count);
     assert_eq!(size_of::<FfiGuiTiledQuadRequest>() as u32, tiled.byte_size);
-    assert_eq!(std::mem::offset_of!(FfiGuiTiledQuadRequest, pose) as u32, tiled.field_offsets[6]);
-    assert_eq!(std::mem::offset_of!(FfiGuiTiledQuadRequest, sequence) as u32, tiled.field_offsets[9]);
-    assert_eq!(std::mem::offset_of!(FfiGuiTiledQuadRequest, clip) as u32, tiled.field_offsets[11]);
-    assert_eq!(std::mem::offset_of!(FfiGuiFrameSubmitRequest, gui_projection_width) as u32,
-        gui_frame.field_offsets[10]);
-    assert_eq!(std::mem::offset_of!(FfiGuiFrameSubmitRequest, gui_projection_height) as u32,
-        gui_frame.field_offsets[11]);
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiTiledQuadRequest, pose) as u32,
+        tiled.field_offsets[6]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiTiledQuadRequest, sequence) as u32,
+        tiled.field_offsets[9]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiTiledQuadRequest, clip) as u32,
+        tiled.field_offsets[11]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiFrameSubmitRequest, gui_projection_width) as u32,
+        gui_frame.field_offsets[10]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiGuiFrameSubmitRequest, gui_projection_height) as u32,
+        gui_frame.field_offsets[11]
+    );
     assert_eq!(
         std::mem::offset_of!(
             FfiWholeFrameSubmitRequest,
@@ -774,37 +1277,49 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
 #[test]
 fn gui_mesh_decal_transport_copies_poses_and_rejects_noncanonical_or_incomplete_state() {
     let mut vertices = gui_mesh_vertices();
-    for vertex in &mut vertices { vertex.normal_packed = 0x007f_0000; }
-    let indices = [0_u32,1,2];
+    for vertex in &mut vertices {
+        vertex.normal_packed = 0x007f_0000;
+    }
+    let indices = [0_u32, 1, 2];
     let mut request = gui_mesh_batch_request(&vertices, &indices);
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(FfiSlice { ptr: request, count: 1 },320,180)
+        super::gui::decode_gui_mesh_batches(
+            FfiSlice {
+                ptr: request,
+                count: 1,
+            },
+            320,
+            180,
+        )
     };
     assert!(decode(&request).unwrap()[0].decal_foil.is_none());
     request.decal_normal_pose[0] = -0.0;
     assert!(decode(&request).is_err());
     request.decal_foil_mode = 1;
     request.decal_model_pose = request.model_transform;
-    request.decal_normal_pose = [1.,0.,0.,0.,1.,0.,0.,0.,1.];
+    request.decal_normal_pose = [1., 0., 0., 0., 1., 0., 0., 0., 1.];
     assert!(decode(&request).is_err()); // no explicit foil timing/material
     request.item_foil_mode = 1;
     request.item_foil_strength = 0.375;
     request.material_mode = 4;
     request.lighting_mode = 1;
     let copied = decode(&request).unwrap().remove(0);
-    assert_eq!(copied.decal_foil.unwrap().model_pose,request.model_transform);
+    assert_eq!(
+        copied.decal_foil.unwrap().model_pose,
+        request.model_transform
+    );
     request.decal_model_pose[12] = 17.;
     request.decal_normal_pose[0] = 2.;
-    assert_eq!(copied.decal_foil.unwrap().model_pose[12],0.);
-    assert_eq!(copied.decal_foil.unwrap().normal_pose[0],1.);
+    assert_eq!(copied.decal_foil.unwrap().model_pose[12], 0.);
+    assert_eq!(copied.decal_foil.unwrap().normal_pose[0], 1.);
     super::super::gui_mesh_frontend::prepare_draws(&[copied])
         .expect("decoded poses and valid original vertices must lower without Java UV preparation");
     request.decal_foil_mode = 3;
     assert!(decode(&request).is_err());
     request.decal_foil_mode = 1;
-    request.decal_normal_pose = [0.;9];
+    request.decal_normal_pose = [0.; 9];
     assert!(decode(&request).is_err());
-    request.decal_normal_pose = [1.,0.,0.,0.,1.,0.,0.,0.,1.];
+    request.decal_normal_pose = [1., 0., 0., 0., 1., 0., 0., 0., 1.];
     request.decal_model_pose[3] = 1.;
     assert!(decode(&request).is_err());
     request.decal_model_pose[3] = 0.;
@@ -814,39 +1329,70 @@ fn gui_mesh_decal_transport_copies_poses_and_rejects_noncanonical_or_incomplete_
 
 #[test]
 fn gui_mesh_block_layout_transport_preserves_double_bounds_and_original_normals() {
-    let vertices=gui_mesh_vertices();let indices=[0_u32,1,2];
-    let mut request=gui_mesh_batch_request(&vertices,&indices);
-    let decode=|request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(FfiSlice {ptr:request,count:1},320,180)
+    let vertices = gui_mesh_vertices();
+    let indices = [0_u32, 1, 2];
+    let mut request = gui_mesh_batch_request(&vertices, &indices);
+    let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
+        super::gui::decode_gui_mesh_batches(
+            FfiSlice {
+                ptr: request,
+                count: 1,
+            },
+            320,
+            180,
+        )
     };
     assert!(decode(&request).unwrap()[0].block_item_raster.is_none());
-    request.block_model_bounds[0]=-0.0;assert!(decode(&request).is_err());
-    request.block_item_layout=1;
-    request.block_item_scale=2;request.block_model_bounds=[-0.5,-0.5,-0.5,0.5+1e-9,0.5,0.5];
-    request.render_width=0;request.render_height=0;request.guard_pixels=0;request.lighting_mode=3;
-    let copied=decode(&request).unwrap().remove(0);
-    let layout=copied.block_item_raster.unwrap();
-    assert_eq!(layout.gui_scale,2);assert_eq!(layout.model_max[0],0.5+1e-9);
+    request.block_model_bounds[0] = -0.0;
+    assert!(decode(&request).is_err());
+    request.block_item_layout = 1;
+    request.block_item_scale = 2;
+    request.block_model_bounds = [-0.5, -0.5, -0.5, 0.5 + 1e-9, 0.5, 0.5];
+    request.render_width = 0;
+    request.render_height = 0;
+    request.guard_pixels = 0;
+    request.lighting_mode = 3;
+    let copied = decode(&request).unwrap().remove(0);
+    let layout = copied.block_item_raster.unwrap();
+    assert_eq!(layout.gui_scale, 2);
+    assert_eq!(layout.model_max[0], 0.5 + 1e-9);
     assert!(!layout.oversized_gui);
-    request.block_item_layout=2;
-    assert!(decode(&request).unwrap()[0].block_item_raster.unwrap().oversized_gui);
-    request.block_item_layout=3;assert!(decode(&request).is_err());
-    request.block_item_layout=0;assert!(decode(&request).is_err());
-    request.block_item_layout=1;
-    assert_eq!(copied.vertices[0].normal_packed,vertices[0].normal_packed);
-    assert_eq!(copied.model_transform,request.model_transform);
+    request.block_item_layout = 2;
+    assert!(
+        decode(&request).unwrap()[0]
+            .block_item_raster
+            .unwrap()
+            .oversized_gui
+    );
+    request.block_item_layout = 3;
+    assert!(decode(&request).is_err());
+    request.block_item_layout = 0;
+    assert!(decode(&request).is_err());
+    request.block_item_layout = 1;
+    assert_eq!(copied.vertices[0].normal_packed, vertices[0].normal_packed);
+    assert_eq!(copied.model_transform, request.model_transform);
     assert!(copied.item_lighting.is_none());
-    request.block_model_bounds[3]=0.75;
-    assert_eq!(layout.model_max[0],0.5+1e-9);
-    for value in [f64::NAN,f64::INFINITY,-1.0] {
-        request.block_model_bounds[3]=value;assert!(decode(&request).is_err());
+    request.block_model_bounds[3] = 0.75;
+    assert_eq!(layout.model_max[0], 0.5 + 1e-9);
+    for value in [f64::NAN, f64::INFINITY, -1.0] {
+        request.block_model_bounds[3] = value;
+        assert!(decode(&request).is_err());
     }
-    request.block_model_bounds[3]=0.5;
-    request.block_item_scale=u32::MAX;assert!(decode(&request).is_err());
-    request.block_item_scale=2;request.item_raster_scale=2;assert!(decode(&request).is_err());
-    request.item_raster_scale=0;request.guard_pixels=1;assert!(decode(&request).is_err());
-    request.guard_pixels=0;request.render_width=34;assert!(decode(&request).is_err());
-    request.render_width=0;request.lighting_mode=2;assert!(decode(&request).is_err());
+    request.block_model_bounds[3] = 0.5;
+    request.block_item_scale = u32::MAX;
+    assert!(decode(&request).is_err());
+    request.block_item_scale = 2;
+    request.item_raster_scale = 2;
+    assert!(decode(&request).is_err());
+    request.item_raster_scale = 0;
+    request.guard_pixels = 1;
+    assert!(decode(&request).is_err());
+    request.guard_pixels = 0;
+    request.render_width = 34;
+    assert!(decode(&request).is_err());
+    request.render_width = 0;
+    request.lighting_mode = 2;
+    assert!(decode(&request).is_err());
 }
 
 #[test]
@@ -861,7 +1407,14 @@ fn gui_mesh_flat_scale_transport_requires_native_layout_and_unresolved_frame_lig
     request.guard_pixels = 0;
     request.model_transform = super::super::gui_item_raster::GuiItemModelTransform::default().0;
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(FfiSlice { ptr: request, count: 1 }, 320, 180)
+        super::gui::decode_gui_mesh_batches(
+            FfiSlice {
+                ptr: request,
+                count: 1,
+            },
+            320,
+            180,
+        )
     };
     let decoded = decode(&request).unwrap().remove(0);
     assert_eq!(decoded.item_raster_scale, 2);
@@ -884,7 +1437,14 @@ fn gui_mesh_foil_transport_preserves_semantics_and_rejects_invalid_modes() {
     let indices = [0_u32, 1, 2];
     let mut request = gui_mesh_batch_request(&vertices, &indices);
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(FfiSlice { ptr: request, count: 1 }, 320, 180)
+        super::gui::decode_gui_mesh_batches(
+            FfiSlice {
+                ptr: request,
+                count: 1,
+            },
+            320,
+            180,
+        )
     };
     assert!(decode(&request).unwrap()[0].item_foil.is_none());
     request.material_mode = 4;
@@ -893,10 +1453,15 @@ fn gui_mesh_foil_transport_preserves_semantics_and_rejects_invalid_modes() {
     request.item_foil_speed = 0.5;
     request.item_foil_strength = 0.5;
     let copied = decode(&request).unwrap().remove(0);
-    assert_eq!(copied.item_foil.unwrap(), super::super::gui_mesh_frontend::GuiItemFoil {
-        kind: crate::render::vulkanic::item_foil::StandardFoilKind::Item,
-        clock_millis: 12_345, speed: 0.5, strength: 0.5,
-    });
+    assert_eq!(
+        copied.item_foil.unwrap(),
+        super::super::gui_mesh_frontend::GuiItemFoil {
+            kind: crate::render::vulkanic::item_foil::StandardFoilKind::Item,
+            clock_millis: 12_345,
+            speed: 0.5,
+            strength: 0.5,
+        }
+    );
     assert_eq!(copied.vertices[0].atlas_uv, vertices[0].atlas_uv);
     request.item_foil_clock_millis = 0;
     assert_eq!(copied.item_foil.unwrap().clock_millis, 12_345);
@@ -922,11 +1487,20 @@ fn gui_inventory_block_lighting_transport_is_explicit_and_closed() {
     let mut request = gui_mesh_batch_request(&vertices, &indices);
     request.lighting_mode = 3;
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(FfiSlice { ptr: request, count: 1 }, 320, 180)
+        super::gui::decode_gui_mesh_batches(
+            FfiSlice {
+                ptr: request,
+                count: 1,
+            },
+            320,
+            180,
+        )
     };
     let decoded = decode(&request).unwrap();
-    assert_eq!(decoded[0].lighting_mode,
-        super::super::gui_mesh_frontend::GuiMeshLightingMode::InventoryBlock);
+    assert_eq!(
+        decoded[0].lighting_mode,
+        super::super::gui_mesh_frontend::GuiMeshLightingMode::InventoryBlock
+    );
     request.lighting_mode = 4;
     assert!(decode(&request).is_err());
 }
@@ -940,7 +1514,14 @@ fn gui_entity_preview_decal_material_transport_is_explicit_and_closed() {
     request.lighting_mode = 5;
     request.alpha_cutoff = 0.1;
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(FfiSlice { ptr: request, count: 1 }, 320, 180)
+        super::gui::decode_gui_mesh_batches(
+            FfiSlice {
+                ptr: request,
+                count: 1,
+            },
+            320,
+            180,
+        )
     };
     assert_eq!(
         decode(&request).unwrap()[0].material_mode,
@@ -1053,7 +1634,10 @@ fn gui_frame_mesh_transport_is_owned_and_shares_one_item_sequence() {
 
 fn frame_request(sprites: &[FfiGuiSpriteRequest]) -> FfiGuiFrameSubmitRequest {
     FfiGuiFrameSubmitRequest {
-        tiled_quads: FfiSlice { ptr: std::ptr::null(), count: 0 },
+        tiled_quads: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
         gui_projection_width: 320.0,
         gui_projection_height: 180.0,
         header: FfiHeader {
@@ -1283,7 +1867,10 @@ fn whole_frame_request(
     projection_matrix[10] = 1.0;
     projection_matrix[15] = 1.0;
     FfiWholeFrameSubmitRequest {
-        gui_tiled_quads: FfiSlice { ptr: std::ptr::null(), count: 0 },
+        gui_tiled_quads: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
         gui_projection_width: 320.0,
         gui_projection_height: 180.0,
         header: FfiHeader {
@@ -1486,8 +2073,18 @@ fn whole_frame_request(
         engine_partial_tick: 0.0,
         engine_glint_alpha: 0.0,
         engine_menu_blur_radius: 0,
-        world_particle_quads: FfiSlice { ptr: std::ptr::null(), count: 0 },
-        world_experience_orbs: FfiSlice { ptr: std::ptr::null(), count: 0 },
+        world_particle_quads: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
+        world_experience_orbs: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
+        world_distant_horizons_generic_boxes: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
         world_lod_instances: FfiSlice {
             ptr: std::ptr::null(),
             count: 0,
@@ -1511,6 +2108,9 @@ fn whole_frame_request(
             camera_world_x: 0.0,
             camera_world_y: 0.0,
             camera_world_z: 0.0,
+            dh_fog_parameters: [0.0; 20],
+            max_level_height: 0,
+            ssao_parameters: [0.0; 8],
         },
         gui_mesh_batches: FfiSlice {
             ptr: std::ptr::null(),
@@ -1756,15 +2356,23 @@ fn world_mesh_asset_update_request(
             ptr: std::ptr::null(),
             count: 0,
         },
-        experience_orbs: FfiSlice { ptr: std::ptr::null(), count: 0 },
+        experience_orbs: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
     }
 }
 
 fn orb_asset() -> FfiWorldExperienceOrbAssetRecord {
     FfiWorldExperienceOrbAssetRecord {
         byte_size: size_of::<FfiWorldExperienceOrbAssetRecord>() as u32,
-        icon: 10, mesh_key: 0x0b01, mesh_generation: 2,
-        red: 127, blue: 5, packed_light: 0x00b00070, reserved0: 0,
+        icon: 10,
+        mesh_key: 0x0b01,
+        mesh_generation: 2,
+        red: 127,
+        blue: 5,
+        packed_light: 0x00b00070,
+        reserved0: 0,
     }
 }
 
@@ -1772,108 +2380,186 @@ fn orb_asset() -> FfiWorldExperienceOrbAssetRecord {
 fn experience_orb_asset_transport_lowers_copied_appearance_without_caller_geometry() {
     let mut orb = orb_asset();
     let mut request = world_mesh_asset_update_request(&[], &[]);
-    request.experience_orbs = FfiSlice { ptr: &orb, count: 1 };
-    let (_, meshes, textures, sorted, retirements) = unsafe {
-        decode_world_mesh_asset_update(&request, test_capabilities()).unwrap()
+    request.experience_orbs = FfiSlice {
+        ptr: &orb,
+        count: 1,
     };
+    let (_, meshes, textures, sorted, retirements) =
+        unsafe { decode_world_mesh_asset_update(&request, test_capabilities()).unwrap() };
     orb.red = 0;
     assert_eq!(orb.red, 0);
     assert!(textures.is_empty() && sorted.is_empty() && retirements.is_empty());
     assert_eq!(meshes.len(), 1);
     let mesh = &meshes[0];
-    assert_eq!((mesh.mesh_key, mesh.mesh_generation), (0x0b01,2));
+    assert_eq!((mesh.mesh_key, mesh.mesh_generation), (0x0b01, 2));
     assert_eq!(mesh.vertices[0].color_argb, 0x807fff05);
     assert_eq!(mesh.vertices[0].normal_packed, 0x7f00);
     assert_eq!(mesh.vertices[0].light, 0x00b00070);
-    assert_eq!(mesh.vertices[0].uv, [0.5,0.75]);
+    assert_eq!(mesh.vertices[0].uv, [0.5, 0.75]);
     assert_eq!(mesh.vertices.len(), 4);
     assert_eq!(mesh.index_bytes.len(), 12);
     assert_eq!(mesh.entity_identity, "minecraft:experience_orb");
     let layout = super::layout::layout_for_struct(109).unwrap();
     assert_eq!(layout.byte_size, 40);
-    assert_eq!(&layout.field_offsets[..8], &[0,4,8,16,24,28,32,36]);
+    assert_eq!(&layout.field_offsets[..8], &[0, 4, 8, 16, 24, 28, 32, 36]);
     let update_layout = super::layout::layout_for_struct(68).unwrap();
     assert_eq!(update_layout.field_count, 8);
     let empty = world_mesh_asset_update_request(&[], &[]);
-    assert_eq!(super::status::input_bytes_for_world_mesh_asset_update(&request)
-        - super::status::input_bytes_for_world_mesh_asset_update(&empty), 40);
+    assert_eq!(
+        super::status::input_bytes_for_world_mesh_asset_update(&request)
+            - super::status::input_bytes_for_world_mesh_asset_update(&empty),
+        40
+    );
 }
 
 #[test]
 fn experience_orb_asset_transport_rejects_invalid_and_duplicate_semantics() {
     let good = orb_asset();
     for bad in [
-        FfiWorldExperienceOrbAssetRecord {byte_size:0,..good},
-        FfiWorldExperienceOrbAssetRecord {mesh_key:0,..good},
-        FfiWorldExperienceOrbAssetRecord {mesh_generation:0,..good},
-        FfiWorldExperienceOrbAssetRecord {icon:11,..good},
-        FfiWorldExperienceOrbAssetRecord {red:256,..good},
-        FfiWorldExperienceOrbAssetRecord {blue:u32::MAX,..good},
-        FfiWorldExperienceOrbAssetRecord {reserved0:1,..good},
+        FfiWorldExperienceOrbAssetRecord {
+            byte_size: 0,
+            ..good
+        },
+        FfiWorldExperienceOrbAssetRecord {
+            mesh_key: 0,
+            ..good
+        },
+        FfiWorldExperienceOrbAssetRecord {
+            mesh_generation: 0,
+            ..good
+        },
+        FfiWorldExperienceOrbAssetRecord { icon: 11, ..good },
+        FfiWorldExperienceOrbAssetRecord { red: 256, ..good },
+        FfiWorldExperienceOrbAssetRecord {
+            blue: u32::MAX,
+            ..good
+        },
+        FfiWorldExperienceOrbAssetRecord {
+            reserved0: 1,
+            ..good
+        },
     ] {
         let mut request = world_mesh_asset_update_request(&[], &[]);
-        request.experience_orbs = FfiSlice { ptr:&bad, count:1 };
-        assert!(unsafe {decode_world_mesh_asset_update(&request, test_capabilities())}.is_err());
+        request.experience_orbs = FfiSlice {
+            ptr: &bad,
+            count: 1,
+        };
+        assert!(unsafe { decode_world_mesh_asset_update(&request, test_capabilities()) }.is_err());
     }
-    let duplicates = [good,good];
+    let duplicates = [good, good];
     let mut request = world_mesh_asset_update_request(&[], &[]);
-    request.experience_orbs = FfiSlice { ptr:duplicates.as_ptr(), count:2 };
-    assert!(unsafe {decode_world_mesh_asset_update(&request, test_capabilities())}.is_err());
+    request.experience_orbs = FfiSlice {
+        ptr: duplicates.as_ptr(),
+        count: 2,
+    };
+    assert!(unsafe { decode_world_mesh_asset_update(&request, test_capabilities()) }.is_err());
 }
 
 #[test]
 fn experience_orb_asset_transport_checks_residency_before_reading_array() {
     let mut request = world_mesh_asset_update_request(&[], &[]);
-    request.experience_orbs = FfiSlice { ptr:std::ptr::null(), count:u64::MAX };
-    let error = unsafe {decode_world_mesh_asset_update(&request, test_capabilities())}.unwrap_err();
+    request.experience_orbs = FfiSlice {
+        ptr: std::ptr::null(),
+        count: u64::MAX,
+    };
+    let error =
+        unsafe { decode_world_mesh_asset_update(&request, test_capabilities()) }.unwrap_err();
     assert!(error.message.contains("residency"));
 }
 
 #[test]
 fn experience_orb_asset_transport_rejects_header_only_old_or_short_requests() {
     for header in [
-        FfiHeader { version:52, byte_size:96 },
-        FfiHeader { version:FFI_ABI_VERSION, byte_size:8 },
+        FfiHeader {
+            version: 52,
+            byte_size: 96,
+        },
+        FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: 8,
+        },
     ] {
         let pointer = (&header as *const FfiHeader).cast::<FfiWorldMeshAssetUpdateRequest>();
-        assert!(unsafe {decode_world_mesh_asset_update(pointer, test_capabilities())}.is_err());
+        assert!(unsafe { decode_world_mesh_asset_update(pointer, test_capabilities()) }.is_err());
     }
 }
 
 #[test]
 fn experience_orb_asset_export_preserves_generation_and_rejects_old_header() {
     let create = FfiContextCreateRequest {
-        header: FfiHeader { version:FFI_ABI_VERSION, byte_size:size_of::<FfiContextCreateRequest>() as u32 },
-        backend_kind:1, tracy_enabled:0,
-        label: FfiBytes { ptr:b"orb ABI".as_ptr(), len:7 },
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiContextCreateRequest>() as u32,
+        },
+        backend_kind: 1,
+        tracy_enabled: 0,
+        label: FfiBytes {
+            ptr: b"orb ABI".as_ptr(),
+            len: 7,
+        },
     };
     let mut context = FfiContextResult::default();
-    assert_eq!(unsafe {mattmc_vulkanic_gal_context_create(&create, &mut context)}, 0);
+    assert_eq!(
+        unsafe { mattmc_vulkanic_gal_context_create(&create, &mut context) },
+        0
+    );
     let mut request = world_mesh_asset_update_request(&[], &[]);
     request.negotiated_feature_bits = context.supported_feature_bits;
     let orb = orb_asset();
-    request.experience_orbs = FfiSlice { ptr:&orb, count:1 };
+    request.experience_orbs = FfiSlice {
+        ptr: &orb,
+        count: 1,
+    };
     let publish = |request: &FfiWorldMeshAssetUpdateRequest| unsafe {
         mattmc_vulkanic_gal_world_mesh_update_assets(context.context_id, request, ptr::null_mut())
     };
     assert_eq!(publish(&request), 0);
     assert_ne!(publish(&request), 0, "stale update must not be accepted");
-    let header = FfiHeader { version:52, byte_size:96 };
-    assert_ne!(unsafe {mattmc_vulkanic_gal_world_mesh_update_assets(context.context_id,
-        (&header as *const FfiHeader).cast(), ptr::null_mut())}, 0);
+    let header = FfiHeader {
+        version: 52,
+        byte_size: 96,
+    };
+    assert_ne!(
+        unsafe {
+            mattmc_vulkanic_gal_world_mesh_update_assets(
+                context.context_id,
+                (&header as *const FfiHeader).cast(),
+                ptr::null_mut(),
+            )
+        },
+        0
+    );
     request.generation += 1;
-    let replacement = FfiWorldExperienceOrbAssetRecord {mesh_generation:3, red:200,..orb};
-    request.experience_orbs = FfiSlice { ptr:&replacement, count:1 };
+    let replacement = FfiWorldExperienceOrbAssetRecord {
+        mesh_generation: 3,
+        red: 200,
+        ..orb
+    };
+    request.experience_orbs = FfiSlice {
+        ptr: &replacement,
+        count: 1,
+    };
     assert_eq!(publish(&request), 0, "rejection must leave context usable");
     request.generation += 1;
-    request.experience_orbs = FfiSlice { ptr:ptr::null(), count:0 };
-    let retirement = FfiWorldMeshAssetRetirementRecord {
-        byte_size:size_of::<FfiWorldMeshAssetRetirementRecord>() as u32, reserved0:0,
-        mesh_key:orb.mesh_key, mesh_generation:3,
+    request.experience_orbs = FfiSlice {
+        ptr: ptr::null(),
+        count: 0,
     };
-    request.retirements = FfiSlice { ptr:&retirement, count:1 };
+    let retirement = FfiWorldMeshAssetRetirementRecord {
+        byte_size: size_of::<FfiWorldMeshAssetRetirementRecord>() as u32,
+        reserved0: 0,
+        mesh_key: orb.mesh_key,
+        mesh_generation: 3,
+    };
+    request.retirements = FfiSlice {
+        ptr: &retirement,
+        count: 1,
+    };
     assert_eq!(publish(&request), 0);
-    assert_eq!(unsafe {mattmc_vulkanic_gal_context_destroy(context.context_id, ptr::null_mut())}, 0);
+    assert_eq!(
+        unsafe { mattmc_vulkanic_gal_context_destroy(context.context_id, ptr::null_mut()) },
+        0
+    );
 }
 
 fn world_lod_asset_update_request(
@@ -1988,10 +2674,20 @@ fn mesh_asset<'a>(
 
 fn mesh_instance() -> FfiWorldMeshInstanceRecord {
     FfiWorldMeshInstanceRecord {
-        model_submission_order_mode: 0, model_submission_order: 0,
-        item_foil_mode: 0, item_foil_clock_millis: 0, item_foil_speed: 0.0, item_foil_strength: 0.0,
-        decal_foil_mode: 0, decal_normal_mode: 0, decal_model_pose: [0.;16], decal_normal_pose: [0.;9],
-        terrain_placement_mode: 0, terrain_origin: [0;3], terrain_camera: [0.0;3],
+        model_submission_order_mode: 0,
+        model_submission_order: 0,
+        packed_light: 0,
+        item_foil_mode: 0,
+        item_foil_clock_millis: 0,
+        item_foil_speed: 0.0,
+        item_foil_strength: 0.0,
+        decal_foil_mode: 0,
+        decal_normal_mode: 0,
+        decal_model_pose: [0.; 16],
+        decal_normal_pose: [0.; 9],
+        terrain_placement_mode: 0,
+        terrain_origin: [0; 3],
+        terrain_camera: [0.0; 3],
         byte_size: size_of::<FfiWorldMeshInstanceRecord>() as u32,
         stratum: WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
         mesh_section_index: 0,
@@ -2032,7 +2728,10 @@ fn semantic_affine_material_is_copied_and_unknown_modes_are_rejected() {
     let mut affine = affine_quad_request();
     affine.material_mode = 1;
     let mut request = frame_request(&[]);
-    request.affine_quads = FfiSlice { ptr: &affine, count: 1 };
+    request.affine_quads = FfiSlice {
+        ptr: &affine,
+        count: 1,
+    };
     let (_, _, _, decoded, _) = unsafe {
         super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
     };
@@ -2045,7 +2744,8 @@ fn semantic_affine_material_is_copied_and_unknown_modes_are_rejected() {
     affine.material_mode = 3;
     assert!(unsafe {
         super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities())
-    }.is_err());
+    }
+    .is_err());
 }
 
 #[test]
@@ -2053,88 +2753,158 @@ fn full_item_raster_ffi_copies_scale_and_rejects_incoherent_semantics() {
     let mut affine = affine_quad_request();
     affine.material_mode = 1;
     affine.item_raster_scale = 3;
-    affine.item_raster_corners = [4.0,2.0,12.0,2.0,4.0,14.0];
+    affine.item_raster_corners = [4.0, 2.0, 12.0, 2.0, 4.0, 14.0];
     let decode = |affine: &FfiGuiAffineQuadRequest| {
         let mut frame = frame_request(&[]);
-        frame.affine_quads = FfiSlice {ptr:affine,count:1};
-        unsafe {super::gui::decode_gui_frame_submit_with_mesh(&frame,test_capabilities())}
+        frame.affine_quads = FfiSlice {
+            ptr: affine,
+            count: 1,
+        };
+        unsafe { super::gui::decode_gui_frame_submit_with_mesh(&frame, test_capabilities()) }
     };
-    let (_,_,_,owned,_) = decode(&affine).unwrap();
-    assert_eq!(owned[0].item_raster_geometry.corners, [4.0,2.0,12.0,2.0,4.0,14.0]);
+    let (_, _, _, owned, _) = decode(&affine).unwrap();
+    assert_eq!(
+        owned[0].item_raster_geometry.corners,
+        [4.0, 2.0, 12.0, 2.0, 4.0, 14.0]
+    );
     affine.item_raster_corners[0] = f32::NAN;
     assert!(decode(&affine).is_err());
-    assert_eq!(owned[0].item_raster_geometry.corners[0],4.0,"transport owns its semantic copy");
-    affine.item_raster_corners = [0.0,0.0,16.0,4.0,4.0,16.0];
-    assert!(decode(&affine).is_err(),"the implied fourth corner must fit the cell");
-    affine.item_raster_corners = [4.0,2.0,12.0,2.0,4.0,14.0];
+    assert_eq!(
+        owned[0].item_raster_geometry.corners[0], 4.0,
+        "transport owns its semantic copy"
+    );
+    affine.item_raster_corners = [0.0, 0.0, 16.0, 4.0, 4.0, 16.0];
+    assert!(
+        decode(&affine).is_err(),
+        "the implied fourth corner must fit the cell"
+    );
+    affine.item_raster_corners = [4.0, 2.0, 12.0, 2.0, 4.0, 14.0];
     affine.item_raster_scale = 4;
-    assert_eq!(owned[0].item_raster_scale,3);
-    assert_eq!(decode(&affine).unwrap().3[0].item_raster_scale,4);
-    for scale in [257,u32::MAX] {affine.item_raster_scale=scale; assert!(decode(&affine).is_err());}
-    affine.item_raster_scale=3;
-    affine.material_mode=0;
+    assert_eq!(owned[0].item_raster_scale, 3);
+    assert_eq!(decode(&affine).unwrap().3[0].item_raster_scale, 4);
+    for scale in [257, u32::MAX] {
+        affine.item_raster_scale = scale;
+        assert!(decode(&affine).is_err());
+    }
+    affine.item_raster_scale = 3;
+    affine.material_mode = 0;
     assert!(decode(&affine).is_err());
-    affine.material_mode=1;
-    affine.u0=0.25;
-    assert_eq!(decode(&affine).unwrap().3[0].u0,0.25);
-    affine.u0=-0.001;
+    affine.material_mode = 1;
+    affine.u0 = 0.25;
+    assert_eq!(decode(&affine).unwrap().3[0].u0, 0.25);
+    affine.u0 = -0.001;
     assert!(decode(&affine).is_err());
-    affine.u0=0.0;
-    affine.byte_size=136;
-    assert!(decode(&affine).is_err(),"ABI37 records cannot silently omit the nested layer slice");
-    affine.byte_size=112;
-    assert!(decode(&affine).is_err(),"ABI36 records cannot silently omit item-local corners");
-    affine.byte_size=104;
-    assert!(decode(&affine).is_err(),"old record sizes cannot silently omit raster semantics");
+    affine.u0 = 0.0;
+    affine.byte_size = 136;
+    assert!(
+        decode(&affine).is_err(),
+        "ABI37 records cannot silently omit the nested layer slice"
+    );
+    affine.byte_size = 112;
+    assert!(
+        decode(&affine).is_err(),
+        "ABI36 records cannot silently omit item-local corners"
+    );
+    affine.byte_size = 104;
+    assert!(
+        decode(&affine).is_err(),
+        "old record sizes cannot silently omit raster semantics"
+    );
 }
 
 #[test]
 fn item_layer_transport_copies_order_and_rejects_invalid_nested_data_before_admission() {
-    let layer=FfiGuiItemRasterLayer {byte_size:size_of::<FfiGuiItemRasterLayer>() as u32,
-        material_mode:1,asset_id:17,color_argb:0x80ff0000,
-        corners:[0.0,0.0,16.0,0.0,0.0,16.0],uv:[0.0,0.0,1.0,1.0],
-        model_transform:super::super::gui_item_raster::GuiItemModelTransform::default().0};
-    let mut layers=[layer, FfiGuiItemRasterLayer {asset_id:18,material_mode:2,..layer}];
-    layers[1].model_transform[0]=0.5;
-    layers[1].model_transform[12]=-0.25;
-    let mut affine=affine_quad_request();
-    affine.material_mode=1; affine.item_raster_scale=2;
-    affine.item_raster_layers=FfiSlice {ptr:layers.as_ptr(),count:2};
-    let decode=|value:&FfiGuiAffineQuadRequest| {
-        let mut frame=frame_request(&[]);
-        frame.affine_quads=FfiSlice {ptr:value,count:1};
-        unsafe {super::gui::decode_gui_frame_submit_with_mesh(&frame,test_capabilities())}
+    let layer = FfiGuiItemRasterLayer {
+        byte_size: size_of::<FfiGuiItemRasterLayer>() as u32,
+        material_mode: 1,
+        asset_id: 17,
+        color_argb: 0x80ff0000,
+        corners: [0.0, 0.0, 16.0, 0.0, 0.0, 16.0],
+        uv: [0.0, 0.0, 1.0, 1.0],
+        model_transform: super::super::gui_item_raster::GuiItemModelTransform::default().0,
     };
-    let owned=decode(&affine).unwrap().3;
-    assert_eq!(owned[0].item_raster_layers.iter().map(|v|v.asset_id).collect::<Vec<_>>(),vec![17,18]);
-    layers[1].asset_id=99;
-    layers[1].model_transform[0]=0.75;
-    assert_eq!(owned[0].item_raster_layers[1].model_transform.0[0],0.5,"matrix is owned, not borrowed");
-    assert_eq!(decode(&affine).unwrap().3[0].item_raster_layers[1].model_transform.0[0],0.75);
-    assert_eq!(owned[0].item_raster_layers[1].asset_id,18,"no borrowed nested memory");
-    assert_eq!(decode(&affine).unwrap().3[0].item_raster_layers[1].asset_id,99);
+    let mut layers = [
+        layer,
+        FfiGuiItemRasterLayer {
+            asset_id: 18,
+            material_mode: 2,
+            ..layer
+        },
+    ];
+    layers[1].model_transform[0] = 0.5;
+    layers[1].model_transform[12] = -0.25;
+    let mut affine = affine_quad_request();
+    affine.material_mode = 1;
+    affine.item_raster_scale = 2;
+    affine.item_raster_layers = FfiSlice {
+        ptr: layers.as_ptr(),
+        count: 2,
+    };
+    let decode = |value: &FfiGuiAffineQuadRequest| {
+        let mut frame = frame_request(&[]);
+        frame.affine_quads = FfiSlice {
+            ptr: value,
+            count: 1,
+        };
+        unsafe { super::gui::decode_gui_frame_submit_with_mesh(&frame, test_capabilities()) }
+    };
+    let owned = decode(&affine).unwrap().3;
+    assert_eq!(
+        owned[0]
+            .item_raster_layers
+            .iter()
+            .map(|v| v.asset_id)
+            .collect::<Vec<_>>(),
+        vec![17, 18]
+    );
+    layers[1].asset_id = 99;
+    layers[1].model_transform[0] = 0.75;
+    assert_eq!(
+        owned[0].item_raster_layers[1].model_transform.0[0], 0.5,
+        "matrix is owned, not borrowed"
+    );
+    assert_eq!(
+        decode(&affine).unwrap().3[0].item_raster_layers[1]
+            .model_transform
+            .0[0],
+        0.75
+    );
+    assert_eq!(
+        owned[0].item_raster_layers[1].asset_id, 18,
+        "no borrowed nested memory"
+    );
+    assert_eq!(
+        decode(&affine).unwrap().3[0].item_raster_layers[1].asset_id,
+        99
+    );
     for defect in 0..9 {
-        layers[1]=layer;
+        layers[1] = layer;
         match defect {
-            0 => layers[1].byte_size=0,
-            1 => layers[1].asset_id=0,
-            2 => layers[1].material_mode=0,
-            3 => layers[1].uv[0]=f32::NAN,
-            4 => layers[1].uv[2]=0.0,
-            5 => layers[1].corners[2]=17.0,
-            6 => layers[1].byte_size=64, // ABI38 nested record is no longer sufficient.
-            7 => layers[1].model_transform[0]=f32::NAN,
-            _ => layers[1].model_transform[3]=0.25,
+            0 => layers[1].byte_size = 0,
+            1 => layers[1].asset_id = 0,
+            2 => layers[1].material_mode = 0,
+            3 => layers[1].uv[0] = f32::NAN,
+            4 => layers[1].uv[2] = 0.0,
+            5 => layers[1].corners[2] = 17.0,
+            6 => layers[1].byte_size = 64, // ABI38 nested record is no longer sufficient.
+            7 => layers[1].model_transform[0] = f32::NAN,
+            _ => layers[1].model_transform[3] = 0.25,
         }
-        assert!(decode(&affine).is_err(),"malformed last layer {defect}");
+        assert!(decode(&affine).is_err(), "malformed last layer {defect}");
     }
-    layers[1]=layer;
-    affine.item_raster_scale=0;
+    layers[1] = layer;
+    affine.item_raster_scale = 0;
     assert!(decode(&affine).is_err());
-    affine.item_raster_scale=2;
-    affine.item_raster_layers=FfiSlice {ptr:std::ptr::null(),count:65};
-    assert!(decode(&affine).is_err(),"count rejected before dereferencing");
-    affine.item_raster_layers.count=1;
+    affine.item_raster_scale = 2;
+    affine.item_raster_layers = FfiSlice {
+        ptr: std::ptr::null(),
+        count: 65,
+    };
+    assert!(
+        decode(&affine).is_err(),
+        "count rejected before dereferencing"
+    );
+    affine.item_raster_layers.count = 1;
     assert!(decode(&affine).is_err());
 }
 
@@ -2148,8 +2918,14 @@ fn semantic_gui_projection_is_owned_exact_and_validated_for_every_family() {
     let mut mesh = gui_mesh_batch_request(&vertices, &indices);
     mesh.sequence = 3;
     let mut request = frame_request(&sprites);
-    request.affine_quads = FfiSlice { ptr: &affine, count: 1 };
-    request.mesh_batches = FfiSlice { ptr: &mesh, count: 1 };
+    request.affine_quads = FfiSlice {
+        ptr: &affine,
+        count: 1,
+    };
+    request.mesh_batches = FfiSlice {
+        ptr: &mesh,
+        count: 1,
+    };
     request.gui_projection_width = 319.75;
     request.gui_projection_height = 179.5;
     let (_, _, sprites, affine, meshes) = unsafe {
@@ -2162,7 +2938,10 @@ fn semantic_gui_projection_is_owned_exact_and_validated_for_every_family() {
     assert_eq!([320, 180], meshes[0].gui_extent);
     for invalid in [f32::NAN, f32::INFINITY, 0.0, -1.0, 319.0, 320.5] {
         request.gui_projection_width = invalid;
-        assert!(unsafe { super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()) }.is_err());
+        assert!(unsafe {
+            super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities())
+        }
+        .is_err());
     }
 }
 
@@ -2279,7 +3058,8 @@ fn whole_frame_engine_globals_are_copied_and_validated() {
     request.engine_partial_tick = 0.5;
     request.engine_glint_alpha = 0.75;
     request.engine_menu_blur_radius = 7;
-    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+    let (_, _, frame, _) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
     request.engine_game_ticks = 0;
     let values = frame.engine_globals.unwrap();
     assert_eq!(48001, values.game_ticks);
@@ -2295,7 +3075,8 @@ fn whole_frame_engine_globals_are_copied_and_validated() {
     request.engine_globals_present = 2;
     assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
     request.engine_globals_present = 0;
-    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+    let (_, _, frame, _) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
     assert!(frame.engine_globals.is_none());
 }
 
@@ -2319,34 +3100,62 @@ fn whole_frame_world_primitive_ffi_decode_copies_caller_memory() {
 
 #[test]
 fn model_submission_order_transport_preserves_signed_values_and_rejects_invalid_scope() {
-    for first_person in [false,true] {
-        for order in [i32::MIN,-1,0,1,i32::MAX] {
-            let mut source=mesh_instance();
-            source.stratum=WORLD_STRATUM_ENTITY_MESH;
-            source.entity_id=0;source.block_entity_id=-1;
-            source.model_submission_order_mode=1;source.model_submission_order=order;
-            let mut request=whole_frame_request_with_mesh_instances(std::slice::from_ref(&source));
+    for first_person in [false, true] {
+        for order in [i32::MIN, -1, 0, 1, i32::MAX] {
+            let mut source = mesh_instance();
+            source.stratum = WORLD_STRATUM_ENTITY_MESH;
+            source.entity_id = 0;
+            source.block_entity_id = -1;
+            source.model_submission_order_mode = 1;
+            source.model_submission_order = order;
+            let mut request =
+                whole_frame_request_with_mesh_instances(std::slice::from_ref(&source));
             if first_person {
-                request.world_mesh_instances=FfiSlice {ptr:std::ptr::null(),count:0};
-                let identity=[1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.];
-                request.world_first_person_frame=FfiWorldFirstPersonFrame {
-                    byte_size:size_of::<FfiWorldFirstPersonFrame>() as u32,
-                    enabled:1,clear_depth_before:1,main_hand_instance_count:1,
-                    projection_matrix:identity,model_view_matrix:identity,
+                request.world_mesh_instances = FfiSlice {
+                    ptr: std::ptr::null(),
+                    count: 0,
                 };
-                request.world_first_person_mesh_instances=FfiSlice {ptr:&source,count:1};
+                let identity = [
+                    1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.,
+                ];
+                request.world_first_person_frame = FfiWorldFirstPersonFrame {
+                    byte_size: size_of::<FfiWorldFirstPersonFrame>() as u32,
+                    enabled: 1,
+                    clear_depth_before: 1,
+                    main_hand_instance_count: 1,
+                    projection_matrix: identity,
+                    model_view_matrix: identity,
+                };
+                request.world_first_person_mesh_instances = FfiSlice {
+                    ptr: &source,
+                    count: 1,
+                };
             }
-            let (_,_,frame,_)=unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.unwrap();
-            let instances=if first_person {&frame.first_person_mesh_instances} else {&frame.mesh_instances};
-            assert_eq!(instances[0].model_submission_order,Some(order));
-            for mode in [2,u32::MAX] {
-                source.model_submission_order_mode=mode;
-                assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+            let (_, _, frame, _) =
+                unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+            let instances = if first_person {
+                &frame.first_person_mesh_instances
+            } else {
+                &frame.mesh_instances
+            };
+            assert_eq!(instances[0].model_submission_order, Some(order));
+            for mode in [2, u32::MAX] {
+                source.model_submission_order_mode = mode;
+                assert!(
+                    unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
+                        .is_err()
+                );
             }
-            source.model_submission_order_mode=0;source.model_submission_order=1;
-            assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
-            source.model_submission_order_mode=1;source.stratum=WORLD_STRATUM_TERRAIN;
-            assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+            source.model_submission_order_mode = 0;
+            source.model_submission_order = 1;
+            assert!(
+                unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err()
+            );
+            source.model_submission_order_mode = 1;
+            source.stratum = WORLD_STRATUM_TERRAIN;
+            assert!(
+                unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err()
+            );
         }
     }
 }
@@ -2357,11 +3166,17 @@ fn equal_depth_model_policy_survives_world_and_hand_ffi_without_relaxing_scope()
     instances[0].stratum = WORLD_STRATUM_ENTITY_MESH;
     instances[0].depth_policy = WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE;
     let request = whole_frame_request_with_mesh_instances(&instances);
-    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
-    assert_eq!(frame.mesh_instances[0].depth_policy, WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE);
+    let (_, _, frame, _) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+    assert_eq!(
+        frame.mesh_instances[0].depth_policy,
+        WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE
+    );
     for policy in [4, u32::MAX] {
         instances[0].depth_policy = policy;
-        assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+        assert!(
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err()
+        );
     }
     instances[0].depth_policy = WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE;
     instances[0].stratum = WORLD_STRATUM_TERRAIN;
@@ -2371,16 +3186,29 @@ fn equal_depth_model_policy_survives_world_and_hand_ffi_without_relaxing_scope()
     assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
     instances[0].item_foil_mode = 0;
     let mut hand = whole_frame_request(&[], &[]);
-    let identity = [1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.];
+    let identity = [
+        1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.,
+    ];
     hand.world_first_person_frame = FfiWorldFirstPersonFrame {
-        byte_size:size_of::<FfiWorldFirstPersonFrame>() as u32,
-        enabled:1, clear_depth_before:1, main_hand_instance_count:1,
-        projection_matrix:identity, model_view_matrix:identity,
+        byte_size: size_of::<FfiWorldFirstPersonFrame>() as u32,
+        enabled: 1,
+        clear_depth_before: 1,
+        main_hand_instance_count: 1,
+        projection_matrix: identity,
+        model_view_matrix: identity,
     };
-    instances[0].entity_id = 0; instances[0].block_entity_id = -1;
-    hand.world_first_person_mesh_instances = FfiSlice {ptr:instances.as_ptr(), count:1};
-    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&hand, test_vulkan_capabilities()) }.unwrap();
-    assert_eq!(frame.first_person_mesh_instances[0].depth_policy, WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE);
+    instances[0].entity_id = 0;
+    instances[0].block_entity_id = -1;
+    hand.world_first_person_mesh_instances = FfiSlice {
+        ptr: instances.as_ptr(),
+        count: 1,
+    };
+    let (_, _, frame, _) =
+        unsafe { decode_whole_frame_submit(&hand, test_vulkan_capabilities()) }.unwrap();
+    assert_eq!(
+        frame.first_person_mesh_instances[0].depth_policy,
+        WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE
+    );
 }
 
 #[test]
@@ -2433,18 +3261,30 @@ fn whole_frame_mesh_instance_ffi_rejects_zero_semantic_identity_before_copying()
 
 #[test]
 fn whole_frame_ffi_preserves_explicit_camera_sort_for_depth_writing_terrain() {
-    use crate::render::vulkanic::world_primitive_frontend::{WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS, WORLD_MESH_SECTION_ALL};
+    use crate::render::vulkanic::world_primitive_frontend::{
+        WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS, WORLD_MESH_SECTION_ALL,
+    };
     let mut instances = vec![mesh_instance()];
     instances[0].stratum = WORLD_STRATUM_TERRAIN;
     instances[0].mesh_section_index = WORLD_MESH_SECTION_ALL;
     instances[0].depth_policy = WORLD_DEPTH_POLICY_TEST_WRITE;
     instances[0].flags = WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS;
     let mut request = whole_frame_request(&[], &[]);
-    request.world_mesh_instances = FfiSlice { ptr: instances.as_ptr(), count: 1 };
-    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+    request.world_mesh_instances = FfiSlice {
+        ptr: instances.as_ptr(),
+        count: 1,
+    };
+    let (_, _, frame, _) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
     instances[0].flags = 0;
-    assert_eq!(frame.mesh_instances[0].flags, WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS);
-    assert_eq!(frame.mesh_instances[0].depth_policy, WORLD_DEPTH_POLICY_TEST_WRITE);
+    assert_eq!(
+        frame.mesh_instances[0].flags,
+        WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS
+    );
+    assert_eq!(
+        frame.mesh_instances[0].depth_policy,
+        WORLD_DEPTH_POLICY_TEST_WRITE
+    );
     instances[0].flags = WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS;
     instances[0].mesh_section_index = 0;
     assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
@@ -2546,10 +3386,20 @@ fn whole_frame_first_person_mesh_stream_is_copied_and_requires_its_own_domain() 
         model_view_matrix: projection,
     };
     let mut hands = vec![FfiWorldMeshInstanceRecord {
-        model_submission_order_mode: 0, model_submission_order: 0,
-        item_foil_mode: 0, item_foil_clock_millis: 0, item_foil_speed: 0.0, item_foil_strength: 0.0,
-        decal_foil_mode: 0, decal_normal_mode: 0, decal_model_pose: [0.;16], decal_normal_pose: [0.;9],
-        terrain_placement_mode: 0, terrain_origin: [0;3], terrain_camera: [0.0;3],
+        model_submission_order_mode: 0,
+        model_submission_order: 0,
+        packed_light: 0,
+        item_foil_mode: 0,
+        item_foil_clock_millis: 0,
+        item_foil_speed: 0.0,
+        item_foil_strength: 0.0,
+        decal_foil_mode: 0,
+        decal_normal_mode: 0,
+        decal_model_pose: [0.; 16],
+        decal_normal_pose: [0.; 9],
+        terrain_placement_mode: 0,
+        terrain_origin: [0; 3],
+        terrain_camera: [0.0; 3],
         byte_size: size_of::<FfiWorldMeshInstanceRecord>() as u32,
         stratum: WORLD_STRATUM_ENTITY_MESH,
         mesh_section_index: u32::MAX,
@@ -2589,7 +3439,9 @@ fn whole_frame_first_person_mesh_stream_is_copied_and_requires_its_own_domain() 
     let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
         .expect_err("terrain placement must never be silently ignored in the hand domain");
     assert_eq!(StatusCode::InvalidArgument, error.code);
-    assert!(error.message.contains("first-person mesh instances cannot use terrain placement"));
+    assert!(error
+        .message
+        .contains("first-person mesh instances cannot use terrain placement"));
     hands[0].stratum = WORLD_STRATUM_ENTITY_MESH;
     hands[0].terrain_placement_mode = 0;
 
@@ -2665,29 +3517,43 @@ fn world_and_hand_decal_foil_transport_copies_context_and_rejects_malformed_requ
         source.item_foil_clock_millis = 12345;
         source.item_foil_speed = 0.125;
         source.item_foil_strength = 0.25;
-        source.decal_foil_mode = if hand {2} else {1};
+        source.decal_foil_mode = if hand { 2 } else { 1 };
         source.decal_normal_mode = 1;
         source.decal_model_pose = source.transform;
-        source.decal_normal_pose = [2.,0.,0.,0.,3.,0.,0.,0.,-4.];
+        source.decal_normal_pose = [2., 0., 0., 0., 3., 0., 0., 0., -4.];
         let mut request = whole_frame_request(&[], &[]);
         if hand {
-            request.world_first_person_mesh_instances = FfiSlice {ptr: &source, count: 1};
+            request.world_first_person_mesh_instances = FfiSlice {
+                ptr: &source,
+                count: 1,
+            };
             request.world_first_person_frame = FfiWorldFirstPersonFrame {
                 byte_size: size_of::<FfiWorldFirstPersonFrame>() as u32,
-                enabled: 1, clear_depth_before: 1, main_hand_instance_count: 1,
-                projection_matrix: source.transform, model_view_matrix: source.transform,
+                enabled: 1,
+                clear_depth_before: 1,
+                main_hand_instance_count: 1,
+                projection_matrix: source.transform,
+                model_view_matrix: source.transform,
             };
         } else {
-            request.world_mesh_instances = FfiSlice {ptr: &source, count: 1};
+            request.world_mesh_instances = FfiSlice {
+                ptr: &source,
+                count: 1,
+            };
         }
-        let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
-        let instances = if hand {&frame.first_person_mesh_instances} else {&frame.mesh_instances};
+        let (_, _, frame, _) =
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+        let instances = if hand {
+            &frame.first_person_mesh_instances
+        } else {
+            &frame.mesh_instances
+        };
         let copied = instances[0].decal_foil.unwrap();
-        assert_eq!(copied.first_person,hand);
+        assert_eq!(copied.first_person, hand);
         assert!(!copied.trusted_normals);
         let valid = source;
         source.decal_normal_pose[0] = 99.;
-        assert_eq!(copied.normal_pose[0],2.);
+        assert_eq!(copied.normal_pose[0], 2.);
         for invalid_case in 0..12 {
             source = valid;
             match invalid_case {
@@ -2695,31 +3561,51 @@ fn world_and_hand_decal_foil_transport_copies_context_and_rejects_malformed_requ
                 1 => source.decal_normal_mode = 2,
                 2 => source.decal_model_pose[12] = 1.,
                 3 => source.decal_normal_pose[0] = f32::NAN,
-                4 => source.decal_normal_pose = [0.;9],
+                4 => source.decal_normal_pose = [0.; 9],
                 5 => source.item_foil_mode = 2,
-                6 => {source.item_foil_mode=0; source.item_foil_clock_millis=0;
-                    source.item_foil_speed=0.; source.item_foil_strength=0.;},
-                7 => source.decal_foil_mode = if hand {1} else {2},
+                6 => {
+                    source.item_foil_mode = 0;
+                    source.item_foil_clock_millis = 0;
+                    source.item_foil_speed = 0.;
+                    source.item_foil_strength = 0.;
+                }
+                7 => source.decal_foil_mode = if hand { 1 } else { 2 },
                 8 => source.block_entity_id = 0,
                 9 => source.decal_foil_mode = 0,
                 10 => source.decal_model_pose[15] = 0.75,
                 11 => source.byte_size -= 8,
                 _ => unreachable!(),
             }
-            assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err(),
-                "hand={hand} case={invalid_case}");
+            assert!(
+                unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err(),
+                "hand={hand} case={invalid_case}"
+            );
         }
         source = valid;
-        source.decal_foil_mode=0; source.decal_normal_mode=0;
-        source.decal_model_pose=[0.;16]; source.decal_normal_pose=[0.;9];
-        assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_ok());
+        source.decal_foil_mode = 0;
+        source.decal_normal_mode = 0;
+        source.decal_model_pose = [0.; 16];
+        source.decal_normal_pose = [0.; 9];
+        assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_ok());
         source.decal_normal_pose[8] = -0.;
-        assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+        assert!(
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err()
+        );
     }
     let layout = super::layout::layout_for_struct(69).unwrap();
-    assert_eq!(layout.field_count,30);
-    assert_eq!(layout.field_offsets[24],std::mem::offset_of!(FfiWorldMeshInstanceRecord,decal_foil_mode) as u32);
-    assert_eq!(layout.field_offsets[27],std::mem::offset_of!(FfiWorldMeshInstanceRecord,decal_normal_pose) as u32);
+    assert_eq!(layout.field_count, 31);
+    assert_eq!(
+        layout.field_offsets[24],
+        std::mem::offset_of!(FfiWorldMeshInstanceRecord, decal_foil_mode) as u32
+    );
+    assert_eq!(
+        layout.field_offsets[27],
+        std::mem::offset_of!(FfiWorldMeshInstanceRecord, decal_normal_pose) as u32
+    );
+    assert_eq!(
+        layout.field_offsets[30],
+        std::mem::offset_of!(FfiWorldMeshInstanceRecord, packed_light) as u32
+    );
 }
 
 #[test]
@@ -2727,23 +3613,35 @@ fn world_and_hand_view_layering_transport_preserves_flags_and_rejects_conflicts(
     let mut source = mesh_instance();
     source.stratum = WORLD_STRATUM_ENTITY_MESH;
     let mut request = whole_frame_request(&[], &[]);
-    request.world_mesh_instances = FfiSlice { ptr: &source, count: 1 };
-    request.world_first_person_mesh_instances = FfiSlice { ptr: &source, count: 1 };
+    request.world_mesh_instances = FfiSlice {
+        ptr: &source,
+        count: 1,
+    };
+    request.world_first_person_mesh_instances = FfiSlice {
+        ptr: &source,
+        count: 1,
+    };
     request.world_first_person_frame = FfiWorldFirstPersonFrame {
         byte_size: size_of::<FfiWorldFirstPersonFrame>() as u32,
-        enabled: 1, clear_depth_before: 1, main_hand_instance_count: 1,
-        projection_matrix: source.transform, model_view_matrix: source.transform,
+        enabled: 1,
+        clear_depth_before: 1,
+        main_hand_instance_count: 1,
+        projection_matrix: source.transform,
+        model_view_matrix: source.transform,
     };
     for flags in [4, 8] {
         source.flags = flags;
-        let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+        let (_, _, frame, _) =
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
         assert_eq!(frame.mesh_instances[0].flags, flags);
         assert_eq!(frame.first_person_mesh_instances[0].flags, flags);
         assert_eq!(frame.mesh_instances[0].transform, source.transform);
     }
-    for flags in [5,6,9,10,12,16] {
+    for flags in [5, 6, 9, 10, 12, 16] {
         source.flags = flags;
-        assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+        assert!(
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err()
+        );
     }
     source.flags = 4;
     source.item_foil_mode = 3;
@@ -2762,35 +3660,71 @@ fn world_and_hand_standard_foil_transport_copies_and_rejects_noncanonical_payloa
     source.item_foil_speed = 0.125;
     source.item_foil_strength = 0.1234567;
     let mut request = whole_frame_request(&[], &[]);
-    request.world_mesh_instances = FfiSlice { ptr: &source, count: 1 };
-    request.world_first_person_mesh_instances = FfiSlice { ptr: &source, count: 1 };
+    request.world_mesh_instances = FfiSlice {
+        ptr: &source,
+        count: 1,
+    };
+    request.world_first_person_mesh_instances = FfiSlice {
+        ptr: &source,
+        count: 1,
+    };
     request.world_first_person_frame = FfiWorldFirstPersonFrame {
         byte_size: size_of::<FfiWorldFirstPersonFrame>() as u32,
-        enabled: 1, clear_depth_before: 1, main_hand_instance_count: 1,
-        projection_matrix: source.transform, model_view_matrix: source.transform,
+        enabled: 1,
+        clear_depth_before: 1,
+        main_hand_instance_count: 1,
+        projection_matrix: source.transform,
+        model_view_matrix: source.transform,
     };
-    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+    let (_, _, frame, _) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
     let expected = crate::render::vulkanic::item_foil::StandardItemFoil {
         kind: crate::render::vulkanic::item_foil::StandardFoilKind::Item,
-        clock_millis: 12345, speed: 0.125, strength: 0.1234567,
+        clock_millis: 12345,
+        speed: 0.125,
+        strength: 0.1234567,
     };
     source.item_foil_clock_millis = 999;
     assert_eq!(frame.mesh_instances[0].item_foil, Some(expected));
-    assert_eq!(frame.first_person_mesh_instances[0].item_foil, Some(expected));
+    assert_eq!(
+        frame.first_person_mesh_instances[0].item_foil,
+        Some(expected)
+    );
     source.item_foil_mode = 2;
     source.item_foil_clock_millis = 12345;
-    let (_, _, entity_frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+    let (_, _, entity_frame, _) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
     let entity_expected = crate::render::vulkanic::item_foil::StandardItemFoil {
-        kind: crate::render::vulkanic::item_foil::StandardFoilKind::Entity, ..expected
+        kind: crate::render::vulkanic::item_foil::StandardFoilKind::Entity,
+        ..expected
     };
-    assert_eq!(entity_frame.mesh_instances[0].item_foil, Some(entity_expected));
-    assert_eq!(entity_frame.first_person_mesh_instances[0].item_foil, Some(entity_expected));
-    for (mode, projection) in [(3, crate::render::vulkanic::item_foil::FoilProjection::Perspective),
-        (4, crate::render::vulkanic::item_foil::FoilProjection::Orthographic)] {
+    assert_eq!(
+        entity_frame.mesh_instances[0].item_foil,
+        Some(entity_expected)
+    );
+    assert_eq!(
+        entity_frame.first_person_mesh_instances[0].item_foil,
+        Some(entity_expected)
+    );
+    for (mode, projection) in [
+        (
+            3,
+            crate::render::vulkanic::item_foil::FoilProjection::Perspective,
+        ),
+        (
+            4,
+            crate::render::vulkanic::item_foil::FoilProjection::Orthographic,
+        ),
+    ] {
         source.item_foil_mode = mode;
-        let (_, _, layered_frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
-        for copied in [layered_frame.mesh_instances[0].item_foil.unwrap(),
-            layered_frame.first_person_mesh_instances[0].item_foil.unwrap()] {
+        let (_, _, layered_frame, _) =
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+        for copied in [
+            layered_frame.mesh_instances[0].item_foil.unwrap(),
+            layered_frame.first_person_mesh_instances[0]
+                .item_foil
+                .unwrap(),
+        ] {
             assert_eq!(copied.kind.armor_projection(), Some(projection));
             assert_eq!(copied.clock_millis, expected.clock_millis);
             assert_eq!(copied.speed, expected.speed);
@@ -2798,25 +3732,36 @@ fn world_and_hand_standard_foil_transport_copies_and_rejects_noncanonical_payloa
         }
     }
     for (mode, clock, speed, strength) in [
-        (0, 1, 0.0, 0.0), (0, 0, -0.0, 0.0), (0, 0, 0.0, -0.0),
-        (5, 0, 0.0, 0.0), (1, u64::MAX, 0.0, 0.0),
-        (1, 0, f64::NAN, 0.5), (1, 0, 0.5, f32::INFINITY),
-        (1, 0, 1.01, 0.5), (1, 0, 0.5, -0.01),
+        (0, 1, 0.0, 0.0),
+        (0, 0, -0.0, 0.0),
+        (0, 0, 0.0, -0.0),
+        (5, 0, 0.0, 0.0),
+        (1, u64::MAX, 0.0, 0.0),
+        (1, 0, f64::NAN, 0.5),
+        (1, 0, 0.5, f32::INFINITY),
+        (1, 0, 1.01, 0.5),
+        (1, 0, 0.5, -0.01),
     ] {
         source.item_foil_mode = mode;
         source.item_foil_clock_millis = clock;
         source.item_foil_speed = speed;
         source.item_foil_strength = strength;
-        assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err());
+        assert!(
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err()
+        );
         request.world_mesh_instances.count = 0;
-        assert!(unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err(), "hand decoder must independently reject malformed foil");
+        assert!(
+            unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err(),
+            "hand decoder must independently reject malformed foil"
+        );
         request.world_mesh_instances.count = 1;
     }
     source.item_foil_mode = 0;
     source.item_foil_clock_millis = 0;
     source.item_foil_speed = 0.0;
     source.item_foil_strength = 0.0;
-    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
+    let (_, _, frame, _) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
     assert_eq!(frame.mesh_instances[0].item_foil, None);
     assert_eq!(frame.first_person_mesh_instances[0].item_foil, None);
     source.item_foil_mode = 1;
@@ -3580,6 +4525,21 @@ fn compact_world_material_ffi_decodes_copies_and_deduplicates_table() {
 }
 
 #[test]
+fn compact_world_material_ffi_preserves_private_dh_generic_stratum() {
+    let mut table = vec![material_table_record()];
+    table[0].stratum = WORLD_STRATUM_DH_GENERIC;
+    table[0].texture_id = WORLD_MATERIAL_TEXTURE_GENERATED_WHITE;
+    table[0].source_program = WORLD_MATERIAL_SOURCE_TEXTURED;
+    table[0].cull_policy = WORLD_CULL_NONE;
+    let request =
+        whole_frame_request_with_compact_materials(&table, &[compact_material_quad_request()]);
+
+    let (_, _, frame, _) =
+        unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
+    assert_eq!(WORLD_STRATUM_DH_GENERIC, frame.material_quads[0].stratum);
+}
+
+#[test]
 fn compact_world_material_ffi_accepts_the_explicit_weather_source_family() {
     let mut table = vec![material_table_record()];
     table[0].material_mode = WORLD_MATERIAL_MODE_TRANSLUCENT;
@@ -3879,7 +4839,9 @@ fn semantic_gui_asset_ffi_rejects_oversized_batches_before_copying() {
 #[test]
 fn semantic_raw_gui_image_ffi_copies_and_validates_pixels() {
     let mut pixels = vec![0u8, 64, 128, 255];
-    let assets = [FfiGuiRawImageAssetPayload { sampling_filter: 0, sampling_address: 0,
+    let assets = [FfiGuiRawImageAssetPayload {
+        sampling_filter: 0,
+        sampling_address: 0,
         byte_size: size_of::<FfiGuiRawImageAssetPayload>() as u32,
         format: 1,
         asset_id: 17,
@@ -3915,20 +4877,40 @@ fn semantic_raw_gui_image_ffi_copies_and_validates_pixels() {
             candidate.sampling_filter = filter;
             candidate.sampling_address = address;
             let changed = FfiGuiRawImageUpdateRequest {
-                assets: FfiSlice { ptr: &candidate, count: 1 }, ..request
+                assets: FfiSlice {
+                    ptr: &candidate,
+                    count: 1,
+                },
+                ..request
             };
             let result = unsafe { decode_gui_raw_image_update(&changed, test_capabilities()) };
-            assert_eq!((filter == 0 && address == 0) || ((1..=2).contains(&filter) && (1..=2).contains(&address)), result.is_ok());
+            assert_eq!(
+                (filter == 0 && address == 0)
+                    || ((1..=2).contains(&filter) && (1..=2).contains(&address)),
+                result.is_ok()
+            );
             if filter > 0 && filter <= 2 && address > 0 && address <= 2 {
                 let sampling = result.unwrap().1[0].sampling.unwrap();
-                assert_eq!(filter == 2, sampling.0 == super::super::resources::SamplerFilter::Linear);
-                assert_eq!(address == 2, sampling.1 == super::super::resources::SamplerAddressMode::ClampToEdge);
+                assert_eq!(
+                    filter == 2,
+                    sampling.0 == super::super::resources::SamplerFilter::Linear
+                );
+                assert_eq!(
+                    address == 2,
+                    sampling.1 == super::super::resources::SamplerAddressMode::ClampToEdge
+                );
             }
         }
     }
     let mut old_layout = assets[0];
     old_layout.byte_size -= 8;
-    let old_request = FfiGuiRawImageUpdateRequest { assets: FfiSlice { ptr: &old_layout, count: 1 }, ..request };
+    let old_request = FfiGuiRawImageUpdateRequest {
+        assets: FfiSlice {
+            ptr: &old_layout,
+            count: 1,
+        },
+        ..request
+    };
     assert!(unsafe { decode_gui_raw_image_update(&old_request, test_capabilities()) }.is_err());
 
     let mut malformed = assets[0];
@@ -3947,7 +4929,9 @@ fn semantic_raw_gui_image_ffi_copies_and_validates_pixels() {
 #[test]
 fn semantic_raw_gui_image_ffi_preserves_frozen_rgba8_metadata() {
     let pixels = [152u8, 152, 152, 255];
-    let assets = [FfiGuiRawImageAssetPayload { sampling_filter: 0, sampling_address: 0,
+    let assets = [FfiGuiRawImageAssetPayload {
+        sampling_filter: 0,
+        sampling_address: 0,
         byte_size: size_of::<FfiGuiRawImageAssetPayload>() as u32,
         format: 2,
         asset_id: 18,
@@ -3978,7 +4962,9 @@ fn semantic_raw_gui_image_ffi_preserves_frozen_rgba8_metadata() {
 #[test]
 fn semantic_raw_gui_image_ffi_rejects_oversized_dimensions_before_copying() {
     let pixels = [0u8; 4];
-    let asset = FfiGuiRawImageAssetPayload { sampling_filter: 0, sampling_address: 0,
+    let asset = FfiGuiRawImageAssetPayload {
+        sampling_filter: 0,
+        sampling_address: 0,
         byte_size: size_of::<FfiGuiRawImageAssetPayload>() as u32,
         format: 2,
         asset_id: 21,
@@ -4206,7 +5192,10 @@ fn whole_frame_terrain_placement_is_lowered_from_owned_full_precision_inputs() {
         )
     };
     let (_, _, frame, _) = decode(instance).unwrap();
-    assert_eq!(&frame.mesh_instances[0].transform[12..15], &[-38.5, -21.6199951171875, -2.5]);
+    assert_eq!(
+        &frame.mesh_instances[0].transform[12..15],
+        &[-38.5, -21.6199951171875, -2.5]
+    );
     instance.terrain_camera[1] = 102.62;
     assert_eq!(frame.mesh_instances[0].transform[13], -21.6199951171875);
     let valid = instance;
@@ -4221,7 +5210,11 @@ fn whole_frame_terrain_placement_is_lowered_from_owned_full_precision_inputs() {
             5 => invalid.stratum = WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY,
             _ => invalid.mesh_section_index = 0,
         }
-        assert_eq!(decode(invalid).unwrap_err().code, StatusCode::InvalidArgument, "case {case}");
+        assert_eq!(
+            decode(invalid).unwrap_err().code,
+            StatusCode::InvalidArgument,
+            "case {case}"
+        );
     }
 }
 
@@ -4282,89 +5275,195 @@ fn whole_frame_world_mesh_ffi_copies_and_rejects_malformed_payloads() {
 fn world_mesh_asset_ffi_retires_gui_views_before_replacing_their_owner() {
     use crate::render::vulkanic::gui_atlas_reference::GuiAtlasReference;
     let create = FfiContextCreateRequest {
-        header: FfiHeader { version: FFI_ABI_VERSION, byte_size: size_of::<FfiContextCreateRequest>() as u32 },
-        backend_kind: 1, tracy_enabled: 0,
-        label: FfiBytes { ptr: b"GUI atlas FFI lifetime".as_ptr(), len: 22 },
+        header: FfiHeader {
+            version: FFI_ABI_VERSION,
+            byte_size: size_of::<FfiContextCreateRequest>() as u32,
+        },
+        backend_kind: 1,
+        tracy_enabled: 0,
+        label: FfiBytes {
+            ptr: b"GUI atlas FFI lifetime".as_ptr(),
+            len: 22,
+        },
     };
     let mut result = FfiContextResult::default();
-    assert_eq!(unsafe { mattmc_vulkanic_gal_context_create(&create, &mut result) }, 0);
+    assert_eq!(
+        unsafe { mattmc_vulkanic_gal_context_create(&create, &mut result) },
+        0
+    );
     let context_id = result.context_id;
     let mut png_bytes = Vec::new();
     {
         let mut encoder = png::Encoder::new(&mut png_bytes, 2, 2);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
-        encoder.write_header().unwrap().write_image_data(&[255; 16]).unwrap();
+        encoder
+            .write_header()
+            .unwrap()
+            .write_image_data(&[255; 16])
+            .unwrap();
     }
     let mut texture = FfiWorldMeshTextureAssetPayload {
         byte_size: size_of::<FfiWorldMeshTextureAssetPayload>() as u32,
         texture_id: WORLD_MATERIAL_TEXTURE_STONE,
-        sampling_filter: 0, sampling_address: 0, requested_mip_levels: 1,
-        png_bytes: FfiBytes { ptr: png_bytes.as_ptr(), len: png_bytes.len() as u64 },
-        mip_png_bytes: FfiSlice { ptr: ptr::null(), count: 0 },
-        frame_width: 0, frame_height: 0, frame_count: 1, frame_ticks: 1,
-        animation_flags: 0, frame_row_size: 0, interpolation_policy: 0, reserved0: 0,
-        animation_frames: FfiSlice { ptr: ptr::null(), count: 0 },
+        sampling_filter: 0,
+        sampling_address: 0,
+        requested_mip_levels: 1,
+        png_bytes: FfiBytes {
+            ptr: png_bytes.as_ptr(),
+            len: png_bytes.len() as u64,
+        },
+        mip_png_bytes: FfiSlice {
+            ptr: ptr::null(),
+            count: 0,
+        },
+        frame_width: 0,
+        frame_height: 0,
+        frame_count: 1,
+        frame_ticks: 1,
+        animation_flags: 0,
+        frame_row_size: 0,
+        interpolation_policy: 0,
+        reserved0: 0,
+        animation_frames: FfiSlice {
+            ptr: ptr::null(),
+            count: 0,
+        },
     };
     let publish = |generation, texture: &FfiWorldMeshTextureAssetPayload| {
         let mut request = world_mesh_asset_update_request(&[], std::slice::from_ref(texture));
         request.generation = generation;
         request.negotiated_feature_bits = result.supported_feature_bits;
-        unsafe { mattmc_vulkanic_gal_world_mesh_update_assets(context_id, &request, ptr::null_mut()) }
+        unsafe {
+            mattmc_vulkanic_gal_world_mesh_update_assets(context_id, &request, ptr::null_mut())
+        }
     };
     assert_eq!(publish(1, &texture), 0);
     let reference = with_registry_mut(|registry| {
         let context = registry.contexts.get_mut(&context_id).unwrap();
-        let atlas = context.world_primitive_frontend.accepted_gui_atlas_incarnation(texture.texture_id).unwrap();
-        let reference = GuiAtlasReference { asset_id: 101, atlas, x: 0, y: 0, width: 2, height: 2 };
-        context.gui_frontend.stage_owned_atlas_references(&mut context.gal, &context.world_primitive_frontend, 1, &[reference]).unwrap();
-        context.gui_frontend.prepare_owned_atlas_view(&mut context.gal, &mut context.world_primitive_frontend, 101).unwrap();
+        let atlas = context
+            .world_primitive_frontend
+            .accepted_gui_atlas_incarnation(texture.texture_id)
+            .unwrap();
+        let reference = GuiAtlasReference {
+            asset_id: 101,
+            atlas,
+            x: 0,
+            y: 0,
+            width: 2,
+            height: 2,
+        };
+        context
+            .gui_frontend
+            .stage_owned_atlas_references(
+                &mut context.gal,
+                &context.world_primitive_frontend,
+                1,
+                &[reference],
+            )
+            .unwrap();
+        context
+            .gui_frontend
+            .prepare_owned_atlas_view(&mut context.gal, &mut context.world_primitive_frontend, 101)
+            .unwrap();
         reference
     });
     let valid_bytes = texture.png_bytes;
-    texture.png_bytes = FfiBytes { ptr: b"bad".as_ptr(), len: 3 };
+    texture.png_bytes = FfiBytes {
+        ptr: b"bad".as_ptr(),
+        len: 3,
+    };
     assert_ne!(publish(2, &texture), 0);
     with_registry_mut(|registry| {
         let context = registry.contexts.get_mut(&context_id).unwrap();
-        assert_eq!(context.world_primitive_frontend.accepted_gui_atlas_incarnation(texture.texture_id), Some(reference.atlas));
-        context.gui_frontend.prepare_owned_atlas_view(&mut context.gal, &mut context.world_primitive_frontend, 101).unwrap();
+        assert_eq!(
+            context
+                .world_primitive_frontend
+                .accepted_gui_atlas_incarnation(texture.texture_id),
+            Some(reference.atlas)
+        );
+        context
+            .gui_frontend
+            .prepare_owned_atlas_view(&mut context.gal, &mut context.world_primitive_frontend, 101)
+            .unwrap();
     });
     texture.png_bytes = valid_bytes;
     assert_eq!(publish(2, &texture), 0);
     let (dependent, sampler) = with_registry_mut(|registry| {
         let context = registry.contexts.get_mut(&context_id).unwrap();
-        assert!(context.gui_frontend.prepare_owned_atlas_view(&mut context.gal, &mut context.world_primitive_frontend, 101).is_err());
+        assert!(context
+            .gui_frontend
+            .prepare_owned_atlas_view(&mut context.gal, &mut context.world_primitive_frontend, 101)
+            .is_err());
         let replacement = GuiAtlasReference {
-            atlas: context.world_primitive_frontend.accepted_gui_atlas_incarnation(texture.texture_id).unwrap(),
+            atlas: context
+                .world_primitive_frontend
+                .accepted_gui_atlas_incarnation(texture.texture_id)
+                .unwrap(),
             ..reference
         };
-        context.gui_frontend.stage_owned_atlas_references(&mut context.gal, &context.world_primitive_frontend, 2, &[replacement]).unwrap();
-        let view = context.gui_frontend.prepare_owned_atlas_view(&mut context.gal, &mut context.world_primitive_frontend, 101).unwrap();
-        let sampler = context.gal.create_sampler(SamplerDesc {
-            label: "test dependent sampler".into(), min_filter: SamplerFilter::Nearest,
-            mag_filter: SamplerFilter::Nearest, mip_filter: SamplerFilter::Nearest,
-            address_u: SamplerAddressMode::ClampToEdge, address_v: SamplerAddressMode::ClampToEdge,
-            address_w: SamplerAddressMode::ClampToEdge, comparison: None,
-        }).unwrap();
-        let dependent = context.gal.create_combined_texture_sampler(
-            crate::render::vulkanic::resources::CombinedTextureSamplerDesc {
-                label: "test external dependent".into(), texture_view: view, sampler,
-            }).unwrap();
+        context
+            .gui_frontend
+            .stage_owned_atlas_references(
+                &mut context.gal,
+                &context.world_primitive_frontend,
+                2,
+                &[replacement],
+            )
+            .unwrap();
+        let view = context
+            .gui_frontend
+            .prepare_owned_atlas_view(&mut context.gal, &mut context.world_primitive_frontend, 101)
+            .unwrap();
+        let sampler = context
+            .gal
+            .create_sampler(SamplerDesc {
+                label: "test dependent sampler".into(),
+                min_filter: SamplerFilter::Nearest,
+                mag_filter: SamplerFilter::Nearest,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+                comparison: None,
+            })
+            .unwrap();
+        let dependent = context
+            .gal
+            .create_combined_texture_sampler(
+                crate::render::vulkanic::resources::CombinedTextureSamplerDesc {
+                    label: "test external dependent".into(),
+                    texture_view: view,
+                    sampler,
+                },
+            )
+            .unwrap();
         (dependent, sampler)
     });
-    assert_eq!(unsafe { mattmc_vulkanic_gal_context_destroy(context_id, ptr::null_mut()) },
-        StatusCode::DependencyViolation as i32);
+    assert_eq!(
+        unsafe { mattmc_vulkanic_gal_context_destroy(context_id, ptr::null_mut()) },
+        StatusCode::DependencyViolation as i32
+    );
     with_registry_mut(|registry| {
-        let context = registry.contexts.get_mut(&context_id).expect("failed reset must retain context ownership for retry");
+        let context = registry
+            .contexts
+            .get_mut(&context_id)
+            .expect("failed reset must retain context ownership for retry");
         context.gal.destroy(dependent).unwrap();
         context.gal.destroy(sampler).unwrap();
         context.gui_frontend.reset(&mut context.gal).unwrap();
         context.world_primitive_frontend.reset(&mut context.gal);
-        context.gal.retire_through(context.gal.latest_submission_id()).unwrap();
+        context
+            .gal
+            .retire_through(context.gal.latest_submission_id())
+            .unwrap();
         assert_eq!(context.gal.metrics().resource_creates, context.gal.metrics().resource_destroys,
             "the real FFI update must release GUI dependencies before owner destruction, not leak rejected destroys");
     });
-    assert_eq!(unsafe { mattmc_vulkanic_gal_context_destroy(context_id, ptr::null_mut()) }, 0);
+    assert_eq!(
+        unsafe { mattmc_vulkanic_gal_context_destroy(context_id, ptr::null_mut()) },
+        0
+    );
 }
 
 #[test]
@@ -4389,7 +5488,10 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
             ptr: png.as_ptr(),
             len: png.len() as u64,
         },
-        mip_png_bytes: FfiSlice { ptr: std::ptr::null(), count: 0 },
+        mip_png_bytes: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
         frame_width: 0,
         frame_height: 0,
         frame_count: 1,
@@ -4425,8 +5527,10 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
     assert_eq!("minecraft:arrow", owned_meshes[0].entity_identity);
     assert_eq!(vec![41u8, 42, 43, 44], owned_textures[0].png_bytes);
     assert_eq!(1, owned_textures[0].requested_mip_levels);
-    assert_eq!(owned_textures[0].sampling,
-        Some(super::super::texture_sampling::TextureSampling::from_texture_metadata(true, true)));
+    assert_eq!(
+        owned_textures[0].sampling,
+        Some(super::super::texture_sampling::TextureSampling::from_texture_metadata(true, true))
+    );
 }
 
 #[test]
@@ -4886,6 +5990,9 @@ fn whole_frame_ffi_copies_bounded_lod_segment_references() {
         camera_world_x: 12.5,
         camera_world_y: 64.0,
         camera_world_z: -3.25,
+        dh_fog_parameters: [0.0; 20],
+        max_level_height: 320,
+        ssao_parameters: [0.0; 8],
     };
     let (_, _, frame, _) =
         unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
@@ -4933,7 +6040,7 @@ fn whole_frame_ffi_copies_bounded_lod_segment_references() {
     unknown_route_flag.world_lod_render_frame.enabled = 1;
     unknown_route_flag.world_lod_render_frame.micro_offset = 0.01;
     unknown_route_flag.world_lod_render_frame.flags =
-        WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED | 0x20;
+        WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED | 0x100;
     let error =
         unsafe { decode_whole_frame_submit(&unknown_route_flag, test_vulkan_capabilities()) }
             .unwrap_err();

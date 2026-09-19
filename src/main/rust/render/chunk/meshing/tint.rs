@@ -36,7 +36,12 @@ pub(super) fn native_vertex_tint_color(
     z: f32,
 ) -> i32 {
     let base = native_tint_color(block, state, false);
-    if base == -1 || matches!(state.tint_type, TINT_NONE | TINT_SPRUCE | TINT_BIRCH | TINT_CONSTANT | TINT_STEM | TINT_REDSTONE) {
+    if base == -1
+        || matches!(
+            state.tint_type,
+            TINT_NONE | TINT_SPRUCE | TINT_BIRCH | TINT_CONSTANT | TINT_STEM | TINT_REDSTONE
+        )
+    {
         return base;
     }
     // Exact Java BlendedColorProvider domain: floor(vertex - 0.5), then the
@@ -65,8 +70,16 @@ pub(super) fn native_vertex_tint_color(
     let z1 = (fz * 255.0) as u32;
     let mix = |a: u32, b: u32, weight: u32| ((a * (255 - weight) + b * weight + 255) >> 8) & 255;
     let channel = |shift| {
-        let a = mix((sample(ix, iz) >> shift) & 255u32, (sample(ix + 1, iz) >> shift) & 255u32, x1);
-        let b = mix((sample(ix, iz + 1) >> shift) & 255u32, (sample(ix + 1, iz + 1) >> shift) & 255u32, x1);
+        let a = mix(
+            (sample(ix, iz) >> shift) & 255u32,
+            (sample(ix + 1, iz) >> shift) & 255u32,
+            x1,
+        );
+        let b = mix(
+            (sample(ix, iz + 1) >> shift) & 255u32,
+            (sample(ix + 1, iz + 1) >> shift) & 255u32,
+            x1,
+        );
         mix(a, b, z1)
     };
     (0xff00_0000 | (channel(16) << 16) | (channel(8) << 8) | channel(0)) as i32

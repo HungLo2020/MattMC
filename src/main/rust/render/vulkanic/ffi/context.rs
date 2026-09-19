@@ -498,7 +498,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
             write_status_out(out, status_error(Some(context), &error));
             return error.code as i32;
         }
-        let mut context = registry.contexts.remove(&context_id).expect("context was checked above");
+        let mut context = registry
+            .contexts
+            .remove(&context_id)
+            .expect("context was checked above");
         if context.windowed_presenter {
             release_windowed_presenter(registry);
         }

@@ -17,8 +17,18 @@ use crate::render::vulkanic::{
 /// between the world and GUI passes.
 #[test]
 fn isolated_vulkan_vignette_blend_preserves_and_darkens_loaded_color() {
-    isolated_loaded_blend(BlendMode::Vignette,[0.75,0.75,0.75,1.0],
-        ClearColor {r:0.8,g:0.8,b:0.8,a:1.0},[51,51,51,255],1);
+    isolated_loaded_blend(
+        BlendMode::Vignette,
+        [0.75, 0.75, 0.75, 1.0],
+        ClearColor {
+            r: 0.8,
+            g: 0.8,
+            b: 0.8,
+            a: 1.0,
+        },
+        [51, 51, 51, 255],
+        1,
+    );
 }
 
 #[test]
@@ -28,11 +38,27 @@ fn isolated_vulkan_glint_blend_matches_frozen_and_preserves_destination_alpha() 
     // blend, source-alpha replacement and plain additive blending.
     // Avoid the hardware's half-intensity blend-factor rounding boundary;
     // quarter-intensity probes retain exact byte assertions on this fixture.
-    isolated_loaded_blend(BlendMode::Glint,[0.25,0.25,0.75,0.125],
-        ClearColor {r:0.125,g:0.375,b:0.0625,a:0.375},[48,112,159,96],0);
+    isolated_loaded_blend(
+        BlendMode::Glint,
+        [0.25, 0.25, 0.75, 0.125],
+        ClearColor {
+            r: 0.125,
+            g: 0.375,
+            b: 0.0625,
+            a: 0.375,
+        },
+        [48, 112, 159, 96],
+        0,
+    );
 }
 
-fn isolated_loaded_blend(blend:BlendMode, source:[f32;4], clear:ClearColor, expected:[u8;4], tolerance:i16) {
+fn isolated_loaded_blend(
+    blend: BlendMode,
+    source: [f32; 4],
+    clear: ClearColor,
+    expected: [u8; 4],
+    tolerance: i16,
+) {
     isolated_loaded_raster(blend, source, clear, expected, tolerance, false, None);
 }
 
@@ -40,28 +66,60 @@ fn isolated_loaded_blend(blend:BlendMode, source:[f32;4], clear:ClearColor, expe
 fn explicit_provoking_vertex_selects_the_declared_flat_value_on_both_backends() {
     for opengl in [false, true] {
         for (mode, red) in [(ProvokingVertex::First, 0), (ProvokingVertex::Last, 255)] {
-            isolated_loaded_raster(BlendMode::Disabled, [0.0;4],
-                ClearColor {r:0.0,g:1.0,b:0.0,a:1.0}, [red,0,0,255], 0, opengl, Some(mode));
+            isolated_loaded_raster(
+                BlendMode::Disabled,
+                [0.0; 4],
+                ClearColor {
+                    r: 0.0,
+                    g: 1.0,
+                    b: 0.0,
+                    a: 1.0,
+                },
+                [red, 0, 0, 255],
+                0,
+                opengl,
+                Some(mode),
+            );
         }
     }
 }
 
-fn isolated_loaded_raster(blend:BlendMode, source:[f32;4], clear:ClearColor, expected:[u8;4], tolerance:i16,
-    opengl: bool, provoking: Option<ProvokingVertex>) {
+fn isolated_loaded_raster(
+    blend: BlendMode,
+    source: [f32; 4],
+    clear: ClearColor,
+    expected: [u8; 4],
+    tolerance: i16,
+    opengl: bool,
+    provoking: Option<ProvokingVertex>,
+) {
     let mut gal = if opengl {
-        VulkanicGal::new_with_backend(Box::new(super::opengl::OpenGlBackend::new(
-            "explicit provoking vertex OpenGL conformance").expect("OpenGL required for provoking vertex readback")), false)
+        VulkanicGal::new_with_backend(
+            Box::new(
+                super::opengl::OpenGlBackend::new("explicit provoking vertex OpenGL conformance")
+                    .expect("OpenGL required for provoking vertex readback"),
+            ),
+            false,
+        )
     } else {
-    let backend = match super::vulkan::VulkanBackend::new("MattMC VulkanicGAL vignette conformance") {
-        Ok(backend) => backend,
-        Err(error) => {
-            assert!(provoking.is_none(), "Vulkan required for provoking vertex readback: {error}");
-            assert_ne!(blend,BlendMode::Glint,"Vulkan required for glint blend regression: {error}");
-            eprintln!("skipping Vulkan vignette conformance: {error}");
-            return;
-        }
-    };
-    VulkanicGal::new_with_backend(Box::new(backend), false)
+        let backend =
+            match super::vulkan::VulkanBackend::new("MattMC VulkanicGAL vignette conformance") {
+                Ok(backend) => backend,
+                Err(error) => {
+                    assert!(
+                        provoking.is_none(),
+                        "Vulkan required for provoking vertex readback: {error}"
+                    );
+                    assert_ne!(
+                        blend,
+                        BlendMode::Glint,
+                        "Vulkan required for glint blend regression: {error}"
+                    );
+                    eprintln!("skipping Vulkan vignette conformance: {error}");
+                    return;
+                }
+            };
+        VulkanicGal::new_with_backend(Box::new(backend), false)
     };
     let extent = Extent3d {
         width: 1,
@@ -219,7 +277,14 @@ void main() { gl_Position = vec4(p[gl_VertexIndex], 0.0, 1.0); }
                     texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
                     extent,
                 }),
-                CommandOp::Barrier(ResourceBarrier { resource: readback, subresources: None, before: TextureUsageState::TransferDst, after: TextureUsageState::ShaderRead, src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics }),
+                CommandOp::Barrier(ResourceBarrier {
+                    resource: readback,
+                    subresources: None,
+                    before: TextureUsageState::TransferDst,
+                    after: TextureUsageState::ShaderRead,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
+                }),
                 CommandOp::HostReadBuffer {
                     buffer: readback,
                     offset: 0,
@@ -244,10 +309,15 @@ void main() { gl_Position = vec4(p[gl_VertexIndex], 0.0, 1.0); }
         .bytes
         .clone();
     for channel in 0..3 {
-        assert!((i16::from(bytes[channel])-i16::from(expected[channel])).abs()<=tolerance,
-            "{blend:?} channel{channel}: actual={bytes:?}, expected={expected:?}");
+        assert!(
+            (i16::from(bytes[channel]) - i16::from(expected[channel])).abs() <= tolerance,
+            "{blend:?} channel{channel}: actual={bytes:?}, expected={expected:?}"
+        );
     }
-    assert_eq!(expected[3],bytes[3],"{blend:?} must preserve destination alpha");
+    assert_eq!(
+        expected[3], bytes[3],
+        "{blend:?} must preserve destination alpha"
+    );
 }
 
 const WIDTH: u32 = 96;

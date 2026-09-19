@@ -10,6 +10,15 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GuiFlatItemMeshCollectorTest {
+    @Test void foilPresenceTracksResolvedLayersWithoutCreatingSemanticSnapshots() {
+        var state = new TrackingItemStackRenderState();
+        assertFalse(state.hasFoil());
+        state.newLayer().setFoilType(net.minecraft.client.renderer.item.ItemStackRenderState.FoilType.STANDARD);
+        assertTrue(state.hasFoil());
+        state.clear();
+        assertFalse(state.hasFoil());
+    }
+
     @Test void modelIdentitySnapshotIsReusedUntilTheTrackedStateChanges() {
         var state = new TrackingItemStackRenderState();
         Object firstElement = new Object();

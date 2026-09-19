@@ -39,6 +39,7 @@ final class AtlasAnimationPublication {
     boolean pending() { return pendingGeneration != 0; }
     int textureId() { return texture.textureId(); }
     boolean owns(AtlasAnimationResource candidate) { return resource == candidate; }
+    void invalidateResourceForReplacement() { resource.invalidatePublication(); }
     SemanticAtlasAnimationSource source() { return source; }
     long stagedGeneration() { return stagedGeneration; }
     int spriteCount() { return source.sprites().size(); }
@@ -72,9 +73,18 @@ final class AtlasAnimationPublication {
         if (!pending()) return null;
         resource.requireOpen();
         long generation = pendingGeneration;
-        // Tick zero belongs to resource creation, not staging time. Earlier
-        // events remain in the resource's FIFO and are delivered after staging.
-        var result = stage.accept(texture.textureId(), generation, 0, source);
+        // A registry/resource reload may retire the native image while the
+        // Java semantic atlas object remains alive. The resource rebases this
+        // value at the publication boundary without weakening Rust's strict
+        // tick validation.
+        if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+            System.out.println("[MattMC graphics audit] atlas-animation.stage texture="
+                + texture.textureId() + " generation=" + generation
+                + " initialTick=" + resource.publicationInitialTick()
+                + " runtimeEpoch=" + AtlasAnimationResource.runtimeEpochForDiagnostics(texture.textureId())
+                + " sourceGeneration=" + source.generation());
+        }
+        var result = stage.accept(texture.textureId(), generation, resource.publicationInitialTick(), source);
         stagedGeneration = generation;
         pendingGeneration = 0;
         return result;

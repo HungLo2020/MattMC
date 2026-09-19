@@ -274,14 +274,13 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	}
 
 	/**
-	 * Collects the vanilla gameplay fog record for the Rust-owned whole-frame
-	 * route.  The Rust source graph has no Java/DH renderer to cancel fog on its
-	 * behalf, so the copied semantic record must retain the actual vanilla fog
-	 * range rather than the legacy Iris/DH sentinel range.  This method does not
-	 * change the normal Java fog path or its cached Iris state.
+	 * Collects the gameplay fog record for the Rust-owned whole-frame route.
+	 * DH's vanilla-fog setting is gameplay policy, not borrowed renderer state:
+	 * Frozen applies the same cancellation before Sodium draws vanilla terrain,
+	 * so Rust must copy that result while avoiding Java UBO or Iris publication.
 	 */
 	public RustFogParameters collectFogParametersForRust(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
-		FogComputation computation = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, false, false);
+		FogComputation computation = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, false, true);
 		FogParameters parameters = computation.parameters();
 		if (TRACE_FOG_STATE) {
 			LOGGER.info(

@@ -1,12 +1,10 @@
 pub mod assets;
-pub(crate) mod vanilla_imports;
-pub(crate) mod vanilla_sources;
-pub(crate) mod engine_globals;
 pub mod cloud_contract;
 pub mod custom_uniform_policy;
 pub mod diagnostics;
 pub mod dialect;
 pub mod distant_horizons_contract;
+pub(crate) mod engine_globals;
 pub mod entity_contract;
 pub mod entity_id_map;
 pub(crate) mod fullscreen;
@@ -27,6 +25,8 @@ pub(crate) mod runtime;
 pub mod shadow_policy;
 pub mod source;
 pub mod source_targets;
+pub(crate) mod vanilla_imports;
+pub(crate) mod vanilla_sources;
 // Source-selected shader-pack resources are private Rust-owned candidate
 // preparation state. Runtime admission remains fail-closed until the complete
 // source plan is wired into the production submit path; keep the candidate

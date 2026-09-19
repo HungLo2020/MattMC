@@ -114,6 +114,30 @@ class AtlasAnimationPublicationTest {
     }
 
     @Test
+    void replacementResourceStagesThePriorSemanticClockEpoch() {
+        var texture = new VulkanicGalBridge.WorldMeshTextureAssetRecord(ATLAS, new byte[]{1}, List.of());
+        var resource = new AtlasAnimationResource(
+            net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS,
+            ATLAS,
+            source(),
+            5772
+        );
+        var publication = new AtlasAnimationPublication(texture, resource);
+        resource.enqueueNextTick(true);
+        publication.textureAccepted(12, texture);
+        AtomicInteger stagedTick = new AtomicInteger(-1);
+        publication.flush((id, generation, initialTick, copied) -> {
+            stagedTick.set((int)initialTick);
+            return null;
+        });
+        assertEquals(5772, stagedTick.get());
+        assertTrue(publication.drainTicks((id, generation, tick, visible, onlyVisible) -> {
+            assertEquals(5773, tick);
+            return true;
+        }));
+    }
+
+    @Test
     void acceptedTextureReplacementRestagesThroughActualRustContext() throws Exception {
         var png = new java.io.ByteArrayOutputStream();
         assertTrue(javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 1,

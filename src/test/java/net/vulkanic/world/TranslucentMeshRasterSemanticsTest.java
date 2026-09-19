@@ -103,6 +103,31 @@ class TranslucentMeshRasterSemanticsTest {
     }
 
     @Test
+    void ordinaryArmorCutoutIsAdmittedWithoutPrivateFoilFlag() throws Exception {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+        Method extract = RustGalWorldPrimitiveRenderer.class.getDeclaredMethod("modelMeshRenderSemantics", RenderType.class);
+        extract.setAccessible(true);
+        RenderType type = RenderType.armorCutoutNoCull(
+            ResourceLocation.withDefaultNamespace("textures/entity/equipment/humanoid/gold.png"));
+        String key = "mattmc.dev.rustArmorFoil", previous = System.getProperty(key);
+        var threadField = net.vulkanic.VulkanicAPI.class.getDeclaredField("renderThread");
+        threadField.setAccessible(true);
+        Object previousThread = threadField.get(null);
+        try {
+            threadField.set(null, Thread.currentThread());
+            System.clearProperty(key);
+            Object semantics = extract.invoke(null, type);
+            assertNotNull(semantics);
+            assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_MODE_CUTOUT, field(semantics, "materialMode"));
+            assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_PER_FACE_MODEL_CUTOUT_TEXTURED, field(semantics, "materialId"));
+        } finally {
+            threadField.set(null, previousThread);
+            if (previous == null) System.clearProperty(key); else System.setProperty(key, previous);
+        }
+    }
+
+    @Test
     void solidModelMaterialsRemainOpaqueAndCutoutModelsRemainDistinct() throws Exception {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();
@@ -159,6 +184,22 @@ class TranslucentMeshRasterSemanticsTest {
         assertRasterMatchesPipeline(item);
         assertRasterMatchesPipeline(entity);
         assertRasterMatchesPipeline(RenderType.entityTranslucentEmissive(texture));
+    }
+
+    @Test
+    void bannerPatternEntityNoOutlinePreservesTranslucentPerFaceContract() throws Exception {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+        RenderType pattern = RenderType.entityNoOutline(
+            ResourceLocation.withDefaultNamespace("textures/atlas/banner_patterns.png"));
+        Method extract = RustGalWorldPrimitiveRenderer.class.getDeclaredMethod("modelMeshRenderSemantics", RenderType.class);
+        extract.setAccessible(true);
+        Object semantics = extract.invoke(null, pattern);
+        assertNotNull(semantics);
+        assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_ID_PER_FACE_TRANSLUCENT_CUTOUT_TEXTURED, field(semantics, "materialId"));
+        assertEquals(RustGalWorldPrimitiveRenderer.MATERIAL_MODE_TRANSLUCENT_CUTOUT, field(semantics, "materialMode"));
+        assertEquals(RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_NO_WRITE, field(semantics, "depthPolicy"));
+        assertEquals(RustGalWorldPrimitiveRenderer.CULL_NONE, field(semantics, "cullPolicy"));
     }
 
     @Test

@@ -144,6 +144,7 @@ public final class RustGalGuiRawImageAssets {
 
 	static void invalidate() {
 		GuiItemMeshSemanticCollector.invalidateCache();
+		GuiFlatItemMeshCollector.invalidateCache();
 		GuiItemSemanticIdentities.clear();
 		RustGalFrameCoordinator.invalidateGuiRawImages();
 		RustGalGuiRenderer.invalidateTextAtlasMetadata();
@@ -480,7 +481,7 @@ public final class RustGalGuiRawImageAssets {
 			// Dynamic textures and animated sprites create immutable snapshots.
 			// Some producers refresh those snapshots without changing a pixel; do
 			// not turn that into a new whole-cache native upload every frame.
-			if (staged == asset || samePayload(staged, asset)) return;
+			if (STAGED_ASSETS.get(asset.assetId()) == asset || samePayload(staged, asset)) return;
 			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 				RustGalFrameCoordinator.auditMessage("Rust GUI raw image changed identity=" + asset.identity
 					+ " asset_id=" + asset.assetId + " extent=" + asset.width + "x" + asset.height

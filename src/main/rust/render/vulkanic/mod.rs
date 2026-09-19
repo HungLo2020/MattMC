@@ -6,35 +6,35 @@ mod backends;
 // Private resource-processing prerequisite; not yet admitted through terrain FFI.
 mod sprite_interpolation;
 
+mod buffer_upload_capture;
 pub mod commands;
 pub mod error;
 pub mod ffi;
 pub mod frame;
 pub mod gal;
-mod buffer_upload_capture;
 pub mod gui_frontend;
 // Explicit same-context atlas references; private until native GUI sampling is wired.
 mod gui_atlas_reference;
-mod item_foil;
-mod view_layering;
-mod special_item_foil;
-mod world_item_foil;
+mod gui_item_layout;
 mod gui_item_material;
 mod gui_item_raster;
-mod gui_item_layout;
-/// Private semantic tiled-GUI lowering; not yet a frame/FFI-admitted route.
-mod gui_tiling;
 /// Backend-neutral GUI mesh semantics. This is not an FFI-admitted route
 /// until the owned offscreen renderer consumes it.
 pub mod gui_mesh_frontend;
+/// Private semantic tiled-GUI lowering; not yet a frame/FFI-admitted route.
+mod gui_tiling;
 pub mod handles;
+mod item_foil;
 pub mod metrics;
 pub mod resources;
 pub mod shader_pack;
+mod special_item_foil;
 pub mod sync;
 pub mod terrain;
-pub mod world_primitive_frontend;
 mod texture_sampling;
+mod view_layering;
+mod world_item_foil;
+pub mod world_primitive_frontend;
 
 /// Maximum viewport axis admitted by semantic frame and GUI submissions.
 /// Keeping this finite prevents hostile FFI dimensions from driving unbounded

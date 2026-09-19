@@ -16,6 +16,7 @@ import com.seibel.distanthorizons.core.util.math.Vec3f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.vulkanic.world.WorldRenderRoutePolicy;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -267,7 +268,10 @@ public class CloudRenderHandler
 			return;
 		}
 		
-		if (!this.renderer.getInstancedRenderingAvailable())
+		// Rust copies the cloud boxes as bounded semantic primitives and does not
+		// require Java's instanced GL capability or initialization state.
+		if (!WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan()
+			&& !this.renderer.getInstancedRenderingAvailable())
 		{
 			if (!this.disabledWarningLogged)
 			{

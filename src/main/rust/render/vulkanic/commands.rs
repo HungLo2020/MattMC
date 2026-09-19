@@ -1,7 +1,10 @@
 use super::handles::Handle;
 use super::resources::{Extent3d, IndexType, QueueClass, TextureSubresourceRange};
 use super::sync::SubmissionId;
-use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 /// CPU lifetime receipt for transient storage referenced by prepared commands.
 /// The allocator retains one owner; each command copy retains another. GAL
@@ -11,12 +14,16 @@ use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
 pub struct SubmissionUsage(Arc<AtomicU64>);
 
 impl PartialEq for SubmissionUsage {
-    fn eq(&self, other: &Self) -> bool { Arc::ptr_eq(&self.0, &other.0) }
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
 }
 impl Eq for SubmissionUsage {}
 
 impl SubmissionUsage {
-    pub(super) fn has_pending_commands(&self) -> bool { Arc::strong_count(&self.0) > 1 }
+    pub(super) fn has_pending_commands(&self) -> bool {
+        Arc::strong_count(&self.0) > 1
+    }
     pub(super) fn last_submission(&self) -> SubmissionId {
         SubmissionId(self.0.load(Ordering::Acquire))
     }

@@ -150,8 +150,13 @@ pub fn serialize_submission_batch_canonical(batch: &SubmissionBatch) -> Vec<u8> 
     for list in &batch.command_lists {
         push_str(&mut out, &list.label);
         // CPU lifetime receipts are private Rust state, not ABI commands.
-        push_u64(&mut out, list.operations.iter()
-            .filter(|op| !matches!(op, CommandOp::TrackSubmission(_))).count() as u64);
+        push_u64(
+            &mut out,
+            list.operations
+                .iter()
+                .filter(|op| !matches!(op, CommandOp::TrackSubmission(_)))
+                .count() as u64,
+        );
         for op in &list.operations {
             serialize_command_op(&mut out, op);
         }
@@ -507,7 +512,11 @@ pub(crate) fn decode_command_op(
             })
         }
         20 => {
-            require_feature(capabilities, BackendFeature::IndirectDraw, "indexed indirect draw")?;
+            require_feature(
+                capabilities,
+                BackendFeature::IndirectDraw,
+                "indexed indirect draw",
+            )?;
             Ok(CommandOp::DrawIndexedIndirect {
                 buffer: require_handle(
                     op.primary,

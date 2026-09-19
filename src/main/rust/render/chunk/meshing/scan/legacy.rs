@@ -42,20 +42,30 @@ struct LegacySectionBlockRecord {
 impl LegacySectionBlockRecord {
     fn decoded(self) -> NativeSectionBlockRecord {
         NativeSectionBlockRecord {
-            state_id: self.state_id, block_id: self.block_id,
-            local_x: self.local_x, local_y: self.local_y, local_z: self.local_z,
-            seed_lo: self.seed_lo, seed_hi: self.seed_hi,
+            state_id: self.state_id,
+            block_id: self.block_id,
+            local_x: self.local_x,
+            local_y: self.local_y,
+            local_z: self.local_z,
+            seed_lo: self.seed_lo,
+            seed_hi: self.seed_hi,
             neighbor_state_ids: self.neighbor_state_ids,
             light_words: self.light_words,
             neighborhood_state_ids: self.neighborhood_state_ids,
             // Legacy records carry one tint, not spatial provider samples.
             tint_lattice: [[[self.tint; 4]; 4]; 4],
-            tint: self.tint, fluid_tint: self.fluid_tint,
-            fluid_flow_x: self.fluid_flow_x, fluid_flow_z: self.fluid_flow_z,
-            absolute_x: self.absolute_x, absolute_y: self.absolute_y, absolute_z: self.absolute_z,
-            legacy_offset_x: self.legacy_offset_x, legacy_offset_y: self.legacy_offset_y,
+            tint: self.tint,
+            fluid_tint: self.fluid_tint,
+            fluid_flow_x: self.fluid_flow_x,
+            fluid_flow_z: self.fluid_flow_z,
+            absolute_x: self.absolute_x,
+            absolute_y: self.absolute_y,
+            absolute_z: self.absolute_z,
+            legacy_offset_x: self.legacy_offset_x,
+            legacy_offset_y: self.legacy_offset_y,
             legacy_offset_z: self.legacy_offset_z,
-            fluid_block_id: self.fluid_block_id, flags: self.flags,
+            fluid_block_id: self.fluid_block_id,
+            flags: self.flags,
         }
     }
 }

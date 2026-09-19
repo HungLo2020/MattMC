@@ -726,6 +726,7 @@ dependencies = [
  "raw-window-handle",
  "serde_json",
  "shaderc",
+ "smallvec 1.15.2",
  "tracy-client",
  "winit",
  "xxhash-rust",

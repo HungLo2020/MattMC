@@ -160,14 +160,19 @@ impl VulkanContext {
         let mut supported_demote =
             vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures::default();
         let extensions = unsafe { instance.enumerate_device_extension_properties(physical_device) }
-            .map_err(|error| GalError::backend(format!("failed to query device extensions: {error:?}")))?;
+            .map_err(|error| {
+                GalError::backend(format!("failed to query device extensions: {error:?}"))
+            })?;
         let provoking_extension = extensions.iter().any(|extension| unsafe {
             CStr::from_ptr(extension.extension_name.as_ptr()) == ash::ext::provoking_vertex::NAME
         });
         let mut provoking_properties = vk::PhysicalDeviceProvokingVertexPropertiesEXT::default();
         if provoking_extension {
-            let mut properties = vk::PhysicalDeviceProperties2::default().push_next(&mut provoking_properties);
-            unsafe { instance.get_physical_device_properties2(physical_device, &mut properties); }
+            let mut properties =
+                vk::PhysicalDeviceProperties2::default().push_next(&mut provoking_properties);
+            unsafe {
+                instance.get_physical_device_properties2(physical_device, &mut properties);
+            }
         }
         let mut provoking_features = vk::PhysicalDeviceProvokingVertexFeaturesEXT::default();
         let mut supported_features =
@@ -185,13 +190,18 @@ impl VulkanContext {
         // so negotiate that core feature instead of silently creating an
         // invalid pipeline and relying on validation to catch it later.
         let independent_blend_supported = supported_features.features.independent_blend == vk::TRUE;
-        let vertex_storage_writes = supported_features.features.vertex_pipeline_stores_and_atomics == vk::TRUE;
-        let fragment_storage_writes = supported_features.features.fragment_stores_and_atomics == vk::TRUE;
-        let provoking_vertex_last = provoking_extension && provoking_features.provoking_vertex_last == vk::TRUE;
-        let core_features =
-            vk::PhysicalDeviceFeatures::default().independent_blend(independent_blend_supported)
-                .vertex_pipeline_stores_and_atomics(vertex_storage_writes)
-                .fragment_stores_and_atomics(fragment_storage_writes);
+        let vertex_storage_writes = supported_features
+            .features
+            .vertex_pipeline_stores_and_atomics
+            == vk::TRUE;
+        let fragment_storage_writes =
+            supported_features.features.fragment_stores_and_atomics == vk::TRUE;
+        let provoking_vertex_last =
+            provoking_extension && provoking_features.provoking_vertex_last == vk::TRUE;
+        let core_features = vk::PhysicalDeviceFeatures::default()
+            .independent_blend(independent_blend_supported)
+            .vertex_pipeline_stores_and_atomics(vertex_storage_writes)
+            .fragment_stores_and_atomics(fragment_storage_writes);
         if supported_demote.shader_demote_to_helper_invocation == vk::TRUE {
             supported_demote = supported_demote.shader_demote_to_helper_invocation(true);
         }
@@ -214,8 +224,8 @@ impl VulkanContext {
         if supported_demote.shader_demote_to_helper_invocation == vk::TRUE {
             device_info = device_info.push_next(&mut supported_demote);
         }
-        let mut enabled_provoking = vk::PhysicalDeviceProvokingVertexFeaturesEXT::default()
-            .provoking_vertex_last(true);
+        let mut enabled_provoking =
+            vk::PhysicalDeviceProvokingVertexFeaturesEXT::default().provoking_vertex_last(true);
         if provoking_vertex_last {
             device_info = device_info.push_next(&mut enabled_provoking);
         }
@@ -268,7 +278,8 @@ impl VulkanContext {
             timeline,
             independent_blend: independent_blend_supported,
             provoking_vertex_last,
-            provoking_vertex_per_pipeline: provoking_properties.provoking_vertex_mode_per_pipeline == vk::TRUE,
+            provoking_vertex_per_pipeline: provoking_properties.provoking_vertex_mode_per_pipeline
+                == vk::TRUE,
             graphics_storage_writes: vertex_storage_writes && fragment_storage_writes,
             surface_loader,
             surface,

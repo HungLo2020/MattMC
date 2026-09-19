@@ -1063,7 +1063,8 @@ public final class RustGalFrameCoordinator {
 					tiledQuadRequests,
 					engineGlobals,
 					primitiveFrame.particleQuads(),
-					primitiveFrame.orbInstances()
+					primitiveFrame.orbInstances(),
+					primitiveFrame.distantHorizonsGenericBoxes()
 				);
 				if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 					auditMessage("Rust GUI whole-frame result mesh items=" + wholeFrameResult.guiMeshItemCount()
@@ -2024,14 +2025,19 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.vulkan-configured-frames-in-flight", profile.vulkanConfiguredFramesInFlight());
 		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.vulkan-images-in-flight", profile.vulkanImagesInFlight());
 		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.vulkan-available-frame-slots", profile.vulkanAvailableFrameSlots());
-		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-shadow-depth", profile.gpuShadowDepthNanos());
-		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-terrain-opaque", profile.gpuTerrainOpaqueNanos());
-		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-terrain-cutout", profile.gpuTerrainCutoutNanos());
-		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-deferred-lighting", profile.gpuDeferredLightingNanos());
-		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-composite-0", profile.gpuComposite0Nanos());
-		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-composite-1", profile.gpuComposite1Nanos());
-		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-final-output", profile.gpuFinalOutputNanos());
-		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-frame-total", profile.gpuFrameTotalNanos());
+		long gpuTimestampSubmission = profile.gpuTimestampStatus();
+		if (gpuTimestampSubmission != 0L && gpuTimestampSubmission != METRICS.profileLastGpuTimestampSubmission) {
+			METRICS.profileLastGpuTimestampSubmission = gpuTimestampSubmission;
+			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-shadow-depth", profile.gpuShadowDepthNanos());
+			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-terrain-opaque", profile.gpuTerrainOpaqueNanos());
+			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-terrain-cutout", profile.gpuTerrainCutoutNanos());
+			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-deferred-lighting", profile.gpuDeferredLightingNanos());
+			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-composite-0", profile.gpuComposite0Nanos());
+			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-composite-1", profile.gpuComposite1Nanos());
+			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-final-output", profile.gpuFinalOutputNanos());
+			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-frame-total", profile.gpuFrameTotalNanos());
+			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-distant-horizons-opaque", profile.gpuDistantHorizonsOpaqueNanos());
+		}
 	}
 
 	private static void recordWorldMetrics(VulkanicGalBridge.WholeFrameSubmitResult result) {
@@ -3030,6 +3036,7 @@ public final class RustGalFrameCoordinator {
 		long profilePipelineBinds;
 		long profileResourceSetBinds;
 		long profileGpuTimestampUnavailableFrames;
+		long profileLastGpuTimestampSubmission;
 		long profileGBufferPersistentCacheHits;
 		long profileGBufferPersistentCacheMisses;
 		long profileGBufferFinalBindingCacheHits;

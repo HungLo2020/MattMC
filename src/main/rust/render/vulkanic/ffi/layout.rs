@@ -509,7 +509,16 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         90 => layout!(
             90,
             FfiGuiRawImageAssetPayload,
-            [byte_size, format, asset_id, width, height, pixels, sampling_filter, sampling_address]
+            [
+                byte_size,
+                format,
+                asset_id,
+                width,
+                height,
+                pixels,
+                sampling_filter,
+                sampling_address
+            ]
         ),
         92 => layout!(
             92,
@@ -547,7 +556,15 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
         96 => layout!(
             96,
             FfiGuiMeshVertex,
-            [position, atlas_uv, local_uv, color_argb, normal_packed, source_face, source_foil_type]
+            [
+                position,
+                atlas_uv,
+                local_uv,
+                color_argb,
+                normal_packed,
+                source_face,
+                source_foil_type
+            ]
         ),
         97 => layout!(
             97,
@@ -751,7 +768,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 engine_glint_alpha,
                 engine_menu_blur_radius,
                 world_particle_quads,
-                world_experience_orbs
+                world_experience_orbs,
+                world_distant_horizons_generic_boxes
             ]
         ),
         89 => layout!(
@@ -1155,7 +1173,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 decal_model_pose,
                 decal_normal_pose,
                 model_submission_order_mode,
-                model_submission_order
+                model_submission_order,
+                packed_light
             ]
         ),
         70 => layout!(
@@ -1296,7 +1315,10 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 reserved0,
                 camera_world_x,
                 camera_world_y,
-                camera_world_z
+                camera_world_z,
+                dh_fog_parameters,
+                max_level_height,
+                ssao_parameters
             ]
         ),
         85 => layout!(
@@ -1435,31 +1457,148 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 model_view_matrix
             ]
         ),
-        101 => layout!(101, FfiGuiTiledQuadRequest,
-            [byte_size, stratum, asset_id, bounds, tile_extent, uv, pose, z,
-             color_argb, sequence, clip_mode, clip]),
-        102 => layout!(102, FfiSpriteAnimationMip,
-            [byte_size, width, height, reserved0, rgba]),
-        103 => layout!(103, FfiSpriteAnimationSource,
-            [byte_size, sprite_id, atlas_x, atlas_y, frame_width, frame_height,
-             interpolate, reserved0, frames, mips]),
-        104 => layout!(104, FfiAtlasAnimationAssetUpdate,
-            [header, texture_id, reserved0, generation, initial_tick, sprites]),
-        105 => layout!(105, FfiGuiAtlasReference,
-            [byte_size, texture_id, asset_id, atlas_generation, atlas_width, atlas_height,
-             x, y, width, height]),
-        106 => layout!(106, FfiGuiAtlasReferenceUpdate,
-            [header, revision, references, negotiated_feature_bits]),
-        107 => layout!(107, FfiGuiItemRasterLayer,
-            [byte_size, material_mode, asset_id, color_argb, corners, uv, model_transform]),
-        108 => layout!(108, FfiWorldParticleQuadRequest,
-            [byte_size, texture_id, surface_kind, material_index, center, rotation,
-             size, uv_bounds, color_argb, packed_light]),
-        109 => layout!(109, FfiWorldExperienceOrbAssetRecord,
-            [byte_size, icon, mesh_key, mesh_generation, red, blue, packed_light, reserved0]),
-        110 => layout!(110, FfiWorldExperienceOrbInstanceRecord,
-            [byte_size, mesh_index, mesh_key, mesh_generation, entity_transform,
-             camera_orientation, entity_id, reserved0]),
+        101 => layout!(
+            101,
+            FfiGuiTiledQuadRequest,
+            [
+                byte_size,
+                stratum,
+                asset_id,
+                bounds,
+                tile_extent,
+                uv,
+                pose,
+                z,
+                color_argb,
+                sequence,
+                clip_mode,
+                clip
+            ]
+        ),
+        102 => layout!(
+            102,
+            FfiSpriteAnimationMip,
+            [byte_size, width, height, reserved0, rgba]
+        ),
+        103 => layout!(
+            103,
+            FfiSpriteAnimationSource,
+            [
+                byte_size,
+                sprite_id,
+                atlas_x,
+                atlas_y,
+                frame_width,
+                frame_height,
+                interpolate,
+                reserved0,
+                frames,
+                mips
+            ]
+        ),
+        104 => layout!(
+            104,
+            FfiAtlasAnimationAssetUpdate,
+            [
+                header,
+                texture_id,
+                reserved0,
+                generation,
+                initial_tick,
+                sprites
+            ]
+        ),
+        105 => layout!(
+            105,
+            FfiGuiAtlasReference,
+            [
+                byte_size,
+                texture_id,
+                asset_id,
+                atlas_generation,
+                atlas_width,
+                atlas_height,
+                x,
+                y,
+                width,
+                height
+            ]
+        ),
+        106 => layout!(
+            106,
+            FfiGuiAtlasReferenceUpdate,
+            [header, revision, references, negotiated_feature_bits]
+        ),
+        107 => layout!(
+            107,
+            FfiGuiItemRasterLayer,
+            [
+                byte_size,
+                material_mode,
+                asset_id,
+                color_argb,
+                corners,
+                uv,
+                model_transform
+            ]
+        ),
+        108 => layout!(
+            108,
+            FfiWorldParticleQuadRequest,
+            [
+                byte_size,
+                texture_id,
+                surface_kind,
+                material_index,
+                center,
+                rotation,
+                size,
+                uv_bounds,
+                color_argb,
+                packed_light
+            ]
+        ),
+        109 => layout!(
+            109,
+            FfiWorldExperienceOrbAssetRecord,
+            [
+                byte_size,
+                icon,
+                mesh_key,
+                mesh_generation,
+                red,
+                blue,
+                packed_light,
+                reserved0
+            ]
+        ),
+        110 => layout!(
+            110,
+            FfiWorldExperienceOrbInstanceRecord,
+            [
+                byte_size,
+                mesh_index,
+                mesh_key,
+                mesh_generation,
+                entity_transform,
+                camera_orientation,
+                entity_id,
+                reserved0
+            ]
+        ),
+        111 => layout!(
+            111,
+            FfiWorldDistantHorizonsGenericBoxRecord,
+            [
+                byte_size,
+                flags,
+                min,
+                max,
+                color_argb,
+                packed_light,
+                shading
+            ]
+        ),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,

@@ -383,6 +383,7 @@ impl Backend for VulkanBackend {
             gpu_composite1_nanos: lowering.gpu_composite1_nanos,
             gpu_final_output_nanos: lowering.gpu_final_output_nanos,
             gpu_frame_total_nanos: lowering.gpu_frame_total_nanos,
+            gpu_distant_horizons_opaque_nanos: lowering.gpu_distant_horizons_opaque_nanos,
             ..BackendRuntimeMetrics::default()
         }
     }
@@ -430,15 +431,24 @@ impl Backend for VulkanBackend {
                 ),
             );
         };
-        let presented = swapchain.present(desc)?;
-        if let Ok(mut lowerer) = self.lowerer.lock() {
-            // `present` has already waited on this frame's timeline value.
-            // Retire the complete lowerer submission prefix now, rather than
-            // merely polling it.  A poll can lag behind the explicit wait on
-            // drivers that do not update the counter immediately; leaving
-            // those command buffers queued caused unbounded native resource
-            // growth during real whole-frame rendering.
-            lowerer.retire_all_in_flight()?;
+        let image_index = swapchain.acquired_image_index(desc.frame)?;
+        let mut lowerer = self.lowerer.lock().map_err(|_| {
+            crate::render::vulkanic::error::GalError::backend("Vulkan lowerer lock poisoned")
+        })?;
+        let present_semaphore = lowerer.present_semaphore_for(desc.wait_for, image_index);
+        let used_gpu_wait = present_semaphore.is_some();
+        let mut presented = swapchain.present(desc, present_semaphore)?;
+        if used_gpu_wait {
+            // queuePresent now waits on the render-finished binary semaphore;
+            // polling here retires only work that is already complete and does
+            // not turn presentation back into a CPU timeline wait.
+            lowerer.complete_present(desc.wait_for);
+            presented.completed_submission = lowerer.completed_submission();
+        } else {
+            // Preserve the explicit synchronous contract for test-only or
+            // non-frame submissions that have no render-finished semaphore.
+            lowerer.retire(desc.wait_for)?;
+            presented.completed_submission = desc.wait_for;
         }
         Ok(presented)
     }

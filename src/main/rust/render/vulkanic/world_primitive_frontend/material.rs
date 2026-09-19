@@ -4,11 +4,36 @@ pub(super) fn validate_quad(
     quad: &WorldMaterialQuadRequest,
     frame: &WorldPrimitiveFrame,
 ) -> GalResult<()> {
-    if quad.stratum != WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY {
+    if !matches!(
+        quad.stratum,
+        WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY
+            | WORLD_STRATUM_DH_GENERIC
+            | WORLD_STRATUM_DH_GENERIC_SSAO
+    ) {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!("unsupported world material stratum {}", quad.stratum),
         ));
+    }
+    if is_distant_horizons_generic_stratum(quad.stratum) {
+        if !frame.lod_render_frame.rust_route_selected()
+            || quad.texture_id != WORLD_MATERIAL_TEXTURE_GENERATED_WHITE
+            || quad.source_program != WORLD_MATERIAL_SOURCE_TEXTURED
+            || quad.source_uv_space != WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
+            || quad.cull_policy != WORLD_CULL_BACK
+            || !matches!(
+                (quad.material_mode, quad.depth_policy),
+                (WORLD_MATERIAL_MODE_OPAQUE, WORLD_DEPTH_POLICY_TEST_WRITE)
+                    | (
+                        WORLD_MATERIAL_MODE_TRANSLUCENT,
+                        WORLD_DEPTH_POLICY_TEST_WRITE
+                    )
+            )
+        {
+            return Err(GalError::unsupported_feature(
+                "DH generic material faces require the selected private DH route, generated-white local texture, back-face culling, and Frozen's depth-writing generic-object semantics",
+            ));
+        }
     }
     if !is_known_material_id(quad.material_id) {
         return Err(GalError::ffi(

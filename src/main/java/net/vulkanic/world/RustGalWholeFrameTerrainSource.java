@@ -77,6 +77,13 @@ public final class RustGalWholeFrameTerrainSource {
 	private long lastCameraSection = Long.MIN_VALUE;
 	/** Radius is semantic selection state: option changes must not retain a prior frontier. */
 	private int lastHorizontalRadius = -1;
+	/** Complete CPU visibility input used by the resident portal traversal. */
+	private long lastVisibilitySignature = Long.MIN_VALUE;
+	/** Final visible section snapshot for an unchanged, fully drained frame. */
+	private ArrayList<RenderSection> cachedVisibleSections = new ArrayList<>();
+	private LongOpenHashSet cachedVisibleKeys = new LongOpenHashSet();
+	private LongOpenHashSet cachedPortalVisibleKeys = new LongOpenHashSet();
+	private long cachedVisibleSignature = Long.MIN_VALUE;
 	/** Current-frame CPU culling semantics; never a renderer or GPU resource. */
 	private Viewport viewport;
 	/**
@@ -92,6 +99,10 @@ public final class RustGalWholeFrameTerrainSource {
 	 */
 	private boolean visibilityGraphDirty;
     private int buildFrame;
+	private long emptySnapshotBuilds;
+	private long meshlessOutputBuilds;
+	private String emptySnapshotSample = "none";
+	private String meshlessOutputSample = "none";
 
     public void setLevel(ClientLevel level) {
         if (this.level == level && this.workerBuilder != null && this.sectionCache != null) {
@@ -118,9 +129,16 @@ public final class RustGalWholeFrameTerrainSource {
 	 * bound peak construction memory for that explicitly named fixture.
 	 */
 	private static int semanticMeshWorkerCount() {
-		return System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()
-			? MAX_SEMANTIC_MESH_WORKERS
-			: 1;
+		if (!System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()) {
+			return 1;
+		}
+		// Vanilla terrain is the near-field correctness source and must become
+		// available promptly even while DH is generating. Keep this bounded pool
+		// independent of optional far-terrain work; the audit knob can still
+		// measure smaller pools explicitly without changing ownership.
+		return Math.max(1, Math.min(MAX_SEMANTIC_MESH_WORKERS,
+			Integer.getInteger("mattmc.dev.rustGalWorldMaterial.terrainMeshWorkers",
+				MAX_SEMANTIC_MESH_WORKERS)));
 	}
 
 	public void enqueue(Camera camera, Frustum frustum, int viewportWidth, int viewportHeight,
@@ -141,8 +159,12 @@ public final class RustGalWholeFrameTerrainSource {
 		if (!(frustum instanceof ViewportProvider viewportProvider)) {
 			throw new IllegalStateException("Rust whole-frame terrain requires Sodium viewport semantics");
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.source-select");
 		this.viewport = viewportProvider.sodium$createViewport();
 		this.terrainSelectionDistance = terrainSelectionDistance;
+		long visibilitySignature = frustum instanceof net.minecraft.client.renderer.culling.Frustum vanillaFrustum
+			? vanillaFrustum.semanticSignature() ^ Float.floatToIntBits(terrainSelectionDistance)
+			: Long.MIN_VALUE;
 		if (this.observedResourceReloadEpoch != resourceReloadEpoch) {
 			this.resetForResourceReload();
 			this.observedResourceReloadEpoch = resourceReloadEpoch;
@@ -152,6 +174,7 @@ public final class RustGalWholeFrameTerrainSource {
 		int horizontalRadius = this.configuredHorizontalRadius();
 		boolean refreshResidentVisibility = false;
 		if (cameraKey != this.lastCameraSection || horizontalRadius != this.lastHorizontalRadius) {
+			this.cachedVisibleSignature = Long.MIN_VALUE;
 			wholeFrameSurfaceQueueDrained = false;
 			wholeFrameTerrainQueueDrained = false;
 			this.lastCameraSection = cameraKey;
@@ -167,22 +190,26 @@ public final class RustGalWholeFrameTerrainSource {
 			this.evictOutsideWindow(cameraSection, horizontalRadius);
 			this.admitSection(cameraSection, GraphDirectionSet.NONE, true, frustum);
 		} else if (this.canRefreshResidentVisibility()) {
-			// Frozen re-evaluates visibility from its resident section graph every
-			// frame. Once this independent producer has no outstanding CPU work,
-			// do the equivalent from its own immutable section cache rather than
-			// retaining the traversal order created while snapshots arrived.
-			this.resetVisibilityFrontier();
-			this.admitSection(cameraSection, GraphDirectionSet.NONE, true, frustum);
-			refreshResidentVisibility = true;
+			if (visibilitySignature != this.lastVisibilitySignature) {
+				this.resetVisibilityFrontier();
+				this.admitSection(cameraSection, GraphDirectionSet.NONE, true, frustum);
+				refreshResidentVisibility = true;
+			}
 		} else {
 			// Revisit the origin's completed CPU section so a transiently unavailable
 			// camera section can never be mistaken for a settled terrain source.
 			this.admitSection(cameraSection, GraphDirectionSet.NONE, true, frustum);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.source-frontier");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.frontier-invalidation");
 		this.admitInvalidatedSections(frustum);
 		this.retryUnavailableSections(frustum);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.frontier-invalidation");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.frontier-completions");
 		this.drainCompletedBuilds(frustum);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.frontier-completions");
 		if (this.visibilityGraphDirty) {
+			this.cachedVisibleSignature = Long.MIN_VALUE;
 			// Do not wait for every worker job in the view to finish. A newly built
 			// portal can expose an already-resident branch immediately; retaining
 			// the old frontier until global quiescence permanently loses that branch
@@ -193,11 +220,14 @@ public final class RustGalWholeFrameTerrainSource {
 			this.visibilityGraphDirty = false;
 			refreshResidentVisibility = true;
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.frontier-traversal");
 		if (refreshResidentVisibility) {
 			this.drainVisibilityFrontierFully(frustum);
 		} else {
 			this.drainVisibilityFrontier(frustum);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.frontier-traversal");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.frontier-scheduling");
 		this.scheduleBuilds(camera);
 		// A worker may finish while the first bounded scheduling pass is still
 		// assembling the frame. Consume that completion immediately so its
@@ -212,6 +242,8 @@ public final class RustGalWholeFrameTerrainSource {
 			this.drainVisibilityFrontier(frustum);
 		}
 		this.scheduleBuilds(camera);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.frontier-scheduling");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.source-frontier");
 		this.sectionCache.cleanup();
 		wholeFrameSurfaceQueueDrained = this.pending.isEmpty()
 			&& this.inFlight.isEmpty()
@@ -223,6 +255,8 @@ public final class RustGalWholeFrameTerrainSource {
 			&& this.completedBuilds.isEmpty()
 			&& this.unavailableSections.isEmpty();
 		wholeFrameTerrainQueueSummary = "pending=" + this.pending.size()
+			+ ",horizontalRadius=" + this.configuredHorizontalRadius()
+			+ ",terrainSelectionDistance=" + this.terrainSelectionDistance
 			+ ",scheduledJobs=" + this.workerBuilder.getScheduledJobCount()
 			+ ",busyWorkers=" + this.workerBuilder.getBusyThreadCount()
 			+ ",workerThreads=" + this.workerBuilder.getTotalThreadCount()
@@ -233,6 +267,12 @@ public final class RustGalWholeFrameTerrainSource {
 			+ ",invalidatedInFlight=" + this.invalidatedInFlight.size()
 			+ ",completed=" + this.completedBuilds.size()
 			+ ",retained=" + this.sections.size()
+			+ ",retainedGeometry=" + this.retainedGeometryCount()
+			+ ",retainedEmpty=" + (this.sections.size() - this.retainedGeometryCount())
+			+ ",emptySnapshots=" + this.emptySnapshotBuilds
+			+ ",meshlessOutputs=" + this.meshlessOutputBuilds
+			+ ",emptySnapshotSample=" + this.emptySnapshotSample
+			+ ",meshlessOutputSample=" + this.meshlessOutputSample
 			+ ",unavailable=" + this.unavailableSections.size()
 			+ ",failureCount=" + wholeFrameTerrainFailureCount
 			+ ",lastFailure=" + lastWholeFrameTerrainFailure
@@ -242,8 +282,21 @@ public final class RustGalWholeFrameTerrainSource {
 			System.out.println("[MattMC graphics audit] Rust whole-frame terrain source "
 				+ wholeFrameTerrainQueueSummary);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.source-select");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visible-list");
+		boolean reuseVisibleSnapshot = wholeFrameTerrainQueueDrained
+			&& visibilitySignature == this.lastVisibilitySignature
+			&& visibilitySignature == this.cachedVisibleSignature;
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+			"world.static-terrain.visible-cache-hit", reuseVisibleSnapshot ? 1L : 0L);
 		var visibleSections = new ArrayList<RenderSection>(this.propagatedIncomingDirections.size() + 26);
 		var visibleKeys = new LongOpenHashSet(this.propagatedIncomingDirections.size() + 26);
+		var portalVisibleKeys = new LongOpenHashSet();
+		if (reuseVisibleSnapshot) {
+			visibleSections = this.cachedVisibleSections;
+			visibleKeys = this.cachedVisibleKeys;
+			portalVisibleKeys = this.cachedPortalVisibleKeys;
+		} else {
 		for (var entry : this.sections.long2ObjectEntrySet()) {
 			// `sections` is a bounded CPU mesh cache, not the render domain. A
 			// cached section may remain frustum-visible after the camera moves but
@@ -267,11 +320,13 @@ public final class RustGalWholeFrameTerrainSource {
 				visibleKeys.add(entry.getLongKey());
 			}
 		}
-		// Preserve the final portal-selected set before the separately modeled
-		// nearby-section enlargement. The predicate is diagnostic-only and is
-		// consumed only by the bounded capture receipt below.
-		var portalVisibleKeys = new LongOpenHashSet(visibleKeys);
+		portalVisibleKeys.addAll(visibleKeys);
 		this.addNearbyVisibleSections(visibleSections, visibleKeys);
+		this.cachedVisibleSections = visibleSections;
+		this.cachedVisibleKeys = visibleKeys;
+		this.cachedPortalVisibleKeys = portalVisibleKeys;
+		this.cachedVisibleSignature = visibilitySignature;
+		}
 		// Capture-only receipt of the final Rust-owned CPU visibility domain.
 		// Wait for the source's existing settled state so startup-empty samples
 		// cannot displace the comparable capture-phase observation.  This does
@@ -282,12 +337,26 @@ public final class RustGalWholeFrameTerrainSource {
 				viewportWidth, viewportHeight, portalVisibleKeys::contains
 			);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-list");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.semantic-submit");
 		RustGalTerrainRenderer.enqueueWholeFrameTerrainSections(visibleSections, camera, viewportWidth, viewportHeight);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.semantic-submit");
+		if (wholeFrameTerrainQueueDrained) {
+			this.lastVisibilitySignature = visibilitySignature;
+		}
     }
 
 	/** True once all client-resident nearby surface sections have been attempted. */
 	public static boolean isWholeFrameSurfaceQueueDrained() {
 		return wholeFrameSurfaceQueueDrained;
+	}
+
+	private int retainedGeometryCount() {
+		int count = 0;
+		for (RenderSection section : this.sections.values()) {
+			if (section != null && section.getFlags() != 0) count++;
+		}
+		return count;
 	}
 
 	/** Capture diagnostic only: identifies a bounded sample of the semantic
@@ -370,9 +439,8 @@ public final class RustGalWholeFrameTerrainSource {
 		net.minecraft.client.dev.DeterministicCameraCapture.invalidateRustWholeFrameTerrainReadiness();
         long key = SectionPos.asLong(sectionX, sectionY, sectionZ);
         this.sectionCache.invalidate(sectionX, sectionY, sectionZ);
-        RustGalTerrainRenderer.removeSection(sectionX, sectionY, sectionZ, "cpu-source-dirty");
-        this.sections.remove(key);
-		this.propagatedIncomingDirections.remove(key);
+		// Keep the last accepted immutable section and Rust mesh visible until its
+		// replacement has completed and can be published as one transaction.
 		this.unavailableSections.remove(key);
 		SectionPos section = SectionPos.of(sectionX, sectionY, sectionZ);
 		if (this.inFlight.contains(key)) {
@@ -410,9 +478,18 @@ public final class RustGalWholeFrameTerrainSource {
 		this.destroyCompletedBuilds();
 		this.lastCameraSection = Long.MIN_VALUE;
 		this.lastHorizontalRadius = -1;
+		this.lastVisibilitySignature = Long.MIN_VALUE;
+		this.cachedVisibleSignature = Long.MIN_VALUE;
+		this.cachedVisibleSections.clear();
+		this.cachedVisibleKeys.clear();
+		this.cachedPortalVisibleKeys.clear();
 		this.viewport = null;
 		this.visibilityGraphDirty = false;
         this.buildFrame = 0;
+		this.emptySnapshotBuilds = 0L;
+		this.meshlessOutputBuilds = 0L;
+		this.emptySnapshotSample = "none";
+		this.meshlessOutputSample = "none";
 		this.level = null;
     }
 
@@ -437,6 +514,11 @@ public final class RustGalWholeFrameTerrainSource {
 		this.unavailableSections.clear();
 		this.lastCameraSection = Long.MIN_VALUE;
 		this.lastHorizontalRadius = -1;
+		this.lastVisibilitySignature = Long.MIN_VALUE;
+		this.cachedVisibleSignature = Long.MIN_VALUE;
+		this.cachedVisibleSections.clear();
+		this.cachedVisibleKeys.clear();
+		this.cachedPortalVisibleKeys.clear();
 		this.visibilityGraphDirty = false;
 		wholeFrameSurfaceQueueDrained = false;
 		wholeFrameTerrainQueueDrained = false;
@@ -863,13 +945,42 @@ public final class RustGalWholeFrameTerrainSource {
 	private void scheduleBuilds(Camera camera) {
 		int capacity = Math.max(1, this.workerBuilder.getTotalThreadCount() * 2);
 		while (this.inFlight.size() < capacity) {
-			SectionPos sectionPos = this.pending.pollFirst();
+			SectionPos sectionPos = this.pollNearestPending();
 			if (sectionPos == null) {
 				return;
 			}
 			this.queued.remove(sectionPos.asLong());
 			this.scheduleBuild(sectionPos, camera);
 		}
+	}
+
+	private SectionPos pollNearestPending() {
+		if (this.pending.isEmpty() || this.lastCameraSection == Long.MIN_VALUE) {
+			return this.pending.pollFirst();
+		}
+		// Once the near-field bootstrap has a substantial resident set, preserve
+		// FIFO portal order. Empty outer sections then drain synchronously instead
+		// of paying a full pending-queue scan for work the player cannot see.
+		if (this.sections.size() >= 256) {
+			return this.pending.pollFirst();
+		}
+		int cameraX = SectionPos.x(this.lastCameraSection);
+		int cameraY = SectionPos.y(this.lastCameraSection);
+		int cameraZ = SectionPos.z(this.lastCameraSection);
+		SectionPos nearest = null;
+		long nearestDistance = Long.MAX_VALUE;
+		for (SectionPos candidate : this.pending) {
+			long dx = candidate.getX() - cameraX;
+			long dy = candidate.getY() - cameraY;
+			long dz = candidate.getZ() - cameraZ;
+			long distance = dx * dx + dy * dy + dz * dz;
+			if (distance < nearestDistance) {
+				nearest = candidate;
+				nearestDistance = distance;
+			}
+		}
+		if (nearest != null) this.pending.removeFirstOccurrence(nearest);
+		return nearest;
 	}
 
 	private void scheduleBuild(SectionPos sectionPos, Camera camera) {
@@ -929,6 +1040,12 @@ public final class RustGalWholeFrameTerrainSource {
 					continue;
 				}
 				completed.section().setInfo(output.info);
+				if (output.info.flags == 0) {
+					this.meshlessOutputBuilds++;
+					if ("none".equals(this.meshlessOutputSample)) {
+						this.meshlessOutputSample = sectionPosString(completed.sectionPos());
+					}
+				}
 				completed.section().setIncomingDirections(this.incomingDirections.get(key) & GraphDirectionSet.ALL);
 				this.sections.put(key, completed.section());
 				this.visibilityGraphDirty = true;
@@ -977,6 +1094,10 @@ public final class RustGalWholeFrameTerrainSource {
 
 	private void completeEmptyBuild(SectionPos sectionPos) {
 		long key = sectionPos.asLong();
+		this.emptySnapshotBuilds++;
+		if ("none".equals(this.emptySnapshotSample)) {
+			this.emptySnapshotSample = sectionPosString(sectionPos);
+		}
 		this.inFlight.remove(key);
 		RenderSection section = new RenderSection(null, sectionPos.getX(), sectionPos.getY(), sectionPos.getZ());
 		section.setInfo(BuiltSectionInfo.EMPTY);
@@ -986,6 +1107,10 @@ public final class RustGalWholeFrameTerrainSource {
 		this.unavailableSections.remove(key);
 		this.requestPropagation(key);
 		this.recordPortalBuildLifecycle(key, "accepted-empty");
+	}
+
+	private static String sectionPosString(SectionPos section) {
+		return section.getX() + ":" + section.getY() + ":" + section.getZ();
 	}
 
 	private void recordPortalBuildLifecycle(long key, String stage) {

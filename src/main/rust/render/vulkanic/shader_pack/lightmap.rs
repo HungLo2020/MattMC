@@ -633,7 +633,12 @@ mod tests {
         .unwrap();
         let texel = |block: usize, sky: usize| {
             let offset = (sky * VANILLA_LIGHTMAP_WIDTH + block) * 4;
-            [pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]]
+            [
+                pixels[offset],
+                pixels[offset + 1],
+                pixels[offset + 2],
+                pixels[offset + 3],
+            ]
         };
         assert_eq!([25, 25, 25, 255], texel(0, 0));
         assert_eq!([39, 34, 31, 255], texel(1, 0));

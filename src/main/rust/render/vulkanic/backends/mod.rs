@@ -94,6 +94,7 @@ pub(in crate::render::vulkanic) struct BackendRuntimeMetrics {
     pub(in crate::render::vulkanic) gpu_composite1_nanos: u64,
     pub(in crate::render::vulkanic) gpu_final_output_nanos: u64,
     pub(in crate::render::vulkanic) gpu_frame_total_nanos: u64,
+    pub(in crate::render::vulkanic) gpu_distant_horizons_opaque_nanos: u64,
 }
 
 pub(super) fn graphics_backend_lock() -> &'static Mutex<()> {

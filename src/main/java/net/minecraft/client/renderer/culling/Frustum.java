@@ -139,6 +139,42 @@ public class Frustum implements ViewportProvider {
 		return this.camZ;
 	}
 
+	/**
+	 * Stable CPU visibility identity for semantic producers. The whole-frame
+	 * Rust terrain source may reuse a resident portal traversal only when the
+	 * composed view/projection planes and camera origin are unchanged. This
+	 * exposes copied scalar state only; it does not expose the frustum object,
+	 * renderer state, or a backend resource.
+	 */
+	public long semanticSignature() {
+		long hash = 0xcbf29ce484222325L;
+		hash = mixSemanticSignature(hash, Double.doubleToLongBits(this.camX));
+		hash = mixSemanticSignature(hash, Double.doubleToLongBits(this.camY));
+		hash = mixSemanticSignature(hash, Double.doubleToLongBits(this.camZ));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m00()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m01()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m02()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m03()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m10()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m11()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m12()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m13()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m20()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m21()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m22()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m23()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m30()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m31()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m32()));
+		hash = mixSemanticSignature(hash, Float.floatToIntBits(this.matrix.m33()));
+		return hash;
+	}
+
+	private static long mixSemanticSignature(long hash, long value) {
+		hash ^= value;
+		return hash * 0x100000001b3L;
+	}
+
 	@Override
 	public Viewport sodium$createViewport() {
 		return new Viewport(new SimpleFrustum(this.intersection), new Vector3d(this.camX, this.camY, this.camZ));

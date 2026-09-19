@@ -300,11 +300,8 @@ impl OpenGlObjects {
         })?;
         unsafe {
             self.gl.bind_buffer(glow::COPY_WRITE_BUFFER, Some(buffer));
-            self.gl.buffer_data_size(
-                glow::COPY_WRITE_BUFFER,
-                size,
-                glow::DYNAMIC_DRAW,
-            );
+            self.gl
+                .buffer_data_size(glow::COPY_WRITE_BUFFER, size, glow::DYNAMIC_DRAW);
             self.gl.bind_buffer(glow::COPY_WRITE_BUFFER, None);
         }
         Ok(BufferObject {
@@ -1152,11 +1149,9 @@ void main() { vec4 color = texture(sampler2D(LightmapTexture, LightmapSampler), 
         assert!(normalized.contains("layout(binding = 8) uniform sampler2D LightmapTexture;"));
         assert!(!normalized.contains("LightmapSampler"));
         assert!(normalized.contains("texture(LightmapTexture, vec2(0.5))"));
-        assert!(
-            sampler_uniform_names(8)
-                .iter()
-                .any(|name| name == "LightmapTexture")
-        );
+        assert!(sampler_uniform_names(8)
+            .iter()
+            .any(|name| name == "LightmapTexture"));
     }
 
     #[test]
@@ -1205,11 +1200,9 @@ void main() {
         assert!(!normalized.contains("uniform sampler Samp0"));
         assert!(!normalized.contains("sampler2D(MainDepthTex, Samp0)"));
         assert!(normalized.contains("texture(MainDepthTex, vec2(0.5)).r"));
-        assert!(
-            sampler_uniform_names(4)
-                .iter()
-                .any(|name| name == "MainDepthTex")
-        );
+        assert!(sampler_uniform_names(4)
+            .iter()
+            .any(|name| name == "MainDepthTex"));
     }
 
     #[test]
@@ -1233,27 +1226,21 @@ layout(binding = 4) uniform sampler2D ShadowDepthTex;
 
     #[test]
     fn opengl_program_interface_aliases_include_owned_mesh_blocks() {
-        assert!(uniform_block_names(1).iter().any(|name| name == "GuiMeshFrame"));
-        assert!(
-            storage_block_names(0)
-                .iter()
-                .any(|name| name == "WorldMeshVertices")
-        );
-        assert!(
-            storage_block_names(0)
-                .iter()
-                .any(|name| name == "GuiMeshVertices")
-        );
-        assert!(
-            storage_block_names(1)
-                .iter()
-                .any(|name| name == "WorldMeshInstances")
-        );
-        assert!(
-            storage_block_names(6)
-                .iter()
-                .any(|name| name == "CompositeShadowUniforms")
-        );
+        assert!(uniform_block_names(1)
+            .iter()
+            .any(|name| name == "GuiMeshFrame"));
+        assert!(storage_block_names(0)
+            .iter()
+            .any(|name| name == "WorldMeshVertices"));
+        assert!(storage_block_names(0)
+            .iter()
+            .any(|name| name == "GuiMeshVertices"));
+        assert!(storage_block_names(1)
+            .iter()
+            .any(|name| name == "WorldMeshInstances"));
+        assert!(storage_block_names(6)
+            .iter()
+            .any(|name| name == "CompositeShadowUniforms"));
     }
 
     #[test]
@@ -1357,9 +1344,9 @@ pub(super) fn texture_format(format: TextureFormat) -> GalResult<GlTextureFormat
             bytes_per_pixel: 4,
             integer: false,
         }),
-        TextureFormat::Bgra8Unorm => Err(GalError::backend(
-            format!("OpenGL texture format {format:?} is not supported in the isolated path"),
-        )),
+        TextureFormat::Bgra8Unorm => Err(GalError::backend(format!(
+            "OpenGL texture format {format:?} is not supported in the isolated path"
+        ))),
     }
 }
 

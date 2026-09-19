@@ -1,7 +1,9 @@
 package net.vulkanic.gui;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.client.gui.render.state.GuiItemRenderState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.entity.ItemRenderer;
@@ -13,11 +15,35 @@ import static net.vulkanic.bridge.VulkanicGalBridge.GUI_MESH_MATERIAL_MODEL_OVER
 
 /** Flat item model snapshots; no Java raster target, projection or foil matrix. */
 final class GuiFlatItemMeshCollector {
-    private static final int MAX_COPIED_VERTICES = 65_536;
-    private record Faces(long asset, List<GuiMeshVertexRecord> vertices) {}
-    record Snapshot(List<GuiMeshBatchRecord> batches, List<GuiItemTextureSource> sources) {
-        Snapshot { batches=List.copyOf(batches); sources=List.copyOf(sources); }
-    }
+	private static final int MAX_COPIED_VERTICES = 65_536;
+	private static final int MAX_CACHED_TOPOLOGIES = 256;
+	private static final Map<FlatTopologyKey, FlatTopology> TOPOLOGY_CACHE = new LinkedHashMap<>(64, 0.75F, true) {
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<FlatTopologyKey, FlatTopology> eldest) {
+			return this.size() > MAX_CACHED_TOPOLOGIES;
+		}
+	};
+	private record Faces(long asset, List<GuiMeshVertexRecord> vertices) {}
+	private record FlatTopologyKey(Object modelIdentity, int guiScale) {}
+	private record FlatLayer(int material, long asset, float[] transform, List<GuiMeshVertexRecord> vertices) {
+		private FlatLayer {
+			transform = transform.clone();
+			vertices = List.copyOf(vertices);
+		}
+	}
+	private record FlatTopology(List<FlatLayer> layers, List<GuiItemTextureSource> sources) {
+		private FlatTopology {
+			layers = List.copyOf(layers);
+			sources = List.copyOf(sources);
+		}
+	}
+	record Snapshot(List<GuiMeshBatchRecord> batches, List<GuiItemTextureSource> sources) {
+		Snapshot { batches=List.copyOf(batches); sources=List.copyOf(sources); }
+	}
+
+	static synchronized void invalidateCache() {
+		TOPOLOGY_CACHE.clear();
+	}
 
     static Snapshot collect(GuiItemRenderState item, int guiWidth, int guiHeight,
                             int guiScale, int stratum, StandardItemFoilRecord foil) {
@@ -27,7 +53,16 @@ final class GuiFlatItemMeshCollector {
         }
         List<GuiMeshBatchRecord> batches=new ArrayList<>();
         List<GuiItemTextureSource> sources=new ArrayList<>();
+        Object modelIdentity = item.itemStackRenderState().getModelIdentity();
+        FlatTopologyKey cacheKey = foil == null && !item.itemStackRenderState().isAnimated() && modelIdentity != null
+            ? new FlatTopologyKey(modelIdentity, guiScale) : null;
+        FlatTopology cached = cacheKey == null ? null : cachedTopology(cacheKey);
+        if (cached != null) {
+            net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-flat-topology-cache.hit", 1L);
+            return instantiate(item, guiWidth, guiHeight, guiScale, stratum, cached);
+        }
         int[] copiedVertexCount = {0};
+        boolean[] animatedSource = {false};
         item.itemStackRenderState().forEachSemanticLayer(layer -> {
             boolean specialFoil=layer.foilType()==ItemStackRenderState.FoilType.SPECIAL;
             if (layer.hasSpecialRenderer() || layer.usesBlockLight() || layer.quads().isEmpty()
@@ -47,6 +82,7 @@ final class GuiFlatItemMeshCollector {
                     throw new IllegalArgumentException("flat mesh face has no semantic quad view");
                 var sprite=quad.getSprite();
                 if (sprite==null) throw new IllegalArgumentException("flat mesh sprite missing");
+                if (sprite.contents().isAnimated()) animatedSource[0] = true;
                 var region=net.vulkanic.world.RustGalTerrainRenderer.requireGuiAtlasSpritePayload(sprite);
                 long asset=RustGalGuiRawImageAssets.assetId("gui-atlas-region:"+sprite.atlasLocation()+":"+sprite.contents().name());
                 var source=new GuiItemTextureSource.Atlas(new GuiAtlasRegion(asset,region.texture(),
@@ -91,8 +127,37 @@ final class GuiFlatItemMeshCollector {
             if(batches.size()>64) throw new IllegalArgumentException("flat mesh layer bound exceeded");
         });
         if(batches.isEmpty()) throw new IllegalArgumentException("flat mesh empty");
+        if (cacheKey != null && !animatedSource[0] && batches.stream().noneMatch(batch -> batch.itemFoil() != null)) {
+            List<FlatLayer> layers = new ArrayList<>(batches.size());
+            for (GuiMeshBatchRecord batch : batches) {
+                layers.add(new FlatLayer(batch.materialMode(), batch.assetId(), batch.modelTransform(), batch.vertices()));
+            }
+            FlatTopology topology = new FlatTopology(layers, sources);
+            cacheTopology(cacheKey, topology);
+            net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-flat-topology-cache.miss", 1L);
+        } else if (cacheKey == null) {
+            net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-flat-topology-cache.bypass", 1L);
+        }
         return new Snapshot(batches,sources);
     }
+
+	private static synchronized FlatTopology cachedTopology(FlatTopologyKey key) {
+		return TOPOLOGY_CACHE.get(key);
+	}
+
+	private static synchronized void cacheTopology(FlatTopologyKey key, FlatTopology topology) {
+		TOPOLOGY_CACHE.putIfAbsent(key, topology);
+	}
+
+	private static Snapshot instantiate(GuiItemRenderState item, int guiWidth, int guiHeight,
+		int guiScale, int stratum, FlatTopology topology) {
+		List<GuiMeshBatchRecord> batches = new ArrayList<>(topology.layers().size());
+		for (FlatLayer layer : topology.layers()) {
+			batches.add(batch(item, guiWidth, guiHeight, guiScale, stratum, batches.size(), layer.material(),
+				layer.asset(), layer.transform(), layer.vertices(), null));
+		}
+		return new Snapshot(batches, topology.sources());
+	}
 
     static GuiMeshBatchRecord batch(GuiItemRenderState item,int width,int height,int scale,int stratum,int layer,
                                            int material,long asset,float[] transform,List<GuiMeshVertexRecord> vertices,

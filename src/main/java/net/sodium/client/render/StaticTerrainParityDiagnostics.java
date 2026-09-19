@@ -221,6 +221,30 @@ public final class StaticTerrainParityDiagnostics {
         emitRustSourceCaptureCoverage(latestRustSourceCutoutCoverage, renderedFrameIndex);
     }
 
+    /**
+     * Bounded capture-only identity for the latest copied source mesh. It
+     * intentionally uses aggregate geometry/material counts rather than
+     * section objects or backend resources, so deterministic capture can reject
+     * a mixed streaming snapshot without changing the Rust route.
+     */
+    public static String rustSourceCoverageFingerprint() {
+        CaptureCoverageSnapshot solid = latestRustSourceSolidCoverage;
+        CaptureCoverageSnapshot cutout = latestRustSourceCutoutCoverage;
+        if (solid == null || cutout == null) {
+            return "missing";
+        }
+        return coverageFingerprint(solid) + "|" + coverageFingerprint(cutout);
+    }
+
+    private static String coverageFingerprint(CaptureCoverageSnapshot snapshot) {
+        return snapshot.layer() + ":sections=" + snapshot.sectionCount()
+                + ":animated=" + snapshot.animatedSections()
+                + ":vertices=" + snapshot.vertexTotal()
+                + ":indices=" + snapshot.indexTotal()
+                + ":primitives=" + snapshot.primitiveTotal()
+                + ":missing=" + snapshot.missingCoverage();
+    }
+
     private static void emitRustSourceCaptureCoverage(CaptureCoverageSnapshot snapshot, long renderedFrameIndex) {
         if (snapshot == null || snapshot.sectionCount() <= 0) {
             return;

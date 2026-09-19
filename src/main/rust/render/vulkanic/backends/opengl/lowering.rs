@@ -46,7 +46,11 @@ pub(super) struct OpenGlLowerer {
 }
 
 impl OpenGlLowerer {
-    pub(super) fn new(gl: Rc<glow::Context>, provoking_vertex: super::context::ProvokingVertexFn, clip_control: super::context::ClipControlFn) -> Self {
+    pub(super) fn new(
+        gl: Rc<glow::Context>,
+        provoking_vertex: super::context::ProvokingVertexFn,
+        clip_control: super::context::ClipControlFn,
+    ) -> Self {
         Self {
             gl,
             provoking_vertex,
@@ -242,7 +246,9 @@ impl OpenGlLowerer {
         op: &CommandOp,
     ) -> GalResult<()> {
         match op {
-            CommandOp::TrackSubmission(_) => Err(GalError::backend("GAL submission receipt reached OpenGL lowering")),
+            CommandOp::TrackSubmission(_) => Err(GalError::backend(
+                "GAL submission receipt reached OpenGL lowering",
+            )),
             CommandOp::HostWriteBuffer {
                 buffer,
                 offset,
@@ -299,10 +305,14 @@ impl OpenGlLowerer {
                 // GPU completion/readback; GL's get operation waits for the
                 // preceding commands instead of manufacturing stale results.
                 unsafe {
-                    self.gl.bind_buffer(glow::COPY_READ_BUFFER, Some(buffer_object.buffer));
-                    self.gl.get_buffer_sub_data(glow::COPY_READ_BUFFER,
-                        i32::try_from(*offset).map_err(|_| GalError::backend("OpenGL read offset exceeds i32"))?,
-                        &mut bytes);
+                    self.gl
+                        .bind_buffer(glow::COPY_READ_BUFFER, Some(buffer_object.buffer));
+                    self.gl.get_buffer_sub_data(
+                        glow::COPY_READ_BUFFER,
+                        i32::try_from(*offset)
+                            .map_err(|_| GalError::backend("OpenGL read offset exceeds i32"))?,
+                        &mut bytes,
+                    );
                 }
                 self.completed_host_reads.push(CompletedHostRead {
                     submission: id,
@@ -423,14 +433,25 @@ impl OpenGlLowerer {
                 self.bind_vao(Some(pipeline.vao));
                 unsafe {
                     (self.provoking_vertex)(match pipeline.provoking_vertex {
-                        crate::render::vulkanic::resources::ProvokingVertex::First => glow::FIRST_VERTEX_CONVENTION,
-                        crate::render::vulkanic::resources::ProvokingVertex::Last => glow::LAST_VERTEX_CONVENTION,
+                        crate::render::vulkanic::resources::ProvokingVertex::First => {
+                            glow::FIRST_VERTEX_CONVENTION
+                        }
+                        crate::render::vulkanic::resources::ProvokingVertex::Last => {
+                            glow::LAST_VERTEX_CONVENTION
+                        }
                     });
                     if self.cache.raster_y_direction != Some(pipeline.raster_y_direction) {
-                        (self.clip_control)(match pipeline.raster_y_direction {
-                            crate::render::vulkanic::resources::RasterYDirection::Up => glow::LOWER_LEFT,
-                            crate::render::vulkanic::resources::RasterYDirection::Down => glow::UPPER_LEFT,
-                        }, glow::NEGATIVE_ONE_TO_ONE);
+                        (self.clip_control)(
+                            match pipeline.raster_y_direction {
+                                crate::render::vulkanic::resources::RasterYDirection::Up => {
+                                    glow::LOWER_LEFT
+                                }
+                                crate::render::vulkanic::resources::RasterYDirection::Down => {
+                                    glow::UPPER_LEFT
+                                }
+                            },
+                            glow::NEGATIVE_ONE_TO_ONE,
+                        );
                         self.cache.raster_y_direction = Some(pipeline.raster_y_direction);
                     }
                 }
@@ -635,12 +656,15 @@ impl OpenGlLowerer {
             // Pixel-store strides preserve the existing source row order and
             // padding without a CPU shadow or a second packed upload copy.
             let prior = std::num::NonZeroU32::new(
-                self.gl.get_parameter_i32(glow::PIXEL_UNPACK_BUFFER_BINDING) as u32
-            ).map(glow::NativeBuffer);
-            self.gl.bind_buffer(glow::PIXEL_UNPACK_BUFFER, Some(source.buffer));
+                self.gl.get_parameter_i32(glow::PIXEL_UNPACK_BUFFER_BINDING) as u32,
+            )
+            .map(glow::NativeBuffer);
+            self.gl
+                .bind_buffer(glow::PIXEL_UNPACK_BUFFER, Some(source.buffer));
             self.gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 1);
             self.gl.pixel_store_i32(glow::UNPACK_ROW_LENGTH, row_length);
-            self.gl.pixel_store_i32(glow::UNPACK_IMAGE_HEIGHT, image_height);
+            self.gl
+                .pixel_store_i32(glow::UNPACK_IMAGE_HEIGHT, image_height);
             self.gl.pixel_store_i32(glow::UNPACK_SKIP_ROWS, 0);
             self.gl.pixel_store_i32(glow::UNPACK_SKIP_PIXELS, 0);
             self.gl.pixel_store_i32(glow::UNPACK_SKIP_IMAGES, 0);
@@ -648,11 +672,29 @@ impl OpenGlLowerer {
             self.gl.bind_texture(target, Some(texture.texture));
             match texture.dimension {
                 TextureDimension::D2 => self.gl.tex_sub_image_2d(
-                    target, mip, x, y, width, height, format.external, format.ty,
-                    glow::PixelUnpackData::BufferOffset(offset)),
+                    target,
+                    mip,
+                    x,
+                    y,
+                    width,
+                    height,
+                    format.external,
+                    format.ty,
+                    glow::PixelUnpackData::BufferOffset(offset),
+                ),
                 TextureDimension::D3 => self.gl.tex_sub_image_3d(
-                    target, mip, x, y, z, width, height, depth, format.external, format.ty,
-                    glow::PixelUnpackData::BufferOffset(offset)),
+                    target,
+                    mip,
+                    x,
+                    y,
+                    z,
+                    width,
+                    height,
+                    depth,
+                    format.external,
+                    format.ty,
+                    glow::PixelUnpackData::BufferOffset(offset),
+                ),
                 _ => unreachable!("GAL validated texture dimension"),
             }
             self.gl.bind_buffer(glow::PIXEL_UNPACK_BUFFER, prior);
@@ -769,9 +811,12 @@ impl OpenGlLowerer {
             self.gl
                 .bind_buffer(glow::COPY_WRITE_BUFFER, Some(target.buffer));
             if bytes_per_row == row_bytes && rows_per_image == height {
-                self.gl.buffer_sub_data_u8_slice(glow::COPY_WRITE_BUFFER,
-                    i32::try_from(dst_start).map_err(|_| GalError::backend("readback buffer offset exceeds i32"))?,
-                    &pixels);
+                self.gl.buffer_sub_data_u8_slice(
+                    glow::COPY_WRITE_BUFFER,
+                    i32::try_from(dst_start)
+                        .map_err(|_| GalError::backend("readback buffer offset exceeds i32"))?,
+                    &pixels,
+                );
             } else {
                 // Update only the declared texel bytes. Padding and adjacent
                 // GPU-written data must not be replaced with an upload cache.
@@ -779,9 +824,13 @@ impl OpenGlLowerer {
                     for row in 0..height {
                         let src = slice * slice_bytes + row * row_bytes;
                         let dst = dst_start + (slice * rows_per_image + row) * bytes_per_row;
-                        self.gl.buffer_sub_data_u8_slice(glow::COPY_WRITE_BUFFER,
-                            i32::try_from(dst).map_err(|_| GalError::backend("readback row offset exceeds i32"))?,
-                            &pixels[src..src + row_bytes]);
+                        self.gl.buffer_sub_data_u8_slice(
+                            glow::COPY_WRITE_BUFFER,
+                            i32::try_from(dst).map_err(|_| {
+                                GalError::backend("readback row offset exceeds i32")
+                            })?,
+                            &pixels[src..src + row_bytes],
+                        );
                     }
                 }
             }
@@ -1491,6 +1540,12 @@ fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
             src_alpha: glow::ZERO,
             dst_alpha: glow::ONE,
         }),
+        BlendMode::AlphaSource => Some(OpenGlBlendFactors {
+            src_color: glow::SRC_ALPHA,
+            dst_color: glow::ONE_MINUS_SRC_ALPHA,
+            src_alpha: glow::ONE,
+            dst_alpha: glow::ZERO,
+        }),
         BlendMode::Premultiplied => Some(OpenGlBlendFactors {
             src_color: glow::ONE,
             dst_color: glow::ONE_MINUS_SRC_ALPHA,
@@ -1558,8 +1613,11 @@ fn gl_index_type(index_type: crate::render::vulkanic::resources::IndexType) -> u
 fn gl_memory_barrier_bits(before: TextureUsageState, after: TextureUsageState) -> u32 {
     match (before, after) {
         (TextureUsageState::ShaderWrite, TextureUsageState::ShaderRead) => {
-            glow::SHADER_IMAGE_ACCESS_BARRIER_BIT | glow::TEXTURE_FETCH_BARRIER_BIT
-                | glow::SHADER_STORAGE_BARRIER_BIT | glow::UNIFORM_BARRIER_BIT | glow::BUFFER_UPDATE_BARRIER_BIT
+            glow::SHADER_IMAGE_ACCESS_BARRIER_BIT
+                | glow::TEXTURE_FETCH_BARRIER_BIT
+                | glow::SHADER_STORAGE_BARRIER_BIT
+                | glow::UNIFORM_BARRIER_BIT
+                | glow::BUFFER_UPDATE_BARRIER_BIT
         }
         (TextureUsageState::ShaderWrite, TextureUsageState::ShaderStorageRead)
         | (TextureUsageState::ShaderStorageRead, TextureUsageState::ShaderStorageRead) => {
@@ -1575,8 +1633,10 @@ fn gl_memory_barrier_bits(before: TextureUsageState, after: TextureUsageState) -
                 | glow::BUFFER_UPDATE_BARRIER_BIT
         }
         (TextureUsageState::TransferDst, TextureUsageState::ShaderWrite) => {
-            glow::TEXTURE_UPDATE_BARRIER_BIT | glow::SHADER_IMAGE_ACCESS_BARRIER_BIT
-                | glow::SHADER_STORAGE_BARRIER_BIT | glow::BUFFER_UPDATE_BARRIER_BIT
+            glow::TEXTURE_UPDATE_BARRIER_BIT
+                | glow::SHADER_IMAGE_ACCESS_BARRIER_BIT
+                | glow::SHADER_STORAGE_BARRIER_BIT
+                | glow::BUFFER_UPDATE_BARRIER_BIT
         }
         (TextureUsageState::TransferDst, TextureUsageState::ShaderRead) => {
             glow::TEXTURE_FETCH_BARRIER_BIT | glow::SHADER_STORAGE_BARRIER_BIT
@@ -1681,7 +1741,9 @@ fn gl_y_for_texture_copy_values(
 /// pixel-store stride; gl_y_for_copy_region remains the coordinate conversion.
 fn pixel_unpack_row_length(bytes_per_row: u32, bytes_per_pixel: u32) -> GalResult<i32> {
     if bytes_per_row == 0 || bytes_per_pixel == 0 || bytes_per_row % bytes_per_pixel != 0 {
-        return Err(GalError::backend("pixel-unpack pitch must contain complete pixels"));
+        return Err(GalError::backend(
+            "pixel-unpack pitch must contain complete pixels",
+        ));
     }
     i32::try_from(bytes_per_row / bytes_per_pixel)
         .map_err(|_| GalError::backend("pixel-unpack row length exceeds i32"))
@@ -1726,6 +1788,23 @@ mod tests {
     }
 
     #[test]
+    fn alpha_source_blend_replaces_destination_alpha_for_dh_water() {
+        let state = opengl_blend_state(BlendMode::AlphaSource);
+        assert!(state.enabled);
+        assert_eq!(glow::FUNC_ADD, state.color_op);
+        assert_eq!(glow::FUNC_ADD, state.alpha_op);
+        assert_eq!(
+            Some(OpenGlBlendFactors {
+                src_color: glow::SRC_ALPHA,
+                dst_color: glow::ONE_MINUS_SRC_ALPHA,
+                src_alpha: glow::ONE,
+                dst_alpha: glow::ZERO,
+            }),
+            state.factors
+        );
+    }
+
+    #[test]
     fn pixel_unpack_pitch_preserves_declared_padding_and_rejects_partial_pixels() {
         assert_eq!(5, pixel_unpack_row_length(20, 4).unwrap());
         assert_eq!(3, pixel_unpack_row_length(24, 8).unwrap());
@@ -1750,14 +1829,19 @@ mod tests {
 
     #[test]
     fn glint_blend_matches_frozen_rgb_addition_and_preserves_destination_alpha() {
-        let state=opengl_blend_state(BlendMode::Glint);
+        let state = opengl_blend_state(BlendMode::Glint);
         assert!(state.enabled);
-        assert_eq!(glow::FUNC_ADD,state.color_op);
-        assert_eq!(glow::FUNC_ADD,state.alpha_op);
-        assert_eq!(Some(OpenGlBlendFactors {
-            src_color:glow::SRC_COLOR,dst_color:glow::ONE,
-            src_alpha:glow::ZERO,dst_alpha:glow::ONE,
-        }),state.factors);
+        assert_eq!(glow::FUNC_ADD, state.color_op);
+        assert_eq!(glow::FUNC_ADD, state.alpha_op);
+        assert_eq!(
+            Some(OpenGlBlendFactors {
+                src_color: glow::SRC_COLOR,
+                dst_color: glow::ONE,
+                src_alpha: glow::ZERO,
+                dst_alpha: glow::ONE,
+            }),
+            state.factors
+        );
     }
 
     #[test]

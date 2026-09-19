@@ -379,6 +379,11 @@ pub enum BlendMode {
     AlphaPreserveAlpha = 11,
     /// Vanilla block-destruction composition: `out.rgb = 2 * src.rgb * dst.rgb`.
     Crumbling = 12,
+    /// Source-alpha RGB composition with source alpha replacing the
+    /// destination alpha. This matches DH's vanilla water state, whose
+    /// transparent blend setup preserves RGB alpha-over while leaving the
+    /// alpha attachment equal to the current source.
+    AlphaSource = 13,
 }
 
 #[repr(u32)]

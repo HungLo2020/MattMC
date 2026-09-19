@@ -1283,6 +1283,7 @@ def canonical_fixture_id(args: argparse.Namespace) -> str:
     world = getattr(args, "world", "") or WORLD_PROFILES[getattr(args, "world_profile", "migration-gate")].world
     resource_pack = getattr(args, "world_static_terrain_resource_pack_scenario", "") or "vanilla"
     model_scenario = getattr(args, "world_mesh_model_scenario", "") or "hidden"
+    beacon_scenario = getattr(args, "world_beacon_beam_scenario", "") or "hidden"
     destroy_stage_suffix = (f"-destroy-stage-{getattr(args, 'world_mesh_destroy_stage', 5)}"
                      if model_scenario in {"oak-sign-breaking", "conduit-breaking", "skeleton-skull-breaking"}
                      else "")
@@ -1302,11 +1303,25 @@ def canonical_fixture_id(args: argparse.Namespace) -> str:
             ("dh-non-water", "world_distant_horizons_non_water"),
             ("dh-water", "world_distant_horizons_water"),
             ("dh-texture-palette", "world_distant_horizons_texture_palette"),
+            ("dh-real-world", "world_distant_horizons_real_world"),
         )
         if getattr(args, flag, False)
     ) or "dh-none"
+    if dh_flags != "dh-none":
+        dh_flags += (
+            f"-dh-radius-{canonical_dh_capture_radius()}"
+            f"-dh-composition-{canonical_dh_composition_mode(args).lower().replace('_', '-')}"
+        )
+    # A source-save DH run is an explicit audit fixture: it skips the bounded
+    # datapack witness so a pre-generated DH database can be photographed after
+    # its own quadtree settles. Keep it in the fixture identity so a normal
+    # witness fixture can never be reused accidentally.
+    if os.environ.get("MATTMC_CAPTURE_DH_SKIP_EXTERNAL_FIXTURE", "").strip().lower() in {
+        "1", "true", "yes"
+    }:
+        dh_flags += "-dh-source-save"
     world_profile = getattr(args, "world_profile", "migration-gate")
-    return f"{world}-{world_profile}-{scenario}-{resource_pack}-{model_scenario}{destroy_stage_suffix}{statue_suffix}-{text_scenario}-{terrain_particle_scenario}-{weather_scenario}-{cloud_scenario}-{background_scenario}-{dh_flags}-{PARITY_FIXTURE_SCHEMA}".replace("/", "_").replace(" ", "_")
+    return f"{world}-{world_profile}-{scenario}-{resource_pack}-{model_scenario}{destroy_stage_suffix}{statue_suffix}-{beacon_scenario}-{text_scenario}-{terrain_particle_scenario}-{weather_scenario}-{cloud_scenario}-{background_scenario}-{dh_flags}-{PARITY_FIXTURE_SCHEMA}".replace("/", "_").replace(" ", "_")
 
 
 def materialize_external_dh_fixture(args: argparse.Namespace, world_root: Path) -> None:
@@ -1325,6 +1340,14 @@ def materialize_external_dh_fixture(args: argparse.Namespace, world_root: Path) 
             "world_distant_horizons_texture_palette",
         )
     ):
+        return
+    if getattr(args, "world_distant_horizons_real_world", False):
+        # Real-world rows consume the copied save as-is. They must not receive
+        # either the shared datapack or the camera-relative panel.
+        return
+    if os.environ.get("MATTMC_CAPTURE_DH_SKIP_EXTERNAL_FIXTURE", "").strip().lower() in {
+        "1", "true", "yes"
+    }:
         return
     datapack = world_root / "datapacks" / "mattmc_dh_fixture"
     function_dir = datapack / "data" / "mattmc" / "function"
@@ -1347,11 +1370,37 @@ def materialize_external_dh_fixture(args: argparse.Namespace, world_root: Path) 
         f"fill {panel_min_x + 16} {panel_y} {panel_min_z + 16} {panel_min_x + 31} {panel_y} {panel_min_z + 31} minecraft:redstone_ore",
         f"fill {panel_min_x} {panel_y + 1} {panel_min_z} {panel_min_x + 31} {panel_y + 4} {panel_min_z + 31} minecraft:air",
     ]
+    beacon_scenario = str(getattr(args, "world_beacon_beam_scenario", "") or "").strip().lower()
+    if beacon_scenario == "ordinary":
+        # Place the same ordinary vanilla beacon in the copied world used by
+        # both repositories. Current may still emit its route receipt, but it
+        # must observe this world state rather than owning a Current-only
+        # renderer fixture. The position is in the fixed camera's forward
+        # cone and is kept outside the DH panel.
+        beacon_x, beacon_y, beacon_z = 145, 102, 529
+        lines.append(f"forceload add {beacon_x - 5} {beacon_z - 5} {beacon_x + 5} {beacon_z + 5}")
+        for level in range(4):
+            radius = level + 1
+            lines.append(
+                f"fill {beacon_x - radius} {beacon_y - level - 1} {beacon_z - radius} "
+                f"{beacon_x + radius} {beacon_y - level - 1} {beacon_z + radius} minecraft:iron_block"
+            )
+        lines.append(f"fill {beacon_x} {beacon_y} {beacon_z} {beacon_x} 240 {beacon_z} minecraft:air")
+        lines.append(f"setblock {beacon_x} {beacon_y} {beacon_z} minecraft:beacon")
+        lines.append(f"setblock {beacon_x} {beacon_y + 1} {beacon_z} minecraft:red_stained_glass")
     if getattr(args, "world_distant_horizons_water", False):
         lines.extend(
             [
                 f"fill {panel_min_x + 28} {panel_y} {panel_min_z + 24} {panel_min_x + 31} {panel_y} {panel_min_z + 27} minecraft:stone",
                 f"fill {panel_min_x + 28} {panel_y + 1} {panel_min_z + 24} {panel_min_x + 31} {panel_y + 1} {panel_min_z + 27} minecraft:water",
+                # The water plate is a source-animation witness, not a fluid
+                # simulation fixture.  Seal its four sides at the water's own
+                # Y level so ordinary fluid ticks cannot replace neighboring
+                # states while the renderer capture is settling.
+                f"fill {panel_min_x + 27} {panel_y + 1} {panel_min_z + 23} {panel_min_x + 32} {panel_y + 1} {panel_min_z + 23} minecraft:stone",
+                f"fill {panel_min_x + 27} {panel_y + 1} {panel_min_z + 28} {panel_min_x + 32} {panel_y + 1} {panel_min_z + 28} minecraft:stone",
+                f"fill {panel_min_x + 27} {panel_y + 1} {panel_min_z + 24} {panel_min_x + 27} {panel_y + 1} {panel_min_z + 27} minecraft:stone",
+                f"fill {panel_min_x + 32} {panel_y + 1} {panel_min_z + 24} {panel_min_x + 32} {panel_y + 1} {panel_min_z + 27} minecraft:stone",
             ]
         )
     # Run one tick after the load tag fires.  Integrated-server world loading
@@ -1588,6 +1637,7 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
         copy_optional_tree(source_world, run_root / "saves" / world)
         materialize_external_dh_fixture(args, run_root / "saves" / world)
         materialize_external_model_fixture(args, run_root / "saves" / world)
+        apply_canonical_dh_capture_settings(run_root / "config" / "DistantHorizons.toml", args)
     if not any(getattr(args, flag, False) for flag in (
         "world_distant_horizons_opaque", "world_distant_horizons_non_water",
         "world_distant_horizons_water", "world_distant_horizons_texture_palette",
@@ -1605,6 +1655,7 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
         "world_static_terrain_scenario": getattr(args, "world_static_terrain_scenario", "") or "",
         "resource_pack_scenario": getattr(args, "world_static_terrain_resource_pack_scenario", "") or "",
         "model_scenario": getattr(args, "world_mesh_model_scenario", "") or "",
+        "world_beacon_beam_scenario": getattr(args, "world_beacon_beam_scenario", "") or "",
         "world_text_scenario": getattr(args, "world_text_scenario", "") or "",
         "terrain_particle_scenario": getattr(args, "world_material_terrain_particle_scenario", "") or "",
         "graphics_mode": getattr(args, "graphics_mode", "fancy"),
@@ -1613,6 +1664,23 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
         "source_save_hash": directory_file_hash(source_world, suffixes={".mca"}),
         "canonical_save_hash": directory_file_hash(run_root / "saves" / world, suffixes={".mca"}),
         "canonical_config_hash": directory_file_hash(run_root / "config"),
+        "dh_capture_settings": (
+            {
+                "numberOfThreads": 1,
+                "lodChunkRenderDistanceRadius": canonical_dh_capture_radius(),
+                "compositionMode": canonical_dh_composition_mode(args),
+            }
+            if any(
+                bool(getattr(args, flag, False))
+                for flag in (
+                    "world_distant_horizons_opaque",
+                    "world_distant_horizons_non_water",
+                    "world_distant_horizons_water",
+                    "world_distant_horizons_texture_palette",
+                )
+            )
+            else None
+        ),
     }
     if getattr(args, "world_mesh_model_scenario", "") in {
         "oak-sign-breaking", "conduit-breaking", "skeleton-skull-breaking"
@@ -1646,6 +1714,171 @@ def apply_canonical_vanilla_dh_isolation(config_path: Path) -> None:
             raise ValueError(f"vanilla DH isolation requires exactly one {key} setting")
     if updated != original:
         config_path.write_text(updated, encoding="utf-8")
+
+
+def canonical_dh_capture_radius() -> int:
+    """Return the DH radius written into the shared Current/Frozen fixture."""
+    raw = os.environ.get("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE", "").strip()
+    if not raw:
+        return 4
+    if not raw.isdigit() or not 1 <= int(raw) <= 32:
+        raise ValueError("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE must be an integer from 1 to 32")
+    return int(raw)
+
+
+def canonical_dh_composition_mode(args: argparse.Namespace) -> str:
+    """Return the explicit shared DH/vanilla composition policy."""
+    requested = (getattr(args, "dh_composition_mode", "") or "").strip().upper()
+    if requested:
+        if requested not in {"NONE", "SINGLE_PASS", "DOUBLE_PASS", "LOD_ONLY"}:
+            raise ValueError(
+                "DH composition mode must be NONE, SINGLE_PASS, DOUBLE_PASS, or LOD_ONLY"
+            )
+        return requested
+    lod_only = os.environ.get("MATTMC_CAPTURE_DH_LOD_ONLY", "").strip().lower()
+    if lod_only not in {"", "true", "false"}:
+        raise ValueError("MATTMC_CAPTURE_DH_LOD_ONLY must be true or false")
+    if lod_only == "true":
+        return "LOD_ONLY"
+    fade_mode = os.environ.get("MATTMC_CAPTURE_DH_VANILLA_FADE_MODE", "NONE").strip().upper()
+    if fade_mode not in {"NONE", "SINGLE_PASS", "DOUBLE_PASS"}:
+        raise ValueError(
+            "MATTMC_CAPTURE_DH_VANILLA_FADE_MODE must be NONE, SINGLE_PASS, or DOUBLE_PASS"
+        )
+    return fade_mode
+
+
+def apply_canonical_dh_capture_settings(config_path: Path, args: argparse.Namespace) -> None:
+    """Make bounded DH capture inputs identical in Current and Frozen copies.
+
+    Current's Python capture runner applies these values while preparing its
+    isolated game directory.  Frozen uses its shell launcher and therefore
+    does not run that preparation step.  Writing the semantic DH settings
+    into the shared copied fixture keeps server view distance, generated LOD
+    radius, and worker count equivalent without touching either repository's
+    normal configuration or renderer behavior.
+    """
+    if not config_path.is_file():
+        return
+    dh_requested = any(
+        bool(getattr(args, flag, False))
+        for flag in (
+            "world_distant_horizons_opaque",
+            "world_distant_horizons_non_water",
+            "world_distant_horizons_water",
+            "world_distant_horizons_texture_palette",
+        )
+    )
+    if not dh_requested:
+        return
+    # Keep water and opaque rows on the same bounded DH footprint. A smaller
+    # water-only radius makes the paired image look like missing terrain even
+    # though both clients are using equivalent settings.
+    bounded_radius = canonical_dh_capture_radius()
+    original = config_path.read_text(encoding="utf-8")
+    updated = original
+    generic_rendering = os.environ.get("MATTMC_CAPTURE_DH_GENERIC", "false").lower() == "true"
+    ssao_capture = os.environ.get("MATTMC_CAPTURE_DH_SSAO", "false").strip().lower()
+    if ssao_capture not in {"true", "false"}:
+        raise ValueError("MATTMC_CAPTURE_DH_SSAO must be true or false")
+    amplified_ssao = os.environ.get("MATTMC_CAPTURE_DH_SSAO_AMPLIFIED", "false").strip().lower()
+    if amplified_ssao not in {"true", "false"}:
+        raise ValueError("MATTMC_CAPTURE_DH_SSAO_AMPLIFIED must be true or false")
+    far_clip_fade = os.environ.get("MATTMC_CAPTURE_DH_FAR_CLIP", "false").strip().lower()
+    if far_clip_fade not in {"true", "false"}:
+        raise ValueError("MATTMC_CAPTURE_DH_FAR_CLIP must be true or false")
+    composition_mode = canonical_dh_composition_mode(args)
+    vanilla_fade_mode = "NONE" if composition_mode == "LOD_ONLY" else composition_mode
+    lod_only_override = "true" if composition_mode == "LOD_ONLY" else "false"
+    write_lod_only = bool(getattr(args, "dh_composition_mode", "")) or bool(
+        os.environ.get("MATTMC_CAPTURE_DH_LOD_ONLY", "").strip()
+    )
+    disable_fog = os.environ.get("MATTMC_CAPTURE_DH_DISABLE_FOG", "false").strip().lower()
+    if disable_fog not in {"true", "false"}:
+        raise ValueError("MATTMC_CAPTURE_DH_DISABLE_FOG must be true or false")
+    for key, value in (
+        ("numberOfThreads", "1"),
+        ("lodChunkRenderDistanceRadius", str(bounded_radius)),
+        # Keep the bounded DH workload identical in Current and Frozen. The
+        # Current child applies these same values while preparing its isolated
+        # game directory; writing them into the shared fixture is what makes
+        # Frozen's shell launcher consume the equivalent quality/composition
+        # inputs instead of silently retaining its user's mutable defaults.
+        # SSAO remains disabled for the normal bounded matrix because it is a
+        # separate vertical slice. An explicit opt-in enables it in both
+        # Current and Frozen copies so the pair has identical DH settings.
+        ("enableSsao", ssao_capture),
+        ("enableGenericRendering", "true" if generic_rendering else "false"),
+        ("dhFadeFarClipPlane", far_clip_fade),
+        ("vanillaFadeMode", f'"{vanilla_fade_mode}"'),
+        # The Current Rust child disables the legacy Java draw after this
+        # fixture is copied. Frozen's shell child has no Python config phase,
+        # so the shared dedicated-DH fixture must retain the source renderer
+        # explicitly. The setting is capture-only and never touches either
+        # repository's normal run configuration.
+        ("rendererMode", '"DEFAULT"'),
+        ("enableRendering", "true"),
+    ):
+        updated, count = re.subn(
+            rf"(?m)^([ \t]*{key}[ \t]*=)[^\r\n]*",
+            rf"\g<1> {value}",
+            updated,
+        )
+        if count != 1:
+            raise ValueError(f"canonical DH capture settings require exactly one {key} setting")
+    opaque_only = bool(getattr(args, "world_distant_horizons_opaque", False))
+    non_water = bool(getattr(args, "world_distant_horizons_non_water", False))
+    water = bool(getattr(args, "world_distant_horizons_water", False))
+    if opaque_only and not (non_water or water):
+        updated, count = re.subn(
+            r"(?m)^([ \t]*transparency[ \t]*=)[^\r\n]*",
+            r'\g<1> "DISABLED"',
+            updated,
+        )
+        if count != 1:
+            raise ValueError("canonical opaque DH capture requires exactly one transparency setting")
+    if write_lod_only:
+        updated, count = re.subn(
+            r"(?m)^([ \t]*lodOnlyMode[ \t]*=)[^\r\n]*",
+            rf"\g<1> {lod_only_override}",
+            updated,
+        )
+        if count != 1:
+            raise ValueError("canonical DH lod-only capture requires exactly one lodOnlyMode setting")
+    if disable_fog == "true":
+        updated, count = re.subn(
+            r"(?m)^([ \t]*enableDhFog[ \t]*=)[^\r\n]*",
+            r"\g<1> false",
+            updated,
+        )
+        if count != 1:
+            raise ValueError("canonical DH fog isolation requires exactly one enableDhFog setting")
+    if amplified_ssao == "true":
+        # Diagnostic-only signal amplification. These remain ordinary DH
+        # configuration values and are written identically into Current and
+        # Frozen fixtures; production defaults are never changed.
+        for key, value in (
+            ("sampleCount", "32"),
+            ("radius", "12.0"),
+            ("strength", "1.0"),
+            ("bias", "0.01"),
+            ("minLight", "0.0"),
+            ("blurRadius", "2"),
+            ("fadeDistanceInBlocks", "1600"),
+        ):
+            updated, count = re.subn(
+                rf"(?m)^([ \t]*{key}[ \t]*=)[^\r\n]*",
+                rf"\g<1> {value}",
+                updated,
+            )
+            if count != 1:
+                raise ValueError(f"amplified SSAO capture requires exactly one {key} setting")
+    if updated != original:
+        config_path.write_text(updated, encoding="utf-8")
+    if generic_rendering:
+        # Preserve the opt-in in the capture metadata without changing normal
+        # user configuration.  This is a bounded callsite diagnostic only.
+        setattr(args, "_dh_generic_rendering_capture", True)
 
 
 def apply_canonical_graphics_mode(options_path: Path, graphics_mode: str) -> None:
@@ -2811,6 +3044,7 @@ def static_terrain_water_animation_dense_evidence(doc: dict[str, object] | None)
         failures.append("terrain_animation_frame_missing")
 
     previous_rendered_frame: int | None = None
+    previous_animation_tick: int | None = None
     previous_atlas_generation: int | None = None
     previous_visible_submissions: int | None = None
     hashes: set[int] = set()
@@ -2829,6 +3063,7 @@ def static_terrain_water_animation_dense_evidence(doc: dict[str, object] | None)
         checked += 1
         index_value = parse_number(raw.get("index"))
         rendered_frame_value = parse_number(raw.get("renderedFrameIndex"))
+        animation_tick_value = parse_number(raw.get("animationTick"))
         game_time_value = parse_number(raw.get("gameTime"))
         animation_hash_value = parse_number(raw.get("animationHash"))
         visible_submissions_value = parse_number(raw.get("visibleLayerSubmissions"))
@@ -2837,6 +3072,7 @@ def static_terrain_water_animation_dense_evidence(doc: dict[str, object] | None)
         index = int(index_value) if index_value is not None else -1
         screenshot = str(raw.get("screenshot") or "")
         rendered_frame = int(rendered_frame_value) if rendered_frame_value is not None else -1
+        animation_tick = int(animation_tick_value) if animation_tick_value is not None else rendered_frame
         game_time = int(game_time_value) if game_time_value is not None else -1
         animation_hash = int(animation_hash_value) if animation_hash_value is not None else 0
         animation_summary = str(raw.get("animationSummary") or "")
@@ -2864,6 +3100,8 @@ def static_terrain_water_animation_dense_evidence(doc: dict[str, object] | None)
                 failures.append("terrain_animation_frame_missing")
         if rendered_frame < 0 or (previous_rendered_frame is not None and rendered_frame <= previous_rendered_frame):
             failures.append("terrain_animation_frame_order_invalid")
+        if animation_tick < 0 or (previous_animation_tick is not None and animation_tick <= previous_animation_tick):
+            failures.append("terrain_animation_frame_order_invalid")
         if game_time < 0:
             failures.append("terrain_animation_frame_order_invalid")
         if animation_hash == 0 or animation_summary == "missing" or not animation_summary:
@@ -2890,7 +3128,7 @@ def static_terrain_water_animation_dense_evidence(doc: dict[str, object] | None)
                 if interpolation not in {"0", "1"}:
                     failures.append("terrain_animation_interpolation_invalid")
                 summary = summary_by_name.get(name)
-                expected = expected_water_animation_state(summary, rendered_frame) if summary else None
+                expected = expected_water_animation_state(summary, animation_tick) if summary else None
                 if expected is None:
                     failures.append("terrain_animation_frame_order_invalid")
                 else:
@@ -2909,6 +3147,7 @@ def static_terrain_water_animation_dense_evidence(doc: dict[str, object] | None)
                         interpolation_progress[name].append(float(fraction))
         hashes.add(animation_hash)
         previous_rendered_frame = rendered_frame
+        previous_animation_tick = animation_tick
         previous_atlas_generation = atlas_generation
         previous_visible_submissions = visible_submissions
         if len(diagnostics) < 8:
@@ -2917,6 +3156,7 @@ def static_terrain_water_animation_dense_evidence(doc: dict[str, object] | None)
                     "index": index,
                     "screenshot": screenshot,
                     "renderedFrameIndex": rendered_frame,
+                    "animationTick": animation_tick,
                     "gameTime": game_time,
                     "animationHash": animation_hash,
                     "atlasGeneration": atlas_generation,
@@ -3418,6 +3658,207 @@ def static_terrain_base_scenario(scenario: str) -> str:
     return suffix if suffix in base_scenarios else scenario
 
 
+def distant_horizons_resource_reload_evidence(route: dict, scenario: str) -> dict:
+    """Prove reset, old-generation retirement, and coherent DH republication."""
+    if static_terrain_base_scenario(scenario) != "resource-reload":
+        return {"passed": True, "status": "not_requested"}
+    route = route if isinstance(route, dict) else {}
+    evidence = {
+        "reload_resets": int(parse_number(route.get("resourceReloadResetCount")) or 0),
+        "reset_reason": str(route.get("lastLifecycleResetReason") or ""),
+        "retired": int(parse_number(route.get("lastLifecyclePublishedRetirements")) or 0),
+        "acknowledged": int(parse_number(route.get("lastLifecycleRetirementsAcknowledged")) or 0),
+        "superseded_by_replacement": int(parse_number(route.get("lastLifecycleRetirementsSupersededByReplacement")) or 0),
+        "outstanding": int(parse_number(route.get("lastLifecycleRetirementsOutstanding")) or 0),
+        "pending_retirements": int(parse_number(route.get("pendingRetirements")) or 0),
+        "invalidated_in_flight": int(parse_number(route.get("invalidatedInFlight")) or 0),
+        "generation_floor": int(parse_number(route.get("lastLifecycleGenerationFloor")) or 0),
+        "minimum_published": int(parse_number(route.get("minimumPublishedGeneration")) or 0),
+    }
+    evidence["passed"] = (
+        evidence["reload_resets"] > 0
+        and evidence["reset_reason"] == "resource-reload"
+        and evidence["retired"] > 0
+        and evidence["acknowledged"] + evidence["superseded_by_replacement"] >= evidence["retired"]
+        and evidence["outstanding"] == 0
+        and evidence["pending_retirements"] == 0
+        and evidence["invalidated_in_flight"] == 0
+        and evidence["generation_floor"] > 0
+        and evidence["minimum_published"] >= evidence["generation_floor"]
+    )
+    evidence["status"] = "passed" if evidence["passed"] else "lifecycle_incomplete"
+    return evidence
+
+
+def distant_horizons_world_unload_evidence(route: dict, scenario: str) -> dict:
+    """Prove a live-world unload retires DH assets before loading a world."""
+    if static_terrain_base_scenario(scenario) not in {"world-unload-reload", "world-different-reload"}:
+        return {"passed": True, "status": "not_requested"}
+    route = route if isinstance(route, dict) else {}
+    evidence = {
+        "world_unload_resets": int(parse_number(route.get("worldUnloadResetCount")) or 0),
+        "reset_reason": str(route.get("lastLifecycleResetReason") or ""),
+        "retired": int(parse_number(route.get("lastLifecyclePublishedRetirements")) or 0),
+        "acknowledged": int(parse_number(route.get("lastLifecycleRetirementsAcknowledged")) or 0),
+        "superseded_by_replacement": int(parse_number(route.get("lastLifecycleRetirementsSupersededByReplacement")) or 0),
+        "outstanding": int(parse_number(route.get("lastLifecycleRetirementsOutstanding")) or 0),
+        "pending_retirements": int(parse_number(route.get("pendingRetirements")) or 0),
+        "invalidated_in_flight": int(parse_number(route.get("invalidatedInFlight")) or 0),
+        "generation_floor": int(parse_number(route.get("lastLifecycleGenerationFloor")) or 0),
+        "minimum_published": int(parse_number(route.get("minimumPublishedGeneration")) or 0),
+    }
+    evidence["passed"] = (
+        evidence["world_unload_resets"] > 0
+        and evidence["reset_reason"] == "world-unload"
+        and evidence["retired"] > 0
+        and evidence["acknowledged"] + evidence["superseded_by_replacement"] >= evidence["retired"]
+        and evidence["outstanding"] == 0
+        and evidence["pending_retirements"] == 0
+        and evidence["invalidated_in_flight"] == 0
+        and evidence["generation_floor"] > 0
+        and evidence["minimum_published"] >= evidence["generation_floor"]
+    )
+    evidence["status"] = "passed" if evidence["passed"] else "lifecycle_incomplete"
+    return evidence
+
+
+def distant_horizons_recreation_evidence(lifecycle: dict, scenario: str) -> dict:
+    """Prove swapchain recreation preserves bounded, published DH residency."""
+    if static_terrain_base_scenario(scenario) not in {"resize-cycle", "swapchain-recreate"}:
+        return {"passed": True, "status": "not_requested"}
+    lifecycle = lifecycle if isinstance(lifecycle, dict) else {}
+    evidence = {
+        "before_cached_columns": int(parse_number(lifecycle.get("beforeDhCachedColumns")) or 0),
+        "after_cached_columns": int(parse_number(lifecycle.get("afterDhCachedColumns")) or 0),
+        "before_visible_columns": int(parse_number(lifecycle.get("beforeDhVisibleColumns")) or 0),
+        "after_visible_columns": int(parse_number(lifecycle.get("afterDhVisibleColumns")) or 0),
+        "after_unpublished_visible": int(parse_number(lifecycle.get("afterDhUnpublishedVisibleColumns")) or 0),
+        "after_pending_retirements": int(parse_number(lifecycle.get("afterDhPendingRetirements")) or 0),
+        "before_retained_bytes": int(parse_number(lifecycle.get("beforeDhRetainedBytes")) or 0),
+        "after_retained_bytes": int(parse_number(lifecycle.get("afterDhRetainedBytes")) or 0),
+        "before_minimum_generation": int(parse_number(lifecycle.get("beforeDhMinimumGeneration")) or 0),
+        "after_minimum_generation": int(parse_number(lifecycle.get("afterDhMinimumGeneration")) or 0),
+        "before_reset_count": int(parse_number(lifecycle.get("beforeDhResetCount")) or 0),
+        "after_reset_count": int(parse_number(lifecycle.get("afterDhResetCount")) or 0),
+    }
+    evidence["passed"] = (
+        evidence["before_cached_columns"] > 0
+        and 0 < evidence["after_cached_columns"] <= 512
+        and evidence["before_visible_columns"] > 0
+        and evidence["after_visible_columns"] > 0
+        and evidence["after_unpublished_visible"] == 0
+        and evidence["after_pending_retirements"] == 0
+        and 0 < evidence["before_retained_bytes"] <= 64 * 1024 * 1024
+        and 0 < evidence["after_retained_bytes"] <= 64 * 1024 * 1024
+        and evidence["before_minimum_generation"] > 0
+        and evidence["after_minimum_generation"] >= evidence["before_minimum_generation"]
+        and evidence["after_reset_count"] == evidence["before_reset_count"]
+    )
+    evidence["status"] = "passed" if evidence["passed"] else "recreation_incomplete"
+    return evidence
+
+
+def distant_horizons_cache_bound_evidence(lifecycle: dict, scenario: str) -> dict:
+    """Prove revisits and soak work settle within the collector's hard bounds."""
+    if static_terrain_base_scenario(scenario) not in {
+        "return-visited-terrain", "memory-cache-soak", "steady-state-performance"
+    }:
+        return {"passed": True, "status": "not_requested"}
+    lifecycle = lifecycle if isinstance(lifecycle, dict) else {}
+    evidence = {
+        "before_cached_columns": int(parse_number(lifecycle.get("beforeDhCachedColumns")) or 0),
+        "after_cached_columns": int(parse_number(lifecycle.get("afterDhCachedColumns")) or 0),
+        "before_visible_columns": int(parse_number(lifecycle.get("beforeDhVisibleColumns")) or 0),
+        "after_visible_columns": int(parse_number(lifecycle.get("afterDhVisibleColumns")) or 0),
+        "after_unpublished_visible": int(parse_number(lifecycle.get("afterDhUnpublishedVisibleColumns")) or 0),
+        "after_pending_retirements": int(parse_number(lifecycle.get("afterDhPendingRetirements")) or 0),
+        "before_retained_bytes": int(parse_number(lifecycle.get("beforeDhRetainedBytes")) or 0),
+        "after_retained_bytes": int(parse_number(lifecycle.get("afterDhRetainedBytes")) or 0),
+        "before_minimum_generation": int(parse_number(lifecycle.get("beforeDhMinimumGeneration")) or 0),
+        "after_minimum_generation": int(parse_number(lifecycle.get("afterDhMinimumGeneration")) or 0),
+        "before_reset_count": int(parse_number(lifecycle.get("beforeDhResetCount")) or 0),
+        "after_reset_count": int(parse_number(lifecycle.get("afterDhResetCount")) or 0),
+        "before_execution_submission": int(parse_number(lifecycle.get("beforeDhExecutionSubmission")) or 0),
+        "after_execution_submission": int(parse_number(lifecycle.get("afterDhExecutionSubmission")) or 0),
+        "after_execution_instances": int(parse_number(lifecycle.get("afterDhExecutionInstances")) or 0),
+        "before_used_memory_bytes": int(parse_number(lifecycle.get("beforeUsedMemoryBytes")) or 0),
+        "after_used_memory_bytes": int(parse_number(lifecycle.get("afterUsedMemoryBytes")) or 0),
+    }
+    evidence["used_memory_delta_bytes"] = (
+        evidence["after_used_memory_bytes"] - evidence["before_used_memory_bytes"]
+    )
+    evidence["passed"] = (
+        0 < evidence["before_cached_columns"] <= 512
+        and 0 < evidence["after_cached_columns"] <= 512
+        and evidence["before_visible_columns"] > 0
+        and evidence["after_visible_columns"] > 0
+        and evidence["after_unpublished_visible"] == 0
+        and evidence["after_pending_retirements"] == 0
+        and 0 < evidence["before_retained_bytes"] <= 64 * 1024 * 1024
+        and 0 < evidence["after_retained_bytes"] <= 64 * 1024 * 1024
+        and evidence["before_minimum_generation"] > 0
+        and evidence["after_minimum_generation"] >= evidence["before_minimum_generation"]
+        and evidence["after_reset_count"] == evidence["before_reset_count"]
+        and evidence["after_execution_submission"] > evidence["before_execution_submission"] > 0
+        and evidence["after_execution_instances"] > 0
+        and evidence["before_used_memory_bytes"] > 0
+        and evidence["after_used_memory_bytes"] > 0
+    )
+    evidence["status"] = "passed" if evidence["passed"] else "cache_bound_incomplete"
+    return evidence
+
+
+def distant_horizons_generic_private_evidence(deterministic_doc: dict) -> dict:
+    """Classify DH generic work without mistaking delegated vanilla clouds for DH output."""
+    identities = (
+        deterministic_doc.get("rustGalSubmittedWorkIdentities")
+        if isinstance(deterministic_doc, dict)
+        and isinstance(deterministic_doc.get("rustGalSubmittedWorkIdentities"), dict)
+        else {}
+    )
+    records = identities.get("distant-horizons-generic-semantics")
+    records = records if isinstance(records, list) else []
+    parsed = []
+    for record in records:
+        if not isinstance(record, str):
+            continue
+        fields = {}
+        for item in record.split(":"):
+            if "=" not in item:
+                continue
+            key, value = item.split("=", 1)
+            try:
+                fields[key] = int(value)
+            except ValueError:
+                continue
+        parsed.append(fields)
+    latest = parsed[-1] if parsed else {}
+    delegated = int(latest.get("cloudDelegated", 0))
+    private_clouds = int(latest.get("cloudPrivate", 0))
+    boxes = int(latest.get("boxes", 0))
+    faces = int(latest.get("faces", 0))
+    ssao_boxes = int(latest.get("ssaoBoxes", 0))
+    non_ssao_boxes = int(latest.get("nonSsaoBoxes", 0))
+    passed = (
+        bool(parsed)
+        and delegated == 0
+        and faces > 0
+        and (private_clouds > 0 or boxes > 0)
+    )
+    return {
+        "status": "private" if passed else ("delegated" if delegated > 0 else "missing"),
+        "passed": passed,
+        "cloud_delegated": delegated,
+        "cloud_private": private_clouds,
+        "boxes": boxes,
+        "faces": faces,
+        "ssao_boxes": ssao_boxes,
+        "non_ssao_boxes": non_ssao_boxes,
+        "mixed_ssao_phases": ssao_boxes > 0 and non_ssao_boxes > 0,
+        "record": records[-1] if records else "",
+    }
+
+
 STATIC_TERRAIN_POST_SETUP_EXECUTION_SCENARIOS = frozenset(
     {
         "interior-edit",
@@ -3657,6 +4098,12 @@ def static_terrain_lifecycle_evidence(
             failures.append("lifecycle_return_visit_incomplete")
     if base_scenario == "memory-cache-soak":
         required_reason_prefixes.append("lifecycle-memory-cache-soak-started")
+        required_reason_prefixes.extend(
+            f"lifecycle-memory-cache-soak-step-{step}" for step in range(1, 5)
+        )
+        action_step = int(parse_number(lifecycle_doc.get("actionStep")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        if action_step < 4:
+            failures.append("lifecycle_memory_cache_soak_incomplete")
     if base_scenario == "steady-state-performance":
         required_reason_prefixes.append("lifecycle-steady-state-performance-started")
     if base_scenario in {"world-unload-reload", "world-different-reload"}:
@@ -3750,6 +4197,110 @@ def static_terrain_lifecycle_evidence(
         "before_generation": before_generation,
         "after_generation": after_generation,
         "reason_counts": {reason: event_reasons.count(reason) for reason in sorted(set(event_reasons)) if reason.startswith("lifecycle-")},
+    }
+
+
+def frozen_static_terrain_lifecycle_evidence(
+    lifecycle_doc: dict[str, object] | None,
+    scenario: str,
+) -> dict[str, object]:
+    """Validate the capture-only lifecycle receipt recorded by Frozen.
+
+    Frozen remains the Java OpenGL baseline and its renderer is intentionally
+    untouched.  For supported resource-pack and view-distance lifecycle pairs,
+    the deterministic capture hook performs the same capture-only invalidation
+    action and records the before/after visible-list receipt.  This evidence is
+    deliberately separate from the Rust generation/event contract above:
+    Frozen has no Rust atlas generations or Rust lifecycle events to inspect.
+    Other lifecycle scenarios still return ``skip`` until an equivalent
+    capture-only action exists on both repositories.
+    """
+    scenario = (scenario or "").strip().lower()
+    base_scenario = static_terrain_base_scenario(scenario)
+    supported = {
+        "resource-reload",
+        "pack-priority-reversal",
+        "view-distance-decrease",
+        "view-distance-increase",
+    }
+    if base_scenario not in supported:
+        return {
+            "status": "skip",
+            "failure": None,
+            "failures": [],
+            "scenario": base_scenario,
+            "reason": "frozen_equivalent_capture_action_not_implemented",
+        }
+
+    failures: list[str] = []
+    document = lifecycle_doc if isinstance(lifecycle_doc, dict) else {}
+    if not document:
+        failures.append("frozen_lifecycle_receipt_missing")
+    if document.get("scenario") not in {None, "", base_scenario}:
+        failures.append("frozen_lifecycle_scenario_mismatch")
+    if not bool(document.get("setup")):
+        failures.append("frozen_lifecycle_setup_missing")
+    if not bool(document.get("afterRecorded")) or document.get("stage") != "replacement-visible":
+        failures.append("frozen_lifecycle_replacement_missing")
+    if base_scenario == "pack-priority-reversal" and not str(document.get("resourcePackScenario") or "").strip():
+        failures.append("frozen_lifecycle_resource_pack_scenario_missing")
+    if base_scenario in {"view-distance-decrease", "view-distance-increase"}:
+        expected_action = (
+            "view-distance-decreased"
+            if base_scenario == "view-distance-decrease"
+            else "view-distance-increased"
+        )
+        if str(document.get("action") or "").strip().lower() != expected_action:
+            failures.append("frozen_lifecycle_view_distance_action_missing")
+        before_render = int(parse_number(document.get("beforeRenderDistance")) or 0)
+        after_render = int(parse_number(document.get("afterRenderDistance")) or 0)
+        before_simulation = int(parse_number(document.get("beforeSimulationDistance")) or 0)
+        after_simulation = int(parse_number(document.get("afterSimulationDistance")) or 0)
+        if min(before_render, after_render, before_simulation, after_simulation) <= 0:
+            failures.append("frozen_lifecycle_view_distance_receipt_missing")
+        elif base_scenario == "view-distance-decrease" and not (
+            after_render < before_render and after_simulation <= before_simulation
+        ):
+            failures.append("frozen_lifecycle_view_distance_decrease_invalid")
+        elif base_scenario == "view-distance-increase" and not (
+            after_render > before_render and after_simulation >= before_simulation
+        ):
+            failures.append("frozen_lifecycle_view_distance_increase_invalid")
+
+    visible_pattern = re.compile(
+        r"^sections=(?P<section_count>\d+),hash=(?P<hash>[^,]+),"
+        r"stableFrames=(?P<stable_frames>\d+),readyFrames=(?P<ready_frames>\d+)"
+    )
+    visible_lists: dict[str, dict[str, object]] = {}
+    for name in ("beforeVisibleList", "afterVisibleList"):
+        raw = str(document.get(name) or "")
+        match = visible_pattern.match(raw)
+        if match is None:
+            failures.append(f"frozen_lifecycle_{name[0].lower() + name[1:]}_missing")
+            continue
+        parsed = {
+            "sections": int(match.group("section_count")),
+            "hash": match.group("hash"),
+            "stableFrames": int(match.group("stable_frames")),
+            "readyFrames": int(match.group("ready_frames")),
+        }
+        visible_lists[name] = parsed
+        if parsed["sections"] <= 0 or not parsed["hash"]:
+            failures.append(f"frozen_lifecycle_{name[0].lower() + name[1:]}_empty")
+    after = visible_lists.get("afterVisibleList")
+    if after is not None and (after["stableFrames"] < 8 or after["readyFrames"] < 8):
+        failures.append("frozen_lifecycle_settlement_incomplete")
+    if int(parse_number(document.get("waitFrames")) or 0) < 8:
+        failures.append("frozen_lifecycle_wait_incomplete")
+    return {
+        "status": "pass" if not failures else "fail",
+        "failure": sorted(set(failures))[0] if failures else None,
+        "failures": sorted(set(failures)),
+        "scenario": base_scenario,
+        "stage": document.get("stage"),
+        "before_visible_list": visible_lists.get("beforeVisibleList"),
+        "after_visible_list": visible_lists.get("afterVisibleList"),
+        "wait_frames": int(parse_number(document.get("waitFrames")) or 0),
     }
 
 
@@ -5273,11 +5824,22 @@ def deterministic_distant_horizons_texture_palette_pixel_evidence(
                         "preferred_sprites": sorted(preferred_sprites),
                     })
                     continue
-                _, selected_match, screen_vertices = max(projected_matches, key=lambda candidate: candidate[0])
-                left = max(0, int(min(vertex[0] for vertex in screen_vertices)))
-                top = max(0, int(min(vertex[1] for vertex in screen_vertices)))
-                right = min(rgb.width, int(max(vertex[0] for vertex in screen_vertices)) + 1)
-                bottom = min(rgb.height, int(max(vertex[1] for vertex in screen_vertices)) + 1)
+                _, selected_match, _ = max(projected_matches, key=lambda candidate: candidate[0])
+                # A semantic target can intersect several adjacent reduced DH
+                # quads.  This is common when a copied column is split at
+                # section or material boundaries: every quad still carries the
+                # target sprite, but choosing only the largest one measures a
+                # single edge fragment and can reject a valid final footprint.
+                # Keep the threshold and colour tests unchanged; form the
+                # footprint from the union of all projected matching quads.
+                footprint_vertices = [
+                    vertices
+                    for _, _, vertices in projected_matches
+                ]
+                left = max(0, int(min(vertex[0] for vertices in footprint_vertices for vertex in vertices)))
+                top = max(0, int(min(vertex[1] for vertices in footprint_vertices for vertex in vertices)))
+                right = min(rgb.width, int(max(vertex[0] for vertices in footprint_vertices for vertex in vertices)) + 1)
+                bottom = min(rgb.height, int(max(vertex[1] for vertices in footprint_vertices for vertex in vertices)) + 1)
                 # Perspective can project a real one-block DH top face to a
                 # two-row strip. The polygon-mask count below is the actual
                 # footprint authority; rejecting it from its axis-aligned box
@@ -5287,10 +5849,12 @@ def deterministic_distant_horizons_texture_palette_pixel_evidence(
                     continue
                 crop = rgb.crop((left, top, right, bottom))
                 mask = Image.new("L", crop.size, 0)
-                ImageDraw.Draw(mask).polygon(
-                    [(x - left, y - top) for x, y in screen_vertices],
-                    fill=255,
-                )
+                mask_draw = ImageDraw.Draw(mask)
+                for vertices in footprint_vertices:
+                    mask_draw.polygon(
+                        [(x - left, y - top) for x, y in vertices],
+                        fill=255,
+                    )
                 pixels = [
                     pixel
                     for pixel, included in zip(crop.getdata(), mask.getdata())
@@ -5318,10 +5882,12 @@ def deterministic_distant_horizons_texture_palette_pixel_evidence(
                 surround_bottom = min(rgb.height, bottom + padding)
                 surround = rgb.crop((surround_left, surround_top, surround_right, surround_bottom))
                 surround_mask = Image.new("L", surround.size, 0)
-                ImageDraw.Draw(surround_mask).polygon(
-                    [(x - surround_left, y - surround_top) for x, y in screen_vertices],
-                    fill=255,
-                )
+                surround_mask_draw = ImageDraw.Draw(surround_mask)
+                for vertices in footprint_vertices:
+                    surround_mask_draw.polygon(
+                        [(x - surround_left, y - surround_top) for x, y in vertices],
+                        fill=255,
+                    )
                 surrounding_pixels = [
                     pixel
                     for pixel, included in zip(surround.getdata(), surround_mask.getdata())
@@ -21145,8 +21711,13 @@ def dh_state_from_text(text: str, meta: dict[str, str]) -> dict[str, object]:
     dh_enabled = bool(re.search(r"DistantHorizons|\[DH-|DH Ready|renderLods|renderDeferredLods", text, re.IGNORECASE))
     world_gen_threads = len(re.findall(r"DH-World Gen Thread\[\d+\]", text))
     runnable_world_gen_threads = len(re.findall(r"DH-World Gen Thread\[\d+\].*?\brunnable\b", text, re.IGNORECASE))
+    # The initialization banner is emitted for every DH client, including
+    # runs that are drawing an already-published database. Treat it as
+    # presence evidence only; classify a run as generating when the log shows
+    # an actual pending generation request or worker thread.  The queue
+    # installation banner is also startup-only and is deliberately ignored.
     generating = bool(
-        re.search(r"Batch Chunk Generator initialized|Set world gen queue|WorldGen requiring|DH-World Gen Thread", text)
+        re.search(r"WorldGen requiring|DH-World Gen Thread", text)
     )
     ordinary_dh_disabled = (
         meta.get("forced_dh_ordinary_enableRendering") == "false"
@@ -21602,6 +22173,7 @@ def workload_signature(
         "dh": dh_state_from_text(combined_logs, meta),
         "config_before": config_snapshot_hash(capture_dir, "config_before"),
         "dh_composition": dh_composition_settings(capture_dir),
+        "dh_fog": dh_fog_settings(capture_dir),
         "workload_counter_definitions": workload_counter_definitions(),
         "workload_counter_instrumentation": {
             "expected_version": WORKLOAD_COUNTER_DEFINITION_VERSION,
@@ -21625,12 +22197,29 @@ def dh_composition_settings(capture_dir: Path) -> dict[str, object]:
         return {"status": "not_recorded"}
     source = snapshots[-1].read_text(encoding="utf-8")
     result: dict[str, object] = {"status": "recorded"}
-    for key in ("rendererMode", "enableRendering", "vanillaFadeMode", "lodOnlyMode"):
+    for key in (
+        "rendererMode",
+        "enableRendering",
+        "vanillaFadeMode",
+        "lodOnlyMode",
+        "lodChunkRenderDistanceRadius",
+    ):
         values = re.findall(rf"(?m)^[ \t]*{key}[ \t]*=[ \t]*([^\r\n#]+)", source)
         if len(values) != 1:
             return {"status": "invalid", "field": key}
         result[key] = values[0].strip().strip('"')
     return result
+
+
+def dh_fog_settings(capture_dir: Path) -> dict[str, object]:
+    snapshots = sorted(capture_dir.glob("config_after_*/DistantHorizons.toml"))
+    if not snapshots:
+        return {"status": "not_recorded"}
+    source = snapshots[-1].read_text(encoding="utf-8")
+    values = re.findall(r"(?m)^[ \t]*enableDhFog[ \t]*=[ \t]*([^\r\n#]+)", source)
+    if len(values) != 1:
+        return {"status": "invalid", "field": "enableDhFog"}
+    return {"status": "recorded", "enableDhFog": values[0].strip().strip('"')}
 
 
 def vanilla_dh_isolation_evidence(capture_dir: Path, meta: Mapping[str, str]) -> dict[str, object]:
@@ -21667,6 +22256,13 @@ def normalized_parity_config(mode: ModeSpec, meta: Mapping[str, str]) -> dict[st
             "schema": meta.get("parity_fixture_schema") or PARITY_FIXTURE_SCHEMA,
             "id": meta.get("parity_fixture_id") or "",
             "source_save_hash": meta.get("parity_fixture_source_save_hash") or meta.get("world_save_state_hash"),
+            # Frozen runners predating the beacon probe omit its runtime
+            # receipt, while both sides still consume the same canonical
+            # datapack fixture. Preserve that identity explicitly.
+            "beacon_beam_scenario": (
+                meta.get("world_beacon_beam_scenario")
+                or ("ordinary" if "-ordinary-" in str(meta.get("parity_fixture_id") or "") else "hidden")
+            ),
             # The fixture scenario is shared across all rendering families.
             # Prefer the selected text workload over a supporting entity model
             # (name-tag fixtures inject a cow only to host the label).
@@ -21803,6 +22399,29 @@ def comparability_key(artifact: dict[str, object], *, cross_repository: bool = F
     if isinstance(settings, dict):
         settings.pop("backend", None)
         settings.pop("validation_mode", None)
+    if cross_repository:
+        # The Frozen baseline must keep DH's Java OpenGL presenter enabled,
+        # while the Current Rust Vulkan row must disable that presenter so the
+        # single Rust-owned frame cannot double-render DH.  This is an
+        # intentional ownership difference, not a workload difference.  Keep
+        # every other DH composition setting strict and normalize only the
+        # exact route-specific values that prove this handoff is in effect.
+        dh_composition = normalized.get("dh_composition")
+        mode = artifact.get("mode")
+        if isinstance(dh_composition, dict) and isinstance(mode, dict):
+            expected_renderer = (
+                mode.get("target") == "current"
+                and mode.get("backend") == "rust-vulkan"
+                and dh_composition.get("rendererMode") == "DEFAULT"
+                and dh_composition.get("enableRendering") == "false"
+            ) or (
+                mode.get("target") == "frozen"
+                and mode.get("backend") == "opengl"
+                and dh_composition.get("rendererMode") == "DEFAULT"
+                and dh_composition.get("enableRendering") == "true"
+            )
+            if expected_renderer:
+                dh_composition["enableRendering"] = "route-owned"
     camera = normalized.get("camera")
     if isinstance(camera, dict):
         camera.pop("frame_count", None)
@@ -22183,6 +22802,8 @@ def mixed_item_foil_fixture_valid(receipt):
 def deterministic_visual_fixture_equivalence(
     baseline: Mapping[str, object] | None,
     current: Mapping[str, object] | None,
+    *,
+    shared_world_beacon: bool = False,
 ) -> dict[str, object]:
     """Validates the semantic state required before pixel comparison.
 
@@ -22648,6 +23269,32 @@ def deterministic_visual_fixture_equivalence(
                for receipt in receipts) or receipts[0] != receipts[1]:
             mismatches.append("atlas-particle-fixture-state")
 
+    # A beacon probe normally requires matching runtime receipts. A paired
+    # canonical beacon run also materializes the same structure in the copied
+    # world datapack, though, and older Frozen runners omit the JVM receipt.
+    # In that explicitly identified case allow the missing legacy receipt while
+    # still validating any receipt the newer runner did produce.
+    beacon_scenarios = [str(doc.get("rustGalWorldBeaconBeamScenario") or "").strip().lower()
+                        for doc in documents]
+    if any(beacon_scenarios):
+        allowed = {"", "ordinary"} if shared_world_beacon else {"ordinary"}
+        if any(scenario not in allowed for scenario in beacon_scenarios) or (
+                shared_world_beacon and "ordinary" not in beacon_scenarios
+        ) or (not shared_world_beacon and len(set(beacon_scenarios)) != 1):
+            mismatches.append("beacon-beam-fixture-state")
+        else:
+            for doc in documents:
+                if not str(doc.get("rustGalWorldBeaconBeamScenario") or "").strip():
+                    continue
+                setup = doc.get("rustGalWorldBeaconBeamSetup")
+                if (not isinstance(setup, Mapping)
+                        or setup.get("status") != "spawned"
+                        or setup.get("clientBeamSectionsReady") is not True
+                        or setup.get("serverBeamSectionsReady") is not True
+                        or not str(setup.get("origin") or "").strip()):
+                    mismatches.append("beacon-beam-fixture-state")
+                    break
+
     def equal_value(name: str, left: object, right: object) -> None:
         if left != right:
             mismatches.append(name)
@@ -22696,6 +23343,7 @@ def deterministic_visual_fixture_equivalence(
     return {
         "status": "passed" if not mismatches else "failed",
         "mismatches": mismatches,
+        "shared_world_beacon": shared_world_beacon,
         "baseline": deterministic_camera_signature(dict(baseline) if isinstance(baseline, Mapping) else None),
         "current": deterministic_camera_signature(dict(current) if isinstance(current, Mapping) else None),
     }
@@ -24451,6 +25099,112 @@ def cloud_local_visual_evidence(baseline_cloud, current_cloud, left, right, tole
     return result
 
 
+def shared_world_beacon_fixture_requested(
+    baseline_artifact: Path,
+    current_artifact: Path,
+) -> bool:
+    """Recognize the paired canonical beacon world without trusting a JVM receipt.
+
+    The fixture id is part of the parity workload signature and is required to
+    match by the cross-repository parity gate.  Requiring the same id and the
+    explicit ``ordinary`` beacon token prevents this exception from applying to
+    a one-sided runtime injection or to an arbitrary legacy capture.
+    """
+    ids: list[str] = []
+    for path in (baseline_artifact, current_artifact):
+        artifact = read_json(path)
+        signature = artifact.get("benchmark_fingerprint", {}).get("workload_signature", {}) if isinstance(artifact, Mapping) else {}
+        parity = signature.get("parity_config", {}) if isinstance(signature, Mapping) else {}
+        fixture = parity.get("fixture", {}) if isinstance(parity, Mapping) else {}
+        fixture_id = str(fixture.get("id") or "").strip()
+        if not fixture_id:
+            return False
+        ids.append(fixture_id)
+    return len(ids) == 2 and ids[0] == ids[1] and "-ordinary-" in ids[0]
+
+
+def dh_visible_extension_visual_evidence(
+    current_artifact: Path,
+    frozen_image,
+    current_image,
+    tolerance: float,
+    mask_output: Path,
+) -> dict[str, object] | None:
+    """Compare only pixels owned by DH beyond Current's vanilla depth coverage."""
+    artifact = read_json(current_artifact)
+    attachments = (
+        artifact.get("capture", {}).get("whole_frame_gameplay_attachments", {})
+        if isinstance(artifact, Mapping)
+        else {}
+    )
+    correlation = attachments.get("correlation_doc", {}) if isinstance(attachments, Mapping) else {}
+    if not isinstance(correlation, Mapping) or correlation.get("world_lod_route_selected") is not True:
+        return None
+    attachment_root = current_artifact.parent / "capture" / "whole_frame_gameplay_attachments"
+    private_path = attachment_root / "attachment-dh_private_color.png"
+    depth_path = attachment_root / "attachment-main_depth.png"
+    if not private_path.is_file() or not depth_path.is_file():
+        return {
+            "schema": "mattmc-dh-visible-extension-visual-v1",
+            "passed": False,
+            "status": "missing-full-attachments",
+            "private_color": str(private_path),
+            "main_depth": str(depth_path),
+        }
+    from PIL import Image
+    private = Image.open(private_path).convert("RGBA")
+    depth = Image.open(depth_path).convert("L")
+    if private.size != current_image.size:
+        private = private.resize(current_image.size, Image.Resampling.NEAREST)
+    if depth.size != current_image.size:
+        depth = depth.resize(current_image.size, Image.Resampling.NEAREST)
+    mask_values = [
+        255 if alpha > 0 and encoded_depth == 0 else 0
+        for alpha, encoded_depth in zip(private.getchannel("A").getdata(), depth.getdata())
+    ]
+    mask = Image.new("L", current_image.size, 0)
+    mask.putdata(mask_values)
+    mask_output.parent.mkdir(parents=True, exist_ok=True)
+    mask.save(mask_output)
+    sums = [0, 0, 0]
+    squares = [0, 0, 0]
+    maxima = [0, 0, 0]
+    pixel_count = 0
+    for included, frozen_pixel, current_pixel in zip(
+        mask_values, frozen_image.getdata(), current_image.getdata()
+    ):
+        if included == 0:
+            continue
+        pixel_count += 1
+        for channel in range(3):
+            delta = abs(int(frozen_pixel[channel]) - int(current_pixel[channel]))
+            sums[channel] += delta
+            squares[channel] += delta * delta
+            maxima[channel] = max(maxima[channel], delta)
+    total_pixels = current_image.width * current_image.height
+    minimum_pixels = max(1024, total_pixels // 1000)
+    mean = [value / pixel_count for value in sums] if pixel_count else [math.inf] * 3
+    rms = [math.sqrt(value / pixel_count) for value in squares] if pixel_count else [math.inf] * 3
+    enough_coverage = pixel_count >= minimum_pixels
+    passed = enough_coverage and all(value <= tolerance for value in mean)
+    return {
+        "schema": "mattmc-dh-visible-extension-visual-v1",
+        "passed": passed,
+        "status": "complete" if passed else "insufficient-coverage" if not enough_coverage else "visual-mismatch",
+        "definition": "DH private alpha is nonzero while the encoded reversed main depth equals its clear value",
+        "pixel_count": pixel_count,
+        "minimum_pixel_count": minimum_pixels,
+        "pixel_fraction": pixel_count / total_pixels if total_pixels else 0.0,
+        "mean_rgb_abs": [round(value, 3) for value in mean],
+        "rms_rgb_abs": [round(value, 3) for value in rms],
+        "max_rgb_abs": maxima,
+        "mean_rgb_abs_tolerance": tolerance,
+        "mask": str(mask_output),
+        "private_color": str(private_path),
+        "main_depth": str(depth_path),
+    }
+
+
 def write_cross_repo_visual_pairs(
     artifact_root: Path,
     cross_repo_parity: Mapping[str, object],
@@ -24504,15 +25258,21 @@ def write_cross_repo_visual_pairs(
                 else "inventory-screen" if inventory_pair else "initial-world-frame"
             ),
         }
+        shared_beacon_fixture = (
+            not title_pair
+            and shared_world_beacon_fixture_requested(baseline_path, current_path)
+        )
         fixture_equivalence = (
             title_visual_fixture_equivalence(baseline_path, current_path)
             if title_pair
             else deterministic_visual_fixture_equivalence(
                 deterministic_capture_document(baseline_path),
                 deterministic_capture_document(current_path),
+                shared_world_beacon=shared_beacon_fixture,
             )
         )
         entry["fixture_equivalence"] = fixture_equivalence
+        entry["shared_world_beacon_fixture"] = shared_beacon_fixture
         if title_transition_pair:
             # Startup wall-clock scheduling is intentionally not a pixel
             # fixture. Preserve its acknowledged frames and diagnostics, but
@@ -24584,6 +25344,17 @@ def write_cross_repo_visual_pairs(
                 },
             }
         )
+        dh_extension = dh_visible_extension_visual_evidence(
+            current_path,
+            left,
+            right,
+            mean_rgb_abs_tolerance,
+            pair_root / "dh_visible_extension_mask.png",
+        )
+        if dh_extension is not None:
+            entry["dh_visible_extension"] = dh_extension
+            if not dh_extension["passed"]:
+                entry["status"] = "dh-visible-extension-mismatch"
         cloud_inputs = [((read_json(path) or {}).get("metrics") or {}).get("rust_gal_slice", {}).get("world_cloud_metrics")
                         for path in (baseline_path, current_path)]
         cloud = cloud_local_visual_evidence(*cloud_inputs, left, right, mean_rgb_abs_tolerance)
@@ -25837,6 +26608,31 @@ def capture_sequence_terrain_coverage(baseline_events, current_events, baseline_
                     failures.append(f"{layer}-capture-record-mismatch")
         results.append({"capture_index": index, "passed": not failures, "failures": failures})
     return {"passed": all(result["passed"] for result in results), "captures": results}
+
+
+def static_terrain_draw_coverage_applicable(args: argparse.Namespace) -> bool:
+    scenario = str(getattr(args, "world_static_terrain_scenario", "") or "").lower()
+    if not scenario:
+        return False
+    dh_requested = any(
+        bool(getattr(args, name, False))
+        for name in (
+            "world_distant_horizons_opaque",
+            "world_distant_horizons_non_water",
+            "world_distant_horizons_water",
+            "world_distant_horizons_texture_palette",
+        )
+    )
+    # A view-distance transition intentionally changes the ordinary terrain
+    # draw set while DH is rendering its own extension. Its acceptance comes
+    # from the paired lifecycle receipts and fresh DH execution, not an exact
+    # aggregate comparison of bounded ordinary-terrain diagnostic samples.
+    return not (
+        dh_requested
+        and static_terrain_base_scenario(scenario) in {
+            "view-distance-decrease", "view-distance-increase"
+        }
+    )
 
 
 def cross_repository_static_terrain_draw_coverage_report(cross_repo_parity: Mapping[str, object]) -> dict[str, object]:
@@ -27192,6 +27988,108 @@ def parity_evidence_failures(baseline: dict[str, object], current: dict[str, obj
     return failures
 
 
+def cross_repository_static_terrain_lifecycle_report(
+    cross_repo_parity: Mapping[str, object],
+) -> dict[str, object]:
+    """Require equivalent capture-only resource lifecycle receipts in a pair.
+
+    Rust and Frozen expose different lifecycle contracts, so this report joins
+    only their normalized evidence status and the shared scenario/resource-pack
+    identity.  It never compares Rust generations to Frozen generations and it
+    never treats Frozen's receipt as renderer ownership evidence.
+    """
+    pairs = cross_repo_parity.get("pairs")
+    if not isinstance(pairs, list):
+        return {
+            "schema": "mattmc-cross-repo-static-terrain-lifecycle-v1",
+            "pair_count": 0,
+            "passed": True,
+            "pairs": [],
+        }
+    report_pairs: list[dict[str, object]] = []
+    supported = {
+        "resource-reload",
+        "pack-priority-reversal",
+        "view-distance-decrease",
+        "view-distance-increase",
+    }
+
+    def slice_doc(artifact: dict[str, object]) -> dict[str, object]:
+        metrics = artifact.get("metrics")
+        if not isinstance(metrics, dict):
+            return {}
+        value = metrics.get("rust_gal_slice")
+        return value if isinstance(value, dict) else {}
+
+    def requested_scenario(artifact: dict[str, object], document: dict[str, object]) -> str:
+        scenario = str(document.get("scenario") or "").strip().lower()
+        if scenario:
+            return static_terrain_base_scenario(scenario)
+        fingerprint = artifact.get("benchmark_fingerprint")
+        signature = fingerprint.get("workload_signature", {}) if isinstance(fingerprint, dict) else {}
+        if isinstance(signature, dict):
+            parity_config = signature.get("parity_config")
+            if isinstance(parity_config, dict):
+                fixture = parity_config.get("fixture")
+                if isinstance(fixture, dict):
+                    scenario = str(fixture.get("scenario") or "").strip().lower()
+        return static_terrain_base_scenario(scenario)
+
+    for pair in pairs:
+        baseline_path = Path(str(pair.get("baseline_artifact", "")))
+        current_path = Path(str(pair.get("current_artifact", "")))
+        baseline = read_json(baseline_path)
+        current = read_json(current_path)
+        if not isinstance(baseline, dict) or not isinstance(current, dict):
+            report_pairs.append({
+                "passed": False,
+                "failures": ["lifecycle_artifact_missing"],
+                "baseline_artifact": str(baseline_path),
+                "current_artifact": str(current_path),
+            })
+            continue
+        baseline_slice = slice_doc(baseline)
+        current_slice = slice_doc(current)
+        baseline_document = baseline_slice.get("world_static_terrain_lifecycle")
+        current_document = current_slice.get("world_static_terrain_lifecycle")
+        baseline_document = baseline_document if isinstance(baseline_document, dict) else {}
+        current_document = current_document if isinstance(current_document, dict) else {}
+        scenario = requested_scenario(current, current_document) or requested_scenario(baseline, baseline_document)
+        if scenario not in supported:
+            continue
+        failures: list[str] = []
+        baseline_evidence = baseline_slice.get("world_static_terrain_lifecycle_evidence")
+        current_evidence = current_slice.get("world_static_terrain_lifecycle_evidence")
+        if not isinstance(baseline_evidence, dict) or baseline_evidence.get("status") != "pass":
+            failures.append("frozen_lifecycle_evidence_failed")
+        if not isinstance(current_evidence, dict) or current_evidence.get("status") != "pass":
+            failures.append("current_lifecycle_evidence_failed")
+        if requested_scenario(baseline, baseline_document) != requested_scenario(current, current_document):
+            failures.append("lifecycle_scenario_mismatch")
+        baseline_pack = str(baseline_document.get("resourcePackScenario") or "").strip().lower()
+        current_pack = str(current_document.get("resourcePackScenario") or "").strip().lower()
+        if scenario == "pack-priority-reversal" and (not baseline_pack or not current_pack):
+            failures.append("lifecycle_resource_pack_scenario_missing")
+        elif baseline_pack != current_pack:
+            failures.append("lifecycle_resource_pack_scenario_mismatch")
+        report_pairs.append({
+            "passed": not failures,
+            "failures": sorted(set(failures)),
+            "scenario": scenario,
+            "resource_pack_scenario": current_pack or baseline_pack,
+            "baseline_artifact": str(baseline_path),
+            "current_artifact": str(current_path),
+            "baseline_evidence": baseline_evidence,
+            "current_evidence": current_evidence,
+        })
+    return {
+        "schema": "mattmc-cross-repo-static-terrain-lifecycle-v1",
+        "pair_count": len(report_pairs),
+        "passed": all(bool(pair.get("passed")) for pair in report_pairs) if report_pairs else True,
+        "pairs": report_pairs,
+    }
+
+
 def baseline_reusable(baseline: dict[str, object], requested_fingerprint: dict[str, object]) -> bool:
     if baseline.get("schema") != SCHEMA:
         return False
@@ -27622,6 +28520,7 @@ def normalize_capture_artifact(
     distant_horizons_capture_execution_doc: dict[str, object] = {}
     distant_horizons_capture_presentation_doc: dict[str, object] = {}
     distant_horizons_texture_probe_doc: dict[str, object] = {}
+    distant_horizons_reduced_color_palette_doc: dict[str, object] = {}
     static_terrain_capture_execution_doc: dict[str, object] = {}
     static_terrain_texture_probe_doc: dict[str, object] = {}
     distant_horizons_capture_acks = sorted(capture_dir.glob("deterministic_camera_capture_*/capture_request_*.ack.json"))
@@ -27638,6 +28537,11 @@ def normalize_capture_artifact(
         candidate_texture_probe = candidate_ack.get("rustGalDistantHorizonsTextureProbeReceipt")
         if isinstance(candidate_texture_probe, dict):
             distant_horizons_texture_probe_doc = candidate_texture_probe
+        candidate_reduced_color_palette = candidate_ack.get(
+            "rustGalDistantHorizonsReducedColorPaletteReceipt"
+        )
+        if isinstance(candidate_reduced_color_palette, dict):
+            distant_horizons_reduced_color_palette_doc = candidate_reduced_color_palette
         candidate_static_execution = candidate_ack.get("rustGalStaticTerrainExecution")
         if isinstance(candidate_static_execution, dict):
             static_terrain_capture_execution_doc = candidate_static_execution
@@ -27653,8 +28557,20 @@ def normalize_capture_artifact(
     gameplay_attachment_dir = capture_dir / "whole_frame_gameplay_attachments"
     gameplay_attachment_manifest_path = latest_matching(gameplay_attachment_dir, "gameplay-attachments-frame-*.json") if gameplay_attachment_dir.exists() else None
     gameplay_attachment_correlation_path = latest_matching(gameplay_attachment_dir, "gameplay-correlation-frame-*.json") if gameplay_attachment_dir.exists() else None
+    gameplay_attachment_ssao_path = (
+        gameplay_attachment_dir / "attachment-ssao.json"
+        if (gameplay_attachment_dir / "attachment-ssao.json").is_file()
+        else None
+    )
+    gameplay_attachment_fade_path = (
+        gameplay_attachment_dir / "attachment-dh-fade.json"
+        if (gameplay_attachment_dir / "attachment-dh-fade.json").is_file()
+        else None
+    )
     gameplay_attachment_doc = read_json(gameplay_attachment_manifest_path) if gameplay_attachment_manifest_path else None
     gameplay_attachment_correlation_doc = read_json(gameplay_attachment_correlation_path) if gameplay_attachment_correlation_path else None
+    gameplay_attachment_ssao_doc = read_json(gameplay_attachment_ssao_path) if gameplay_attachment_ssao_path else None
+    gameplay_attachment_fade_doc = read_json(gameplay_attachment_fade_path) if gameplay_attachment_fade_path else None
     terrain_contract_dir = capture_dir / "terrain_pass_contract"
     terrain_contract_path = latest_matching(terrain_contract_dir, "terrain-pass-contract-generation-*.json") if terrain_contract_dir.exists() else None
     terrain_contract_doc = read_json(terrain_contract_path) if terrain_contract_path else None
@@ -28357,6 +29273,17 @@ def normalize_capture_artifact(
         if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("rustGalStaticTerrainLifecycle"), dict)
         else {}
     )
+    frozen_static_terrain_lifecycle_doc = (
+        deterministic_doc.get("frozenStaticTerrainLifecycle")
+        if isinstance(deterministic_doc, dict) and isinstance(deterministic_doc.get("frozenStaticTerrainLifecycle"), dict)
+        else {}
+    )
+    frozen_dh_far_only_doc = (
+        deterministic_doc.get("frozenDistantHorizonsFarOnly")
+        if isinstance(deterministic_doc, dict)
+        and isinstance(deterministic_doc.get("frozenDistantHorizonsFarOnly"), dict)
+        else {}
+    )
     static_terrain_frame_doc = (
         frame_doc.get("staticTerrainScenario")
         if isinstance(frame_doc, dict) and isinstance(frame_doc.get("staticTerrainScenario"), dict)
@@ -28384,9 +29311,25 @@ def normalize_capture_artifact(
         benchmark_route = frame_doc.get("distantHorizonsRoute")
         if isinstance(benchmark_route, dict):
             distant_horizons_route_doc = benchmark_route
+    distant_horizons_resource_reload = distant_horizons_resource_reload_evidence(
+        distant_horizons_route_doc, requested_world_static_terrain_scenario or ""
+    )
+    distant_horizons_world_unload = distant_horizons_world_unload_evidence(
+        distant_horizons_route_doc, requested_world_static_terrain_scenario or ""
+    )
+    distant_horizons_recreation = distant_horizons_recreation_evidence(
+        static_terrain_lifecycle_doc, requested_world_static_terrain_scenario or ""
+    )
+    distant_horizons_cache_bound = distant_horizons_cache_bound_evidence(
+        static_terrain_lifecycle_doc, requested_world_static_terrain_scenario or ""
+    )
+    distant_horizons_generic_private = distant_horizons_generic_private_evidence(
+        deterministic_doc
+    )
     requested_world_distant_horizons_opaque = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.opaqueV1") == "true"
         or parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.semanticCapture") == "true"
+        or parse_java_property(combined_logs, "mattmc.dev.deterministicCameraCapture.dhRequested") == "true"
     )
     requested_world_distant_horizons_non_water = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.requireTransparent") == "true"
@@ -28399,6 +29342,9 @@ def normalize_capture_artifact(
     )
     requested_world_distant_horizons_legacy_observation = (
         parse_java_property(combined_logs, "mattmc.dev.rustGalDistantHorizons.legacyObservation") == "true"
+    )
+    requested_world_distant_horizons_generic_fixture = (
+        parse_java_property(combined_logs, "mattmc.dev.dhGenericBoxFixture") == "true"
     )
     requested_world_distant_horizons = (
         requested_world_distant_horizons_opaque
@@ -28432,11 +29378,18 @@ def normalize_capture_artifact(
         deterministic_doc
     )
     static_terrain_water_animation_dense = static_terrain_water_animation_dense_evidence(deterministic_doc)
-    static_terrain_lifecycle = static_terrain_lifecycle_evidence(
-        static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
-        static_terrain_lifecycle_doc,
-        requested_world_static_terrain_scenario or "",
-    )
+    if mode.target == "frozen":
+        static_terrain_lifecycle = frozen_static_terrain_lifecycle_evidence(
+            frozen_static_terrain_lifecycle_doc,
+            requested_world_static_terrain_scenario or "",
+        )
+        static_terrain_lifecycle_doc = frozen_static_terrain_lifecycle_doc
+    else:
+        static_terrain_lifecycle = static_terrain_lifecycle_evidence(
+            static_terrain_doc if static_terrain_doc else static_terrain_frame_doc,
+            static_terrain_lifecycle_doc,
+            requested_world_static_terrain_scenario or "",
+        )
     static_terrain_fault_expectations = {
         "old-stride": "vertex_stride_invalid",
         "incorrect-vertex-stride": "vertex_stride_invalid",
@@ -29088,6 +30041,69 @@ def normalize_capture_artifact(
         combined_logs, r"rust_gal_world_depth_attachment_reuses[=: ]+(\d+)"
     )
     validation_messages: list[str] = []
+    dh_lifecycle_scenario = static_terrain_base_scenario(requested_world_static_terrain_scenario or "")
+    if requested_world_distant_horizons and dh_lifecycle_scenario in {
+        "view-distance-decrease", "view-distance-increase"
+    }:
+        if mode.target == "frozen":
+            before_passes = int(parse_number(frozen_static_terrain_lifecycle_doc.get("beforeDhOpaquePasses")) or 0)
+            after_passes = int(parse_number(frozen_static_terrain_lifecycle_doc.get("afterDhOpaquePasses")) or 0)
+            after_columns = int(parse_number(frozen_static_terrain_lifecycle_doc.get("afterDhOpaqueColumns")) or 0)
+            before_distance = int(parse_number(frozen_static_terrain_lifecycle_doc.get("beforeRenderDistance")) or 0)
+            after_distance = int(parse_number(frozen_static_terrain_lifecycle_doc.get("afterRenderDistance")) or 0)
+            expected_distance = after_distance <= 4 if dh_lifecycle_scenario == "view-distance-decrease" else after_distance >= 12
+            if not (
+                frozen_static_terrain_lifecycle_doc.get("afterRecorded") is True
+                and after_passes > before_passes > 0
+                and after_columns > 0
+                and before_distance != after_distance
+                and expected_distance
+            ):
+                validation_messages.append(
+                    "Frozen DH view-distance lifecycle lacks a post-rebuild opaque LOD draw "
+                    f"(scenario={dh_lifecycle_scenario}, receipt={frozen_static_terrain_lifecycle_doc or 'missing'})"
+                )
+        elif mode.backend == "rust-vulkan":
+            before_submission = int(parse_number(static_terrain_lifecycle_doc.get("beforeDhExecutionSubmission")) or 0)
+            after_submission = int(parse_number(static_terrain_lifecycle_doc.get("afterDhExecutionSubmission")) or 0)
+            after_frame = int(parse_number(static_terrain_lifecycle_doc.get("afterDhExecutionFrame")) or 0)
+            after_instances = int(parse_number(static_terrain_lifecycle_doc.get("afterDhExecutionInstances")) or 0)
+            unpublished = int(parse_number(static_terrain_lifecycle_doc.get("afterDhUnpublishedVisibleColumns")) or 0)
+            pending_retirements = int(parse_number(static_terrain_lifecycle_doc.get("afterDhPendingRetirements")) or 0)
+            if not (
+                static_terrain_lifecycle_doc.get("afterRecorded") is True
+                and after_submission > before_submission > 0
+                and after_frame > 0
+                and after_instances > 0
+                and unpublished == 0
+                and pending_retirements == 0
+            ):
+                validation_messages.append(
+                    "Rust DH view-distance lifecycle lacks a fresh drained post-change execution "
+                    f"(scenario={dh_lifecycle_scenario}, receipt={static_terrain_lifecycle_doc or 'missing'})"
+                )
+    if mode.target == "frozen" and requested_world_distant_horizons_texture_palette:
+        far_only_target = int(parse_number(frozen_dh_far_only_doc.get("targetRenderDistance")) or -1)
+        far_only_before = int(parse_number(frozen_dh_far_only_doc.get("beforeRenderDistance")) or -1)
+        far_only_after = int(parse_number(frozen_dh_far_only_doc.get("afterRenderDistance")) or -1)
+        far_only_baseline = int(parse_number(frozen_dh_far_only_doc.get("opaquePassBaseline")) or -1)
+        far_only_passes = int(parse_number(frozen_dh_far_only_doc.get("opaquePasses")) or -1)
+        far_only_columns = int(parse_number(frozen_dh_far_only_doc.get("lastOpaqueColumns")) or 0)
+        far_only_visible = int(parse_number(frozen_dh_far_only_doc.get("visibleChunks")) or 0)
+        if not (
+            frozen_dh_far_only_doc.get("requested") is True
+            and frozen_dh_far_only_doc.get("complete") is True
+            and far_only_target == 2
+            and far_only_before > far_only_target
+            and far_only_after == far_only_target
+            and far_only_passes > far_only_baseline >= 0
+            and far_only_columns > 0
+            and far_only_visible > 0
+        ):
+            validation_messages.append(
+                "Frozen DH palette capture did not complete the paired far-only vanilla terrain rebuild "
+                f"(receipt={frozen_dh_far_only_doc or 'missing'})"
+            )
     if not entity_shadow_execution_evidence["passed"]:
         validation_messages.append("entity shadow capture lacks correlated semantic/submission evidence: " + entity_shadow_execution_evidence["status"])
     validation_notes: list[str] = []
@@ -30029,6 +31045,21 @@ def normalize_capture_artifact(
         elif mode.backend != "rust-vulkan":
             world_distant_horizons_opaque_workload_complete = False
             validation_messages.append("Rust Distant Horizons opaque route requires the Rust Vulkan whole-frame backend")
+        elif int(distant_horizons_generic_private.get("cloud_delegated", 0)) > 0:
+            world_distant_horizons_opaque_workload_complete = False
+            validation_messages.append(
+                "Distant Horizons generic capture did not prove private DH-target execution; "
+                "delegated vanilla clouds are not DH evidence "
+                f"({distant_horizons_generic_private})"
+            )
+        elif requested_world_distant_horizons_generic_fixture \
+            and bool((gameplay_attachment_ssao_doc or {}).get("enabled")) \
+            and not bool(distant_horizons_generic_private.get("mixed_ssao_phases")):
+            world_distant_horizons_opaque_workload_complete = False
+            validation_messages.append(
+                "Distant Horizons generic+SSAO fixture did not execute both pre-SSAO and post-SSAO object phases "
+                f"({distant_horizons_generic_private})"
+            )
         elif not selected or decision != "selected" or admitted_segments <= 0 \
             or (requested_world_distant_horizons_non_water and transparent_segments <= 0) \
             or (requested_world_distant_horizons_water and water_segments <= 0):
@@ -30061,7 +31092,47 @@ def normalize_capture_artifact(
                 f"waterInstances={capture_water_instances}, "
                 f"semanticFrameEnabled={capture_semantics_enabled})"
             )
-        elif requested_world_distant_horizons_texture_palette and not bool(distant_horizons_texture_probe_doc.get("matched")):
+        elif static_terrain_base_scenario(requested_world_static_terrain_scenario or "") == "resource-reload":
+            if distant_horizons_resource_reload.get("passed") is not True:
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "Distant Horizons resource reload did not prove old-generation retirement and coherent republication "
+                    f"({distant_horizons_resource_reload})"
+                )
+        elif static_terrain_base_scenario(requested_world_static_terrain_scenario or "") in {
+            "world-unload-reload", "world-different-reload"
+        }:
+            if distant_horizons_world_unload.get("passed") is not True:
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "Distant Horizons world unload did not prove old-generation retirement and coherent republication "
+                    f"({distant_horizons_world_unload})"
+                )
+        elif static_terrain_base_scenario(requested_world_static_terrain_scenario or "") in {
+            "resize-cycle", "swapchain-recreate"
+        }:
+            if distant_horizons_recreation.get("passed") is not True:
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "Distant Horizons target recreation did not preserve bounded published residency "
+                    f"({distant_horizons_recreation})"
+                )
+        elif static_terrain_base_scenario(requested_world_static_terrain_scenario or "") in {
+            "return-visited-terrain", "memory-cache-soak", "steady-state-performance"
+        }:
+            if distant_horizons_cache_bound.get("passed") is not True:
+                world_distant_horizons_opaque_workload_complete = False
+                validation_messages.append(
+                    "Distant Horizons revisit/soak did not settle within bounded published residency "
+                    f"({distant_horizons_cache_bound})"
+                )
+        elif requested_world_distant_horizons_texture_palette \
+            and not (
+                mode.backend == "rust-vulkan"
+                and mode.shaders == "off"
+                and not selected_source_execution_requested
+            ) \
+            and not bool(distant_horizons_texture_probe_doc.get("matched")):
             world_distant_horizons_opaque_workload_complete = False
             validation_messages.append(
                 "deterministic Distant Horizons texture palette did not prove exact semantic sprite coverage "
@@ -30107,7 +31178,28 @@ def normalize_capture_artifact(
                 for entry in target_coverage
                 if not isinstance(entry, dict) or not bool(entry.get("matched"))
             ]
-            if source_texture_contract == "reduced-color-material-category" and source_atlas_bound is False:
+            ordinary_reduced_color = (
+                mode.backend == "rust-vulkan"
+                and mode.shaders == "off"
+                and not selected_source_execution_requested
+            )
+            if ordinary_reduced_color:
+                # Frozen's shader-off DH renderer consumes DH's native reduced
+                # vertex color/light/material-category stream.  The correlated
+                # plan must explicitly retain that contract and must not inject
+                # an atlas draw which Frozen never performs.
+                if distant_horizons_reduced_color_palette_doc.get("contract") \
+                        != "reduced-color-material-category" \
+                    or distant_horizons_reduced_color_palette_doc.get("matched") is not True:
+                    world_distant_horizons_opaque_workload_complete = False
+                    validation_messages.append(
+                        "deterministic Distant Horizons ordinary reduced-color contract lacks a screenshot-frame-"
+                        "correlated consumed-column material receipt "
+                        f"(contract={distant_horizons_reduced_color_palette_doc.get('contract')}, "
+                        f"matched={distant_horizons_reduced_color_palette_doc.get('matched')}, "
+                        f"status={distant_horizons_reduced_color_palette_doc.get('status')})"
+                    )
+            elif source_texture_contract == "reduced-color-material-category" and source_atlas_bound is False:
                 # Complementary's selected dh_terrain program declares DH's
                 # reduced color/category interface. An atlas writer is not a
                 # valid substitute for that contract, even as diagnostics.
@@ -31234,28 +32326,84 @@ def normalize_capture_artifact(
             if gameplay_attachment_correlation_doc.get("same_acquired_presented_image") is not True:
                 validation_messages.append("Rust Vulkan gameplay attachment frame did not prove acquired/presented image identity")
             evidence = gameplay_attachment_doc.get("attachment_evidence")
-            required = [
-                "shadow_depth",
-                "albedo",
-                "normal",
-                "material_light",
-                "world_position",
-                "main_depth",
-                "deferred_lit",
-                "composite_0",
-                "composite_1",
-                "final_output",
-            ]
+            attachment_scope = str(gameplay_attachment_doc.get("capture_scope") or "")
+            # The complete attachment contract is route-specific. Deferred
+            # captures own the G-buffer and intermediate composites; the
+            # forward DH route has no such images and deliberately exposes its
+            # real depth plus pre-GUI/final color copies instead. Do not make a
+            # forward capture fail by asking it to fabricate deferred targets.
+            if attachment_scope == "full-attachments":
+                required = [
+                    "shadow_depth",
+                    "albedo",
+                    "normal",
+                    "material_light",
+                    "world_position",
+                    "main_depth",
+                    "deferred_lit",
+                    "composite_0",
+                    "composite_1",
+                    "final_output",
+                ]
+                color_attachment_names = (
+                    "albedo",
+                    "normal",
+                    "material_light",
+                    "world_position",
+                    "deferred_lit",
+                    "composite_0",
+                    "composite_1",
+                    "final_output",
+                )
+                depth_attachment_names = ("shadow_depth", "main_depth")
+            elif attachment_scope == "forward-final-attachments":
+                required = ["main_depth", "world_final_pre_gui", "final_output"]
+                color_attachment_names = ("world_final_pre_gui", "final_output")
+                depth_attachment_names = ("main_depth",)
+            elif attachment_scope == "final-output-only":
+                required = ["final_output"]
+                color_attachment_names = ("final_output",)
+                depth_attachment_names = ()
+            else:
+                # An absent or unknown scope is malformed. Keep the strict
+                # deferred contract as the fallback so a producer cannot
+                # evade the complete-set check by omitting its route label.
+                required = [
+                    "shadow_depth",
+                    "albedo",
+                    "normal",
+                    "material_light",
+                    "world_position",
+                    "main_depth",
+                    "deferred_lit",
+                    "composite_0",
+                    "composite_1",
+                    "final_output",
+                ]
+                color_attachment_names = (
+                    "albedo",
+                    "normal",
+                    "material_light",
+                    "world_position",
+                    "deferred_lit",
+                    "composite_0",
+                    "composite_1",
+                    "final_output",
+                )
+                depth_attachment_names = ("shadow_depth", "main_depth")
+            if requested_world_distant_horizons and require_complete_gameplay_attachments:
+                required.extend(("dh_private_color", "dh_resolved_color"))
+                color_attachment_names += ("dh_private_color", "dh_resolved_color")
             if not isinstance(evidence, dict) or "final_output" not in evidence:
                 validation_messages.append("Rust Vulkan gameplay attachment dump did not include final output evidence")
             elif require_complete_gameplay_attachments and any(name not in evidence for name in required):
                 validation_messages.append("Rust Vulkan gameplay attachment dump did not include the complete required attachment set")
             elif require_complete_gameplay_attachments:
-                for color_name in ("albedo", "normal", "material_light", "world_position", "deferred_lit", "composite_0", "composite_1", "final_output"):
+                for color_name in color_attachment_names:
                     value = evidence.get(color_name) if isinstance(evidence.get(color_name), dict) else {}
                     if parse_number(value.get("nonblack_rgb")) in (None, 0):
                         validation_messages.append(f"Rust Vulkan gameplay attachment {color_name} did not prove non-empty color data")
-                for depth_name in ("shadow_depth", "main_depth"):
+                for depth_name in depth_attachment_names:
                     value = evidence.get(depth_name) if isinstance(evidence.get(depth_name), dict) else {}
                     if parse_number(value.get("less_than_clear")) in (None, 0):
                         validation_messages.append(f"Rust Vulkan gameplay attachment {depth_name} did not prove non-empty depth data")
@@ -31738,8 +32886,12 @@ def normalize_capture_artifact(
                 "directory": str(gameplay_attachment_dir) if gameplay_attachment_dir.exists() else None,
                 "manifest": str(gameplay_attachment_manifest_path) if gameplay_attachment_manifest_path else None,
                 "correlation": str(gameplay_attachment_correlation_path) if gameplay_attachment_correlation_path else None,
+                "ssao_receipt": str(gameplay_attachment_ssao_path) if gameplay_attachment_ssao_path else None,
+                "dh_fade_receipt": str(gameplay_attachment_fade_path) if gameplay_attachment_fade_path else None,
                 "manifest_doc": gameplay_attachment_doc if isinstance(gameplay_attachment_doc, dict) else None,
                 "correlation_doc": gameplay_attachment_correlation_doc if isinstance(gameplay_attachment_correlation_doc, dict) else None,
+                "ssao_receipt_doc": gameplay_attachment_ssao_doc if isinstance(gameplay_attachment_ssao_doc, dict) else None,
+                "dh_fade_receipt_doc": gameplay_attachment_fade_doc if isinstance(gameplay_attachment_fade_doc, dict) else None,
             },
             "terrain_pass_contract": {
                 "directory": str(terrain_contract_dir) if terrain_contract_dir.exists() else None,
@@ -31900,7 +33052,13 @@ def normalize_capture_artifact(
                 "world_distant_horizons_water_requested": requested_world_distant_horizons_water,
                 "world_distant_horizons_texture_palette_requested": requested_world_distant_horizons_texture_palette,
                 "world_distant_horizons_opaque_route": distant_horizons_route_doc,
+                "world_distant_horizons_resource_reload": distant_horizons_resource_reload,
+                "world_distant_horizons_world_unload": distant_horizons_world_unload,
+                "world_distant_horizons_recreation": distant_horizons_recreation,
+                "world_distant_horizons_cache_bound": distant_horizons_cache_bound,
+                "world_distant_horizons_generic_private": distant_horizons_generic_private,
                 "world_distant_horizons_opaque_capture_execution": distant_horizons_capture_execution_doc,
+                "world_distant_horizons_opaque_ssao": gameplay_attachment_ssao_doc,
                 "world_distant_horizons_texture_probe": distant_horizons_texture_probe_doc,
                 "world_distant_horizons_exact_atlas_plan": distant_horizons_exact_atlas_plan_doc,
                 "world_distant_horizons_source_material_contract": distant_horizons_source_material_contract_doc,
@@ -34567,6 +35725,46 @@ def ground_special_foil_phase_targets_from_artifact(path,args):
 
 
 def validate_fixture_combinations(args: argparse.Namespace) -> None:
+    # DH material probes are meaningful only when the run requests a real DH
+    # producer.  Ordinary terrain/resource-pack rows intentionally inject the
+    # Rust-side DH-disabled property; allowing a private DH selector to leak
+    # into one of those rows creates a large, visually plausible artifact with
+    # no DH draws and makes the probe result impossible to interpret.
+    dh_probe_environment = (
+        "MATTMC_CAPTURE_DH_PRIVATE_FLIP_Y",
+        "MATTMC_CAPTURE_DH_PRIVATE_NO_DEPTH_REMAP",
+        "MATTMC_CAPTURE_DH_PRIVATE_COLUMN_IDS",
+        "MATTMC_CAPTURE_DH_PRIVATE_NO_FADE",
+        "MATTMC_CAPTURE_DH_PRIVATE_DITHER_Y",
+        "MATTMC_CAPTURE_DH_TRANSPARENT_RAW_COLOR",
+        "MATTMC_CAPTURE_DH_WATER_DEBUG_COLOR",
+        "MATTMC_CAPTURE_DH_LIGHTMAP_RAW_COLOR",
+        "MATTMC_CAPTURE_DH_EXACT_ATLAS_RAW_COLOR",
+        "MATTMC_CAPTURE_DH_EXACT_ATLAS_BASE_MIP",
+        "MATTMC_CAPTURE_DH_CLIP_DISTANCE_OVERRIDE",
+    )
+    active_dh_probe = any(
+        os.environ.get(name, "").strip().lower() in {"1", "true", "yes"}
+        or (
+            name == "MATTMC_CAPTURE_DH_CLIP_DISTANCE_OVERRIDE"
+            and os.environ.get(name, "").strip() != ""
+        )
+        for name in dh_probe_environment
+    )
+    dh_requested = any(
+        bool(getattr(args, name, False))
+        for name in (
+            "world_distant_horizons_opaque",
+            "world_distant_horizons_non_water",
+            "world_distant_horizons_water",
+            "world_distant_horizons_texture_palette",
+        )
+    )
+    if active_dh_probe and not dh_requested:
+        raise ValueError(
+            "DH capture-only probes require an explicit Distant Horizons workload "
+            "such as --world-distant-horizons-opaque; ordinary rows disable DH"
+        )
     if getattr(args,'require_normal_special_foil',False) and (
             args.tool!='capture' or args.hotbar_item_fixture not in ('special-foil','recovery-foil')
             or (args.special_foil_context=='gui' and not getattr(args,'dropped_special_foil',False))
@@ -34788,6 +35986,15 @@ def build_capture_command(
     water_animation_capture_requested = bool(
         getattr(args, "world_static_terrain_water_animation_capture", False)
         or static_terrain_base_scenario(static_terrain_scenario) == "translucent-water"
+    )
+    dh_readiness_requested = any(
+        bool(getattr(args, flag, False))
+        for flag in (
+            "world_distant_horizons_opaque",
+            "world_distant_horizons_non_water",
+            "world_distant_horizons_water",
+            "world_distant_horizons_texture_palette",
+        )
     )
     if (
         getattr(args, "world_static_terrain_water_animation_capture", False)
@@ -35041,7 +36248,27 @@ def build_capture_command(
         tracy=getattr(args, "tracy_capture", False),
     )
     env["MATTMC_GRAPHICS_TOOL_INTERNAL"] = "1"
+    # The matrix owns an isolated retention root, which may be outside the
+    # repository. Allow only this explicitly managed child runner to preserve
+    # its capture products there; standalone capture_runner invocations keep
+    # their repository-local artifact restriction.
+    env["MATTMC_ALLOW_EXTERNAL_ARTIFACT_DIR"] = "true"
     env["MATTMC_GRAPHICS_RUN_TYPE"] = run_type
+    # The Frozen Java OpenGL row is the DH correctness baseline. Its copied
+    # bounded fixture must keep the source renderer enabled so the paired
+    # image contains the same LOD contribution that Current Rust replaces.
+    # Current Rust still suppresses the legacy draw through capture_runner;
+    # this marker is consumed only by that isolated child configuration.
+    if mode.target == "frozen" and any(
+        bool(getattr(args, flag, False))
+        for flag in (
+            "world_distant_horizons_opaque",
+            "world_distant_horizons_non_water",
+            "world_distant_horizons_water",
+            "world_distant_horizons_texture_palette",
+        )
+    ):
+        env["MATTMC_CAPTURE_FROZEN_DH_BASELINE"] = "true"
     env["MATTMC_GRAPHICS_WORLD_PROFILE"] = world_profile.name
     env["MATTMC_GRAPHICS_WORLD_PROFILE_ROLE"] = world_profile.role
     env["MATTMC_GRAPHICS_MIGRATION_GATE_BLOCKING"] = "true" if world_profile.migration_gate_blocking else "false"
@@ -35392,12 +36619,47 @@ def build_capture_command(
     dh_non_water = bool(getattr(args, "world_distant_horizons_non_water", False))
     dh_water = bool(getattr(args, "world_distant_horizons_water", False))
     dh_texture_palette = bool(getattr(args, "world_distant_horizons_texture_palette", False))
+    dh_real_world = bool(getattr(args, "world_distant_horizons_real_world", False))
+    dh_composition_mode = canonical_dh_composition_mode(args)
+    env["MATTMC_CAPTURE_DH_VANILLA_FADE_MODE"] = (
+        "NONE" if dh_composition_mode == "LOD_ONLY" else dh_composition_mode
+    )
+    env["MATTMC_CAPTURE_DH_LOD_ONLY"] = (
+        "true" if dh_composition_mode == "LOD_ONLY" else "false"
+    )
+    if dh_real_world and not (dh_opaque_only or dh_non_water or dh_water):
+        raise ValueError("--world-distant-horizons-real-world requires an explicit DH stream")
     if tool_kind == "capture" and (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette):
-        # Dedicated DH captures are provenance tests.  Force the isolated
-        # world to regenerate its client database so legacy rows cannot make
-        # the new contributor sidecar appear unused.  This is identical for
-        # Frozen OpenGL and Rust Vulkan and never mutates either source run.
-        env["MATTMC_CAPTURE_RESET_DH_DATABASE"] = "true"
+        # Dedicated DH rows must consume the same immutable LOD database in
+        # Current and Frozen. The canonical fixture already carries that
+        # database; resetting it only in capture_runner leaves Frozen with a
+        # populated quadtree while Rust starts with freshly generated columns,
+        # invalidating the parity comparison. An explicit external
+        # MATTMC_CAPTURE_RESET_DH_DATABASE=true remains available for a
+        # regeneration diagnostic, but is never implied by a correctness row.
+        java_options.append("-Dmattmc.dev.deterministicCameraCapture.dhRequested=true")
+    if tool_kind == "capture" and (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette):
+        # The canonical DH panel is intentionally several chunks beyond the
+        # fixed camera.  A three-chunk vanilla window lets Rust's semantic
+        # collector see the panel directly, but leaves Frozen's source
+        # producer without the chunks it needs to build the same DH columns.
+        # Keep a bounded ten/twelve-chunk producer window for both rows so the
+        # OpenGL control can ingest the copied panel before the screenshot;
+        # callers may still provide a smaller or larger diagnostic override.
+        env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "10")
+        env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "12")
+        # DH fog is part of the copied material/composition contract. Keep it
+        # enabled for Current so Rust receives the same semantic fog block
+        # that Frozen's OpenGL baseline applies in its DH fog stage.
+        env["MATTMC_CAPTURE_DH_KEEP_FOG"] = "true"
+        if kind == "shell" and shell_settled_static_capture:
+            # Frozen's shell launcher can carry the readiness properties above,
+            # but older copied baselines may not implement the settled-family
+            # gate itself.  Give that observational path the same bounded
+            # producer warm-up used by settled static-terrain captures so the
+            # baseline cannot photograph DH's first unloaded frame.  This is
+            # capture timing only; it does not alter either renderer or route.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1200")
     ordinary_selected_source_capture = (
         tool_kind == "capture"
         and bool(getattr(args, "rust_selected_source_execution", False))
@@ -35544,14 +36806,37 @@ def build_capture_command(
         # correctness baseline into a false Rust-route request.
         java_options.extend(
             [
-                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                # DH owns a separate asynchronous column producer, but the
+                # same whole-frame capture also depends on the ordinary
+                # vanilla terrain producer being populated. Keep both
+                # readiness families instead of replacing the world-profile
+                # Sodium/terrain gate with DH alone; otherwise the screenshot
+                # can be admitted with only a small near-world subset and
+                # expose sky through the still-missing vanilla sections.
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons",
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames="
                 + ("2" if dh_texture_palette else "8"),
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames="
                 + ("900" if args.profile == "extended" else str(world_profile.deterministic_ready_max_wait_frames)),
             ]
         )
-        if getattr(args, "_canonical_fixture_run_source", None):
+        # Frozen's capture hook predates the semantic DH generation-queue gate
+        # used by Current. Give only the immutable baseline a longer bounded
+        # frame warmup so its high OpenGL frame rate cannot photograph a visibly
+        # incomplete LOD set while Current is still waiting on real queue state.
+        # Final acceptance still requires the Frozen screenshot to be free of the
+        # generation-progress overlay.
+        if mode.target == "frozen":
+            # The canonical options cap Frozen at 120 FPS, so 9,600 frames
+            # provide at least 80 seconds for its unmodified DH generator.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=9600")
+        else:
+            # Current has the authoritative queue gate above; only a small
+            # post-settle presentation window is needed after it passes.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2")
+        if getattr(args, "_canonical_fixture_run_source", None) and os.environ.get(
+            "MATTMC_CAPTURE_DH_SKIP_EXTERNAL_FIXTURE", ""
+        ).strip().lower() not in {"1", "true", "yes"}:
             # Matrix rows share a harness-materialized world datapack. Current
             # must observe those fixed coordinates rather than create a
             # camera-relative private panel; Frozen loads the same datapack
@@ -35561,7 +36846,13 @@ def build_capture_command(
             # radius. Give DH's real asynchronous column builder a bounded
             # publication window; this does not relax route, execution, or
             # parity acceptance gates.
-            java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames=900")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames=2400")
+        elif mode.backend == "opengl" and mode.target == "current":
+            # This is a capture-only OpenGL control row. It explicitly enables
+            # DH's existing Java compatibility presenter so its image can be
+            # compared with the Rust Vulkan whole-frame submission using the
+            # same copied source save. Vulkan rows never receive this flag.
+            java_options.append("-Dmattmc.dev.rustGalDistantHorizons.legacyControl=true")
         if mode.backend == "rust-vulkan":
             java_options.extend(
                 [
@@ -35576,6 +36867,12 @@ def build_capture_command(
                     "-Dmattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution=true",
                 ]
             )
+            if dh_real_world:
+                # Do not let the deterministic capture hook create its
+                # camera-relative witness. The saved world is the sole source
+                # for this row; readiness comes from the Rust DH execution
+                # receipt above.
+                java_options.append("-Dmattmc.dev.rustGalDistantHorizons.realWorld=true")
         if dh_non_water:
             java_options.append("-Dmattmc.dev.rustGalDistantHorizons.requireTransparent=true")
         if dh_water:
@@ -35587,6 +36884,24 @@ def build_capture_command(
             # diagnostic-only and never selects or changes the DH route.
             env["MATTMC_GRAPHICS_AUDIT"] = "true"
             java_options.append("-Dmattmc.dev.rustGalDistantHorizons.texturePalette=true")
+            # Both copied runs first expose the source panel at the canonical
+            # producer radius, then transition to the same two-chunk vanilla
+            # radius after a real DH opaque pass. Current keys that transition
+            # to its consumed semantic column; Frozen keys it to an observed
+            # Java OpenGL DH pass and performs the normal Sodium reload. This
+            # keeps ordinary composition comparable without changing Frozen's
+            # renderer or allowing vanilla terrain to cover the palette.
+            java_options.append(
+                "-Dmattmc.dev.deterministicCameraCapture.dhFarOnlyRenderDistance=2"
+            )
+            if mode.target == "frozen":
+                # The far-only hook now has renderer-derived readiness on both
+                # sides of the transition. Keep a bounded post-gate window;
+                # the former 9,600-frame blind delay is redundant here and can
+                # exceed the capture cap after a cold Frozen startup.
+                java_options.append(
+                    "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=240"
+                )
             if mode.name in {"current-opengl-shaders-off", "current-opengl-shaders-on"}:
                 # The Java control keeps one bounded copied DH observation
                 # after the legacy VBO is released. This proves the actual
@@ -36056,11 +37371,23 @@ def build_capture_command(
         if tool_kind == "capture":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=3")
+            # Activating a real beacon can enqueue advancement toast/chat
+            # notifications at different wall-clock moments in Current and
+            # Frozen. Clear those presentation-only objects immediately before
+            # the paired screenshot so the comparison remains about world
+            # pixels and DH output.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.hideChat=true")
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.clearToasts=true")
         beacon_beam_control = getattr(args, "world_beacon_beam_control", "rust")
         if beacon_beam_control == "disabled":
             java_options.append("-Dmattmc.dev.rustGalWorldBeaconBeam.disabled=true")
         elif beacon_beam_control == "legacy":
             java_options.append("-Dmattmc.dev.rustGalWorldBeaconBeam.legacyControl=true")
+    if os.environ.get("MATTMC_CAPTURE_DH_GENERIC_FIXTURE", "false").lower() == "true":
+        # Capture-only positive-path probe for the DH generic semantic
+        # collector. The fixture is camera-relative and never exists in normal
+        # gameplay unless this explicit diagnostic environment flag is set.
+        java_options.append("-Dmattmc.dev.dhGenericBoxFixture=true")
     if getattr(args, "world_mesh_model_scenario", ""):
         java_options.append(
             f"-Dmattmc.dev.rustGalWorldMesh.modelScenario={args.world_mesh_model_scenario}"
@@ -36240,6 +37567,18 @@ def build_capture_command(
     if static_terrain_scenario and (mode.backend == "rust-vulkan" or bool(requested_static_terrain_scenario)):
         java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.scenario={static_terrain_scenario}")
         java_options.append(f"-Dmattmc.dev.rustGalStaticTerrain.worldId={args.world}")
+        if (
+            tool_kind == "capture"
+            and static_terrain_base_scenario(static_terrain_scenario) in {
+                "view-distance-decrease", "view-distance-increase"
+            }
+            and (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
+        ):
+            # DH's earlier blind Frozen warm-up is deliberately long, but the
+            # lifecycle hook already waits for a real pre-change opaque pass
+            # and a later rebuilt pass. Override that generic delay here so it
+            # cannot become a second 9,600-frame post-rebuild requirement.
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=8")
         # Frozen remains a renderer-only OpenGL baseline. For the palette
         # fixture it still needs the identical copied-world blocks and focused
         # camera, supplied exclusively by its deterministic-capture hook.
@@ -36337,7 +37676,16 @@ def build_capture_command(
         if water_animation_capture_requested:
             java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseCapture=true")
             java_options.append("-Dmattmc.dev.rustGalStaticTerrain.waterAnimationDenseFrames=24")
-        if tool_kind == "capture" and static_terrain_scenario and not any(
+        if water_animation_capture_requested or static_terrain_scenario.lower() == "translucent-water":
+            # Keep the copied world immutable once the dense source receipt is
+            # observable. This prevents scheduled fluid ticks from changing
+            # the source mesh between paired Current/Frozen samples.
+            java_options.append(
+                "-Dmattmc.dev.deterministicCameraCapture.freezeServerTicksForWaterAnimation=true"
+            )
+        if tool_kind == "capture" and static_terrain_scenario and not (
+            dh_opaque_only or dh_non_water or dh_water
+        ) and not any(
             getattr(args, name, "") for name in (
                 "world_mesh_falling_block_scenario", "world_mesh_piston_scenario",
                 "world_mesh_primed_tnt_scenario", "world_mesh_arrow_scenario",
@@ -36359,7 +37707,7 @@ def build_capture_command(
             else:
                 java_options.append("-Dmattmc.dev.deterministicCameraCapture.poseCount=1")
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0")
-            if static_terrain_scenario.lower() in {"translucent-overlap", "translucent-mixed"}:
+            if static_terrain_scenario.lower() in {"translucent-overlap", "translucent-mixed", "translucent-water"}:
                 # This canonical Origin fixture must not let asynchronous mesh
                 # readiness choose a different pane origin on each renderer.
                 java_options.append("-Dmattmc.dev.deterministicCameraCapture.staticTerrainFixtureTarget=146,99,532")
@@ -36375,8 +37723,19 @@ def build_capture_command(
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.cameraPathType=fixed-static-terrain")
             env["MATTMC_CAPTURE_MAX_FPS"] = "260"
             env["MATTMC_CAPTURE_DISABLE_DH_FOR_PERF"] = "true"
-            env["MATTMC_CAPTURE_RENDER_DISTANCE"] = "4"
-            env["MATTMC_CAPTURE_SIMULATION_DISTANCE"] = "5"
+            # Dedicated DH rows established a larger, paired producer window
+            # above.  Do not let the ordinary static-terrain bound overwrite
+            # that window: the DH fade boundary and the vanilla handoff are
+            # derived from the copied render distance, so shrinking only this
+            # combined row makes its Current/Frozen image look like missing
+            # far terrain. Ordinary static-terrain rows retain the bounded
+            # four/five-distance workload.
+            if dh_readiness_requested:
+                env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "10")
+                env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "12")
+            else:
+                env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "4")
+                env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "5")
         if (
             tool_kind == "capture"
             and mode.backend == "rust-vulkan"
@@ -36390,7 +37749,23 @@ def build_capture_command(
             # whole-frame visibility identities legitimately churn while the
             # copied terrain source is settling, even though its queue is
             # already drained and all visible submissions are valid.
-            java_options.append("-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain")
+            # Explicit DH rows have a second asynchronous producer.  Preserve
+            # that readiness family when a static-terrain fixture is combined
+            # with an opaque, transparent, water, or texture-palette witness;
+            # otherwise the screenshot can be admitted with only the near
+            # Sodium sections while the Rust DH route is still at a reduced
+            # radius.  Ordinary vanilla static-terrain rows retain the
+            # sodium-only gate.
+            dh_readiness_requested = bool(
+                getattr(args, "world_distant_horizons_opaque", False)
+                or getattr(args, "world_distant_horizons_non_water", False)
+                or getattr(args, "world_distant_horizons_water", False)
+                or getattr(args, "world_distant_horizons_texture_palette", False)
+            )
+            readiness_families = "sodium-terrain,distant-horizons" if dh_readiness_requested else "sodium-terrain"
+            java_options.append(
+                f"-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies={readiness_families}"
+            )
             # Translucent overlap captures revisit their initial camera after
             # several relocations. Require a longer stable Rust terrain window
             # so the first image cannot be taken while async section visibility
@@ -36517,11 +37892,33 @@ def build_capture_command(
             or bool(getattr(args, "world_distant_horizons_opaque", False))
             or bool(getattr(args, "world_distant_horizons_non_water", False))
             or bool(getattr(args, "world_distant_horizons_water", False))
+            or bool(getattr(args, "world_distant_horizons_texture_palette", False))
         ):
             # The exact screenshot-frame selector is armed on the settled
             # penultimate render. One-frame poses cannot establish that
-            # causal link, so use the smallest bounded two-frame pose.
-            java_options.append("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2")
+            # causal link, so ordinary DH rows use the smallest bounded
+            # two-frame pose. The texture-palette fixture has an additional
+            # real server/DH invalidation and source-publication phase; two
+            # frames can end the process while it is still waiting for that
+            # producer, before any Rust route evidence exists. Give that
+            # fixture setup now progresses from the guaranteed client tick,
+            # so once the real source/exact-atlas gates pass it can use the
+            # same smallest exact-frame correlation window as ordinary DH.
+            # DH source updates can publish a visible column replacement after
+            # the first route-ready frame.  Keep the normal capture window
+            # minimal, but allow a bounded diagnostic override when auditing
+            # generation convergence against the OpenGL control.
+            dh_settle_frames = os.environ.get(
+                "MATTMC_CAPTURE_DH_SETTLE_FRAMES_PER_POSE", "2"
+            ).strip()
+            try:
+                dh_settle_frames_value = max(2, int(dh_settle_frames))
+            except ValueError:
+                dh_settle_frames_value = 2
+            java_options.append(
+                "-Dmattmc.dev.deterministicCameraCapture.framesPerPose="
+                + str(dh_settle_frames_value)
+            )
     # This option is scoped to the Current Rust Vulkan row. In a combined
     # parity invocation the Frozen OpenGL row must simply omit it; rejecting
     # the whole matrix here prevented canonical Rust/Frozen source evidence
@@ -36659,10 +38056,11 @@ def build_capture_command(
             or getattr(args, "world_distant_horizons_water", False)
             or getattr(args, "world_distant_horizons_texture_palette", False)
         ):
-            # A freshly reset DH database must build its real quadtree before
-            # the Rust material route can submit work. This extends only the
-            # bounded producer-readiness wait; route execution, capture
-            # correlation, and parity gates remain unchanged.
+            # DH rows may consume the canonical prepopulated quadtree, while
+            # explicitly reset diagnostic rows may need bounded generation
+            # time. This extends only the producer-readiness wait; route
+            # execution, capture correlation, and parity gates remain
+            # unchanged.
             readiness_timeout_seconds = max(readiness_timeout_seconds, 120)
         pack_scenario = (
             getattr(args, "gui_resource_pack_scenario", "")
@@ -38858,6 +40256,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             default=os.environ.get("MATTMC_WORLD_DISTANT_HORIZONS_TEXTURE_PALETTE", "").lower() in {"1", "true", "yes"},
             help="Require a deterministic far-LOD material palette to reach the real Rust Distant Horizons route.",
         )
+        subparser.add_argument(
+            "--world-distant-horizons-real-world",
+            action="store_true",
+            default=os.environ.get("MATTMC_WORLD_DISTANT_HORIZONS_REAL_WORLD", "").lower() in {"1", "true", "yes"},
+            help="Observe an existing saved-world DH stream without creating a capture fixture panel.",
+        )
+        subparser.add_argument(
+            "--dh-composition-mode",
+            choices=("NONE", "SINGLE_PASS", "DOUBLE_PASS", "LOD_ONLY"),
+            default="",
+            help=(
+                "Select the shared DH/vanilla composition policy for an explicit DH row. "
+                "The policy is written into both copied configurations and the canonical fixture identity."
+            ),
+        )
         subparser.add_argument("--client-args", default=os.environ.get("CLIENT_ARGS", ""))
         subparser.add_argument(
             "--rust-profile",
@@ -40142,9 +41555,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     # would turn an inapplicable diagnostic into a false rendering failure.
     cross_repo_static_terrain_draw_coverage = (
         cross_repository_static_terrain_draw_coverage_report(cross_repo_parity)
-        if getattr(args, "world_static_terrain_scenario", "")
+        if static_terrain_draw_coverage_applicable(args)
         else {
             "schema": "mattmc-cross-repo-static-terrain-draw-coverage-v1",
+            "pair_count": 0,
+            "passed": True,
+            "pairs": [],
+            "skipped": (
+                "dh-view-distance-lifecycle-uses-lifecycle-and-execution-receipts"
+                if getattr(args, "world_static_terrain_scenario", "")
+                else "static-terrain-scenario-not-requested"
+            ),
+        }
+    )
+    cross_repo_static_terrain_lifecycle = (
+        cross_repository_static_terrain_lifecycle_report(cross_repo_parity)
+        if getattr(args, "world_static_terrain_scenario", "")
+        else {
+            "schema": "mattmc-cross-repo-static-terrain-lifecycle-v1",
             "pair_count": 0,
             "passed": True,
             "pairs": [],
@@ -40210,6 +41638,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "cross_repository_model_crop_parity": cross_repo_model_crop_parity,
         "cross_repository_shadow_receiver_parity": cross_repo_shadow_receiver_parity,
         "cross_repository_static_terrain_draw_coverage": cross_repo_static_terrain_draw_coverage,
+        "cross_repository_static_terrain_lifecycle": cross_repo_static_terrain_lifecycle,
         "repeatability": repeatability,
         "success": all(result.success for result in results)
         and ground_source_reference["passed"]
@@ -40241,7 +41670,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         and lava_detail_parity["passed"]
         and cross_repo_model_crop_parity["passed"]
         and cross_repo_shadow_receiver_parity["passed"]
-        and cross_repo_static_terrain_draw_coverage["passed"],
+        and cross_repo_static_terrain_draw_coverage["passed"]
+        and cross_repo_static_terrain_lifecycle["passed"],
         "aggregate": str(aggregate_path) if aggregate else None,
         "results": [asdict(result) for result in results],
     }

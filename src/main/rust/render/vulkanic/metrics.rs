@@ -128,6 +128,7 @@ pub struct WholeFrameProfile {
     pub world_mesh_dynamic_offset_count: u64,
     pub gui_mesh_prepare_nanos: u64,
     pub gui_mesh_lower_nanos: u64,
+    pub gpu_distant_horizons_opaque_nanos: u64,
 }
 
 #[inline]

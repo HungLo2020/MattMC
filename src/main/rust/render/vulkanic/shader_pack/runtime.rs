@@ -13,9 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
-use super::super::world_primitive_frontend::{
-    WORLD_STRATUM_ENTITY_MESH, WORLD_STRATUM_TERRAIN,
-};
+use super::super::world_primitive_frontend::{WORLD_STRATUM_ENTITY_MESH, WORLD_STRATUM_TERRAIN};
 use super::assets::{ShaderPackAssets, TerrainShaderPackAssetBindings};
 use super::cloud_contract::{
     derive_cloud_pass_contract, lower_cloud_source_pair, CloudFaceDisposition, CloudPassContract,
@@ -345,6 +343,9 @@ pub(crate) struct TerrainMeshDraw {
     /// and semantic set-one resources without borrowing terrain-pass state.
     pub shadow: Option<TerrainShadowDraw>,
     pub pipeline: Handle,
+    /// Optional direct-DH pipeline variant that writes the private DH depth
+    /// target. Ordinary terrain and source-derived draws leave this unset.
+    pub offscreen_pipeline: Option<Handle>,
     pub pipeline_layout: Handle,
     pub resource_set: Handle,
     /// Dynamic offsets required by the semantic mesh resource set. Fixture
@@ -1336,6 +1337,10 @@ pub(crate) struct ShaderPackRuntimeExecutor {
     /// staged replacement until the exact combined submission has succeeded.
     vanilla_lightmap_residency: Option<VanillaLightmapResidency>,
     pending_vanilla_lightmap_residency: Option<VanillaLightmapResidency>,
+    /// Replaced lightmaps stay alive until their pass-owned resource sets are
+    /// retired.  A confirmed frame can still have consumers in the frontend;
+    /// destroying the image view here would violate GAL dependency ordering.
+    retired_vanilla_lightmap_residencies: Vec<VanillaLightmapResidency>,
     /// Private preparation state for a future selected-source terrain pass.
     /// It owns Rust D3 resources and copied mesh semantics only; it cannot
     /// select source programs or bind terrain material resources.
@@ -1726,6 +1731,7 @@ impl ShaderPackRuntimeExecutor {
             vanilla_lightmap: VanillaLightmapCache::default(),
             vanilla_lightmap_residency: None,
             pending_vanilla_lightmap_residency: None,
+            retired_vanilla_lightmap_residencies: Vec::new(),
             terrain_occupancy: None,
             terrain_colored_light: None,
             terrain_puddle: None,
@@ -1825,13 +1831,26 @@ impl ShaderPackRuntimeExecutor {
 
     pub(crate) fn confirm_vanilla_lightmap_submission(
         &mut self,
-        gal: &mut VulkanicGal,
+        _gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         let Some(replacement) = self.pending_vanilla_lightmap_residency.take() else {
             return Ok(());
         };
         if let Some(previous) = self.vanilla_lightmap_residency.replace(replacement) {
-            previous.destroy(gal)?;
+            self.retired_vanilla_lightmap_residencies.push(previous);
+        }
+        Ok(())
+    }
+
+    /// Destroys lightmaps whose frontend resource-set consumers have already
+    /// been removed. This is called after pass caches retain the new binding,
+    /// keeping the sampled view alive across the replacement boundary.
+    pub(crate) fn retire_replaced_vanilla_lightmaps(
+        &mut self,
+        gal: &mut VulkanicGal,
+    ) -> GalResult<()> {
+        for resources in self.retired_vanilla_lightmap_residencies.drain(..) {
+            resources.destroy(gal)?;
         }
         Ok(())
     }
@@ -4737,6 +4756,9 @@ impl ShaderPackRuntimeExecutor {
         if let Some(resources) = self.vanilla_lightmap_residency.take() {
             resources.destroy(gal)?;
         }
+        for resources in self.retired_vanilla_lightmap_residencies.drain(..) {
+            resources.destroy(gal)?;
+        }
         self.clear_candidate_source_shadow_depth_resources(gal)?;
         self.clear_candidate_source_shadow_color_resources(gal)?;
         self.clear_candidate_source_material_texture_resources(gal)?;
@@ -5945,15 +5967,16 @@ impl ShaderPackRuntimeExecutor {
         Ok(Some(TerrainSourceProgramCandidate { program, binding }))
     }
 
-    /// Prepares the complete semantic identity for an owned colored-light
-    /// runtime. The source contract owns extent/format/material/emission
-    /// policy; the caller supplies only copied world/resource/camera facts.
-    pub(crate) fn candidate_colored_light_preparation(
+    /// Builds the semantic identity for an owned colored-light runtime without
+    /// cloning its immutable material and emission tables. The source
+    /// contract owns extent/format/material/emission policy; the caller
+    /// supplies only copied world/resource/camera facts.
+    pub(crate) fn candidate_colored_light_descriptor(
         &self,
         world_generation: u64,
         resource_generation: u64,
         camera_world_position: [f32; 3],
-    ) -> GalResult<Option<TerrainColoredLightPreparation>> {
+    ) -> GalResult<Option<VoxelLightVolumeDescriptor>> {
         let (generation, pack_name, contract, requires_colored_voxel_light, materials, emission) =
             match &self.source_candidate {
                 TerrainSourceCandidateState::Unavailable
@@ -5989,10 +6012,10 @@ impl ShaderPackRuntimeExecutor {
                 "selected terrain source requires ColoredVoxelLighting without a volume descriptor",
             )
         })?;
-        let materials = materials.as_ref().ok_or_else(|| {
+        let _materials = materials.as_ref().ok_or_else(|| {
             GalError::invalid_argument("selected terrain source has no derived voxel material map")
         })?;
-        let emission = emission.as_ref().ok_or_else(|| {
+        let _emission = emission.as_ref().ok_or_else(|| {
             GalError::invalid_argument(
                 "selected terrain source has no derived colored-light emission table",
             )
@@ -6032,6 +6055,49 @@ impl ShaderPackRuntimeExecutor {
             )?,
         };
         descriptor.validate()?;
+        Ok(Some(descriptor))
+    }
+
+    /// Prepares the complete semantic identity for an owned colored-light
+    /// runtime. This clones immutable source tables only when the caller has
+    /// determined that a compatible runtime cannot be reused.
+    pub(crate) fn candidate_colored_light_preparation(
+        &self,
+        world_generation: u64,
+        resource_generation: u64,
+        camera_world_position: [f32; 3],
+    ) -> GalResult<Option<TerrainColoredLightPreparation>> {
+        let Some(descriptor) = self.candidate_colored_light_descriptor(
+            world_generation,
+            resource_generation,
+            camera_world_position,
+        )?
+        else {
+            return Ok(None);
+        };
+        let (materials, emission) = match &self.source_candidate {
+            TerrainSourceCandidateState::Discovered {
+                voxel_materials,
+                voxel_emission,
+                ..
+            } => (
+                voxel_materials.as_ref().ok_or_else(|| {
+                    GalError::invalid_argument(
+                        "selected terrain source has no derived voxel material map",
+                    )
+                })?,
+                voxel_emission.as_ref().ok_or_else(|| {
+                    GalError::invalid_argument(
+                        "selected terrain source has no derived colored-light emission table",
+                    )
+                })?,
+            ),
+            _ => {
+                return Err(GalError::invalid_argument(
+                    "colored-light descriptor exists without a discovered source candidate",
+                ));
+            }
+        };
         Ok(Some(TerrainColoredLightPreparation {
             descriptor,
             materials: materials.clone(),
@@ -6107,6 +6173,19 @@ impl ShaderPackRuntimeExecutor {
             preparation.emission,
         )?;
         Ok(true)
+    }
+
+    /// Reports whether the existing Rust-owned volume can serve the supplied
+    /// semantic descriptor without rebuilding GPU resources. Camera mapping
+    /// remains frame-local and is deliberately excluded by the descriptor's
+    /// resource-compatibility policy.
+    pub(crate) fn candidate_colored_light_runtime_compatible(
+        &self,
+        descriptor: &VoxelLightVolumeDescriptor,
+    ) -> bool {
+        self.terrain_colored_light
+            .as_ref()
+            .is_some_and(|runtime| runtime.descriptor().resource_compatible_with(descriptor))
     }
 
     /// Installs or reuses the private source-derived puddle field. Its stable
@@ -6320,6 +6399,9 @@ impl ShaderPackRuntimeExecutor {
     pub(crate) fn destroy(mut self, gal: &mut VulkanicGal) -> GalResult<()> {
         self.discard_vanilla_lightmap_submission(gal);
         if let Some(resources) = self.vanilla_lightmap_residency.take() {
+            resources.destroy(gal)?;
+        }
+        for resources in self.retired_vanilla_lightmap_residencies.drain(..) {
             resources.destroy(gal)?;
         }
         self.vanilla_lightmap.clear();
@@ -7388,11 +7470,7 @@ impl ShaderPackRuntimeExecutor {
     ) -> GalResult<()> {
         if !draws.iter().any(|draw| {
             draw.material_mode == TerrainMaterialPassMode::Translucent
-                && !Self::translucent_draw_is_external(
-                    draw,
-                    translucent_entity_external,
-                    false,
-                )
+                && !Self::translucent_draw_is_external(draw, translucent_entity_external, false)
         }) {
             return Ok(());
         }
@@ -7413,22 +7491,34 @@ impl ShaderPackRuntimeExecutor {
             )));
             ops.push(CommandOp::Barrier(texture_barrier(
                 capture.depth_texture,
-                if targets.translucent_capture_initialized { TextureUsageState::ShaderRead }
-                else { TextureUsageState::Undefined },
+                if targets.translucent_capture_initialized {
+                    TextureUsageState::ShaderRead
+                } else {
+                    TextureUsageState::Undefined
+                },
                 TextureUsageState::TransferDst,
             )));
             ops.push(CommandOp::CopyTexture(TextureImageCopyRegion {
                 row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
-                src_texture: targets.depth_texture, src_mip: 0, src_layer: 0,
+                src_texture: targets.depth_texture,
+                src_mip: 0,
+                src_layer: 0,
                 src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-                dst_texture: capture.depth_texture, dst_mip: 0, dst_layer: 0,
-                dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 }, extent: capture.extent,
+                dst_texture: capture.depth_texture,
+                dst_mip: 0,
+                dst_layer: 0,
+                dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                extent: capture.extent,
             }));
             ops.push(CommandOp::Barrier(texture_barrier(
-                targets.depth_texture, TextureUsageState::TransferSrc, TextureUsageState::ShaderRead,
+                targets.depth_texture,
+                TextureUsageState::TransferSrc,
+                TextureUsageState::ShaderRead,
             )));
             ops.push(CommandOp::Barrier(texture_barrier(
-                capture.depth_texture, TextureUsageState::TransferDst, TextureUsageState::DepthStencilAttachment,
+                capture.depth_texture,
+                TextureUsageState::TransferDst,
+                TextureUsageState::DepthStencilAttachment,
             )));
             ops.push(CommandOp::BeginPass {
                 pass: capture.pass,
@@ -7454,11 +7544,7 @@ impl ShaderPackRuntimeExecutor {
             let mut capture_draw_state = IndexedDrawState::default();
             for draw in draws.iter().filter(|draw| {
                 draw.material_mode == TerrainMaterialPassMode::Translucent
-                    && !Self::translucent_draw_is_external(
-                        draw,
-                        translucent_entity_external,
-                        false,
-                    )
+                    && !Self::translucent_draw_is_external(draw, translucent_entity_external, false)
             }) {
                 append_indexed_draw(
                     ops,
@@ -7567,19 +7653,19 @@ impl ShaderPackRuntimeExecutor {
         Ok(())
     }
 
-/// Returns whether this translucent draw is owned by the explicit Fabulous
-/// attachment graph rather than the normal deferred color target.  The
-/// capture pass deliberately keeps terrain available to Fabulous while entity
-/// meshes use their separate `item_entity` role; the final deferred pass must
-/// omit both external families so neither is composited twice.
+    /// Returns whether this translucent draw is owned by the explicit Fabulous
+    /// attachment graph rather than the normal deferred color target.  The
+    /// capture pass deliberately keeps terrain available to Fabulous while entity
+    /// meshes use their separate `item_entity` role; the final deferred pass must
+    /// omit both external families so neither is composited twice.
     fn translucent_draw_is_external(
-    draw: &TerrainMeshDraw,
-    translucent_entity_external: bool,
-    translucent_terrain_external: bool,
-) -> bool {
-    (translucent_entity_external && draw.stratum == WORLD_STRATUM_ENTITY_MESH)
-        || (translucent_terrain_external && draw.stratum == WORLD_STRATUM_TERRAIN)
-}
+        draw: &TerrainMeshDraw,
+        translucent_entity_external: bool,
+        translucent_terrain_external: bool,
+    ) -> bool {
+        (translucent_entity_external && draw.stratum == WORLD_STRATUM_ENTITY_MESH)
+            || (translucent_terrain_external && draw.stratum == WORLD_STRATUM_TERRAIN)
+    }
 
     /// Direct semantic material quads use their own texture/pipeline contract,
     /// but must be written after deferred terrain lighting and before the
@@ -7765,7 +7851,7 @@ impl TerrainCompositeUniforms {
 }
 
 #[derive(Default)]
-struct IndexedDrawState {
+pub(crate) struct IndexedDrawState {
     pipeline: Option<Handle>,
     resource_set: Option<(Handle, u32, Handle, Vec<u64>)>,
     shader_resource_set: Option<(Handle, u32, Handle)>,
@@ -7799,20 +7885,23 @@ fn append_direct_draw(
         state.resource_set = None;
         state.shader_resource_set = None;
     }
-    let resource_set_binding = (
-        pipeline_layout,
-        0,
-        resource_set,
-        resource_set_dynamic_offsets.to_vec(),
+    let resource_set_matches = state.resource_set.as_ref().is_some_and(
+        |(layout, set_index, bound_set, dynamic_offsets)| {
+            *layout == pipeline_layout
+                && *set_index == 0
+                && *bound_set == resource_set
+                && dynamic_offsets.as_slice() == resource_set_dynamic_offsets
+        },
     );
-    if state.resource_set.as_ref() != Some(&resource_set_binding) {
+    if !resource_set_matches {
+        let dynamic_offsets = resource_set_dynamic_offsets.to_vec();
         ops.push(CommandOp::BindResourceSet {
             pipeline_layout,
             set_index: 0,
             set: resource_set,
-            dynamic_offsets: resource_set_dynamic_offsets.to_vec(),
+            dynamic_offsets: dynamic_offsets.clone(),
         });
-        state.resource_set = Some(resource_set_binding);
+        state.resource_set = Some((pipeline_layout, 0, resource_set, dynamic_offsets));
     }
     let shader_resource_set_binding =
         shader_resource_set.map(|binding| (pipeline_layout, binding.set_index, binding.set));
@@ -7834,7 +7923,7 @@ fn append_direct_draw(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn append_indexed_draw(
+pub(crate) fn append_indexed_draw(
     ops: &mut Vec<CommandOp>,
     state: &mut IndexedDrawState,
     pipeline: Handle,
@@ -7855,20 +7944,23 @@ fn append_indexed_draw(
         state.resource_set = None;
         state.shader_resource_set = None;
     }
-    let resource_set_binding = (
-        pipeline_layout,
-        0,
-        resource_set,
-        resource_set_dynamic_offsets.to_vec(),
+    let resource_set_matches = state.resource_set.as_ref().is_some_and(
+        |(layout, set_index, bound_set, dynamic_offsets)| {
+            *layout == pipeline_layout
+                && *set_index == 0
+                && *bound_set == resource_set
+                && dynamic_offsets.as_slice() == resource_set_dynamic_offsets
+        },
     );
-    if state.resource_set.as_ref() != Some(&resource_set_binding) {
+    if !resource_set_matches {
+        let dynamic_offsets = resource_set_dynamic_offsets.to_vec();
         ops.push(CommandOp::BindResourceSet {
             pipeline_layout,
             set_index: 0,
             set: resource_set,
-            dynamic_offsets: resource_set_dynamic_offsets.to_vec(),
+            dynamic_offsets: dynamic_offsets.clone(),
         });
-        state.resource_set = Some(resource_set_binding);
+        state.resource_set = Some((pipeline_layout, 0, resource_set, dynamic_offsets));
     }
     let shader_resource_set_binding =
         shader_resource_set.map(|binding| (pipeline_layout, binding.set_index, binding.set));
@@ -7893,7 +7985,12 @@ fn append_indexed_draw(
         state.index_buffer = Some(index_binding);
     }
     if let Some(indirect) = indexed_indirect {
-        if let Some(CommandOp::DrawIndexedIndirect { buffer, offset, draw_count }) = ops.last_mut() {
+        if let Some(CommandOp::DrawIndexedIndirect {
+            buffer,
+            offset,
+            draw_count,
+        }) = ops.last_mut()
+        {
             let expected = offset.saturating_add(u64::from(*draw_count) * 20);
             if *buffer == indirect.buffer && expected == indirect.offset {
                 *draw_count = draw_count.saturating_add(1);
@@ -7998,6 +8095,7 @@ mod tests {
         let draw = |stratum| TerrainMeshDraw {
             shadow: None,
             pipeline: Handle::NULL,
+            offscreen_pipeline: None,
             pipeline_layout: Handle::NULL,
             resource_set: Handle::NULL,
             resource_set_dynamic_offsets: Vec::new(),
@@ -11009,6 +11107,11 @@ mod tests {
         assert!(executor
             .ensure_candidate_colored_light_runtime(&mut gal, preparation.clone())
             .unwrap());
+        let compatible_descriptor = executor
+            .candidate_colored_light_descriptor(43, 59, [0.75, 64.5, 0.25])
+            .unwrap()
+            .unwrap();
+        assert!(executor.candidate_colored_light_runtime_compatible(&compatible_descriptor));
         assert!(!executor
             .ensure_candidate_colored_light_runtime(&mut gal, preparation)
             .unwrap());
@@ -11196,9 +11299,22 @@ mod tests {
         let mut state = IndexedDrawState::default();
         for offset in [0, 20, 40] {
             append_indexed_draw(
-                &mut ops, &mut state, pipeline, layout, set, &[0, 0], None,
-                index, 0, IndexType::U32, 6, 1,
-                Some(TerrainIndexedIndirect { buffer: indirect, offset }),
+                &mut ops,
+                &mut state,
+                pipeline,
+                layout,
+                set,
+                &[0, 0],
+                None,
+                index,
+                0,
+                IndexType::U32,
+                6,
+                1,
+                Some(TerrainIndexedIndirect {
+                    buffer: indirect,
+                    offset,
+                }),
             );
         }
         assert!(matches!(
@@ -11208,7 +11324,9 @@ mod tests {
         ));
         assert_eq!(
             1,
-            ops.iter().filter(|op| matches!(op, CommandOp::DrawIndexedIndirect { .. })).count()
+            ops.iter()
+                .filter(|op| matches!(op, CommandOp::DrawIndexedIndirect { .. }))
+                .count()
         );
     }
 

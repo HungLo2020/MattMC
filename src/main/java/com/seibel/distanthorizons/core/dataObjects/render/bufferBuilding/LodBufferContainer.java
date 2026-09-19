@@ -45,6 +45,12 @@ public class LodBufferContainer implements AutoCloseable
 	public final long pos;
 	
 	public boolean buffersUploaded = false;
+	/** True after this container published an immutable CPU semantic asset for
+	 * the selected Rust whole-frame route.  This is a lifecycle state, not a
+	 * Java GPU upload: retaining the container lets the owning render section
+	 * retire that asset from {@link #close()} at the normal DH boundary. */
+	private boolean rustSemanticBuffersPublished = false;
+	private long rustSemanticColumnGeneration = 0L;
 	
 	public GLVertexBuffer[] vbos;
 	public GLVertexBuffer[] vbosTransparent;
@@ -203,11 +209,12 @@ public class LodBufferContainer implements AutoCloseable
 			LodQuadBuilder.SemanticVertexBufferBuild transparent = builder.makeTransparentRustSemanticBuffers();
 			LodQuadBuilder.SemanticVertexBufferBuild transparentUp = builder.makeTransparentUpRustSemanticBuffers();
 			LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp = builder.makeTransparentWaterUpRustSemanticBuffers();
-			net.vulkanic.world.DistantHorizonsSemanticCollector.recordRustSemanticBuiltColumn(
+			this.rustSemanticColumnGeneration = net.vulkanic.world.DistantHorizonsSemanticCollector.recordRustSemanticBuiltColumn(
 				this.pos, this.minCornerBlockPos, builder.semanticMaterials(), builder.semanticQuadCoverage(),
 				LodQuadBuilder.semanticQuadCoverage(opaque, transparent, transparentUp, transparentWaterUp),
 				opaque, transparent, transparentUp, transparentWaterUp
 			);
+			this.rustSemanticBuffersPublished = true;
 			// This route intentionally owns no Java GL VBO and schedules no Java GL
 			// upload. The immutable semantic packets now belong to the collector.
 			this.uploadFuture = null;
@@ -338,6 +345,7 @@ public class LodBufferContainer implements AutoCloseable
 	}
 	
 	public boolean uploadInProgress() { return this.uploadFuture != null; }
+	public boolean renderDataReady() { return this.buffersUploaded || this.rustSemanticBuffersPublished; }
 	
 	public void debugDumpStats(StatsMap statsMap)
 	{
@@ -379,9 +387,20 @@ public class LodBufferContainer implements AutoCloseable
 	public void close()
 	{
 		this.buffersUploaded = false;
+		this.rustSemanticBuffersPublished = false;
 		// Keep the copied semantic asset lifecycle aligned with the legacy LOD
 		// container. This touches no native renderer object or GL state.
-		net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(this.pos);
+		if (this.rustSemanticColumnGeneration != 0L)
+		{
+			net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(
+				this.pos, this.rustSemanticColumnGeneration
+			);
+			this.rustSemanticColumnGeneration = 0L;
+		}
+		else
+		{
+			net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(this.pos);
+		}
 		
 		GLProxy.queueRunningOnRenderThread(() ->
 		{

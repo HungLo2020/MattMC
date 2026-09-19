@@ -247,7 +247,10 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
         let source = vertices[index];
         let mut color = source.color;
         if applies_tint {
-            color = multiply_argb(color, native_vertex_tint_color(&block, state, source.x, source.y, source.z));
+            color = multiply_argb(
+                color,
+                native_vertex_tint_color(&block, state, source.x, source.y, source.z),
+            );
         }
         if format.separate_ao {
             color = color_mul_rgb(color, directional_shade);

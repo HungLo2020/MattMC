@@ -253,6 +253,17 @@ class GuiItemMeshSemanticCollectorTest {
 			"cache identity must include vanilla model semantics and raster scale");
 		assertTrue(assets.contains("GuiItemMeshSemanticCollector.invalidateCache();"),
 			"resource reload must retire cached topology before new atlas identities are used");
+		String flatCollector = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/java/net/vulkanic/gui/GuiFlatItemMeshCollector.java"));
+		assertTrue(flatCollector.contains("MAX_CACHED_TOPOLOGIES = 256"));
+		assertTrue(flatCollector.contains("foil == null"),
+			"foil submissions must bypass the non-foil topology cache");
+		assertTrue(flatCollector.contains("!item.itemStackRenderState().isAnimated()"),
+			"animated flat item geometry must remain frame-local");
+		assertTrue(flatCollector.contains("static synchronized void invalidateCache()"),
+			"flat topology cache must have an explicit resource-lifetime invalidation seam");
+		assertTrue(assets.contains("GuiFlatItemMeshCollector.invalidateCache();"),
+			"resource reload must retire flat topology before new atlas identities are used");
 	}
 
 	private static float[] identityMatrix() {

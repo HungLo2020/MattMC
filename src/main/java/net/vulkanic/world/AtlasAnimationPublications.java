@@ -39,6 +39,10 @@ final class AtlasAnimationPublications {
         // Rejected resource publication leaves the old incarnation and retry
         // intact. The caller's existing texture budget is checked here too.
         publishTexture.run();
+        var previous = publications.get(publication.textureId());
+        if (previous != null) {
+            previous.invalidateResourceForReplacement();
+        }
         publications.put(publication.textureId(), publication);
     }
 
@@ -99,5 +103,11 @@ final class AtlasAnimationPublications {
         return publication != null && publication.owns(resource) && !publication.pending()
             ? publication.stagedGeneration() : 0;
     }
-    void clear() { publications.clear(); retryTexture = null; }
+    void clear() {
+        for (var publication : publications.values()) {
+            publication.invalidateResourceForReplacement();
+        }
+        publications.clear();
+        retryTexture = null;
+    }
 }

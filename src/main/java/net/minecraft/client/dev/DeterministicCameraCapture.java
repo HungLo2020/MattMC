@@ -13,6 +13,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.util.Mth;
@@ -119,6 +120,7 @@ import net.vulkanic.world.DistantHorizonsSemanticCollector;
 import net.vulkanic.world.RustGalTerrainRenderer;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import net.vulkanic.world.WorldRenderRoutePolicy;
+import net.sodium.client.render.StaticTerrainParityDiagnostics;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
 import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ServerApi;
@@ -210,6 +212,13 @@ public final class DeterministicCameraCapture {
 		1,
 		Math.min(120, Integer.getInteger("mattmc.dev.rustGalStaticTerrain.waterAnimationDenseFrames", 24))
 	);
+	private static final int STATIC_TERRAIN_WATER_ANIMATION_COVERAGE_STABLE_FRAMES = 3;
+	/** Capture-only option: stop integrated-server simulation once the dense
+	 * water source receipt exists, so fluid updates cannot race the paired mesh
+	 * sequence. Normal gameplay never reads this option. */
+	private static final boolean FREEZE_SERVER_TICKS_FOR_WATER_ANIMATION =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.freezeServerTicksForWaterAnimation");
+	private static boolean staticTerrainWaterAnimationServerTicksFrozen;
 	private static final String FORCED_CAMERA_TYPE = System.getProperty("mattmc.dev.deterministicCameraCapture.cameraType", "").trim();
 	private static final String FORCED_GAME_MODE = System.getProperty("mattmc.dev.deterministicCameraCapture.gameMode", "").trim();
 	private static final int FORCED_SELECTED_HOTBAR_SLOT = Integer.getInteger("mattmc.dev.deterministicCameraCapture.selectedHotbarSlot", 0);
@@ -308,6 +317,8 @@ public final class DeterministicCameraCapture {
 	 */
 	private static final boolean SOURCE_ENTITY_ISOLATION =
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.sourceEntityIsolation");
+	private static final boolean SUPPRESS_WORLD_ENTITIES =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.suppressWorldEntities");
 	private static final String WEATHER_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalWeather.scenario", "").trim().toLowerCase(Locale.ROOT);
 	/**
@@ -360,8 +371,25 @@ public final class DeterministicCameraCapture {
 	/** Harness-materialized DH fixture shared byte-for-byte with Frozen. */
 	private static final boolean DISTANT_HORIZONS_EXTERNAL_FIXTURE =
 		Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.externalFixture");
+	/**
+	 * Observe an already-populated saved world without placing the capture
+	 * hook's bounded material panel. This is capture plumbing only: readiness is
+	 * admitted from the copied Rust DH execution receipt and no renderer state
+	 * or world block data is fabricated.
+	 */
+	private static final boolean DISTANT_HORIZONS_REAL_WORLD =
+		Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.realWorld");
 	private static final boolean DISTANT_HORIZONS_LEGACY_OBSERVATION =
 		Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.legacyObservation");
+	/**
+	 * Capture-fixture near-terrain radius applied only after the real palette
+	 * column has been consumed. The paired Frozen hook receives the same value
+	 * and performs its transition after observing a real DH opaque pass.
+	 */
+	private static final int DISTANT_HORIZONS_FAR_ONLY_RENDER_DISTANCE = Math.max(
+		2,
+		Integer.getInteger("mattmc.dev.deterministicCameraCapture.dhFarOnlyRenderDistance", 2)
+	);
 	private static final int DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE = 32;
 	private static final int DISTANT_HORIZONS_TEXTURE_PALETTE_QUADRANT = DISTANT_HORIZONS_TEXTURE_PALETTE_SIDE / 2;
 	// The panel is snapped to a 64-block DH column. Use enough requested distance
@@ -412,6 +440,8 @@ public final class DeterministicCameraCapture {
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.playerHealthRegeneration");
 	private static final boolean HIDE_CHAT =
 		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.hideChat");
+	private static final boolean CLEAR_TOASTS =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.clearToasts");
 	private static final int FORCED_BOSS_BAR_COUNT =
 		Integer.getInteger("mattmc.dev.deterministicCameraCapture.bossBars", -1);
 	private static final String FORCED_BOSS_BAR_PROGRESS =
@@ -527,6 +557,10 @@ public final class DeterministicCameraCapture {
 	private static Path staticTerrainWaterAnimationAckPath;
 	private static long staticTerrainWaterAnimationPendingRenderedFrameIndex = -1L;
 	private static long staticTerrainWaterAnimationPendingGameTime = -1L;
+	private static long staticTerrainWaterAnimationPendingAnimationTick = -1L;
+	private static String staticTerrainWaterAnimationPendingCoverageFingerprint = "missing";
+	private static String staticTerrainWaterAnimationCoverageFingerprint = "missing";
+	private static int staticTerrainWaterAnimationCoverageStableFrames;
 	private static long staticTerrainWaterAnimationPendingHash;
 	private static String staticTerrainWaterAnimationPendingSummary = "missing";
 	private static String staticTerrainWaterAnimationPendingState = "missing";
@@ -551,6 +585,9 @@ public final class DeterministicCameraCapture {
 	private static int settledReadyPoseIndex = Integer.MIN_VALUE;
 	/** Consecutive drained Rust terrain frames used for whole-frame readiness. */
 	private static int settledRustTerrainFrames;
+	/** Consecutive frames with DH's real generation queue fully drained. */
+	private static int settledDistantHorizonsGenerationFrames;
+	private static String distantHorizonsGenerationSummary = "unobserved";
 	/**
 	 * Consecutive real legacy DH VBO observations used only by the explicit
 	 * Java-control capture. Rust-selected captures continue to use their native
@@ -596,6 +633,22 @@ public final class DeterministicCameraCapture {
 	private static Vec3 staticTerrainOriginalPosition;
 	private static int staticTerrainLifecycleBeforeCachedLayers;
 	private static int staticTerrainLifecycleAfterCachedLayers;
+	private static int staticTerrainLifecycleBeforeDhCachedColumns;
+	private static int staticTerrainLifecycleAfterDhCachedColumns;
+	private static int staticTerrainLifecycleBeforeDhVisibleColumns;
+	private static int staticTerrainLifecycleAfterDhVisibleColumns;
+	private static int staticTerrainLifecycleAfterDhUnpublishedVisibleColumns;
+	private static int staticTerrainLifecycleAfterDhPendingRetirements;
+	private static long staticTerrainLifecycleBeforeDhRetainedBytes;
+	private static long staticTerrainLifecycleAfterDhRetainedBytes;
+	private static long staticTerrainLifecycleBeforeDhMinimumGeneration;
+	private static long staticTerrainLifecycleAfterDhMinimumGeneration;
+	private static long staticTerrainLifecycleBeforeDhResetCount;
+	private static long staticTerrainLifecycleAfterDhResetCount;
+	private static long staticTerrainLifecycleBeforeDhExecutionSubmission;
+	private static long staticTerrainLifecycleAfterDhExecutionSubmission;
+	private static long staticTerrainLifecycleAfterDhExecutionFrame;
+	private static long staticTerrainLifecycleAfterDhExecutionInstances;
 	private static long staticTerrainLifecycleBeforeRssBytes;
 	private static long staticTerrainLifecycleAfterRssBytes;
 	private static int staticTerrainMenuCachedLayers;
@@ -1242,6 +1295,7 @@ public final class DeterministicCameraCapture {
 				.append("},\n");
 			appendDistantHorizonsExecutionCorrelation(json, 2).append(",\n");
 			appendDistantHorizonsTextureProbeReceipt(json, 2).append(",\n");
+			appendDistantHorizonsReducedColorPaletteReceipt(json, 2).append(",\n");
 			appendDistantHorizonsWaterProbeReceipt(json, 2).append(",\n");
 			// The final-output path bypasses the normal main-target screenshot
 			// acknowledgement. Preserve the same producer-specific correlation so
@@ -1295,6 +1349,17 @@ public final class DeterministicCameraCapture {
 		LocalPlayer player = minecraft.player;
 		if (player == null) {
 			return;
+		}
+		// The Rust whole-frame path advances its post-present hook from the frame
+		// coordinator, which is not reached while the client is still crossing the
+		// loading overlay. The DH texture-palette fixture has a real server/light
+		// invalidation state machine that must continue during that interval. Poll
+		// it from the guaranteed client tick as well; this is capture plumbing only,
+		// and the normal render hook still owns readiness and screenshot admission.
+		if (distantHorizonsFixtureRequested()
+			&& initialized
+			&& !distantHorizonsTexturePaletteSourceReady) {
+			setupDistantHorizonsTexturePaletteAfterSettledReady(minecraft);
 		}
 		if (!FORCED_SELECTED_SKIN.isEmpty() && !FORCED_SELECTED_SKIN.equals(minecraft.options.selectedSkin)) {
 			minecraft.options.selectedSkin = FORCED_SELECTED_SKIN;
@@ -1489,6 +1554,17 @@ public final class DeterministicCameraCapture {
 			? poses[translucentWarmupPoseIndex]
 			: poses[poseIndex];
 		applyPose(minecraft.player, activePose);
+		// A literal world transition deliberately passes through the menu, where
+		// there is no player, level, or DH producer. Advance that coordinator
+		// before the ordinary world-only readiness gates; otherwise the DH gate
+		// waits forever after disconnect and the reload request is never issued.
+		if (staticTerrainLiteralWorldTransitionScenario()
+			&& staticTerrainLifecycleActionStep > 0
+			&& !setupStaticTerrainLiteralWorldTransition(minecraft)) {
+			afterRenderLifecycleGateReturns++;
+			renderedFramesAtPose = 0;
+			return;
+		}
 		// Camera relocation invalidates the previous pose's visibility and upload
 		// identities.  Whole-frame Rust terrain must prove a fresh drained/stable
 		// window before the new pose is captured; retaining the global boolean here
@@ -1497,6 +1573,7 @@ public final class DeterministicCameraCapture {
 			settledReadyPoseIndex = poseIndex;
 			settledReadyGateSatisfied = false;
 			settledRustTerrainFrames = 0;
+			settledDistantHorizonsGenerationFrames = 0;
 			settledLegacyDistantHorizonsObservationFrames = 0;
 			framesWaitingForSettledReady = 0;
 		}
@@ -1541,8 +1618,14 @@ public final class DeterministicCameraCapture {
 		if (!captureStaticTerrainWaterAnimationFrameIfNeeded(minecraft)) {
 			return;
 		}
+		// Dense water frames are a complete capture phase of their own. Do not
+		// arm the ordinary selected-source attachment request while that phase is
+		// still collecting; otherwise the attachment correlation can be claimed
+		// by an early dense frame and remain stale when the final pose screenshot
+		// is acknowledged after the dense sequence.
 		boolean denseWaterCapture = STATIC_TERRAIN_WATER_ANIMATION_DENSE_CAPTURE
-			&& "translucent-water".equals(STATIC_TERRAIN_SCENARIO);
+			&& "translucent-water".equals(STATIC_TERRAIN_SCENARIO)
+			&& !staticTerrainWaterAnimationDenseComplete;
 		if (!denseWaterCapture && !settledReadyGateSatisfied && !settledReadyGateSatisfied(minecraft)) {
 			afterRenderSettledGateReturns++;
 			renderedFramesAtPose = 0;
@@ -1575,6 +1658,14 @@ public final class DeterministicCameraCapture {
 			afterRenderLifecycleGateReturns++;
 			renderedFramesAtPose = 0;
 			return;
+		}
+		// A named translucent-water parity fixture is a single source block,
+		// not a fluid-simulation workload. Freeze only the copied integrated
+		// server after the fixture is visible; the client atlas ticker remains
+		// open so ordinary water texture animation is still observable.
+		if ("translucent-water".equals(STATIC_TERRAIN_SCENARIO)
+			&& staticTerrainLifecycleAfterRecorded) {
+			freezeServerTicksForWaterAnimationCapture(minecraft);
 		}
 		if (staticTerrainRequiresTranslucentCameraSequence() && !translucentWarmupComplete) {
 			if (translucentWarmupPoseIndex < 0) {
@@ -1686,9 +1777,10 @@ public final class DeterministicCameraCapture {
 		// Selected-source rows may opt into a bounded per-pose final readback.  The
 		// ordinary default retains one attachment set, while the opt-in prevents a
 		// later pose from silently falling back to an external window capture.
-		boolean captureWholeFrameAttachmentsForPose = !selectedSourceCaptureRequested()
-			|| poseIndex == 0
-			|| RUST_FINAL_OUTPUT_EVERY_POSE;
+		boolean captureWholeFrameAttachmentsForPose = !denseWaterCapture
+			&& (!selectedSourceCaptureRequested()
+				|| poseIndex == 0
+				|| RUST_FINAL_OUTPUT_EVERY_POSE);
 		if (captureWholeFrameAttachmentsForPose
 			&& renderedFramesAtPose == Math.max(1, FRAMES_PER_POSE - 1)
 			&& !wholeFrameAttachmentCaptureReady) {
@@ -1873,6 +1965,24 @@ public final class DeterministicCameraCapture {
 				return true;
 			}
 		}
+		String sourceCoverageFingerprint = StaticTerrainParityDiagnostics.rustSourceCoverageFingerprint();
+		if (!"missing".equals(sourceCoverageFingerprint)) {
+			freezeServerTicksForWaterAnimationCapture(minecraft);
+			if (!sourceCoverageFingerprint.equals(staticTerrainWaterAnimationCoverageFingerprint)) {
+				if (staticTerrainWaterAnimationScreenshotInFlight
+					|| staticTerrainWaterAnimationDenseCapturedFrames > 0) {
+					resetStaticTerrainWaterAnimationSequenceForCoverageChange(minecraft, sourceCoverageFingerprint);
+					return false;
+				}
+				staticTerrainWaterAnimationCoverageFingerprint = sourceCoverageFingerprint;
+				staticTerrainWaterAnimationCoverageStableFrames = 1;
+			}
+			if (!staticTerrainWaterAnimationScreenshotInFlight
+				&& staticTerrainWaterAnimationCoverageStableFrames < STATIC_TERRAIN_WATER_ANIMATION_COVERAGE_STABLE_FRAMES) {
+				staticTerrainWaterAnimationCoverageStableFrames++;
+				return false;
+			}
+		}
 		if (staticTerrainWaterAnimationScreenshotInFlight) {
 			if (checkStaticTerrainWaterAnimationAck(minecraft)) {
 				return false;
@@ -1893,10 +2003,19 @@ public final class DeterministicCameraCapture {
 		staticTerrainWaterAnimationScreenshotPath = SCREENSHOT_DIR.resolve(String.format(Locale.ROOT, "water_animation_frame_%03d.png", frameIndex));
 		staticTerrainWaterAnimationAckPath = SCREENSHOT_DIR.resolve(String.format(Locale.ROOT, "capture_request_water_animation_%03d.ack.json", frameIndex));
 		Path requestPath = SCREENSHOT_DIR.resolve(String.format(Locale.ROOT, "capture_request_water_animation_%03d.json", frameIndex));
+		try {
+			Files.deleteIfExists(staticTerrainWaterAnimationScreenshotPath);
+			Files.deleteIfExists(staticTerrainWaterAnimationAckPath);
+		} catch (IOException exception) {
+			fail("failed to clear stale water animation dense screenshot files: " + exception.getMessage());
+			return false;
+		}
 		RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
-		long animationTick = renderedFrameIndex;
+		long animationTick = staticTerrainWaterAnimationProducedTick(minecraft);
 		staticTerrainWaterAnimationPendingRenderedFrameIndex = renderedFrameIndex;
 		staticTerrainWaterAnimationPendingGameTime = minecraft.level == null ? -1L : minecraft.level.getGameTime();
+		staticTerrainWaterAnimationPendingAnimationTick = animationTick;
+		staticTerrainWaterAnimationPendingCoverageFingerprint = sourceCoverageFingerprint;
 		staticTerrainWaterAnimationPendingHash = RustGalTerrainRenderer.waterAnimationHashForDiagnostics();
 		staticTerrainWaterAnimationPendingSummary = RustGalTerrainRenderer.waterAnimationSummaryForDiagnostics();
 		staticTerrainWaterAnimationPendingState = RustGalTerrainRenderer.waterAnimationFrameStateForDiagnostics(animationTick);
@@ -1932,9 +2051,93 @@ public final class DeterministicCameraCapture {
 		return false;
 	}
 
+	private static void freezeServerTicksForWaterAnimationCapture(Minecraft minecraft) {
+		if (!FREEZE_SERVER_TICKS_FOR_WATER_ANIMATION) {
+			return;
+		}
+		var server = minecraft.getSingleplayerServer();
+		if (server == null) {
+			return;
+		}
+		if (!staticTerrainWaterAnimationServerTicksFrozen && !server.tickRateManager().isFrozen()) {
+			server.tickRateManager().setFrozen(true);
+		}
+		// The server freeze stops fluid/world simulation, but the dense receipt
+		// still needs the client atlas ticker to advance once per rendered frame.
+		// Re-open only the client-side tick gate; no client fluid simulation is
+		// performed by this capture path.
+		if (minecraft.level != null && minecraft.level.tickRateManager().isFrozen()) {
+			minecraft.level.tickRateManager().setFrozen(false);
+		}
+		if (!staticTerrainWaterAnimationServerTicksFrozen) {
+			staticTerrainWaterAnimationServerTicksFrozen = true;
+			LOGGER.info("Deterministic water animation capture froze integrated-server ticks after source mesh became observable");
+		}
+	}
+
+	private static void resetStaticTerrainWaterAnimationSequenceForCoverageChange(Minecraft minecraft, String sourceCoverageFingerprint) {
+		if (staticTerrainWaterAnimationScreenshotPath != null) {
+			try {
+				Files.deleteIfExists(staticTerrainWaterAnimationScreenshotPath);
+			} catch (IOException ignored) {
+				// The next request overwrites the path; diagnostics must not fail solely
+				// because an external screenshot process still owns the old file.
+			}
+		}
+		if (staticTerrainWaterAnimationAckPath != null) {
+			try {
+				Files.deleteIfExists(staticTerrainWaterAnimationAckPath);
+			} catch (IOException ignored) {
+				// See the screenshot cleanup above.
+			}
+		}
+		WATER_ANIMATION_CAPTURES.clear();
+		staticTerrainWaterAnimationDenseCapturedFrames = 0;
+		staticTerrainWaterAnimationDenseComplete = false;
+		staticTerrainWaterAnimationScreenshotInFlight = false;
+		framesAwaitingStaticTerrainWaterAnimationAck = 0;
+		staticTerrainWaterAnimationScreenshotPath = null;
+		staticTerrainWaterAnimationAckPath = null;
+		staticTerrainWaterAnimationPendingRenderedFrameIndex = -1L;
+		staticTerrainWaterAnimationPendingGameTime = -1L;
+		staticTerrainWaterAnimationPendingAnimationTick = -1L;
+		staticTerrainWaterAnimationPendingCoverageFingerprint = "missing";
+		staticTerrainWaterAnimationPendingHash = 0L;
+		staticTerrainWaterAnimationPendingSummary = "missing";
+		staticTerrainWaterAnimationPendingState = "missing";
+		staticTerrainWaterAnimationPendingVisibleLayerSubmissions = 0L;
+		staticTerrainWaterAnimationPendingCurrentFrameVisibleLayerSubmissions = 0L;
+		staticTerrainWaterAnimationPendingAtlasGeneration = 0L;
+		staticTerrainWaterAnimationCoverageFingerprint = sourceCoverageFingerprint;
+		staticTerrainWaterAnimationCoverageStableFrames = 1;
+		writeMetadata(minecraft, "static_terrain_water_animation_dense_source_changed");
+	}
+
+	/**
+	 * The semantic atlas resource is the producer clock delivered to Rust. A
+	 * rendered-frame count is only a presentation cadence and must not stand in
+	 * for an animation tick when producing diagnostic state.
+	 */
+	private static long staticTerrainWaterAnimationProducedTick(Minecraft minecraft) {
+		if (minecraft != null) {
+			var texture = minecraft.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
+			if (texture instanceof TextureAtlas atlas) {
+				var resource = atlas.semanticAnimationResource();
+				if (resource != null) return resource.producedTickForDiagnostics();
+			}
+		}
+		return renderedFrameIndex;
+	}
+
 	private static boolean checkStaticTerrainWaterAnimationAck(Minecraft minecraft) {
 		if (staticTerrainWaterAnimationAckPath == null || !Files.isRegularFile(staticTerrainWaterAnimationAckPath)) {
 			return false;
+		}
+		String sourceCoverageFingerprint = StaticTerrainParityDiagnostics.rustSourceCoverageFingerprint();
+		if (!"missing".equals(sourceCoverageFingerprint)
+			&& !sourceCoverageFingerprint.equals(staticTerrainWaterAnimationPendingCoverageFingerprint)) {
+			resetStaticTerrainWaterAnimationSequenceForCoverageChange(minecraft, sourceCoverageFingerprint);
+			return true;
 		}
 		if (staticTerrainWaterAnimationScreenshotPath == null || !Files.isRegularFile(staticTerrainWaterAnimationScreenshotPath)) {
 			fail("water animation dense screenshot ack exists but screenshot is missing: " + staticTerrainWaterAnimationScreenshotPath);
@@ -1945,6 +2148,7 @@ public final class DeterministicCameraCapture {
 			staticTerrainWaterAnimationScreenshotPath.toAbsolutePath().toString(),
 			staticTerrainWaterAnimationPendingRenderedFrameIndex,
 			staticTerrainWaterAnimationPendingGameTime,
+			staticTerrainWaterAnimationPendingAnimationTick,
 			staticTerrainWaterAnimationPendingHash,
 			staticTerrainWaterAnimationPendingSummary,
 			staticTerrainWaterAnimationPendingState,
@@ -1959,6 +2163,8 @@ public final class DeterministicCameraCapture {
 		staticTerrainWaterAnimationAckPath = null;
 		staticTerrainWaterAnimationPendingRenderedFrameIndex = -1L;
 		staticTerrainWaterAnimationPendingGameTime = -1L;
+		staticTerrainWaterAnimationPendingAnimationTick = -1L;
+		staticTerrainWaterAnimationPendingCoverageFingerprint = "missing";
 		staticTerrainWaterAnimationPendingHash = 0L;
 		staticTerrainWaterAnimationPendingSummary = "missing";
 		staticTerrainWaterAnimationPendingState = "missing";
@@ -2203,6 +2409,27 @@ public final class DeterministicCameraCapture {
 		return !SOURCE_ENTITY_ISOLATION
 			|| (sourceEntityIsolationApplied
 				&& sourceEntityIsolationClientSyncFrames >= 12);
+	}
+
+	/**
+	 * Prevents the copied world's pre-existing entities from entering a capture
+	 * frame before the server-owned isolation request and its removal packets
+	 * have settled. The first whole-frame render can precede {@link #afterRender},
+	 * so waiting only in the capture lifecycle leaves one unsafe traversal.
+	 */
+	public static boolean suppressWorldEntitiesForCapture() {
+		return ENABLED && (SUPPRESS_WORLD_ENTITIES
+			|| SOURCE_ENTITY_ISOLATION && !isSelectedSourceCoverageReady()
+			// The away leg exists only to exercise terrain/DH cache relocation; it
+			// is never captured. Do not let a newly visible, unrelated entity family
+			// abort that diagnostic before the camera returns to the equivalent
+			// Current/Frozen screenshot position. Ordinary entity rendering resumes
+			// on the first frame after action step two is published.
+			|| "return-visited-terrain".equals(staticTerrainBaseScenario())
+				&& staticTerrainLifecycleActionStep == 1
+			|| "memory-cache-soak".equals(staticTerrainBaseScenario())
+				&& staticTerrainLifecycleSetup
+				&& staticTerrainLifecycleActionStep < 4);
 	}
 
 	private static int countClientNonPlayerEntities(ClientLevel level, LocalPlayer player) {
@@ -2477,10 +2704,58 @@ public final class DeterministicCameraCapture {
 	 * it after the near client terrain radius has been reduced. This is capture
 	 * plumbing only: no renderer state, mesh, or DH buffer is fabricated here.
 	 */
+	private static boolean observeDistantHorizonsRealWorldAfterSettledReady(Minecraft minecraft) {
+		distantHorizonsTexturePaletteWaitFrames++;
+		DistantHorizonsSemanticCollector.RouteDiagnostics diagnostics =
+			DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+		boolean opaqueExecuted = diagnostics.selected()
+			&& diagnostics.lastExecutedOpaqueInstances() > 0
+			&& diagnostics.lastExecutedSubmission() > 0;
+		boolean transparentExecuted = diagnostics.selected()
+			&& diagnostics.lastExecutedTransparentInstances() > 0
+			&& diagnostics.lastExecutedSubmission() > 0;
+		boolean waterExecuted = diagnostics.selected()
+			&& diagnostics.lastExecutedWaterInstances() > 0
+			&& diagnostics.lastExecutedSubmission() > 0;
+		boolean routeExecuted = opaqueExecuted || transparentExecuted || waterExecuted;
+		boolean requiredStreamsExecuted = routeExecuted
+			&& (!DISTANT_HORIZONS_REQUIRE_TRANSPARENT || transparentExecuted)
+			&& (!DISTANT_HORIZONS_REQUIRE_WATER || waterExecuted)
+			&& diagnostics.semanticUnpublishedCandidates() == 0;
+		if (requiredStreamsExecuted) {
+			distantHorizonsTexturePaletteSourceReady = true;
+			distantHorizonsTexturePaletteStage = "real-world-dh-executed";
+			writeMetadata(minecraft, "distant_horizons_real_world_executed");
+			return true;
+		}
+		if (distantHorizonsTexturePaletteWaitFrames > SETTLED_READY_MAX_WAIT_FRAMES) {
+			fail("timed out waiting for real-world DH execution: selected=" + diagnostics.selected()
+				+ " executedOpaqueInstances=" + diagnostics.lastExecutedOpaqueInstances()
+				+ " executedTransparentInstances=" + diagnostics.lastExecutedTransparentInstances()
+				+ " executedWaterInstances=" + diagnostics.lastExecutedWaterInstances()
+				+ " submission=" + diagnostics.lastExecutedSubmission());
+			return false;
+		}
+		String nextStage = "waiting-for-real-world-dh"
+			+ ":selected=" + diagnostics.selected()
+			+ ":opaque=" + opaqueExecuted
+			+ ":transparent=" + transparentExecuted
+			+ ":water=" + waterExecuted;
+		boolean stageChanged = !nextStage.equals(distantHorizonsTexturePaletteStage);
+		distantHorizonsTexturePaletteStage = nextStage;
+		if (stageChanged || (distantHorizonsTexturePaletteWaitFrames % 30) == 0) {
+			writeMetadata(minecraft, "waiting_for_real_world_distant_horizons");
+		}
+		return false;
+	}
+
 	private static boolean setupDistantHorizonsTexturePaletteAfterSettledReady(Minecraft minecraft) {
 		if (!distantHorizonsFixtureRequested()) {
 			distantHorizonsTexturePaletteStage = "inactive";
 			return true;
+		}
+		if (DISTANT_HORIZONS_REAL_WORLD) {
+			return observeDistantHorizonsRealWorldAfterSettledReady(minecraft);
 		}
 		if (minecraft.player == null || minecraft.level == null || minecraft.getSingleplayerServer() == null) {
 			distantHorizonsTexturePaletteStage = "waiting-for-world";
@@ -2518,7 +2793,9 @@ public final class DeterministicCameraCapture {
 			// the ordinary source chunks; clamping to two chunks here leaves DH with
 			// only unrelated cached columns and makes the palette gate wait forever.
 			// The radius is reduced to two after the source column is proven below.
-			minecraft.options.renderDistance().set(8);
+			// Four chunks still stream the panel's source area while avoiding the
+			// broad near-terrain rebuild that can consume the bounded capture window.
+			minecraft.options.renderDistance().set(4);
 			BlockPos panelOrigin = new BlockPos(64, 81, 512);
 			// Keep the target center aligned with the datapack-authored panel.  The
 			// invalidation helpers derive their 32x32 footprint from this point; using
@@ -2874,10 +3151,14 @@ public final class DeterministicCameraCapture {
 			writeDistantHorizonsTexturePaletteWaitMetadata(minecraft);
 			return false;
 		}
-		if (DISTANT_HORIZONS_EXTERNAL_FIXTURE) {
-			// Keep the source stream alive until DH has cached the panel; only then
-			// shrink near terrain so the retained LOD becomes the visible producer.
-			minecraft.options.renderDistance().set(3);
+		if (DISTANT_HORIZONS_EXTERNAL_FIXTURE && !distantHorizonsTexturePaletteSourceReady) {
+			// The paired Frozen control keeps the canonical DH water row at the
+			// harness producer window (10 chunks).  Reducing only Current to three
+			// chunks after the panel is cached leaves the Rust near-world handoff
+			// with a different fade boundary and photographs sky where Frozen has
+			// terrain.  Water remains a real DH stream witness; it does not require
+			// suppressing the equivalent vanilla near-world window.
+			minecraft.options.renderDistance().set(DISTANT_HORIZONS_REQUIRE_WATER ? 10 : 3);
 		}
 		// Texture identity is valid only when every displayed palette target has
 		// both spatially matching semantic provenance and the expected exact atlas
@@ -2890,8 +3171,15 @@ public final class DeterministicCameraCapture {
 		if (exactAtlasStatus.targetsMatched()) {
 			distantHorizonsTexturePaletteExactAtlasObserved = true;
 		}
+		boolean reducedColorPaletteRoute = DISTANT_HORIZONS_TEXTURE_PALETTE
+			&& !DISTANT_HORIZONS_LEGACY_OBSERVATION
+			&& !selectedSourceCaptureRequested();
+		boolean reducedColorPaletteReady = reducedColorPaletteRoute
+			&& distantHorizonsReducedColorPaletteReady();
 		boolean sourceColumnReady = (DISTANT_HORIZONS_REQUIRE_WATER && !DISTANT_HORIZONS_TEXTURE_PALETTE)
 			? distantHorizonsWaterSourceProbeReceipt().matched()
+			: reducedColorPaletteRoute
+			? reducedColorPaletteReady
 			: DISTANT_HORIZONS_LEGACY_OBSERVATION
 			? distantHorizonsTexturePaletteProbes.stream().allMatch(probe ->
 				DistantHorizonsSemanticCollector.hasObservedVisibleOpaqueColumnCoveringBlock(
@@ -2918,7 +3206,8 @@ public final class DeterministicCameraCapture {
 		// a target even while Rust has matched its exact sprite and world bounds;
 		// require the stronger target-matched receipt rather than rejecting that
 		// valid Vulkan evidence merely because the legacy observer is incomplete.
-		boolean textureIdentityReady = distantHorizonsTexturePaletteProbeReceipt().matched()
+		boolean textureIdentityReady = reducedColorPaletteReady
+			|| distantHorizonsTexturePaletteProbeReceipt().matched()
 			|| exactAtlasStatus.targetsMatched()
 			|| distantHorizonsTexturePaletteExactAtlasObserved;
 		boolean exactAtlasReady = exactAtlasStatus.targetsMatched()
@@ -2927,7 +3216,7 @@ public final class DeterministicCameraCapture {
 		// Water-only captures still require spatial source and executed-water
 		// receipts, but must not be rejected because no opaque palette witness was
 		// requested or admitted in that run.
-		boolean exactAtlasRequired = DISTANT_HORIZONS_TEXTURE_PALETTE;
+		boolean exactAtlasRequired = DISTANT_HORIZONS_TEXTURE_PALETTE && !reducedColorPaletteRoute;
 		DistantHorizonsSemanticCollector.RouteDiagnostics diagnostics =
 			DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
 		DistantHorizonsSemanticCollector.DistantHorizonsWaterProbeReceipt waterReceipt =
@@ -2968,7 +3257,7 @@ public final class DeterministicCameraCapture {
 			// proven, reduce the copied server's normal radius and wait for the
 			// ordinary client terrain route to release it. The subsequent frame
 			// must therefore be rendered from the same retained DH column alone.
-			minecraft.options.renderDistance().set(2);
+			minecraft.options.renderDistance().set(DISTANT_HORIZONS_FAR_ONLY_RENDER_DISTANCE);
 			distantHorizonsTexturePaletteSourceReady = true;
 			distantHorizonsTexturePaletteStage = "dh-palette-source-ready";
 			writeMetadata(minecraft, "distant_horizons_texture_palette_source_ready");
@@ -3200,7 +3489,10 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean distantHorizonsFixtureRequested() {
-		return DISTANT_HORIZONS_TEXTURE_PALETTE || DISTANT_HORIZONS_REQUIRE_TRANSPARENT || DISTANT_HORIZONS_REQUIRE_WATER;
+		return DISTANT_HORIZONS_REAL_WORLD
+			|| DISTANT_HORIZONS_TEXTURE_PALETTE
+			|| DISTANT_HORIZONS_REQUIRE_TRANSPARENT
+			|| DISTANT_HORIZONS_REQUIRE_WATER;
 	}
 
 	private static void forceDistantHorizonsTexturePaletteChunks(ServerLevel serverLevel, int panelMinX, int panelMinZ) {
@@ -3379,6 +3671,14 @@ public final class DeterministicCameraCapture {
 				? beforeDiagnostics.atlasGeneration()
 				: before == null ? 0L : before.meshGeneration();
 			staticTerrainLifecycleBeforeCachedLayers = beforeDiagnostics.cachedLayerAssets();
+			DistantHorizonsSemanticCollector.RouteDiagnostics dhBefore =
+				DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+			staticTerrainLifecycleBeforeDhCachedColumns = dhBefore.cachedColumns();
+			staticTerrainLifecycleBeforeDhVisibleColumns = dhBefore.visibleColumns();
+			staticTerrainLifecycleBeforeDhRetainedBytes = dhBefore.retainedBytes();
+			staticTerrainLifecycleBeforeDhMinimumGeneration = dhBefore.minimumPublishedGeneration();
+			staticTerrainLifecycleBeforeDhResetCount = dhBefore.lifecycleResetCount();
+			staticTerrainLifecycleBeforeDhExecutionSubmission = dhBefore.lastExecutedSubmission();
 			staticTerrainLifecycleBeforeRssBytes = currentUsedMemoryBytes();
 			staticTerrainLifecycleExecutionSubmissionBaseline = executionBefore.submissionId();
 			BlockState replacement = staticTerrainReplacementState();
@@ -3495,6 +3795,18 @@ public final class DeterministicCameraCapture {
 			if (!staticTerrainLifecycleAfterRecorded) {
 				RustGalTerrainRenderer.TerrainDiagnostics afterDiagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
 				staticTerrainLifecycleAfterCachedLayers = afterDiagnostics.cachedLayerAssets();
+				DistantHorizonsSemanticCollector.RouteDiagnostics dhAfter =
+					DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+				staticTerrainLifecycleAfterDhCachedColumns = dhAfter.cachedColumns();
+				staticTerrainLifecycleAfterDhVisibleColumns = dhAfter.visibleColumns();
+				staticTerrainLifecycleAfterDhUnpublishedVisibleColumns = dhAfter.unpublishedVisibleColumns();
+				staticTerrainLifecycleAfterDhPendingRetirements = dhAfter.pendingRetirements();
+				staticTerrainLifecycleAfterDhRetainedBytes = dhAfter.retainedBytes();
+				staticTerrainLifecycleAfterDhMinimumGeneration = dhAfter.minimumPublishedGeneration();
+				staticTerrainLifecycleAfterDhResetCount = dhAfter.lifecycleResetCount();
+				staticTerrainLifecycleAfterDhExecutionSubmission = dhAfter.lastExecutedSubmission();
+				staticTerrainLifecycleAfterDhExecutionFrame = dhAfter.lastExecutedWorldFrame();
+				staticTerrainLifecycleAfterDhExecutionInstances = dhAfter.lastExecutedInstances();
 				staticTerrainLifecycleAfterRssBytes = currentUsedMemoryBytes();
 				RustGalTerrainRenderer.recordLifecycleMarker(
 					"lifecycle-edit-after",
@@ -3906,6 +4218,11 @@ public final class DeterministicCameraCapture {
 				staticTerrainOriginalSimulationDistance = minecraft.options.simulationDistance().get();
 				minecraft.options.renderDistance().set(Math.max(2, Math.min(staticTerrainOriginalRenderDistance, 4)));
 				minecraft.options.simulationDistance().set(Math.max(2, Math.min(staticTerrainOriginalSimulationDistance, 4)));
+				// The action runs after the pre-change settled gate. Changing the
+				// semantic visibility radius starts a new Rust producer domain, so the
+				// old drained receipt cannot admit the next frame.
+				invalidateRustWholeFrameTerrainReadiness();
+				settledDistantHorizonsGenerationFrames = 0;
 				staticTerrainLifecycleStage = "view-distance-decreased";
 				RustGalTerrainRenderer.recordLifecycleMarker(
 						"lifecycle-view-distance-decreased",
@@ -3918,8 +4235,17 @@ public final class DeterministicCameraCapture {
 			case "view-distance-increase", "memory-cache-soak", "steady-state-performance" -> {
 				staticTerrainOriginalRenderDistance = minecraft.options.renderDistance().get();
 				staticTerrainOriginalSimulationDistance = minecraft.options.simulationDistance().get();
+				if ("memory-cache-soak".equals(scenario)) {
+					staticTerrainOriginalPosition = initialPosition;
+					staticTerrainLifecycleActionStep = 0;
+				}
 				minecraft.options.renderDistance().set(Math.max(staticTerrainOriginalRenderDistance, 12));
 				minecraft.options.simulationDistance().set(Math.max(staticTerrainOriginalSimulationDistance, 12));
+				// The action runs after the pre-change settled gate. Changing the
+				// semantic visibility radius starts a new Rust producer domain, so the
+				// old drained receipt cannot admit the next frame.
+				invalidateRustWholeFrameTerrainReadiness();
+				settledDistantHorizonsGenerationFrames = 0;
 				staticTerrainLifecycleStage = "visibility-expanded";
 				RustGalTerrainRenderer.recordLifecycleMarker(
 						"lifecycle-view-distance-increased",
@@ -4035,6 +4361,11 @@ public final class DeterministicCameraCapture {
 				staticTerrainLifecycleBeforeCachedLayers = diagnostics.cachedLayerAssets();
 				staticTerrainLifecycleBeforeRssBytes = currentUsedMemoryBytes();
 				staticTerrainUnloadSubmissionSnapshot = diagnostics.visibleLayerSubmissions();
+				// Keep the last pre-unload Rust submission as the correlation boundary
+				// for the rebuilt world. Literal transitions do not pass through the
+				// ordinary block-edit path that initializes this baseline.
+				staticTerrainLifecycleExecutionSubmissionBaseline =
+					RustGalTerrainRenderer.staticTerrainExecutionSnapshot().submissionId();
 				staticTerrainLifecycleSetup = true;
 				staticTerrainLifecycleStage = "leaving-world-a";
 				RustGalTerrainRenderer.recordLifecycleMarker(
@@ -4106,6 +4437,9 @@ public final class DeterministicCameraCapture {
 					|| diagnostics.visibleLayerSubmissions() <= staticTerrainMenuSubmissionSnapshot
 					|| diagnostics.cachedLayerAssets() <= 0) {
 					staticTerrainLifecycleStage = "waiting-for-world-a-reload-terrain";
+					return false;
+				}
+				if (!staticTerrainPostSetupExecutionReady(minecraft)) {
 					return false;
 				}
 				staticTerrainReloadGenerationA = Math.max(1L, diagnostics.atlasGeneration());
@@ -4223,6 +4557,9 @@ public final class DeterministicCameraCapture {
 					staticTerrainLifecycleStage = "waiting-for-world-b-terrain";
 					return false;
 				}
+				if (!staticTerrainPostSetupExecutionReady(minecraft)) {
+					return false;
+				}
 				staticTerrainReloadGenerationB = Math.max(1L, diagnostics.atlasGeneration());
 				staticTerrainLifecycleAfterGeneration = staticTerrainReloadGenerationB;
 				staticTerrainLifecycleAfterCachedLayers = diagnostics.cachedLayerAssets();
@@ -4245,6 +4582,13 @@ public final class DeterministicCameraCapture {
 						+ ":generation=" + staticTerrainReloadGenerationB
 						+ ":cachedLayers=" + diagnostics.cachedLayerAssets()
 				);
+				// Opening the copied world under a new name makes VoxelMap emit a
+				// capture-only "no waypoints" chat line. Frozen's diagnostic baseline
+				// does not perform this Current-only world-open implementation step,
+				// so remove the unrelated transient after world B is proven ready.
+				// Repeat during the bounded stability window in case VoxelMap posts it
+				// from its main-thread callback after the first ready frame.
+				minecraft.gui.getChat().clearMessages(true);
 				framesWaitingForStaticTerrainLifecycle++;
 				return framesWaitingForStaticTerrainLifecycle >= Math.max(8, FRAMES_PER_POSE);
 			}
@@ -4279,6 +4623,14 @@ public final class DeterministicCameraCapture {
 			&& staticTerrainLifecycleActionStep == 1
 			&& staticTerrainOriginalPosition != null
 			&& framesWaitingForStaticTerrainLifecycle >= Math.max(2, FRAMES_PER_POSE / 2)) {
+			// The expanded distance belongs only to the away leg. Restore the
+			// original capture inputs before returning so the final Current frame is
+			// directly comparable to Frozen while the caches still carry the revisit
+			// pressure produced by the relocated view.
+			minecraft.options.renderDistance().set(staticTerrainOriginalRenderDistance);
+			minecraft.options.simulationDistance().set(staticTerrainOriginalSimulationDistance);
+			invalidateRustWholeFrameTerrainReadiness();
+			settledDistantHorizonsGenerationFrames = 0;
 			initialPosition = staticTerrainOriginalPosition;
 			if (minecraft.player != null && initialPose != null) {
 				minecraft.player.setPos(initialPosition);
@@ -4291,6 +4643,44 @@ public final class DeterministicCameraCapture {
 				staticTerrainLifecycleEditBlock,
 				staticTerrainLifecycleLayer(),
 				"position=" + formatVec(initialPosition)
+			);
+			return true;
+		}
+		if ("memory-cache-soak".equals(scenario)
+			&& staticTerrainOriginalPosition != null
+			&& staticTerrainLifecycleActionStep < 4) {
+			int interval = Math.max(12, FRAMES_PER_POSE * 4);
+			if (framesWaitingForStaticTerrainLifecycle < (staticTerrainLifecycleActionStep + 1) * interval) {
+				return true;
+			}
+			Vec3[] positions = {
+				staticTerrainOriginalPosition.add(64.0, 0.0, 0.0),
+				staticTerrainOriginalPosition.add(64.0, 0.0, 64.0),
+				staticTerrainOriginalPosition.add(0.0, 0.0, 64.0),
+				staticTerrainOriginalPosition
+			};
+			int nextStep = staticTerrainLifecycleActionStep + 1;
+			initialPosition = positions[staticTerrainLifecycleActionStep];
+			if (minecraft.player != null && initialPose != null) {
+				minecraft.player.setPos(initialPosition);
+				minecraft.player.setOldPosAndRot(initialPosition, initialPose.yaw(), initialPose.pitch());
+			}
+			staticTerrainLifecycleActionStep = nextStep;
+			if (nextStep == 4) {
+				minecraft.options.renderDistance().set(staticTerrainOriginalRenderDistance);
+				minecraft.options.simulationDistance().set(staticTerrainOriginalSimulationDistance);
+				staticTerrainLifecycleStage = "memory-cache-soak-returned";
+			} else {
+				staticTerrainLifecycleStage = "memory-cache-soak-step-" + nextStep;
+			}
+			invalidateRustWholeFrameTerrainReadiness();
+			settledDistantHorizonsGenerationFrames = 0;
+			RustGalTerrainRenderer.recordLifecycleMarker(
+				"lifecycle-memory-cache-soak-step-" + nextStep,
+				staticTerrainLifecycleEditBlock,
+				staticTerrainLifecycleLayer(),
+				"position=" + formatVec(initialPosition)
+					+ ":renderDistance=" + minecraft.options.renderDistance().get()
 			);
 			return true;
 		}
@@ -4366,6 +4756,9 @@ public final class DeterministicCameraCapture {
 		staticTerrainLifecycleExecutionFrame = execution.frameId();
 		staticTerrainLifecycleExecutionSubmission = execution.submissionId();
 		staticTerrainLifecycleExecutionInstances = execution.instances();
+		if (!staticTerrainPostSetupDistantHorizonsExecutionReady(minecraft)) {
+			return false;
+		}
 		if (staticTerrainLifecycleSourceExecutionSubmission > 0L) {
 			return true;
 		}
@@ -4381,6 +4774,44 @@ public final class DeterministicCameraCapture {
 		}
 		staticTerrainLifecycleSourceExecutionFrame = execution.frameId();
 		staticTerrainLifecycleSourceExecutionSubmission = execution.submissionId();
+		return true;
+	}
+
+	private static boolean staticTerrainPostSetupDistantHorizonsExecutionReady(Minecraft minecraft) {
+		if (!distantHorizonsFixtureRequested()) {
+			return true;
+		}
+		DistantHorizonsSemanticCollector.RouteDiagnostics diagnostics =
+			DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+		boolean executionReady = diagnostics.selected()
+			&& diagnostics.lastExecutedSubmission() > staticTerrainLifecycleBeforeDhExecutionSubmission
+			&& diagnostics.lastExecutedWorldFrame() > 0L
+			&& diagnostics.lastExecutedInstances() > 0L
+			&& diagnostics.semanticUnpublishedCandidates() == 0;
+		boolean generationReady = !(switch (staticTerrainBaseScenario()) {
+			case "view-distance-decrease", "view-distance-increase", "memory-cache-soak",
+				"steady-state-performance" -> true;
+			default -> false;
+		}) || distantHorizonsGenerationSettledForCapture();
+		if (!executionReady || !generationReady) {
+			staticTerrainLifecycleStage = "waiting-for-post-setup-distant-horizons-execution";
+			if (framesWaitingForStaticTerrainLifecycle > SETTLED_READY_MAX_WAIT_FRAMES) {
+				fail("timed out waiting for post-setup Distant Horizons execution: baselineSubmission="
+					+ staticTerrainLifecycleBeforeDhExecutionSubmission
+					+ " selected=" + diagnostics.selected()
+					+ " executedFrame=" + diagnostics.lastExecutedWorldFrame()
+					+ " executedSubmission=" + diagnostics.lastExecutedSubmission()
+					+ " instances=" + diagnostics.lastExecutedInstances()
+					+ " unpublished=" + diagnostics.semanticUnpublishedCandidates()
+					+ " generation=" + distantHorizonsGenerationSummary);
+			} else if ((framesWaitingForStaticTerrainLifecycle % 30) == 0) {
+				writeMetadata(minecraft, "waiting_for_post_setup_distant_horizons_execution");
+			}
+			return false;
+		}
+		staticTerrainLifecycleAfterDhExecutionSubmission = diagnostics.lastExecutedSubmission();
+		staticTerrainLifecycleAfterDhExecutionFrame = diagnostics.lastExecutedWorldFrame();
+		staticTerrainLifecycleAfterDhExecutionInstances = diagnostics.lastExecutedInstances();
 		return true;
 	}
 
@@ -4513,6 +4944,21 @@ public final class DeterministicCameraCapture {
 		return DISTANT_HORIZONS_LEGACY_OBSERVATION
 			? DistantHorizonsSemanticCollector.legacyTextureProbeReceipt(probes)
 			: DistantHorizonsSemanticCollector.textureProbeReceipt(probes);
+	}
+
+	private static boolean distantHorizonsReducedColorPaletteReady() {
+		if (!DISTANT_HORIZONS_TEXTURE_PALETTE || distantHorizonsTexturePaletteTarget == null
+			|| distantHorizonsTexturePaletteProbes.isEmpty()) {
+			return false;
+		}
+		List<String> blockIds = distantHorizonsTexturePaletteProbes.stream()
+			.map(DistantHorizonsTexturePaletteProbe::blockId)
+			.toList();
+		return DistantHorizonsSemanticCollector.hasLastConsumedVisibleOpaqueColumnCoveringBlock(
+			distantHorizonsTexturePaletteTarget.getX(), distantHorizonsTexturePaletteTarget.getZ()
+		) && DistantHorizonsSemanticCollector.hasLastConsumedVisibleColumnCoveringBlockWithExecutedOpaqueSemanticMaterialIdentities(
+			distantHorizonsTexturePaletteTarget.getX(), distantHorizonsTexturePaletteTarget.getZ(), blockIds
+		);
 	}
 
 	private static DistantHorizonsSemanticCollector.DistantHorizonsWaterProbeReceipt distantHorizonsWaterProbeReceipt() {
@@ -5441,8 +5887,33 @@ public final class DeterministicCameraCapture {
 			return false;
 		}
 		if (DISTANT_HORIZONS_TEXTURE_PALETTE
+			&& selectedSourceCaptureRequested()
 			&& !net.vulkanic.world.DistantHorizonsSemanticCollector.exactAtlasCoverageStableForCapture()) {
 			return false;
+		}
+		if (SETTLED_READY_FAMILIES.contains("distant-horizons")
+			&& !net.vulkanic.world.DistantHorizonsSemanticCollector.visiblePayloadStableForCapture(
+				SETTLED_READY_FRAMES)) {
+			return false;
+		}
+		if (SETTLED_READY_FAMILIES.contains("distant-horizons")
+			&& !distantHorizonsGenerationSettledForCapture()) {
+			return false;
+		}
+		if (SETTLED_READY_FAMILIES.contains("distant-horizons")
+			&& net.vulkanic.world.DistantHorizonsSemanticCollector.enabled()) {
+			var dhRoute = net.vulkanic.world.DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+			// A prior route execution must not satisfy the generic family counter
+			// when the current visible DH set has since been replaced or rejected.
+			// Screenshots require a selected route, visible columns, and a real
+			// Rust execution receipt for the settled frame window.
+			if (!dhRoute.selected()
+				|| dhRoute.visibleColumns() <= 0
+				|| dhRoute.semanticUnpublishedCandidates() != 0
+				|| dhRoute.lastExecutedInstances() <= 0
+				|| dhRoute.lastExecutedCaptureFrame() < Math.max(0L, renderedFrameIndex - SETTLED_READY_FRAMES * 2L)) {
+				return false;
+			}
 		}
 		if (!staticTerrainAssetsSettled()) {
 			return false;
@@ -5465,6 +5936,47 @@ public final class DeterministicCameraCapture {
 			settledReadySummary()
 		);
 		return true;
+	}
+
+	private static boolean distantHorizonsGenerationSettledForCapture() {
+		com.seibel.distanthorizons.core.world.IDhClientWorld world =
+			com.seibel.distanthorizons.core.api.internal.SharedApi.tryGetDhClientWorld();
+		com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper wrapper =
+			com.seibel.distanthorizons.core.api.internal.ClientApi.RENDER_STATE.clientLevelWrapper;
+		com.seibel.distanthorizons.core.level.IDhClientLevel level =
+			world == null || wrapper == null ? null : world.getClientLevel(wrapper);
+		com.seibel.distanthorizons.core.level.LodRequestModule module = null;
+		if (level instanceof com.seibel.distanthorizons.core.level.DhClientLevel clientLevel) {
+			module = clientLevel.lodRequestModule;
+		} else if (level instanceof com.seibel.distanthorizons.core.level.DhClientServerLevel clientServerLevel) {
+			module = clientServerLevel.serverside.lodRequestModule;
+		}
+		if (module == null) {
+			settledDistantHorizonsGenerationFrames = 0;
+			distantHorizonsGenerationSummary = "unavailable";
+			return false;
+		}
+
+		var progress = module.getWorldGenerationProgress();
+		distantHorizonsGenerationSummary = "running=" + progress.running()
+			+ ",remaining=" + progress.remainingChunks()
+			+ ",waiting=" + progress.waitingTasks()
+			+ ",inProgress=" + progress.inProgressTasks()
+			+ ",queued=" + progress.queuedChunks();
+		// A stopped request module has no generation queue and reports -1 sentinel
+		// counts. That is a quiescent state once the visible/published/executed DH
+		// checks above have passed. Only an active module can still carry work.
+		if (progress.running() && (progress.remainingChunks() != 0
+			|| progress.waitingTasks() != 0 || progress.inProgressTasks() != 0
+			|| progress.queuedChunks() != 0)) {
+			settledDistantHorizonsGenerationFrames = 0;
+			return false;
+		}
+		settledDistantHorizonsGenerationFrames = Math.min(
+			SETTLED_READY_FRAMES,
+			settledDistantHorizonsGenerationFrames + 1
+		);
+		return settledDistantHorizonsGenerationFrames >= SETTLED_READY_FRAMES;
 	}
 
 	private static boolean usesLegacyDistantHorizonsObservationForSettledReadiness(String family) {
@@ -5552,6 +6064,12 @@ public final class DeterministicCameraCapture {
 				.append("/").append(SETTLED_READY_FRAMES);
 			summary.append(";rust-whole-frame-assets=")
 				.append(RustGalTerrainRenderer.wholeFrameAssetUploadSummary());
+		}
+		if (SETTLED_READY_FAMILIES.contains("distant-horizons")) {
+			summary.append(";dh-generation-settled=")
+				.append(settledDistantHorizonsGenerationFrames)
+				.append("/").append(SETTLED_READY_FRAMES)
+				.append(" ").append(distantHorizonsGenerationSummary);
 		}
 		String appearanceLightReadiness = net.sodium.client.render.StaticTerrainParityDiagnostics.appearanceLightReadinessSummary();
 		if (!appearanceLightReadiness.endsWith("ready=true")) {
@@ -6012,6 +6530,13 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static void requestCurrentPoseScreenshot(Minecraft minecraft) {
+		if (CLEAR_TOASTS) {
+			// World fixtures such as an active beacon can legitimately trigger
+			// advancement notifications while both clients are settling. Remove
+			// only those transient UI objects before the paired screenshot; this
+			// does not alter world state or any renderer submission.
+			minecraft.getToastManager().clear();
+		}
 		blockAnimationAtCapture = GraphicsAuditBlockDisplayFixture.animationObservation(minecraft);
 		captureSurfaceObservations();
 		// Correlate the copied Rust semantic source with the ordinary screenshot
@@ -6046,6 +6571,7 @@ public final class DeterministicCameraCapture {
 		appendWholeFramePresentationCorrelation(json, renderedFrameIndex, 2).append(",\n");
 		appendDistantHorizonsExecutionCorrelation(json, 2).append(",\n");
 		appendDistantHorizonsTextureProbeReceipt(json, 2).append(",\n");
+		appendDistantHorizonsReducedColorPaletteReceipt(json, 2).append(",\n");
 		appendDistantHorizonsWaterProbeReceipt(json, 2).append(",\n");
 		appendStaticTerrainExecutionCorrelation(json, 2).append(",\n");
 		appendStaticTerrainAtlasReceipt(json, 2).append(",\n");
@@ -6083,6 +6609,9 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static void captureCurrentPoseInternally(Minecraft minecraft) {
+		if (CLEAR_TOASTS) {
+			minecraft.getToastManager().clear();
+		}
 		Pose pose = poses[poseIndex];
 		int captureIndex = poseIndex + 1;
 		String fileName = String.format(Locale.ROOT, "%02d_%s.png", captureIndex, pose.name());
@@ -6134,6 +6663,7 @@ public final class DeterministicCameraCapture {
 		appendWholeFramePresentationCorrelation(json, renderedFrameIndex, 2).append(",\n");
 		appendDistantHorizonsExecutionCorrelation(json, 2).append(",\n");
 		appendDistantHorizonsTextureProbeReceipt(json, 2).append(",\n");
+		appendDistantHorizonsReducedColorPaletteReceipt(json, 2).append(",\n");
 		appendDistantHorizonsWaterProbeReceipt(json, 2).append(",\n");
 		appendStaticTerrainExecutionCorrelation(json, 2).append(",\n");
 		appendStaticTerrainAtlasReceipt(json, 2).append(",\n");
@@ -7433,7 +7963,19 @@ public final class DeterministicCameraCapture {
 				&& (!isBlockEntityModelScenario() || diagnostic.blockEntityId() >= 0)
 				&& diagnostic.projected()
 				&& diagnostic.sectionCount() > 0).toList();
-		boolean queued = !copied.isEmpty();
+		int minimumModelPartInstances = isDecoratedPotModelScenario() ? 7 : isActiveConduitModelScenario() ? 4
+			: isBreakingOakSignModelScenario() || isBreakingConduitModelScenario() ? 2 : 1;
+		boolean queued = !copied.isEmpty()
+			&& RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().anyMatch(diagnostic ->
+				Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
+					&& expectedModelMeshDiagnosticTextureId().equals(diagnostic.textureId())
+					&& diagnostic.projected() && diagnostic.sectionCount() > 0)
+			&& RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics().stream().anyMatch(diagnostic ->
+				"model-part".equals(diagnostic.provenance())
+				&& (!isBlockEntityModelScenario() || diagnostic.blockEntityId() >= 0)
+				&& (!isBlockEntityModelScenario() || copied.stream().anyMatch(mesh -> mesh.blockEntityId() == diagnostic.blockEntityId()))
+				&& Math.abs(diagnostic.deterministicFrameIndex() - frameIndex) <= frameTolerance
+				&& diagnostic.instances() >= minimumModelPartInstances);
 		if (isBreakingConduitModelScenario()) {
 			Set<Integer> conduitScopes = copied.stream()
 				.map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId)
@@ -7464,14 +8006,7 @@ public final class DeterministicCameraCapture {
 			&& (copied.size() < 4 || copied.stream().map(RustGalWorldPrimitiveRenderer.ModelMeshDiagnostic::blockEntityId).distinct().count() != 1L)) {
 			return false;
 		}
-		return queued && RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics().stream().anyMatch(diagnostic ->
-			"model-part".equals(diagnostic.provenance())
-				&& (!isBlockEntityModelScenario() || diagnostic.blockEntityId() >= 0)
-				&& (!isBlockEntityModelScenario() || copied.stream().anyMatch(mesh -> mesh.blockEntityId() == diagnostic.blockEntityId()))
-				&& Math.abs(diagnostic.deterministicFrameIndex() - frameIndex) <= frameTolerance
-				&& diagnostic.instances() >= (isDecoratedPotModelScenario() ? 7 : isActiveConduitModelScenario() ? 4
-					: isBreakingOakSignModelScenario() || isBreakingConduitModelScenario() ? 2 : 1)
-		);
+		return queued;
 	}
 
 	private static String expectedModelMeshTextureId() {
@@ -16834,6 +17369,7 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 			json.append("  \"mountMaxHealthOverride\": ").append(format(FORCED_MOUNT_MAX_HEALTH)).append(",\n");
 			json.append("  \"mountHealthRowsOverride\": ").append(FORCED_MOUNT_HEALTH_ROWS).append(",\n");
 			json.append("  \"hideChat\": ").append(HIDE_CHAT).append(",\n");
+			json.append("  \"clearToasts\": ").append(CLEAR_TOASTS).append(",\n");
 			json.append("  \"bossBarOverride\": ").append(hasBossBarOverride()).append(",\n");
 			json.append("  \"bossBarCount\": ").append(hasBossBarOverride() ? forcedBossBarCount() : -1).append(",\n");
 			appendField(json, "bossBarProgress", FORCED_BOSS_BAR_PROGRESS).append(",\n");
@@ -16857,6 +17393,7 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 		json.append("  \"settledReadyGateSatisfied\": ").append(settledReadyGateSatisfied).append(",\n");
 		appendField(json, "settledReadySummary", settledReadySummary()).append(",\n");
 		appendSubmittedWorkCounts(json).append(",\n");
+		appendSubmittedWorkIdentities(json).append(",\n");
 		json.append("  \"rustGalGuiScreenCycle\": { \"enabled\": ").append(RUST_GAL_GUI_SCREEN_CYCLE)
 			.append(", \"complete\": ").append(rustGalGuiScreenCycleComplete)
 			.append(", \"stage\": ").append(rustGalGuiScreenCycleStage)
@@ -16972,9 +17509,12 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 		appendField(json, "reason", route.reason(), 0).append(", ");
 		appendField(json, "matrixStatus", route.matrixStatus(), 0).append(", ");
 		appendField(json, "matrixDetail", route.matrixDetail(), 0).append(", ");
+		json.append("\"clipDistance\": ").append(route.clipDistance()).append(", ");
 		json.append("\"opaqueSegments\": ").append(route.opaqueSegments()).append(", ");
 		json.append("\"exactAtlasIdentitySegments\": ").append(route.exactAtlasIdentitySegments()).append(", ");
 		json.append("\"exactAtlasIdentityQuads\": ").append(route.exactAtlasIdentityQuads()).append(", ");
+		json.append("\"exactAtlasPartialSegments\": ").append(route.exactAtlasPartialSegments()).append(", ");
+		json.append("\"exactAtlasPartialQuads\": ").append(route.exactAtlasPartialQuads()).append(", ");
 		json.append("\"exactAtlasMixedQuads\": ").append(route.exactAtlasMixedQuads()).append(", ");
 		json.append("\"exactAtlasUnavailableQuads\": ").append(route.exactAtlasUnavailableQuads()).append(", ");
 		json.append("\"exactAtlasMissingProvenanceQuads\": ").append(route.exactAtlasMissingProvenanceQuads()).append(", ");
@@ -17000,12 +17540,27 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 		json.append("\"waterSegments\": ").append(route.waterSegments()).append(", ");
 		json.append("\"visibleColumns\": ").append(route.visibleColumns()).append(", ");
 		json.append("\"cachedColumns\": ").append(route.cachedColumns()).append(", ");
+		json.append("\"semanticCandidateColumns\": ").append(route.semanticCandidateColumns()).append(", ");
+		json.append("\"semanticUnpublishedCandidates\": ").append(route.semanticUnpublishedCandidates()).append(", ");
 		json.append("\"unpublishedVisibleColumns\": ").append(route.unpublishedVisibleColumns()).append(", ");
 		json.append("\"semanticBuildAttempts\": ").append(route.semanticBuildAttempts()).append(", ");
 		json.append("\"semanticColumnsBuilt\": ").append(route.semanticColumnsBuilt()).append(", ");
 		json.append("\"semanticColumnsReused\": ").append(route.semanticColumnsReused()).append(", ");
 		json.append("\"semanticColumnsReplaced\": ").append(route.semanticColumnsReplaced()).append(", ");
 		appendField(json, "lastPayloadDifference", route.lastPayloadDifference(), 0).append(", ");
+		json.append("\"lifecycleResetCount\": ").append(route.lifecycleResetCount()).append(", ");
+		json.append("\"resourceReloadResetCount\": ").append(route.resourceReloadResetCount()).append(", ");
+		json.append("\"worldUnloadResetCount\": ").append(route.worldUnloadResetCount()).append(", ");
+		appendField(json, "lastLifecycleResetReason", route.lastLifecycleResetReason(), 0).append(", ");
+		json.append("\"lastLifecyclePublishedRetirements\": ").append(route.lastLifecyclePublishedRetirements()).append(", ");
+		json.append("\"lastLifecycleInvalidatedInFlight\": ").append(route.lastLifecycleInvalidatedInFlight()).append(", ");
+		json.append("\"lastLifecycleRetirementsAcknowledged\": ").append(route.lastLifecycleRetirementsAcknowledged()).append(", ");
+		json.append("\"lastLifecycleRetirementsSupersededByReplacement\": ").append(route.lastLifecycleRetirementsSupersededByReplacement()).append(", ");
+		json.append("\"lastLifecycleRetirementsOutstanding\": ").append(route.lastLifecycleRetirementsOutstanding()).append(", ");
+		json.append("\"pendingRetirements\": ").append(route.pendingRetirements()).append(", ");
+		json.append("\"invalidatedInFlight\": ").append(route.invalidatedInFlight()).append(", ");
+		json.append("\"lastLifecycleGenerationFloor\": ").append(route.lastLifecycleGenerationFloor()).append(", ");
+		json.append("\"minimumPublishedGeneration\": ").append(route.minimumPublishedGeneration()).append(", ");
 		json.append("\"retainedBytes\": ").append(route.retainedBytes()).append(", ");
 		json.append("\"oversizedColumns\": ").append(route.oversizedColumns()).append(", ");
 		json.append("\"frameSemanticsEnabled\": ").append(route.frameSemanticsEnabled()).append(", ");
@@ -17030,6 +17585,10 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 			distantHorizonsTexturePaletteTarget == null ? "" : distantHorizonsTexturePaletteTarget.toShortString(),
 			0
 		).append(", ");
+		json.append("\"farOnlyRenderDistance\": ")
+			.append(DISTANT_HORIZONS_FAR_ONLY_RENDER_DISTANCE).append(", ");
+		json.append("\"captureRenderDistance\": ")
+			.append(Minecraft.getInstance().options.renderDistance().get()).append(", ");
 		DistantHorizonsSemanticCollector.ColumnCoverageDiagnostics sourceCoverage =
 			distantHorizonsTexturePaletteTarget == null
 				? new DistantHorizonsSemanticCollector.ColumnCoverageDiagnostics(0, 0, 0, List.of())
@@ -17318,6 +17877,20 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 		return json.append("] }");
 	}
 
+	private static StringBuilder appendDistantHorizonsReducedColorPaletteReceipt(StringBuilder json, int indent) {
+		String padding = " ".repeat(Math.max(0, indent));
+		json.append(padding).append("\"rustGalDistantHorizonsReducedColorPaletteReceipt\": ");
+		if (!DISTANT_HORIZONS_TEXTURE_PALETTE || selectedSourceCaptureRequested()) {
+			return json.append("null");
+		}
+		boolean matched = distantHorizonsReducedColorPaletteReady();
+		json.append("{ ");
+		appendField(json, "contract", "reduced-color-material-category", 0).append(", ");
+		json.append("\"matched\": ").append(matched).append(", ");
+		appendField(json, "status", matched ? "consumed-column-materials-present" : "consumed-column-materials-missing", 0);
+		return json.append(" }");
+	}
+
 	private static StringBuilder appendDistantHorizonsWaterProbeReceipt(StringBuilder json, int indent) {
 		String padding = " ".repeat(Math.max(0, indent));
 		json.append(padding).append("\"rustGalDistantHorizonsWaterProbeReceipt\": ");
@@ -17370,6 +17943,7 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 			appendField(json, "screenshot", frame.screenshot(), 0).append(", ");
 			json.append("\"renderedFrameIndex\": ").append(frame.renderedFrameIndex()).append(", ");
 			json.append("\"gameTime\": ").append(frame.gameTime()).append(", ");
+			json.append("\"animationTick\": ").append(frame.animationTick()).append(", ");
 			json.append("\"animationHash\": ").append(frame.animationHash()).append(", ");
 			appendField(json, "animationSummary", frame.animationSummary(), 0).append(", ");
 			appendField(json, "animationState", frame.animationState(), 0).append(", ");
@@ -17444,6 +18018,54 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 			}
 			json.append('"').append(escape(entry.getKey())).append("\": ").append(entry.getValue());
 			first = false;
+		}
+		return json.append(" }");
+	}
+
+	/**
+	 * Persists only the latest completed frame's bounded semantic identities.
+	 * Counts alone prove that a producer ran but cannot distinguish an empty
+	 * producer from a positive payload.  Identities remain semantic strings;
+	 * Java/DH renderer objects and backend handles never enter the receipt.
+	 */
+	private static StringBuilder appendSubmittedWorkIdentities(StringBuilder json) {
+		Map<String, Set<String>> latest = null;
+		long latestFrame = Math.max(0L, renderedFrameIndex - 1L);
+		synchronized (SUBMITTED_WORK_BY_FRAME) {
+			latest = SUBMITTED_WORK_BY_FRAME.get(latestFrame);
+			if (latest == null && !SUBMITTED_WORK_BY_FRAME.isEmpty()) {
+				latest = SUBMITTED_WORK_BY_FRAME.values().stream().reduce((first, second) -> second).orElse(null);
+			}
+		}
+		json.append("  \"rustGalSubmittedWorkIdentities\": {");
+		if (latest == null || latest.isEmpty()) {
+			return json.append(" }");
+		}
+		boolean firstFamily = true;
+		int familyCount = 0;
+		for (Map.Entry<String, Set<String>> entry : latest.entrySet()) {
+			if (familyCount++ >= 32) {
+				break;
+			}
+			if (!firstFamily) {
+				json.append(", ");
+			}
+			json.append('"').append(escape(entry.getKey())).append("\": [");
+			boolean firstIdentity = true;
+			int identityCount = 0;
+			for (String identity : entry.getValue()) {
+				if (identityCount++ >= 32) {
+					break;
+				}
+				if (!firstIdentity) {
+					json.append(", ");
+				}
+				String boundedIdentity = identity.length() > 512 ? identity.substring(0, 512) : identity;
+				json.append('"').append(escape(boundedIdentity)).append('"');
+				firstIdentity = false;
+			}
+			json.append(']');
+			firstFamily = false;
 		}
 		return json.append(" }");
 	}
@@ -17722,6 +18344,22 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 		json.append("\"originalSimulationDistance\": ").append(staticTerrainOriginalSimulationDistance).append(", ");
 		json.append("\"beforeCachedLayers\": ").append(staticTerrainLifecycleBeforeCachedLayers).append(", ");
 		json.append("\"afterCachedLayers\": ").append(staticTerrainLifecycleAfterCachedLayers).append(", ");
+		json.append("\"beforeDhCachedColumns\": ").append(staticTerrainLifecycleBeforeDhCachedColumns).append(", ");
+		json.append("\"afterDhCachedColumns\": ").append(staticTerrainLifecycleAfterDhCachedColumns).append(", ");
+		json.append("\"beforeDhVisibleColumns\": ").append(staticTerrainLifecycleBeforeDhVisibleColumns).append(", ");
+		json.append("\"afterDhVisibleColumns\": ").append(staticTerrainLifecycleAfterDhVisibleColumns).append(", ");
+		json.append("\"afterDhUnpublishedVisibleColumns\": ").append(staticTerrainLifecycleAfterDhUnpublishedVisibleColumns).append(", ");
+		json.append("\"afterDhPendingRetirements\": ").append(staticTerrainLifecycleAfterDhPendingRetirements).append(", ");
+		json.append("\"beforeDhRetainedBytes\": ").append(staticTerrainLifecycleBeforeDhRetainedBytes).append(", ");
+		json.append("\"afterDhRetainedBytes\": ").append(staticTerrainLifecycleAfterDhRetainedBytes).append(", ");
+		json.append("\"beforeDhMinimumGeneration\": ").append(staticTerrainLifecycleBeforeDhMinimumGeneration).append(", ");
+		json.append("\"afterDhMinimumGeneration\": ").append(staticTerrainLifecycleAfterDhMinimumGeneration).append(", ");
+		json.append("\"beforeDhResetCount\": ").append(staticTerrainLifecycleBeforeDhResetCount).append(", ");
+		json.append("\"afterDhResetCount\": ").append(staticTerrainLifecycleAfterDhResetCount).append(", ");
+		json.append("\"beforeDhExecutionSubmission\": ").append(staticTerrainLifecycleBeforeDhExecutionSubmission).append(", ");
+		json.append("\"afterDhExecutionSubmission\": ").append(staticTerrainLifecycleAfterDhExecutionSubmission).append(", ");
+		json.append("\"afterDhExecutionFrame\": ").append(staticTerrainLifecycleAfterDhExecutionFrame).append(", ");
+		json.append("\"afterDhExecutionInstances\": ").append(staticTerrainLifecycleAfterDhExecutionInstances).append(", ");
 		json.append("\"beforeUsedMemoryBytes\": ").append(staticTerrainLifecycleBeforeRssBytes).append(", ");
 		json.append("\"afterUsedMemoryBytes\": ").append(staticTerrainLifecycleAfterRssBytes).append(", ");
 		json.append("\"menuCachedLayers\": ").append(staticTerrainMenuCachedLayers).append(", ");
@@ -19256,6 +19894,7 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 		String screenshot,
 		long renderedFrameIndex,
 		long gameTime,
+		long animationTick,
 		long animationHash,
 		String animationSummary,
 		String animationState,

@@ -537,8 +537,12 @@ struct TextureAtlas {
 
 #[derive(Clone, Copy)]
 enum GuiImageOwnership {
-    Owned { upload_buffer: Handle },
-    SharedRaw { key: (u64, GuiRawImageFormat) },
+    Owned {
+        upload_buffer: Handle,
+    },
+    SharedRaw {
+        key: (u64, GuiRawImageFormat),
+    },
     /// The GUI atlas cache owns the view; the world owner owns the image.
     /// This binding owns only its sampler and draw resources.
     AtlasView,
@@ -566,13 +570,10 @@ impl GuiResources {
         let mut handles = vec![self.resource_set, self.uniform_buffer, self.index_buffer];
         handles.extend(self.private_sampler);
         match self.image_ownership {
-            GuiImageOwnership::Owned { upload_buffer } => handles.extend([
-                self.texture_view,
-                self.sampler,
-                self.texture,
-                upload_buffer,
-            ]),
-            GuiImageOwnership::SharedRaw { .. } => {},
+            GuiImageOwnership::Owned { upload_buffer } => {
+                handles.extend([self.texture_view, self.sampler, self.texture, upload_buffer])
+            }
+            GuiImageOwnership::SharedRaw { .. } => {}
             GuiImageOwnership::AtlasView => handles.push(self.sampler),
         }
         handles
@@ -658,12 +659,18 @@ impl GuiSharedPipelineKey {
 const GUI_MAX_SHARED_PIPELINES: usize = 16;
 
 fn gui_fragment_material_code(source: &[u8], item_raster: bool, item_cutout: bool) -> Vec<u8> {
-    if !item_raster && !item_cutout { return source.to_vec(); }
+    if !item_raster && !item_cutout {
+        return source.to_vec();
+    }
     // GLSL requires #version first. This specialization belongs to the explicit
     // item pipeline and cannot affect normal GUI images sharing its atlas.
     let version_end = source.iter().position(|byte| *byte == b'\n').unwrap() + 1;
     let mut code = source[..version_end].to_vec();
-    code.extend_from_slice(if item_cutout { b"#define GUI_ITEM_CUTOUT\n" } else { b"#define GUI_ITEM_RASTER\n" });
+    code.extend_from_slice(if item_cutout {
+        b"#define GUI_ITEM_CUTOUT\n"
+    } else {
+        b"#define GUI_ITEM_RASTER\n"
+    });
     code.extend_from_slice(&source[version_end..]);
     code
 }
@@ -1284,7 +1291,7 @@ pub struct GuiItemRasterLayer {
     pub color_argb: u32,
     pub material: super::gui_item_material::GuiAffineMaterial,
     pub geometry: super::gui_item_raster::GuiItemRasterGeometry,
-    pub uv: [f32;4],
+    pub uv: [f32; 4],
     pub model_transform: super::gui_item_raster::GuiItemModelTransform,
 }
 
@@ -1297,13 +1304,22 @@ pub(crate) struct GuiItemRasterGroup {
 impl GuiItemRasterGroup {
     fn single(request: &GuiAffineQuadRequest) -> Self {
         if !request.item_raster_layers.is_empty() {
-            return Self {presentation:request.clone(),layers:request.item_raster_layers.clone()};
+            return Self {
+                presentation: request.clone(),
+                layers: request.item_raster_layers.clone(),
+            };
         }
-        Self { presentation: request.clone(), layers: vec![GuiItemRasterLayer {
-            asset_id:request.asset_id,color_argb:request.color_argb,material:request.material,
-            geometry:request.item_raster_geometry,uv:[request.u0,request.v0,request.u1,request.v1],
-            model_transform: Default::default(),
-        }] }
+        Self {
+            presentation: request.clone(),
+            layers: vec![GuiItemRasterLayer {
+                asset_id: request.asset_id,
+                color_argb: request.color_argb,
+                material: request.material,
+                geometry: request.item_raster_geometry,
+                uv: [request.u0, request.v0, request.u1, request.v1],
+                model_transform: Default::default(),
+            }],
+        }
     }
 }
 
@@ -1363,15 +1379,30 @@ pub(crate) const GUI_MAX_EXPANDED_AFFINE_QUADS: usize = 65_536;
 impl GuiTiledQuadRequest {
     pub(crate) fn validate(&self) -> GalResult<()> {
         validate_gui_projection(self.gui_extent, self.projection_extent)?;
-        if self.asset_id == 0 || self.sequence == 0 || self.stratum == 0 || !self.z.is_finite()
-            || self.gui_extent.iter().any(|v| *v == 0 || *v > GUI_MAX_VIEWPORT_AXIS as u32) {
-            return Err(GalError::invalid_argument("invalid semantic tiled GUI identity or extent"));
+        if self.asset_id == 0
+            || self.sequence == 0
+            || self.stratum == 0
+            || !self.z.is_finite()
+            || self
+                .gui_extent
+                .iter()
+                .any(|v| *v == 0 || *v > GUI_MAX_VIEWPORT_AXIS as u32)
+        {
+            return Err(GalError::invalid_argument(
+                "invalid semantic tiled GUI identity or extent",
+            ));
         }
         if let Some([left, top, width, height]) = self.clip {
-            if left < 0 || top < 0 || width < 0 || height < 0
+            if left < 0
+                || top < 0
+                || width < 0
+                || height < 0
                 || i64::from(left) + i64::from(width) > i64::from(self.gui_extent[0])
-                || i64::from(top) + i64::from(height) > i64::from(self.gui_extent[1]) {
-                return Err(GalError::invalid_argument("tiled GUI clip must be frame-local"));
+                || i64::from(top) + i64::from(height) > i64::from(self.gui_extent[1])
+            {
+                return Err(GalError::invalid_argument(
+                    "tiled GUI clip must be frame-local",
+                ));
             }
         }
         Ok(())
@@ -1379,17 +1410,23 @@ impl GuiTiledQuadRequest {
 }
 
 pub(crate) fn preflight_tiled_affine_count(
-    requests: &[GuiTiledQuadRequest], ordinary_affine_count: usize,
+    requests: &[GuiTiledQuadRequest],
+    ordinary_affine_count: usize,
 ) -> GalResult<usize> {
     let mut count = ordinary_affine_count;
     if count > GUI_MAX_EXPANDED_AFFINE_QUADS {
-        return Err(GalError::invalid_argument("GUI frame affine expansion exceeds bounded limit"));
+        return Err(GalError::invalid_argument(
+            "GUI frame affine expansion exceeds bounded limit",
+        ));
     }
     for request in requests {
         request.validate()?;
-        count = count.checked_add(super::gui_tiling::tile_segment_count(request.geometry)?)
+        count = count
+            .checked_add(super::gui_tiling::tile_segment_count(request.geometry)?)
             .filter(|n| *n <= GUI_MAX_EXPANDED_AFFINE_QUADS)
-            .ok_or_else(|| GalError::invalid_argument("GUI frame affine expansion exceeds bounded limit"))?;
+            .ok_or_else(|| {
+                GalError::invalid_argument("GUI frame affine expansion exceeds bounded limit")
+            })?;
     }
     Ok(count)
 }
@@ -1397,42 +1434,71 @@ pub(crate) fn preflight_tiled_affine_count(
 fn lower_tiled_request(request: GuiTiledQuadRequest) -> GalResult<Vec<GuiAffineQuadRequest>> {
     request.validate()?;
     let [clip_left, clip_top, clip_width, clip_height] = request.clip.unwrap_or([0; 4]);
-    super::gui_tiling::lower_tiles(request.geometry)?.into_iter().map(|quad| {
-        let child = GuiAffineQuadRequest {
-            item_raster_layers: vec![],
-            item_raster_scale: 0,
-            item_raster_geometry: Default::default(),
-            material: super::gui_item_material::GuiAffineMaterial::Unlit,
-            stratum: request.stratum, asset_id: request.asset_id,
-            x0: quad.origin[0], y0: quad.origin[1],
-            x1: quad.origin[0] + quad.axis_u[0], y1: quad.origin[1] + quad.axis_u[1],
-            x3: quad.origin[0] + quad.axis_v[0], y3: quad.origin[1] + quad.axis_v[1],
-            z: request.z, u0: quad.uv[0], v0: quad.uv[1], u1: quad.uv[2], v1: quad.uv[3],
-            color_argb: request.color_argb,
-            gui_width: request.gui_extent[0], gui_height: request.gui_extent[1],
-            projection_extent: request.projection_extent, sequence: request.sequence,
-            clip_mode: u32::from(request.clip.is_some()), clip_left, clip_top, clip_width, clip_height,
-        };
-        validate_affine_quad(&child)?;
-        Ok(child)
-    }).collect()
+    super::gui_tiling::lower_tiles(request.geometry)?
+        .into_iter()
+        .map(|quad| {
+            let child = GuiAffineQuadRequest {
+                item_raster_layers: vec![],
+                item_raster_scale: 0,
+                item_raster_geometry: Default::default(),
+                material: super::gui_item_material::GuiAffineMaterial::Unlit,
+                stratum: request.stratum,
+                asset_id: request.asset_id,
+                x0: quad.origin[0],
+                y0: quad.origin[1],
+                x1: quad.origin[0] + quad.axis_u[0],
+                y1: quad.origin[1] + quad.axis_u[1],
+                x3: quad.origin[0] + quad.axis_v[0],
+                y3: quad.origin[1] + quad.axis_v[1],
+                z: request.z,
+                u0: quad.uv[0],
+                v0: quad.uv[1],
+                u1: quad.uv[2],
+                v1: quad.uv[3],
+                color_argb: request.color_argb,
+                gui_width: request.gui_extent[0],
+                gui_height: request.gui_extent[1],
+                projection_extent: request.projection_extent,
+                sequence: request.sequence,
+                clip_mode: u32::from(request.clip.is_some()),
+                clip_left,
+                clip_top,
+                clip_width,
+                clip_height,
+            };
+            validate_affine_quad(&child)?;
+            Ok(child)
+        })
+        .collect()
 }
 
 pub(crate) fn validate_gui_frame_sequences(
-    sprites: &[GuiSpriteRequest], affine: &[GuiAffineQuadRequest],
-    meshes: &[GuiMeshBatchRequest], tiles: &[GuiTiledQuadRequest],
+    sprites: &[GuiSpriteRequest],
+    affine: &[GuiAffineQuadRequest],
+    meshes: &[GuiMeshBatchRequest],
+    tiles: &[GuiTiledQuadRequest],
 ) -> GalResult<()> {
-    let mesh_sequences = meshes.iter().map(|request| request.sequence)
+    let mesh_sequences = meshes
+        .iter()
+        .map(|request| request.sequence)
         .collect::<std::collections::BTreeSet<_>>();
     let mut seen = std::collections::BTreeSet::new();
-    for sequence in sprites.iter().map(|request| request.sequence)
+    for sequence in sprites
+        .iter()
+        .map(|request| request.sequence)
         .chain(affine.iter().map(|request| request.sequence))
-        .chain(tiles.iter().map(|request| request.sequence)).chain(mesh_sequences) {
+        .chain(tiles.iter().map(|request| request.sequence))
+        .chain(mesh_sequences)
+    {
         if sequence == 0 {
-            return Err(GalError::invalid_argument("GUI requests require non-zero scheduler sequences"));
+            return Err(GalError::invalid_argument(
+                "GUI requests require non-zero scheduler sequences",
+            ));
         }
         if !seen.insert(sequence) {
-            return Err(GalError::invalid_argument("GUI request scheduler sequences must be unique within one frame"));
+            return Err(GalError::invalid_argument(
+                "GUI request scheduler sequences must be unique within one frame",
+            ));
         }
     }
     Ok(())
@@ -1537,7 +1603,8 @@ impl GuiFrontend {
             .mesh_geometry_cache
             .iter()
             .filter_map(|(key, residency)| {
-                (!residency.usage.has_pending_commands() && residency.usage.last_submission() <= completed)
+                (!residency.usage.has_pending_commands()
+                    && residency.usage.last_submission() <= completed)
                     .then(|| (*key, residency.clone()))
             })
             .collect();
@@ -1615,12 +1682,7 @@ impl GuiFrontend {
             // stream and never grow the private buffers beyond their cap.
             gal.retire_through(oldest)?;
             self.reclaim_completed_mesh_geometry(oldest);
-            return self.allocate_mesh_geometry(
-                gal,
-                raster_key,
-                vertex_bytes,
-                index_bytes,
-            );
+            return self.allocate_mesh_geometry(gal, raster_key, vertex_bytes, index_bytes);
         };
         let allocation = GuiMeshGeometryResidency {
             stream: range.stream,
@@ -1907,7 +1969,10 @@ impl GuiFrontend {
             }
         }
         if images.keys().any(|id| self.atlas_references.contains(*id)) {
-            return Err(GalError::ffi(StatusCode::InvalidArgument, "raw GUI image collides with explicit atlas reference"));
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                "raw GUI image collides with explicit atlas reference",
+            ));
         }
         let changed_assets = self.changed_raw_image_assets(&images);
         self.destroy_dynamic_resources_for_assets(gal, &changed_assets);
@@ -1919,43 +1984,78 @@ impl GuiFrontend {
     /// Private declaration prerequisite. No FFI or renderer capability admits
     /// sampling these references until native view/lifetime lowering is complete.
     #[cfg(test)]
-    pub(crate) fn stage_atlas_references(&mut self, revision: u64, references: &[GuiAtlasReference],
-        accepted: impl FnMut(u32) -> Option<AcceptedAtlasIncarnation>) -> GalResult<()> {
+    pub(crate) fn stage_atlas_references(
+        &mut self,
+        revision: u64,
+        references: &[GuiAtlasReference],
+        accepted: impl FnMut(u32) -> Option<AcceptedAtlasIncarnation>,
+    ) -> GalResult<()> {
         if !self.atlas_views.is_empty() {
-            return Err(GalError::invalid_argument("resident atlas views require owner-coordinated staging"));
+            return Err(GalError::invalid_argument(
+                "resident atlas views require owner-coordinated staging",
+            ));
         }
-        self.atlas_references.replace(revision, references, &self.raw_images.keys().copied().collect(), accepted)
+        self.atlas_references.replace(
+            revision,
+            references,
+            &self.raw_images.keys().copied().collect(),
+            accepted,
+        )
     }
 
     /// Context-owned staging path: declarations cannot certify their own acceptance.
-    pub(crate) fn stage_owned_atlas_references(&mut self, gal: &mut VulkanicGal,
+    pub(crate) fn stage_owned_atlas_references(
+        &mut self,
+        gal: &mut VulkanicGal,
         world: &super::world_primitive_frontend::WorldPrimitiveFrontend,
-        revision: u64, references: &[GuiAtlasReference]) -> GalResult<()> {
+        revision: u64,
+        references: &[GuiAtlasReference],
+    ) -> GalResult<()> {
         let mut next = self.atlas_references.clone();
-        next.replace(revision, references, &self.raw_images.keys().copied().collect(),
-            |id| world.accepted_gui_atlas_incarnation(id))?;
-        let changed = self.atlas_views.iter().filter_map(|(asset, (incarnation, _))| {
-            let retained = next.resolve(*asset, |id| world.accepted_gui_atlas_incarnation(id))
-                .is_ok_and(|reference| reference.atlas == *incarnation);
-            (!retained).then_some(*asset)
-        }).collect();
+        next.replace(
+            revision,
+            references,
+            &self.raw_images.keys().copied().collect(),
+            |id| world.accepted_gui_atlas_incarnation(id),
+        )?;
+        let changed = self
+            .atlas_views
+            .iter()
+            .filter_map(|(asset, (incarnation, _))| {
+                let retained = next
+                    .resolve(*asset, |id| world.accepted_gui_atlas_incarnation(id))
+                    .is_ok_and(|reference| reference.atlas == *incarnation);
+                (!retained).then_some(*asset)
+            })
+            .collect();
         self.retire_atlas_views_for_assets(gal, &changed)?;
         self.atlas_references = next;
         Ok(())
     }
 
     /// Bounded, private preparation only. Native draw binding remains unadmitted.
-    pub(crate) fn prepare_owned_atlas_view(&mut self, gal: &mut VulkanicGal,
-        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend, asset: u64) -> GalResult<Handle> {
-        let reference = self.atlas_references.resolve(asset, |id| world.accepted_gui_atlas_incarnation(id))?;
+    pub(crate) fn prepare_owned_atlas_view(
+        &mut self,
+        gal: &mut VulkanicGal,
+        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
+        asset: u64,
+    ) -> GalResult<Handle> {
+        let reference = self
+            .atlas_references
+            .resolve(asset, |id| world.accepted_gui_atlas_incarnation(id))?;
         if let Some((incarnation, view)) = self.atlas_views.get(&asset) {
             if *incarnation != reference.atlas {
-                return Err(GalError::ffi(StatusCode::StaleHandle, "GUI atlas view was not invalidated before replacement"));
+                return Err(GalError::ffi(
+                    StatusCode::StaleHandle,
+                    "GUI atlas view was not invalidated before replacement",
+                ));
             }
             return Ok(*view);
         }
         if self.atlas_views.len() >= super::gui_atlas_reference::MAX_GUI_ATLAS_REFERENCES {
-            return Err(GalError::invalid_argument("GUI atlas view residency bound exceeded"));
+            return Err(GalError::invalid_argument(
+                "GUI atlas view residency bound exceeded",
+            ));
         }
         let view = world.create_gui_atlas_view(gal, reference)?;
         self.atlas_views.insert(asset, (reference.atlas, view));
@@ -1964,22 +2064,37 @@ impl GuiFrontend {
 
     /// Called before the same context replaces owner textures. Keep declarations
     /// so failed publication can retry; consumption still checks exact incarnation.
-    pub(crate) fn invalidate_atlas_texture_views(&mut self, gal: &mut VulkanicGal,
-        textures: impl IntoIterator<Item = u32>) -> GalResult<()> {
-        if self.atlas_views.is_empty() { return Ok(()); }
+    pub(crate) fn invalidate_atlas_texture_views(
+        &mut self,
+        gal: &mut VulkanicGal,
+        textures: impl IntoIterator<Item = u32>,
+    ) -> GalResult<()> {
+        if self.atlas_views.is_empty() {
+            return Ok(());
+        }
         let textures: BTreeSet<_> = textures.into_iter().collect();
-        let assets = self.atlas_views.iter().filter_map(|(asset, (incarnation, _))|
-            textures.contains(&incarnation.texture_id).then_some(*asset)).collect();
+        let assets = self
+            .atlas_views
+            .iter()
+            .filter_map(|(asset, (incarnation, _))| {
+                textures.contains(&incarnation.texture_id).then_some(*asset)
+            })
+            .collect();
         self.retire_atlas_views_for_assets(gal, &assets)
     }
 
     /// Private native binding preparation. No Java/FFI capability admits this
     /// path yet. The owner's explicit upload prepares the image; this binding
     /// allocates no image, copied pixels, or texture-upload buffer.
-    pub(crate) fn prepare_owned_atlas_binding(&mut self, gal: &mut VulkanicGal,
+    pub(crate) fn prepare_owned_atlas_binding(
+        &mut self,
+        gal: &mut VulkanicGal,
         world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
-        asset: u64, sampling: SamplerFilter, color: ColorFormat,
-        depth: Option<TextureFormat>) -> GalResult<()> {
+        asset: u64,
+        sampling: SamplerFilter,
+        color: ColorFormat,
+        depth: Option<TextureFormat>,
+    ) -> GalResult<()> {
         let group = match sampling {
             SamplerFilter::Nearest => TextureGroup::Dynamic(asset),
             SamplerFilter::Linear => TextureGroup::DynamicLinear(asset),
@@ -1987,18 +2102,29 @@ impl GuiFrontend {
         self.prepare_owned_atlas_binding_group(gal, world, group, color, depth)
     }
 
-    fn prepare_owned_atlas_binding_group(&mut self, gal: &mut VulkanicGal,
+    fn prepare_owned_atlas_binding_group(
+        &mut self,
+        gal: &mut VulkanicGal,
         world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
-        group: TextureGroup, color: ColorFormat, depth: Option<TextureFormat>) -> GalResult<()> {
-        let asset = TextureGroupKey::from(group).dynamic_asset_id()
-            .ok_or_else(|| GalError::invalid_argument("GUI atlas binding needs a semantic image identity"))?;
+        group: TextureGroup,
+        color: ColorFormat,
+        depth: Option<TextureFormat>,
+    ) -> GalResult<()> {
+        let asset = TextureGroupKey::from(group)
+            .dynamic_asset_id()
+            .ok_or_else(|| {
+                GalError::invalid_argument("GUI atlas binding needs a semantic image identity")
+            })?;
         let sampling = group.sampling();
         let view = self.prepare_owned_atlas_view(gal, world, asset)?;
         let key = ResourceKey::new(group, color, depth);
         if let Some(binding) = self.resources.get(&key) {
             if !matches!(binding.image_ownership, GuiImageOwnership::AtlasView)
-                || binding.texture_view != view {
-                return Err(GalError::invalid_argument("GUI atlas binding ownership mismatch"));
+                || binding.texture_view != view
+            {
+                return Err(GalError::invalid_argument(
+                    "GUI atlas binding ownership mismatch",
+                ));
             }
             return Ok(());
         }
@@ -2007,33 +2133,58 @@ impl GuiFrontend {
         let mut created = Vec::new();
         let result = (|| -> GalResult<GuiResources> {
             let index_buffer = gal.create_buffer(BufferDesc {
-                label: format!("gui-atlas-{asset}.index"), size: index_bytes().len() as u64,
+                label: format!("gui-atlas-{asset}.index"),
+                size: index_bytes().len() as u64,
                 memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::Index, BufferUsage::TransferDst, BufferUsage::HostWrite],
+                usages: vec![
+                    BufferUsage::Index,
+                    BufferUsage::TransferDst,
+                    BufferUsage::HostWrite,
+                ],
             })?;
             created.push(index_buffer);
             let uniform_buffer = gal.create_buffer(BufferDesc {
-                label: format!("gui-atlas-{asset}.uniform"), size: GUI_PACKED_UNIFORM_BYTES,
+                label: format!("gui-atlas-{asset}.uniform"),
+                size: GUI_PACKED_UNIFORM_BYTES,
                 memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::Uniform, BufferUsage::TransferDst, BufferUsage::HostWrite],
+                usages: vec![
+                    BufferUsage::Uniform,
+                    BufferUsage::TransferDst,
+                    BufferUsage::HostWrite,
+                ],
             })?;
             created.push(uniform_buffer);
             let sampler = gal.create_sampler(SamplerDesc {
-                label: format!("gui-atlas-{asset}.sampler"), min_filter: sampling,
-                mag_filter: sampling, mip_filter: SamplerFilter::Nearest,
+                label: format!("gui-atlas-{asset}.sampler"),
+                min_filter: sampling,
+                mag_filter: sampling,
+                mip_filter: SamplerFilter::Nearest,
                 address_u: SamplerAddressMode::ClampToEdge,
                 address_v: SamplerAddressMode::ClampToEdge,
-                address_w: SamplerAddressMode::ClampToEdge, comparison: None,
+                address_w: SamplerAddressMode::ClampToEdge,
+                comparison: None,
             })?;
             created.push(sampler);
             let resource_set = gal.create_resource_set(ResourceSetDesc {
-                label: format!("gui-atlas-{asset}.set"), layout: pipeline.resource_layout,
-                bindings: [(uniform_buffer, ResourceBindingKind::UniformBuffer),
-                    (view, ResourceBindingKind::SampledTexture), (sampler, ResourceBindingKind::Sampler)]
-                    .into_iter().enumerate().map(|(binding, (resource, kind))| ResourceBinding {
-                        binding: binding as u32, array_index: 0, resource, kind,
-                        access: AccessFlags::READ, dynamic_offsets: Vec::new(), buffer_range: None,
-                    }).collect(),
+                label: format!("gui-atlas-{asset}.set"),
+                layout: pipeline.resource_layout,
+                bindings: [
+                    (uniform_buffer, ResourceBindingKind::UniformBuffer),
+                    (view, ResourceBindingKind::SampledTexture),
+                    (sampler, ResourceBindingKind::Sampler),
+                ]
+                .into_iter()
+                .enumerate()
+                .map(|(binding, (resource, kind))| ResourceBinding {
+                    binding: binding as u32,
+                    array_index: 0,
+                    resource,
+                    kind,
+                    access: AccessFlags::READ,
+                    dynamic_offsets: Vec::new(),
+                    buffer_range: None,
+                })
+                .collect(),
             })?;
             created.push(resource_set);
             gal.submit(SubmissionBatch {
@@ -2043,72 +2194,145 @@ impl GuiFrontend {
                     operations: gui_index_upload_ops(index_buffer),
                 })],
             })?;
-            Ok(GuiResources { private_sampler: None, index_buffer, uniform_buffer, texture, sampler,
-                texture_view: view, resource_set, pipeline_layout: pipeline.pipeline_layout,
-                pipeline: pipeline.pipeline, image_ownership: GuiImageOwnership::AtlasView })
+            Ok(GuiResources {
+                private_sampler: None,
+                index_buffer,
+                uniform_buffer,
+                texture,
+                sampler,
+                texture_view: view,
+                resource_set,
+                pipeline_layout: pipeline.pipeline_layout,
+                pipeline: pipeline.pipeline,
+                image_ownership: GuiImageOwnership::AtlasView,
+            })
         })();
         match result {
-            Ok(binding) => { self.resources.insert(key, binding); Ok(()) },
+            Ok(binding) => {
+                self.resources.insert(key, binding);
+                Ok(())
+            }
             Err(error) => {
-                for handle in created.into_iter().rev() { let _ = gal.destroy(handle); }
+                for handle in created.into_iter().rev() {
+                    let _ = gal.destroy(handle);
+                }
                 Err(error)
-            },
+            }
         }
     }
 
     /// Private semantic atlas command consumer. It appends to the caller's GAL
     /// pass; it owns no target or presenter. Public mixed GUI admission remains
     /// disabled until its scheduler and FFI supply these typed references.
-    pub(crate) fn append_owned_atlas_quads(&mut self, gal: &mut VulkanicGal,
+    pub(crate) fn append_owned_atlas_quads(
+        &mut self,
+        gal: &mut VulkanicGal,
         world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
-        frame_pass: Handle, target: Handle, color_view: Handle, depth_view: Option<Handle>,
-        color: ColorFormat, depth: Option<TextureFormat>, pre_present_y_flip: bool,
-        requests: &[GuiAffineQuadRequest]) -> GalResult<Vec<CommandOp>> {
+        frame_pass: Handle,
+        target: Handle,
+        color_view: Handle,
+        depth_view: Option<Handle>,
+        color: ColorFormat,
+        depth: Option<TextureFormat>,
+        pre_present_y_flip: bool,
+        requests: &[GuiAffineQuadRequest],
+    ) -> GalResult<Vec<CommandOp>> {
         if requests.len() > GUI_MAX_EXPANDED_AFFINE_QUADS {
-            return Err(GalError::invalid_argument("GUI atlas quad count exceeds frame bound"));
+            return Err(GalError::invalid_argument(
+                "GUI atlas quad count exceeds frame bound",
+            ));
         }
         validate_gui_frame_sequences(&[], requests, &[], &[])?;
         let mut ordered = requests.to_vec();
         ordered.sort_by_key(|request| (request.stratum, request.sequence));
-        self.append_scheduled_owned_atlas_quads(gal, world, frame_pass, target, color_view,
-            depth_view, color, depth, pre_present_y_flip, &ordered, false)
+        self.append_scheduled_owned_atlas_quads(
+            gal,
+            world,
+            frame_pass,
+            target,
+            color_view,
+            depth_view,
+            color,
+            depth,
+            pre_present_y_flip,
+            &ordered,
+            false,
+        )
     }
 
     /// Private item-local raster stage. The target and source atlas are both
     /// Rust GAL resources. No presentation or CPU pixel round-trip occurs.
     /// The caller owns target initialization, transitions and composition.
-    pub(crate) fn append_owned_item_raster_quads(&mut self, gal: &mut VulkanicGal,
+    pub(crate) fn append_owned_item_raster_quads(
+        &mut self,
+        gal: &mut VulkanicGal,
         world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
-        frame_pass: Handle, target: Handle, color_view: Handle,
-        requests: &[(super::gui_item_raster::GuiItemRasterPlacement, GuiAffineQuadRequest)])
-        -> GalResult<Vec<CommandOp>> {
+        frame_pass: Handle,
+        target: Handle,
+        color_view: Handle,
+        requests: &[(
+            super::gui_item_raster::GuiItemRasterPlacement,
+            GuiAffineQuadRequest,
+        )],
+    ) -> GalResult<Vec<CommandOp>> {
         if requests.len() > GUI_MAX_RAW_IMAGES {
-            return Err(GalError::invalid_argument("GUI item raster count exceeds bounded limit"));
+            return Err(GalError::invalid_argument(
+                "GUI item raster count exceeds bounded limit",
+            ));
         }
         let extent = gal.pass_target_extent(target)?;
-        let quads = requests.iter().map(|(placement, local)| {
-            if placement.target_extent != [extent.width, extent.height] {
-                return Err(GalError::invalid_argument("GUI item raster target extent mismatch"));
-            }
-            placement.lower_quad(local)
-        }).collect::<GalResult<Vec<_>>>()?;
+        let quads = requests
+            .iter()
+            .map(|(placement, local)| {
+                if placement.target_extent != [extent.width, extent.height] {
+                    return Err(GalError::invalid_argument(
+                        "GUI item raster target extent mismatch",
+                    ));
+                }
+                placement.lower_quad(local)
+            })
+            .collect::<GalResult<Vec<_>>>()?;
         validate_gui_frame_sequences(&[], &quads, &[], &[])?;
-        self.append_scheduled_owned_atlas_quads(gal, world, frame_pass, target, color_view,
-            None, ColorFormat::Rgba8Unorm, None, false, &quads, true)
+        self.append_scheduled_owned_atlas_quads(
+            gal,
+            world,
+            frame_pass,
+            target,
+            color_view,
+            None,
+            ColorFormat::Rgba8Unorm,
+            None,
+            false,
+            &quads,
+            true,
+        )
     }
 
     /// Only the parent-validated scheduler (or the validating wrapper above)
     /// calls this encoder. Expanded tile children legitimately share a parent
     /// sequence; they must not be reclassified as duplicate parent commands.
-    fn append_scheduled_owned_atlas_quads(&mut self, gal: &mut VulkanicGal,
+    fn append_scheduled_owned_atlas_quads(
+        &mut self,
+        gal: &mut VulkanicGal,
         world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
-        frame_pass: Handle, target: Handle, color_view: Handle, depth_view: Option<Handle>,
-        color: ColorFormat, depth: Option<TextureFormat>, pre_present_y_flip: bool,
-        requests: &[GuiAffineQuadRequest], item_local_oriented_uv: bool) -> GalResult<Vec<CommandOp>> {
+        frame_pass: Handle,
+        target: Handle,
+        color_view: Handle,
+        depth_view: Option<Handle>,
+        color: ColorFormat,
+        depth: Option<TextureFormat>,
+        pre_present_y_flip: bool,
+        requests: &[GuiAffineQuadRequest],
+        item_local_oriented_uv: bool,
+    ) -> GalResult<Vec<CommandOp>> {
         if requests.len() > GUI_MAX_EXPANDED_AFFINE_QUADS {
-            return Err(GalError::invalid_argument("GUI atlas quad count exceeds frame bound"));
+            return Err(GalError::invalid_argument(
+                "GUI atlas quad count exceeds frame bound",
+            ));
         }
-        if requests.is_empty() { return Ok(Vec::new()); }
+        if requests.is_empty() {
+            return Ok(Vec::new());
+        }
         world.require_gui_atlas_upload_boundary()?;
         let mut batches = Vec::new();
         // Validate the complete semantic input before allocating GPU bindings.
@@ -2118,50 +2342,78 @@ impl GuiFrontend {
                 // through the same bounded UV interval. Validate its bounds
                 // without replacing the authored order used for rasterization.
                 let mut bounds = request.clone();
-                if ![bounds.u0,bounds.u1,bounds.v0,bounds.v1].iter().all(|v| v.is_finite()) {
+                if ![bounds.u0, bounds.u1, bounds.v0, bounds.v1]
+                    .iter()
+                    .all(|v| v.is_finite())
+                {
                     return Err(GalError::invalid_argument("non-finite item raster UV"));
                 }
-                if bounds.u0 > bounds.u1 { std::mem::swap(&mut bounds.u0, &mut bounds.u1); }
-                if bounds.v0 > bounds.v1 { std::mem::swap(&mut bounds.v0, &mut bounds.v1); }
+                if bounds.u0 > bounds.u1 {
+                    std::mem::swap(&mut bounds.u0, &mut bounds.u1);
+                }
+                if bounds.v0 > bounds.v1 {
+                    std::mem::swap(&mut bounds.v0, &mut bounds.v1);
+                }
                 validate_affine_quad(&bounds)?;
             } else {
                 validate_affine_quad(request)?;
             }
-            let reference = self.atlas_references.resolve(request.asset_id,
-                |id| world.accepted_gui_atlas_incarnation(id))?;
+            let reference = self.atlas_references.resolve(request.asset_id, |id| {
+                world.accepted_gui_atlas_incarnation(id)
+            })?;
             let low = reference.atlas_uv([request.u0, request.v0])?;
             let high = reference.atlas_uv([request.u1, request.v1])?;
             let uv = [low[0], low[1], high[0] - low[0], high[1] - low[1]];
             if uv.iter().any(|value| !value.is_finite()) {
-                return Err(GalError::invalid_argument("GUI atlas UV interval overflows"));
+                return Err(GalError::invalid_argument(
+                    "GUI atlas UV interval overflows",
+                ));
             }
-            append_gui_quad(&mut batches, request.stratum,
-                if item_local_oriented_uv && request.material.is_cutout() { TextureGroup::DynamicItemCutout(request.asset_id) }
-                else if item_local_oriented_uv { TextureGroup::DynamicItemRaster(request.asset_id) }
-                else { dynamic_texture_group(request.stratum, request.asset_id) }, PackedGuiQuad {
+            append_gui_quad(
+                &mut batches,
+                request.stratum,
+                if item_local_oriented_uv && request.material.is_cutout() {
+                    TextureGroup::DynamicItemCutout(request.asset_id)
+                } else if item_local_oriented_uv {
+                    TextureGroup::DynamicItemRaster(request.asset_id)
+                } else {
+                    dynamic_texture_group(request.stratum, request.asset_id)
+                },
+                PackedGuiQuad {
                     origin: [request.x0, request.y0],
                     axis_u: [request.x1 - request.x0, request.y1 - request.y0],
                     axis_v: [request.x3 - request.x0, request.y3 - request.y0],
                     viewport: request.projection_extent,
-                    clip: [request.clip_left as f32, request.clip_top as f32,
+                    clip: [
+                        request.clip_left as f32,
+                        request.clip_top as f32,
                         (request.clip_left + request.clip_width) as f32,
-                        (request.clip_top + request.clip_height) as f32],
-                    clip_enabled: request.clip_mode == 1, pre_present_y_flip,
+                        (request.clip_top + request.clip_height) as f32,
+                    ],
+                    clip_enabled: request.clip_mode == 1,
+                    pre_present_y_flip,
                     uv,
                     color: request.material.color(argb_to_rgba(request.color_argb))?,
-                    texture_mode: GuiRawImageFormat::Rgba8.shader_mode(), z: request.z,
-                });
+                    texture_mode: GuiRawImageFormat::Rgba8.shader_mode(),
+                    z: request.z,
+                },
+            );
         }
         for batch in &batches {
             self.prepare_owned_atlas_binding_group(gal, world, batch.group, color, depth)?;
         }
         let mut ops = Vec::new();
-        append_gui_batches_ops(self, frame_pass, target, color_view, depth_view,
-            color, depth, &batches, &mut ops)?;
+        append_gui_batches_ops(
+            self, frame_pass, target, color_view, depth_view, color, depth, &batches, &mut ops,
+        )?;
         Ok(ops)
     }
 
-    fn retire_atlas_views_for_assets(&mut self, gal: &mut VulkanicGal, assets: &BTreeSet<u64>) -> GalResult<()> {
+    fn retire_atlas_views_for_assets(
+        &mut self,
+        gal: &mut VulkanicGal,
+        assets: &BTreeSet<u64>,
+    ) -> GalResult<()> {
         // Descriptor sets must release their view dependencies before the views.
         self.destroy_dynamic_resources_for_assets(gal, assets);
         for asset in assets {
@@ -2329,25 +2581,49 @@ impl GuiFrontend {
         affine_quads: Vec<GuiAffineQuadRequest>,
         mesh_batches: Vec<GuiMeshBatchRequest>,
     ) -> GalResult<GuiSubmitStats> {
-        self.submit_frame_with_tiled_quads(gal, generation, frame_target,
-            requests, affine_quads, mesh_batches, Vec::new())
+        self.submit_frame_with_tiled_quads(
+            gal,
+            generation,
+            frame_target,
+            requests,
+            affine_quads,
+            mesh_batches,
+            Vec::new(),
+        )
     }
 
     pub(crate) fn submit_frame_with_tiled_quads(
-        &mut self, gal: &mut VulkanicGal, generation: u64, frame_target: Handle,
-        requests: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
-        mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        requests: Vec<GuiSpriteRequest>,
+        affine_quads: Vec<GuiAffineQuadRequest>,
+        mesh_batches: Vec<GuiMeshBatchRequest>,
+        tiled_quads: Vec<GuiTiledQuadRequest>,
     ) -> GalResult<GuiSubmitStats> {
-        self.submit_frame_with_owned_atlases(gal, None, generation, frame_target,
-            requests, affine_quads, mesh_batches, tiled_quads)
+        self.submit_frame_with_owned_atlases(
+            gal,
+            None,
+            generation,
+            frame_target,
+            requests,
+            affine_quads,
+            mesh_batches,
+            tiled_quads,
+        )
     }
 
     pub(crate) fn submit_frame_with_owned_atlases(
-        &mut self, gal: &mut VulkanicGal,
+        &mut self,
+        gal: &mut VulkanicGal,
         world: Option<&mut super::world_primitive_frontend::WorldPrimitiveFrontend>,
-        generation: u64, frame_target: Handle,
-        requests: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
-        mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
+        generation: u64,
+        frame_target: Handle,
+        requests: Vec<GuiSpriteRequest>,
+        affine_quads: Vec<GuiAffineQuadRequest>,
+        mesh_batches: Vec<GuiMeshBatchRequest>,
+        tiled_quads: Vec<GuiTiledQuadRequest>,
     ) -> GalResult<GuiSubmitStats> {
         validate_gui_frame_sequences(&requests, &affine_quads, &mesh_batches, &tiled_quads)?;
         let (ops, mut stats) = self.append_frame_ops_with_owned_atlases_to_target(
@@ -2627,30 +2903,65 @@ impl GuiFrontend {
         blur_radius: i32,
         pre_present_y_flip: bool,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
-        self.append_frame_ops_with_tiled_blur_boundary(gal, generation, render_target,
-            color_attachment, requests, affine_quads, mesh_batches, Vec::new(),
-            boundary_stratum, blur_radius, pre_present_y_flip)
+        self.append_frame_ops_with_tiled_blur_boundary(
+            gal,
+            generation,
+            render_target,
+            color_attachment,
+            requests,
+            affine_quads,
+            mesh_batches,
+            Vec::new(),
+            boundary_stratum,
+            blur_radius,
+            pre_present_y_flip,
+        )
     }
 
     pub(crate) fn append_frame_ops_with_tiled_blur_boundary(
-        &mut self, gal: &mut VulkanicGal, generation: u64, render_target: Handle,
-        color_attachment: Handle, requests: Vec<GuiSpriteRequest>,
-        affine_quads: Vec<GuiAffineQuadRequest>, mesh_batches: Vec<GuiMeshBatchRequest>,
-        tiled_quads: Vec<GuiTiledQuadRequest>, boundary_stratum: i32, blur_radius: i32,
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        render_target: Handle,
+        color_attachment: Handle,
+        requests: Vec<GuiSpriteRequest>,
+        affine_quads: Vec<GuiAffineQuadRequest>,
+        mesh_batches: Vec<GuiMeshBatchRequest>,
+        tiled_quads: Vec<GuiTiledQuadRequest>,
+        boundary_stratum: i32,
+        blur_radius: i32,
         pre_present_y_flip: bool,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
-        self.append_frame_ops_with_owned_atlases_and_blur_boundary(gal, None, generation,
-            render_target, color_attachment, requests, affine_quads, mesh_batches,
-            tiled_quads, boundary_stratum, blur_radius, pre_present_y_flip)
+        self.append_frame_ops_with_owned_atlases_and_blur_boundary(
+            gal,
+            None,
+            generation,
+            render_target,
+            color_attachment,
+            requests,
+            affine_quads,
+            mesh_batches,
+            tiled_quads,
+            boundary_stratum,
+            blur_radius,
+            pre_present_y_flip,
+        )
     }
 
     pub(crate) fn append_frame_ops_with_owned_atlases_and_blur_boundary(
-        &mut self, gal: &mut VulkanicGal,
+        &mut self,
+        gal: &mut VulkanicGal,
         mut world: Option<&mut super::world_primitive_frontend::WorldPrimitiveFrontend>,
-        generation: u64, render_target: Handle, color_attachment: Handle,
-        requests: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
-        mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
-        boundary_stratum: i32, blur_radius: i32, pre_present_y_flip: bool,
+        generation: u64,
+        render_target: Handle,
+        color_attachment: Handle,
+        requests: Vec<GuiSpriteRequest>,
+        affine_quads: Vec<GuiAffineQuadRequest>,
+        mesh_batches: Vec<GuiMeshBatchRequest>,
+        tiled_quads: Vec<GuiTiledQuadRequest>,
+        boundary_stratum: i32,
+        blur_radius: i32,
+        pre_present_y_flip: bool,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
         // Validate the whole frame before partitioning or creating resources;
         // splitting at blur must not bypass aggregate bounds or hide collisions.
@@ -2695,24 +3006,24 @@ impl GuiFrontend {
                 after_mesh.push(request);
             }
         }
-        let (before_tiled, after_tiled) = tiled_quads.into_iter()
+        let (before_tiled, after_tiled) = tiled_quads
+            .into_iter()
             .partition(|request| request.stratum < threshold);
-        let (mut ops, mut stats) = self
-            .append_frame_ops_with_owned_atlases_to_target(
-                gal,
-                world.as_deref_mut(),
-                generation,
-                render_target,
-                color_attachment,
-                None,
-                None,
-                None,
-                pre_present_y_flip,
-                before_requests,
-                before_affine,
-                before_mesh,
-                before_tiled,
-            )?;
+        let (mut ops, mut stats) = self.append_frame_ops_with_owned_atlases_to_target(
+            gal,
+            world.as_deref_mut(),
+            generation,
+            render_target,
+            color_attachment,
+            None,
+            None,
+            None,
+            pre_present_y_flip,
+            before_requests,
+            before_affine,
+            before_mesh,
+            before_tiled,
+        )?;
         let extent = gal.pass_target_extent(render_target)?;
         let color_format = gal.pass_target_color_format(render_target)?;
         let resources =
@@ -2783,24 +3094,32 @@ impl GuiFrontend {
             ]);
         }
         ops.push(CommandOp::Barrier(ResourceBarrier {
-                resource: snapshot,
-                subresources: None,
-                before: TextureUsageState::TransferDst,
-                after: TextureUsageState::ShaderRead,
-                src_queue: QueueClass::Transfer,
-                dst_queue: QueueClass::Graphics,
-            }));
+            resource: snapshot,
+            subresources: None,
+            before: TextureUsageState::TransferDst,
+            after: TextureUsageState::ShaderRead,
+            src_queue: QueueClass::Transfer,
+            dst_queue: QueueClass::Graphics,
+        }));
         // Frozen minecraft:blur is three horizontal/vertical box-blur pairs.
         // Ping-pong owned scratch images, writing the final pass to the frame.
         let mut initialized = self.spider_initialized;
         for index in 0..6 {
             let final_pass = index == 5;
             let output = if index % 2 == 0 { 2 } else { 3 };
-            let source_set = if index == 0 { resource_set }
-                else if index % 2 == 1 { scratch_sets[1] }
-                else { scratch_sets[3] };
+            let source_set = if index == 0 {
+                resource_set
+            } else if index % 2 == 1 {
+                scratch_sets[1]
+            } else {
+                scratch_sets[3]
+            };
             let mut bytes = vec![0u8; 64];
-            let direction: [f32; 2] = if index % 2 == 0 { [1.0, 0.0] } else { [0.0, 1.0] };
+            let direction: [f32; 2] = if index % 2 == 0 {
+                [1.0, 0.0]
+            } else {
+                [0.0, 1.0]
+            };
             bytes[..4].copy_from_slice(&direction[0].to_le_bytes());
             bytes[4..8].copy_from_slice(&direction[1].to_le_bytes());
             bytes[8..12].copy_from_slice(&(blur_radius as f32).to_le_bytes());
@@ -2814,52 +3133,83 @@ impl GuiFrontend {
             push_uniform_write(&mut ops, uniform_buffer, bytes);
             if !final_pass {
                 ops.push(CommandOp::Barrier(ResourceBarrier {
-                    resource: scratch_textures[output], subresources: None,
-                    before: if initialized[output] { TextureUsageState::ShaderRead } else { TextureUsageState::Undefined },
+                    resource: scratch_textures[output],
+                    subresources: None,
+                    before: if initialized[output] {
+                        TextureUsageState::ShaderRead
+                    } else {
+                        TextureUsageState::Undefined
+                    },
                     after: TextureUsageState::ColorAttachment,
-                    src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
                 }));
             }
             ops.extend([
                 CommandOp::BeginPass {
-                    pass: if final_pass { pass } else { scratch_passes[output] },
-                    target: if final_pass { render_target } else { scratch_targets[output] },
-                    colors: vec![if final_pass { loaded_frame_color_attachment(color_attachment) }
-                        else { PassAttachment { view: scratch_views[output], load_op: AttachmentLoadOp::DontCare,
-                            store_op: AttachmentStoreOp::Store, clear_color: None } }],
+                    pass: if final_pass {
+                        pass
+                    } else {
+                        scratch_passes[output]
+                    },
+                    target: if final_pass {
+                        render_target
+                    } else {
+                        scratch_targets[output]
+                    },
+                    colors: vec![if final_pass {
+                        loaded_frame_color_attachment(color_attachment)
+                    } else {
+                        PassAttachment {
+                            view: scratch_views[output],
+                            load_op: AttachmentLoadOp::DontCare,
+                            store_op: AttachmentStoreOp::Store,
+                            clear_color: None,
+                        }
+                    }],
                     depth_stencil: None,
                 },
                 CommandOp::BindGraphicsPipeline(pipeline),
-                CommandOp::BindResourceSet { pipeline_layout, set_index: 0, set: source_set, dynamic_offsets: Vec::new() },
-                CommandOp::Draw { vertices: 3, instances: 1 },
+                CommandOp::BindResourceSet {
+                    pipeline_layout,
+                    set_index: 0,
+                    set: source_set,
+                    dynamic_offsets: Vec::new(),
+                },
+                CommandOp::Draw {
+                    vertices: 3,
+                    instances: 1,
+                },
                 CommandOp::EndPass,
             ]);
             if !final_pass {
                 ops.push(CommandOp::Barrier(ResourceBarrier {
-                    resource: scratch_textures[output], subresources: None,
-                    before: TextureUsageState::ColorAttachment, after: TextureUsageState::ShaderRead,
-                    src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics,
+                    resource: scratch_textures[output],
+                    subresources: None,
+                    before: TextureUsageState::ColorAttachment,
+                    after: TextureUsageState::ShaderRead,
+                    src_queue: QueueClass::Graphics,
+                    dst_queue: QueueClass::Graphics,
                 }));
                 initialized[output] = true;
             }
         }
         self.spider_initialized = initialized;
-        let (after_ops, after_stats) = self
-            .append_frame_ops_with_owned_atlases_to_target(
-                gal,
-                world,
-                generation,
-                render_target,
-                color_attachment,
-                None,
-                None,
-                None,
-                false,
-                after_requests,
-                after_affine,
-                after_mesh,
-                after_tiled,
-            )?;
+        let (after_ops, after_stats) = self.append_frame_ops_with_owned_atlases_to_target(
+            gal,
+            world,
+            generation,
+            render_target,
+            color_attachment,
+            None,
+            None,
+            None,
+            false,
+            after_requests,
+            after_affine,
+            after_mesh,
+            after_tiled,
+        )?;
         ops.extend(after_ops);
         stats.sprite_count = stats.sprite_count.saturating_add(after_stats.sprite_count);
         stats.affine_quad_count = stats
@@ -2874,16 +3224,21 @@ impl GuiFrontend {
         stats.mesh_draw_count = stats
             .mesh_draw_count
             .saturating_add(after_stats.mesh_draw_count);
-        stats.entity_preview_item_count = stats.entity_preview_item_count
+        stats.entity_preview_item_count = stats
+            .entity_preview_item_count
             .saturating_add(after_stats.entity_preview_item_count);
-        stats.entity_preview_batch_count = stats.entity_preview_batch_count
+        stats.entity_preview_batch_count = stats
+            .entity_preview_batch_count
             .saturating_add(after_stats.entity_preview_batch_count);
-        stats.entity_preview_draw_count = stats.entity_preview_draw_count
+        stats.entity_preview_draw_count = stats
+            .entity_preview_draw_count
             .saturating_add(after_stats.entity_preview_draw_count);
         stats.entity_preview_material_mask |= after_stats.entity_preview_material_mask;
-        stats.entity_preview_vertex_count = stats.entity_preview_vertex_count
+        stats.entity_preview_vertex_count = stats
+            .entity_preview_vertex_count
             .saturating_add(after_stats.entity_preview_vertex_count);
-        stats.entity_preview_index_count = stats.entity_preview_index_count
+        stats.entity_preview_index_count = stats
+            .entity_preview_index_count
             .saturating_add(after_stats.entity_preview_index_count);
         stats.sprite_batch_count = stats
             .sprite_batch_count
@@ -3165,18 +3520,32 @@ impl GuiFrontend {
             let frame_copy_scratch = if needs_frame_scratch {
                 let texture = gal.create_texture(TextureDesc {
                     label: format!("{label}.frame-copy-scratch"),
-                    dimension: TextureDimension::D2, format: color_format,
-                    extent: Extent3d { width, height, depth: 1 }, mip_levels: 1, array_layers: 1,
+                    dimension: TextureDimension::D2,
+                    format: color_format,
+                    extent: Extent3d {
+                        width,
+                        height,
+                        depth: 1,
+                    },
+                    mip_levels: 1,
+                    array_layers: 1,
                     usages: vec![TextureUsage::TransferSrc, TextureUsage::TransferDst],
                 })?;
                 created.push(texture);
                 Some(texture)
-            } else { None };
+            } else {
+                None
+            };
             for input_index in 0..input_count {
-                let snapshot_format = if input_row_order == super::commands::TextureRowOrder::Reverse {
-                    input_depth_views[input_index].map(|view| gal.texture_view_info(view).map(|info| info.format))
-                        .transpose()?.unwrap_or(color_format)
-                } else { color_format };
+                let snapshot_format =
+                    if input_row_order == super::commands::TextureRowOrder::Reverse {
+                        input_depth_views[input_index]
+                            .map(|view| gal.texture_view_info(view).map(|info| info.format))
+                            .transpose()?
+                            .unwrap_or(color_format)
+                    } else {
+                        color_format
+                    };
                 let snapshot = gal.create_texture(TextureDesc {
                     label: format!("{label}.snapshot-{input_index}"),
                     dimension: TextureDimension::D2,
@@ -3289,10 +3658,16 @@ impl GuiFrontend {
                 let sampler = if let Some(sampler) = image_samplers[input_index] {
                     sampler
                 } else {
-                    let filter = if input_bilinear[input_index] { SamplerFilter::Linear } else { SamplerFilter::Nearest };
+                    let filter = if input_bilinear[input_index] {
+                        SamplerFilter::Linear
+                    } else {
+                        SamplerFilter::Nearest
+                    };
                     let sampler = gal.create_sampler(SamplerDesc {
                         label: format!("{label}.target-{input_index}.sampler"),
-                        min_filter: filter, mag_filter: filter, mip_filter: SamplerFilter::Nearest,
+                        min_filter: filter,
+                        mag_filter: filter,
+                        mip_filter: SamplerFilter::Nearest,
                         address_u: SamplerAddressMode::ClampToEdge,
                         address_v: SamplerAddressMode::ClampToEdge,
                         address_w: SamplerAddressMode::ClampToEdge,
@@ -3307,9 +3682,14 @@ impl GuiFrontend {
                     image_views[input_index],
                     image_samplers[input_index],
                 ) {
-                    (Some(depth_view), _, _) => (if input_row_order == super::commands::TextureRowOrder::Reverse {
-                        snapshot_views[input_index]
-                    } else { depth_view }, sampler),
+                    (Some(depth_view), _, _) => (
+                        if input_row_order == super::commands::TextureRowOrder::Reverse {
+                            snapshot_views[input_index]
+                        } else {
+                            depth_view
+                        },
+                        sampler,
+                    ),
                     (None, Some(view), Some(input_sampler)) => (view, input_sampler),
                     (None, _, _) => (snapshot_views[input_index], sampler),
                 };
@@ -3661,10 +4041,17 @@ impl GuiFrontend {
         let mut intermediate_names = BTreeMap::<String, ()>::new();
         for source in shader_sources {
             if source.input_bilinear.len() != source.input_count {
-                return Err(GalError::invalid_argument("custom post-effect filter inventory does not match input count"));
+                return Err(GalError::invalid_argument(
+                    "custom post-effect filter inventory does not match input count",
+                ));
             }
-            if source.sampler_info_uniform.is_some_and(|index| index >= source.uniform_blocks.len()) {
-                return Err(GalError::invalid_argument("post-effect SamplerInfo binding is outside its uniform inventory"));
+            if source
+                .sampler_info_uniform
+                .is_some_and(|index| index >= source.uniform_blocks.len())
+            {
+                return Err(GalError::invalid_argument(
+                    "post-effect SamplerInfo binding is outside its uniform inventory",
+                ));
             }
             let uniform_bytes = source
                 .uniform_blocks
@@ -3732,10 +4119,13 @@ impl GuiFrontend {
                 ));
             }
             for (index, target) in source.input_targets.iter().enumerate() {
-                if source.input_use_depth[index] && (source.input_images[index].is_some()
-                    || (target != "minecraft:main" && external_targets
-                        .and_then(|targets| targets.get(target))
-                        .and_then(|binding| binding.depth_attachment).is_none()))
+                if source.input_use_depth[index]
+                    && (source.input_images[index].is_some()
+                        || (target != "minecraft:main"
+                            && external_targets
+                                .and_then(|targets| targets.get(target))
+                                .and_then(|binding| binding.depth_attachment)
+                                .is_none()))
                 {
                     return Err(GalError::unsupported_feature(
                         "custom post-effect named depth input has no matching owned depth attachment",
@@ -3865,9 +4255,11 @@ impl GuiFrontend {
                     source.input_row_order,
                     source.input_row_order == super::commands::TextureRowOrder::Reverse
                         && render_target.kind() == Some(super::handles::HandleKind::FrameTarget)
-                        && source.input_targets.iter().enumerate().any(|(i, name)|
-                            name == "minecraft:main" && !source.input_use_depth[i]
-                                && source.input_images[i].is_none()),
+                        && source.input_targets.iter().enumerate().any(|(i, name)| {
+                            name == "minecraft:main"
+                                && !source.input_use_depth[i]
+                                && source.input_images[i].is_none()
+                        }),
                     &source.input_bilinear,
                     &source.input_targets,
                     &source.input_images,
@@ -3951,37 +4343,65 @@ impl GuiFrontend {
                     dst_queue: QueueClass::Transfer,
                 }));
                 if source.input_use_depth[input_index] {
-                    let info = gal.texture_view_info(input_depth_views[input_index].ok_or_else(||
-                        GalError::unsupported_feature("row-converted depth input has no owned view"))?)?;
-                    if info.range.base_mip != 0 || info.range.mip_count != 1
-                        || info.range.base_layer != 0 || info.range.layer_count != 1
-                        || info.extent != extent || !info.usages.contains(&TextureUsage::TransferSrc)
+                    let info = gal.texture_view_info(
+                        input_depth_views[input_index].ok_or_else(|| {
+                            GalError::unsupported_feature(
+                                "row-converted depth input has no owned view",
+                            )
+                        })?,
+                    )?;
+                    if info.range.base_mip != 0
+                        || info.range.mip_count != 1
+                        || info.range.base_layer != 0
+                        || info.range.layer_count != 1
+                        || info.extent != extent
+                        || !info.usages.contains(&TextureUsage::TransferSrc)
                     {
                         return Err(GalError::unsupported_feature(
                             "row-converted depth input requires a full-size transferable single-subresource attachment"));
                     }
-                    let restore = external_targets.and_then(|targets| targets.get(source_target_name))
+                    let restore = external_targets
+                        .and_then(|targets| targets.get(source_target_name))
                         .and_then(|binding| binding.depth_usage)
                         .unwrap_or(TextureUsageState::DepthStencilAttachment);
                     ops.extend([
-                        CommandOp::Barrier(texture_barrier(info.texture, restore, TextureUsageState::TransferSrc)),
+                        CommandOp::Barrier(texture_barrier(
+                            info.texture,
+                            restore,
+                            TextureUsageState::TransferSrc,
+                        )),
                         CommandOp::CopyTexture(TextureImageCopyRegion {
                             row_order: source.input_row_order,
-                            src_texture: info.texture, src_mip: 0, src_layer: 0,
+                            src_texture: info.texture,
+                            src_mip: 0,
+                            src_layer: 0,
                             src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-                            dst_texture: snapshot, dst_mip: 0, dst_layer: 0,
-                            dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 }, extent,
+                            dst_texture: snapshot,
+                            dst_mip: 0,
+                            dst_layer: 0,
+                            dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                            extent,
                         }),
-                        CommandOp::Barrier(texture_barrier(info.texture, TextureUsageState::TransferSrc, restore)),
+                        CommandOp::Barrier(texture_barrier(
+                            info.texture,
+                            TextureUsageState::TransferSrc,
+                            restore,
+                        )),
                     ]);
                 } else if source_target_name == "minecraft:main"
                     && render_target.kind() == Some(super::handles::HandleKind::FrameTarget)
                 {
                     let copy_destination = frame_copy_scratch.unwrap_or(snapshot);
                     if let Some(scratch) = frame_copy_scratch {
-                        ops.push(CommandOp::Barrier(texture_barrier(scratch,
-                            if scratch_initialized { TextureUsageState::TransferSrc } else { TextureUsageState::Undefined },
-                            TextureUsageState::TransferDst)));
+                        ops.push(CommandOp::Barrier(texture_barrier(
+                            scratch,
+                            if scratch_initialized {
+                                TextureUsageState::TransferSrc
+                            } else {
+                                TextureUsageState::Undefined
+                            },
+                            TextureUsageState::TransferDst,
+                        )));
                     }
                     ops.push(CommandOp::CopyFrameTargetToTexture {
                         src: render_target,
@@ -3990,13 +4410,22 @@ impl GuiFrontend {
                     });
                     if let Some(scratch) = frame_copy_scratch {
                         ops.extend([
-                            CommandOp::Barrier(texture_barrier(scratch, TextureUsageState::TransferDst, TextureUsageState::TransferSrc)),
+                            CommandOp::Barrier(texture_barrier(
+                                scratch,
+                                TextureUsageState::TransferDst,
+                                TextureUsageState::TransferSrc,
+                            )),
                             CommandOp::CopyTexture(TextureImageCopyRegion {
                                 row_order: source.input_row_order,
-                                src_texture: scratch, src_mip: 0, src_layer: 0,
+                                src_texture: scratch,
+                                src_mip: 0,
+                                src_layer: 0,
                                 src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-                                dst_texture: snapshot, dst_mip: 0, dst_layer: 0,
-                                dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 }, extent,
+                                dst_texture: snapshot,
+                                dst_mip: 0,
+                                dst_layer: 0,
+                                dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                                extent,
                             }),
                         ]);
                         scratch_initialized = true;
@@ -4032,9 +4461,12 @@ impl GuiFrontend {
                             external_targets
                                 .and_then(|targets| targets.get(source_target_name))
                                 .map(|binding| binding.color_usage)
-                            .unwrap_or_else(|| self.custom_post_effect_intermediates
-                                .get(source_target_name).map(|target| target.usage)
-                                .unwrap_or(TextureUsageState::ColorAttachment))
+                                .unwrap_or_else(|| {
+                                    self.custom_post_effect_intermediates
+                                        .get(source_target_name)
+                                        .map(|target| target.usage)
+                                        .unwrap_or(TextureUsageState::ColorAttachment)
+                                })
                         });
                     ops.extend([
                         CommandOp::Barrier(ResourceBarrier {
@@ -4067,7 +4499,10 @@ impl GuiFrontend {
                         }),
                     ]);
                     source_states.insert(source_target_name.clone(), restore_state);
-                    if let Some(target) = self.custom_post_effect_intermediates.get_mut(source_target_name) {
+                    if let Some(target) = self
+                        .custom_post_effect_intermediates
+                        .get_mut(source_target_name)
+                    {
                         target.usage = restore_state;
                     }
                 }
@@ -4132,8 +4567,14 @@ impl GuiFrontend {
                 ]);
                 self.custom_post_effect_image_initialized[pass_index][input_index] = true;
             }
-            for (index, (buffer, bytes)) in uniform_buffers.iter().zip(source.uniform_blocks.iter()).enumerate() {
-                push_uniform_write(&mut ops, *buffer,
+            for (index, (buffer, bytes)) in uniform_buffers
+                .iter()
+                .zip(source.uniform_blocks.iter())
+                .enumerate()
+            {
+                push_uniform_write(
+                    &mut ops,
+                    *buffer,
                     if source.sampler_info_uniform == Some(index) {
                         custom_sampler_info_bytes(extent, &source.input_images)
                     } else if bytes.is_empty() {
@@ -4161,9 +4602,9 @@ impl GuiFrontend {
                     dst_queue: QueueClass::Graphics,
                 }));
             }
-            if let Some(depth_texture) = depth_texture
-                .filter(|_| !reverse_rows && source.input_use_depth.iter().any(|uses_depth| *uses_depth))
-            {
+            if let Some(depth_texture) = depth_texture.filter(|_| {
+                !reverse_rows && source.input_use_depth.iter().any(|uses_depth| *uses_depth)
+            }) {
                 ops.push(CommandOp::Barrier(ResourceBarrier {
                     resource: depth_texture,
                     subresources: None,
@@ -4213,9 +4654,15 @@ impl GuiFrontend {
                     }));
                 }
             }
-            if let Some(target) = self.custom_post_effect_intermediates.get_mut(&source.output_target) {
-                ops.push(CommandOp::Barrier(texture_barrier(target.texture, target.usage,
-                    TextureUsageState::ColorAttachment)));
+            if let Some(target) = self
+                .custom_post_effect_intermediates
+                .get_mut(&source.output_target)
+            {
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    target.texture,
+                    target.usage,
+                    TextureUsageState::ColorAttachment,
+                )));
                 target.usage = TextureUsageState::ColorAttachment;
             }
             ops.extend([
@@ -4266,9 +4713,9 @@ impl GuiFrontend {
                     }));
                 }
             }
-            if let Some(depth_texture) = depth_texture
-                .filter(|_| !reverse_rows && source.input_use_depth.iter().any(|uses_depth| *uses_depth))
-            {
+            if let Some(depth_texture) = depth_texture.filter(|_| {
+                !reverse_rows && source.input_use_depth.iter().any(|uses_depth| *uses_depth)
+            }) {
                 ops.push(CommandOp::Barrier(ResourceBarrier {
                     resource: depth_texture,
                     subresources: None,
@@ -4841,52 +5288,134 @@ impl GuiFrontend {
         affine_quads: Vec<GuiAffineQuadRequest>,
         mesh_batches: Vec<GuiMeshBatchRequest>,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
-        self.append_frame_ops_with_tiled_quads_to_target(gal, generation, render_target,
-            color_attachment, render_pass, depth_attachment, depth_format, pre_present_y_flip,
-            requests, affine_quads, mesh_batches, Vec::new())
+        self.append_frame_ops_with_tiled_quads_to_target(
+            gal,
+            generation,
+            render_target,
+            color_attachment,
+            render_pass,
+            depth_attachment,
+            depth_format,
+            pre_present_y_flip,
+            requests,
+            affine_quads,
+            mesh_batches,
+            Vec::new(),
+        )
     }
 
     pub(crate) fn append_frame_ops_with_tiled_quads_to_target(
-        &mut self, gal: &mut VulkanicGal, generation: u64, render_target: Handle,
-        color_attachment: Handle, render_pass: Option<Handle>, depth_attachment: Option<Handle>,
-        depth_format: Option<TextureFormat>, pre_present_y_flip: bool,
-        requests: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
-        mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        render_target: Handle,
+        color_attachment: Handle,
+        render_pass: Option<Handle>,
+        depth_attachment: Option<Handle>,
+        depth_format: Option<TextureFormat>,
+        pre_present_y_flip: bool,
+        requests: Vec<GuiSpriteRequest>,
+        affine_quads: Vec<GuiAffineQuadRequest>,
+        mesh_batches: Vec<GuiMeshBatchRequest>,
+        tiled_quads: Vec<GuiTiledQuadRequest>,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
-        self.append_frame_ops_with_owned_atlases_to_target(gal, None, generation, render_target,
-            color_attachment, render_pass, depth_attachment, depth_format, pre_present_y_flip,
-            requests, affine_quads, mesh_batches, tiled_quads)
+        self.append_frame_ops_with_owned_atlases_to_target(
+            gal,
+            None,
+            generation,
+            render_target,
+            color_attachment,
+            render_pass,
+            depth_attachment,
+            depth_format,
+            pre_present_y_flip,
+            requests,
+            affine_quads,
+            mesh_batches,
+            tiled_quads,
+        )
     }
 
     /// Prepare all full-item rasters before GUI ordering consumes their image
     /// cells. Source identity is immutable semantic data, not a Java cache key.
-    fn prepare_full_item_rasters(&mut self, gal: &mut VulkanicGal,
+    fn prepare_full_item_rasters(
+        &mut self,
+        gal: &mut VulkanicGal,
         world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
-        ordered: &[GuiFrameRequest], color: ColorFormat, depth: Option<TextureFormat>,
-        stats: &mut GuiSubmitStats, ops: &mut Vec<CommandOp>)
-        -> GalResult<BTreeMap<u64, (GuiMeshCompositeKey, super::gui_item_raster::GuiItemRasterPlacement, u64)>> {
-        let mut items: Vec<_> = ordered.iter().filter_map(|entry| match entry {
-            GuiFrameRequest::AffineBatch(batch) => Some(batch.iter()), _ => None,
-        }).flatten().filter(|request| request.item_raster_scale != 0).collect();
+        ordered: &[GuiFrameRequest],
+        color: ColorFormat,
+        depth: Option<TextureFormat>,
+        stats: &mut GuiSubmitStats,
+        ops: &mut Vec<CommandOp>,
+    ) -> GalResult<
+        BTreeMap<
+            u64,
+            (
+                GuiMeshCompositeKey,
+                super::gui_item_raster::GuiItemRasterPlacement,
+                u64,
+            ),
+        >,
+    > {
+        let mut items: Vec<_> = ordered
+            .iter()
+            .filter_map(|entry| match entry {
+                GuiFrameRequest::AffineBatch(batch) => Some(batch.iter()),
+                _ => None,
+            })
+            .flatten()
+            .filter(|request| request.item_raster_scale != 0)
+            .collect();
         items.sort_by_key(|request| request.sequence);
-        self.prepare_item_raster_groups(gal, world,
-            &items.into_iter().map(GuiItemRasterGroup::single).collect::<Vec<_>>(), color, depth, stats, ops)
+        self.prepare_item_raster_groups(
+            gal,
+            world,
+            &items
+                .into_iter()
+                .map(GuiItemRasterGroup::single)
+                .collect::<Vec<_>>(),
+            color,
+            depth,
+            stats,
+            ops,
+        )
     }
 
     /// One ordered layer group becomes one offscreen item and one presentation.
     /// This private native entry point is shared by single-quad lowering and
     /// grouped-raster tests; multi-layer Java admission remains disabled.
-    fn prepare_item_raster_groups(&mut self, gal: &mut VulkanicGal,
+    fn prepare_item_raster_groups(
+        &mut self,
+        gal: &mut VulkanicGal,
         world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
-        items: &[GuiItemRasterGroup], color: ColorFormat, depth: Option<TextureFormat>,
-        stats: &mut GuiSubmitStats, ops: &mut Vec<CommandOp>)
-        -> GalResult<BTreeMap<u64, (GuiMeshCompositeKey, super::gui_item_raster::GuiItemRasterPlacement, u64)>> {
+        items: &[GuiItemRasterGroup],
+        color: ColorFormat,
+        depth: Option<TextureFormat>,
+        stats: &mut GuiSubmitStats,
+        ops: &mut Vec<CommandOp>,
+    ) -> GalResult<
+        BTreeMap<
+            u64,
+            (
+                GuiMeshCompositeKey,
+                super::gui_item_raster::GuiItemRasterPlacement,
+                u64,
+            ),
+        >,
+    > {
         use super::gui_item_raster::{GuiItemRasterIdentity, GuiItemRasterTarget, MAX_ITEM_LAYERS};
-        if items.is_empty() { return Ok(BTreeMap::new()); }
-        if items.len() > GUI_MAX_MESH_BATCHES || items.iter().any(|item|
-            item.layers.is_empty() || item.layers.len() > MAX_ITEM_LAYERS)
-            || items.iter().map(|item| item.layers.len()).sum::<usize>() > GUI_MAX_RAW_IMAGES {
-            return Err(GalError::invalid_argument("full-item raster frame exceeds bounded composite stream"));
+        if items.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+        if items.len() > GUI_MAX_MESH_BATCHES
+            || items
+                .iter()
+                .any(|item| item.layers.is_empty() || item.layers.len() > MAX_ITEM_LAYERS)
+            || items.iter().map(|item| item.layers.len()).sum::<usize>() > GUI_MAX_RAW_IMAGES
+        {
+            return Err(GalError::invalid_argument(
+                "full-item raster frame exceeds bounded composite stream",
+            ));
         }
         let scale = items[0].presentation.item_raster_scale;
         let mut sequences = BTreeSet::new();
@@ -4897,9 +5426,14 @@ impl GuiFrontend {
         for item in items {
             let request = &item.presentation;
             validate_affine_quad(request)?;
-            if scale == 0 || request.item_raster_scale != scale
-                || request.sequence == 0 || !sequences.insert(request.sequence) {
-                return Err(GalError::invalid_argument("item rasters require one explicit frame GUI scale"));
+            if scale == 0
+                || request.item_raster_scale != scale
+                || request.sequence == 0
+                || !sequences.insert(request.sequence)
+            {
+                return Err(GalError::invalid_argument(
+                    "item rasters require one explicit frame GUI scale",
+                ));
             }
             let mut prepared = item.clone();
             let mut identity = Vec::with_capacity(prepared.layers.len());
@@ -4910,142 +5444,284 @@ impl GuiFrontend {
                 let lighting = match layer.material {
                     super::gui_item_material::GuiAffineMaterial::FlatItem(value)
                     | super::gui_item_material::GuiAffineMaterial::FlatItemCutout(value) => value,
-                    _ => return Err(GalError::invalid_argument("item layer requires explicit item material")),
+                    _ => {
+                        return Err(GalError::invalid_argument(
+                            "item layer requires explicit item material",
+                        ))
+                    }
                 };
-                if lighting.rgb.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v)) {
+                if lighting
+                    .rgb
+                    .iter()
+                    .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+                {
                     return Err(GalError::invalid_argument("invalid item layer lighting"));
                 }
-                let reference = self.atlas_references.resolve(layer.asset_id,
-                    |id| world.accepted_gui_atlas_incarnation(id))?;
-                identity.push(GuiItemRasterIdentity {asset_id:layer.asset_id,color_argb:layer.color_argb,
-                    lighting_rgb:lighting.rgb.map(|v| if v == 0.0 {0} else {v.to_bits()}),
-                    cutout:layer.material.is_cutout(),
-                    atlas_generation:reference.atlas.generation,texture_id:reference.atlas.texture_id,
-                    geometry:layer.geometry.identity()?,
-                    uv:super::gui_item_raster::item_uv_identity(layer.uv)?,
-                    region:[reference.x,reference.y,reference.width,reference.height]});
+                let reference = self.atlas_references.resolve(layer.asset_id, |id| {
+                    world.accepted_gui_atlas_incarnation(id)
+                })?;
+                identity.push(GuiItemRasterIdentity {
+                    asset_id: layer.asset_id,
+                    color_argb: layer.color_argb,
+                    lighting_rgb: lighting.rgb.map(|v| if v == 0.0 { 0 } else { v.to_bits() }),
+                    cutout: layer.material.is_cutout(),
+                    atlas_generation: reference.atlas.generation,
+                    texture_id: reference.atlas.texture_id,
+                    geometry: layer.geometry.identity()?,
+                    uv: super::gui_item_raster::item_uv_identity(layer.uv)?,
+                    region: [reference.x, reference.y, reference.width, reference.height],
+                });
             }
             let index = *identities.entry(identity.clone()).or_insert_with(|| {
                 unique_identities.push(identity);
-                unique.push(prepared); (unique.len()-1) as u32
+                unique.push(prepared);
+                (unique.len() - 1) as u32
             });
             indices.push(index);
         }
         let mut next_slots = self.item_raster_slots.clone();
-        let placements = next_slots.prepare_groups(scale,&unique_identities,4096)?;
-        let [width,height] = placements[0].target_extent;
-        let key = GuiMeshCompositeKey {item_identity:0,width,height,color_format:color,depth_format:depth};
+        let placements = next_slots.prepare_groups(scale, &unique_identities, 4096)?;
+        let [width, height] = placements[0].target_extent;
+        let key = GuiMeshCompositeKey {
+            item_identity: 0,
+            width,
+            height,
+            color_format: color,
+            depth_format: depth,
+        };
         if !self.item_rasters.contains_key(&key) {
-            let pixels: u64 = self.item_rasters.keys().map(|key| u64::from(key.width)*u64::from(key.height)).sum();
-            if self.item_rasters.len() >= 4 || pixels + u64::from(width)*u64::from(height) > 32*1024*1024 {
-                return Err(GalError::invalid_argument("item raster residency budget exhausted"));
+            let pixels: u64 = self
+                .item_rasters
+                .keys()
+                .map(|key| u64::from(key.width) * u64::from(key.height))
+                .sum();
+            if self.item_rasters.len() >= 4
+                || pixels + u64::from(width) * u64::from(height) > 32 * 1024 * 1024
+            {
+                return Err(GalError::invalid_argument(
+                    "item raster residency budget exhausted",
+                ));
             }
-            let target = GuiItemRasterTarget::create(gal, Extent3d {width,height,depth:1})?;
-            let composite = match GuiMeshCompositeResources::create(gal, "gui.item-raster.composite", color, depth, target.view) {
+            let target = GuiItemRasterTarget::create(
+                gal,
+                Extent3d {
+                    width,
+                    height,
+                    depth: 1,
+                },
+            )?;
+            let composite = match GuiMeshCompositeResources::create(
+                gal,
+                "gui.item-raster.composite",
+                color,
+                depth,
+                target.view,
+            ) {
                 Ok(composite) => composite,
-                Err(error) => { let _ = target.destroy(gal); return Err(error); }
+                Err(error) => {
+                    let _ = target.destroy(gal);
+                    return Err(error);
+                }
             };
-            self.item_rasters.insert(key, GuiItemRasterResources {target,composite,usage:TextureUsageState::Undefined});
+            self.item_rasters.insert(
+                key,
+                GuiItemRasterResources {
+                    target,
+                    composite,
+                    usage: TextureUsageState::Undefined,
+                },
+            );
         }
         let resource = self.item_rasters.get(&key).expect("created item raster");
-        let (pass,target,view,image) = (resource.target.pass,resource.target.target,resource.target.view,resource.target.color);
+        let (pass, target, view, image) = (
+            resource.target.pass,
+            resource.target.target,
+            resource.target.view,
+            resource.target.color,
+        );
         let before = resource.usage;
-        ops.push(CommandOp::Barrier(texture_barrier(image,before,TextureUsageState::ColorAttachment)));
-        ops.push(CommandOp::BeginPass {pass,target,
-            colors:vec![PassAttachment {view,load_op:AttachmentLoadOp::Clear,store_op:AttachmentStoreOp::Store,
-                clear_color:Some(super::commands::ClearColor {r:0.0,g:0.0,b:0.0,a:0.0})}],depth_stencil:None});
+        ops.push(CommandOp::Barrier(texture_barrier(
+            image,
+            before,
+            TextureUsageState::ColorAttachment,
+        )));
+        ops.push(CommandOp::BeginPass {
+            pass,
+            target,
+            colors: vec![PassAttachment {
+                view,
+                load_op: AttachmentLoadOp::Clear,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: Some(super::commands::ClearColor {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 0.0,
+                }),
+            }],
+            depth_stencil: None,
+        });
         ops.push(CommandOp::EndPass);
         let mut raster_requests = Vec::new();
         for (index, item) in unique.into_iter().enumerate() {
-          for layer in item.layers {
-            let mut source = item.presentation.clone();
-            source.item_raster_scale = 0;
-            source.item_raster_layers.clear();
-            source.sequence = raster_requests.len() as u64 + 1;
-            source.asset_id = layer.asset_id;
-            source.color_argb = layer.color_argb;
-            source.material = layer.material;
-            source.item_raster_geometry = layer.geometry;
-            [source.u0,source.v0,source.u1,source.v1] = layer.uv;
-            [source.x0,source.y0,source.x1,source.y1,source.x3,source.y3] = layer.geometry.corners;
-            raster_requests.push((placements[index],source));
-          }
+            for layer in item.layers {
+                let mut source = item.presentation.clone();
+                source.item_raster_scale = 0;
+                source.item_raster_layers.clear();
+                source.sequence = raster_requests.len() as u64 + 1;
+                source.asset_id = layer.asset_id;
+                source.color_argb = layer.color_argb;
+                source.material = layer.material;
+                source.item_raster_geometry = layer.geometry;
+                [source.u0, source.v0, source.u1, source.v1] = layer.uv;
+                [
+                    source.x0, source.y0, source.x1, source.y1, source.x3, source.y3,
+                ] = layer.geometry.corners;
+                raster_requests.push((placements[index], source));
+            }
         }
-        ops.extend(self.append_owned_item_raster_quads(gal,world,pass,target,view,&raster_requests)?);
+        ops.extend(self.append_owned_item_raster_quads(
+            gal,
+            world,
+            pass,
+            target,
+            view,
+            &raster_requests,
+        )?);
         self.item_rasters.get_mut(&key).unwrap().usage = TextureUsageState::ColorAttachment;
         self.item_raster_slots = next_slots;
         stats.owned_intermediate_targets.push(target);
-        items.iter().zip(indices).enumerate().map(|(offset,(item,index))| {
-            Ok((item.presentation.sequence,(key,placements[index as usize],
-                offset as u64*GUI_MESH_COMPOSITE_UNIFORM_STRIDE)))
-        }).collect()
+        items
+            .iter()
+            .zip(indices)
+            .enumerate()
+            .map(|(offset, (item, index))| {
+                Ok((
+                    item.presentation.sequence,
+                    (
+                        key,
+                        placements[index as usize],
+                        offset as u64 * GUI_MESH_COMPOSITE_UNIFORM_STRIDE,
+                    ),
+                ))
+            })
+            .collect()
     }
 
     fn preflight_owned_atlas_commands(
-        &self, world: Option<&super::world_primitive_frontend::WorldPrimitiveFrontend>,
-        affine_quads: &[GuiAffineQuadRequest], tiled_quads: &[GuiTiledQuadRequest],
+        &self,
+        world: Option<&super::world_primitive_frontend::WorldPrimitiveFrontend>,
+        affine_quads: &[GuiAffineQuadRequest],
+        tiled_quads: &[GuiTiledQuadRequest],
     ) -> GalResult<bool> {
-        if affine_quads.iter().any(|quad| quad.item_raster_scale != 0 &&
-            (!self.atlas_references.contains(quad.asset_id) || quad.item_raster_layers.iter().any(|layer|
-                !self.atlas_references.contains(layer.asset_id)))) {
-            return Err(GalError::invalid_argument("item raster requires an explicit owner-backed atlas source"));
+        if affine_quads.iter().any(|quad| {
+            quad.item_raster_scale != 0
+                && (!self.atlas_references.contains(quad.asset_id)
+                    || quad
+                        .item_raster_layers
+                        .iter()
+                        .any(|layer| !self.atlas_references.contains(layer.asset_id)))
+        }) {
+            return Err(GalError::invalid_argument(
+                "item raster requires an explicit owner-backed atlas source",
+            ));
         }
-        let has_atlases = affine_quads.iter().any(|quad| self.atlas_references.contains(quad.asset_id))
-            || tiled_quads.iter().any(|quad| self.atlas_references.contains(quad.asset_id));
+        let has_atlases = affine_quads
+            .iter()
+            .any(|quad| self.atlas_references.contains(quad.asset_id))
+            || tiled_quads
+                .iter()
+                .any(|quad| self.atlas_references.contains(quad.asset_id));
         if has_atlases {
-            let owner = world.ok_or_else(|| GalError::unsupported_feature(
-                "GUI atlas commands require explicit world owner access"))?;
+            let owner = world.ok_or_else(|| {
+                GalError::unsupported_feature(
+                    "GUI atlas commands require explicit world owner access",
+                )
+            })?;
             owner.require_gui_atlas_upload_boundary()?;
-            for asset in affine_quads.iter().map(|quad| quad.asset_id)
-                .chain(affine_quads.iter().flat_map(|quad|quad.item_raster_layers.iter().map(|layer|layer.asset_id)))
-                .chain(tiled_quads.iter().map(|quad| quad.asset_id)) {
+            for asset in
+                affine_quads
+                    .iter()
+                    .map(|quad| quad.asset_id)
+                    .chain(affine_quads.iter().flat_map(|quad| {
+                        quad.item_raster_layers.iter().map(|layer| layer.asset_id)
+                    }))
+                    .chain(tiled_quads.iter().map(|quad| quad.asset_id))
+            {
                 if self.atlas_references.contains(asset) {
-                    self.atlas_references.resolve(asset, |id| owner.accepted_gui_atlas_incarnation(id))?;
+                    self.atlas_references
+                        .resolve(asset, |id| owner.accepted_gui_atlas_incarnation(id))?;
                 }
             }
         }
         Ok(has_atlases)
     }
 
-    fn preflight_mesh_atlas_commands(&self,
+    fn preflight_mesh_atlas_commands(
+        &self,
         world: Option<&super::world_primitive_frontend::WorldPrimitiveFrontend>,
-        batches: &[GuiMeshBatchRequest]) -> GalResult<()> {
+        batches: &[GuiMeshBatchRequest],
+    ) -> GalResult<()> {
         for batch in batches {
             let atlas = self.atlas_references.contains(batch.asset_id);
-            if batch.item_raster_scale != 0 && !atlas && !self.raw_images.contains_key(&batch.asset_id) {
-                return Err(GalError::invalid_argument("native item mesh requires an explicitly owned atlas or image resource"));
+            if batch.item_raster_scale != 0
+                && !atlas
+                && !self.raw_images.contains_key(&batch.asset_id)
+            {
+                return Err(GalError::invalid_argument(
+                    "native item mesh requires an explicitly owned atlas or image resource",
+                ));
             }
-            if !atlas { continue; }
+            if !atlas {
+                continue;
+            }
             if !mesh_atlas_contract_supported(batch) {
                 return Err(GalError::unsupported_feature("GUI mesh atlas sampling requires an explicit inventory base or front-model overlay layer"));
             }
-            let owner = world.ok_or_else(|| GalError::invalid_argument("GUI mesh atlas sampling requires its explicit Rust image owner"))?;
+            let owner = world.ok_or_else(|| {
+                GalError::invalid_argument(
+                    "GUI mesh atlas sampling requires its explicit Rust image owner",
+                )
+            })?;
             owner.require_gui_atlas_upload_boundary()?;
-            let reference = self.atlas_references.resolve(batch.asset_id,
-                |id| owner.accepted_gui_atlas_incarnation(id))?;
-            for vertex in &batch.vertices { reference.atlas_uv(vertex.local_uv)?; }
+            let reference = self.atlas_references.resolve(batch.asset_id, |id| {
+                owner.accepted_gui_atlas_incarnation(id)
+            })?;
+            for vertex in &batch.vertices {
+                reference.atlas_uv(vertex.local_uv)?;
+            }
         }
         Ok(())
     }
 
     /// Same mixed scheduler and target, with explicit access to the image owner.
     pub(crate) fn append_frame_ops_with_owned_atlases_to_target(
-        &mut self, gal: &mut VulkanicGal,
+        &mut self,
+        gal: &mut VulkanicGal,
         mut world: Option<&mut super::world_primitive_frontend::WorldPrimitiveFrontend>,
-        generation: u64, render_target: Handle, color_attachment: Handle,
-        render_pass: Option<Handle>, depth_attachment: Option<Handle>,
-        depth_format: Option<TextureFormat>, pre_present_y_flip: bool,
-        requests: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
-        mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
+        generation: u64,
+        render_target: Handle,
+        color_attachment: Handle,
+        render_pass: Option<Handle>,
+        depth_attachment: Option<Handle>,
+        depth_format: Option<TextureFormat>,
+        pre_present_y_flip: bool,
+        requests: Vec<GuiSpriteRequest>,
+        affine_quads: Vec<GuiAffineQuadRequest>,
+        mesh_batches: Vec<GuiMeshBatchRequest>,
+        tiled_quads: Vec<GuiTiledQuadRequest>,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
         let frontend_started = std::time::Instant::now();
         preflight_tiled_affine_count(&tiled_quads, affine_quads.len())?;
-        let has_atlases = self.preflight_owned_atlas_commands(world.as_deref(), &affine_quads, &tiled_quads)?;
+        let has_atlases =
+            self.preflight_owned_atlas_commands(world.as_deref(), &affine_quads, &tiled_quads)?;
         self.preflight_mesh_atlas_commands(world.as_deref(), &mesh_batches)?;
         let needs_depth = affine_quads
             .iter()
             .any(|request| request.stratum == GUI_LEQUAL_DEPTH_BLIT_STRATUM)
-            || tiled_quads.iter().any(|request| request.stratum == GUI_LEQUAL_DEPTH_BLIT_STRATUM);
+            || tiled_quads
+                .iter()
+                .any(|request| request.stratum == GUI_LEQUAL_DEPTH_BLIT_STRATUM);
         let infer_depth = needs_depth && depth_attachment.is_none();
         let (depth_attachment, depth_format) = if needs_depth && depth_attachment.is_none() {
             let Some((_, view)) = gal.pass_target_depth_attachment(render_target)? else {
@@ -5074,8 +5750,11 @@ impl GuiFrontend {
             stats.frontend_nanos = super::metrics::elapsed_nanos_u64(frontend_started);
             return Ok((ops, stats));
         }
-        let ordered = order_gui_requests_with_tiles(requests, affine_quads, mesh_batches, tiled_quads)?;
-        self.mesh_geometry_transaction = self.mesh_geometry_transaction.checked_add(1)
+        let ordered =
+            order_gui_requests_with_tiles(requests, affine_quads, mesh_batches, tiled_quads)?;
+        self.mesh_geometry_transaction = self
+            .mesh_geometry_transaction
+            .checked_add(1)
             .ok_or_else(|| GalError::invalid_argument("GUI mesh transaction identity exhausted"))?;
         if generation != self.generation {
             self.destroy_render_resources(gal);
@@ -5139,17 +5818,42 @@ impl GuiFrontend {
                         GalError::ffi(StatusCode::InvalidArgument, "empty GUI affine batch")
                     })?;
                     if first.item_raster_scale != 0 {
-                        append_gui_batches_ops(self,frame_pass,render_target,color_attachment,
-                            depth_attachment,color_format,depth_format,&pending_gui_batches,&mut ops)?;
+                        append_gui_batches_ops(
+                            self,
+                            frame_pass,
+                            render_target,
+                            color_attachment,
+                            depth_attachment,
+                            color_format,
+                            depth_format,
+                            &pending_gui_batches,
+                            &mut ops,
+                        )?;
                         stats.sprite_batch_count += pending_gui_batches.len() as u64;
                         pending_gui_batches.clear();
                         for request in &requests {
-                            let (key,placement,offset) = item_raster_placements.get(&request.sequence)
-                                .ok_or_else(|| GalError::invalid_argument("item raster command not prepared"))?;
-                            let resource = self.item_rasters.get_mut(key).expect("prepared raster resource");
-                            resource.composite.append_item_raster_composite(resource.target.color,resource.usage,
-                                *placement,frame_pass,render_target,color_attachment,depth_attachment,request,
-                                pre_present_y_flip,*offset,&mut ops)?;
+                            let (key, placement, offset) = item_raster_placements
+                                .get(&request.sequence)
+                                .ok_or_else(|| {
+                                    GalError::invalid_argument("item raster command not prepared")
+                                })?;
+                            let resource = self
+                                .item_rasters
+                                .get_mut(key)
+                                .expect("prepared raster resource");
+                            resource.composite.append_item_raster_composite(
+                                resource.target.color,
+                                resource.usage,
+                                *placement,
+                                frame_pass,
+                                render_target,
+                                color_attachment,
+                                depth_attachment,
+                                request,
+                                pre_present_y_flip,
+                                *offset,
+                                &mut ops,
+                            )?;
                             resource.usage = TextureUsageState::ShaderRead;
                         }
                         stats.affine_quad_count += requests.len() as u64;
@@ -5157,23 +5861,54 @@ impl GuiFrontend {
                         continue;
                     }
                     if self.atlas_references.contains(first.asset_id) {
-                        append_gui_batches_ops(self, frame_pass, render_target, color_attachment,
-                            depth_attachment, color_format, depth_format, &pending_gui_batches, &mut ops)?;
+                        append_gui_batches_ops(
+                            self,
+                            frame_pass,
+                            render_target,
+                            color_attachment,
+                            depth_attachment,
+                            color_format,
+                            depth_format,
+                            &pending_gui_batches,
+                            &mut ops,
+                        )?;
                         stats.sprite_batch_count += pending_gui_batches.len() as u64;
                         pending_gui_batches.clear();
-                        let owner = world.as_deref_mut().ok_or_else(|| GalError::unsupported_feature(
-                            "GUI atlas commands require explicit world owner access"))?;
+                        let owner = world.as_deref_mut().ok_or_else(|| {
+                            GalError::unsupported_feature(
+                                "GUI atlas commands require explicit world owner access",
+                            )
+                        })?;
                         let cached = self.resources.contains_key(&ResourceKey::new(
-                            dynamic_texture_group(first.stratum, first.asset_id), color_format, depth_format));
+                            dynamic_texture_group(first.stratum, first.asset_id),
+                            color_format,
+                            depth_format,
+                        ));
                         let creates_before = gal.metrics().resource_creates;
-                        let atlas_ops = self.append_scheduled_owned_atlas_quads(gal, owner, frame_pass,
-                            render_target, color_attachment, depth_attachment, color_format,
-                            depth_format, pre_present_y_flip, &requests, false)?;
+                        let atlas_ops = self.append_scheduled_owned_atlas_quads(
+                            gal,
+                            owner,
+                            frame_pass,
+                            render_target,
+                            color_attachment,
+                            depth_attachment,
+                            color_format,
+                            depth_format,
+                            pre_present_y_flip,
+                            &requests,
+                            false,
+                        )?;
                         stats.resource_creates += gal.metrics().resource_creates - creates_before;
-                        if cached { stats.cache_hits += 1; } else { stats.cache_misses += 1; }
+                        if cached {
+                            stats.cache_hits += 1;
+                        } else {
+                            stats.cache_misses += 1;
+                        }
                         stats.affine_quad_count += requests.len() as u64;
-                        stats.sprite_batch_count += atlas_ops.iter().filter(|op|
-                            matches!(op, CommandOp::DrawIndexed { .. })).count() as u64;
+                        stats.sprite_batch_count += atlas_ops
+                            .iter()
+                            .filter(|op| matches!(op, CommandOp::DrawIndexed { .. }))
+                            .count() as u64;
                         ops.extend(atlas_ops);
                         continue;
                     }
@@ -5344,22 +6079,28 @@ impl GuiFrontend {
         // Resolve exact owner incarnations before allocating any mesh resources.
         // The geometry keeps original sprite-local UVs until this native boundary.
         for (batch, draw) in mesh_batches.iter().zip(&mut prepared) {
-            if !self.atlas_references.contains(draw.asset_id) { continue; }
+            if !self.atlas_references.contains(draw.asset_id) {
+                continue;
+            }
             if !mesh_atlas_contract_supported(batch) {
                 return Err(GalError::unsupported_feature("GUI mesh atlas sampling requires an explicit inventory base or front-model overlay layer"));
             }
-            let owner = world.as_deref().ok_or_else(|| GalError::invalid_argument(
-                "GUI mesh atlas sampling requires its explicit Rust image owner"))?;
-            let reference = self.atlas_references.resolve(draw.asset_id,
-                |id| owner.accepted_gui_atlas_incarnation(id))?;
+            let owner = world.as_deref().ok_or_else(|| {
+                GalError::invalid_argument(
+                    "GUI mesh atlas sampling requires its explicit Rust image owner",
+                )
+            })?;
+            let reference = self
+                .atlas_references
+                .resolve(draw.asset_id, |id| owner.accepted_gui_atlas_incarnation(id))?;
             for vertex in &mut draw.vertices {
                 vertex.local_uv = reference.atlas_uv(vertex.local_uv)?;
             }
         }
         prepared.sort_by_key(|draw| (draw.stratum, draw.sequence, draw.layer_index));
-        stats.mesh_prepare_nanos = stats.mesh_prepare_nanos.saturating_add(
-            super::metrics::elapsed_nanos_u64(prepare_started)
-        );
+        stats.mesh_prepare_nanos = stats
+            .mesh_prepare_nanos
+            .saturating_add(super::metrics::elapsed_nanos_u64(prepare_started));
         if prepared.is_empty() {
             return Ok(Vec::new());
         }
@@ -5415,7 +6156,9 @@ impl GuiFrontend {
                     let raw_resources = self
                         .resources
                         .get(&ResourceKey::new(texture_group, color_format, depth_format))
-                        .ok_or_else(|| GalError::backend("GUI panorama image resources vanished before raster"))?;
+                        .ok_or_else(|| {
+                            GalError::backend("GUI panorama image resources vanished before raster")
+                        })?;
                     (raw_resources.texture_view, raw_resources.sampler)
                 };
                 let raster_key = direct_gui_mesh_raster_key(first, color_format);
@@ -5435,7 +6178,10 @@ impl GuiFrontend {
                     )?;
                     let raster = GuiMeshPassResources::create_with_shared_program(
                         gal,
-                        &format!("minecraft.gui.panorama.asset{}.gen{}", first.asset_id, generation),
+                        &format!(
+                            "minecraft.gui.panorama.asset{}.gen{}",
+                            first.asset_id, generation
+                        ),
                         texture_view,
                         sampler,
                         shared_program,
@@ -5443,14 +6189,23 @@ impl GuiFrontend {
                     self.mesh_rasters.insert(raster_key, raster);
                     stats.resource_creates = stats.resource_creates.saturating_add(1);
                 }
-                let geometry_key = (raster_key, gui_mesh_geometry_fingerprint(first), self.mesh_geometry_transaction);
-                let vertex_bytes = (first.vertices.len() * super::gui_mesh_frontend::GUI_MESH_GPU_VERTEX_BYTES) as u64;
+                let geometry_key = (
+                    raster_key,
+                    gui_mesh_geometry_fingerprint(first),
+                    self.mesh_geometry_transaction,
+                );
+                let vertex_bytes = (first.vertices.len()
+                    * super::gui_mesh_frontend::GUI_MESH_GPU_VERTEX_BYTES)
+                    as u64;
                 let index_bytes = (first.indices.len() * std::mem::size_of::<u32>()) as u64;
-                let (stream, reused) = if let Some(residency) = self.mesh_geometry_cache.get_mut(&geometry_key) {
+                let (stream, reused) = if let Some(residency) =
+                    self.mesh_geometry_cache.get_mut(&geometry_key)
+                {
                     operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
                     (residency.stream, true)
                 } else {
-                    let residency = self.allocate_mesh_geometry(gal, raster_key, vertex_bytes, index_bytes)?;
+                    let residency =
+                        self.allocate_mesh_geometry(gal, raster_key, vertex_bytes, index_bytes)?;
                     let stream = residency.stream;
                     operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
                     self.mesh_geometry_cache.insert(geometry_key, residency);
@@ -5458,7 +6213,9 @@ impl GuiFrontend {
                 };
                 self.mesh_rasters
                     .get(&raster_key)
-                    .ok_or_else(|| GalError::backend("GUI panorama raster resources vanished before draw"))?
+                    .ok_or_else(|| {
+                        GalError::backend("GUI panorama raster resources vanished before draw")
+                    })?
                     .append_direct_frame_draw(
                         frame_pass,
                         render_target,
@@ -5491,34 +6248,34 @@ impl GuiFrontend {
             // the same command transaction, never by a previous preparation.
             target.initialized = accepted_raster.is_some()
                 || stats.owned_intermediate_targets.contains(&target.target);
-            let reuse_pixels = first.item_cache.is_some_and(|cache| !cache.animated)
-                && accepted_raster.is_some();
+            let reuse_pixels =
+                first.item_cache.is_some_and(|cache| !cache.animated) && accepted_raster.is_some();
             if !stats.owned_intermediate_targets.contains(&target.target) {
                 stats.owned_intermediate_targets.push(target.target);
             }
-            for (execution_index, layer_index) in mesh_item_layer_execution_order(item_layers).into_iter().enumerate().filter(|_| !reuse_pixels) {
+            for (execution_index, layer_index) in mesh_item_layer_execution_order(item_layers)
+                .into_iter()
+                .enumerate()
+                .filter(|_| !reuse_pixels)
+            {
                 let draw = &item_layers[layer_index];
                 let texture_group = dynamic_mesh_texture_group(draw);
                 if self.atlas_references.contains(draw.asset_id) {
-                    self.prepare_owned_atlas_binding_group(gal, world.as_deref_mut().ok_or_else(||
-                        GalError::invalid_argument("GUI mesh atlas owner unavailable"))?,
-                        texture_group, color_format, depth_format)?;
+                    self.prepare_owned_atlas_binding_group(
+                        gal,
+                        world.as_deref_mut().ok_or_else(|| {
+                            GalError::invalid_argument("GUI mesh atlas owner unavailable")
+                        })?,
+                        texture_group,
+                        color_format,
+                        depth_format,
+                    )?;
                 }
-                self.ensure_resources(
-                    gal,
-                    texture_group,
-                    color_format,
-                    depth_format,
-                    stats,
-                )?;
+                self.ensure_resources(gal, texture_group, color_format, depth_format, stats)?;
                 let (texture_view, sampler) = {
                     let raw_resources = self
                         .resources
-                        .get(&ResourceKey::new(
-                            texture_group,
-                            color_format,
-                            depth_format,
-                        ))
+                        .get(&ResourceKey::new(texture_group, color_format, depth_format))
                         .ok_or_else(|| {
                             GalError::backend("GUI mesh image resources vanished before raster")
                         })?;
@@ -5552,27 +6309,28 @@ impl GuiFrontend {
                     self.mesh_rasters.insert(raster_key, raster);
                     stats.resource_creates = stats.resource_creates.saturating_add(1);
                 }
-                let geometry_key = (raster_key, gui_mesh_geometry_fingerprint(draw), self.mesh_geometry_transaction);
+                let geometry_key = (
+                    raster_key,
+                    gui_mesh_geometry_fingerprint(draw),
+                    self.mesh_geometry_transaction,
+                );
                 let vertex_bytes = (draw.vertices.len()
                     * super::gui_mesh_frontend::GUI_MESH_GPU_VERTEX_BYTES)
                     as u64;
                 let index_bytes = (draw.indices.len() * std::mem::size_of::<u32>()) as u64;
-                let (stream, reused) =
-                    if let Some(residency) = self.mesh_geometry_cache.get_mut(&geometry_key) {
-                        operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
-                        (residency.stream, true)
-                    } else {
-                        let residency = self.allocate_mesh_geometry(
-                            gal,
-                            raster_key,
-                            vertex_bytes,
-                            index_bytes,
-                        )?;
-                        let stream = residency.stream;
-                        operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
-                        self.mesh_geometry_cache.insert(geometry_key, residency);
-                        (stream, false)
-                    };
+                let (stream, reused) = if let Some(residency) =
+                    self.mesh_geometry_cache.get_mut(&geometry_key)
+                {
+                    operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
+                    (residency.stream, true)
+                } else {
+                    let residency =
+                        self.allocate_mesh_geometry(gal, raster_key, vertex_bytes, index_bytes)?;
+                    let stream = residency.stream;
+                    operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
+                    self.mesh_geometry_cache.insert(geometry_key, residency);
+                    (stream, false)
+                };
                 let raster = self.mesh_rasters.get(&raster_key).ok_or_else(|| {
                     GalError::backend("GUI mesh raster resources vanished before draw")
                 })?;
@@ -5597,12 +6355,17 @@ impl GuiFrontend {
                 stats.mesh_batch_count = stats.mesh_batch_count.saturating_add(1);
                 stats.mesh_draw_count = stats.mesh_draw_count.saturating_add(1);
                 if entity_preview {
-                    stats.entity_preview_batch_count = stats.entity_preview_batch_count.saturating_add(1);
-                    stats.entity_preview_draw_count = stats.entity_preview_draw_count.saturating_add(1);
-                    stats.entity_preview_material_mask |= gui_mesh_material_semantic_bit(draw.material_mode);
-                    stats.entity_preview_vertex_count = stats.entity_preview_vertex_count
+                    stats.entity_preview_batch_count =
+                        stats.entity_preview_batch_count.saturating_add(1);
+                    stats.entity_preview_draw_count =
+                        stats.entity_preview_draw_count.saturating_add(1);
+                    stats.entity_preview_material_mask |=
+                        gui_mesh_material_semantic_bit(draw.material_mode);
+                    stats.entity_preview_vertex_count = stats
+                        .entity_preview_vertex_count
                         .saturating_add(draw.vertices.len() as u64);
-                    stats.entity_preview_index_count = stats.entity_preview_index_count
+                    stats.entity_preview_index_count = stats
+                        .entity_preview_index_count
                         .saturating_add(draw.indices.len() as u64);
                 }
             }
@@ -5639,7 +6402,11 @@ impl GuiFrontend {
                 .ok_or_else(|| GalError::backend("GUI mesh compositor vanished before draw"))?;
             composite.append_composite(
                 target,
-                if reuse_pixels { TextureUsageState::ShaderRead } else { TextureUsageState::ColorAttachment },
+                if reuse_pixels {
+                    TextureUsageState::ShaderRead
+                } else {
+                    TextureUsageState::ColorAttachment
+                },
                 frame_pass,
                 render_target,
                 color_attachment,
@@ -5664,9 +6431,9 @@ impl GuiFrontend {
             cursor = group_end;
         }
         stats.command_ops = stats.command_ops.saturating_add(operations.len() as u64);
-        stats.mesh_lower_nanos = stats.mesh_lower_nanos.saturating_add(
-            super::metrics::elapsed_nanos_u64(lower_started)
-        );
+        stats.mesh_lower_nanos = stats
+            .mesh_lower_nanos
+            .saturating_add(super::metrics::elapsed_nanos_u64(lower_started));
         Ok(operations)
     }
 
@@ -5683,14 +6450,27 @@ impl GuiFrontend {
         affine_quads: Vec<GuiAffineQuadRequest>,
         mesh_batches: Vec<GuiMeshBatchRequest>,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
-        self.append_frame_ops_to_transient_tiled_diagnostic_target(gal, generation, render_target,
-            color_attachment, requests, affine_quads, mesh_batches, Vec::new())
+        self.append_frame_ops_to_transient_tiled_diagnostic_target(
+            gal,
+            generation,
+            render_target,
+            color_attachment,
+            requests,
+            affine_quads,
+            mesh_batches,
+            Vec::new(),
+        )
     }
 
     pub(crate) fn append_frame_ops_to_transient_tiled_diagnostic_target(
-        &mut self, gal: &mut VulkanicGal, generation: u64, render_target: Handle,
-        color_attachment: Handle, requests: Vec<GuiSpriteRequest>,
-        affine_quads: Vec<GuiAffineQuadRequest>, mesh_batches: Vec<GuiMeshBatchRequest>,
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        render_target: Handle,
+        color_attachment: Handle,
+        requests: Vec<GuiSpriteRequest>,
+        affine_quads: Vec<GuiAffineQuadRequest>,
+        mesh_batches: Vec<GuiMeshBatchRequest>,
         tiled_quads: Vec<GuiTiledQuadRequest>,
     ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)> {
         preflight_tiled_affine_count(&tiled_quads, affine_quads.len())?;
@@ -5783,7 +6563,8 @@ impl GuiFrontend {
         } else {
             (VERTEX_SHADER_OPENGL, FRAGMENT_SHADER_OPENGL)
         };
-        let fragment_code = gui_fragment_material_code(fragment_code, key.item_raster, key.item_cutout);
+        let fragment_code =
+            gui_fragment_material_code(fragment_code, key.item_raster, key.item_cutout);
         let mut created = Vec::new();
         let result = (|| -> GalResult<GuiSharedPipeline> {
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
@@ -5896,19 +6677,20 @@ impl GuiFrontend {
         let mut created = Vec::new();
         let mut newly_shared_texture = None;
         let result = (|| -> GalResult<GuiResources> {
-            let shared_texture = dynamic_texture_key.and_then(|key| self.dynamic_textures.get(&key).copied());
+            let shared_texture =
+                dynamic_texture_key.and_then(|key| self.dynamic_textures.get(&key).copied());
             let upload_buffer = if let Some(shared) = shared_texture {
                 shared.upload_buffer
             } else {
                 let upload = gal.create_buffer(BufferDesc {
-                label: format!("{label}.texture-upload"),
-                size: source.bytes.len() as u64,
-                memory: MemoryDomain::Upload,
-                usages: vec![
-                    BufferUsage::TransferSrc,
-                    BufferUsage::TransferDst,
-                    BufferUsage::HostWrite,
-                ],
+                    label: format!("{label}.texture-upload"),
+                    size: source.bytes.len() as u64,
+                    memory: MemoryDomain::Upload,
+                    usages: vec![
+                        BufferUsage::TransferSrc,
+                        BufferUsage::TransferDst,
+                        BufferUsage::HostWrite,
+                    ],
                 })?;
                 created.push(upload);
                 upload
@@ -6056,8 +6838,12 @@ impl GuiFrontend {
                     (upload_buffer, texture, sampler, texture_view, false)
                 };
             let private_sampler = if matches!(group, TextureGroup::DynamicGlint(_)) {
-                let TextureGroup::DynamicGlint(asset_id) = group else { unreachable!() };
-                let (filter, address) = self.raw_images.get(&asset_id)
+                let TextureGroup::DynamicGlint(asset_id) = group else {
+                    unreachable!()
+                };
+                let (filter, address) = self
+                    .raw_images
+                    .get(&asset_id)
                     .and_then(|image| image.sampling)
                     .unwrap_or((SamplerFilter::Linear, SamplerAddressMode::Repeat));
                 let sampler = gal.create_sampler(SamplerDesc {
@@ -6072,7 +6858,9 @@ impl GuiFrontend {
                 })?;
                 created.push(sampler);
                 Some(sampler)
-            } else { None };
+            } else {
+                None
+            };
             let sampler = private_sampler.unwrap_or(sampler);
             let resource_set = gal.create_resource_set(ResourceSetDesc {
                 label: format!("{label}.resource-set"),
@@ -6123,8 +6911,13 @@ impl GuiFrontend {
                     None => GuiImageOwnership::Owned { upload_buffer },
                 },
             };
-            self.upload_resources(gal, &source, group, &resources,
-                (!reused_shared_texture).then_some(upload_buffer))?;
+            self.upload_resources(
+                gal,
+                &source,
+                group,
+                &resources,
+                (!reused_shared_texture).then_some(upload_buffer),
+            )?;
             if let Some((key, shared)) = newly_shared_texture.take() {
                 self.dynamic_textures.insert(key, shared);
             }
@@ -6825,22 +7618,40 @@ impl GuiFrontend {
         if let Some(upload_buffer) = image_upload {
             operations.extend([
                 CommandOp::HostWriteBuffer {
-                    buffer: upload_buffer, offset: 0, data: source.bytes.clone(),
+                    buffer: upload_buffer,
+                    offset: 0,
+                    data: source.bytes.clone(),
                 },
-                CommandOp::Barrier(buffer_barrier(upload_buffer,
-                    TextureUsageState::TransferDst, TextureUsageState::TransferSrc)),
-                CommandOp::Barrier(texture_barrier(resources.texture,
-                    TextureUsageState::Undefined, TextureUsageState::TransferDst)),
+                CommandOp::Barrier(buffer_barrier(
+                    upload_buffer,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::TransferSrc,
+                )),
+                CommandOp::Barrier(texture_barrier(
+                    resources.texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::TransferDst,
+                )),
                 CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
-                    buffer: upload_buffer, buffer_offset: 0,
+                    buffer: upload_buffer,
+                    buffer_offset: 0,
                     bytes_per_row: source.width * source.format.bytes_per_pixel() as u32,
-                    rows_per_image: source.height, texture: resources.texture,
-                    texture_mip: 0, texture_layer: 0,
+                    rows_per_image: source.height,
+                    texture: resources.texture,
+                    texture_mip: 0,
+                    texture_layer: 0,
                     texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-                    extent: Extent3d { width: source.width, height: source.height, depth: 1 },
+                    extent: Extent3d {
+                        width: source.width,
+                        height: source.height,
+                        depth: 1,
+                    },
                 }),
-                CommandOp::Barrier(texture_barrier(resources.texture,
-                    TextureUsageState::TransferDst, TextureUsageState::ShaderRead)),
+                CommandOp::Barrier(texture_barrier(
+                    resources.texture,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                )),
             ]);
         }
         gal.submit(SubmissionBatch {
@@ -6989,16 +7800,23 @@ fn gui_mesh_material_semantic_bit(mode: GuiMeshMaterialMode) -> u64 {
         GuiMeshMaterialMode::ModelOverlay => 6,
         GuiMeshMaterialMode::EntityCutoutNoCull => 7,
         GuiMeshMaterialMode::EntityTranslucentNoCull => 8,
-		GuiMeshMaterialMode::EntityDecalCutoutNoCull => 9,
+        GuiMeshMaterialMode::EntityDecalCutoutNoCull => 9,
     };
     1_u64 << semantic_mode
 }
 
 fn gui_index_upload_ops(index_buffer: Handle) -> Vec<CommandOp> {
     vec![
-        CommandOp::HostWriteBuffer { buffer: index_buffer, offset: 0, data: index_bytes() },
-        CommandOp::Barrier(buffer_barrier(index_buffer,
-            TextureUsageState::TransferDst, TextureUsageState::IndexRead)),
+        CommandOp::HostWriteBuffer {
+            buffer: index_buffer,
+            offset: 0,
+            data: index_bytes(),
+        },
+        CommandOp::Barrier(buffer_barrier(
+            index_buffer,
+            TextureUsageState::TransferDst,
+            TextureUsageState::IndexRead,
+        )),
     ]
 }
 
@@ -7086,11 +7904,16 @@ fn mesh_atlas_contract_supported(batch: &GuiMeshBatchRequest) -> bool {
     if batch.material_mode == GuiMeshMaterialMode::ModelOverlay {
         return batch.item_raster_scale != 0
             && batch.lighting_mode == GuiMeshLightingMode::FrontModel
-            && batch.alpha_cutoff == 0.0 && batch.item_foil.is_none();
+            && batch.alpha_cutoff == 0.0
+            && batch.item_foil.is_none();
     }
     (batch.item_raster_scale != 0 || batch.lighting_mode == GuiMeshLightingMode::InventoryBlock)
-        && matches!(batch.material_mode,
-            GuiMeshMaterialMode::Opaque | GuiMeshMaterialMode::Cutout | GuiMeshMaterialMode::Translucent)
+        && matches!(
+            batch.material_mode,
+            GuiMeshMaterialMode::Opaque
+                | GuiMeshMaterialMode::Cutout
+                | GuiMeshMaterialMode::Translucent
+        )
 }
 
 /// Semantic model overlays finish before the item's depth-equal foil pass.
@@ -7099,8 +7922,16 @@ fn mesh_atlas_contract_supported(batch: &GuiMeshBatchRequest) -> bool {
 /// Other item families keep their existing authored order.
 fn mesh_item_layer_execution_order(layers: &[GuiMeshPreparedDraw]) -> Vec<usize> {
     let mut order: Vec<_> = (0..layers.len()).collect();
-    if layers.iter().any(|layer| layer.material_mode == GuiMeshMaterialMode::ModelOverlay) {
-        order.sort_by_key(|index| (layers[*index].material_mode == GuiMeshMaterialMode::Glint, *index));
+    if layers
+        .iter()
+        .any(|layer| layer.material_mode == GuiMeshMaterialMode::ModelOverlay)
+    {
+        order.sort_by_key(|index| {
+            (
+                layers[*index].material_mode == GuiMeshMaterialMode::Glint,
+                *index,
+            )
+        });
     }
     order
 }
@@ -7146,8 +7977,10 @@ fn order_gui_requests_with_mesh(
 }
 
 fn order_gui_requests_with_tiles(
-    sprites: Vec<GuiSpriteRequest>, affine_quads: Vec<GuiAffineQuadRequest>,
-    mesh_batches: Vec<GuiMeshBatchRequest>, tiled_quads: Vec<GuiTiledQuadRequest>,
+    sprites: Vec<GuiSpriteRequest>,
+    affine_quads: Vec<GuiAffineQuadRequest>,
+    mesh_batches: Vec<GuiMeshBatchRequest>,
+    tiled_quads: Vec<GuiTiledQuadRequest>,
 ) -> GalResult<Vec<GuiFrameRequest>> {
     preflight_tiled_affine_count(&tiled_quads, affine_quads.len())?;
     if mesh_batches.len() > GUI_MAX_MESH_BATCHES {
@@ -7160,9 +7993,10 @@ fn order_gui_requests_with_tiles(
         ));
     }
     let mesh_items = group_gui_mesh_items(mesh_batches)?;
-    let tiled_items = tiled_quads.into_iter().map(|request| {
-        lower_tiled_request(request).map(GuiFrameRequest::AffineBatch)
-    }).collect::<GalResult<Vec<_>>>()?;
+    let tiled_items = tiled_quads
+        .into_iter()
+        .map(|request| lower_tiled_request(request).map(GuiFrameRequest::AffineBatch))
+        .collect::<GalResult<Vec<_>>>()?;
     let mut ordered = sprites
         .into_iter()
         .map(GuiFrameRequest::Sprite)
@@ -7183,7 +8017,8 @@ fn coalesce_ordered_affine_requests(ordered: Vec<GuiFrameRequest>) -> Vec<GuiFra
                 let can_append = result.last().is_some_and(|previous| {
                     if let GuiFrameRequest::AffineBatch(batch) = previous {
                         batch.last().is_some_and(|last| {
-                            last.stratum == request.stratum && last.asset_id == request.asset_id
+                            last.stratum == request.stratum
+                                && last.asset_id == request.asset_id
                                 && last.item_raster_scale == request.item_raster_scale
                         })
                     } else {
@@ -7296,29 +8131,46 @@ fn argb_to_rgba(color_argb: u32) -> [f32; 4] {
 }
 
 pub(crate) fn validate_gui_projection(layout: [u32; 2], projection: [f32; 2]) -> GalResult<()> {
-    if projection.iter().zip(layout).any(|(&value, bound)|
-        !value.is_finite() || value <= 0.0 || value.ceil() != bound as f32) {
-        return Err(GalError::ffi(StatusCode::InvalidArgument,
-            "GUI projection must be finite, positive, and ceil to the explicit layout extent"));
+    if projection
+        .iter()
+        .zip(layout)
+        .any(|(&value, bound)| !value.is_finite() || value <= 0.0 || value.ceil() != bound as f32)
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            "GUI projection must be finite, positive, and ceil to the explicit layout extent",
+        ));
     }
     Ok(())
 }
 
 pub(crate) fn validate_affine_quad(request: &GuiAffineQuadRequest) -> GalResult<()> {
     if request.item_raster_layers.len() > super::gui_item_raster::MAX_ITEM_LAYERS
-        || (!request.item_raster_layers.is_empty() && request.item_raster_scale == 0) {
-        return Err(GalError::invalid_argument("invalid bounded item layer request"));
+        || (!request.item_raster_layers.is_empty() && request.item_raster_scale == 0)
+    {
+        return Err(GalError::invalid_argument(
+            "invalid bounded item layer request",
+        ));
     }
     if request.item_raster_scale != 0 {
         request.item_raster_geometry.validate()?;
-        super::gui_item_raster::item_uv_identity([request.u0,request.v0,request.u1,request.v1])?;
+        super::gui_item_raster::item_uv_identity([request.u0, request.v0, request.u1, request.v1])?;
     }
-    if request.item_raster_scale > 256 || (request.item_raster_scale != 0
-        && (matches!(request.material, super::gui_item_material::GuiAffineMaterial::Unlit)
-            || request.z != 0.0)) {
-        return Err(GalError::invalid_argument("invalid full-item raster semantics"));
+    if request.item_raster_scale > 256
+        || (request.item_raster_scale != 0
+            && (matches!(
+                request.material,
+                super::gui_item_material::GuiAffineMaterial::Unlit
+            ) || request.z != 0.0))
+    {
+        return Err(GalError::invalid_argument(
+            "invalid full-item raster semantics",
+        ));
     }
-    validate_gui_projection([request.gui_width, request.gui_height], request.projection_extent)?;
+    validate_gui_projection(
+        [request.gui_width, request.gui_height],
+        request.projection_extent,
+    )?;
     const GUI_UV_OVERLAP_LIMIT: f32 = 1.0 / 16.0;
     if request.asset_id == 0 || request.gui_width == 0 || request.gui_height == 0 {
         return Err(GalError::ffi(
@@ -7389,13 +8241,23 @@ fn buffer_barrier(
     }
 }
 
-fn custom_sampler_info_bytes(extent: Extent3d, images: &[Option<CustomPostEffectImage>]) -> Vec<u8> {
+fn custom_sampler_info_bytes(
+    extent: Extent3d,
+    images: &[Option<CustomPostEffectImage>],
+) -> Vec<u8> {
     let mut sizes = vec![extent.width as f32, extent.height as f32];
     for image in images {
-        sizes.extend(image.as_ref().map(|image| [image.width as f32, image.height as f32])
-            .unwrap_or([extent.width as f32, extent.height as f32]));
+        sizes.extend(
+            image
+                .as_ref()
+                .map(|image| [image.width as f32, image.height as f32])
+                .unwrap_or([extent.width as f32, extent.height as f32]),
+        );
     }
-    let mut data = sizes.into_iter().flat_map(f32::to_le_bytes).collect::<Vec<_>>();
+    let mut data = sizes
+        .into_iter()
+        .flat_map(f32::to_le_bytes)
+        .collect::<Vec<_>>();
     data.resize((data.len() + 15) / 16 * 16, 0);
     data
 }
@@ -7434,7 +8296,10 @@ fn texture_barrier(
 }
 
 fn validate_request(request: &GuiSpriteRequest, def: &SpriteDef) -> GalResult<()> {
-    validate_gui_projection([request.gui_width, request.gui_height], request.projection_extent)?;
+    validate_gui_projection(
+        [request.gui_width, request.gui_height],
+        request.projection_extent,
+    )?;
     if !request.progress_fraction.is_finite() {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -8681,11 +9546,20 @@ mod tests {
     #[test]
     fn vulkan_dynamic_vignette_affine_quad_darkens_the_loaded_target() {
         let Some(bytes) = vulkan_gui_sample(
-            GUI_VIGNETTE_BLIT_STRATUM, vec![191, 191, 191, 255], 0.0, 1.0, None,
-        ) else { return };
+            GUI_VIGNETTE_BLIT_STRATUM,
+            vec![191, 191, 191, 255],
+            0.0,
+            1.0,
+            None,
+        ) else {
+            return;
+        };
         // 0.8 * (1 - 191 / 255) is approximately 51/255.
         for channel in &bytes[..3] {
-            assert!((*channel as i16 - 51).abs() <= 1, "unexpected GUI vignette: {bytes:?}");
+            assert!(
+                (*channel as i16 - 51).abs() <= 1,
+                "unexpected GUI vignette: {bytes:?}"
+            );
         }
     }
 
@@ -8696,9 +9570,15 @@ mod tests {
         // extent before interpolating incorrectly selects texel 0.
         let Some(bytes) = vulkan_gui_sample(
             GUI_OPAQUE_BLIT_STRATUM,
-            vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255],
-            0.1, 0.45, None,
-        ) else { return };
+            vec![
+                255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+            ],
+            0.1,
+            0.45,
+            None,
+        ) else {
+            return;
+        };
         assert_eq!(&[0, 255, 0, 255], bytes.as_slice());
     }
 
@@ -8712,23 +9592,43 @@ mod tests {
         for translation in [0.0, -0.4] {
             let Some(bytes) = vulkan_gui_sample(
                 GUI_OPAQUE_BLIT_STRATUM,
-                vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255],
-                0.1, 0.9,
-                Some(GuiTileGeometry { bounds: [0, 0, 5, 1], tile_extent: [2, 1],
-                    uv: [0.1, 0.0, 0.9, 1.0], pose: [0.2, 0.0, 0.0, 1.0, translation, 0.0] }),
-            ) else { return };
-            assert_eq!(&[0, 255, 0, 255], bytes.as_slice(), "translation={translation}");
+                vec![
+                    255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+                ],
+                0.1,
+                0.9,
+                Some(GuiTileGeometry {
+                    bounds: [0, 0, 5, 1],
+                    tile_extent: [2, 1],
+                    uv: [0.1, 0.0, 0.9, 1.0],
+                    pose: [0.2, 0.0, 0.0, 1.0, translation, 0.0],
+                }),
+            ) else {
+                return;
+            };
+            assert_eq!(
+                &[0, 255, 0, 255],
+                bytes.as_slice(),
+                "translation={translation}"
+            );
         }
     }
 
     fn gui_tiled_request() -> GuiTiledQuadRequest {
         GuiTiledQuadRequest {
             geometry: super::super::gui_tiling::GuiTileGeometry {
-                bounds: [7, 11, 71, 43], tile_extent: [32, 32],
-                uv: [0.25, 0.5, 0.75, 1.0], pose: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+                bounds: [7, 11, 71, 43],
+                tile_extent: [32, 32],
+                uv: [0.25, 0.5, 0.75, 1.0],
+                pose: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
             },
-            stratum: GUI_OPAQUE_BLIT_STRATUM, asset_id: 41, z: 0.25, color_argb: 0xffaabbcc,
-            gui_extent: [320, 180], projection_extent: [319.75, 179.5], sequence: 11,
+            stratum: GUI_OPAQUE_BLIT_STRATUM,
+            asset_id: 41,
+            z: 0.25,
+            color_argb: 0xffaabbcc,
+            gui_extent: [320, 180],
+            projection_extent: [319.75, 179.5],
+            sequence: 11,
             clip: Some([1, 2, 100, 50]),
         }
     }
@@ -8746,7 +9646,15 @@ mod tests {
             assert_eq!(request.color_argb, quad.color_argb);
             assert_eq!(request.projection_extent, quad.projection_extent);
             assert_eq!(1, quad.clip_mode);
-            assert_eq!([1, 2, 100, 50], [quad.clip_left, quad.clip_top, quad.clip_width, quad.clip_height]);
+            assert_eq!(
+                [1, 2, 100, 50],
+                [
+                    quad.clip_left,
+                    quad.clip_top,
+                    quad.clip_width,
+                    quad.clip_height
+                ]
+            );
         }
         let mut invalid = request;
         invalid.clip = Some([319, 0, 2, 1]);
@@ -8758,14 +9666,34 @@ mod tests {
         let request = gui_tiled_request();
         let mut ordinary = lower_tiled_request(request.clone()).unwrap().remove(0);
         ordinary.sequence = 12;
-        let ordered = order_gui_requests_with_tiles(Vec::new(), vec![ordinary.clone()], Vec::new(), vec![request.clone()]).unwrap();
-        let GuiFrameRequest::AffineBatch(batch) = &ordered[0] else { panic!("expected compatible batch") };
-        assert_eq!(vec![11, 11, 12], batch.iter().map(|q| q.sequence).collect::<Vec<_>>());
+        let ordered = order_gui_requests_with_tiles(
+            Vec::new(),
+            vec![ordinary.clone()],
+            Vec::new(),
+            vec![request.clone()],
+        )
+        .unwrap();
+        let GuiFrameRequest::AffineBatch(batch) = &ordered[0] else {
+            panic!("expected compatible batch")
+        };
+        assert_eq!(
+            vec![11, 11, 12],
+            batch.iter().map(|q| q.sequence).collect::<Vec<_>>()
+        );
         ordinary.sequence = 11;
-        assert!(order_gui_requests_with_tiles(Vec::new(), vec![ordinary], Vec::new(), vec![request.clone()]).is_err());
+        assert!(order_gui_requests_with_tiles(
+            Vec::new(),
+            vec![ordinary],
+            Vec::new(),
+            vec![request.clone()]
+        )
+        .is_err());
         let mut maximum = request;
         maximum.sequence = u64::MAX;
-        assert!(order_gui_requests_with_tiles(Vec::new(), Vec::new(), Vec::new(), vec![maximum]).is_ok());
+        assert!(
+            order_gui_requests_with_tiles(Vec::new(), Vec::new(), Vec::new(), vec![maximum])
+                .is_ok()
+        );
     }
 
     #[test]
@@ -8774,131 +9702,304 @@ mod tests {
         request.geometry.bounds = [0, 0, 4096, 4096];
         request.geometry.uv = [0.0, 0.0, 1.0, 1.0];
         let four = vec![request.clone(); 4];
-        assert_eq!(GUI_MAX_EXPANDED_AFFINE_QUADS, preflight_tiled_affine_count(&four, 0).unwrap());
+        assert_eq!(
+            GUI_MAX_EXPANDED_AFFINE_QUADS,
+            preflight_tiled_affine_count(&four, 0).unwrap()
+        );
         assert!(preflight_tiled_affine_count(&four, 1).is_err());
         assert!(preflight_tiled_affine_count(&vec![request; 5], 0).is_err());
         assert!(preflight_tiled_affine_count(&[], usize::MAX).is_err());
     }
 
-    fn vulkan_gui_sample(stratum: u32, pixels: Vec<u8>, u0: f32, u1: f32,
-        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>) -> Option<Vec<u8>> {
+    fn vulkan_gui_sample(
+        stratum: u32,
+        pixels: Vec<u8>,
+        u0: f32,
+        u1: f32,
+        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>,
+    ) -> Option<Vec<u8>> {
         vulkan_gui_sample_with_effect(stratum, pixels, u0, u1, tiles, 1, false)
     }
 
     #[test]
     fn vulkan_invert_post_effect_preserves_asymmetric_framebuffer_rows() {
-        let Some(bytes) = vulkan_gui_sample_with_effect(GUI_OPAQUE_BLIT_STRATUM,
-            vec![20, 60, 100, 255, 180, 220, 240, 255], 0.0, 1.0, None, 2, true)
-            else { return };
+        let Some(bytes) = vulkan_gui_sample_with_effect(
+            GUI_OPAQUE_BLIT_STRATUM,
+            vec![20, 60, 100, 255, 180, 220, 240, 255],
+            0.0,
+            1.0,
+            None,
+            2,
+            true,
+        ) else {
+            return;
+        };
         let expected = [192u8, 168, 144, 255, 96, 72, 60, 255];
         assert_eq!(8, bytes.len());
         for (actual, expected) in bytes.iter().zip(expected) {
-            assert!((*actual as i16 - expected as i16).abs() <= 1,
-                "inversion must preserve source row order and vanilla 0.8 mix: {bytes:?}");
+            assert!(
+                (*actual as i16 - expected as i16).abs() <= 1,
+                "inversion must preserve source row order and vanilla 0.8 mix: {bytes:?}"
+            );
         }
     }
 
-    fn vulkan_gui_sample_with_effect(stratum: u32, pixels: Vec<u8>, u0: f32, u1: f32,
-        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>, height: u32,
-        invert: bool) -> Option<Vec<u8>> {
-        vulkan_gui_sample_with_reused_image(stratum, pixels, u0, u1, tiles, height, invert, false, None, false)
+    fn vulkan_gui_sample_with_effect(
+        stratum: u32,
+        pixels: Vec<u8>,
+        u0: f32,
+        u1: f32,
+        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>,
+        height: u32,
+        invert: bool,
+    ) -> Option<Vec<u8>> {
+        vulkan_gui_sample_with_reused_image(
+            stratum, pixels, u0, u1, tiles, height, invert, false, None, false,
+        )
     }
 
     #[test]
     fn vulkan_gui_reused_image_preserves_opaque_pixels_after_alpha_preparation() {
-        let bytes = vulkan_gui_sample_with_reused_image(GUI_OPAQUE_BLIT_STRATUM,
-            vec![17, 83, 211, 255], 0.0, 1.0, None, 1, false, true, None, false)
-            .expect("Vulkan is required for reused GUI image regression");
+        let bytes = vulkan_gui_sample_with_reused_image(
+            GUI_OPAQUE_BLIT_STRATUM,
+            vec![17, 83, 211, 255],
+            0.0,
+            1.0,
+            None,
+            1,
+            false,
+            true,
+            None,
+            false,
+        )
+        .expect("Vulkan is required for reused GUI image regression");
         assert_eq!(bytes, vec![17, 83, 211, 255]);
     }
 
     #[test]
     fn vulkan_gui_private_atlas_binding_samples_the_declared_region_without_copied_pixels() {
-        let bytes = vulkan_gui_sample_with_reused_image(1,
-            vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255],
-            0.0, 1.0, None, 2, false, false, Some([1, 0, 1, 2]), false)
-            .expect("Vulkan required for owner-backed atlas sampling regression");
-        assert_eq!(bytes, vec![0, 255, 0, 255, 255, 255, 0, 255],
-            "sample only the right atlas column and preserve semantic row orientation");
+        let bytes = vulkan_gui_sample_with_reused_image(
+            1,
+            vec![
+                255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255,
+            ],
+            0.0,
+            1.0,
+            None,
+            2,
+            false,
+            false,
+            Some([1, 0, 1, 2]),
+            false,
+        )
+        .expect("Vulkan required for owner-backed atlas sampling regression");
+        assert_eq!(
+            bytes,
+            vec![0, 255, 0, 255, 255, 255, 0, 255],
+            "sample only the right atlas column and preserve semantic row orientation"
+        );
     }
 
     #[test]
     fn vulkan_mixed_gui_scheduler_preserves_raw_atlas_raw_blend_order() {
-        let bytes = vulkan_gui_sample_with_reused_image(1,
-            vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255],
-            0.0, 1.0, None, 2, false, false, Some([1, 0, 1, 2]), true)
-            .expect("Vulkan required for mixed GUI ownership regression");
+        let bytes = vulkan_gui_sample_with_reused_image(
+            1,
+            vec![
+                255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255,
+            ],
+            0.0,
+            1.0,
+            None,
+            2,
+            false,
+            false,
+            Some([1, 0, 1, 2]),
+            true,
+        )
+        .expect("Vulkan required for mixed GUI ownership regression");
         assert_eq!(bytes, vec![0, 127, 128, 255, 127, 127, 128, 255]);
     }
 
     #[test]
     fn vulkan_mixed_gui_scheduler_tiles_local_coordinates_inside_the_atlas_region() {
         use super::super::gui_tiling::GuiTileGeometry;
-        let bytes = vulkan_gui_sample_with_reused_image(1,
-            vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255],
-            0.0, 1.0, Some(GuiTileGeometry { bounds: [0, 0, 5, 1], tile_extent: [2, 1],
-                uv: [0.0, 0.0, 1.0, 1.0], pose: [0.2, 0.0, 0.0, 1.0, 0.0, 0.0] }),
-            1, false, false, Some([1, 0, 2, 1]), false)
-            .expect("Vulkan required for tiled GUI atlas regression");
+        let bytes = vulkan_gui_sample_with_reused_image(
+            1,
+            vec![
+                255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+            ],
+            0.0,
+            1.0,
+            Some(GuiTileGeometry {
+                bounds: [0, 0, 5, 1],
+                tile_extent: [2, 1],
+                uv: [0.0, 0.0, 1.0, 1.0],
+                pose: [0.2, 0.0, 0.0, 1.0, 0.0, 0.0],
+            }),
+            1,
+            false,
+            false,
+            Some([1, 0, 2, 1]),
+            false,
+        )
+        .expect("Vulkan required for tiled GUI atlas regression");
         assert_eq!(bytes, vec![0, 255, 0, 255]);
     }
 
-    fn vulkan_gui_sample_with_reused_image(stratum: u32, pixels: Vec<u8>, u0: f32, u1: f32,
-        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>, height: u32,
-        invert: bool, prewarm_alpha: bool, atlas_region: Option<[u32; 4]>, mixed: bool) -> Option<Vec<u8>> {
-        vulkan_gui_sample_with_blur(stratum, pixels, u0, u1, tiles, height, invert,
-            prewarm_alpha, atlas_region, mixed, None)
+    fn vulkan_gui_sample_with_reused_image(
+        stratum: u32,
+        pixels: Vec<u8>,
+        u0: f32,
+        u1: f32,
+        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>,
+        height: u32,
+        invert: bool,
+        prewarm_alpha: bool,
+        atlas_region: Option<[u32; 4]>,
+        mixed: bool,
+    ) -> Option<Vec<u8>> {
+        vulkan_gui_sample_with_blur(
+            stratum,
+            pixels,
+            u0,
+            u1,
+            tiles,
+            height,
+            invert,
+            prewarm_alpha,
+            atlas_region,
+            mixed,
+            None,
+        )
     }
 
     #[test]
     fn vulkan_owned_atlas_draws_on_both_sides_of_blur_boundary() {
         for stratum in [0, 100] {
             let pixels = vec![255, 0, 0, 255, 0, 255, 0, 255];
-            let actual = vulkan_gui_sample_with_blur(stratum, pixels, 0.0, 1.0,
-                None, 1, false, false, Some([1, 0, 1, 1]), false, Some((2, 2)))
-                .expect("Vulkan required for atlas blur boundary regression");
+            let actual = vulkan_gui_sample_with_blur(
+                stratum,
+                pixels,
+                0.0,
+                1.0,
+                None,
+                1,
+                false,
+                false,
+                Some([1, 0, 1, 1]),
+                false,
+                Some((2, 2)),
+            )
+            .expect("Vulkan required for atlas blur boundary regression");
             assert_eq!(actual, vec![0, 255, 0, 255], "stratum {stratum}");
         }
     }
 
-    fn vulkan_gui_sample_with_blur(stratum: u32, pixels: Vec<u8>, u0: f32, u1: f32,
-        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>, height: u32,
-        invert: bool, prewarm_alpha: bool, atlas_region: Option<[u32; 4]>, mixed: bool,
-        blur: Option<(i32, i32)>) -> Option<Vec<u8>> {
-        vulkan_gui_sample_with_material(stratum, pixels, u0, u1, tiles, height, invert,
-            prewarm_alpha, atlas_region, mixed, blur,
-            crate::render::vulkanic::gui_item_material::GuiAffineMaterial::Unlit)
+    fn vulkan_gui_sample_with_blur(
+        stratum: u32,
+        pixels: Vec<u8>,
+        u0: f32,
+        u1: f32,
+        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>,
+        height: u32,
+        invert: bool,
+        prewarm_alpha: bool,
+        atlas_region: Option<[u32; 4]>,
+        mixed: bool,
+        blur: Option<(i32, i32)>,
+    ) -> Option<Vec<u8>> {
+        vulkan_gui_sample_with_material(
+            stratum,
+            pixels,
+            u0,
+            u1,
+            tiles,
+            height,
+            invert,
+            prewarm_alpha,
+            atlas_region,
+            mixed,
+            blur,
+            crate::render::vulkanic::gui_item_material::GuiAffineMaterial::Unlit,
+        )
     }
 
     #[test]
     fn vulkan_gui_flat_item_material_modulates_atlas_without_lighting_unlit_controls() {
         use crate::render::vulkanic::gui_item_material::GuiAffineMaterial;
-        use crate::render::vulkanic::shader_pack::lightmap::{VanillaLightmapFrame, VanillaLightmapInputs};
+        use crate::render::vulkanic::shader_pack::lightmap::{
+            VanillaLightmapFrame, VanillaLightmapInputs,
+        };
         let mut material = GuiAffineMaterial::FlatItemPending;
-        material.resolve(Some(VanillaLightmapFrame { generation: 1, inputs: VanillaLightmapInputs {
-            ambient_light_factor: 0.0, sky_factor: 1.0, block_factor: 1.5,
-            night_vision_factor: 0.0, darkness_scale: 0.0, darken_world_factor: 0.0,
-            brightness_factor: 0.0, sky_light_color: [1.0; 3], ambient_color: [1.0; 3],
-        }})).unwrap();
+        material
+            .resolve(Some(VanillaLightmapFrame {
+                generation: 1,
+                inputs: VanillaLightmapInputs {
+                    ambient_light_factor: 0.0,
+                    sky_factor: 1.0,
+                    block_factor: 1.5,
+                    night_vision_factor: 0.0,
+                    darkness_scale: 0.0,
+                    darken_world_factor: 0.0,
+                    brightness_factor: 0.0,
+                    sky_light_color: [1.0; 3],
+                    ambient_color: [1.0; 3],
+                },
+            }))
+            .unwrap();
         for blur in [None, Some((2, 2))] {
             for stratum in [0, 100] {
                 let pixels = vec![255, 0, 0, 255, 255, 255, 255, 255];
-                let actual = vulkan_gui_sample_with_material(stratum, pixels.clone(), 0.0, 1.0,
-                    None, 1, false, false, Some([1, 0, 1, 1]), false, blur, material)
-                    .expect("Vulkan required for explicit GUI item material regression");
+                let actual = vulkan_gui_sample_with_material(
+                    stratum,
+                    pixels.clone(),
+                    0.0,
+                    1.0,
+                    None,
+                    1,
+                    false,
+                    false,
+                    Some([1, 0, 1, 1]),
+                    false,
+                    blur,
+                    material,
+                )
+                .expect("Vulkan required for explicit GUI item material regression");
                 assert_eq!(actual, vec![252, 252, 252, 255]);
-                let mixed = vulkan_gui_sample_with_material(stratum, pixels, 0.0, 1.0,
-                    None, 1, false, false, Some([1, 0, 1, 1]), true, blur, material)
-                    .expect("Vulkan required for unlit material isolation regression");
+                let mixed = vulkan_gui_sample_with_material(
+                    stratum,
+                    pixels,
+                    0.0,
+                    1.0,
+                    None,
+                    1,
+                    false,
+                    false,
+                    Some([1, 0, 1, 1]),
+                    true,
+                    blur,
+                    material,
+                )
+                .expect("Vulkan required for unlit material isolation regression");
                 assert_eq!(mixed, vec![126, 126, 254, 255]);
             }
         }
     }
 
-    fn vulkan_gui_sample_with_material(stratum: u32, pixels: Vec<u8>, u0: f32, u1: f32,
-        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>, height: u32,
-        invert: bool, prewarm_alpha: bool, atlas_region: Option<[u32; 4]>, mixed: bool,
-        blur: Option<(i32, i32)>, material: crate::render::vulkanic::gui_item_material::GuiAffineMaterial) -> Option<Vec<u8>> {
+    fn vulkan_gui_sample_with_material(
+        stratum: u32,
+        pixels: Vec<u8>,
+        u0: f32,
+        u1: f32,
+        tiles: Option<crate::render::vulkanic::gui_tiling::GuiTileGeometry>,
+        height: u32,
+        invert: bool,
+        prewarm_alpha: bool,
+        atlas_region: Option<[u32; 4]>,
+        mixed: bool,
+        blur: Option<(i32, i32)>,
+        material: crate::render::vulkanic::gui_item_material::GuiAffineMaterial,
+    ) -> Option<Vec<u8>> {
         let backend = match VulkanBackend::new("MattMC GUI vignette frontend conformance") {
             Ok(backend) => backend,
             Err(error) => {
@@ -8961,92 +10062,161 @@ mod tests {
         let mut frontend = GuiFrontend::default();
         let mut world = super::super::world_primitive_frontend::WorldPrimitiveFrontend::default();
         let atlas_reference = if let Some([x, y, width, region_height]) = atlas_region {
-            use super::super::world_primitive_frontend::{WorldMeshTextureAssetPayload, WORLD_MATERIAL_TEXTURE_STONE};
+            use super::super::world_primitive_frontend::{
+                WorldMeshTextureAssetPayload, WORLD_MATERIAL_TEXTURE_STONE,
+            };
             let image_width = (pixels.len() / 4) as u32 / height;
             let mut encoded = Vec::new();
             {
                 let mut encoder = png::Encoder::new(&mut encoded, image_width, height);
                 encoder.set_color(png::ColorType::Rgba);
                 encoder.set_depth(png::BitDepth::Eight);
-                encoder.write_header().unwrap().write_image_data(&pixels).unwrap();
+                encoder
+                    .write_header()
+                    .unwrap()
+                    .write_image_data(&pixels)
+                    .unwrap();
             }
-            world.apply_world_mesh_asset_update(&mut gal, 1, Vec::new(), vec![WorldMeshTextureAssetPayload {
-                texture_id: WORLD_MATERIAL_TEXTURE_STONE, png_bytes: encoded, mip_png_bytes: Vec::new(),
-                frame_width: 0, frame_height: 0, frame_count: 1, frame_ticks: 1,
-                animation_flags: 0, frame_row_size: 0, interpolation_policy: 0,
-                animation_frames: Vec::new(), coordinate_origin: 0, sampling: None, requested_mip_levels: 1,
-            }]).unwrap();
-            let reference = GuiAtlasReference { asset_id: 41,
-                atlas: world.accepted_gui_atlas_incarnation(WORLD_MATERIAL_TEXTURE_STONE).unwrap(),
-                x, y, width, height: region_height };
-            frontend.stage_owned_atlas_references(&mut gal, &world, 1, &[reference]).unwrap();
-            assert!(frontend.raw_images.is_empty(), "native atlas sampling must not stage copied GUI pixels");
+            world
+                .apply_world_mesh_asset_update(
+                    &mut gal,
+                    1,
+                    Vec::new(),
+                    vec![WorldMeshTextureAssetPayload {
+                        texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                        png_bytes: encoded,
+                        mip_png_bytes: Vec::new(),
+                        frame_width: 0,
+                        frame_height: 0,
+                        frame_count: 1,
+                        frame_ticks: 1,
+                        animation_flags: 0,
+                        frame_row_size: 0,
+                        interpolation_policy: 0,
+                        animation_frames: Vec::new(),
+                        coordinate_origin: 0,
+                        sampling: None,
+                        requested_mip_levels: 1,
+                    }],
+                )
+                .unwrap();
+            let reference = GuiAtlasReference {
+                asset_id: 41,
+                atlas: world
+                    .accepted_gui_atlas_incarnation(WORLD_MATERIAL_TEXTURE_STONE)
+                    .unwrap(),
+                x,
+                y,
+                width,
+                height: region_height,
+            };
+            frontend
+                .stage_owned_atlas_references(&mut gal, &world, 1, &[reference])
+                .unwrap();
+            assert!(
+                frontend.raw_images.is_empty(),
+                "native atlas sampling must not stage copied GUI pixels"
+            );
             Some(reference)
-        } else { None };
+        } else {
+            None
+        };
         if atlas_reference.is_none() {
-        frontend
-            .apply_raw_image_update(
-                &mut gal,
-                1,
-                vec![GuiRawImageAssetPayload { sampling: None,
-                    asset_id: 41,
-                    format: GuiRawImageFormat::Rgba8,
-                    width: (pixels.len() / 4) as u32 / height,
-                    height,
-                    pixels,
-                }],
-            )
-            .unwrap();
+            frontend
+                .apply_raw_image_update(
+                    &mut gal,
+                    1,
+                    vec![GuiRawImageAssetPayload {
+                        sampling: None,
+                        asset_id: 41,
+                        format: GuiRawImageFormat::Rgba8,
+                        width: (pixels.len() / 4) as u32 / height,
+                        height,
+                        pixels,
+                    }],
+                )
+                .unwrap();
         }
         if prewarm_alpha {
-            frontend.ensure_resources(&mut gal, TextureGroup::Dynamic(41), ColorFormat::Rgba8Unorm,
-                None, &mut GuiSubmitStats::default()).unwrap();
+            frontend
+                .ensure_resources(
+                    &mut gal,
+                    TextureGroup::Dynamic(41),
+                    ColorFormat::Rgba8Unorm,
+                    None,
+                    &mut GuiSubmitStats::default(),
+                )
+                .unwrap();
         }
         let template = GuiAffineQuadRequest {
-                    item_raster_layers: vec![],
-                    item_raster_scale: 0,
-                    item_raster_geometry: Default::default(),
-                    material,
+            item_raster_layers: vec![],
+            item_raster_scale: 0,
+            item_raster_geometry: Default::default(),
+            material,
+            stratum,
+            asset_id: 41,
+            x0: 0.0,
+            y0: 0.0,
+            x1: 1.0,
+            y1: 0.0,
+            x3: 0.0,
+            y3: height as f32,
+            z: 0.0,
+            u0,
+            v0: 0.0,
+            u1,
+            v1: 1.0,
+            color_argb: 0xffff_ffff,
+            gui_width: 1,
+            gui_height: height,
+            projection_extent: [1.0, height as f32],
+            sequence: 1,
+            clip_mode: 0,
+            clip_left: 0,
+            clip_top: 0,
+            clip_width: 0,
+            clip_height: 0,
+        };
+        let (quads, tiled) = if let Some(geometry) = tiles {
+            (
+                Vec::new(),
+                vec![GuiTiledQuadRequest {
+                    geometry,
                     stratum,
                     asset_id: 41,
-                    x0: 0.0,
-                    y0: 0.0,
-                    x1: 1.0,
-                    y1: 0.0,
-                    x3: 0.0,
-                    y3: height as f32,
                     z: 0.0,
-                    u0,
-                    v0: 0.0,
-                    u1,
-                    v1: 1.0,
                     color_argb: 0xffff_ffff,
-                    gui_width: 1,
-                    gui_height: height,
-                    projection_extent: [1.0, height as f32],
+                    gui_extent: [1, 1],
+                    projection_extent: [1.0, 1.0],
                     sequence: 1,
-                    clip_mode: 0,
-                    clip_left: 0,
-                    clip_top: 0,
-                    clip_width: 0,
-                    clip_height: 0,
-                };
-        let (quads, tiled) = if let Some(geometry) = tiles {
-            (Vec::new(), vec![GuiTiledQuadRequest {
-                geometry, stratum, asset_id: 41, z: 0.0, color_argb: 0xffff_ffff,
-                gui_extent: [1, 1], projection_extent: [1.0, 1.0], sequence: 1, clip: None,
-            }])
-        } else { (vec![template], Vec::new()) };
+                    clip: None,
+                }],
+            )
+        } else {
+            (vec![template], Vec::new())
+        };
         let mut quads = quads;
         if mixed {
-            frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload { sampling: None,
-                asset_id: 42, format: GuiRawImageFormat::Rgba8, width: 1, height: 1,
-                pixels: vec![0, 0, 255, 128],
-            }]).unwrap();
+            frontend
+                .apply_raw_image_update(
+                    &mut gal,
+                    1,
+                    vec![GuiRawImageAssetPayload {
+                        sampling: None,
+                        asset_id: 42,
+                        format: GuiRawImageFormat::Rgba8,
+                        width: 1,
+                        height: 1,
+                        pixels: vec![0, 0, 255, 128],
+                    }],
+                )
+                .unwrap();
             let mut before = quads[0].clone();
             before.material = crate::render::vulkanic::gui_item_material::GuiAffineMaterial::Unlit;
-            before.asset_id = 42; before.sequence = 1;
-            let mut after = before.clone(); after.sequence = 3;
+            before.asset_id = 42;
+            before.sequence = 1;
+            let mut after = before.clone();
+            after.sequence = 3;
             quads[0].sequence = 2;
             // Deliberately scrambled input: semantic scheduling must put the
             // blue control before and after the opaque atlas sample.
@@ -9056,41 +10226,133 @@ mod tests {
         let (mut ops, stats) = if atlas_reference.is_some() {
             let before = gal.metrics().resource_creates;
             if let Some(valid) = quads.iter().find(|quad| quad.asset_id == 41) {
-            let mut invalid = valid.clone();
-            invalid.asset_id = 999;
-            invalid.sequence = 99;
-            assert!(frontend.append_owned_atlas_quads(&mut gal, &mut world,
-                clear_pass, target, color_view, None, ColorFormat::Rgba8Unorm, None,
-                false, &[valid.clone(), invalid]).is_err());
-            assert_eq!(before, gal.metrics().resource_creates, "invalid semantic batch must reject before GPU allocation");
+                let mut invalid = valid.clone();
+                invalid.asset_id = 999;
+                invalid.sequence = 99;
+                assert!(frontend
+                    .append_owned_atlas_quads(
+                        &mut gal,
+                        &mut world,
+                        clear_pass,
+                        target,
+                        color_view,
+                        None,
+                        ColorFormat::Rgba8Unorm,
+                        None,
+                        false,
+                        &[valid.clone(), invalid]
+                    )
+                    .is_err());
+                assert_eq!(
+                    before,
+                    gal.metrics().resource_creates,
+                    "invalid semantic batch must reject before GPU allocation"
+                );
             }
-            assert!(frontend.append_frame_ops_with_tiled_quads_to_target(&mut gal,
-                1, target, color_view, Some(clear_pass), None, None, false,
-                Vec::new(), quads.clone(), Vec::new(), tiled.clone()).is_err(),
-                "mixed atlas submission must not bypass explicit owner access");
+            assert!(
+                frontend
+                    .append_frame_ops_with_tiled_quads_to_target(
+                        &mut gal,
+                        1,
+                        target,
+                        color_view,
+                        Some(clear_pass),
+                        None,
+                        None,
+                        false,
+                        Vec::new(),
+                        quads.clone(),
+                        Vec::new(),
+                        tiled.clone()
+                    )
+                    .is_err(),
+                "mixed atlas submission must not bypass explicit owner access"
+            );
             assert_eq!(before, gal.metrics().resource_creates);
-            let duplicate_affine = quads.iter().find(|quad| quad.asset_id == 41)
-                .map(|quad| vec![quad.clone(), quad.clone()]).unwrap_or_default();
-            let duplicate_tiles = tiled.first().map(|tile| vec![tile.clone(), tile.clone()])
+            let duplicate_affine = quads
+                .iter()
+                .find(|quad| quad.asset_id == 41)
+                .map(|quad| vec![quad.clone(), quad.clone()])
                 .unwrap_or_default();
-            assert!(frontend.append_frame_ops_with_owned_atlases_to_target(&mut gal, Some(&mut world),
-                1, target, color_view, Some(clear_pass), None, None, false,
-                Vec::new(), duplicate_affine, Vec::new(), duplicate_tiles).is_err(),
-                "duplicate parent commands must still reject even though tile children share an ID");
+            let duplicate_tiles = tiled
+                .first()
+                .map(|tile| vec![tile.clone(), tile.clone()])
+                .unwrap_or_default();
+            assert!(
+                frontend
+                    .append_frame_ops_with_owned_atlases_to_target(
+                        &mut gal,
+                        Some(&mut world),
+                        1,
+                        target,
+                        color_view,
+                        Some(clear_pass),
+                        None,
+                        None,
+                        false,
+                        Vec::new(),
+                        duplicate_affine,
+                        Vec::new(),
+                        duplicate_tiles
+                    )
+                    .is_err(),
+                "duplicate parent commands must still reject even though tile children share an ID"
+            );
             assert_eq!(before, gal.metrics().resource_creates);
             if let Some((boundary, radius)) = blur {
-                frontend.append_frame_ops_with_owned_atlases_and_blur_boundary(
-                    &mut gal, Some(&mut world), 1, target, color_view,
-                    Vec::new(), quads, Vec::new(), tiled, boundary, radius, false).unwrap()
-            } else { frontend.append_frame_ops_with_owned_atlases_to_target(&mut gal, Some(&mut world),
-                1, target, color_view, Some(clear_pass), None, None, false,
-                Vec::new(), quads, Vec::new(), tiled).unwrap() }
-        } else { frontend
-            .append_frame_ops_with_tiled_quads_to_target(
-                &mut gal, 1, target, color_view, None, None, None, false, Vec::new(), quads,
-                Vec::new(), tiled,
-            )
-            .unwrap() };
+                frontend
+                    .append_frame_ops_with_owned_atlases_and_blur_boundary(
+                        &mut gal,
+                        Some(&mut world),
+                        1,
+                        target,
+                        color_view,
+                        Vec::new(),
+                        quads,
+                        Vec::new(),
+                        tiled,
+                        boundary,
+                        radius,
+                        false,
+                    )
+                    .unwrap()
+            } else {
+                frontend
+                    .append_frame_ops_with_owned_atlases_to_target(
+                        &mut gal,
+                        Some(&mut world),
+                        1,
+                        target,
+                        color_view,
+                        Some(clear_pass),
+                        None,
+                        None,
+                        false,
+                        Vec::new(),
+                        quads,
+                        Vec::new(),
+                        tiled,
+                    )
+                    .unwrap()
+            }
+        } else {
+            frontend
+                .append_frame_ops_with_tiled_quads_to_target(
+                    &mut gal,
+                    1,
+                    target,
+                    color_view,
+                    None,
+                    None,
+                    None,
+                    false,
+                    Vec::new(),
+                    quads,
+                    Vec::new(),
+                    tiled,
+                )
+                .unwrap()
+        };
         assert_eq!(quad_count as u64, stats.affine_quad_count);
         let mut commands = vec![
             CommandOp::Barrier(texture_barrier(
@@ -9118,7 +10380,11 @@ mod tests {
         ];
         commands.append(&mut ops);
         if invert {
-            commands.extend(frontend.append_invert_post_effect(&mut gal, target, color_view).unwrap());
+            commands.extend(
+                frontend
+                    .append_invert_post_effect(&mut gal, target, color_view)
+                    .unwrap(),
+            );
         }
         commands.extend([
             CommandOp::Barrier(texture_barrier(
@@ -9175,8 +10441,11 @@ mod tests {
             gal.destroy(handle).unwrap();
         }
         gal.retire_through(gal.latest_submission_id()).unwrap();
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys,
-            "GUI readback fixture must retire draw bindings, source owner and target resources");
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys,
+            "GUI readback fixture must retire draw bindings, source owner and target resources"
+        );
         Some(bytes)
     }
 
@@ -9202,24 +10471,41 @@ mod tests {
         assert!(ops
             .iter()
             .any(|op| matches!(op, CommandOp::CopyFrameTargetToTexture { .. })));
-        assert_eq!(6, ops.iter().filter(|op| matches!(
-            op,
-            CommandOp::Draw {
-                vertices: 3,
-                instances: 1
-            }
-        )).count(), "Frozen's menu blur requires all three horizontal/vertical pairs");
-        let configs = ops.iter().filter_map(|op| match op {
-            CommandOp::HostWriteBuffer { data, .. } if data.len() == 64 => Some(data),
-            _ => None,
-        }).collect::<Vec<_>>();
+        assert_eq!(
+            6,
+            ops.iter()
+                .filter(|op| matches!(
+                    op,
+                    CommandOp::Draw {
+                        vertices: 3,
+                        instances: 1
+                    }
+                ))
+                .count(),
+            "Frozen's menu blur requires all three horizontal/vertical pairs"
+        );
+        let configs = ops
+            .iter()
+            .filter_map(|op| match op {
+                CommandOp::HostWriteBuffer { data, .. } if data.len() == 64 => Some(data),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
         assert_eq!(6, configs.len());
         for (index, bytes) in configs.into_iter().enumerate() {
             let x = f32::from_le_bytes(bytes[..4].try_into().unwrap());
             let y = f32::from_le_bytes(bytes[4..8].try_into().unwrap());
-            assert_eq!([x, y], if index % 2 == 0 { [1.0, 0.0] } else { [0.0, 1.0] });
+            assert_eq!(
+                [x, y],
+                if index % 2 == 0 {
+                    [1.0, 0.0]
+                } else {
+                    [0.0, 1.0]
+                }
+            );
         }
-        assert!(std::str::from_utf8(BLUR_FRAGMENT_SHADER_VULKAN).unwrap()
+        assert!(std::str::from_utf8(BLUR_FRAGMENT_SHADER_VULKAN)
+            .unwrap()
             .contains("gl_FragCoord.xy * texel"));
         gal.submit(SubmissionBatch {
             label: "gui-blur-replay".to_owned(),
@@ -9329,7 +10615,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 "minecraft:test_custom",
                 &[
                     CustomPostEffectSource {
-                        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+                        input_row_order:
+                            crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                         sampler_info_uniform: None,
                         vertex_shader: vertex.to_vec(),
                         fragment_shader: fragment.to_vec(),
@@ -9342,7 +10629,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
                         uniform_blocks: vec![vec![7; 16]],
                     },
                     CustomPostEffectSource {
-                        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+                        input_row_order:
+                            crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                         sampler_info_uniform: None,
                         vertex_shader: vertex.to_vec(),
                         fragment_shader: fragment.to_vec(),
@@ -9370,11 +10658,13 @@ void main() { fragColor = texture(InSampler, texCoord); }
         for (index, op) in ops.iter().enumerate() {
             if let CommandOp::HostWriteBuffer { buffer, data, .. } = op {
                 if data == &vec![7; 16] {
-                    assert!(matches!(ops.get(index + 1), Some(CommandOp::Barrier(barrier))
+                    assert!(
+                        matches!(ops.get(index + 1), Some(CommandOp::Barrier(barrier))
                         if barrier.resource == *buffer
                             && barrier.before == TextureUsageState::TransferDst
                             && barrier.after == TextureUsageState::ShaderRead),
-                        "every post-effect uniform upload needs an explicit read dependency");
+                        "every post-effect uniform upload needs an explicit read dependency"
+                    );
                 }
             }
         }
@@ -9425,7 +10715,7 @@ void main() { fragColor = texture(MaskSampler, texCoord); }
                     vertex_shader: vertex.to_vec(),
                     fragment_shader: fragment.to_vec(),
                     input_count: 1,
-                        input_bilinear: vec![false; 1],
+                    input_bilinear: vec![false; 1],
                     input_targets: vec![String::new()],
                     input_images: vec![Some(CustomPostEffectImage {
                         path: "textures/effect/mask.png".to_owned(),
@@ -9453,8 +10743,10 @@ void main() { fragColor = texture(MaskSampler, texCoord); }
         assert!(!ops
             .iter()
             .any(|op| matches!(op, CommandOp::CopyFrameTargetToTexture { .. })));
-        assert!(!ops.iter().any(|op| matches!(op, CommandOp::CopyTexture(_))),
-            "uploaded image rows must not inherit framebuffer row conversion");
+        assert!(
+            !ops.iter().any(|op| matches!(op, CommandOp::CopyTexture(_))),
+            "uploaded image rows must not inherit framebuffer row conversion"
+        );
         let second_ops = frontend
             .append_custom_post_effect(
                 &mut gal,
@@ -9467,7 +10759,7 @@ void main() { fragColor = texture(MaskSampler, texCoord); }
                     vertex_shader: vertex.to_vec(),
                     fragment_shader: fragment.to_vec(),
                     input_count: 1,
-                        input_bilinear: vec![false; 1],
+                    input_bilinear: vec![false; 1],
                     input_targets: vec![String::new()],
                     input_images: vec![Some(CustomPostEffectImage {
                         path: "textures/effect/mask.png".to_owned(),
@@ -9497,7 +10789,7 @@ void main() { fragColor = texture(MaskSampler, texCoord); }
                     vertex_shader: vertex.to_vec(),
                     fragment_shader: fragment.to_vec(),
                     input_count: 1,
-                        input_bilinear: vec![false; 1],
+                    input_bilinear: vec![false; 1],
                     input_targets: vec!["minecraft:main".to_owned()],
                     input_images: vec![None],
                     input_use_depth: vec![true],
@@ -9527,7 +10819,7 @@ in vec2 texCoord; uniform sampler2D MainDepthSampler; out vec4 fragColor;
 void main() { fragColor = texture(MainDepthSampler, texCoord); }"#
                 .to_vec(),
             input_count: 1,
-                        input_bilinear: vec![false; 1],
+            input_bilinear: vec![false; 1],
             input_targets: vec!["minecraft:main".to_owned()],
             input_images: vec![None],
             input_use_depth: vec![true],
@@ -9669,7 +10961,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 "minecraft:test_intermediate",
                 &[
                     CustomPostEffectSource {
-                        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+                        input_row_order:
+                            crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                         sampler_info_uniform: None,
                         vertex_shader: vertex.to_vec(),
                         fragment_shader: fragment.to_vec(),
@@ -9682,7 +10975,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
                         uniform_blocks: Vec::new(),
                     },
                     CustomPostEffectSource {
-                        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+                        input_row_order:
+                            crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                         sampler_info_uniform: None,
                         vertex_shader: vertex.to_vec(),
                         fragment_shader: fragment.to_vec(),
@@ -9722,8 +11016,13 @@ void main() { fragColor = texture(InSampler, texCoord); }
         })
         .unwrap();
         let intermediate = &frontend.custom_post_effect_intermediates["intermediate"];
-        let begin = ops.iter().position(|op| matches!(op, CommandOp::BeginPass { target, .. }
-            if *target == intermediate.target)).unwrap();
+        let begin = ops
+            .iter()
+            .position(|op| {
+                matches!(op, CommandOp::BeginPass { target, .. }
+            if *target == intermediate.target)
+            })
+            .unwrap();
         assert!(ops[..begin].iter().any(|op| matches!(op, CommandOp::Barrier(barrier)
             if barrier.resource == intermediate.texture && barrier.before == TextureUsageState::Undefined
                 && barrier.after == TextureUsageState::ColorAttachment)));
@@ -9732,12 +11031,26 @@ void main() { fragColor = texture(InSampler, texCoord); }
 
     #[test]
     fn custom_post_effect_sampler_info_packs_explicit_output_and_input_extents() {
-        let image = CustomPostEffectImage { path: "test".into(), width: 8, height: 4,
-            pixels_rgba8: vec![0; 8 * 4 * 4], bilinear: false };
-        let bytes = custom_sampler_info_bytes(Extent3d { width: 320, height: 180, depth: 1 },
-            &[None, Some(image)]);
+        let image = CustomPostEffectImage {
+            path: "test".into(),
+            width: 8,
+            height: 4,
+            pixels_rgba8: vec![0; 8 * 4 * 4],
+            bilinear: false,
+        };
+        let bytes = custom_sampler_info_bytes(
+            Extent3d {
+                width: 320,
+                height: 180,
+                depth: 1,
+            },
+            &[None, Some(image)],
+        );
         assert_eq!(32, bytes.len());
-        let values = bytes.chunks_exact(4).map(|b| f32::from_le_bytes(b.try_into().unwrap())).collect::<Vec<_>>();
+        let values = bytes
+            .chunks_exact(4)
+            .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+            .collect::<Vec<_>>();
         assert_eq!(vec![320.0, 180.0, 320.0, 180.0, 8.0, 4.0, 0.0, 0.0], values);
     }
 
@@ -9882,7 +11195,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                     vertex_shader: vertex.to_vec(),
                     fragment_shader: fragment.to_vec(),
                     input_count: 1,
-                        input_bilinear: vec![false; 1],
+                    input_bilinear: vec![false; 1],
                     input_targets: vec!["minecraft:main".to_owned()],
                     input_images: vec![None],
                     input_use_depth: vec![false],
@@ -9932,7 +11245,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 "minecraft:test_multi_intermediate",
                 &[
                     CustomPostEffectSource {
-                        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+                        input_row_order:
+                            crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                         sampler_info_uniform: None,
                         vertex_shader: vertex.to_vec(),
                         fragment_shader: fragment.to_vec(),
@@ -9945,7 +11259,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
                         uniform_blocks: Vec::new(),
                     },
                     CustomPostEffectSource {
-                        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+                        input_row_order:
+                            crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                         sampler_info_uniform: None,
                         vertex_shader: vertex.to_vec(),
                         fragment_shader: fragment.to_vec(),
@@ -9958,7 +11273,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
                         uniform_blocks: Vec::new(),
                     },
                     CustomPostEffectSource {
-                        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+                        input_row_order:
+                            crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                         sampler_info_uniform: None,
                         vertex_shader: vertex.to_vec(),
                         fragment_shader: fragment.to_vec(),
@@ -10027,7 +11343,8 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
                 "minecraft:test-distinct-inputs",
                 &[
                     CustomPostEffectSource {
-                        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+                        input_row_order:
+                            crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                         sampler_info_uniform: None,
                         vertex_shader: vertex.to_vec(),
                         fragment_shader: fragment.to_vec(),
@@ -10040,7 +11357,8 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
                         uniform_blocks: Vec::new(),
                     },
                     CustomPostEffectSource {
-                        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+                        input_row_order:
+                            crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                         sampler_info_uniform: None,
                         vertex_shader: vertex.to_vec(),
                         fragment_shader: fragment.to_vec(),
@@ -10082,9 +11400,18 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
         let mut live = None;
         for iteration in 0..8 {
             let source = row_conversion_fixture(false, 2);
-            let ops = frontend.append_custom_post_effect(&mut gal, target, target,
-                "row-conversion-fixture", &[source]).unwrap();
-            let scratch = frontend.custom_post_effect_resources[0].frame_copy_scratch.unwrap();
+            let ops = frontend
+                .append_custom_post_effect(
+                    &mut gal,
+                    target,
+                    target,
+                    "row-conversion-fixture",
+                    &[source],
+                )
+                .unwrap();
+            let scratch = frontend.custom_post_effect_resources[0]
+                .frame_copy_scratch
+                .unwrap();
             assert_eq!(2, ops.iter().filter(|op| matches!(op,
                 CommandOp::CopyTexture(region) if region.row_order == super::super::commands::TextureRowOrder::Reverse
                     && region.src_texture == scratch)).count());
@@ -10092,26 +11419,45 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
                 CommandOp::Barrier(ResourceBarrier { resource, before: TextureUsageState::Undefined, .. })
                     if *resource == scratch));
             assert_eq!(iteration == 0, starts_undefined);
-            let list = gal.create_command_list(CommandListDesc { label: "row-fixture".into(), operations: ops }).unwrap();
-            let token = gal.submit(SubmissionBatch { label: "row-fixture".into(), command_lists: vec![list] }).unwrap();
+            let list = gal
+                .create_command_list(CommandListDesc {
+                    label: "row-fixture".into(),
+                    operations: ops,
+                })
+                .unwrap();
+            let token = gal
+                .submit(SubmissionBatch {
+                    label: "row-fixture".into(),
+                    command_lists: vec![list],
+                })
+                .unwrap();
             gal.retire_through_for_test(token.submission).unwrap();
             let count = gal.metrics().resource_creates - gal.metrics().resource_destroys;
             assert_eq!(*live.get_or_insert(count), count);
         }
         frontend.reset(&mut gal).unwrap();
         gal.destroy(target).unwrap();
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys
+        );
     }
 
     fn row_conversion_fixture(depth: bool, count: usize) -> CustomPostEffectSource {
         CustomPostEffectSource {
             input_row_order: super::super::commands::TextureRowOrder::Reverse,
-            input_bilinear: vec![false; count], sampler_info_uniform: None,
+            input_bilinear: vec![false; count],
+            sampler_info_uniform: None,
             vertex_shader: b"#version 450\nvoid main() { gl_Position=vec4(0.0); }".to_vec(),
-            fragment_shader: b"#version 450\nlayout(location=0) out vec4 color; void main() { color=vec4(1.0); }".to_vec(),
-            input_count: count, input_targets: vec!["minecraft:main".into(); count],
-            input_images: vec![None; count], input_use_depth: vec![depth; count],
-            output_target: "minecraft:main".into(), uniform_blocks: vec![],
+            fragment_shader:
+                b"#version 450\nlayout(location=0) out vec4 color; void main() { color=vec4(1.0); }"
+                    .to_vec(),
+            input_count: count,
+            input_targets: vec!["minecraft:main".into(); count],
+            input_images: vec![None; count],
+            input_use_depth: vec![depth; count],
+            output_target: "minecraft:main".into(),
+            uniform_blocks: vec![],
         }
     }
 
@@ -10125,10 +11471,22 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
         let mut consume = row_conversion_fixture(true, 1);
         consume.input_targets[0] = "private-color".into();
         let creates = gal.metrics().resource_creates;
-        let result = frontend.append_custom_post_effect(&mut gal, target, color,
-            "missing-named-depth", &[produce, consume]);
-        assert!(result.is_err(), "a named depth input must not sample main depth instead");
-        assert_eq!(creates, gal.metrics().resource_creates, "reject missing depth before graph allocation");
+        let result = frontend.append_custom_post_effect(
+            &mut gal,
+            target,
+            color,
+            "missing-named-depth",
+            &[produce, consume],
+        );
+        assert!(
+            result.is_err(),
+            "a named depth input must not sample main depth instead"
+        );
+        assert_eq!(
+            creates,
+            gal.metrics().resource_creates,
+            "reject missing depth before graph allocation"
+        );
     }
 
     #[test]
@@ -10136,20 +11494,35 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
         let mut gal = mock_gal();
         let (target, color_view, depth) = depth_render_target(&mut gal);
         let mut frontend = GuiFrontend::default();
-        let ops = frontend.append_custom_post_effect(&mut gal, target, color_view,
-            "depth-row-conversion", &[row_conversion_fixture(true, 1)]).unwrap();
+        let ops = frontend
+            .append_custom_post_effect(
+                &mut gal,
+                target,
+                color_view,
+                "depth-row-conversion",
+                &[row_conversion_fixture(true, 1)],
+            )
+            .unwrap();
         let resources = &frontend.custom_post_effect_resources[0];
         assert!(resources.frame_copy_scratch.is_none());
         let snapshot = resources.snapshots[0];
         let info = gal.texture_view_info(resources.snapshot_views[0]).unwrap();
         assert_eq!(TextureFormat::Depth32Float, info.format);
         assert_ne!(depth, info.texture);
-        assert!(ops.iter().any(|op| matches!(op, CommandOp::CopyTexture(region)
+        assert!(ops
+            .iter()
+            .any(|op| matches!(op, CommandOp::CopyTexture(region)
             if region.src_texture == depth && region.dst_texture == snapshot
                 && region.row_order == super::super::commands::TextureRowOrder::Reverse)));
-        assert!(!ops.iter().any(|op| matches!(op, CommandOp::Barrier(ResourceBarrier {
+        assert!(!ops
+            .iter()
+            .any(|op| matches!(op, CommandOp::Barrier(ResourceBarrier {
             resource, after: TextureUsageState::ShaderRead, .. }) if *resource == depth)));
-        gal.create_command_list(CommandListDesc { label: "depth-row-fixture".into(), operations: ops }).unwrap();
+        gal.create_command_list(CommandListDesc {
+            label: "depth-row-fixture".into(),
+            operations: ops,
+        })
+        .unwrap();
     }
 
     #[test]
@@ -10168,16 +11541,30 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
                 input_images: vec![None; 2], input_use_depth: vec![false; 2],
                 output_target: "minecraft:main".into(), uniform_blocks: Vec::new(),
             };
-            frontend.append_custom_post_effect(&mut gal, target, target,
-                "minecraft:sampler-fixture", &[source]).unwrap();
+            frontend
+                .append_custom_post_effect(
+                    &mut gal,
+                    target,
+                    target,
+                    "minecraft:sampler-fixture",
+                    &[source],
+                )
+                .unwrap();
             for handle in &previous {
-                assert!(gal.sampler_descriptor_for_test(*handle).is_err(), "changed filters must retire old bindings");
+                assert!(
+                    gal.sampler_descriptor_for_test(*handle).is_err(),
+                    "changed filters must retire old bindings"
+                );
             }
             let samplers = &frontend.custom_post_effect_resources[0].target_samplers;
             assert_eq!(2, samplers.len());
             for (handle, bilinear) in samplers.iter().zip(flags) {
                 let desc = gal.sampler_descriptor_for_test(*handle).unwrap();
-                let expected = if bilinear { SamplerFilter::Linear } else { SamplerFilter::Nearest };
+                let expected = if bilinear {
+                    SamplerFilter::Linear
+                } else {
+                    SamplerFilter::Nearest
+                };
                 assert_eq!(expected, desc.min_filter);
                 assert_eq!(expected, desc.mag_filter);
             }
@@ -10185,7 +11572,10 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
         }
         frontend.reset(&mut gal).unwrap();
         gal.destroy(target).unwrap();
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys
+        );
     }
 
     #[test]
@@ -10197,37 +11587,75 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
             input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
             sampler_info_uniform: None,
             vertex_shader: b"#version 450\nvoid main() { gl_Position = vec4(0.0); }".to_vec(),
-            fragment_shader: b"#version 450\nlayout(location=0) out vec4 color; void main() { color=vec4(1.0); }".to_vec(),
+            fragment_shader:
+                b"#version 450\nlayout(location=0) out vec4 color; void main() { color=vec4(1.0); }"
+                    .to_vec(),
             input_count: 1,
-                        input_bilinear: vec![false; 1], input_targets: vec![input.into()], input_images: vec![None],
-            input_use_depth: vec![false], output_target: output.into(), uniform_blocks: Vec::new(),
+            input_bilinear: vec![false; 1],
+            input_targets: vec![input.into()],
+            input_images: vec![None],
+            input_use_depth: vec![false],
+            output_target: output.into(),
+            uniform_blocks: Vec::new(),
         };
-        let sources = [source("minecraft:main", "swap"), source("swap", "minecraft:main")];
-        let unsubmitted = frontend.append_custom_post_effect(&mut gal, target, target,
-            "minecraft:cancel-fixture", &sources).unwrap();
+        let sources = [
+            source("minecraft:main", "swap"),
+            source("swap", "minecraft:main"),
+        ];
+        let unsubmitted = frontend
+            .append_custom_post_effect(
+                &mut gal,
+                target,
+                target,
+                "minecraft:cancel-fixture",
+                &sources,
+            )
+            .unwrap();
         let old_texture = frontend.custom_post_effect_intermediates["swap"].texture;
-        assert!(frontend.custom_post_effect_snapshot_initialized.iter().flatten().all(|v| *v));
+        assert!(frontend
+            .custom_post_effect_snapshot_initialized
+            .iter()
+            .flatten()
+            .all(|v| *v));
         drop(unsubmitted);
         frontend.discard_prepared_post_effects(&mut gal);
         assert!(frontend.custom_post_effect_resources.is_empty());
         assert!(frontend.custom_post_effect_snapshot_initialized.is_empty());
-        let retry = frontend.append_custom_post_effect(&mut gal, target, target,
-            "minecraft:cancel-fixture", &sources).unwrap();
+        let retry = frontend
+            .append_custom_post_effect(
+                &mut gal,
+                target,
+                target,
+                "minecraft:cancel-fixture",
+                &sources,
+            )
+            .unwrap();
         let new_texture = frontend.custom_post_effect_intermediates["swap"].texture;
         assert_ne!(old_texture, new_texture);
-        assert!(retry.iter().any(|op| matches!(op, CommandOp::Barrier(barrier)
+        assert!(retry
+            .iter()
+            .any(|op| matches!(op, CommandOp::Barrier(barrier)
             if barrier.resource == new_texture && barrier.before == TextureUsageState::Undefined
                 && barrier.after == TextureUsageState::ColorAttachment)));
-        let list = gal.create_command_list(CommandListDesc {
-            label: "post-effect-cancel-retry".into(), operations: retry,
-        }).unwrap();
-        let token = gal.submit(SubmissionBatch {
-            label: "post-effect-cancel-retry".into(), command_lists: vec![list],
-        }).unwrap();
+        let list = gal
+            .create_command_list(CommandListDesc {
+                label: "post-effect-cancel-retry".into(),
+                operations: retry,
+            })
+            .unwrap();
+        let token = gal
+            .submit(SubmissionBatch {
+                label: "post-effect-cancel-retry".into(),
+                command_lists: vec![list],
+            })
+            .unwrap();
         gal.retire_through(token.submission).unwrap();
         frontend.reset(&mut gal).unwrap();
         gal.destroy(target).unwrap();
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys
+        );
     }
 
     #[test]
@@ -10240,13 +11668,23 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
         for iteration in 0..32u64 {
             let width = if iteration % 2 == 0 { 320 } else { 640 };
             let height = if iteration % 2 == 0 { 180 } else { 360 };
-            let target = gal.create_frame_target(FrameTargetDesc {
-                label: "post-effect-resize-test".into(), frame_id: iteration + 2,
-                render_target: crate::render::vulkanic::frame::FrameRenderTargetId(iteration + 2),
-                extent: Extent3d { width, height, depth: 1 },
-                color_format: TextureFormat::Rgba8Unorm,
-            }).unwrap();
-            let source = |input: &str, output: &str| CustomPostEffectSource {
+            let target = gal
+                .create_frame_target(FrameTargetDesc {
+                    label: "post-effect-resize-test".into(),
+                    frame_id: iteration + 2,
+                    render_target: crate::render::vulkanic::frame::FrameRenderTargetId(
+                        iteration + 2,
+                    ),
+                    extent: Extent3d {
+                        width,
+                        height,
+                        depth: 1,
+                    },
+                    color_format: TextureFormat::Rgba8Unorm,
+                })
+                .unwrap();
+            let source = |input: &str, output: &str| {
+                CustomPostEffectSource {
                 input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
                 sampler_info_uniform: Some(1),
                 vertex_shader: b"#version 450\nvoid main() { gl_Position = vec4(0.0); }".to_vec(),
@@ -10255,32 +11693,61 @@ void main() { fragColor = texture(MainSampler, texCoord) + texture(PrivateSample
                         input_bilinear: vec![false; 1], input_targets: vec![input.into()], input_images: vec![None],
                 input_use_depth: vec![false], output_target: output.into(),
                 uniform_blocks: vec![vec![iteration as u8; 16], vec![0; 16]],
+            }
             };
-            let ops = frontend.append_custom_post_effect(&mut gal, target, target,
-                "minecraft:resize-fixture", &[source("minecraft:main", "swap"),
-                    source("swap", "minecraft:main")]).unwrap();
+            let ops = frontend
+                .append_custom_post_effect(
+                    &mut gal,
+                    target,
+                    target,
+                    "minecraft:resize-fixture",
+                    &[
+                        source("minecraft:main", "swap"),
+                        source("swap", "minecraft:main"),
+                    ],
+                )
+                .unwrap();
             let expected_extents = [width as f32, height as f32, width as f32, height as f32]
-                .into_iter().flat_map(f32::to_le_bytes).collect::<Vec<_>>();
-            assert_eq!(2, ops.iter().filter(|op| matches!(op,
-                CommandOp::HostWriteBuffer { data, .. } if data == &expected_extents)).count());
-            let list = gal.create_command_list(CommandListDesc {
-                label: "post-effect-resize-test".into(), operations: ops,
-            }).unwrap();
-            let token = gal.submit(SubmissionBatch {
-                label: "post-effect-resize-test".into(), command_lists: vec![list],
-            }).unwrap();
+                .into_iter()
+                .flat_map(f32::to_le_bytes)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                2,
+                ops.iter()
+                    .filter(|op| matches!(op,
+                CommandOp::HostWriteBuffer { data, .. } if data == &expected_extents))
+                    .count()
+            );
+            let list = gal
+                .create_command_list(CommandListDesc {
+                    label: "post-effect-resize-test".into(),
+                    operations: ops,
+                })
+                .unwrap();
+            let token = gal
+                .submit(SubmissionBatch {
+                    label: "post-effect-resize-test".into(),
+                    command_lists: vec![list],
+                })
+                .unwrap();
             gal.retire_through(token.submission).unwrap();
             frontend.clear_frame_passes_for_targets(&mut gal, &[target]);
             gal.destroy(target).unwrap();
             assert_eq!(2, frontend.custom_post_effect_resources.len());
             assert_eq!(1, frontend.custom_post_effect_intermediates.len());
             let live = gal.metrics().resource_creates - gal.metrics().resource_destroys;
-            assert_eq!(*expected_live.get_or_insert(live), live,
-                "resizing and changing uniform bytes must replace, not accumulate, resources");
+            assert_eq!(
+                *expected_live.get_or_insert(live),
+                live,
+                "resizing and changing uniform bytes must replace, not accumulate, resources"
+            );
         }
         frontend.reset(&mut gal).unwrap();
         gal.retire_completed().unwrap();
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys
+        );
     }
 
     #[test]
@@ -10304,7 +11771,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
             vertex_shader: vertex.to_vec(),
             fragment_shader: [fragment, marker].concat(),
             input_count: 1,
-                        input_bilinear: vec![false; 1],
+            input_bilinear: vec![false; 1],
             input_targets: vec!["minecraft:main".to_owned()],
             input_images: vec![None],
             input_use_depth: vec![false],
@@ -10368,7 +11835,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                     vertex_shader: vertex.to_vec(),
                     fragment_shader: fragment.to_vec(),
                     input_count: 1,
-                        input_bilinear: vec![false; 1],
+                    input_bilinear: vec![false; 1],
                     input_targets: vec!["later".to_owned()],
                     input_images: vec![None],
                     input_use_depth: vec![false],
@@ -10381,7 +11848,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                     vertex_shader: vertex.to_vec(),
                     fragment_shader: fragment.to_vec(),
                     input_count: 1,
-                        input_bilinear: vec![false; 1],
+                    input_bilinear: vec![false; 1],
                     input_targets: vec!["minecraft:main".to_owned()],
                     input_images: vec![None],
                     input_use_depth: vec![false],
@@ -10404,7 +11871,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                     vertex_shader: vertex.to_vec(),
                     fragment_shader: fragment.to_vec(),
                     input_count: 1,
-                        input_bilinear: vec![false; 1],
+                    input_bilinear: vec![false; 1],
                     input_targets: vec!["minecraft:main".to_owned()],
                     input_images: vec![None],
                     input_use_depth: vec![false],
@@ -10417,7 +11884,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                     vertex_shader: vertex.to_vec(),
                     fragment_shader: fragment.to_vec(),
                     input_count: 1,
-                        input_bilinear: vec![false; 1],
+                    input_bilinear: vec![false; 1],
                     input_targets: vec!["loop".to_owned()],
                     input_images: vec![None],
                     input_use_depth: vec![false],
@@ -10440,7 +11907,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
             vertex_shader: b"#version 330\nvoid main() {}".to_vec(),
             fragment_shader: b"#version 330\nvoid main() {}".to_vec(),
             input_count: 1,
-                        input_bilinear: vec![false; 1],
+            input_bilinear: vec![false; 1],
             input_targets: vec!["minecraft:main".to_owned()],
             input_images: vec![None],
             input_use_depth: vec![false],
@@ -10463,7 +11930,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
             vertex_shader: b"#version 330\nvoid main() {}".to_vec(),
             fragment_shader: b"#version 330\nvoid main() {}".to_vec(),
             input_count: 1,
-                        input_bilinear: vec![false; 1],
+            input_bilinear: vec![false; 1],
             input_targets: vec!["minecraft:main".to_owned()],
             input_images: vec![None],
             input_use_depth: vec![false],
@@ -10660,7 +12127,11 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 extent,
                 mip_levels: 1,
                 array_layers: 1,
-                usages: vec![TextureUsage::Sampled, TextureUsage::DepthStencilAttachment, TextureUsage::TransferSrc],
+                usages: vec![
+                    TextureUsage::Sampled,
+                    TextureUsage::DepthStencilAttachment,
+                    TextureUsage::TransferSrc,
+                ],
             })
             .unwrap();
         let depth_view = gal
@@ -10712,28 +12183,71 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let mut frontend = GuiFrontend::default();
         let mut request = mesh_batch(0);
         request.item_raster_scale = 2;
-        request.render_extent = [0,0];
+        request.render_extent = [0, 0];
         request.guard_pixels = 0;
-        request.model_transform = [0.8,0.,-0.6,0., 0.,1.,0.,0., 0.6,0.,0.8,0., 0.,0.,0.,1.];
+        request.model_transform = [
+            0.8, 0., -0.6, 0., 0., 1., 0., 0., 0.6, 0., 0.8, 0., 0., 0., 0., 1.,
+        ];
         request.lighting_mode = GuiMeshLightingMode::Flat;
         request.item_lighting = Some(super::super::gui_mesh_frontend::GuiFlatItemLighting {
-            lightmap_generation: 1, rgb: [1.;3],
+            lightmap_generation: 1,
+            rgb: [1.; 3],
         });
         let before = gal.metrics().resource_creates;
-        assert!(frontend.append_mesh_items_to_target(&mut gal, None, 1,
-            target, target, None, None, None, vec![request.clone()], &mut GuiSubmitStats::default()).is_err());
+        assert!(frontend
+            .append_mesh_items_to_target(
+                &mut gal,
+                None,
+                1,
+                target,
+                target,
+                None,
+                None,
+                None,
+                vec![request.clone()],
+                &mut GuiSubmitStats::default()
+            )
+            .is_err());
         assert_eq!(before, gal.metrics().resource_creates);
-        frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload { sampling: None,
-            asset_id: 7, format: GuiRawImageFormat::Rgba8, width: 2, height: 2, pixels: vec![255;16],
-        }]).unwrap();
+        frontend
+            .apply_raw_image_update(
+                &mut gal,
+                1,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
+                    asset_id: 7,
+                    format: GuiRawImageFormat::Rgba8,
+                    width: 2,
+                    height: 2,
+                    pixels: vec![255; 16],
+                }],
+            )
+            .unwrap();
         let mut stats = GuiSubmitStats::default();
-        let ops = frontend.append_mesh_items_to_target(&mut gal, None, 1,
-            target, target, None, None, None, vec![request.clone()], &mut stats).unwrap();
+        let ops = frontend
+            .append_mesh_items_to_target(
+                &mut gal,
+                None,
+                1,
+                target,
+                target,
+                None,
+                None,
+                None,
+                vec![request.clone()],
+                &mut stats,
+            )
+            .unwrap();
         assert!(!ops.is_empty());
         assert_eq!(stats.mesh_item_count, 1);
-        assert!(frontend.resources.values().all(|binding| !matches!(binding.image_ownership, GuiImageOwnership::AtlasView)));
+        assert!(frontend
+            .resources
+            .values()
+            .all(|binding| !matches!(binding.image_ownership, GuiImageOwnership::AtlasView)));
         request.asset_id = 8;
-        assert!(frontend.preflight_mesh_atlas_commands(None, &[request]).is_err());
+        assert!(frontend
+            .preflight_mesh_atlas_commands(None, &[request])
+            .is_err());
         frontend.reset(&mut gal).unwrap();
         gal.destroy(target).unwrap();
         // Creating the owned image submitted an upload. Destruction must
@@ -10741,37 +12255,76 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let completed = gal.latest_submission_id();
         gal.mock_backend_mut().unwrap().complete_through(completed);
         gal.retire_through(completed).unwrap();
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys
+        );
     }
 
     #[test]
     fn model_overlay_passes_finish_before_foil_without_changing_authored_layers() {
-        let requests: Vec<_> = (0..6).map(|i| {
-            let mut request=mesh_batch(i);
-            request.item_raster_scale=3; request.render_extent=[0,0];request.guard_pixels=0;
-            request.model_transform=[1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.,0.,0.,0.,0.,1.];
-            request.material_mode=if i==2 {GuiMeshMaterialMode::Glint}
-                else if i>=3 {GuiMeshMaterialMode::ModelOverlay} else {GuiMeshMaterialMode::Opaque};
-            request.lighting_mode=if i==2 {GuiMeshLightingMode::Flat} else {GuiMeshLightingMode::FrontModel};
-            request.alpha_cutoff=if i==2 {0.1} else {0.0};
-            if i==2 {
-                request.item_foil=Some(super::super::item_foil::StandardItemFoil {
-                    kind:super::super::item_foil::StandardFoilKind::Entity,clock_millis:0,speed:0.,strength:0.5 });
-            } else {
-                request.item_lighting=Some(super::super::gui_mesh_frontend::GuiFlatItemLighting {
-                    lightmap_generation:1,rgb:[1.;3] });
-            }
-            request
-        }).collect();
-        let mut draws=prepare_gui_mesh_draws(&requests).unwrap();
+        let requests: Vec<_> = (0..6)
+            .map(|i| {
+                let mut request = mesh_batch(i);
+                request.item_raster_scale = 3;
+                request.render_extent = [0, 0];
+                request.guard_pixels = 0;
+                request.model_transform = [
+                    1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.,
+                ];
+                request.material_mode = if i == 2 {
+                    GuiMeshMaterialMode::Glint
+                } else if i >= 3 {
+                    GuiMeshMaterialMode::ModelOverlay
+                } else {
+                    GuiMeshMaterialMode::Opaque
+                };
+                request.lighting_mode = if i == 2 {
+                    GuiMeshLightingMode::Flat
+                } else {
+                    GuiMeshLightingMode::FrontModel
+                };
+                request.alpha_cutoff = if i == 2 { 0.1 } else { 0.0 };
+                if i == 2 {
+                    request.item_foil = Some(super::super::item_foil::StandardItemFoil {
+                        kind: super::super::item_foil::StandardFoilKind::Entity,
+                        clock_millis: 0,
+                        speed: 0.,
+                        strength: 0.5,
+                    });
+                } else {
+                    request.item_lighting =
+                        Some(super::super::gui_mesh_frontend::GuiFlatItemLighting {
+                            lightmap_generation: 1,
+                            rgb: [1.; 3],
+                        });
+                }
+                request
+            })
+            .collect();
+        let mut draws = prepare_gui_mesh_draws(&requests).unwrap();
         validate_mesh_item_layers(&draws).unwrap();
-        assert_eq!(mesh_item_layer_execution_order(&draws),vec![0,1,3,4,5,2]);
-        assert_eq!(draws.iter().map(|draw|draw.layer_index).collect::<Vec<_>>(),vec![0,1,2,3,4,5]);
+        assert_eq!(
+            mesh_item_layer_execution_order(&draws),
+            vec![0, 1, 3, 4, 5, 2]
+        );
+        assert_eq!(
+            draws
+                .iter()
+                .map(|draw| draw.layer_index)
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4, 5]
+        );
         // This dependency must not reorder unrelated authored item layers.
-        for draw in &mut draws { if draw.material_mode==GuiMeshMaterialMode::ModelOverlay {
-            draw.material_mode=GuiMeshMaterialMode::Translucent;
-        }}
-        assert_eq!(mesh_item_layer_execution_order(&draws),vec![0,1,2,3,4,5]);
+        for draw in &mut draws {
+            if draw.material_mode == GuiMeshMaterialMode::ModelOverlay {
+                draw.material_mode = GuiMeshMaterialMode::Translucent;
+            }
+        }
+        assert_eq!(
+            mesh_item_layer_execution_order(&draws),
+            vec![0, 1, 2, 3, 4, 5]
+        );
     }
 
     fn mesh_batch(layer_index: u32) -> GuiMeshBatchRequest {
@@ -10810,21 +12363,27 @@ void main() { fragColor = texture(InSampler, texCoord); }
                     atlas_uv: [0.0, 0.0],
                     local_uv: [0.0, 0.0],
                     color_argb: 0xffff_ffff,
-                    normal_packed: 0x007f_0000, source_face: 0, source_foil_type: 0,
+                    normal_packed: 0x007f_0000,
+                    source_face: 0,
+                    source_foil_type: 0,
                 },
                 GuiMeshVertex {
                     position: [1.0, 0.0, 0.0],
                     atlas_uv: [1.0, 0.0],
                     local_uv: [1.0, 0.0],
                     color_argb: 0xffff_ffff,
-                    normal_packed: 0x007f_0000, source_face: 0, source_foil_type: 0,
+                    normal_packed: 0x007f_0000,
+                    source_face: 0,
+                    source_foil_type: 0,
                 },
                 GuiMeshVertex {
                     position: [0.0, 1.0, 0.0],
                     atlas_uv: [0.0, 1.0],
                     local_uv: [0.0, 1.0],
                     color_argb: 0xffff_ffff,
-                    normal_packed: 0x007f_0000, source_face: 0, source_foil_type: 0,
+                    normal_packed: 0x007f_0000,
+                    source_face: 0,
+                    source_foil_type: 0,
                 },
             ],
             indices: vec![0, 1, 2],
@@ -10888,12 +12447,15 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .expect("the fixed stream admits one full allocation");
         let reservation_command = CommandOp::TrackSubmission(full.usage.clone());
         frontend.mesh_geometry_cache.insert((key, 1, 0), full);
-        let accepted = gal.submit(SubmissionBatch {
-            label: "accepted-stream-reservation".into(),
-            command_lists: vec![CommandList::from(CommandListDesc {
-                label: "allocator-completion-fixture".into(), operations: vec![reservation_command],
-            })],
-        }).unwrap();
+        let accepted = gal
+            .submit(SubmissionBatch {
+                label: "accepted-stream-reservation".into(),
+                command_lists: vec![CommandList::from(CommandListDesc {
+                    label: "allocator-completion-fixture".into(),
+                    operations: vec![reservation_command],
+                })],
+            })
+            .unwrap();
         assert_eq!(reserved, accepted.submission);
 
         let after_wait = frontend
@@ -10922,7 +12484,9 @@ void main() { fragColor = texture(InSampler, texCoord); }
             )
             .expect("the current frame can reserve the stream");
         let _pending_command = CommandOp::TrackSubmission(reservation.usage.clone());
-        frontend.mesh_geometry_cache.insert((key, 1, 0), reservation);
+        frontend
+            .mesh_geometry_cache
+            .insert((key, 1, 0), reservation);
 
         let error = frontend
             .allocate_mesh_geometry(&mut gal, key, 48, 4)
@@ -10944,7 +12508,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .apply_raw_image_update(
                 &mut gal,
                 1,
-                vec![GuiRawImageAssetPayload { sampling: None,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
                     asset_id: 7,
                     format: GuiRawImageFormat::Rgba8,
                     width: 1,
@@ -10972,21 +12537,27 @@ void main() { fragColor = texture(InSampler, texCoord); }
                     atlas_uv: [0.0, 0.0],
                     local_uv: [-1.0, -1.0],
                     color_argb: 0xffff_ffff,
-                    normal_packed: 0x007f_0000, source_face: 0, source_foil_type: 0,
+                    normal_packed: 0x007f_0000,
+                    source_face: 0,
+                    source_foil_type: 0,
                 },
                 GuiMeshVertex {
                     position: [2.0, 1.0, frame as f32 / 10.0],
                     atlas_uv: [0.0, 0.0],
                     local_uv: [3.0, -1.0],
                     color_argb: 0xffff_ffff,
-                    normal_packed: 0x007f_0000, source_face: 0, source_foil_type: 0,
+                    normal_packed: 0x007f_0000,
+                    source_face: 0,
+                    source_foil_type: 0,
                 },
                 GuiMeshVertex {
                     position: [0.0, -1.0, frame as f32 / 10.0],
                     atlas_uv: [0.0, 0.0],
                     local_uv: [-1.0, 3.0],
                     color_argb: 0xffff_ffff,
-                    normal_packed: 0x007f_0000, source_face: 0, source_foil_type: 0,
+                    normal_packed: 0x007f_0000,
+                    source_face: 0,
+                    source_foil_type: 0,
                 },
             ];
             panorama.indices = vec![0, 1, 2];
@@ -11058,276 +12629,586 @@ void main() { fragColor = texture(InSampler, texCoord); }
     #[test]
     fn inventory_mesh_atlas_uses_explicit_owner_and_native_sprite_uv_mapping() {
         for (block_lit, overlay) in [(false, false), (true, false), (false, true)] {
-        use super::super::world_primitive_frontend::{WorldPrimitiveFrontend, WorldMeshTextureAssetPayload, WORLD_MATERIAL_TEXTURE_STONE};
-        let mut gal = mock_gal();
-        let target = frame_target(&mut gal);
-        let mut world = WorldPrimitiveFrontend::default();
-        let mut png_bytes = Vec::new();
-        {
-            let mut encoder = png::Encoder::new(&mut png_bytes, 2, 1);
-            encoder.set_color(png::ColorType::Rgba);
-            encoder.set_depth(png::BitDepth::Eight);
-            encoder.write_header().unwrap().write_image_data(&[255,0,0,255, 0,255,0,255]).unwrap();
-        }
-        world.apply_world_mesh_asset_update(&mut gal, 1, Vec::new(), vec![WorldMeshTextureAssetPayload {
-            texture_id: WORLD_MATERIAL_TEXTURE_STONE, png_bytes, mip_png_bytes: Vec::new(),
-            frame_width: 0, frame_height: 0, frame_count: 1, frame_ticks: 1, animation_flags: 0,
-            frame_row_size: 0, interpolation_policy: 0, animation_frames: Vec::new(),
-            coordinate_origin: 0, sampling: None, requested_mip_levels: 1,
-        }]).unwrap();
-        let mut frontend = GuiFrontend::default();
-        let reference = GuiAtlasReference { asset_id: 7,
-            atlas: world.accepted_gui_atlas_incarnation(WORLD_MATERIAL_TEXTURE_STONE).unwrap(),
-            x: 1, y: 0, width: 1, height: 1 };
-        frontend.stage_owned_atlas_references(&mut gal, &world, 1, &[reference]).unwrap();
-        let mut request = mesh_batch(0);
-        request.item_raster_scale = 2;
-        request.render_extent = [0, 0]; request.guard_pixels = 0;
-        request.model_transform = super::super::gui_item_raster::GuiItemModelTransform::default().0;
-        request.lighting_mode = GuiMeshLightingMode::Flat;
-        request.item_lighting = Some(super::super::gui_mesh_frontend::GuiFlatItemLighting {
-            lightmap_generation: 1, rgb: [1.0; 3],
-        });
-        if block_lit {
-            request.item_raster_scale = 0;
-            request.render_extent = [34,34];
-            request.guard_pixels = 1;
-            request.lighting_mode = GuiMeshLightingMode::InventoryBlock;
-        }
-        if overlay {
-            request.material_mode = GuiMeshMaterialMode::ModelOverlay;
-            request.lighting_mode = GuiMeshLightingMode::FrontModel;
-            request.alpha_cutoff = 0.0;
-            let mut wrong_lighting = request.clone();
-            wrong_lighting.lighting_mode = GuiMeshLightingMode::Flat;
-            assert!(frontend.preflight_mesh_atlas_commands(Some(&world), &[wrong_lighting]).is_err());
-            let mut wrong_cutout = request.clone();
-            wrong_cutout.alpha_cutoff = 0.1;
-            assert!(frontend.preflight_mesh_atlas_commands(Some(&world), &[wrong_cutout]).is_err());
-        }
-        let before = gal.metrics().resource_creates;
-        let mut invalid = request.clone(); invalid.asset_id = 999;
-        if !block_lit { assert!(frontend.preflight_mesh_atlas_commands(Some(&world), &[invalid]).is_err()); }
-        let mut unsupported = request.clone();
-        unsupported.item_raster_scale = 0;
-        unsupported.lighting_mode = GuiMeshLightingMode::Block;
-        assert!(frontend.preflight_mesh_atlas_commands(Some(&world), &[unsupported]).is_err());
-        let mut foil = request.clone(); foil.material_mode = GuiMeshMaterialMode::Glint;
-        assert!(frontend.preflight_mesh_atlas_commands(Some(&world), &[foil]).is_err());
-        assert!(frontend.append_frame_ops_with_owned_atlases_and_blur_boundary(&mut gal, None,
-            1, target, target, Vec::new(), Vec::new(), vec![request.clone()], Vec::new(),
-            400, 2, false).is_err());
-        assert_eq!(before, gal.metrics().resource_creates);
-        assert!(frontend.append_mesh_items_to_target(&mut gal, None, 1,
-            target, target, None, None, None, vec![request.clone()], &mut GuiSubmitStats::default()).is_err());
-        assert_eq!(before, gal.metrics().resource_creates);
-        let mut stats = GuiSubmitStats::default();
-        let ops = frontend.append_mesh_items_to_target(&mut gal, Some(&mut world), 1,
-            target, target, None, None, None, vec![request], &mut stats).unwrap();
-        assert_eq!(stats.mesh_item_count, 1);
-        assert!(frontend.raw_images.is_empty());
-        assert!(frontend.dynamic_textures.is_empty());
-        assert!(frontend.resources.values().all(|binding| matches!(binding.image_ownership, GuiImageOwnership::AtlasView)));
-        let writes: Vec<_> = ops.iter().filter_map(|op| match op {
-            CommandOp::HostWriteBuffer { data, .. } if data.len() == 3 * 48 => Some(data),
-            _ => None,
-        }).collect();
-        assert_eq!(writes.len(), 1);
-        let values: Vec<_> = writes[0].chunks_exact(4).map(|v| f32::from_le_bytes(v.try_into().unwrap())).collect();
-        assert_eq!(values[3], 0.5, "local U=0 resolves to the right sprite's start");
-        assert_eq!(values[15], 1.0, "local U=1 resolves to the right sprite's end");
-        frontend.invalidate_atlas_texture_views(&mut gal, [WORLD_MATERIAL_TEXTURE_STONE]).unwrap();
-        assert!(frontend.atlas_views.is_empty());
-        assert!(frontend.mesh_rasters.is_empty());
-        frontend.reset(&mut gal).unwrap();
+            use super::super::world_primitive_frontend::{
+                WorldMeshTextureAssetPayload, WorldPrimitiveFrontend, WORLD_MATERIAL_TEXTURE_STONE,
+            };
+            let mut gal = mock_gal();
+            let target = frame_target(&mut gal);
+            let mut world = WorldPrimitiveFrontend::default();
+            let mut png_bytes = Vec::new();
+            {
+                let mut encoder = png::Encoder::new(&mut png_bytes, 2, 1);
+                encoder.set_color(png::ColorType::Rgba);
+                encoder.set_depth(png::BitDepth::Eight);
+                encoder
+                    .write_header()
+                    .unwrap()
+                    .write_image_data(&[255, 0, 0, 255, 0, 255, 0, 255])
+                    .unwrap();
+            }
+            world
+                .apply_world_mesh_asset_update(
+                    &mut gal,
+                    1,
+                    Vec::new(),
+                    vec![WorldMeshTextureAssetPayload {
+                        texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+                        png_bytes,
+                        mip_png_bytes: Vec::new(),
+                        frame_width: 0,
+                        frame_height: 0,
+                        frame_count: 1,
+                        frame_ticks: 1,
+                        animation_flags: 0,
+                        frame_row_size: 0,
+                        interpolation_policy: 0,
+                        animation_frames: Vec::new(),
+                        coordinate_origin: 0,
+                        sampling: None,
+                        requested_mip_levels: 1,
+                    }],
+                )
+                .unwrap();
+            let mut frontend = GuiFrontend::default();
+            let reference = GuiAtlasReference {
+                asset_id: 7,
+                atlas: world
+                    .accepted_gui_atlas_incarnation(WORLD_MATERIAL_TEXTURE_STONE)
+                    .unwrap(),
+                x: 1,
+                y: 0,
+                width: 1,
+                height: 1,
+            };
+            frontend
+                .stage_owned_atlas_references(&mut gal, &world, 1, &[reference])
+                .unwrap();
+            let mut request = mesh_batch(0);
+            request.item_raster_scale = 2;
+            request.render_extent = [0, 0];
+            request.guard_pixels = 0;
+            request.model_transform =
+                super::super::gui_item_raster::GuiItemModelTransform::default().0;
+            request.lighting_mode = GuiMeshLightingMode::Flat;
+            request.item_lighting = Some(super::super::gui_mesh_frontend::GuiFlatItemLighting {
+                lightmap_generation: 1,
+                rgb: [1.0; 3],
+            });
+            if block_lit {
+                request.item_raster_scale = 0;
+                request.render_extent = [34, 34];
+                request.guard_pixels = 1;
+                request.lighting_mode = GuiMeshLightingMode::InventoryBlock;
+            }
+            if overlay {
+                request.material_mode = GuiMeshMaterialMode::ModelOverlay;
+                request.lighting_mode = GuiMeshLightingMode::FrontModel;
+                request.alpha_cutoff = 0.0;
+                let mut wrong_lighting = request.clone();
+                wrong_lighting.lighting_mode = GuiMeshLightingMode::Flat;
+                assert!(frontend
+                    .preflight_mesh_atlas_commands(Some(&world), &[wrong_lighting])
+                    .is_err());
+                let mut wrong_cutout = request.clone();
+                wrong_cutout.alpha_cutoff = 0.1;
+                assert!(frontend
+                    .preflight_mesh_atlas_commands(Some(&world), &[wrong_cutout])
+                    .is_err());
+            }
+            let before = gal.metrics().resource_creates;
+            let mut invalid = request.clone();
+            invalid.asset_id = 999;
+            if !block_lit {
+                assert!(frontend
+                    .preflight_mesh_atlas_commands(Some(&world), &[invalid])
+                    .is_err());
+            }
+            let mut unsupported = request.clone();
+            unsupported.item_raster_scale = 0;
+            unsupported.lighting_mode = GuiMeshLightingMode::Block;
+            assert!(frontend
+                .preflight_mesh_atlas_commands(Some(&world), &[unsupported])
+                .is_err());
+            let mut foil = request.clone();
+            foil.material_mode = GuiMeshMaterialMode::Glint;
+            assert!(frontend
+                .preflight_mesh_atlas_commands(Some(&world), &[foil])
+                .is_err());
+            assert!(frontend
+                .append_frame_ops_with_owned_atlases_and_blur_boundary(
+                    &mut gal,
+                    None,
+                    1,
+                    target,
+                    target,
+                    Vec::new(),
+                    Vec::new(),
+                    vec![request.clone()],
+                    Vec::new(),
+                    400,
+                    2,
+                    false
+                )
+                .is_err());
+            assert_eq!(before, gal.metrics().resource_creates);
+            assert!(frontend
+                .append_mesh_items_to_target(
+                    &mut gal,
+                    None,
+                    1,
+                    target,
+                    target,
+                    None,
+                    None,
+                    None,
+                    vec![request.clone()],
+                    &mut GuiSubmitStats::default()
+                )
+                .is_err());
+            assert_eq!(before, gal.metrics().resource_creates);
+            let mut stats = GuiSubmitStats::default();
+            let ops = frontend
+                .append_mesh_items_to_target(
+                    &mut gal,
+                    Some(&mut world),
+                    1,
+                    target,
+                    target,
+                    None,
+                    None,
+                    None,
+                    vec![request],
+                    &mut stats,
+                )
+                .unwrap();
+            assert_eq!(stats.mesh_item_count, 1);
+            assert!(frontend.raw_images.is_empty());
+            assert!(frontend.dynamic_textures.is_empty());
+            assert!(frontend
+                .resources
+                .values()
+                .all(|binding| matches!(binding.image_ownership, GuiImageOwnership::AtlasView)));
+            let writes: Vec<_> = ops
+                .iter()
+                .filter_map(|op| match op {
+                    CommandOp::HostWriteBuffer { data, .. } if data.len() == 3 * 48 => Some(data),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(writes.len(), 1);
+            let values: Vec<_> = writes[0]
+                .chunks_exact(4)
+                .map(|v| f32::from_le_bytes(v.try_into().unwrap()))
+                .collect();
+            assert_eq!(
+                values[3], 0.5,
+                "local U=0 resolves to the right sprite's start"
+            );
+            assert_eq!(
+                values[15], 1.0,
+                "local U=1 resolves to the right sprite's end"
+            );
+            frontend
+                .invalidate_atlas_texture_views(&mut gal, [WORLD_MATERIAL_TEXTURE_STONE])
+                .unwrap();
+            assert!(frontend.atlas_views.is_empty());
+            assert!(frontend.mesh_rasters.is_empty());
+            frontend.reset(&mut gal).unwrap();
         }
     }
 
     #[test]
     fn vulkan_item_cache_retains_pixels_moves_composition_and_invalidates_identity_and_reload() {
-        use crate::render::vulkanic::gui_mesh_frontend::GuiItemCache;
         use crate::render::vulkanic::gui_item_raster::GuiItemRasterTarget;
+        use crate::render::vulkanic::gui_mesh_frontend::GuiItemCache;
         for animated in [false, true] {
             let backend = VulkanBackend::new("GUI item cache pixel lifetime").unwrap();
             let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
             let mut frontend = GuiFrontend::default();
-            let extent = Extent3d { width: 32, height: 16, depth: 1 };
+            let extent = Extent3d {
+                width: 32,
+                height: 16,
+                depth: 1,
+            };
             let target = GuiItemRasterTarget::create(&mut gal, extent).unwrap();
-            let readback = gal.create_buffer(BufferDesc {
-                label: "item-cache.readback".into(), size: 32 * 16 * 4,
-                memory: MemoryDomain::Readback,
-                usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
-            }).unwrap();
+            let readback = gal
+                .create_buffer(BufferDesc {
+                    label: "item-cache.readback".into(),
+                    size: 32 * 16 * 4,
+                    memory: MemoryDomain::Readback,
+                    usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+                })
+                .unwrap();
             let mut first_pixels = Vec::new();
             let mut second_pixels = Vec::new();
             for step in 0..=4 {
                 let generation = if step == 4 { 2 } else { 1 };
                 if step == 0 || step == 4 {
-                    frontend.apply_raw_image_update(&mut gal, generation, vec![GuiRawImageAssetPayload {
-                        sampling: None, asset_id: 7, format: GuiRawImageFormat::Rgba8,
-                        width: 1, height: 1,
-                        pixels: if step == 0 { vec![255,0,0,255] } else { vec![0,0,255,255] },
-                    }]).unwrap();
+                    frontend
+                        .apply_raw_image_update(
+                            &mut gal,
+                            generation,
+                            vec![GuiRawImageAssetPayload {
+                                sampling: None,
+                                asset_id: 7,
+                                format: GuiRawImageFormat::Rgba8,
+                                width: 1,
+                                height: 1,
+                                pixels: if step == 0 {
+                                    vec![255, 0, 0, 255]
+                                } else {
+                                    vec![0, 0, 255, 255]
+                                },
+                            }],
+                        )
+                        .unwrap();
                 }
                 if step == 1 {
                     // Simulate an in-place owned-atlas animation upload. This
                     // must not invalidate a static item's already rasterized pixels.
                     let source = frontend.dynamic_textures[&(7, GuiRawImageFormat::Rgba8)];
-                    gal.submit(SubmissionBatch { label: "source mutation".into(),
+                    gal.submit(SubmissionBatch {
+                        label: "source mutation".into(),
                         command_lists: vec![CommandList::from(CommandListDesc {
-                            label: "owned texture mutation".into(), operations: vec![
-                                CommandOp::Barrier(buffer_barrier(source.upload_buffer,
-                                    TextureUsageState::TransferSrc, TextureUsageState::TransferDst)),
-                                CommandOp::HostWriteBuffer { buffer: source.upload_buffer, offset: 0,
-                                    data: vec![0,255,0,255] },
-                                CommandOp::Barrier(buffer_barrier(source.upload_buffer,
-                                    TextureUsageState::TransferDst, TextureUsageState::TransferSrc)),
-                                CommandOp::Barrier(texture_barrier(source.texture,
-                                    TextureUsageState::ShaderRead, TextureUsageState::TransferDst)),
+                            label: "owned texture mutation".into(),
+                            operations: vec![
+                                CommandOp::Barrier(buffer_barrier(
+                                    source.upload_buffer,
+                                    TextureUsageState::TransferSrc,
+                                    TextureUsageState::TransferDst,
+                                )),
+                                CommandOp::HostWriteBuffer {
+                                    buffer: source.upload_buffer,
+                                    offset: 0,
+                                    data: vec![0, 255, 0, 255],
+                                },
+                                CommandOp::Barrier(buffer_barrier(
+                                    source.upload_buffer,
+                                    TextureUsageState::TransferDst,
+                                    TextureUsageState::TransferSrc,
+                                )),
+                                CommandOp::Barrier(texture_barrier(
+                                    source.texture,
+                                    TextureUsageState::ShaderRead,
+                                    TextureUsageState::TransferDst,
+                                )),
                                 CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
-                                    buffer: source.upload_buffer, buffer_offset: 0, bytes_per_row: 4,
-                                    rows_per_image: 1, texture: source.texture, texture_mip: 0,
-                                    texture_layer: 0, texture_origin: TextureOrigin3d {x:0,y:0,z:0},
-                                    extent: Extent3d {width:1,height:1,depth:1},
+                                    buffer: source.upload_buffer,
+                                    buffer_offset: 0,
+                                    bytes_per_row: 4,
+                                    rows_per_image: 1,
+                                    texture: source.texture,
+                                    texture_mip: 0,
+                                    texture_layer: 0,
+                                    texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                                    extent: Extent3d {
+                                        width: 1,
+                                        height: 1,
+                                        depth: 1,
+                                    },
                                 }),
-                                CommandOp::Barrier(texture_barrier(source.texture,
-                                    TextureUsageState::TransferDst, TextureUsageState::ShaderRead)),
+                                CommandOp::Barrier(texture_barrier(
+                                    source.texture,
+                                    TextureUsageState::TransferDst,
+                                    TextureUsageState::ShaderRead,
+                                )),
                             ],
                         })],
-                    }).unwrap();
+                    })
+                    .unwrap();
                 }
                 let mut request = mesh_batch(0);
-                request.item_cache = Some(GuiItemCache { identity: if step == 3 { 2 } else { 1 }, animated });
+                request.item_cache = Some(GuiItemCache {
+                    identity: if step == 3 { 2 } else { 1 },
+                    animated,
+                });
                 request.item_raster_scale = 1;
-                request.render_extent = [0,0];
+                request.render_extent = [0, 0];
                 request.guard_pixels = 0;
                 request.lighting_mode = GuiMeshLightingMode::FrontModel;
-                request.item_lighting = Some(crate::render::vulkanic::gui_item_material::GuiFlatItemLighting {
-                    lightmap_generation: 1, rgb: [1.0;3],
-                });
-                request.model_transform = [1.,0.,0.,0., 0.,1.,0.,0., 0.,0.,1.,0., 0.,0.,0.,1.];
+                request.item_lighting = Some(
+                    crate::render::vulkanic::gui_item_material::GuiFlatItemLighting {
+                        lightmap_generation: 1,
+                        rgb: [1.0; 3],
+                    },
+                );
+                request.model_transform = [
+                    1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.,
+                ];
                 for (vertex, position) in request.vertices.iter_mut().zip([
-                    [-0.5,-0.5,0.], [0.5,-0.5,0.], [-0.5,0.5,0.],
-                ]) { vertex.position = position; }
-                request.bounds = if step == 2 { [16,0,32,16] } else { [0,0,16,16] };
-                request.gui_extent = [32,16];
-                request.projection_extent = [32.,16.];
-                let (draws, stats) = frontend.append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
-                    &mut gal, generation, target.target, target.view, Some(target.pass),
-                    None, None, false, vec![], vec![], vec![request]).unwrap();
+                    [-0.5, -0.5, 0.],
+                    [0.5, -0.5, 0.],
+                    [-0.5, 0.5, 0.],
+                ]) {
+                    vertex.position = position;
+                }
+                request.bounds = if step == 2 {
+                    [16, 0, 32, 16]
+                } else {
+                    [0, 0, 16, 16]
+                };
+                request.gui_extent = [32, 16];
+                request.projection_extent = [32., 16.];
+                let (draws, stats) = frontend
+                    .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                        &mut gal,
+                        generation,
+                        target.target,
+                        target.view,
+                        Some(target.pass),
+                        None,
+                        None,
+                        false,
+                        vec![],
+                        vec![],
+                        vec![request],
+                    )
+                    .unwrap();
                 let mut ops = vec![
-                    CommandOp::Barrier(texture_barrier(target.color,
-                        if step == 0 { TextureUsageState::Undefined } else { TextureUsageState::TransferSrc },
-                        TextureUsageState::ColorAttachment)),
-                    CommandOp::BeginPass {pass:target.pass,target:target.target,
-                        colors:vec![PassAttachment {view:target.view,load_op:AttachmentLoadOp::Clear,
-                            store_op:AttachmentStoreOp::Store,
-                            clear_color:Some(ClearColor {r:0.,g:0.,b:0.,a:1.})}],depth_stencil:None},
+                    CommandOp::Barrier(texture_barrier(
+                        target.color,
+                        if step == 0 {
+                            TextureUsageState::Undefined
+                        } else {
+                            TextureUsageState::TransferSrc
+                        },
+                        TextureUsageState::ColorAttachment,
+                    )),
+                    CommandOp::BeginPass {
+                        pass: target.pass,
+                        target: target.target,
+                        colors: vec![PassAttachment {
+                            view: target.view,
+                            load_op: AttachmentLoadOp::Clear,
+                            store_op: AttachmentStoreOp::Store,
+                            clear_color: Some(ClearColor {
+                                r: 0.,
+                                g: 0.,
+                                b: 0.,
+                                a: 1.,
+                            }),
+                        }],
+                        depth_stencil: None,
+                    },
                     CommandOp::EndPass,
                 ];
                 ops.extend(draws);
                 ops.extend([
-                    CommandOp::Barrier(texture_barrier(target.color,
-                        TextureUsageState::ColorAttachment, TextureUsageState::TransferSrc)),
+                    CommandOp::Barrier(texture_barrier(
+                        target.color,
+                        TextureUsageState::ColorAttachment,
+                        TextureUsageState::TransferSrc,
+                    )),
                     CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
-                        buffer:readback,buffer_offset:0,bytes_per_row:32*4,rows_per_image:16,
-                        texture:target.color,texture_mip:0,texture_layer:0,
-                        texture_origin:TextureOrigin3d{x:0,y:0,z:0},extent,
+                        buffer: readback,
+                        buffer_offset: 0,
+                        bytes_per_row: 32 * 4,
+                        rows_per_image: 16,
+                        texture: target.color,
+                        texture_mip: 0,
+                        texture_layer: 0,
+                        texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                        extent,
                     }),
-                    CommandOp::Barrier(buffer_barrier(readback,
-                        TextureUsageState::TransferDst,TextureUsageState::ShaderRead)),
-                    CommandOp::HostReadBuffer{buffer:readback,offset:0,size:32*16*4},
+                    CommandOp::Barrier(buffer_barrier(
+                        readback,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::ShaderRead,
+                    )),
+                    CommandOp::HostReadBuffer {
+                        buffer: readback,
+                        offset: 0,
+                        size: 32 * 16 * 4,
+                    },
                 ]);
-                let token = gal.submit(SubmissionBatch {label:"cached item frame".into(),
-                    command_lists:vec![CommandList::from(CommandListDesc {label:"cached item commands".into(),operations:ops})],
-                }).unwrap();
+                let token = gal
+                    .submit(SubmissionBatch {
+                        label: "cached item frame".into(),
+                        command_lists: vec![CommandList::from(CommandListDesc {
+                            label: "cached item commands".into(),
+                            operations: ops,
+                        })],
+                    })
+                    .unwrap();
                 gal.retire_through_for_test(token.submission).unwrap();
-                let pixels = gal.completed_host_reads().iter().rev()
-                    .find(|read|read.buffer==readback).unwrap().bytes.clone();
-                let channel = if step == 4 { 2 } else if step == 3 || animated && step > 0 { 1 } else { 0 };
+                let pixels = gal
+                    .completed_host_reads()
+                    .iter()
+                    .rev()
+                    .find(|read| read.buffer == readback)
+                    .unwrap()
+                    .bytes
+                    .clone();
+                let channel = if step == 4 {
+                    2
+                } else if step == 3 || animated && step > 0 {
+                    1
+                } else {
+                    0
+                };
                 assert!(pixels.chunks_exact(4).filter(|p|p[channel]>32).count()>40,
                     "step {step} animated={animated}: actual raster must contain the expected colored geometry");
-                assert!(pixels.chunks_exact(4).all(|p|(0..3).all(|c|c==channel || p[c]==0)));
-                assert_eq!(stats.mesh_batch_count, u64::from(animated || step==0 || step>=3),
-                    "static pixels must be reused; animated/identity/reload paths must redraw");
-                if step == 0 { first_pixels = pixels.clone(); }
+                assert!(pixels
+                    .chunks_exact(4)
+                    .all(|p| (0..3).all(|c| c == channel || p[c] == 0)));
+                assert_eq!(
+                    stats.mesh_batch_count,
+                    u64::from(animated || step == 0 || step >= 3),
+                    "static pixels must be reused; animated/identity/reload paths must redraw"
+                );
+                if step == 0 {
+                    first_pixels = pixels.clone();
+                }
                 if step == 1 {
-                    if !animated { assert_eq!(pixels,first_pixels); }
+                    if !animated {
+                        assert_eq!(pixels, first_pixels);
+                    }
                     second_pixels = pixels.clone();
                 }
                 if step == 2 {
-                    for y in 0..16 { for x in 0..16 {
-                        assert_eq!(&pixels[(y*32+x+16)*4..][..4],&second_pixels[(y*32+x)*4..][..4]);
-                        assert_eq!(&pixels[(y*32+x)*4..][..3], &[0,0,0]);
-                    }}
+                    for y in 0..16 {
+                        for x in 0..16 {
+                            assert_eq!(
+                                &pixels[(y * 32 + x + 16) * 4..][..4],
+                                &second_pixels[(y * 32 + x) * 4..][..4]
+                            );
+                            assert_eq!(&pixels[(y * 32 + x) * 4..][..3], &[0, 0, 0]);
+                        }
+                    }
                 }
             }
             frontend.reset(&mut gal).unwrap();
             target.destroy(&mut gal).unwrap();
             gal.destroy(readback).unwrap();
             gal.retire_through(gal.latest_submission_id()).unwrap();
-            assert_eq!(gal.metrics().resource_creates,gal.metrics().resource_destroys);
+            assert_eq!(
+                gal.metrics().resource_creates,
+                gal.metrics().resource_destroys
+            );
         }
     }
 
     #[test]
     fn vulkan_pending_mesh_preparations_match_separate_submissions() {
-        use crate::render::vulkanic::gui_mesh_frontend::GuiItemCache;
         use crate::render::vulkanic::gui_item_raster::GuiItemRasterTarget;
+        use crate::render::vulkanic::gui_mesh_frontend::GuiItemCache;
         let mut reference = Vec::new();
         for combined in [false, true] {
             let backend = VulkanBackend::new("pending GUI stream pixel regression").unwrap();
             let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
             let mut frontend = GuiFrontend::default();
-            let extent = Extent3d { width: 32, height: 16, depth: 1 };
+            let extent = Extent3d {
+                width: 32,
+                height: 16,
+                depth: 1,
+            };
             let target = GuiItemRasterTarget::create(&mut gal, extent).unwrap();
-            let readback = gal.create_buffer(BufferDesc {
-                label: "pending-mesh.readback".into(), size: 32 * 16 * 4,
-                memory: MemoryDomain::Readback,
-                usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
-            }).unwrap();
-            frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload {
-                sampling: None, asset_id: 7, format: GuiRawImageFormat::Rgba8,
-                width: 1, height: 1, pixels: vec![255; 4],
-            }]).unwrap();
+            let readback = gal
+                .create_buffer(BufferDesc {
+                    label: "pending-mesh.readback".into(),
+                    size: 32 * 16 * 4,
+                    memory: MemoryDomain::Readback,
+                    usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+                })
+                .unwrap();
+            frontend
+                .apply_raw_image_update(
+                    &mut gal,
+                    1,
+                    vec![GuiRawImageAssetPayload {
+                        sampling: None,
+                        asset_id: 7,
+                        format: GuiRawImageFormat::Rgba8,
+                        width: 1,
+                        height: 1,
+                        pixels: vec![255; 4],
+                    }],
+                )
+                .unwrap();
             let mut ops = vec![
-                CommandOp::Barrier(texture_barrier(target.color,
-                    TextureUsageState::Undefined, TextureUsageState::ColorAttachment)),
-                CommandOp::BeginPass {pass:target.pass,target:target.target,
-                    colors:vec![PassAttachment {view:target.view,load_op:AttachmentLoadOp::Clear,
-                        store_op:AttachmentStoreOp::Store,
-                        clear_color:Some(ClearColor {r:0.,g:0.,b:0.,a:1.})}],depth_stencil:None},
+                CommandOp::Barrier(texture_barrier(
+                    target.color,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                )),
+                CommandOp::BeginPass {
+                    pass: target.pass,
+                    target: target.target,
+                    colors: vec![PassAttachment {
+                        view: target.view,
+                        load_op: AttachmentLoadOp::Clear,
+                        store_op: AttachmentStoreOp::Store,
+                        clear_color: Some(ClearColor {
+                            r: 0.,
+                            g: 0.,
+                            b: 0.,
+                            a: 1.,
+                        }),
+                    }],
+                    depth_stencil: None,
+                },
                 CommandOp::EndPass,
             ];
             for item in 0..2 {
                 let mut request = mesh_batch(0);
-                request.item_cache = Some(GuiItemCache { identity: item + 1, animated: true });
-                request.item_raster_scale = 1;
-                request.render_extent = [0,0]; request.guard_pixels = 0;
-                request.lighting_mode = GuiMeshLightingMode::FrontModel;
-                request.item_lighting = Some(crate::render::vulkanic::gui_item_material::GuiFlatItemLighting {
-                    lightmap_generation: 1, rgb: [1.0;3],
+                request.item_cache = Some(GuiItemCache {
+                    identity: item + 1,
+                    animated: true,
                 });
-                request.model_transform = [1.,0.,0.,0., 0.,1.,0.,0., 0.,0.,1.,0., 0.,0.,0.,1.];
+                request.item_raster_scale = 1;
+                request.render_extent = [0, 0];
+                request.guard_pixels = 0;
+                request.lighting_mode = GuiMeshLightingMode::FrontModel;
+                request.item_lighting = Some(
+                    crate::render::vulkanic::gui_item_material::GuiFlatItemLighting {
+                        lightmap_generation: 1,
+                        rgb: [1.0; 3],
+                    },
+                );
+                request.model_transform = [
+                    1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.,
+                ];
                 for (vertex, position) in request.vertices.iter_mut().zip([
-                    [-0.5,-0.5,0.], [0.5,-0.5,0.], [-0.5,0.5,0.],
+                    [-0.5, -0.5, 0.],
+                    [0.5, -0.5, 0.],
+                    [-0.5, 0.5, 0.],
                 ]) {
                     vertex.position = position;
                     vertex.color_argb = if item == 0 { 0xffff0000 } else { 0xff00ff00 };
                 }
-                request.bounds = if item == 0 { [0,0,16,16] } else { [16,0,32,16] };
-                request.gui_extent = [32,16]; request.projection_extent = [32.,16.];
-                let (draws, _) = frontend.append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
-                    &mut gal, 1, target.target, target.view, Some(target.pass),
-                    None, None, false, vec![], vec![], vec![request]).unwrap();
+                request.bounds = if item == 0 {
+                    [0, 0, 16, 16]
+                } else {
+                    [16, 0, 32, 16]
+                };
+                request.gui_extent = [32, 16];
+                request.projection_extent = [32., 16.];
+                let (draws, _) = frontend
+                    .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                        &mut gal,
+                        1,
+                        target.target,
+                        target.view,
+                        Some(target.pass),
+                        None,
+                        None,
+                        false,
+                        vec![],
+                        vec![],
+                        vec![request],
+                    )
+                    .unwrap();
                 ops.extend(draws);
                 if item == 0 {
                     if !combined {
-                        gal.submit(SubmissionBatch { label: "separate first draw".into(),
+                        gal.submit(SubmissionBatch {
+                            label: "separate first draw".into(),
                             command_lists: vec![CommandList::from(CommandListDesc {
-                                label: "first draw".into(), operations: std::mem::take(&mut ops),
+                                label: "first draw".into(),
+                                operations: std::mem::take(&mut ops),
                             })],
-                        }).unwrap();
+                        })
+                        .unwrap();
                     }
                     // In the combined case only internal uploads have been
                     // accepted. The first draw remains pending while they finish.
@@ -11335,34 +13216,81 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 }
             }
             ops.extend([
-                CommandOp::Barrier(texture_barrier(target.color,
-                    TextureUsageState::ColorAttachment, TextureUsageState::TransferSrc)),
+                CommandOp::Barrier(texture_barrier(
+                    target.color,
+                    TextureUsageState::ColorAttachment,
+                    TextureUsageState::TransferSrc,
+                )),
                 CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
-                    buffer:readback,buffer_offset:0,bytes_per_row:32*4,rows_per_image:16,
-                    texture:target.color,texture_mip:0,texture_layer:0,
-                    texture_origin:TextureOrigin3d{x:0,y:0,z:0},extent,
+                    buffer: readback,
+                    buffer_offset: 0,
+                    bytes_per_row: 32 * 4,
+                    rows_per_image: 16,
+                    texture: target.color,
+                    texture_mip: 0,
+                    texture_layer: 0,
+                    texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                    extent,
                 }),
-                CommandOp::Barrier(buffer_barrier(readback,
-                    TextureUsageState::TransferDst,TextureUsageState::ShaderRead)),
-                CommandOp::HostReadBuffer{buffer:readback,offset:0,size:32*16*4},
+                CommandOp::Barrier(buffer_barrier(
+                    readback,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                )),
+                CommandOp::HostReadBuffer {
+                    buffer: readback,
+                    offset: 0,
+                    size: 32 * 16 * 4,
+                },
             ]);
-            let accepted = gal.submit(SubmissionBatch { label: "pending GUI frame".into(),
-                command_lists: vec![CommandList::from(CommandListDesc {
-                    label: "pending GUI draws".into(), operations: ops,
-                })],
-            }).unwrap();
+            let accepted = gal
+                .submit(SubmissionBatch {
+                    label: "pending GUI frame".into(),
+                    command_lists: vec![CommandList::from(CommandListDesc {
+                        label: "pending GUI draws".into(),
+                        operations: ops,
+                    })],
+                })
+                .unwrap();
             gal.retire_through_for_test(accepted.submission).unwrap();
-            let pixels = gal.completed_host_reads().iter().rev()
-                .find(|read| read.buffer == readback).unwrap().bytes.clone();
-            assert!(pixels.chunks_exact(4).filter(|p| p[0] > 32 && p[1] == 0).count() > 40);
-            assert!(pixels.chunks_exact(4).filter(|p| p[1] > 32 && p[0] == 0).count() > 40);
-            if combined { assert_eq!(reference, pixels, "pending preparations must preserve both meshes"); }
-            else { reference = pixels; }
+            let pixels = gal
+                .completed_host_reads()
+                .iter()
+                .rev()
+                .find(|read| read.buffer == readback)
+                .unwrap()
+                .bytes
+                .clone();
+            assert!(
+                pixels
+                    .chunks_exact(4)
+                    .filter(|p| p[0] > 32 && p[1] == 0)
+                    .count()
+                    > 40
+            );
+            assert!(
+                pixels
+                    .chunks_exact(4)
+                    .filter(|p| p[1] > 32 && p[0] == 0)
+                    .count()
+                    > 40
+            );
+            if combined {
+                assert_eq!(
+                    reference, pixels,
+                    "pending preparations must preserve both meshes"
+                );
+            } else {
+                reference = pixels;
+            }
             frontend.reset(&mut gal).unwrap();
             target.destroy(&mut gal).unwrap();
             gal.destroy(readback).unwrap();
             gal.retire_through(gal.latest_submission_id()).unwrap();
-            assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+            assert_eq!(
+                gal.metrics().resource_creates,
+                gal.metrics().resource_destroys
+            );
         }
     }
 
@@ -11371,43 +13299,89 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let mut gal = mock_gal();
         let target = frame_target(&mut gal);
         let mut frontend = GuiFrontend::default();
-        frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload {
-            sampling: None, asset_id: 7, format: GuiRawImageFormat::Rgba8,
-            width: 1, height: 1, pixels: vec![255; 4],
-        }]).unwrap();
+        frontend
+            .apply_raw_image_update(
+                &mut gal,
+                1,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
+                    asset_id: 7,
+                    format: GuiRawImageFormat::Rgba8,
+                    width: 1,
+                    height: 1,
+                    pixels: vec![255; 4],
+                }],
+            )
+            .unwrap();
         let prepare = |frontend: &mut GuiFrontend, gal: &mut VulkanicGal| {
-            frontend.append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
-                gal, 1, target, target, None, None, None, false,
-                Vec::new(), Vec::new(), vec![mesh_batch(0)]).unwrap().0
+            frontend
+                .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                    gal,
+                    1,
+                    target,
+                    target,
+                    None,
+                    None,
+                    None,
+                    false,
+                    Vec::new(),
+                    Vec::new(),
+                    vec![mesh_batch(0)],
+                )
+                .unwrap()
+                .0
         };
         let first = prepare(&mut frontend, &mut gal);
-        let vertex_range = |ops: &[CommandOp]| ops.iter().find_map(|op| match op {
-            CommandOp::HostWriteBuffer { buffer, offset, data } if data.len() == 3 * 48
-                => Some((*buffer, *offset)),
-            _ => None,
-        }).expect("mesh vertex stream write");
+        let vertex_range = |ops: &[CommandOp]| {
+            ops.iter()
+                .find_map(|op| match op {
+                    CommandOp::HostWriteBuffer {
+                        buffer,
+                        offset,
+                        data,
+                    } if data.len() == 3 * 48 => Some((*buffer, *offset)),
+                    _ => None,
+                })
+                .expect("mesh vertex stream write")
+        };
         let first_range = vertex_range(&first);
         // Preparation uploads GUI assets internally, consuming submission IDs
         // before these still-pending draw commands can be submitted.
         let uploads = gal.latest_submission_id();
-        assert!(uploads.0 > 0, "fixture must actually submit internal uploads");
+        assert!(
+            uploads.0 > 0,
+            "fixture must actually submit internal uploads"
+        );
         gal.retire_through(uploads).unwrap();
         let second = prepare(&mut frontend, &mut gal);
-        assert_ne!(first_range, vertex_range(&second),
-            "completed asset uploads must not release a pending draw's stream");
+        assert_ne!(
+            first_range,
+            vertex_range(&second),
+            "completed asset uploads must not release a pending draw's stream"
+        );
         drop((first, second));
         let retry = prepare(&mut frontend, &mut gal);
-        assert_eq!(first_range, vertex_range(&retry),
-            "discarded preparations must release reservations without a fake submission");
-        let accepted = gal.submit(SubmissionBatch { label: "delayed mesh draw".into(),
-            command_lists: vec![CommandList::from(CommandListDesc {
-                label: "delayed mesh commands".into(), operations: retry,
-            })],
-        }).unwrap();
+        assert_eq!(
+            first_range,
+            vertex_range(&retry),
+            "discarded preparations must release reservations without a fake submission"
+        );
+        let accepted = gal
+            .submit(SubmissionBatch {
+                label: "delayed mesh draw".into(),
+                command_lists: vec![CommandList::from(CommandListDesc {
+                    label: "delayed mesh commands".into(),
+                    operations: retry,
+                })],
+            })
+            .unwrap();
         assert!(accepted.submission > uploads);
         frontend.reclaim_completed_mesh_geometry(uploads);
-        assert_eq!(frontend.mesh_geometry_cache.len(), 1,
-            "the draw's actual accepted submission must outlive the upload completion");
+        assert_eq!(
+            frontend.mesh_geometry_cache.len(),
+            1,
+            "the draw's actual accepted submission must outlive the upload completion"
+        );
         gal.retire_through(accepted.submission).unwrap();
         frontend.reclaim_completed_mesh_geometry(gal.poll_completed());
         assert!(frontend.mesh_geometry_cache.is_empty());
@@ -11419,38 +13393,73 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let mut gal = mock_gal();
         let target = frame_target(&mut gal);
         let mut frontend = GuiFrontend::default();
-        frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload {
-            sampling: None, asset_id: 7, format: GuiRawImageFormat::Rgba8,
-            width: 1, height: 1, pixels: vec![255; 4],
-        }]).unwrap();
+        frontend
+            .apply_raw_image_update(
+                &mut gal,
+                1,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
+                    asset_id: 7,
+                    format: GuiRawImageFormat::Rgba8,
+                    width: 1,
+                    height: 1,
+                    pixels: vec![255; 4],
+                }],
+            )
+            .unwrap();
         let prepare = |frontend: &mut GuiFrontend, gal: &mut VulkanicGal| {
-            frontend.append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
-                gal, 1, target, target, None, None, None, false,
-                Vec::new(), Vec::new(), vec![mesh_batch(0)]).unwrap().0
+            frontend
+                .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                    gal,
+                    1,
+                    target,
+                    target,
+                    None,
+                    None,
+                    None,
+                    false,
+                    Vec::new(),
+                    Vec::new(),
+                    vec![mesh_batch(0)],
+                )
+                .unwrap()
+                .0
         };
         let discarded = prepare(&mut frontend, &mut gal);
-        let depth = discarded.iter().find_map(|op| match op {
-            CommandOp::Barrier(barrier) if barrier.after == TextureUsageState::DepthStencilAttachment
-                => Some(barrier.resource),
-            _ => None,
-        }).expect("private raster depth attachment");
+        let depth = discarded
+            .iter()
+            .find_map(|op| match op {
+                CommandOp::Barrier(barrier)
+                    if barrier.after == TextureUsageState::DepthStencilAttachment =>
+                {
+                    Some(barrier.resource)
+                }
+                _ => None,
+            })
+            .expect("private raster depth attachment");
         drop(discarded);
         let unsubmitted_retry = prepare(&mut frontend, &mut gal);
-        assert!(unsubmitted_retry.iter().any(|op| matches!(op,
+        assert!(
+            unsubmitted_retry.iter().any(|op| matches!(op,
             CommandOp::HostWriteBuffer { data, .. } if data.len() == 3 * 48)),
-            "a discarded preparation cannot satisfy the retry's vertex upload");
-        assert!(unsubmitted_retry.iter().any(|op| matches!(op,
+            "a discarded preparation cannot satisfy the retry's vertex upload"
+        );
+        assert!(
+            unsubmitted_retry.iter().any(|op| matches!(op,
             CommandOp::HostWriteBuffer { data, .. } if data.len() == 3 * 4)),
-            "a discarded preparation cannot satisfy the retry's index upload");
+            "a discarded preparation cannot satisfy the retry's index upload"
+        );
         drop(unsubmitted_retry);
         // Even consuming its predicted ID elsewhere proves nothing about
         // this target's texture layouts.
         gal.submit(SubmissionBatch {
             label: "unrelated accepted submission".into(),
             command_lists: vec![CommandList::from(CommandListDesc {
-                label: "empty unrelated list".into(), operations: vec![],
+                label: "empty unrelated list".into(),
+                operations: vec![],
             })],
-        }).unwrap();
+        })
+        .unwrap();
         let retry = prepare(&mut frontend, &mut gal);
         assert!(retry.iter().any(|op| matches!(op,
             CommandOp::Barrier(barrier) if barrier.resource == depth
@@ -11468,7 +13477,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .apply_raw_image_update(
                 &mut gal,
                 1,
-                vec![GuiRawImageAssetPayload { sampling: None,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
                     asset_id: 7,
                     format: GuiRawImageFormat::Rgba8,
                     width: 1,
@@ -11688,7 +13698,10 @@ void main() { fragColor = texture(InSampler, texCoord); }
         assert_eq!(1, stats.entity_preview_item_count);
         assert_eq!(3, stats.entity_preview_batch_count);
         assert_eq!(4, stats.entity_preview_draw_count);
-        assert_eq!((1_u64 << 7) | (1_u64 << 8) | (1_u64 << 9), stats.entity_preview_material_mask);
+        assert_eq!(
+            (1_u64 << 7) | (1_u64 << 8) | (1_u64 << 9),
+            stats.entity_preview_material_mask
+        );
         assert_eq!(9, stats.entity_preview_vertex_count);
         assert_eq!(9, stats.entity_preview_index_count);
 
@@ -11711,7 +13724,9 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 &mut GuiSubmitStats::default(),
             )
             .expect_err("mixed entity-preview lighting must fail closed");
-        assert!(error.to_string().contains("must all use entity-preview lighting"));
+        assert!(error
+            .to_string()
+            .contains("must all use entity-preview lighting"));
         frontend.reset(&mut gal).unwrap();
     }
 
@@ -11725,14 +13740,16 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 &mut gal,
                 1,
                 vec![
-                    GuiRawImageAssetPayload { sampling: None,
+                    GuiRawImageAssetPayload {
+                        sampling: None,
                         asset_id: 7,
                         format: GuiRawImageFormat::Rgba8,
                         width: 1,
                         height: 1,
                         pixels: vec![255, 255, 255, 255],
                     },
-                    GuiRawImageAssetPayload { sampling: None,
+                    GuiRawImageAssetPayload {
+                        sampling: None,
                         asset_id: 8,
                         format: GuiRawImageFormat::Rgba8,
                         width: 1,
@@ -12177,8 +14194,14 @@ void main() { fragColor = texture(InSampler, texCoord); }
         })
         .unwrap();
         let direct_flip = f32::from_le_bytes(direct_bytes[44..48].try_into().unwrap());
-        assert_eq!(319.75, f32::from_le_bytes(direct_bytes[32..36].try_into().unwrap()));
-        assert_eq!(179.5, f32::from_le_bytes(direct_bytes[36..40].try_into().unwrap()));
+        assert_eq!(
+            319.75,
+            f32::from_le_bytes(direct_bytes[32..36].try_into().unwrap())
+        );
+        assert_eq!(
+            179.5,
+            f32::from_le_bytes(direct_bytes[36..40].try_into().unwrap())
+        );
         assert_eq!(
             0.0, direct_flip,
             "ordinary GUI targets must not pre-flip their stream"
@@ -12251,13 +14274,35 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .unwrap();
 
         let first = frontend
-            .submit_frame(&mut gal, 10, target, vec![request(2), GuiSpriteRequest { sequence: 2, ..request(3) }])
+            .submit_frame(
+                &mut gal,
+                10,
+                target,
+                vec![
+                    request(2),
+                    GuiSpriteRequest {
+                        sequence: 2,
+                        ..request(3)
+                    },
+                ],
+            )
             .unwrap();
         assert!(first.resource_creates > 0);
         assert!(first.cache_misses > 0);
 
         let second = frontend
-            .submit_frame(&mut gal, 10, target, vec![request(2), GuiSpriteRequest { sequence: 2, ..request(3) }])
+            .submit_frame(
+                &mut gal,
+                10,
+                target,
+                vec![
+                    request(2),
+                    GuiSpriteRequest {
+                        sequence: 2,
+                        ..request(3)
+                    },
+                ],
+            )
             .unwrap();
         assert_eq!(0, second.resource_creates);
         assert!(second.cache_hits > 0);
@@ -12271,7 +14316,18 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let target = frame_target(&mut gal);
 
         let stats = frontend
-            .submit_frame(&mut gal, 10, target, vec![request(2), GuiSpriteRequest { sequence: 2, ..request(3) }])
+            .submit_frame(
+                &mut gal,
+                10,
+                target,
+                vec![
+                    request(2),
+                    GuiSpriteRequest {
+                        sequence: 2,
+                        ..request(3)
+                    },
+                ],
+            )
             .unwrap();
 
         assert_eq!(2, stats.sprite_batch_count);
@@ -12289,7 +14345,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .apply_raw_image_update(
                 &mut gal,
                 3,
-                vec![GuiRawImageAssetPayload { sampling: None,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
                     asset_id: 41,
                     format: GuiRawImageFormat::Alpha8,
                     width: 2,
@@ -12351,7 +14408,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
     fn unchanged_raw_image_generation_retains_dynamic_gpu_resources() {
         let mut gal = mock_gal();
         let mut frontend = GuiFrontend::default();
-        let payload = GuiRawImageAssetPayload { sampling: None,
+        let payload = GuiRawImageAssetPayload {
+            sampling: None,
             asset_id: 41,
             format: GuiRawImageFormat::Rgba8,
             width: 1,
@@ -12388,14 +14446,16 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 &mut gal,
                 3,
                 vec![
-                    GuiRawImageAssetPayload { sampling: None,
+                    GuiRawImageAssetPayload {
+                        sampling: None,
                         asset_id: 41,
                         format: GuiRawImageFormat::Alpha8,
                         width: 2,
                         height: 2,
                         pixels: vec![255; 4],
                     },
-                    GuiRawImageAssetPayload { sampling: None,
+                    GuiRawImageAssetPayload {
+                        sampling: None,
                         asset_id: 42,
                         format: GuiRawImageFormat::Alpha8,
                         width: 2,
@@ -12444,7 +14504,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .apply_raw_image_update(
                 &mut gal,
                 1,
-                vec![GuiRawImageAssetPayload { sampling: None,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
                     asset_id: 41,
                     format: GuiRawImageFormat::Rgba8,
                     width: 2,
@@ -12516,16 +14577,36 @@ void main() { fragColor = texture(InSampler, texCoord); }
             "continuous semantic images require a distinct linear sampler without copying their Rust-owned texture");
         assert_eq!(1, frontend.dynamic_textures.len());
         assert_eq!(1, texture_creates_after_first);
-        assert_eq!(texture_creates_after_first, texture_creates_after_all_groups);
+        assert_eq!(
+            texture_creates_after_first,
+            texture_creates_after_all_groups
+        );
         gal.mock_backend_mut().unwrap().fail_next_submit();
-        assert!(frontend.ensure_resources(&mut gal, TextureGroup::DynamicPremultiplied(41),
-            ColorFormat::Rgba8Unorm, None, &mut stats).is_err());
-        frontend.ensure_resources(&mut gal, TextureGroup::DynamicPremultiplied(41),
-            ColorFormat::Rgba8Unorm, None, &mut stats).unwrap();
+        assert!(frontend
+            .ensure_resources(
+                &mut gal,
+                TextureGroup::DynamicPremultiplied(41),
+                ColorFormat::Rgba8Unorm,
+                None,
+                &mut stats
+            )
+            .is_err());
+        frontend
+            .ensure_resources(
+                &mut gal,
+                TextureGroup::DynamicPremultiplied(41),
+                ColorFormat::Rgba8Unorm,
+                None,
+                &mut stats,
+            )
+            .unwrap();
         frontend.destroy_render_resources(&mut gal);
         gal.retire_through(gal.latest_submission_id()).unwrap();
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys,
-            "reused GUI image bindings must not orphan a newly allocated upload buffer");
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys,
+            "reused GUI image bindings must not orphan a newly allocated upload buffer"
+        );
     }
 
     #[test]
@@ -12536,11 +14617,17 @@ void main() { fragColor = texture(InSampler, texCoord); }
             batch.material_mode = GuiMeshMaterialMode::Glint;
             batch.alpha_cutoff = 0.1;
             let glint = prepare_gui_mesh_draws(&[batch.clone()]).unwrap().remove(0);
-            assert_eq!(dynamic_mesh_texture_group(&glint), TextureGroup::DynamicGlint(batch.asset_id));
+            assert_eq!(
+                dynamic_mesh_texture_group(&glint),
+                TextureGroup::DynamicGlint(batch.asset_id)
+            );
             batch.material_mode = GuiMeshMaterialMode::Opaque;
             batch.alpha_cutoff = 0.0;
             let ordinary = prepare_gui_mesh_draws(&[batch.clone()]).unwrap().remove(0);
-            assert_ne!(dynamic_mesh_texture_group(&ordinary), TextureGroup::DynamicGlint(batch.asset_id));
+            assert_ne!(
+                dynamic_mesh_texture_group(&ordinary),
+                TextureGroup::DynamicGlint(batch.asset_id)
+            );
         }
     }
 
@@ -12549,24 +14636,54 @@ void main() { fragColor = texture(InSampler, texCoord); }
         for glint_first in [false, true] {
             let mut gal = mock_gal();
             let mut frontend = GuiFrontend::default();
-            frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload { sampling: None,
-                asset_id: 41, format: GuiRawImageFormat::Rgba8, width: 2, height: 2,
-                pixels: vec![127; 16],
-            }]).unwrap();
+            frontend
+                .apply_raw_image_update(
+                    &mut gal,
+                    1,
+                    vec![GuiRawImageAssetPayload {
+                        sampling: None,
+                        asset_id: 41,
+                        format: GuiRawImageFormat::Rgba8,
+                        width: 2,
+                        height: 2,
+                        pixels: vec![127; 16],
+                    }],
+                )
+                .unwrap();
             let glint = TextureGroup::DynamicGlint(41);
             let ordinary = TextureGroup::Dynamic(41);
-            let groups = if glint_first { [glint, ordinary] } else { [ordinary, glint] };
+            let groups = if glint_first {
+                [glint, ordinary]
+            } else {
+                [ordinary, glint]
+            };
             for group in groups {
                 if group == glint {
                     gal.mock_backend_mut().unwrap().fail_next_submit();
-                    assert!(frontend.ensure_resources(&mut gal, group, ColorFormat::Rgba8Unorm,
-                        None, &mut GuiSubmitStats::default()).is_err());
+                    assert!(frontend
+                        .ensure_resources(
+                            &mut gal,
+                            group,
+                            ColorFormat::Rgba8Unorm,
+                            None,
+                            &mut GuiSubmitStats::default()
+                        )
+                        .is_err());
                 }
-                frontend.ensure_resources(&mut gal, group, ColorFormat::Rgba8Unorm,
-                    None, &mut GuiSubmitStats::default()).unwrap();
+                frontend
+                    .ensure_resources(
+                        &mut gal,
+                        group,
+                        ColorFormat::Rgba8Unorm,
+                        None,
+                        &mut GuiSubmitStats::default(),
+                    )
+                    .unwrap();
             }
-            let repeat = &frontend.resources[&ResourceKey::new(glint, ColorFormat::Rgba8Unorm, None)];
-            let clamp = &frontend.resources[&ResourceKey::new(ordinary, ColorFormat::Rgba8Unorm, None)];
+            let repeat =
+                &frontend.resources[&ResourceKey::new(glint, ColorFormat::Rgba8Unorm, None)];
+            let clamp =
+                &frontend.resources[&ResourceKey::new(ordinary, ColorFormat::Rgba8Unorm, None)];
             assert_eq!(repeat.texture, clamp.texture);
             assert_eq!(repeat.texture_view, clamp.texture_view);
             assert_eq!(repeat.private_sampler, Some(repeat.sampler));
@@ -12576,18 +14693,35 @@ void main() { fragColor = texture(InSampler, texCoord); }
             assert_eq!(desc.mag_filter, SamplerFilter::Linear);
             assert_eq!(desc.address_u, SamplerAddressMode::Repeat);
             assert_eq!(desc.address_v, SamplerAddressMode::Repeat);
-            assert_eq!(gal.sampler_descriptor_for_test(clamp.sampler).unwrap().address_u,
-                SamplerAddressMode::ClampToEdge);
+            assert_eq!(
+                gal.sampler_descriptor_for_test(clamp.sampler)
+                    .unwrap()
+                    .address_u,
+                SamplerAddressMode::ClampToEdge
+            );
             let old_sampler = repeat.sampler;
-            frontend.apply_raw_image_update(&mut gal, 2, vec![GuiRawImageAssetPayload { sampling: None,
-                asset_id: 41, format: GuiRawImageFormat::Rgba8, width: 2, height: 2,
-                pixels: vec![255; 16],
-            }]).unwrap();
+            frontend
+                .apply_raw_image_update(
+                    &mut gal,
+                    2,
+                    vec![GuiRawImageAssetPayload {
+                        sampling: None,
+                        asset_id: 41,
+                        format: GuiRawImageFormat::Rgba8,
+                        width: 2,
+                        height: 2,
+                        pixels: vec![255; 16],
+                    }],
+                )
+                .unwrap();
             gal.retire_through(gal.latest_submission_id()).unwrap();
             assert!(gal.sampler_descriptor_for_test(old_sampler).is_err());
             frontend.reset(&mut gal).unwrap();
             gal.retire_through(gal.latest_submission_id()).unwrap();
-            assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+            assert_eq!(
+                gal.metrics().resource_creates,
+                gal.metrics().resource_destroys
+            );
         }
     }
 
@@ -12600,23 +14734,50 @@ void main() { fragColor = texture(InSampler, texCoord); }
         for filter in [SamplerFilter::Nearest, SamplerFilter::Linear] {
             for address in [SamplerAddressMode::Repeat, SamplerAddressMode::ClampToEdge] {
                 generation += 1;
-                frontend.apply_raw_image_update(&mut gal, generation, vec![GuiRawImageAssetPayload {
-                    asset_id: 41, format: GuiRawImageFormat::Rgba8, width: 2, height: 2,
-                    pixels: vec![127; 16], sampling: Some((filter, address)),
-                }]).unwrap();
+                frontend
+                    .apply_raw_image_update(
+                        &mut gal,
+                        generation,
+                        vec![GuiRawImageAssetPayload {
+                            asset_id: 41,
+                            format: GuiRawImageFormat::Rgba8,
+                            width: 2,
+                            height: 2,
+                            pixels: vec![127; 16],
+                            sampling: Some((filter, address)),
+                        }],
+                    )
+                    .unwrap();
                 for group in [TextureGroup::Dynamic(41), TextureGroup::DynamicGlint(41)] {
-                    frontend.ensure_resources(&mut gal, group, ColorFormat::Rgba8Unorm,
-                        None, &mut GuiSubmitStats::default()).unwrap();
+                    frontend
+                        .ensure_resources(
+                            &mut gal,
+                            group,
+                            ColorFormat::Rgba8Unorm,
+                            None,
+                            &mut GuiSubmitStats::default(),
+                        )
+                        .unwrap();
                 }
-                let glint = &frontend.resources[&ResourceKey::new(TextureGroup::DynamicGlint(41), ColorFormat::Rgba8Unorm, None)];
-                let ordinary = &frontend.resources[&ResourceKey::new(TextureGroup::Dynamic(41), ColorFormat::Rgba8Unorm, None)];
+                let glint = &frontend.resources[&ResourceKey::new(
+                    TextureGroup::DynamicGlint(41),
+                    ColorFormat::Rgba8Unorm,
+                    None,
+                )];
+                let ordinary = &frontend.resources
+                    [&ResourceKey::new(TextureGroup::Dynamic(41), ColorFormat::Rgba8Unorm, None)];
                 let desc = gal.sampler_descriptor_for_test(glint.sampler).unwrap();
                 assert_eq!(filter, desc.min_filter);
                 assert_eq!(filter, desc.mag_filter);
                 assert_eq!(address, desc.address_u);
                 assert_eq!(address, desc.address_v);
                 assert_eq!(glint.texture, ordinary.texture);
-                assert_eq!(SamplerAddressMode::ClampToEdge, gal.sampler_descriptor_for_test(ordinary.sampler).unwrap().address_u);
+                assert_eq!(
+                    SamplerAddressMode::ClampToEdge,
+                    gal.sampler_descriptor_for_test(ordinary.sampler)
+                        .unwrap()
+                        .address_u
+                );
                 if let Some(old) = previous_sampler {
                     assert_ne!(old, glint.sampler);
                     gal.retire_through(gal.latest_submission_id()).unwrap();
@@ -12627,7 +14788,10 @@ void main() { fragColor = texture(InSampler, texCoord); }
         }
         frontend.reset(&mut gal).unwrap();
         gal.retire_through(gal.latest_submission_id()).unwrap();
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys
+        );
     }
 
     #[test]
@@ -12637,24 +14801,51 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let mut frontend = GuiFrontend::default();
         let mut stable_live_count = None;
         for generation in 1..=16 {
-            frontend.apply_raw_image_update(&mut gal, generation, vec![GuiRawImageAssetPayload { sampling: None,
-                asset_id: 41, format: GuiRawImageFormat::Rgba8, width: 2, height: 2,
-                pixels: vec![generation as u8; 16],
-            }]).unwrap();
-            for group in [TextureGroup::Dynamic(41), TextureGroup::DynamicOpaque(41),
-                TextureGroup::DynamicLinear(41), TextureGroup::DynamicPremultiplied(41),
-                TextureGroup::DynamicGlint(41)] {
-                frontend.ensure_resources(&mut gal, group, ColorFormat::Rgba8Unorm, None,
-                    &mut GuiSubmitStats::default()).unwrap();
+            frontend
+                .apply_raw_image_update(
+                    &mut gal,
+                    generation,
+                    vec![GuiRawImageAssetPayload {
+                        sampling: None,
+                        asset_id: 41,
+                        format: GuiRawImageFormat::Rgba8,
+                        width: 2,
+                        height: 2,
+                        pixels: vec![generation as u8; 16],
+                    }],
+                )
+                .unwrap();
+            for group in [
+                TextureGroup::Dynamic(41),
+                TextureGroup::DynamicOpaque(41),
+                TextureGroup::DynamicLinear(41),
+                TextureGroup::DynamicPremultiplied(41),
+                TextureGroup::DynamicGlint(41),
+            ] {
+                frontend
+                    .ensure_resources(
+                        &mut gal,
+                        group,
+                        ColorFormat::Rgba8Unorm,
+                        None,
+                        &mut GuiSubmitStats::default(),
+                    )
+                    .unwrap();
             }
             gal.retire_through(gal.latest_submission_id()).unwrap();
             let live_count = gal.metrics().resource_creates - gal.metrics().resource_destroys;
-            assert_eq!(*stable_live_count.get_or_insert(live_count), live_count,
-                "changing image pixels cannot accumulate discarded upload buffers");
+            assert_eq!(
+                *stable_live_count.get_or_insert(live_count),
+                live_count,
+                "changing image pixels cannot accumulate discarded upload buffers"
+            );
         }
         frontend.reset(&mut gal).unwrap();
         gal.retire_through(gal.latest_submission_id()).unwrap();
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys
+        );
     }
 
     #[test]
@@ -12663,25 +14854,58 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let mut frontend = GuiFrontend::default();
         let reference = GuiAtlasReference {
             asset_id: 101,
-            atlas: AcceptedAtlasIncarnation { texture_id: 202, generation: 3, width: 32, height: 16 },
-            x: 16, y: 0, width: 16, height: 16,
+            atlas: AcceptedAtlasIncarnation {
+                texture_id: 202,
+                generation: 3,
+                width: 32,
+                height: 16,
+            },
+            x: 16,
+            y: 0,
+            width: 16,
+            height: 16,
         };
-        frontend.stage_atlas_references(1, &[reference], |_| Some(reference.atlas)).unwrap();
-        assert_eq!(frontend.texture_source(TextureGroup::Dynamic(101)).err().unwrap().code,
-            StatusCode::UnsupportedFeature);
-        let payload = || GuiRawImageAssetPayload { sampling: None,
-            asset_id: 101, format: GuiRawImageFormat::Rgba8, width: 1, height: 1, pixels: vec![255; 4],
+        frontend
+            .stage_atlas_references(1, &[reference], |_| Some(reference.atlas))
+            .unwrap();
+        assert_eq!(
+            frontend
+                .texture_source(TextureGroup::Dynamic(101))
+                .err()
+                .unwrap()
+                .code,
+            StatusCode::UnsupportedFeature
+        );
+        let payload = || GuiRawImageAssetPayload {
+            sampling: None,
+            asset_id: 101,
+            format: GuiRawImageFormat::Rgba8,
+            width: 1,
+            height: 1,
+            pixels: vec![255; 4],
         };
-        assert!(frontend.apply_raw_image_update(&mut gal, 1, vec![payload()]).is_err());
+        assert!(frontend
+            .apply_raw_image_update(&mut gal, 1, vec![payload()])
+            .is_err());
         assert!(frontend.raw_images.is_empty());
         assert_eq!(frontend.raw_image_generation, 0);
         assert!(frontend.resources.is_empty());
         assert!(frontend.dynamic_textures.is_empty());
         frontend.atlas_references.clear();
-        frontend.apply_raw_image_update(&mut gal, 1, vec![payload()]).unwrap();
-        assert!(frontend.stage_atlas_references(1, &[reference], |_| Some(reference.atlas)).is_err());
+        frontend
+            .apply_raw_image_update(&mut gal, 1, vec![payload()])
+            .unwrap();
+        assert!(frontend
+            .stage_atlas_references(1, &[reference], |_| Some(reference.atlas))
+            .is_err());
         assert!(!frontend.atlas_references.contains(101));
-        assert_eq!(frontend.texture_source(TextureGroup::Dynamic(101)).unwrap().bytes, vec![255; 4]);
+        assert_eq!(
+            frontend
+                .texture_source(TextureGroup::Dynamic(101))
+                .unwrap()
+                .bytes,
+            vec![255; 4]
+        );
         frontend.reset(&mut gal).unwrap();
     }
 
@@ -12693,7 +14917,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .apply_raw_image_update(
                 &mut gal,
                 1,
-                vec![GuiRawImageAssetPayload { sampling: None,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
                     asset_id: 41,
                     format: GuiRawImageFormat::Rgba8,
                     width: 2,
@@ -12726,7 +14951,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .apply_raw_image_update(
                 &mut gal,
                 2,
-                vec![GuiRawImageAssetPayload { sampling: None,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
                     asset_id: 41,
                     format: GuiRawImageFormat::Rgba8,
                     width: 2,
@@ -12833,7 +15059,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .apply_raw_image_update(
                 &mut gal,
                 4,
-                vec![GuiRawImageAssetPayload { sampling: None,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
                     asset_id: 7,
                     format: GuiRawImageFormat::Rgba8,
                     width: 1,
@@ -12846,7 +15073,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .apply_raw_image_update(
                 &mut gal,
                 5,
-                vec![GuiRawImageAssetPayload { sampling: None,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
                     asset_id: 8,
                     format: GuiRawImageFormat::Alpha8,
                     width: 2,
@@ -12869,7 +15097,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
             .apply_raw_image_update(
                 &mut gal,
                 1,
-                vec![GuiRawImageAssetPayload { sampling: None,
+                vec![GuiRawImageAssetPayload {
+                    sampling: None,
                     asset_id: 99,
                     format: GuiRawImageFormat::Alpha8,
                     width: 8192,

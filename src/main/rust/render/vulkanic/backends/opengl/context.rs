@@ -135,22 +135,46 @@ pub(super) struct OpenGlContext {
 pub(super) type ProvokingVertexFn = unsafe extern "system" fn(u32);
 pub(super) type ClipControlFn = unsafe extern "system" fn(u32, u32);
 
-fn load_clip_control(address: *const c_void, library: Option<&Library>) -> GalResult<ClipControlFn> {
+fn load_clip_control(
+    address: *const c_void,
+    library: Option<&Library>,
+) -> GalResult<ClipControlFn> {
     if !address.is_null() {
         return Ok(unsafe { std::mem::transmute::<*const c_void, ClipControlFn>(address) });
     }
-    library.and_then(|library| unsafe {
-        library.get::<ClipControlFn>(b"glClipControl\0").ok().map(|symbol| *symbol)
-    }).ok_or_else(|| GalError::unsupported_feature("OpenGL glClipControl is required for explicit raster direction"))
+    library
+        .and_then(|library| unsafe {
+            library
+                .get::<ClipControlFn>(b"glClipControl\0")
+                .ok()
+                .map(|symbol| *symbol)
+        })
+        .ok_or_else(|| {
+            GalError::unsupported_feature(
+                "OpenGL glClipControl is required for explicit raster direction",
+            )
+        })
 }
 
-fn load_provoking_vertex(address: *const c_void, library: Option<&Library>) -> GalResult<ProvokingVertexFn> {
+fn load_provoking_vertex(
+    address: *const c_void,
+    library: Option<&Library>,
+) -> GalResult<ProvokingVertexFn> {
     if !address.is_null() {
         return Ok(unsafe { std::mem::transmute::<*const c_void, ProvokingVertexFn>(address) });
     }
-    library.and_then(|library| unsafe {
-        library.get::<ProvokingVertexFn>(b"glProvokingVertex\0").ok().map(|symbol| *symbol)
-    }).ok_or_else(|| GalError::unsupported_feature("OpenGL glProvokingVertex is required for explicit flat-shading state"))
+    library
+        .and_then(|library| unsafe {
+            library
+                .get::<ProvokingVertexFn>(b"glProvokingVertex\0")
+                .ok()
+                .map(|symbol| *symbol)
+        })
+        .ok_or_else(|| {
+            GalError::unsupported_feature(
+                "OpenGL glProvokingVertex is required for explicit flat-shading state",
+            )
+        })
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -178,9 +202,16 @@ impl OpenGlContext {
     pub(super) fn new(label: &str) -> GalResult<Self> {
         let gl_library = unsafe { Library::new("libGL.so.1") }.ok();
         let native = create_native_context()?;
-        let clip_control = load_clip_control(native.get_proc_address(c"glClipControl".as_ptr()).cast(), gl_library.as_ref())?;
+        let clip_control = load_clip_control(
+            native.get_proc_address(c"glClipControl".as_ptr()).cast(),
+            gl_library.as_ref(),
+        )?;
         let provoking_vertex = load_provoking_vertex(
-            native.get_proc_address(c"glProvokingVertex".as_ptr()).cast(), gl_library.as_ref())?;
+            native
+                .get_proc_address(c"glProvokingVertex".as_ptr())
+                .cast(),
+            gl_library.as_ref(),
+        )?;
         let gl = unsafe {
             glow::Context::from_loader_function(|name| {
                 let cname = CString::new(name).expect("GL symbol names do not contain NUL");
@@ -245,11 +276,19 @@ impl OpenGlContext {
                 .map(|symbol| *symbol)
         };
         let provoking_vertex = load_provoking_vertex(
-            get_proc_address.map(|get| unsafe { get(c"glProvokingVertex".as_ptr().cast()) })
-                .unwrap_or(ptr::null()).cast(), Some(&gl_library))?;
+            get_proc_address
+                .map(|get| unsafe { get(c"glProvokingVertex".as_ptr().cast()) })
+                .unwrap_or(ptr::null())
+                .cast(),
+            Some(&gl_library),
+        )?;
         let clip_control = load_clip_control(
-            get_proc_address.map(|get| unsafe { get(c"glClipControl".as_ptr().cast()) })
-                .unwrap_or(ptr::null()).cast(), Some(&gl_library))?;
+            get_proc_address
+                .map(|get| unsafe { get(c"glClipControl".as_ptr().cast()) })
+                .unwrap_or(ptr::null())
+                .cast(),
+            Some(&gl_library),
+        )?;
         let gl = unsafe {
             glow::Context::from_loader_function(|name| {
                 let cname = CString::new(name).expect("GL symbol names do not contain NUL");
@@ -306,9 +345,14 @@ impl OpenGlContext {
         &self,
         capture_images: bool,
     ) -> Option<BorrowedOpenGlStateGuard> {
-        self.native
-            .is_existing()
-            .then(|| BorrowedOpenGlStateGuard::capture(self.gl.clone(), self.provoking_vertex, self.clip_control, capture_images))
+        self.native.is_existing().then(|| {
+            BorrowedOpenGlStateGuard::capture(
+                self.gl.clone(),
+                self.provoking_vertex,
+                self.clip_control,
+                capture_images,
+            )
+        })
     }
 
     pub(super) fn supports_storage_textures(&self) -> bool {
@@ -500,7 +544,12 @@ struct StencilFaceState {
 }
 
 impl BorrowedOpenGlStateGuard {
-    fn capture(gl: Rc<glow::Context>, provoking_vertex_fn: ProvokingVertexFn, clip_control_fn: ClipControlFn, capture_images: bool) -> Self {
+    fn capture(
+        gl: Rc<glow::Context>,
+        provoking_vertex_fn: ProvokingVertexFn,
+        clip_control_fn: ClipControlFn,
+        capture_images: bool,
+    ) -> Self {
         let _zone = trace::Zone::new("opengl.borrowed-state.capture");
         unsafe {
             let active_texture = gl.get_parameter_i32(glow::ACTIVE_TEXTURE);
@@ -659,17 +708,34 @@ fn borrowed_provoking_vertex_state_is_restored_in_both_directions() {
     let context = OpenGlContext::new("provoking-vertex-state-restoration")
         .expect("OpenGL required for explicit raster-state restoration test");
     context.make_current().unwrap();
-    for (original, changed) in [(glow::FIRST_VERTEX_CONVENTION, glow::LAST_VERTEX_CONVENTION),
-        (glow::LAST_VERTEX_CONVENTION, glow::FIRST_VERTEX_CONVENTION)] {
-        unsafe { (context.provoking_vertex)(original); }
+    for (original, changed) in [
+        (glow::FIRST_VERTEX_CONVENTION, glow::LAST_VERTEX_CONVENTION),
+        (glow::LAST_VERTEX_CONVENTION, glow::FIRST_VERTEX_CONVENTION),
+    ] {
+        unsafe {
+            (context.provoking_vertex)(original);
+        }
         {
-            let _guard = BorrowedOpenGlStateGuard::capture(context.gl.clone(), context.provoking_vertex, context.clip_control, false);
+            let _guard = BorrowedOpenGlStateGuard::capture(
+                context.gl.clone(),
+                context.provoking_vertex,
+                context.clip_control,
+                false,
+            );
             unsafe {
                 (context.provoking_vertex)(changed);
-                assert_eq!(context.gl.get_parameter_i32(glow::PROVOKING_VERTEX) as u32, changed);
+                assert_eq!(
+                    context.gl.get_parameter_i32(glow::PROVOKING_VERTEX) as u32,
+                    changed
+                );
             }
         }
-        unsafe { assert_eq!(context.gl.get_parameter_i32(glow::PROVOKING_VERTEX) as u32, original); }
+        unsafe {
+            assert_eq!(
+                context.gl.get_parameter_i32(glow::PROVOKING_VERTEX) as u32,
+                original
+            );
+        }
     }
 }
 
@@ -677,31 +743,70 @@ fn borrowed_provoking_vertex_state_is_restored_in_both_directions() {
 fn borrowed_raster_y_direction_and_depth_clip_mode_are_restored() {
     let context = OpenGlContext::new("clip-control-state-restoration").unwrap();
     context.make_current().unwrap();
-    for (origin, depth) in [(glow::LOWER_LEFT, glow::NEGATIVE_ONE_TO_ONE),
-        (glow::UPPER_LEFT, glow::ZERO_TO_ONE)] {
-        unsafe { (context.clip_control)(origin, depth); }
+    for (origin, depth) in [
+        (glow::LOWER_LEFT, glow::NEGATIVE_ONE_TO_ONE),
+        (glow::UPPER_LEFT, glow::ZERO_TO_ONE),
+    ] {
+        unsafe {
+            (context.clip_control)(origin, depth);
+        }
         {
-            let _guard = BorrowedOpenGlStateGuard::capture(context.gl.clone(), context.provoking_vertex, context.clip_control, false);
-            unsafe { (context.clip_control)(if origin == glow::LOWER_LEFT { glow::UPPER_LEFT } else { glow::LOWER_LEFT },
-                if depth == glow::ZERO_TO_ONE { glow::NEGATIVE_ONE_TO_ONE } else { glow::ZERO_TO_ONE }); }
+            let _guard = BorrowedOpenGlStateGuard::capture(
+                context.gl.clone(),
+                context.provoking_vertex,
+                context.clip_control,
+                false,
+            );
+            unsafe {
+                (context.clip_control)(
+                    if origin == glow::LOWER_LEFT {
+                        glow::UPPER_LEFT
+                    } else {
+                        glow::LOWER_LEFT
+                    },
+                    if depth == glow::ZERO_TO_ONE {
+                        glow::NEGATIVE_ONE_TO_ONE
+                    } else {
+                        glow::ZERO_TO_ONE
+                    },
+                );
+            }
         }
         unsafe {
-            assert_eq!(context.gl.get_parameter_i32(glow::CLIP_ORIGIN) as u32, origin);
-            assert_eq!(context.gl.get_parameter_i32(glow::CLIP_DEPTH_MODE) as u32, depth);
+            assert_eq!(
+                context.gl.get_parameter_i32(glow::CLIP_ORIGIN) as u32,
+                origin
+            );
+            assert_eq!(
+                context.gl.get_parameter_i32(glow::CLIP_DEPTH_MODE) as u32,
+                depth
+            );
         }
     }
 }
 
 #[test]
 fn borrowed_unpack_skip_images_is_restored_after_buffer_texture_copy_state() {
-    let context = OpenGlContext::new("unpack-image-skip-restoration").expect("OpenGL required for state restoration");
+    let context = OpenGlContext::new("unpack-image-skip-restoration")
+        .expect("OpenGL required for state restoration");
     context.make_current().unwrap();
-    unsafe { context.gl.pixel_store_i32(glow::UNPACK_SKIP_IMAGES, 3); }
-    {
-        let _guard = BorrowedOpenGlStateGuard::capture(context.gl.clone(), context.provoking_vertex, context.clip_control, false);
-        unsafe { context.gl.pixel_store_i32(glow::UNPACK_SKIP_IMAGES, 0); }
+    unsafe {
+        context.gl.pixel_store_i32(glow::UNPACK_SKIP_IMAGES, 3);
     }
-    unsafe { assert_eq!(context.gl.get_parameter_i32(glow::UNPACK_SKIP_IMAGES), 3); }
+    {
+        let _guard = BorrowedOpenGlStateGuard::capture(
+            context.gl.clone(),
+            context.provoking_vertex,
+            context.clip_control,
+            false,
+        );
+        unsafe {
+            context.gl.pixel_store_i32(glow::UNPACK_SKIP_IMAGES, 0);
+        }
+    }
+    unsafe {
+        assert_eq!(context.gl.get_parameter_i32(glow::UNPACK_SKIP_IMAGES), 3);
+    }
 }
 
 impl Drop for BorrowedOpenGlStateGuard {
@@ -813,7 +918,8 @@ impl Drop for BorrowedOpenGlStateGuard {
                 .pixel_store_i32(glow::UNPACK_SKIP_PIXELS, self.unpack_skip_pixels);
             self.gl
                 .pixel_store_i32(glow::UNPACK_IMAGE_HEIGHT, self.unpack_image_height);
-            self.gl.pixel_store_i32(glow::UNPACK_SKIP_IMAGES, self.unpack_skip_images);
+            self.gl
+                .pixel_store_i32(glow::UNPACK_SKIP_IMAGES, self.unpack_skip_images);
             self.gl
                 .pixel_store_i32(glow::PACK_ALIGNMENT, self.pack_alignment);
             self.gl
@@ -1115,7 +1221,12 @@ mod tests {
             let original_ssbo_size =
                 gl.get_parameter_indexed_i64(glow::SHADER_STORAGE_BUFFER_SIZE, 0);
             {
-                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone(), context.provoking_vertex, context.clip_control, false);
+                let _guard = BorrowedOpenGlStateGuard::capture(
+                    gl.clone(),
+                    context.provoking_vertex,
+                    context.clip_control,
+                    false,
+                );
                 gl.bind_buffer_range(glow::UNIFORM_BUFFER, 0, Some(replacement_ubo), 0, 64);
                 gl.bind_buffer_range(
                     glow::SHADER_STORAGE_BUFFER,
@@ -1221,7 +1332,12 @@ mod tests {
             gl.bind_image_texture(0, Some(original), 0, true, 0, glow::READ_ONLY, glow::R8UI);
             let original_image = gl.get_parameter_indexed_i32(glow::IMAGE_BINDING_NAME, 0);
             {
-                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone(), context.provoking_vertex, context.clip_control, true);
+                let _guard = BorrowedOpenGlStateGuard::capture(
+                    gl.clone(),
+                    context.provoking_vertex,
+                    context.clip_control,
+                    true,
+                );
                 gl.active_texture(glow::TEXTURE0 + 2);
                 gl.bind_texture(glow::TEXTURE_3D, Some(replacement));
                 gl.bind_image_texture(
@@ -1306,7 +1422,12 @@ mod tests {
             gl.stencil_op_separate(glow::BACK, glow::ZERO, glow::INVERT, glow::DECR_WRAP);
 
             {
-                let _guard = BorrowedOpenGlStateGuard::capture(gl.clone(), context.provoking_vertex, context.clip_control, false);
+                let _guard = BorrowedOpenGlStateGuard::capture(
+                    gl.clone(),
+                    context.provoking_vertex,
+                    context.clip_control,
+                    false,
+                );
                 gl.bind_vertex_array(Some(replacement_vao));
                 gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(replacement_indices));
                 gl.line_width(1.0);

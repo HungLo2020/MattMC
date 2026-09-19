@@ -6,8 +6,8 @@ use ash::vk;
 use super::device::VulkanContext;
 use super::resources::{aspect_for_format, texture_format};
 use super::trace;
-use crate::render::vulkanic::backends::BackendToken;
 use crate::render::vulkanic::backends::vulkan::resources::FrameTargetObject;
+use crate::render::vulkanic::backends::BackendToken;
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::frame::{
     AcquiredFrame, FrameAcquireDesc, FrameAcquireStatus, FrameId, FramePresentStatus,
@@ -249,7 +249,24 @@ impl VulkanSwapchain {
         })
     }
 
-    pub(super) fn present(&mut self, desc: &PresentFrameDesc) -> GalResult<PresentedFrame> {
+    pub(super) fn acquired_image_index(&self, frame: FrameId) -> GalResult<u32> {
+        self.acquired
+            .iter()
+            .find(|acquired| acquired.frame == frame)
+            .map(|acquired| acquired.image_index)
+            .ok_or_else(|| {
+                GalError::submission(
+                    crate::render::vulkanic::StatusCode::InvalidArgument,
+                    "Vulkan frame was not acquired before present",
+                )
+            })
+    }
+
+    pub(super) fn present(
+        &mut self,
+        desc: &PresentFrameDesc,
+        wait_semaphore: Option<vk::Semaphore>,
+    ) -> GalResult<PresentedFrame> {
         let _zone = trace::Zone::new("vulkan.swapchain.present");
         let present_started = std::time::Instant::now();
         let Some(position) = self
@@ -266,16 +283,24 @@ impl VulkanSwapchain {
         // have succeeded.  If either operation fails, callers can still retry or
         // explicitly tear down the surface without silently losing the in-flight image.
         let acquired = self.acquired[position];
-        let wait_started = std::time::Instant::now();
-        wait_timeline(&self.context, desc.wait_for)?;
-        self.metrics.present_wait_nanos = self.metrics.present_wait_nanos.saturating_add(
-            crate::render::vulkanic::metrics::elapsed_nanos_u64(wait_started),
-        );
         let swapchains = [self.swapchain];
         let image_indices = [acquired.image_index];
-        let present_info = vk::PresentInfoKHR::default()
+        let wait_semaphores = wait_semaphore.into_iter().collect::<Vec<_>>();
+        let mut present_info = vk::PresentInfoKHR::default()
             .swapchains(&swapchains)
             .image_indices(&image_indices);
+        if !wait_semaphores.is_empty() {
+            present_info = present_info.wait_semaphores(&wait_semaphores);
+        } else {
+            // Older/non-frame submissions and test-only clear frames have no
+            // render-finished semaphore. Preserve their explicit timeline
+            // contract instead of presenting an image before its writes land.
+            let wait_started = std::time::Instant::now();
+            wait_timeline(&self.context, desc.wait_for)?;
+            self.metrics.present_wait_nanos = self.metrics.present_wait_nanos.saturating_add(
+                crate::render::vulkanic::metrics::elapsed_nanos_u64(wait_started),
+            );
+        }
         let status = match unsafe { self.loader.queue_present(self.context.queue, &present_info) } {
             Ok(suboptimal) => {
                 if suboptimal || acquired.suboptimal {
@@ -467,7 +492,10 @@ impl VulkanSwapchain {
         let required_image_usage = vk::ImageUsageFlags::COLOR_ATTACHMENT
             | vk::ImageUsageFlags::TRANSFER_DST
             | vk::ImageUsageFlags::TRANSFER_SRC;
-        if !capabilities.supported_usage_flags.contains(required_image_usage) {
+        if !capabilities
+            .supported_usage_flags
+            .contains(required_image_usage)
+        {
             return Err(GalError::unsupported_feature(format!(
                 "presentation surface cannot support Rust VulkanicGAL's explicit acquired-frame snapshot: required=0x{:x}, supported=0x{:x}",
                 required_image_usage.as_raw(),

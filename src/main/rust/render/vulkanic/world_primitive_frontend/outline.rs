@@ -4,8 +4,8 @@ use crate::render::vulkanic::ffi::FFI_MAX_BATCH_ITEMS;
 use crate::render::vulkanic::handles::HandleKind;
 use crate::render::vulkanic::shader_pack::vanilla_post_effect_contract::VanillaPostEffectExecutionPlan;
 use crate::render::vulkanic::shader_pack::vanilla_post_effect_executor::{
-    VanillaPostEffectExecutor, VanillaPostEffectInputBinding, VanillaPostEffectPassBinding,
     bundled_entity_outline_executor, bundled_entity_outline_shader_sources, pack_uniform_block,
+    VanillaPostEffectExecutor, VanillaPostEffectInputBinding, VanillaPostEffectPassBinding,
 };
 
 /// Backend-neutral input for the Rust-owned entity-outline mask pass. It
@@ -249,12 +249,24 @@ pub(crate) fn create_entity_outline_post_effect_resource_sets(
             label: "minecraft.entity-outline.composite.resource-set".into(),
             layout: pipelines.sobel_resource_layout,
             bindings: vec![
-                ResourceBinding { binding: 0, array_index: 0, resource: targets.outline_view,
-                    kind: ResourceBindingKind::SampledTexture, access: AccessFlags::READ,
-                    dynamic_offsets: Vec::new(), buffer_range: None },
-                ResourceBinding { binding: 1, array_index: 0, resource: targets.sampler,
-                    kind: ResourceBindingKind::Sampler, access: AccessFlags::READ,
-                    dynamic_offsets: Vec::new(), buffer_range: None },
+                ResourceBinding {
+                    binding: 0,
+                    array_index: 0,
+                    resource: targets.outline_view,
+                    kind: ResourceBindingKind::SampledTexture,
+                    access: AccessFlags::READ,
+                    dynamic_offsets: Vec::new(),
+                    buffer_range: None,
+                },
+                ResourceBinding {
+                    binding: 1,
+                    array_index: 0,
+                    resource: targets.sampler,
+                    kind: ResourceBindingKind::Sampler,
+                    access: AccessFlags::READ,
+                    dynamic_offsets: Vec::new(),
+                    buffer_range: None,
+                },
             ],
         })?;
         created.push(composite_set);
@@ -303,7 +315,11 @@ pub(crate) fn bind_entity_outline_post_effect_passes(
             targets.outline_view,
         ),
         (targets.swap_pass, targets.swap_target, targets.swap_view),
-        (targets.outline_pass, targets.outline_target, targets.outline_view),
+        (
+            targets.outline_pass,
+            targets.outline_target,
+            targets.outline_view,
+        ),
     ];
     let pipelines_for_pass = [
         (pipelines.sobel_pipeline, pipelines.sobel_layout),
@@ -364,12 +380,7 @@ pub(crate) fn lower_entity_outline_post_effect_with_resources(
     swap_before: TextureUsageState,
     outline_before: TextureUsageState,
 ) -> GalResult<Vec<CommandOp>> {
-    let bindings = bind_entity_outline_post_effect_passes(
-        plan,
-        targets,
-        pipelines,
-        sets,
-    )?;
+    let bindings = bind_entity_outline_post_effect_passes(plan, targets, pipelines, sets)?;
     let mut operations = Vec::with_capacity(40);
     let uniform_buffers = sets.uniform_buffers;
     for (pass_index, block_name, buffer_index) in [
@@ -430,14 +441,28 @@ pub(crate) fn lower_entity_outline_post_effect_with_resources(
         }
     }
     operations.extend([
-        CommandOp::BeginPass { pass: frame_pass, target: frame_target,
-            colors: vec![PassAttachment { view: frame_color_attachment,
-                load_op: AttachmentLoadOp::Load, store_op: AttachmentStoreOp::Store,
-                clear_color: None }], depth_stencil: None },
+        CommandOp::BeginPass {
+            pass: frame_pass,
+            target: frame_target,
+            colors: vec![PassAttachment {
+                view: frame_color_attachment,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }],
+            depth_stencil: None,
+        },
         CommandOp::BindGraphicsPipeline(composite_pipeline),
-        CommandOp::BindResourceSet { pipeline_layout: pipelines.sobel_layout, set_index: 0,
-            set: sets.composite_set, dynamic_offsets: Vec::new() },
-        CommandOp::Draw { vertices: 3, instances: 1 },
+        CommandOp::BindResourceSet {
+            pipeline_layout: pipelines.sobel_layout,
+            set_index: 0,
+            set: sets.composite_set,
+            dynamic_offsets: Vec::new(),
+        },
+        CommandOp::Draw {
+            vertices: 3,
+            instances: 1,
+        },
         CommandOp::EndPass,
     ]);
     Ok(operations)
@@ -508,14 +533,17 @@ pub(crate) fn create_entity_outline_post_effect_pipelines(
             MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT,
         )?;
         created.push(blit_shader);
-        let composite_shader = module("minecraft.entity-outline.composite.fragment", ShaderStage::Fragment,
+        let composite_shader = module(
+            "minecraft.entity-outline.composite.fragment",
+            ShaderStage::Fragment,
             r#"#version 450
 layout(set=0,binding=0) uniform texture2D InTexture;
 layout(set=0,binding=1) uniform sampler InSampler;
 layout(location=0) in vec2 v_uv;
 layout(location=0) out vec4 out_color;
 void main() { out_color = texture(sampler2D(InTexture, InSampler), v_uv); }
-"#)?;
+"#,
+        )?;
         created.push(composite_shader);
         let mut layout = |label: &str, uniform: bool| {
             let mut bindings = vec![
@@ -572,26 +600,27 @@ void main() { out_color = texture(sampler2D(InTexture, InSampler), v_uv); }
             resource_layouts: vec![blit_resource_layout],
         })?;
         created.push(blit_layout);
-        let mut pipeline = |label: &str, layout: Handle, fragment_shader: Handle, depth_format, blend| {
-            gal.create_graphics_pipeline(GraphicsPipelineDesc {
-                label: label.to_string(),
-                layout,
-                vertex_shader,
-                fragment_shader,
-                topology: PrimitiveTopology::Triangles,
-                cull_mode: CullMode::None,
-                front_face: FrontFace::CounterClockwise,
-                provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
-                raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
-                blend,
-                depth_compare: None,
-                depth_write: false,
-                depth_bias: None,
-                color_formats: vec![color_format],
-                depth_format,
-                stencil: None,
-            })
-        };
+        let mut pipeline =
+            |label: &str, layout: Handle, fragment_shader: Handle, depth_format, blend| {
+                gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                    label: label.to_string(),
+                    layout,
+                    vertex_shader,
+                    fragment_shader,
+                    topology: PrimitiveTopology::Triangles,
+                    cull_mode: CullMode::None,
+                    front_face: FrontFace::CounterClockwise,
+                    provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                    raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
+                    blend,
+                    depth_compare: None,
+                    depth_write: false,
+                    depth_bias: None,
+                    color_formats: vec![color_format],
+                    depth_format,
+                    stencil: None,
+                })
+            };
         let sobel_pipeline = pipeline(
             "minecraft.entity-outline.sobel.pipeline",
             sobel_layout,
@@ -617,8 +646,11 @@ void main() { out_color = texture(sampler2D(InTexture, InSampler), v_uv); }
         )?;
         created.push(blit_pipeline);
         let composite_pipeline = pipeline(
-            "minecraft.entity-outline.composite.pipeline", sobel_layout, composite_shader,
-            Some(TextureFormat::Depth32Float), BlendMode::AlphaPreserveAlpha,
+            "minecraft.entity-outline.composite.pipeline",
+            sobel_layout,
+            composite_shader,
+            Some(TextureFormat::Depth32Float),
+            BlendMode::AlphaPreserveAlpha,
         )?;
         created.push(composite_pipeline);
         let composite_depthless_pipeline = pipeline(
@@ -808,7 +840,18 @@ pub(crate) fn pack_entity_outline_instances(
         // material.w selects the copied local/atlas UV contract. Lighting,
         // animation and overlay color do not modify an entity silhouette.
         for lane in 0..(super::WORLD_MESH_INSTANCE_BYTES / 4 - 20) {
-            super::push_f32(&mut bytes, if lane == 3 && source_atlas_uv { 1.0 } else { 0.0 });
+            let value = if lane == 3 && source_atlas_uv {
+                1.0
+            } else if lane == 16 || lane == 17 {
+                // The shared instance ABI's final vec4 is the authored UV
+                // transform. Outline draws still need identity when they use
+                // atlas coordinates; zeroing it collapses every sample to
+                // (0,0) and defeats cutout silhouettes.
+                1.0
+            } else {
+                0.0
+            };
+            super::push_f32(&mut bytes, value);
         }
     }
     Ok(bytes)
@@ -834,7 +877,10 @@ pub(crate) fn pack_entity_outline_instance_stream(
         }
         offsets.push(aligned);
         stream.extend_from_slice(&super::packed_mesh_uniform_header(frame));
-        stream.extend_from_slice(&pack_entity_outline_instances(&draw.instances, draw.source_atlas_uv)?);
+        stream.extend_from_slice(&pack_entity_outline_instances(
+            &draw.instances,
+            draw.source_atlas_uv,
+        )?);
     }
     Ok((stream, offsets))
 }
@@ -1360,7 +1406,10 @@ mod tests {
         );
         assert_eq!(plan.instances[0].depth_policy, WORLD_DEPTH_POLICY_DISABLED);
         let atlas_bytes = pack_entity_outline_instances(&plan.instances, true).unwrap();
-        assert_eq!(f32::from_le_bytes(atlas_bytes[92..96].try_into().unwrap()), 1.0);
+        assert_eq!(
+            f32::from_le_bytes(atlas_bytes[92..96].try_into().unwrap()),
+            1.0
+        );
     }
 
     #[test]
@@ -1398,6 +1447,7 @@ mod tests {
             19,
             super::MeshAssetStore {
                 translucent_order: Default::default(),
+                section_ranges_cache: Default::default(),
                 mesh_generation: 1,
                 index_generation: 1,
                 vertex_layout_version: 0,
@@ -1543,12 +1593,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(Some(depth_view), resources.mask_depth_view);
-        assert!(
-            resources
-                .handles_in_destroy_order()
-                .iter()
-                .all(|handle| { *handle != depth && *handle != depth_view })
-        );
+        assert!(resources
+            .handles_in_destroy_order()
+            .iter()
+            .all(|handle| { *handle != depth && *handle != depth_view }));
         for handle in resources.handles_in_destroy_order() {
             gal.destroy(handle).unwrap();
         }
@@ -1778,13 +1826,8 @@ mod tests {
         let plan = prepare_entity_outline_post_effect(&frame_with_instances(vec![instance]))
             .unwrap()
             .unwrap();
-        let bindings = bind_entity_outline_post_effect_passes(
-            &plan,
-            &targets,
-            &pipelines,
-            &sets,
-        )
-        .unwrap();
+        let bindings =
+            bind_entity_outline_post_effect_passes(&plan, &targets, &pipelines, &sets).unwrap();
         assert_eq!(4, bindings.len());
         assert_eq!(targets.swap_target, bindings[0].render_target);
         assert_eq!(targets.outline_target, bindings[1].render_target);
@@ -1855,8 +1898,12 @@ mod tests {
             CommandOp::BeginPass { target, colors, .. }
                 if *target == Handle::new(HandleKind::RenderTarget, 91, 1).unwrap()
                     && colors[0].load_op == AttachmentLoadOp::Load)));
-        assert_eq!(gal.graphics_pipeline_descriptor_for_test(pipelines.composite_depthless_pipeline)
-            .unwrap().blend, BlendMode::AlphaPreserveAlpha);
+        assert_eq!(
+            gal.graphics_pipeline_descriptor_for_test(pipelines.composite_depthless_pipeline)
+                .unwrap()
+                .blend,
+            BlendMode::AlphaPreserveAlpha
+        );
         assert!(operations.iter().any(|operation| matches!(
             operation,
             CommandOp::Barrier(barrier)
@@ -1884,6 +1931,7 @@ mod tests {
             super::super::MeshAssetStore {
                 decal_normals: None,
                 translucent_order: Default::default(),
+                section_ranges_cache: Default::default(),
                 mesh_generation: asset.mesh_generation,
                 index_generation: 1,
                 vertex_layout_version: asset.vertex_layout_version,
@@ -1901,7 +1949,12 @@ mod tests {
         instance.outline_color_argb = 0xff_00_80_ff;
         let frame = frame_with_instances(vec![instance]);
         let resources = frontend
-            .prepare_entity_outline_mask_gpu_resources(&mut gal, &frame, ColorFormat::Rgba8Unorm, RasterYDirection::Up)
+            .prepare_entity_outline_mask_gpu_resources(
+                &mut gal,
+                &frame,
+                ColorFormat::Rgba8Unorm,
+                RasterYDirection::Up,
+            )
             .unwrap()
             .unwrap()
             .clone();
@@ -1929,6 +1982,7 @@ mod tests {
             color_argb: 0xffff_ffff,
             entity_id: 0,
             entity_color_argb: 0,
+            packed_light: 0,
             outline_color_argb: 0,
             flags: 0,
             block_entity_id: -1,
@@ -1944,48 +1998,104 @@ mod tests {
     #[test]
     fn entity_outline_native_composition_preserves_background_alpha_and_orientation() {
         for direction in [RasterYDirection::Up, RasterYDirection::Down] {
-          for texture_case in 0..3 {
-            let pixels = native_outline_pixels(direction, texture_case);
-            let pixel = |x: usize, y: usize| &pixels[(y * 128 + x) * 4..(y * 128 + x + 1) * 4];
-            assert_eq!(pixel(8, 8), [32, 64, 128, 64], "background {direction:?}");
-            assert_eq!(pixel(64, 100), [32, 64, 128, 64], "no reflected outline {direction:?}");
-            assert!(pixels.chunks_exact(4).all(|p| p[3] == 64), "destination alpha {direction:?}");
-            if texture_case == 1 {
-                assert!(pixels.chunks_exact(4).all(|p| p == [32, 64, 128, 64]),
-                    "fully transparent texture must have no silhouette {direction:?}");
-            } else {
-                assert!(pixel(47, 36)[1] > 64, "outline edge {direction:?}: {:?}", pixel(47, 36));
-                // Frozen's box blur averages RGB, but SUMS alpha. At this
-                // straight edge RGB is 0.4 green and alpha saturates to one
-                // after the vertical pass: no background may bleed through.
-                assert_eq!(pixel(47, 36), [0, 102, 0, 64], "vanilla blur opacity {direction:?}");
-                if texture_case == 2 {
-                    assert!(pixel(64, 36)[1] > 64, "alpha silhouette edge {direction:?}");
-                    assert_eq!(pixel(80, 36), [32, 64, 128, 64], "transparent half {direction:?}");
+            for texture_case in 0..3 {
+                let pixels = native_outline_pixels(direction, texture_case);
+                let pixel = |x: usize, y: usize| &pixels[(y * 128 + x) * 4..(y * 128 + x + 1) * 4];
+                assert_eq!(pixel(8, 8), [32, 64, 128, 64], "background {direction:?}");
+                assert_eq!(
+                    pixel(64, 100),
+                    [32, 64, 128, 64],
+                    "no reflected outline {direction:?}"
+                );
+                assert!(
+                    pixels.chunks_exact(4).all(|p| p[3] == 64),
+                    "destination alpha {direction:?}"
+                );
+                if texture_case == 1 {
+                    assert!(
+                        pixels.chunks_exact(4).all(|p| p == [32, 64, 128, 64]),
+                        "fully transparent texture must have no silhouette {direction:?}"
+                    );
                 } else {
-                    assert_eq!(pixel(64, 36), [32, 64, 128, 64], "hollow interior {direction:?}");
+                    assert!(
+                        pixel(47, 36)[1] > 64,
+                        "outline edge {direction:?}: {:?}",
+                        pixel(47, 36)
+                    );
+                    // Frozen's box blur averages RGB, but SUMS alpha. At this
+                    // straight edge RGB is 0.4 green and alpha saturates to one
+                    // after the vertical pass: no background may bleed through.
+                    assert_eq!(
+                        pixel(47, 36),
+                        [0, 102, 0, 64],
+                        "vanilla blur opacity {direction:?}"
+                    );
+                    if texture_case == 2 {
+                        assert!(
+                            pixel(64, 36)[1] > 64,
+                            "alpha silhouette edge {direction:?}: {:?}",
+                            pixel(64, 36)
+                        );
+                        assert_eq!(
+                            pixel(80, 36),
+                            [32, 64, 128, 64],
+                            "transparent half {direction:?}"
+                        );
+                    } else {
+                        assert_eq!(
+                            pixel(64, 36),
+                            [32, 64, 128, 64],
+                            "hollow interior {direction:?}"
+                        );
+                    }
                 }
             }
-          }
         }
     }
 
     #[cfg(target_os = "linux")]
     fn native_outline_pixels(direction: RasterYDirection, texture_case: u8) -> Vec<u8> {
+        use super::super::oriented_target::{
+            OrientedWorldTarget, WorldAttachmentStates, WorldTargetDesc,
+        };
         use crate::render::vulkanic::backends::vulkan::VulkanBackend;
-        use super::super::oriented_target::{OrientedWorldTarget, WorldTargetDesc, WorldAttachmentStates};
-        let mut gal = VulkanicGal::new_with_backend(Box::new(VulkanBackend::new("outline composition").unwrap()), false);
-        let extent = Extent3d { width: 128, height: 128, depth: 1 };
-        let owner = OrientedWorldTarget::create(&mut gal, "outline.world", WorldTargetDesc {
-            extent, color_format: TextureFormat::Rgba8Unorm, raster_y_direction: direction,
-        }).unwrap();
-        let canonical = OrientedWorldTarget::create(&mut gal, "outline.canonical", WorldTargetDesc {
-            extent, color_format: TextureFormat::Rgba8Unorm, raster_y_direction: RasterYDirection::Up,
-        }).unwrap();
+        let mut gal = VulkanicGal::new_with_backend(
+            Box::new(VulkanBackend::new("outline composition").unwrap()),
+            false,
+        );
+        let extent = Extent3d {
+            width: 128,
+            height: 128,
+            depth: 1,
+        };
+        let owner = OrientedWorldTarget::create(
+            &mut gal,
+            "outline.world",
+            WorldTargetDesc {
+                extent,
+                color_format: TextureFormat::Rgba8Unorm,
+                raster_y_direction: direction,
+            },
+        )
+        .unwrap();
+        let canonical = OrientedWorldTarget::create(
+            &mut gal,
+            "outline.canonical",
+            WorldTargetDesc {
+                extent,
+                color_format: TextureFormat::Rgba8Unorm,
+                raster_y_direction: RasterYDirection::Up,
+            },
+        )
+        .unwrap();
         let mut frontend = WorldPrimitiveFrontend::default();
         let mut mesh = super::super::tests::mesh_asset(9891, 1, IndexType::U32);
         for vertex in &mut mesh.vertices {
-            vertex.position = [vertex.position[0] * 0.5, vertex.position[1] * 0.5 + 0.4, 0.0];
+            vertex.position = [
+                vertex.position[0] * 0.5,
+                vertex.position[1] * 0.5 + 0.4,
+                0.0,
+            ];
         }
         let mut padding = super::super::tests::mesh_asset(9890, 1, IndexType::U32);
         padding.index_bytes.fill(0);
@@ -1995,21 +2105,53 @@ mod tests {
             encoder.set_color(png::ColorType::Rgba);
             encoder.set_depth(png::BitDepth::Eight);
             let mut writer = encoder.write_header().unwrap();
-            writer.write_image_data(&[255,255,255, if texture_case == 1 { 0 } else { 255 },
-                255,255,255, if texture_case == 0 { 255 } else { 0 }]).unwrap();
+            writer
+                .write_image_data(&[
+                    255,
+                    255,
+                    255,
+                    if texture_case == 1 { 0 } else { 255 },
+                    255,
+                    255,
+                    255,
+                    if texture_case == 0 { 255 } else { 0 },
+                ])
+                .unwrap();
         }
         let texture = WorldMeshTextureAssetPayload {
-            texture_id: WORLD_MATERIAL_TEXTURE_STONE, png_bytes, mip_png_bytes: Vec::new(),
-            frame_width: 0, frame_height: 0, frame_count: 1, frame_ticks: 1,
-            animation_flags: 0, frame_row_size: 0, interpolation_policy: 0,
-            animation_frames: Vec::new(), coordinate_origin: 0, sampling: None, requested_mip_levels: 1,
+            texture_id: WORLD_MATERIAL_TEXTURE_STONE,
+            png_bytes,
+            mip_png_bytes: Vec::new(),
+            frame_width: 0,
+            frame_height: 0,
+            frame_count: 1,
+            frame_ticks: 1,
+            animation_flags: 0,
+            frame_row_size: 0,
+            interpolation_policy: 0,
+            animation_frames: Vec::new(),
+            coordinate_origin: 0,
+            sampling: None,
+            requested_mip_levels: 1,
         };
-        frontend.apply_world_mesh_asset_update(&mut gal, 1, vec![padding, mesh], vec![texture]).unwrap();
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![padding, mesh], vec![texture])
+            .unwrap();
         let padding = &frontend.mesh_assets[&9890];
         let vertex_bytes = padding.vertex_bytes.clone();
         let index_bytes = padding.index_bytes.clone();
-        frontend.ensure_mesh_geometry_resources(&mut gal,
-            MeshGeometryResourceKey { mesh_key: 9890, mesh_generation: 1 }, vertex_bytes, index_bytes, false).unwrap();
+        frontend
+            .ensure_mesh_geometry_resources(
+                &mut gal,
+                MeshGeometryResourceKey {
+                    mesh_key: 9890,
+                    mesh_generation: 1,
+                },
+                vertex_bytes,
+                index_bytes,
+                false,
+            )
+            .unwrap();
         let mut instance = test_mesh_instance(9891);
         instance.flags = WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY;
         instance.outline_color_argb = 0xff00ff00;
@@ -2023,51 +2165,126 @@ mod tests {
         frame.background.color_argb = 0x40204080;
         frame.background.viewport_width = 128;
         frame.background.viewport_height = 128;
-        let (mut ops, _) = frontend.append_frame_ops_inner(
-            &mut gal, 1, owner.target, frame, true, direction,
-        ).unwrap();
+        let (mut ops, _) = frontend
+            .append_frame_ops_inner(&mut gal, 1, owner.target, frame, true, direction)
+            .unwrap();
         let draw = &frontend.entity_outline_mask_gpu.as_ref().unwrap().draws[0];
-        assert!(draw.vertex_offset > 0 && draw.index_offset > 0,
-            "fixture must exercise both shared-geometry offsets");
-        let descriptor = gal.graphics_pipeline_descriptor_for_test(draw.pipeline).unwrap();
+        assert!(
+            draw.vertex_offset > 0 && draw.index_offset > 0,
+            "fixture must exercise both shared-geometry offsets"
+        );
+        let descriptor = gal
+            .graphics_pipeline_descriptor_for_test(draw.pipeline)
+            .unwrap();
         assert_eq!(descriptor.depth_compare, None);
         assert!(!descriptor.depth_write);
-        ops.insert(0, CommandOp::Barrier(texture_barrier(owner.color_texture,
-            TextureUsageState::Undefined, TextureUsageState::ColorAttachment)));
-        ops.extend(owner.transfer_to(&canonical, WorldAttachmentStates::ATTACHMENTS,
-            WorldAttachmentStates::UNDEFINED, WorldAttachmentStates::ATTACHMENTS).unwrap());
-        let readback = gal.create_buffer(BufferDesc {
-            label: "outline.readback".into(), size: 128 * 128 * 8, memory: MemoryDomain::Readback,
-            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
-        }).unwrap();
+        ops.insert(
+            0,
+            CommandOp::Barrier(texture_barrier(
+                owner.color_texture,
+                TextureUsageState::Undefined,
+                TextureUsageState::ColorAttachment,
+            )),
+        );
+        ops.extend(
+            owner
+                .transfer_to(
+                    &canonical,
+                    WorldAttachmentStates::ATTACHMENTS,
+                    WorldAttachmentStates::UNDEFINED,
+                    WorldAttachmentStates::ATTACHMENTS,
+                )
+                .unwrap(),
+        );
+        let readback = gal
+            .create_buffer(BufferDesc {
+                label: "outline.readback".into(),
+                size: 128 * 128 * 8,
+                memory: MemoryDomain::Readback,
+                usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+            })
+            .unwrap();
         ops.extend([
-            CommandOp::Barrier(texture_barrier(canonical.color_texture, TextureUsageState::ColorAttachment, TextureUsageState::TransferSrc)),
+            CommandOp::Barrier(texture_barrier(
+                canonical.color_texture,
+                TextureUsageState::ColorAttachment,
+                TextureUsageState::TransferSrc,
+            )),
             CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
-                buffer: readback, buffer_offset: 0, bytes_per_row: 128 * 4, rows_per_image: 128,
-                texture: canonical.color_texture, texture_mip: 0, texture_layer: 0,
-                texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 }, extent,
+                buffer: readback,
+                buffer_offset: 0,
+                bytes_per_row: 128 * 4,
+                rows_per_image: 128,
+                texture: canonical.color_texture,
+                texture_mip: 0,
+                texture_layer: 0,
+                texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                extent,
             }),
-            CommandOp::Barrier(texture_barrier(canonical.depth_texture, TextureUsageState::DepthStencilAttachment, TextureUsageState::TransferSrc)),
+            CommandOp::Barrier(texture_barrier(
+                canonical.depth_texture,
+                TextureUsageState::DepthStencilAttachment,
+                TextureUsageState::TransferSrc,
+            )),
             CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
-                buffer: readback, buffer_offset: 128 * 128 * 4, bytes_per_row: 128 * 4, rows_per_image: 128,
-                texture: canonical.depth_texture, texture_mip: 0, texture_layer: 0,
-                texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 }, extent,
+                buffer: readback,
+                buffer_offset: 128 * 128 * 4,
+                bytes_per_row: 128 * 4,
+                rows_per_image: 128,
+                texture: canonical.depth_texture,
+                texture_mip: 0,
+                texture_layer: 0,
+                texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                extent,
             }),
-            CommandOp::Barrier(buffer_barrier(readback, TextureUsageState::TransferDst, TextureUsageState::ShaderRead)),
-            CommandOp::HostReadBuffer { buffer: readback, offset: 0, size: 128 * 128 * 8 },
+            CommandOp::Barrier(buffer_barrier(
+                readback,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            )),
+            CommandOp::HostReadBuffer {
+                buffer: readback,
+                offset: 0,
+                size: 128 * 128 * 8,
+            },
         ]);
-        let list = gal.create_command_list(CommandListDesc { label: "outline.commands".into(), operations: ops }).unwrap();
-        let token = gal.submit(SubmissionBatch { label: "outline.submit".into(), command_lists: vec![list] }).unwrap();
+        let list = gal
+            .create_command_list(CommandListDesc {
+                label: "outline.commands".into(),
+                operations: ops,
+            })
+            .unwrap();
+        let token = gal
+            .submit(SubmissionBatch {
+                label: "outline.submit".into(),
+                command_lists: vec![list],
+            })
+            .unwrap();
         gal.retire_through(token.submission).unwrap();
-        let pixels = gal.completed_host_reads().iter().find(|read| read.buffer == readback).unwrap().bytes.clone();
-        assert!(pixels[128 * 128 * 4..].chunks_exact(4).all(|p| f32::from_ne_bytes(p.try_into().unwrap()) == 1.0),
-            "outline mask and composition must not modify world depth");
+        let pixels = gal
+            .completed_host_reads()
+            .iter()
+            .find(|read| read.buffer == readback)
+            .unwrap()
+            .bytes
+            .clone();
+        assert!(
+            pixels[128 * 128 * 4..]
+                .chunks_exact(4)
+                .all(|p| f32::from_ne_bytes(p.try_into().unwrap()) == 1.0),
+            "outline mask and composition must not modify world depth"
+        );
         gal.destroy(readback).unwrap();
         frontend.reset(&mut gal);
         for resource in [owner, canonical] {
-            for handle in resource.handles_in_destroy_order() { gal.destroy(handle).unwrap(); }
+            for handle in resource.handles_in_destroy_order() {
+                gal.destroy(handle).unwrap();
+            }
         }
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys
+        );
         pixels[..128 * 128 * 4].to_vec()
     }
 }

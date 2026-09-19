@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::mem::{align_of, size_of};
 use std::path::Path;
@@ -8,7 +9,10 @@ use super::commands::*;
 use super::error::{ErrorDomain, GalError, StatusCode};
 use super::ffi::*;
 use super::frame::*;
-use super::gal::{normalize_submission_batch, CommandNormalizationStats, VulkanicGal};
+use super::gal::{
+    normalize_submission_batch, normalize_submission_batch_with_pipeline_layouts,
+    CommandNormalizationStats, VulkanicGal,
+};
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
 use super::metrics::{Metrics, WholeFrameProfile};
 use super::resources::*;
@@ -22,32 +26,51 @@ fn gal() -> VulkanicGal {
 fn submission_usage_tracks_accepted_work_and_retained_command_copies() {
     let mut gal = gal();
     let usage = SubmissionUsage::default();
-    let batch = SubmissionBatch { label: "tracked commands".into(), command_lists: vec![
-        gal.create_command_list(CommandListDesc { label: "tracked list".into(),
-            operations: vec![CommandOp::TrackSubmission(usage.clone())] }).unwrap(),
-    ] };
+    let batch = SubmissionBatch {
+        label: "tracked commands".into(),
+        command_lists: vec![gal
+            .create_command_list(CommandListDesc {
+                label: "tracked list".into(),
+                operations: vec![CommandOp::TrackSubmission(usage.clone())],
+            })
+            .unwrap()],
+    };
     assert!(usage.has_pending_commands());
     // A failed backend attempt consumes an ID but must not publish accepted use.
     gal.mock_backend_mut().unwrap().fail_next_submit = true;
     assert!(gal.submit(batch.clone()).is_err());
     assert_eq!(usage.last_submission(), SubmissionId(0));
-    assert!(usage.has_pending_commands(), "the retained retry is still pending");
+    assert!(
+        usage.has_pending_commands(),
+        "the retained retry is still pending"
+    );
     let first = gal.submit(batch.clone()).unwrap();
     assert_eq!(usage.last_submission(), first.submission);
     gal.retire_through(first.submission).unwrap();
-    assert!(usage.has_pending_commands(), "completed use does not cancel a retained command copy");
+    assert!(
+        usage.has_pending_commands(),
+        "completed use does not cancel a retained command copy"
+    );
     let second = gal.submit(batch).unwrap();
     assert!(second.submission > first.submission);
     assert_eq!(usage.last_submission(), second.submission);
     assert!(!usage.has_pending_commands());
-    assert_eq!(gal.poll_completed(), first.submission, "new accepted work remains in flight");
+    assert_eq!(
+        gal.poll_completed(),
+        first.submission,
+        "new accepted work remains in flight"
+    );
     gal.retire_through(second.submission).unwrap();
     assert_eq!(gal.poll_completed(), usage.last_submission());
 
     let cancelled = CommandOp::TrackSubmission(usage.clone());
     drop(cancelled);
     assert!(!usage.has_pending_commands());
-    assert_eq!(usage.last_submission(), second.submission, "cancellation preserves earlier accepted use");
+    assert_eq!(
+        usage.last_submission(),
+        second.submission,
+        "cancellation preserves earlier accepted use"
+    );
 }
 
 #[test]
@@ -59,13 +82,18 @@ fn completion_wait_rejects_unsubmitted_ids_without_fabricating_progress() {
     let batch = || SubmissionBatch {
         label: "completion-failure".into(),
         command_lists: vec![CommandList::from(CommandListDesc {
-            label: "empty-but-valid-command-list".into(), operations: vec![],
+            label: "empty-but-valid-command-list".into(),
+            operations: vec![],
         })],
     };
     gal.mock_backend_mut().unwrap().fail_next_submit = true;
     assert!(gal.submit(batch()).is_err());
     assert_eq!(gal.next_submission_id(), SubmissionId(2));
-    assert_eq!(gal.latest_submission_id(), SubmissionId(0), "a failed attempt is not an accepted receipt");
+    assert_eq!(
+        gal.latest_submission_id(),
+        SubmissionId(0),
+        "a failed attempt is not an accepted receipt"
+    );
     assert!(gal.retire_through(SubmissionId(1)).is_err());
     assert!(gal.mock_backend().unwrap().retire_requests.is_empty());
     let token = gal.submit(batch()).unwrap();
@@ -78,25 +106,62 @@ fn completion_wait_rejects_unsubmitted_ids_without_fabricating_progress() {
 #[test]
 fn same_usage_write_barriers_are_dependencies_but_read_only_noops_are_rejected() {
     let mut gal = gal();
-    let buffer = gal.create_buffer(BufferDesc {
-        label: "same-usage-dependency".into(), size: 4, memory: MemoryDomain::Upload,
-        usages: vec![BufferUsage::TransferSrc, BufferUsage::TransferDst, BufferUsage::HostWrite],
-    }).unwrap();
-    let barrier = |before, after| CommandOp::Barrier(ResourceBarrier {
-        resource: buffer, subresources: None, before, after,
-        src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics,
-    });
+    let buffer = gal
+        .create_buffer(BufferDesc {
+            label: "same-usage-dependency".into(),
+            size: 4,
+            memory: MemoryDomain::Upload,
+            usages: vec![
+                BufferUsage::TransferSrc,
+                BufferUsage::TransferDst,
+                BufferUsage::HostWrite,
+            ],
+        })
+        .unwrap();
+    let barrier = |before, after| {
+        CommandOp::Barrier(ResourceBarrier {
+            resource: buffer,
+            subresources: None,
+            before,
+            after,
+            src_queue: QueueClass::Graphics,
+            dst_queue: QueueClass::Graphics,
+        })
+    };
     let batch = |operations| SubmissionBatch {
         label: "same-usage-dependency".into(),
-        command_lists: vec![CommandList::from(CommandListDesc { label: "commands".into(), operations })],
+        command_lists: vec![CommandList::from(CommandListDesc {
+            label: "commands".into(),
+            operations,
+        })],
     };
     gal.submit(batch(vec![
-        CommandOp::HostWriteBuffer { buffer, offset: 0, data: vec![1, 2, 3, 4] },
-        barrier(TextureUsageState::TransferDst, TextureUsageState::TransferDst),
-        CommandOp::HostWriteBuffer { buffer, offset: 0, data: vec![5, 6, 7, 8] },
-        barrier(TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
-    ])).unwrap();
-    assert!(gal.submit(batch(vec![barrier(TextureUsageState::TransferSrc, TextureUsageState::TransferSrc)])).is_err());
+        CommandOp::HostWriteBuffer {
+            buffer,
+            offset: 0,
+            data: vec![1, 2, 3, 4],
+        },
+        barrier(
+            TextureUsageState::TransferDst,
+            TextureUsageState::TransferDst,
+        ),
+        CommandOp::HostWriteBuffer {
+            buffer,
+            offset: 0,
+            data: vec![5, 6, 7, 8],
+        },
+        barrier(
+            TextureUsageState::TransferDst,
+            TextureUsageState::TransferSrc,
+        ),
+    ]))
+    .unwrap();
+    assert!(gal
+        .submit(batch(vec![barrier(
+            TextureUsageState::TransferSrc,
+            TextureUsageState::TransferSrc
+        )]))
+        .is_err());
 }
 
 fn gal_with_capabilities(capabilities: BackendCapabilities) -> VulkanicGal {
@@ -2620,33 +2685,66 @@ fn texture_row_reversal_is_capability_checked_and_retains_copy_validation() {
         let mut caps = vulkan_capabilities();
         caps.features.texture_row_reversal = supported;
         let mut gal = gal_with_capabilities(caps);
-        let source = gal.create_texture(texture("row-source", TextureFormat::Rgba8Unorm,
-            vec![TextureUsage::TransferSrc])).unwrap();
-        let destination = gal.create_texture(texture("row-destination", TextureFormat::Rgba8Unorm,
-            vec![TextureUsage::TransferDst])).unwrap();
+        let source = gal
+            .create_texture(texture(
+                "row-source",
+                TextureFormat::Rgba8Unorm,
+                vec![TextureUsage::TransferSrc],
+            ))
+            .unwrap();
+        let destination = gal
+            .create_texture(texture(
+                "row-destination",
+                TextureFormat::Rgba8Unorm,
+                vec![TextureUsage::TransferDst],
+            ))
+            .unwrap();
         let region = TextureImageCopyRegion {
             row_order: TextureRowOrder::Reverse,
-            src_texture: source, src_mip: 0, src_layer: 0,
+            src_texture: source,
+            src_mip: 0,
+            src_layer: 0,
             src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-            dst_texture: destination, dst_mip: 0, dst_layer: 0,
+            dst_texture: destination,
+            dst_mip: 0,
+            dst_layer: 0,
             dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-            extent: Extent3d { width: 2, height: 3, depth: 1 },
+            extent: Extent3d {
+                width: 2,
+                height: 3,
+                depth: 1,
+            },
         };
-        let list = |region| CommandListDesc { label: "reverse-rows".into(),
-            operations: vec![CommandOp::CopyTexture(region)] };
+        let list = |region| CommandListDesc {
+            label: "reverse-rows".into(),
+            operations: vec![CommandOp::CopyTexture(region)],
+        };
         if supported {
             gal.create_command_list(list(region.clone())).unwrap();
-            assert_code(gal.create_command_list(list(TextureImageCopyRegion {
-                dst_texture: source, ..region.clone()
-            })), StatusCode::InvalidArgument);
-            assert_code(gal.create_command_list(list(TextureImageCopyRegion {
-                dst_origin: TextureOrigin3d { x: 0, y: 127, z: 0 }, ..region
-            })), StatusCode::InvalidArgument);
+            assert_code(
+                gal.create_command_list(list(TextureImageCopyRegion {
+                    dst_texture: source,
+                    ..region.clone()
+                })),
+                StatusCode::InvalidArgument,
+            );
+            assert_code(
+                gal.create_command_list(list(TextureImageCopyRegion {
+                    dst_origin: TextureOrigin3d { x: 0, y: 127, z: 0 },
+                    ..region
+                })),
+                StatusCode::InvalidArgument,
+            );
         } else {
-            assert_code(gal.create_command_list(list(region.clone())), StatusCode::UnsupportedFeature);
+            assert_code(
+                gal.create_command_list(list(region.clone())),
+                StatusCode::UnsupportedFeature,
+            );
             gal.create_command_list(list(TextureImageCopyRegion {
-                row_order: TextureRowOrder::Preserve, ..region
-            })).unwrap();
+                row_order: TextureRowOrder::Preserve,
+                ..region
+            }))
+            .unwrap();
         }
     }
 }
@@ -2659,68 +2757,161 @@ fn vulkan_texture_row_reversal_copies_exact_asymmetric_color_and_depth_rows() {
     let backend = VulkanBackend::new("explicit row reversal conformance").unwrap();
     let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
     for format in [TextureFormat::Rgba8Unorm, TextureFormat::Depth32Float] {
-        let extent = Extent3d { width: 2, height: 3, depth: 1 };
-        let pixels: Vec<u8> = if format == TextureFormat::Depth32Float {
-            [0.125f32, 0.25, 0.375, 0.5, 0.625, 0.875].into_iter()
-                .flat_map(f32::to_le_bytes).collect()
-        } else { (1u8..=24).collect() };
-        let source = gal.create_texture(TextureDesc {
-            label: "row-source".into(), dimension: TextureDimension::D2, format, extent,
-            mip_levels: 1, array_layers: 1,
-            usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc],
-        }).unwrap();
-        let destination = gal.create_texture(TextureDesc {
-            label: "row-destination".into(), dimension: TextureDimension::D2, format, extent,
-            mip_levels: 1, array_layers: 1,
-            usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc],
-        }).unwrap();
-        let upload = gal.create_buffer(BufferDesc {
-            label: "row-upload".into(), size: 24, memory: MemoryDomain::Upload,
-            usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
-        }).unwrap();
-        let readback = gal.create_buffer(BufferDesc {
-            label: "row-readback".into(), size: 24, memory: MemoryDomain::Readback,
-            usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
-        }).unwrap();
-        let barrier = |resource, before, after| CommandOp::Barrier(ResourceBarrier {
-            resource, subresources: None, before, after,
-            src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics,
-        });
-        let copy = |buffer, texture| BufferImageCopyRegion {
-            buffer, buffer_offset: 0, bytes_per_row: 8, rows_per_image: 3, texture,
-            texture_mip: 0, texture_layer: 0,
-            texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 }, extent,
+        let extent = Extent3d {
+            width: 2,
+            height: 3,
+            depth: 1,
         };
-        let list = gal.create_command_list(CommandListDesc {
-            label: "explicit-row-reversal".into(), operations: vec![
-                CommandOp::HostWriteBuffer { buffer: upload, offset: 0, data: pixels.clone() },
-                barrier(upload, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
-                barrier(source, TextureUsageState::Undefined, TextureUsageState::TransferDst),
-                CommandOp::CopyBufferToTexture(copy(upload, source)),
-                barrier(source, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
-                barrier(destination, TextureUsageState::Undefined, TextureUsageState::TransferDst),
-                CommandOp::CopyTexture(TextureImageCopyRegion {
-                    row_order: TextureRowOrder::Reverse,
-                    src_texture: source, src_mip: 0, src_layer: 0,
-                    src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-                    dst_texture: destination, dst_mip: 0, dst_layer: 0,
-                    dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 }, extent,
-                }),
-                barrier(destination, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
-                CommandOp::CopyTextureToBuffer(copy(readback, destination)),
-                barrier(readback, TextureUsageState::TransferDst, TextureUsageState::ShaderRead),
-                CommandOp::HostReadBuffer { buffer: readback, offset: 0, size: 24 },
-            ],
-        }).unwrap();
-        let token = gal.submit(SubmissionBatch {
-            label: "explicit-row-reversal".into(), command_lists: vec![list],
-        }).unwrap();
+        let pixels: Vec<u8> = if format == TextureFormat::Depth32Float {
+            [0.125f32, 0.25, 0.375, 0.5, 0.625, 0.875]
+                .into_iter()
+                .flat_map(f32::to_le_bytes)
+                .collect()
+        } else {
+            (1u8..=24).collect()
+        };
+        let source = gal
+            .create_texture(TextureDesc {
+                label: "row-source".into(),
+                dimension: TextureDimension::D2,
+                format,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc],
+            })
+            .unwrap();
+        let destination = gal
+            .create_texture(TextureDesc {
+                label: "row-destination".into(),
+                dimension: TextureDimension::D2,
+                format,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::TransferDst, TextureUsage::TransferSrc],
+            })
+            .unwrap();
+        let upload = gal
+            .create_buffer(BufferDesc {
+                label: "row-upload".into(),
+                size: 24,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc],
+            })
+            .unwrap();
+        let readback = gal
+            .create_buffer(BufferDesc {
+                label: "row-readback".into(),
+                size: 24,
+                memory: MemoryDomain::Readback,
+                usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+            })
+            .unwrap();
+        let barrier = |resource, before, after| {
+            CommandOp::Barrier(ResourceBarrier {
+                resource,
+                subresources: None,
+                before,
+                after,
+                src_queue: QueueClass::Graphics,
+                dst_queue: QueueClass::Graphics,
+            })
+        };
+        let copy = |buffer, texture| BufferImageCopyRegion {
+            buffer,
+            buffer_offset: 0,
+            bytes_per_row: 8,
+            rows_per_image: 3,
+            texture,
+            texture_mip: 0,
+            texture_layer: 0,
+            texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            extent,
+        };
+        let list = gal
+            .create_command_list(CommandListDesc {
+                label: "explicit-row-reversal".into(),
+                operations: vec![
+                    CommandOp::HostWriteBuffer {
+                        buffer: upload,
+                        offset: 0,
+                        data: pixels.clone(),
+                    },
+                    barrier(
+                        upload,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::TransferSrc,
+                    ),
+                    barrier(
+                        source,
+                        TextureUsageState::Undefined,
+                        TextureUsageState::TransferDst,
+                    ),
+                    CommandOp::CopyBufferToTexture(copy(upload, source)),
+                    barrier(
+                        source,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::TransferSrc,
+                    ),
+                    barrier(
+                        destination,
+                        TextureUsageState::Undefined,
+                        TextureUsageState::TransferDst,
+                    ),
+                    CommandOp::CopyTexture(TextureImageCopyRegion {
+                        row_order: TextureRowOrder::Reverse,
+                        src_texture: source,
+                        src_mip: 0,
+                        src_layer: 0,
+                        src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                        dst_texture: destination,
+                        dst_mip: 0,
+                        dst_layer: 0,
+                        dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                        extent,
+                    }),
+                    barrier(
+                        destination,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::TransferSrc,
+                    ),
+                    CommandOp::CopyTextureToBuffer(copy(readback, destination)),
+                    barrier(
+                        readback,
+                        TextureUsageState::TransferDst,
+                        TextureUsageState::ShaderRead,
+                    ),
+                    CommandOp::HostReadBuffer {
+                        buffer: readback,
+                        offset: 0,
+                        size: 24,
+                    },
+                ],
+            })
+            .unwrap();
+        let token = gal
+            .submit(SubmissionBatch {
+                label: "explicit-row-reversal".into(),
+                command_lists: vec![list],
+            })
+            .unwrap();
         gal.retire_through_for_test(token.submission).unwrap();
         let reads = gal.completed_host_reads();
-        let actual = &reads.iter().rev().find(|read| read.buffer == readback).unwrap().bytes;
+        let actual = &reads
+            .iter()
+            .rev()
+            .find(|read| read.buffer == readback)
+            .unwrap()
+            .bytes;
         let expected: Vec<u8> = pixels.chunks_exact(8).rev().flatten().copied().collect();
-        assert_eq!(&expected, actual, "row reversal must preserve exact texels for {format:?}");
-        for handle in [source, destination, upload, readback] { gal.destroy(handle).unwrap(); }
+        assert_eq!(
+            &expected, actual,
+            "row reversal must preserve exact texels for {format:?}"
+        );
+        for handle in [source, destination, upload, readback] {
+            gal.destroy(handle).unwrap();
+        }
     }
 }
 
@@ -4145,6 +4336,26 @@ fn normalize_ops_for_test(
     (stats, list.operations)
 }
 
+fn normalize_ops_for_test_with_pipeline_layouts(
+    operations: Vec<CommandOp>,
+    graphics_pipeline_layouts: BTreeMap<Handle, Handle>,
+) -> (CommandNormalizationStats, Vec<CommandOp>) {
+    let mut batch = SubmissionBatch {
+        label: "normalizer-layout-test".to_owned(),
+        command_lists: vec![CommandList {
+            label: "main".to_owned(),
+            operations,
+        }],
+    };
+    let stats = normalize_submission_batch_with_pipeline_layouts(
+        &mut batch,
+        &graphics_pipeline_layouts,
+        &BTreeMap::new(),
+    );
+    let list = batch.command_lists.pop().unwrap();
+    (stats, list.operations)
+}
+
 #[test]
 fn command_normalization_removes_redundant_state_binds() {
     let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
@@ -4240,6 +4451,95 @@ fn command_normalization_keeps_resource_binds_with_distinct_dynamic_offsets() {
     assert_eq!(stats.resource_set_binds_removed, 1);
     assert_eq!(
         2,
+        operations
+            .iter()
+            .filter(|op| matches!(op, CommandOp::BindResourceSet { .. }))
+            .count()
+    );
+}
+
+#[test]
+fn command_normalization_rebinds_descriptor_sets_after_pipeline_change() {
+    let first_pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+    let second_pipeline = test_handle(HandleKind::GraphicsPipeline, 2);
+    let layout = test_handle(HandleKind::PipelineLayout, 1);
+    let set = test_handle(HandleKind::ResourceSet, 1);
+
+    let (stats, operations) = normalize_ops_for_test(vec![
+        minimal_begin_pass(),
+        CommandOp::BindGraphicsPipeline(first_pipeline),
+        CommandOp::BindResourceSet {
+            pipeline_layout: layout,
+            set_index: 1,
+            set,
+            dynamic_offsets: Vec::new(),
+        },
+        CommandOp::DrawIndexed {
+            indices: 6,
+            instances: 1,
+        },
+        CommandOp::BindGraphicsPipeline(second_pipeline),
+        CommandOp::BindResourceSet {
+            pipeline_layout: layout,
+            set_index: 1,
+            set,
+            dynamic_offsets: Vec::new(),
+        },
+        CommandOp::DrawIndexed {
+            indices: 6,
+            instances: 1,
+        },
+        CommandOp::EndPass,
+    ]);
+
+    assert_eq!(stats.resource_set_binds_removed, 0);
+    assert_eq!(
+        2,
+        operations
+            .iter()
+            .filter(|op| matches!(op, CommandOp::BindResourceSet { .. }))
+            .count()
+    );
+}
+
+#[test]
+fn command_normalization_retains_sets_for_pipelines_sharing_a_layout() {
+    let first_pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+    let second_pipeline = test_handle(HandleKind::GraphicsPipeline, 2);
+    let layout = test_handle(HandleKind::PipelineLayout, 1);
+    let set = test_handle(HandleKind::ResourceSet, 1);
+    let (stats, operations) = normalize_ops_for_test_with_pipeline_layouts(
+        vec![
+            minimal_begin_pass(),
+            CommandOp::BindGraphicsPipeline(first_pipeline),
+            CommandOp::BindResourceSet {
+                pipeline_layout: layout,
+                set_index: 1,
+                set,
+                dynamic_offsets: Vec::new(),
+            },
+            CommandOp::DrawIndexed {
+                indices: 6,
+                instances: 1,
+            },
+            CommandOp::BindGraphicsPipeline(second_pipeline),
+            CommandOp::BindResourceSet {
+                pipeline_layout: layout,
+                set_index: 1,
+                set,
+                dynamic_offsets: Vec::new(),
+            },
+            CommandOp::DrawIndexed {
+                indices: 6,
+                instances: 1,
+            },
+            CommandOp::EndPass,
+        ],
+        BTreeMap::from([(first_pipeline, layout), (second_pipeline, layout)]),
+    );
+    assert_eq!(stats.resource_set_binds_removed, 1);
+    assert_eq!(
+        1,
         operations
             .iter()
             .filter(|op| matches!(op, CommandOp::BindResourceSet { .. }))
@@ -4456,36 +4756,86 @@ fn storage_binding_hazards_use_explicit_ranges_and_effective_dynamic_offsets() {
         for second_access in [AccessFlags::READ, AccessFlags::WRITE] {
             for (second_offset, accepted) in [(256u64, true), (128, false), (0, false)] {
                 let mut gal = gal();
-                let buffer = gal.create_buffer(BufferDesc { label: "ranged-storage".into(),
-                    size: 1024, memory: MemoryDomain::DeviceLocal, usages: vec![BufferUsage::Storage] }).unwrap();
-                let layout = gal.create_resource_layout(ResourceLayoutDesc {
-                    label: "ranged-storage-layout".into(), bindings: vec![ResourceBindingDesc {
-                        binding: 0, kind: ResourceBindingKind::StorageBuffer, stages: PipelineStageFlags::COMPUTE,
-                        array_count: 1, optional: false, dynamic_offset_count: 1,
-                    }],
-                }).unwrap();
-                let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
-                    label: "ranged-storage-pipeline-layout".into(), resource_layouts: vec![layout],
-                }).unwrap();
-                let shader = gal.create_shader_module(shader("ranged-storage-shader", ShaderStage::Compute)).unwrap();
-                let pipeline = gal.create_compute_pipeline(ComputePipelineDesc {
-                    label: "ranged-storage-pipeline".into(), layout: pipeline_layout, shader,
-                }).unwrap();
+                let buffer = gal
+                    .create_buffer(BufferDesc {
+                        label: "ranged-storage".into(),
+                        size: 1024,
+                        memory: MemoryDomain::DeviceLocal,
+                        usages: vec![BufferUsage::Storage],
+                    })
+                    .unwrap();
+                let layout = gal
+                    .create_resource_layout(ResourceLayoutDesc {
+                        label: "ranged-storage-layout".into(),
+                        bindings: vec![ResourceBindingDesc {
+                            binding: 0,
+                            kind: ResourceBindingKind::StorageBuffer,
+                            stages: PipelineStageFlags::COMPUTE,
+                            array_count: 1,
+                            optional: false,
+                            dynamic_offset_count: 1,
+                        }],
+                    })
+                    .unwrap();
+                let pipeline_layout = gal
+                    .create_pipeline_layout(PipelineLayoutDesc {
+                        label: "ranged-storage-pipeline-layout".into(),
+                        resource_layouts: vec![layout],
+                    })
+                    .unwrap();
+                let shader = gal
+                    .create_shader_module(shader("ranged-storage-shader", ShaderStage::Compute))
+                    .unwrap();
+                let pipeline = gal
+                    .create_compute_pipeline(ComputePipelineDesc {
+                        label: "ranged-storage-pipeline".into(),
+                        layout: pipeline_layout,
+                        shader,
+                    })
+                    .unwrap();
                 let mut operations = vec![CommandOp::BindComputePipeline(pipeline)];
                 for (offset, access) in [(0, AccessFlags::WRITE), (second_offset, second_access)] {
-                    let set = gal.create_resource_set(ResourceSetDesc { label: "ranged-storage-set".into(), layout,
-                        bindings: vec![ResourceBinding { binding: 0, array_index: 0, resource: buffer,
-                            kind: ResourceBindingKind::StorageBuffer, access,
-                            dynamic_offsets: vec![if overrides { 0 } else { offset }], buffer_range: Some(256) }],
-                    }).unwrap();
-                    operations.push(CommandOp::BindResourceSet { pipeline_layout, set_index: 0, set,
-                        dynamic_offsets: if overrides { vec![offset] } else { vec![] } });
-                    operations.push(CommandOp::Dispatch { groups_x: 1, groups_y: 1, groups_z: 1 });
+                    let set = gal
+                        .create_resource_set(ResourceSetDesc {
+                            label: "ranged-storage-set".into(),
+                            layout,
+                            bindings: vec![ResourceBinding {
+                                binding: 0,
+                                array_index: 0,
+                                resource: buffer,
+                                kind: ResourceBindingKind::StorageBuffer,
+                                access,
+                                dynamic_offsets: vec![if overrides { 0 } else { offset }],
+                                buffer_range: Some(256),
+                            }],
+                        })
+                        .unwrap();
+                    operations.push(CommandOp::BindResourceSet {
+                        pipeline_layout,
+                        set_index: 0,
+                        set,
+                        dynamic_offsets: if overrides { vec![offset] } else { vec![] },
+                    });
+                    operations.push(CommandOp::Dispatch {
+                        groups_x: 1,
+                        groups_y: 1,
+                        groups_z: 1,
+                    });
                 }
-                let commands = gal.create_command_list(CommandListDesc { label: "ranged-storage-commands".into(), operations }).unwrap();
-                let result = gal.submit(SubmissionBatch { label: "ranged-storage-submit".into(), command_lists: vec![commands] });
+                let commands = gal
+                    .create_command_list(CommandListDesc {
+                        label: "ranged-storage-commands".into(),
+                        operations,
+                    })
+                    .unwrap();
+                let result = gal.submit(SubmissionBatch {
+                    label: "ranged-storage-submit".into(),
+                    command_lists: vec![commands],
+                });
                 assert_eq!(result.is_ok(), accepted, "offset={second_offset} overrides={overrides} access={second_access:?}: {result:?}");
-                if let Err(error) = result { assert_eq!(error.domain, ErrorDomain::Submission); }
+                if let Err(error) = result {
+                    assert_eq!(error.domain, ErrorDomain::Submission);
+                }
             }
         }
     }
@@ -4569,7 +4919,7 @@ fn frozen_ffi_abi_sizes_and_capability_negotiation_are_stable() {
     assert_eq!(FFI_ABI_V40_VERSION, 40);
     assert_eq!(FFI_ABI_V41_VERSION, 41);
     assert_eq!(FFI_ABI_V42_VERSION, 42);
-    assert_eq!(FFI_ABI_VERSION, 63);
+    assert_eq!(FFI_ABI_VERSION, 65);
     assert!(!FFI_INITIAL_PRESENTATION_SUPPORTED);
     assert_eq!(size_of::<FfiHeader>(), 8);
     assert_eq!(size_of::<FfiHandle>(), 8);
@@ -5279,7 +5629,13 @@ fn ffi_abi_fuzz_rejects_unknown_versions_enums_and_lengths() {
         requested_feature_bits: FfiFeatureBits::GRAPHICS,
         reserved0: 0,
     };
-    for version in [0, FFI_ABI_V27_VERSION, FFI_ABI_V28_VERSION, FFI_ABI_VERSION + 1, u32::MAX] {
+    for version in [
+        0,
+        FFI_ABI_V27_VERSION,
+        FFI_ABI_V28_VERSION,
+        FFI_ABI_VERSION + 1,
+        u32::MAX,
+    ] {
         let mut request = base;
         request.header.version = version;
         assert_code(

@@ -44,11 +44,11 @@ final class WorldRenderRoutePolicyIrisIsolationTest {
 	}
 
 	@Test
-	void distantHorizonsIsUnavailableForEveryVulkanRoute() {
-		assertEquals(DISABLED, WorldRenderRoutePolicy.selectDistantHorizonsRouteForTests(
+	void distantHorizonsUsesTheRustPresenterForEveryVulkanRoute() {
+		assertEquals(RUST_VULKAN_WHOLE_FRAME, WorldRenderRoutePolicy.selectDistantHorizonsRouteForTests(
 			true, false, false, false
 		));
-		assertEquals(DISABLED, WorldRenderRoutePolicy.selectDistantHorizonsRouteForTests(
+		assertEquals(RUST_VULKAN_WHOLE_FRAME, WorldRenderRoutePolicy.selectDistantHorizonsRouteForTests(
 			false, true, false, false
 		));
 	}

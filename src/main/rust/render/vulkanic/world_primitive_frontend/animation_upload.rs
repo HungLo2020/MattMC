@@ -16,8 +16,9 @@ pub(super) enum UploadAttempt {
 impl UploadQueue {
     /// Reclaim only the oldest owned lease, never device-idle or unrelated work.
     pub(super) fn wait_for_oldest(&mut self, gal: &mut VulkanicGal) -> GalResult<()> {
-        let submission = self.pending.front().map(|entry| entry.0)
-            .ok_or_else(|| GalError::invalid_argument("animation backpressure has no owned completion"))?;
+        let submission = self.pending.front().map(|entry| entry.0).ok_or_else(|| {
+            GalError::invalid_argument("animation backpressure has no owned completion")
+        })?;
         gal.retire_through(submission)?;
         self.reap(gal)
     }
@@ -227,9 +228,13 @@ pub(super) fn operations(
                 copies.push(CommandOp::Barrier(texture_subresource_barrier(
                     resources.texture,
                     TextureSubresourceRange {
-                        base_mip: level as u32, mip_count: 1, base_layer: 0, layer_count: 1,
+                        base_mip: level as u32,
+                        mip_count: 1,
+                        base_layer: 0,
+                        layer_count: 1,
                     },
-                    TextureUsageState::TransferDst, TextureUsageState::TransferDst,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::TransferDst,
                 )));
             }
             copies.push(CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
@@ -413,10 +418,16 @@ mod tests {
         let mut retained = retained_atlas(2, 1, vec![0; 8], vec![]);
         let mut queue = UploadQueue::default();
         for tick in 1..=3 {
-            let captured=super::equipment_capture::cached_texture_source(1,&retained).unwrap();
-            let cached_ptr=retained.equipment_capture_png.get().unwrap().as_ptr();
-            assert_eq!(super::equipment_capture::cached_texture_source(1,&retained).unwrap(),captured);
-            assert_eq!(retained.equipment_capture_png.get().unwrap().as_ptr(),cached_ptr);
+            let captured = super::equipment_capture::cached_texture_source(1, &retained).unwrap();
+            let cached_ptr = retained.equipment_capture_png.get().unwrap().as_ptr();
+            assert_eq!(
+                super::equipment_capture::cached_texture_source(1, &retained).unwrap(),
+                captured
+            );
+            assert_eq!(
+                retained.equipment_capture_png.get().unwrap().as_ptr(),
+                cached_ptr
+            );
             let mut pending = Some(
                 animation
                     .prepare_tick(2, 1, 1, tick, &BTreeSet::from([1]), true)
@@ -446,7 +457,7 @@ mod tests {
         );
         let creates = gal.mock_backend().unwrap().creates.len();
         let before = retained.rgba.clone();
-        let captured=super::equipment_capture::cached_texture_source(1,&retained).unwrap();
+        let captured = super::equipment_capture::cached_texture_source(1, &retained).unwrap();
         assert_eq!(
             queue
                 .submit(
@@ -461,7 +472,10 @@ mod tests {
         );
         assert!(pending.is_some());
         assert_eq!(retained.rgba, before);
-        assert_eq!(super::equipment_capture::cached_texture_source(1,&retained).unwrap(),captured);
+        assert_eq!(
+            super::equipment_capture::cached_texture_source(1, &retained).unwrap(),
+            captured
+        );
         assert_eq!(gal.mock_backend().unwrap().creates.len(), creates);
         gal.mock_backend_mut().unwrap().completed = queue.pending.back().unwrap().0;
         assert!(matches!(
@@ -487,47 +501,41 @@ mod tests {
         // Invalid retained storage must reject without consuming the tick or
         // creating an upload lease, so a corrected incarnation can retry it.
         retained.rgba.pop();
-        assert!(
-            queue
-                .submit(
-                    &mut gal,
-                    &resources,
-                    &mut animation,
-                    &mut retained,
-                    &mut pending
-                )
-                .is_err()
-        );
+        assert!(queue
+            .submit(
+                &mut gal,
+                &resources,
+                &mut animation,
+                &mut retained,
+                &mut pending
+            )
+            .is_err());
         assert!(pending.is_some());
         assert_eq!(gal.mock_backend().unwrap().live.len(), live);
         retained.rgba = before.clone();
         retained.animation_generation += 1;
-        assert!(
-            queue
-                .submit(
-                    &mut gal,
-                    &resources,
-                    &mut animation,
-                    &mut retained,
-                    &mut pending
-                )
-                .is_err()
-        );
+        assert!(queue
+            .submit(
+                &mut gal,
+                &resources,
+                &mut animation,
+                &mut retained,
+                &mut pending
+            )
+            .is_err());
         retained.animation_generation -= 1;
         assert!(pending.is_some());
         assert_eq!(retained.rgba, before);
         gal.mock_backend_mut().unwrap().fail_next_submit = true;
-        assert!(
-            queue
-                .submit(
-                    &mut gal,
-                    &resources,
-                    &mut animation,
-                    &mut retained,
-                    &mut pending
-                )
-                .is_err()
-        );
+        assert!(queue
+            .submit(
+                &mut gal,
+                &resources,
+                &mut animation,
+                &mut retained,
+                &mut pending
+            )
+            .is_err());
         assert!(pending.is_some());
         assert_eq!(gal.mock_backend().unwrap().live.len(), live);
         assert_eq!(retained.rgba, before);
@@ -561,74 +569,163 @@ mod tests {
     #[test]
     fn atlas_animation_registry_updates_two_vulkan_images_without_cross_atlas_writes() {
         let mut gal = VulkanicGal::new_with_backend(
-            Box::new(VulkanBackend::new("independent atlas animation readback").unwrap()), false);
+            Box::new(VulkanBackend::new("independent atlas animation readback").unwrap()),
+            false,
+        );
         let mut frontend = WorldPrimitiveFrontend::default();
         for (id, baseline, base) in [(101, 9, 20u8), (202, 8, 120u8)] {
             let mut asset = retained_atlas(2, 1, vec![baseline; 8], vec![]);
             asset.requested_mip_levels = 1;
             frontend.mesh_texture_assets.insert(id, asset);
-            frontend.ensure_mesh_texture_resources(&mut gal, id, "atlas-isolation-test").unwrap();
-            frontend.stage_atlas_animation_assets(OwnedAtlasAnimationUpdate {
-                texture_id: id, generation: 1,
-                sprites: vec![OwnedSpriteAnimation {
-                    sprite_id: 1,
-                    region: SpriteAtlasRegion { x: 0, y: 0, width: 1, height: 1 },
-                    clock: SpriteAnimationClock::new(vec![
-                        SpriteAnimationFrame { index: 0, duration_ticks: 2 },
-                        SpriteAnimationFrame { index: 1, duration_ticks: 2 },
-                    ], 2, true, 0).unwrap(),
-                    sheets: vec![SpriteMipSheet { width: 2, height: 1,
-                        rgba: vec![base, 0, 0, 255, base + 60, 0, 0, 255] }],
-                }],
-            }).unwrap();
+            frontend
+                .ensure_mesh_texture_resources(&mut gal, id, "atlas-isolation-test")
+                .unwrap();
+            frontend
+                .stage_atlas_animation_assets(OwnedAtlasAnimationUpdate {
+                    texture_id: id,
+                    generation: 1,
+                    sprites: vec![OwnedSpriteAnimation {
+                        sprite_id: 1,
+                        region: SpriteAtlasRegion {
+                            x: 0,
+                            y: 0,
+                            width: 1,
+                            height: 1,
+                        },
+                        clock: SpriteAnimationClock::new(
+                            vec![
+                                SpriteAnimationFrame {
+                                    index: 0,
+                                    duration_ticks: 2,
+                                },
+                                SpriteAnimationFrame {
+                                    index: 1,
+                                    duration_ticks: 2,
+                                },
+                            ],
+                            2,
+                            true,
+                            0,
+                        )
+                        .unwrap(),
+                        sheets: vec![SpriteMipSheet {
+                            width: 2,
+                            height: 1,
+                            rgba: vec![base, 0, 0, 255, base + 60, 0, 0, 255],
+                        }],
+                    }],
+                })
+                .unwrap();
         }
-        assert_ne!(frontend.mesh_texture_resources[&101].texture, frontend.mesh_texture_resources[&202].texture);
+        assert_ne!(
+            frontend.mesh_texture_resources[&101].texture,
+            frontend.mesh_texture_resources[&202].texture
+        );
         let read_images = |gal: &mut VulkanicGal, frontend: &WorldPrimitiveFrontend| {
-            let readback = gal.create_buffer(BufferDesc {
-                label: "two-atlas.readback".into(), size: 16, memory: MemoryDomain::Readback,
-                usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
-            }).unwrap();
+            let readback = gal
+                .create_buffer(BufferDesc {
+                    label: "two-atlas.readback".into(),
+                    size: 16,
+                    memory: MemoryDomain::Readback,
+                    usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
+                })
+                .unwrap();
             let mut operations = Vec::new();
             for (id, offset) in [(101, 0), (202, 8)] {
                 let texture = frontend.mesh_texture_resources[&id].texture;
-                let range = TextureSubresourceRange { base_mip: 0, mip_count: 1, base_layer: 0, layer_count: 1 };
-                operations.push(CommandOp::Barrier(texture_subresource_barrier(texture, range,
-                    TextureUsageState::ShaderRead, TextureUsageState::TransferSrc)));
+                let range = TextureSubresourceRange {
+                    base_mip: 0,
+                    mip_count: 1,
+                    base_layer: 0,
+                    layer_count: 1,
+                };
+                operations.push(CommandOp::Barrier(texture_subresource_barrier(
+                    texture,
+                    range,
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::TransferSrc,
+                )));
                 operations.push(CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
-                    buffer: readback, buffer_offset: offset, bytes_per_row: 8, rows_per_image: 1,
-                    texture, texture_mip: 0, texture_layer: 0,
+                    buffer: readback,
+                    buffer_offset: offset,
+                    bytes_per_row: 8,
+                    rows_per_image: 1,
+                    texture,
+                    texture_mip: 0,
+                    texture_layer: 0,
                     texture_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
-                    extent: Extent3d { width: 2, height: 1, depth: 1 },
+                    extent: Extent3d {
+                        width: 2,
+                        height: 1,
+                        depth: 1,
+                    },
                 }));
-                operations.push(CommandOp::Barrier(texture_subresource_barrier(texture, range,
-                    TextureUsageState::TransferSrc, TextureUsageState::ShaderRead)));
+                operations.push(CommandOp::Barrier(texture_subresource_barrier(
+                    texture,
+                    range,
+                    TextureUsageState::TransferSrc,
+                    TextureUsageState::ShaderRead,
+                )));
             }
-            operations.push(CommandOp::Barrier(buffer_barrier(readback,
-                TextureUsageState::TransferDst, TextureUsageState::ShaderRead)));
-            operations.push(CommandOp::HostReadBuffer { buffer: readback, offset: 0, size: 16 });
-            let receipt = gal.submit(SubmissionBatch { label: "two-atlas.readback".into(),
-                command_lists: vec![CommandList::from(CommandListDesc {
-                    label: "two-atlas.readback.commands".into(), operations,
-                })],
-            }).unwrap();
+            operations.push(CommandOp::Barrier(buffer_barrier(
+                readback,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            )));
+            operations.push(CommandOp::HostReadBuffer {
+                buffer: readback,
+                offset: 0,
+                size: 16,
+            });
+            let receipt = gal
+                .submit(SubmissionBatch {
+                    label: "two-atlas.readback".into(),
+                    command_lists: vec![CommandList::from(CommandListDesc {
+                        label: "two-atlas.readback.commands".into(),
+                        operations,
+                    })],
+                })
+                .unwrap();
             gal.retire_through_for_test(receipt.submission).unwrap();
-            let bytes = gal.completed_host_reads().iter().rev()
-                .find(|read| read.buffer == readback).unwrap().bytes.clone();
+            let bytes = gal
+                .completed_host_reads()
+                .iter()
+                .rev()
+                .find(|read| read.buffer == readback)
+                .unwrap()
+                .bytes
+                .clone();
             gal.destroy(readback).unwrap();
             bytes
         };
         let event = |texture_id, tick| AtlasAnimationTickEvent {
-            texture_id, generation: 1, tick, visible: BTreeSet::from([1]), animate_only_visible: true,
+            texture_id,
+            generation: 1,
+            tick,
+            visible: BTreeSet::from([1]),
+            animate_only_visible: true,
         };
-        assert!(frontend.advance_atlas_animation(&mut gal, event(101, 1)).unwrap());
-        assert_eq!(read_images(&mut gal, &frontend),
-            vec![50, 0, 0, 255, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8]);
-        assert!(frontend.advance_atlas_animation(&mut gal, event(202, 1)).unwrap());
-        assert_eq!(read_images(&mut gal, &frontend),
-            vec![50, 0, 0, 255, 9, 9, 9, 9, 150, 0, 0, 255, 8, 8, 8, 8]);
-        assert!(frontend.advance_atlas_animation(&mut gal, event(101, 2)).unwrap());
-        assert_eq!(read_images(&mut gal, &frontend),
-            vec![80, 0, 0, 255, 9, 9, 9, 9, 150, 0, 0, 255, 8, 8, 8, 8]);
+        assert!(frontend
+            .advance_atlas_animation(&mut gal, event(101, 1))
+            .unwrap());
+        assert_eq!(
+            read_images(&mut gal, &frontend),
+            vec![50, 0, 0, 255, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8]
+        );
+        assert!(frontend
+            .advance_atlas_animation(&mut gal, event(202, 1))
+            .unwrap());
+        assert_eq!(
+            read_images(&mut gal, &frontend),
+            vec![50, 0, 0, 255, 9, 9, 9, 9, 150, 0, 0, 255, 8, 8, 8, 8]
+        );
+        assert!(frontend
+            .advance_atlas_animation(&mut gal, event(101, 2))
+            .unwrap());
+        assert_eq!(
+            read_images(&mut gal, &frontend),
+            vec![80, 0, 0, 255, 9, 9, 9, 9, 150, 0, 0, 255, 8, 8, 8, 8]
+        );
         frontend.reset(&mut gal);
         assert!(frontend.mesh_texture_resources.is_empty());
         assert!(frontend.staged_atlas_animations.is_empty());
@@ -780,10 +877,9 @@ mod tests {
             .unwrap();
         assert!(operations(&resources, patch_upload, 19, &pending).is_err());
         let ops = operations(&resources, patch_upload, 20, &pending).unwrap();
-        assert!(
-            !ops.iter()
-                .any(|op| matches!(op, CommandOp::GenerateMipmaps { .. }))
-        );
+        assert!(!ops
+            .iter()
+            .any(|op| matches!(op, CommandOp::GenerateMipmaps { .. })));
         let mut candidate = Some(pending);
         let mut retained = retained_atlas(4, 2, vec![9; 32], vec![vec![8; 8]]);
         let mut queue = UploadQueue::default();
@@ -939,43 +1035,105 @@ mod tests {
         // explicit dependencies as well as exact output on a real Vulkan image.
         animation.sprites.push(OwnedSpriteAnimation {
             sprite_id: 2,
-            region: SpriteAtlasRegion { x: 0, y: 0, width: 2, height: 2 },
-            clock: SpriteAnimationClock::new(vec![
-                SpriteAnimationFrame { index: 0, duration_ticks: 2 },
-                SpriteAnimationFrame { index: 1, duration_ticks: 2 },
-            ], 2, true, 1).unwrap(),
+            region: SpriteAtlasRegion {
+                x: 0,
+                y: 0,
+                width: 2,
+                height: 2,
+            },
+            clock: SpriteAnimationClock::new(
+                vec![
+                    SpriteAnimationFrame {
+                        index: 0,
+                        duration_ticks: 2,
+                    },
+                    SpriteAnimationFrame {
+                        index: 1,
+                        duration_ticks: 2,
+                    },
+                ],
+                2,
+                true,
+                1,
+            )
+            .unwrap(),
             sheets: vec![
-                SpriteMipSheet { width: 4, height: 2, rgba: [
-                    [20, 40, 60, 80].repeat(2), [100, 120, 140, 160].repeat(2),
-                    [20, 40, 60, 80].repeat(2), [100, 120, 140, 160].repeat(2),
-                ].concat() },
-                SpriteMipSheet { width: 2, height: 1,
-                    rgba: vec![30, 50, 70, 90, 110, 130, 150, 170] },
+                SpriteMipSheet {
+                    width: 4,
+                    height: 2,
+                    rgba: [
+                        [20, 40, 60, 80].repeat(2),
+                        [100, 120, 140, 160].repeat(2),
+                        [20, 40, 60, 80].repeat(2),
+                        [100, 120, 140, 160].repeat(2),
+                    ]
+                    .concat(),
+                },
+                SpriteMipSheet {
+                    width: 2,
+                    height: 1,
+                    rgba: vec![30, 50, 70, 90, 110, 130, 150, 170],
+                },
             ],
         });
-        submit(&mut gal, vec![
-            CommandOp::Barrier(texture_subresource_barrier(texture,
-                TextureSubresourceRange { base_mip: 0, mip_count: 2, base_layer: 0, layer_count: 1 },
-                TextureUsageState::TransferSrc, TextureUsageState::ShaderRead)),
-            CommandOp::Barrier(buffer_barrier(readback,
-                TextureUsageState::ShaderRead, TextureUsageState::TransferDst)),
-        ]);
-        let mut candidate = Some(animation.prepare_tick(4, 2, 2, 2, &BTreeSet::from([1, 2]), true).unwrap());
+        submit(
+            &mut gal,
+            vec![
+                CommandOp::Barrier(texture_subresource_barrier(
+                    texture,
+                    TextureSubresourceRange {
+                        base_mip: 0,
+                        mip_count: 2,
+                        base_layer: 0,
+                        layer_count: 1,
+                    },
+                    TextureUsageState::TransferSrc,
+                    TextureUsageState::ShaderRead,
+                )),
+                CommandOp::Barrier(buffer_barrier(
+                    readback,
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::TransferDst,
+                )),
+            ],
+        );
+        let mut candidate = Some(
+            animation
+                .prepare_tick(4, 2, 2, 2, &BTreeSet::from([1, 2]), true)
+                .unwrap(),
+        );
         assert_eq!(candidate.as_ref().unwrap().patches().len(), 2);
-        assert!(matches!(queue.submit(&mut gal, &resources, &mut animation,
-            frontend.mesh_texture_assets.get_mut(&1).unwrap(), &mut candidate).unwrap(),
-            UploadAttempt::Accepted(Some(_))));
+        assert!(matches!(
+            queue
+                .submit(
+                    &mut gal,
+                    &resources,
+                    &mut animation,
+                    frontend.mesh_texture_assets.get_mut(&1).unwrap(),
+                    &mut candidate
+                )
+                .unwrap(),
+            UploadAttempt::Accepted(Some(_))
+        ));
         let token = submit(&mut gal, read_operations(texture, readback));
         gal.retire_through_for_test(token.submission).unwrap();
         queue.reap(&mut gal).unwrap();
         assert!(queue.pending.is_empty());
         let reads = gal.completed_host_reads();
-        let bytes = &reads.iter().rev().find(|read| read.buffer == readback).unwrap().bytes;
+        let bytes = &reads
+            .iter()
+            .rev()
+            .find(|read| read.buffer == readback)
+            .unwrap()
+            .bytes;
         let expected = [
-            [60, 80, 100, 80].repeat(2), [110, 120, 130, 99].repeat(2),
-            [60, 80, 100, 80].repeat(2), [110, 120, 130, 99].repeat(2),
+            [60, 80, 100, 80].repeat(2),
+            [110, 120, 130, 99].repeat(2),
+            [60, 80, 100, 80].repeat(2),
+            [110, 120, 130, 99].repeat(2),
             vec![70, 90, 110, 90, 200, 210, 220, 80],
-        ].concat();
+        ]
+        .concat();
         assert_eq!(bytes, &expected);
         let retained = frontend.mesh_texture_assets.get(&1).unwrap();
         assert_eq!(&bytes[..32], retained.rgba.as_slice());

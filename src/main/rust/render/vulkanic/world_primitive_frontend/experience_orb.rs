@@ -105,6 +105,7 @@ impl ExperienceOrbPlacement {
             color_argb: 0xffffffff,
             entity_id: self.entity_id,
             entity_color_argb: 0,
+            packed_light: 0,
             outline_color_argb: 0,
             flags: 0,
             block_entity_id: -1,

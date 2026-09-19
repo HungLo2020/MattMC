@@ -393,14 +393,19 @@ pub fn bundled_transparency_vulkan_shader_sources() -> GalResult<Vec<(Vec<u8>, V
 }
 
 pub(crate) fn normalize_vulkan_vertex_source(api: BackendApi, source: &[u8]) -> GalResult<Vec<u8>> {
-    normalize_vulkan_vertex_source_for_input_rows(api, source,
-        crate::render::vulkanic::commands::TextureRowOrder::Preserve)
+    normalize_vulkan_vertex_source_for_input_rows(
+        api,
+        source,
+        crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+    )
 }
 
 /// Preserve copied shader arithmetic when attachment inputs have already
 /// been converted into the shader's original row convention explicitly.
 pub(crate) fn normalize_vulkan_vertex_source_for_input_rows(
-    api: BackendApi, source: &[u8], rows: crate::render::vulkanic::commands::TextureRowOrder,
+    api: BackendApi,
+    source: &[u8],
+    rows: crate::render::vulkanic::commands::TextureRowOrder,
 ) -> GalResult<Vec<u8>> {
     let source = std::str::from_utf8(source).map_err(|_| {
         GalError::invalid_argument("vanilla post-effect vertex shader is not UTF-8")
@@ -442,7 +447,9 @@ pub(crate) fn normalize_vulkan_vertex_source_for_pass(
     rows: crate::render::vulkanic::commands::TextureRowOrder,
 ) -> GalResult<Vec<u8>> {
     let normalized = normalize_vulkan_vertex_source_for_input_rows(api, source, rows)?;
-    if api != BackendApi::Vulkan { return Ok(normalized); }
+    if api != BackendApi::Vulkan {
+        return Ok(normalized);
+    }
     let source = std::str::from_utf8(&normalized)
         .map_err(|_| GalError::invalid_argument("post-effect vertex shader is not UTF-8"))?;
     Ok(bind_vulkan_uniform_blocks(source.to_owned(), pass).into_bytes())
@@ -453,8 +460,11 @@ fn bind_vulkan_uniform_blocks(mut source: String, pass: &VanillaPostEffectPass) 
     // in both stages. A block absent from one stage needs no declaration there.
     for (block_index, block_name) in pass.uniform_values.keys().enumerate() {
         let binding = pass.inputs.len() + block_index;
-        source = source.replacen(&format!("layout(std140) uniform {block_name}"),
-            &format!("layout(set = 0, binding = {binding}, std140) uniform {block_name}"), 1);
+        source = source.replacen(
+            &format!("layout(std140) uniform {block_name}"),
+            &format!("layout(set = 0, binding = {binding}, std140) uniform {block_name}"),
+            1,
+        );
     }
     source
 }
@@ -940,7 +950,8 @@ mod tests {
 
     #[test]
     fn vulkan_screenquad_normalization_flips_attachment_row_origin() {
-        let source = include_bytes!("../../../../resources/assets/minecraft/shaders/core/screenquad.vsh");
+        let source =
+            include_bytes!("../../../../resources/assets/minecraft/shaders/core/screenquad.vsh");
         let lowered = String::from_utf8(
             normalize_vulkan_vertex_source(BackendApi::Vulkan, source)
                 .expect("bundled screenquad must normalize for Vulkan"),

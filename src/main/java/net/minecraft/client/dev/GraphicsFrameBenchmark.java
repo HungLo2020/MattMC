@@ -20,6 +20,7 @@ import net.vulkanic.gui.RustGalFrameCoordinator;
 import net.vulkanic.world.RustGalTerrainRenderer;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import net.vulkanic.world.DistantHorizonsSemanticCollector;
+import net.vulkanic.world.RustGalWholeFrameTerrainSource;
 
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
@@ -64,6 +65,19 @@ public final class GraphicsFrameBenchmark {
 	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
 	private static final boolean REQUIRE_DH_EXECUTION =
 		Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution");
+	/**
+	 * A DH gameplay sample is not steady-state while the independent vanilla
+	 * terrain source is still ingesting section builds.  Keep this gate opt-out
+	 * capable for intentionally streaming probes, but make the normal DH
+	 * performance path wait for the source-owned CPU queue to drain.
+	 */
+	private static final boolean REQUIRE_TERRAIN_QUEUE_DRAIN =
+		Boolean.parseBoolean(System.getProperty(
+			"mattmc.dev.graphicsFrameBenchmark.requireTerrainQueueDrain",
+			Boolean.toString(REQUIRE_DH_EXECUTION)
+		));
+	private static final int TERRAIN_QUEUE_DRAIN_STABLE_FRAMES = Math.max(1,
+		Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.terrainQueueDrainStableFrames", 8));
 	private static final long POSITIVE_CONTROL_DELAY_NANOS = Math.max(0L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.positiveControlDelayNanos", 0L));
 	private static final boolean GC_BEFORE_MEASUREMENT =
 		Boolean.parseBoolean(System.getProperty("mattmc.dev.graphicsFrameBenchmark.gcBeforeMeasurement", "false"));
@@ -176,6 +190,7 @@ public final class GraphicsFrameBenchmark {
 	private static long readinessStartNanos = -1L;
 	private static long producerWorkloadStartNanos = -1L;
 	private static long producerWorkloadWaitFrames;
+	private static long terrainQueueDrainStableFrames;
 	private static long staticTerrainSteadyFrames;
 	private static long staticTerrainLastActiveLayers = Long.MIN_VALUE;
 	private static long staticTerrainLastActiveSectionAssets = Long.MIN_VALUE;
@@ -447,6 +462,11 @@ public final class GraphicsFrameBenchmark {
 			return;
 		}
 		PHASE_STACK.push(new OpenPhase(name, System.nanoTime(), beginTracyZone(name)));
+	}
+
+	/** Returns whether frame-local diagnostic timing is currently being sampled. */
+	public static boolean isFrameBenchmarkActive() {
+		return ENABLED && frameActive;
 	}
 
 	public static void endPhase(String name) {
@@ -753,6 +773,17 @@ public final class GraphicsFrameBenchmark {
 
 	private static boolean producerWorkloadReady(Minecraft minecraft) {
 		List<String> missing = missingProducerWorkloads();
+		if (REQUIRE_TERRAIN_QUEUE_DRAIN) {
+			if (RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
+				terrainQueueDrainStableFrames++;
+			} else {
+				terrainQueueDrainStableFrames = 0L;
+			}
+			if (terrainQueueDrainStableFrames < TERRAIN_QUEUE_DRAIN_STABLE_FRAMES) {
+				missing.add("rust-terrain-queue-drain(" + terrainQueueDrainStableFrames + "/"
+					+ TERRAIN_QUEUE_DRAIN_STABLE_FRAMES + ")");
+			}
+		}
 		if (missing.isEmpty()) {
 			lastProducerWorkloadBlocker = "ready";
 			return true;
@@ -766,6 +797,7 @@ public final class GraphicsFrameBenchmark {
 			+ ", blockDisplayStatus=" + blockDisplayScenarioStatus
 			+ ", fallingBlockStatus=" + fallingBlockScenarioStatus
 			+ ", pistonStatus=" + pistonScenarioStatus
+			+ ", terrainQueue=" + RustGalWholeFrameTerrainSource.wholeFrameTerrainQueueSummary()
 			+ ", submitted=" + SUBMITTED_WORK_COUNTS
 			+ ", fallingRoutes=" + FALLING_BLOCK_ROUTE_COUNTS
 			+ ", movingRoutes=" + MOVING_BLOCK_ROUTE_COUNTS;
@@ -1054,7 +1086,10 @@ public final class GraphicsFrameBenchmark {
 			+ ", screenTitle=" + screenTitle(minecraft)
 			+ ", overlay=" + overlay
 			+ ", loadedChunks=" + loadedChunks
-			+ ", staleStartupScreen=" + isStaleStartupScreen(minecraft);
+			+ ", staleStartupScreen=" + isStaleStartupScreen(minecraft)
+			+ ", terrainQueueDrainRequired=" + REQUIRE_TERRAIN_QUEUE_DRAIN
+			+ ", terrainQueueDrainStableFrames=" + terrainQueueDrainStableFrames + "/" + TERRAIN_QUEUE_DRAIN_STABLE_FRAMES
+			+ ", terrainQueue=" + RustGalWholeFrameTerrainSource.wholeFrameTerrainQueueSummary();
 	}
 
 	private static void applyPositiveControlDelay() {
@@ -1644,6 +1679,9 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"warmupFramesRequested\": ").append(WARMUP_FRAMES).append(",\n");
 		json.append("  \"measureFramesRequested\": ").append(MEASURE_FRAMES).append(",\n");
 		json.append("  \"readinessTimeoutNanos\": ").append(READINESS_TIMEOUT_NANOS).append(",\n");
+		json.append("  \"terrainQueueDrainRequired\": ").append(REQUIRE_TERRAIN_QUEUE_DRAIN).append(",\n");
+		json.append("  \"terrainQueueDrainStableFramesRequired\": ").append(TERRAIN_QUEUE_DRAIN_STABLE_FRAMES).append(",\n");
+		json.append("  \"terrainQueueDrainStableFrames\": ").append(terrainQueueDrainStableFrames).append(",\n");
 		json.append("  \"positiveControlDelayNanos\": ").append(POSITIVE_CONTROL_DELAY_NANOS).append(",\n");
 		json.append("  \"gcBeforeMeasurement\": ").append(GC_BEFORE_MEASUREMENT).append(",\n");
 		json.append("  \"gcBeforeMeasurementOffsetFrames\": ").append(GC_BEFORE_MEASUREMENT_OFFSET_FRAMES).append(",\n");
@@ -1731,10 +1769,22 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"frame\": ").append(route.frame()).append(",\n");
 		json.append("    \"visibleColumns\": ").append(route.visibleColumns()).append(",\n");
 		json.append("    \"cachedColumns\": ").append(route.cachedColumns()).append(",\n");
+		json.append("    \"semanticCandidateColumns\": ").append(route.semanticCandidateColumns()).append(",\n");
+		json.append("    \"semanticUnpublishedCandidates\": ").append(route.semanticUnpublishedCandidates()).append(",\n");
 		json.append("    \"unpublishedVisibleColumns\": ").append(route.unpublishedVisibleColumns()).append(",\n");
 		json.append("    \"opaqueSegments\": ").append(route.opaqueSegments()).append(",\n");
 		json.append("    \"transparentSegments\": ").append(route.transparentSegments()).append(",\n");
 		json.append("    \"waterSegments\": ").append(route.waterSegments()).append(",\n");
+		json.append("    \"lifecycleResetCount\": ").append(route.lifecycleResetCount()).append(",\n");
+		json.append("    \"resourceReloadResetCount\": ").append(route.resourceReloadResetCount()).append(",\n");
+		field(json, "lastLifecycleResetReason", route.lastLifecycleResetReason(), 4, true);
+		json.append("    \"lastLifecycleRetirementsAcknowledged\": ").append(route.lastLifecycleRetirementsAcknowledged()).append(",\n");
+		json.append("    \"lastLifecycleRetirementsSupersededByReplacement\": ").append(route.lastLifecycleRetirementsSupersededByReplacement()).append(",\n");
+		json.append("    \"lastLifecycleRetirementsOutstanding\": ").append(route.lastLifecycleRetirementsOutstanding()).append(",\n");
+		json.append("    \"pendingRetirements\": ").append(route.pendingRetirements()).append(",\n");
+		json.append("    \"invalidatedInFlight\": ").append(route.invalidatedInFlight()).append(",\n");
+		json.append("    \"lastLifecycleGenerationFloor\": ").append(route.lastLifecycleGenerationFloor()).append(",\n");
+		json.append("    \"minimumPublishedGeneration\": ").append(route.minimumPublishedGeneration()).append(",\n");
 		json.append("    \"frameSemanticsEnabled\": ").append(route.frameSemanticsEnabled()).append(",\n");
 		json.append("    \"selected\": ").append(route.selected()).append(",\n");
 		json.append("    \"lastExecutedWorldFrame\": ").append(route.lastExecutedWorldFrame()).append(",\n");

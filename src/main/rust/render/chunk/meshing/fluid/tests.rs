@@ -8,8 +8,12 @@ struct RecordedFluidFaces {
 }
 
 impl NativeFluidFaceSink for RecordedFluidFaces {
-    fn profile(&mut self) -> &mut NativeMeshingProfile { &mut self.profile }
-    fn mark_fluid_sprite(&mut self, mask: i32) { self.sprite_mask |= mask; }
+    fn profile(&mut self) -> &mut NativeMeshingProfile {
+        &mut self.profile
+    }
+    fn mark_fluid_sprite(&mut self, mask: i32) {
+        self.sprite_mask |= mask;
+    }
     fn emit(&mut self, face: NativeFluidFace) -> Result<(), i32> {
         self.faces.push(face);
         Ok(())
@@ -19,26 +23,35 @@ impl NativeFluidFaceSink for RecordedFluidFaces {
 #[test]
 fn emitted_water_and_lava_faces_report_only_their_used_sprites() {
     for (fluid_type, expected) in [
-        (FLUID_WATER, FLUID_SPRITE_WATER_STILL | FLUID_SPRITE_WATER_FLOW),
+        (
+            FLUID_WATER,
+            FLUID_SPRITE_WATER_STILL | FLUID_SPRITE_WATER_FLOW,
+        ),
         (FLUID_LAVA, FLUID_SPRITE_LAVA_STILL | FLUID_SPRITE_LAVA_FLOW),
     ] {
         let fluid = NativeMeshingState {
-            fluid_type, fluid_own_height: 8.0 / 9.0,
+            fluid_type,
+            fluid_own_height: 8.0 / 9.0,
             ..NativeMeshingState::default()
         };
         let states = [Some(NativeMeshingState::default()), Some(fluid)];
         for enclosed in [false, true] {
             let neighbor = if enclosed { 1 } else { 0 };
             let block = NativeSectionBlockRecord {
-                neighbor_state_ids: [neighbor; 6], neighborhood_state_ids: [neighbor; 27],
+                neighbor_state_ids: [neighbor; 6],
+                neighborhood_state_ids: [neighbor; 27],
                 ..NativeSectionBlockRecord::default()
             };
             let mut sink = RecordedFluidFaces::default();
-            let count = native_section_fluid_faces_to_sink(&block, fluid, &states, &mut sink).unwrap();
+            let count =
+                native_section_fluid_faces_to_sink(&block, fluid, &states, &mut sink).unwrap();
             assert_eq!(count, sink.faces.len());
             assert_eq!(enclosed, sink.faces.is_empty());
-            assert_eq!(if enclosed { 0 } else { expected }, sink.sprite_mask,
-                "fluid={fluid_type}, enclosed={enclosed}");
+            assert_eq!(
+                if enclosed { 0 } else { expected },
+                sink.sprite_mask,
+                "fluid={fluid_type}, enclosed={enclosed}"
+            );
         }
     }
 }
@@ -53,10 +66,17 @@ fn fluid_ceiling_exposure_matches_shape_boundary_tolerance() {
         neighborhood_state_ids: [0; 27],
         ..NativeSectionBlockRecord::default()
     };
-    for (height, exposed) in [(0.5, true), (8.0 / 9.0, true),
-            (f32::from_bits(1.0f32.to_bits() - 2), true),
-            (f32::from_bits(1.0f32.to_bits() - 1), false), (1.0, false)] {
-        assert_eq!(exposed, fluid_side_exposed(&block, &states, 0, 1, 0, height));
+    for (height, exposed) in [
+        (0.5, true),
+        (8.0 / 9.0, true),
+        (f32::from_bits(1.0f32.to_bits() - 2), true),
+        (f32::from_bits(1.0f32.to_bits() - 1), false),
+        (1.0, false),
+    ] {
+        assert_eq!(
+            exposed,
+            fluid_side_exposed(&block, &states, 0, 1, 0, height)
+        );
         for direction in [0, 2, 3, 4, 5] {
             let (dx, dy, dz) = dir_step(direction);
             assert!(!fluid_side_exposed(&block, &states, dx, dy, dz, height));
@@ -69,16 +89,23 @@ fn partial_height_fluid_keeps_top_and_backface_below_solid_ceiling() {
     for fluid_type in [FLUID_WATER, FLUID_LAVA] {
         for height in [8.0 / 9.0, 1.0] {
             let fluid = NativeMeshingState {
-                fluid_type, fluid_own_height: height,
+                fluid_type,
+                fluid_own_height: height,
                 ..NativeMeshingState::default()
             };
-            let states = [Some(NativeMeshingState::default()), Some(fluid),
+            let states = [
+                Some(NativeMeshingState::default()),
+                Some(fluid),
                 Some(NativeMeshingState {
-                    flags: STATE_FLAG_CAN_OCCLUDE | STATE_FLAG_FULL_OCCLUSION | STATE_FLAG_SOLID_RENDER,
+                    flags: STATE_FLAG_CAN_OCCLUDE
+                        | STATE_FLAG_FULL_OCCLUSION
+                        | STATE_FLAG_SOLID_RENDER,
                     ..NativeMeshingState::default()
-                })];
+                }),
+            ];
             let mut block = NativeSectionBlockRecord {
-                neighbor_state_ids: [1; 6], neighborhood_state_ids: [1; 27],
+                neighbor_state_ids: [1; 6],
+                neighborhood_state_ids: [1; 27],
                 ..NativeSectionBlockRecord::default()
             };
             // Keep the neighboring surface at this same partial height: fluid
@@ -95,8 +122,11 @@ fn partial_height_fluid_keeps_top_and_backface_below_solid_ceiling() {
             block.neighborhood_state_ids[neighborhood_index(1, 1, 1)] = 0;
             let mut sink = RecordedFluidFaces::default();
             native_section_fluid_faces_to_sink(&block, fluid, &states, &mut sink).unwrap();
-            assert_eq!(if height < 1.0 { 2 } else { 0 }, sink.faces.len(),
-                "fluid={fluid_type}, height={height}");
+            assert_eq!(
+                if height < 1.0 { 2 } else { 0 },
+                sink.faces.len(),
+                "fluid={fluid_type}, height={height}"
+            );
         }
     }
 }
@@ -108,11 +138,14 @@ fn fluid_bottom_exposure_is_independent_of_horizontal_solid_neighbors() {
         fluid_own_height: 8.0 / 9.0,
         ..NativeMeshingState::default()
     };
-    let states = [Some(NativeMeshingState::default()), Some(water),
+    let states = [
+        Some(NativeMeshingState::default()),
+        Some(water),
         Some(NativeMeshingState {
             flags: STATE_FLAG_CAN_OCCLUDE | STATE_FLAG_FULL_OCCLUSION | STATE_FLAG_BLOCKS_MOTION,
             ..NativeMeshingState::default()
-        })];
+        }),
+    ];
     for direction in 2..6 {
         for solid_below in [false, true] {
             let mut block = NativeSectionBlockRecord {
@@ -130,9 +163,14 @@ fn fluid_bottom_exposure_is_independent_of_horizontal_solid_neighbors() {
             }
             let mut sink = RecordedFluidFaces::default();
             native_section_fluid_faces_to_sink(&block, water, &states, &mut sink).unwrap();
-            assert_eq!(if solid_below { 0 } else { 1 },
-                sink.faces.iter().filter(|face| face.face_kind == FLUID_FACE_BOTTOM).count(),
-                "horizontal direction={direction}, solid below={solid_below}");
+            assert_eq!(
+                if solid_below { 0 } else { 1 },
+                sink.faces
+                    .iter()
+                    .filter(|face| face.face_kind == FLUID_FACE_BOTTOM)
+                    .count(),
+                "horizontal direction={direction}, solid below={solid_below}"
+            );
         }
     }
 }
@@ -147,8 +185,20 @@ fn declared_overlay_controls_emitted_uvs_backfaces_and_sprite_usage() {
         fluid_type: FLUID_WATER,
         fluid_own_height: 8.0 / 9.0,
         fluid_overlay_valid: 1,
-        fluid_flow: FluidSprite { u0: 0.1, u1: 0.3, v0: 0.2, v1: 0.4, shrink: 0.0 },
-        fluid_overlay: FluidSprite { u0: 0.6, u1: 0.8, v0: 0.7, v1: 0.9, shrink: 0.0 },
+        fluid_flow: FluidSprite {
+            u0: 0.1,
+            u1: 0.3,
+            v0: 0.2,
+            v1: 0.4,
+            shrink: 0.0,
+        },
+        fluid_overlay: FluidSprite {
+            u0: 0.6,
+            u1: 0.8,
+            v0: 0.7,
+            v1: 0.9,
+            shrink: 0.0,
+        },
         ..NativeMeshingState::default()
     };
     for direction in 2..6 {
@@ -161,16 +211,35 @@ fn declared_overlay_controls_emitted_uvs_backfaces_and_sprite_usage() {
             let (dx, dy, dz) = dir_step(direction);
             block.neighbor_state_ids[direction as usize] = 1;
             block.neighborhood_state_ids[neighborhood_index(dx, dy, dz)] = 1;
-            let states = [Some(water), Some(NativeMeshingState {
-                flags: if transparent { STATE_FLAG_FLUID_OVERLAY_TRANSPARENT } else { 0 },
-                ..NativeMeshingState::default()
-            })];
+            let states = [
+                Some(water),
+                Some(NativeMeshingState {
+                    flags: if transparent {
+                        STATE_FLAG_FLUID_OVERLAY_TRANSPARENT
+                    } else {
+                        0
+                    },
+                    ..NativeMeshingState::default()
+                }),
+            ];
             let mut sink = RecordedFluidFaces::default();
-            let emitted = native_section_fluid_faces_to_sink(&block, water, &states, &mut sink).unwrap();
+            let emitted =
+                native_section_fluid_faces_to_sink(&block, water, &states, &mut sink).unwrap();
             assert_eq!(if transparent { 1 } else { 2 }, emitted);
             assert_eq!(emitted, sink.faces.len());
-            assert_eq!(if transparent { FLUID_SPRITE_WATER_OVERLAY } else { FLUID_SPRITE_WATER_FLOW }, sink.sprite_mask);
-            let sprite = if transparent { water.fluid_overlay } else { water.fluid_flow };
+            assert_eq!(
+                if transparent {
+                    FLUID_SPRITE_WATER_OVERLAY
+                } else {
+                    FLUID_SPRITE_WATER_FLOW
+                },
+                sink.sprite_mask
+            );
+            let sprite = if transparent {
+                water.fluid_overlay
+            } else {
+                water.fluid_flow
+            };
             for face in &sink.faces {
                 assert_eq!(FLUID_FACE_SIDE, face.face_kind);
                 assert_eq!(FLUID_WATER, face.fluid_type);
@@ -186,7 +255,10 @@ fn declared_overlay_controls_emitted_uvs_backfaces_and_sprite_usage() {
                 // its collector flips that bucket's aligned normal. Do not
                 // substitute a normal derived from the front winding here.
                 assert_ne!(front.facing, back.facing);
-                assert_eq!(flip_packed_normal(packed_fluid_normal(back.facing, &front.vertices)), back.packed_normal);
+                assert_eq!(
+                    flip_packed_normal(packed_fluid_normal(back.facing, &front.vertices)),
+                    back.packed_normal
+                );
                 for (i, j) in [(0, 0), (1, 3), (2, 2), (3, 1)] {
                     let a = front.vertices[i];
                     let b = back.vertices[j];
@@ -214,11 +286,19 @@ fn overlay_selection_consumes_declared_transparency_not_occlusion() {
     for flags in 0..STATE_FLAG_FLUID_OVERLAY_TRANSPARENT {
         for declared in [false, true] {
             let states = [Some(NativeMeshingState {
-                flags: flags | if declared { STATE_FLAG_FLUID_OVERLAY_TRANSPARENT } else { 0 },
+                flags: flags
+                    | if declared {
+                        STATE_FLAG_FLUID_OVERLAY_TRANSPARENT
+                    } else {
+                        0
+                    },
                 ..NativeMeshingState::default()
             })];
             for direction in 2..6 {
-                assert_eq!(declared, fluid_side_uses_overlay(&block, water, &states, direction));
+                assert_eq!(
+                    declared,
+                    fluid_side_uses_overlay(&block, water, &states, direction)
+                );
             }
         }
     }

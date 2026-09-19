@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 
 use super::super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandOp, PassAttachment, ResourceBarrier,
-    TextureImageCopyRegion, TextureOrigin3d, TextureUsageState, TextureRowOrder,
+    TextureImageCopyRegion, TextureOrigin3d, TextureRowOrder, TextureUsageState,
 };
 use super::super::error::{GalError, GalResult};
 use super::super::gal::VulkanicGal;
@@ -1146,13 +1146,23 @@ impl FabulousAttachmentSet {
         source_before: TextureUsageState,
         destination_before: TextureUsageState,
     ) -> GalResult<()> {
-        self.append_translucent_capture_copy_oriented(ops, source_texture, extent,
-            source_before, destination_before, TextureRowOrder::Preserve)
+        self.append_translucent_capture_copy_oriented(
+            ops,
+            source_texture,
+            extent,
+            source_before,
+            destination_before,
+            TextureRowOrder::Preserve,
+        )
     }
 
     fn append_translucent_capture_copy_oriented(
-        &self, ops: &mut Vec<CommandOp>, source_texture: Handle, extent: Extent3d,
-        source_before: TextureUsageState, destination_before: TextureUsageState,
+        &self,
+        ops: &mut Vec<CommandOp>,
+        source_texture: Handle,
+        extent: Extent3d,
+        source_before: TextureUsageState,
+        destination_before: TextureUsageState,
         row_order: TextureRowOrder,
     ) -> GalResult<()> {
         if extent.width == 0 || extent.height == 0 || extent.depth != 1 {
@@ -1260,13 +1270,25 @@ impl FabulousAttachmentSet {
         source_before: TextureUsageState,
         destination_before: TextureUsageState,
     ) -> GalResult<()> {
-        self.append_depth_capture_copy_oriented(ops, source_texture, destination, extent,
-            source_before, destination_before, TextureRowOrder::Preserve)
+        self.append_depth_capture_copy_oriented(
+            ops,
+            source_texture,
+            destination,
+            extent,
+            source_before,
+            destination_before,
+            TextureRowOrder::Preserve,
+        )
     }
 
     fn append_depth_capture_copy_oriented(
-        &self, ops: &mut Vec<CommandOp>, source_texture: Handle, destination: FabulousTargetRole,
-        extent: Extent3d, source_before: TextureUsageState, destination_before: TextureUsageState,
+        &self,
+        ops: &mut Vec<CommandOp>,
+        source_texture: Handle,
+        destination: FabulousTargetRole,
+        extent: Extent3d,
+        source_before: TextureUsageState,
+        destination_before: TextureUsageState,
         row_order: TextureRowOrder,
     ) -> GalResult<()> {
         if extent.width == 0 || extent.height == 0 || extent.depth != 1 {
@@ -1451,22 +1473,41 @@ impl FabulousAttachmentSet {
         attachments_initialized: bool,
         deferred_translucent_initialized: bool,
     ) -> GalResult<Handle> {
-        self.append_terrain_handoff_to_frame_target_oriented(gal, ops, frame_target, extent,
-            deferred_frame_color_source, deferred_translucent_source, deferred_depth_source,
-            deferred_translucent_depth_source, external_operations, external_roles_written,
-            attachments_initialized, deferred_translucent_initialized, TextureRowOrder::Preserve)
+        self.append_terrain_handoff_to_frame_target_oriented(
+            gal,
+            ops,
+            frame_target,
+            extent,
+            deferred_frame_color_source,
+            deferred_translucent_source,
+            deferred_depth_source,
+            deferred_translucent_depth_source,
+            external_operations,
+            external_roles_written,
+            attachments_initialized,
+            deferred_translucent_initialized,
+            TextureRowOrder::Preserve,
+        )
     }
 
     /// Acquired-frame color and external roles are canonical. Deferred color
     /// and both deferred depth inputs carry the declared copy row order; they
     /// are normalized together before the transparency graph samples them.
     pub(crate) fn append_terrain_handoff_to_frame_target_oriented(
-        &self, gal: &mut VulkanicGal, ops: &mut Vec<CommandOp>, frame_target: Handle,
-        extent: Extent3d, deferred_frame_color_source: Handle,
-        deferred_translucent_source: Handle, deferred_depth_source: Handle,
-        deferred_translucent_depth_source: Handle, external_operations: &[CommandOp],
-        external_roles_written: [bool; 4], attachments_initialized: bool,
-        deferred_translucent_initialized: bool, deferred_row_order: TextureRowOrder,
+        &self,
+        gal: &mut VulkanicGal,
+        ops: &mut Vec<CommandOp>,
+        frame_target: Handle,
+        extent: Extent3d,
+        deferred_frame_color_source: Handle,
+        deferred_translucent_source: Handle,
+        deferred_depth_source: Handle,
+        deferred_translucent_depth_source: Handle,
+        external_operations: &[CommandOp],
+        external_roles_written: [bool; 4],
+        attachments_initialized: bool,
+        deferred_translucent_initialized: bool,
+        deferred_row_order: TextureRowOrder,
     ) -> GalResult<Handle> {
         // A newly allocated attachment has no prior Vulkan layout.  Once a
         // submitted handoff has completed this explicit state becomes
@@ -1514,7 +1555,12 @@ impl FabulousAttachmentSet {
                     view: attachment.color_view,
                     load_op: AttachmentLoadOp::Clear,
                     store_op: AttachmentStoreOp::Store,
-                    clear_color: Some(ClearColor { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }),
+                    clear_color: Some(ClearColor {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 0.0,
+                    }),
                 }],
                 depth_stencil: None,
             });
@@ -2316,13 +2362,21 @@ mod tests {
                 usages: vec![TextureUsage::TransferSrc, TextureUsage::Sampled],
             })
             .unwrap();
-        let translucent_depth = gal.create_texture(TextureDesc {
-            label: "terrain-independent-translucent-depth".to_string(),
-            dimension: TextureDimension::D2, format: TextureFormat::Depth32Float,
-            extent: Extent3d { width: 32, height: 32, depth: 1 },
-            mip_levels: 1, array_layers: 1,
-            usages: vec![TextureUsage::TransferSrc, TextureUsage::Sampled],
-        }).unwrap();
+        let translucent_depth = gal
+            .create_texture(TextureDesc {
+                label: "terrain-independent-translucent-depth".to_string(),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Depth32Float,
+                extent: Extent3d {
+                    width: 32,
+                    height: 32,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::TransferSrc, TextureUsage::Sampled],
+            })
+            .unwrap();
         let mut operations = Vec::new();
         let presentation_pass = set
             .append_terrain_handoff_to_frame_target(
@@ -2340,15 +2394,26 @@ mod tests {
                 translucent_depth,
             )
             .unwrap();
-        let depth_copy_sources: Vec<_> = operations.iter().filter_map(|operation| match operation {
-            super::super::super::commands::CommandOp::CopyTexture(copy)
-                if copy.dst_texture == set.main.depth_texture || copy.dst_texture == set.translucent.depth_texture =>
-                    Some((copy.src_texture, copy.dst_texture)),
-            _ => None,
-        }).collect();
-        assert_eq!(depth_copy_sources, vec![(capture_depth, set.main.depth_texture),
-            (translucent_depth, set.translucent.depth_texture)],
-            "each Fabulous color layer must retain its own producer depth");
+        let depth_copy_sources: Vec<_> = operations
+            .iter()
+            .filter_map(|operation| match operation {
+                super::super::super::commands::CommandOp::CopyTexture(copy)
+                    if copy.dst_texture == set.main.depth_texture
+                        || copy.dst_texture == set.translucent.depth_texture =>
+                {
+                    Some((copy.src_texture, copy.dst_texture))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            depth_copy_sources,
+            vec![
+                (capture_depth, set.main.depth_texture),
+                (translucent_depth, set.translucent.depth_texture)
+            ],
+            "each Fabulous color layer must retain its own producer depth"
+        );
         gal.create_command_list(super::super::super::commands::CommandListDesc {
             label: "terrain-bgra-handoff-test".to_string(),
             operations,
@@ -2362,7 +2427,11 @@ mod tests {
                 &mut gal,
                 &mut no_translucent_operations,
                 frame_target,
-                Extent3d { width: 32, height: 32, depth: 1 },
+                Extent3d {
+                    width: 32,
+                    height: 32,
+                    depth: 1,
+                },
                 frame_target,
                 capture_source,
                 capture_depth,
@@ -2387,25 +2456,48 @@ mod tests {
         for row_order in [TextureRowOrder::Preserve, TextureRowOrder::Reverse] {
             for has_translucent in [false, true] {
                 let mut oriented = Vec::new();
-                let pass = set.append_terrain_handoff_to_frame_target_oriented(
-                    &mut gal, &mut oriented, frame_target,
-                    Extent3d { width: 32, height: 32, depth: 1 }, frame_target,
-                    capture_source, capture_depth, translucent_depth, &[], [false; 4],
-                    false, has_translucent, row_order,
-                ).unwrap();
-                let copies: Vec<_> = oriented.iter().filter_map(|op| match op {
-                    CommandOp::CopyTexture(copy) => Some(copy), _ => None,
-                }).collect();
+                let pass = set
+                    .append_terrain_handoff_to_frame_target_oriented(
+                        &mut gal,
+                        &mut oriented,
+                        frame_target,
+                        Extent3d {
+                            width: 32,
+                            height: 32,
+                            depth: 1,
+                        },
+                        frame_target,
+                        capture_source,
+                        capture_depth,
+                        translucent_depth,
+                        &[],
+                        [false; 4],
+                        false,
+                        has_translucent,
+                        row_order,
+                    )
+                    .unwrap();
+                let copies: Vec<_> = oriented
+                    .iter()
+                    .filter_map(|op| match op {
+                        CommandOp::CopyTexture(copy) => Some(copy),
+                        _ => None,
+                    })
+                    .collect();
                 assert_eq!(copies.len(), if has_translucent { 3 } else { 2 });
                 assert!(copies.iter().all(|copy| copy.row_order == row_order),
                     "deferred translucent color and both depths must share one normalization contract");
-                assert!(oriented.iter().any(|op| matches!(op,
+                assert!(
+                    oriented.iter().any(|op| matches!(op,
                     CommandOp::CopyFrameTargetToTexture { src, dst, .. }
                         if *src == frame_target && *dst == set.main.color_texture)),
-                    "already-canonical acquired color must not be reversed again");
+                    "already-canonical acquired color must not be reversed again"
+                );
                 gal.create_command_list(super::super::super::commands::CommandListDesc {
-                    label: "oriented-terrain-handoff".into(), operations: oriented,
-                }).unwrap();
+                    label: "oriented-terrain-handoff".into(),
+                    operations: oriented,
+                })
+                .unwrap();
                 gal.destroy(pass).unwrap();
             }
         }
@@ -2413,35 +2505,81 @@ mod tests {
         // work which the earlier world graph has already populated.
         for (role_index, attachment) in [(1, &set.particles), (2, &set.clouds), (3, &set.weather)] {
             let mut external = Vec::new();
-            set.append_empty_attachment_clear(&mut external,
-                [FabulousTargetRole::Particles, FabulousTargetRole::Clouds, FabulousTargetRole::Weather][role_index - 1],
-                TextureUsageState::ShaderRead, TextureUsageState::ShaderRead);
+            set.append_empty_attachment_clear(
+                &mut external,
+                [
+                    FabulousTargetRole::Particles,
+                    FabulousTargetRole::Clouds,
+                    FabulousTargetRole::Weather,
+                ][role_index - 1],
+                TextureUsageState::ShaderRead,
+                TextureUsageState::ShaderRead,
+            );
             // Model the real producer's Load pass, leaving attachments in
             // their writable layouts for the handoff's final transitions.
             external.truncate(4);
-            if let CommandOp::BeginPass { colors, depth_stencil, .. } = &mut external[2] {
+            if let CommandOp::BeginPass {
+                colors,
+                depth_stencil,
+                ..
+            } = &mut external[2]
+            {
                 colors[0].load_op = AttachmentLoadOp::Load;
                 colors[0].clear_color = None;
                 depth_stencil.as_mut().unwrap().load_op = AttachmentLoadOp::Load;
-            } else { panic!("expected external attachment pass"); }
+            } else {
+                panic!("expected external attachment pass");
+            }
             let mut written = [false; 4];
             written[role_index] = true;
             let mut ops = Vec::new();
-            let pass = set.append_terrain_handoff_to_frame_target_with_external_ops(
-                &mut gal, &mut ops, frame_target, Extent3d { width: 32, height: 32, depth: 1 },
-                frame_target, capture_source, capture_depth, translucent_depth, &external, written, false, false,
-            ).unwrap();
-            let loads: Vec<_> = ops.iter().filter_map(|op| match op {
-                CommandOp::BeginPass { target, colors, depth_stencil, .. } if *target == attachment.render_target =>
-                    Some((colors[0].load_op, depth_stencil.as_ref().unwrap().load_op)),
-                _ => None,
-            }).collect();
-            assert_eq!(loads, vec![(AttachmentLoadOp::Clear, AttachmentLoadOp::Clear),
-                (AttachmentLoadOp::Load, AttachmentLoadOp::Load)],
-                "each produced external role must initialize color/depth before loading them");
+            let pass = set
+                .append_terrain_handoff_to_frame_target_with_external_ops(
+                    &mut gal,
+                    &mut ops,
+                    frame_target,
+                    Extent3d {
+                        width: 32,
+                        height: 32,
+                        depth: 1,
+                    },
+                    frame_target,
+                    capture_source,
+                    capture_depth,
+                    translucent_depth,
+                    &external,
+                    written,
+                    false,
+                    false,
+                )
+                .unwrap();
+            let loads: Vec<_> = ops
+                .iter()
+                .filter_map(|op| match op {
+                    CommandOp::BeginPass {
+                        target,
+                        colors,
+                        depth_stencil,
+                        ..
+                    } if *target == attachment.render_target => {
+                        Some((colors[0].load_op, depth_stencil.as_ref().unwrap().load_op))
+                    }
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(
+                loads,
+                vec![
+                    (AttachmentLoadOp::Clear, AttachmentLoadOp::Clear),
+                    (AttachmentLoadOp::Load, AttachmentLoadOp::Load)
+                ],
+                "each produced external role must initialize color/depth before loading them"
+            );
             gal.create_command_list(super::super::super::commands::CommandListDesc {
-                label: "initialized-external-handoff".into(), operations: ops,
-            }).unwrap();
+                label: "initialized-external-handoff".into(),
+                operations: ops,
+            })
+            .unwrap();
             gal.destroy(pass).unwrap();
         }
         gal.destroy(capture_source).unwrap();

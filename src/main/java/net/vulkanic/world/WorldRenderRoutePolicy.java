@@ -511,12 +511,10 @@ public final class WorldRenderRoutePolicy {
 	}
 
 	/**
-	 * Distant Horizons is outside the vanilla Rust Vulkan migration slice.  It
-	 * must therefore remain unavailable while the Rust whole-frame route owns a
-	 * vanilla frame: admitting it here would make an ordinary Vulkan run depend
-	 * on a separate, incomplete renderer family.  This is deliberately a route
-	 * decision rather than a Java fallback; callers receive {@link Route#DISABLED}
-	 * and no DH draw is authorized.
+	 * Selects the sole DH presenter for a Rust-owned frame.  DH's Java render
+	 * hooks remain suppressed by the whole-frame shell; this route only admits
+	 * the copied semantic traversal and Rust material streams.  An explicit
+	 * disable switch remains available for isolation and migration diagnostics.
 	 */
 	public static Route currentDistantHorizonsOpaqueRoute() {
 		return selectDistantHorizonsRoute(
@@ -540,8 +538,11 @@ public final class WorldRenderRoutePolicy {
 		boolean vulkanBackendSelected, boolean wholeFrameVulkanEnabled,
 		boolean diagnosticsDisabled, boolean legacyControl
 	) {
-		if (wholeFrameVulkanEnabled || vulkanBackendSelected || diagnosticsDisabled) {
+		if (diagnosticsDisabled) {
 			return Route.DISABLED;
+		}
+		if (wholeFrameVulkanEnabled || vulkanBackendSelected) {
+			return Route.RUST_VULKAN_WHOLE_FRAME;
 		}
 		return legacyControl ? legacyCompatibilityRoute()
 			: selectWholeFrameRoute(false, false);

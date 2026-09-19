@@ -5821,7 +5821,7 @@ public class Phase3DrawPathTest {
         String contract = source.substring(allowlist, Math.min(source.length(), allowlist + 8_000));
         for (String model : new String[] {
             "ShulkerModel", "ArmorStandModel", "VillagerModel", "ZombieVillagerModel",
-            "PlayerModel", "SpinAttackEffectModel"
+            "PlayerModel", "HumanoidModel", "SpinAttackEffectModel"
         }) {
             assertTrue(contract.contains(model), model + " must be admitted by the copied atlas-backed model contract");
         }

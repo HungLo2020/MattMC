@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RustGalWorldEntityIdentityTest {
 	@BeforeAll
@@ -34,5 +35,13 @@ class RustGalWorldEntityIdentityTest {
 
 		state.entityType = EntityType.WITHER_SKULL;
 		assertEquals(ResourceLocation.withDefaultNamespace("wither_skull"), RustGalWorldPrimitiveRenderer.entityIdentity(state));
+	}
+
+	@Test
+	void modelPartIdentityEncodesArbitraryJavaPartNamesWithoutWeakeningRustContract() {
+		String identity = RustGalWorldPrimitiveRenderer.canonicalModelPartIdentity(
+			"minecraft:generic_model/1234", "vChains/Upper Arm");
+		assertEquals("minecraft:generic_model/1234/part/76436861696e732f55707065722041726d", identity);
+		assertTrue(RustGalWorldPrimitiveRenderer.isCanonicalWorldMeshResourceLocation(identity));
 	}
 }

@@ -17,6 +17,7 @@ use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
 use crate::render::vulkanic::shader_pack::programs::{
     distant_horizons_lod_opaque_resource_layouts,
+    minimal_distant_horizons_lod_exact_atlas_forward_opaque_program,
     minimal_distant_horizons_lod_exact_atlas_opaque_program,
     minimal_distant_horizons_lod_opaque_program, minimal_distant_horizons_lod_transparent_program,
     prepare_lowered_distant_horizons_exact_atlas_source_program,
@@ -24,8 +25,9 @@ use crate::render::vulkanic::shader_pack::programs::{
     prepare_lowered_hand_source_program, prepare_lowered_terrain_source_program,
     prepare_lowered_textured_material_source_program, prepare_lowered_weather_source_program,
     shader_stage_code_for_backend, LoweredTerrainSourceProgram, TerrainMaterialProgramKind,
-    COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_FRAGMENT,
-    MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT, MINIMAL_TERRAIN_MATERIAL_VERTEX,
+    COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT,
+    MINIMAL_TERRAIN_MATERIAL_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT,
+    MINIMAL_TERRAIN_MATERIAL_VERTEX,
 };
 use crate::render::vulkanic::shader_pack::{
     distant_horizons_contract::{
@@ -58,14 +60,28 @@ const HEIGHT: u32 = 64;
 #[test]
 fn terrain_coordinate_diagnostic_variants_compile_on_vulkan() {
     for mode in ["u-bits", "v-bits", "depth-bits", "clip-bits"] {
-        let source = crate::render::vulkanic::shader_pack::programs::terrain_fragment_coordinate_probe(
-            MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.to_owned(), Some(mode));
-        compile_glsl_for_backend_test(shaderc::ShaderKind::Fragment, &source,
-            &format!("terrain-{mode}.fragment")).expect("terrain diagnostic must compile on Vulkan");
-        let vertex = crate::render::vulkanic::shader_pack::programs::terrain_vertex_coordinate_probe(
-            MINIMAL_TERRAIN_MATERIAL_VERTEX.to_owned(), Some(mode));
-        compile_glsl_for_backend_test(shaderc::ShaderKind::Vertex, &vertex,
-            &format!("terrain-{mode}.vertex")).expect("terrain vertex diagnostic must compile on Vulkan");
+        let source =
+            crate::render::vulkanic::shader_pack::programs::terrain_fragment_coordinate_probe(
+                MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.to_owned(),
+                Some(mode),
+            );
+        compile_glsl_for_backend_test(
+            shaderc::ShaderKind::Fragment,
+            &source,
+            &format!("terrain-{mode}.fragment"),
+        )
+        .expect("terrain diagnostic must compile on Vulkan");
+        let vertex =
+            crate::render::vulkanic::shader_pack::programs::terrain_vertex_coordinate_probe(
+                MINIMAL_TERRAIN_MATERIAL_VERTEX.to_owned(),
+                Some(mode),
+            );
+        compile_glsl_for_backend_test(
+            shaderc::ShaderKind::Vertex,
+            &vertex,
+            &format!("terrain-{mode}.vertex"),
+        )
+        .expect("terrain vertex diagnostic must compile on Vulkan");
     }
 }
 
@@ -171,24 +187,40 @@ fn distant_horizons_lod_opaque_program_compiles_for_vulkan_without_legacy_state(
 }
 
 #[test]
+fn distant_horizons_ssao_program_compiles_for_vulkan() {
+    let code =
+        shader_stage_code_for_backend(BackendApi::Vulkan, MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT);
+    compile_glsl_for_backend_test(
+        shaderc::ShaderKind::Fragment,
+        std::str::from_utf8(&code).unwrap(),
+        "distant-horizons.ssao.fragment",
+    )
+    .expect("Rust-owned Distant Horizons SSAO shader must compile for Vulkan");
+}
+
+#[test]
 fn distant_horizons_lod_exact_atlas_program_compiles_for_vulkan() {
-    let program = minimal_distant_horizons_lod_exact_atlas_opaque_program();
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
-        compile_glsl_for_backend_test(
-            match module.stage {
-                ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
-                ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
-                stage => panic!("unexpected exact-atlas DH LOD shader stage {stage:?}"),
-            },
-            std::str::from_utf8(&module.code).unwrap(),
-            &module.label,
-        )
-        .unwrap_or_else(|error| {
-            panic!(
+    for program in [
+        minimal_distant_horizons_lod_exact_atlas_opaque_program(),
+        minimal_distant_horizons_lod_exact_atlas_forward_opaque_program(),
+    ] {
+        for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+            compile_glsl_for_backend_test(
+                match module.stage {
+                    ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+                    ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+                    stage => panic!("unexpected exact-atlas DH LOD shader stage {stage:?}"),
+                },
+                std::str::from_utf8(&module.code).unwrap(),
+                &module.label,
+            )
+            .unwrap_or_else(|error| {
+                panic!(
                 "Rust-owned Distant Horizons exact-atlas LOD {} must compile for Vulkan: {error}",
                 module.label
             )
-        });
+            });
+        }
     }
 }
 
@@ -1031,31 +1063,53 @@ fn prepared_lowered_terrain_program_compiles_at_the_vulkan_boundary() {
 #[test]
 fn model_translucent_cutout_spirv_discards_without_terrain_lod_bias() {
     use crate::render::vulkanic::shader_pack::programs::{
-        minimal_direct_model_translucent_cutout_program,
-        minimal_direct_terrain_translucent_program,
+        minimal_direct_model_translucent_cutout_program, minimal_direct_terrain_translucent_program,
     };
     let instructions = |bytes: Vec<u8>| {
-        let words = bytes.chunks_exact(4)
-            .map(|b| u32::from_le_bytes(b.try_into().unwrap())).collect::<Vec<_>>();
+        let words = bytes
+            .chunks_exact(4)
+            .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
+            .collect::<Vec<_>>();
         let mut result = Vec::new();
         let mut cursor = 5;
         while cursor < words.len() {
             let count = (words[cursor] >> 16) as usize;
             assert!(count > 0 && cursor + count <= words.len());
-            result.push(words[cursor..cursor+count].to_vec());
+            result.push(words[cursor..cursor + count].to_vec());
             cursor += count;
         }
         result
     };
-    let compile = |source: &str| instructions(compile_glsl_for_backend_test(
-        shaderc::ShaderKind::Fragment, source, "model-alpha-contract.frag").unwrap());
+    let compile = |source: &str| {
+        instructions(
+            compile_glsl_for_backend_test(
+                shaderc::ShaderKind::Fragment,
+                source,
+                "model-alpha-contract.frag",
+            )
+            .unwrap(),
+        )
+    };
     let model_program = minimal_direct_model_translucent_cutout_program();
-    assert!(model_program.vertex.source.starts_with("#version 450\n#define VULKANIC_MODEL_TRANSLUCENT_CUTOUT 1\n"));
-    assert!(model_program.vertex.source.contains("normal = trunc(clamp(normal, vec3(-1.0), vec3(1.0)) * 127.0) / 127.0;"));
+    assert!(model_program
+        .vertex
+        .source
+        .starts_with("#version 450\n#define VULKANIC_MODEL_TRANSLUCENT_CUTOUT 1\n"));
+    assert!(model_program
+        .vertex
+        .source
+        .contains("normal = trunc(clamp(normal, vec3(-1.0), vec3(1.0)) * 127.0) / 127.0;"));
     let vertex_source = String::from_utf8(shader_stage_code_for_backend(
-        BackendApi::Vulkan, &model_program.vertex.source)).unwrap();
-    compile_glsl_for_backend_test(shaderc::ShaderKind::Vertex,
-        &vertex_source, "model-normal-contract.vert").unwrap();
+        BackendApi::Vulkan,
+        &model_program.vertex.source,
+    ))
+    .unwrap();
+    compile_glsl_for_backend_test(
+        shaderc::ShaderKind::Vertex,
+        &vertex_source,
+        "model-normal-contract.vert",
+    )
+    .unwrap();
     let model = compile(&model_program.fragment.source);
     let terrain = compile(&minimal_direct_terrain_translucent_program().fragment.source);
     // Vulkan 1.3 shaderc may lower discard to helper demotion rather than
@@ -1064,16 +1118,25 @@ fn model_translucent_cutout_spirv_discards_without_terrain_lod_bias() {
     // DemoteToHelperInvocation=5380. ImplicitLod=87; optional ImageOperands
     // begins at operand five and Bias is bit 0. Inspect compiled behavior,
     // not dead preprocessor text.
-    let discards = |code: &Vec<Vec<u32>>| code.iter()
-        .map(|i| i[0] & 0xffff).filter(|op| matches!(op, 252 | 4416 | 5380)).collect::<Vec<_>>();
+    let discards = |code: &Vec<Vec<u32>>| {
+        code.iter()
+            .map(|i| i[0] & 0xffff)
+            .filter(|op| matches!(op, 252 | 4416 | 5380))
+            .collect::<Vec<_>>()
+    };
     let model_discards = discards(&model);
     assert!(!model_discards.is_empty());
     assert!(discards(&terrain).is_empty());
     eprintln!("model fragment discard opcodes: {model_discards:?}");
-    let samples = model.iter().filter(|i| i[0] & 0xffff == 87).collect::<Vec<_>>();
+    let samples = model
+        .iter()
+        .filter(|i| i[0] & 0xffff == 87)
+        .collect::<Vec<_>>();
     assert!(!samples.is_empty());
     assert!(samples.iter().all(|i| i.len() == 5 || i[5] & 1 == 0));
-    assert!(terrain.iter().any(|i| i[0] & 0xffff == 87 && i.len() > 5 && i[5] & 1 != 0));
+    assert!(terrain
+        .iter()
+        .any(|i| i[0] & 0xffff == 87 && i.len() > 5 && i[5] & 1 != 0));
 }
 
 #[test]
@@ -1081,9 +1144,12 @@ fn standard_item_foil_compiles_without_vertex_lighting_or_terrain_lod_bias() {
     use crate::render::vulkanic::shader_pack::programs::minimal_direct_standard_item_foil_program;
     let program = minimal_direct_standard_item_foil_program();
     let compile = |source: &str, kind| {
-        let source = String::from_utf8(shader_stage_code_for_backend(BackendApi::Vulkan, source)).unwrap();
+        let source =
+            String::from_utf8(shader_stage_code_for_backend(BackendApi::Vulkan, source)).unwrap();
         let bytes = compile_glsl_for_backend_test(kind, &source, "standard-item-foil").unwrap();
-        let words = bytes.chunks_exact(4).map(|b| u32::from_le_bytes(b.try_into().unwrap()))
+        let words = bytes
+            .chunks_exact(4)
+            .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
             .collect::<Vec<_>>();
         let mut instructions = Vec::new();
         let mut cursor = 5;
@@ -1099,11 +1165,19 @@ fn standard_item_foil_compiles_without_vertex_lighting_or_terrain_lod_bias() {
     // No sample or fetch instructions: fullbright foil must not read UV2.
     assert!(!vertex.iter().any(|i| matches!(i[0] & 0xffff, 87..=98)));
     let fragment = compile(&program.fragment.source, shaderc::ShaderKind::Fragment);
-    assert!(fragment.iter().any(|i| matches!(i[0] & 0xffff, 252 | 4416 | 5380)));
-    let samples = fragment.iter().filter(|i| i[0] & 0xffff == 87).collect::<Vec<_>>();
+    assert!(fragment
+        .iter()
+        .any(|i| matches!(i[0] & 0xffff, 252 | 4416 | 5380)));
+    let samples = fragment
+        .iter()
+        .filter(|i| i[0] & 0xffff == 87)
+        .collect::<Vec<_>>();
     assert_eq!(samples.len(), 1);
     assert!(samples[0].len() == 5 || samples[0][5] & 1 == 0);
-    assert!(program.fragment.source.contains("(1.0 - fog) * v_foil_strength"));
+    assert!(program
+        .fragment
+        .source
+        .contains("(1.0 - fog) * v_foil_strength"));
     assert!(program.fragment.source.contains("), color.a)"));
     assert!(program.vertex.source.contains("binding = 4, std430"));
 }

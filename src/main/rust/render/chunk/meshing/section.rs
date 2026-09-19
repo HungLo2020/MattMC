@@ -306,7 +306,8 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
         for y in 0..4 {
             for z in 0..4 {
                 for x in 0..4 {
-                    record.tint_lattice[y][z][x] = self.tint_lattices[lattice_start + (y * 4 + z) * 4 + x];
+                    record.tint_lattice[y][z][x] =
+                        self.tint_lattices[lattice_start + (y * 4 + z) * 4 + x];
                 }
             }
         }
@@ -367,7 +368,6 @@ impl NativeSectionRecordSource for CompactSectionSnapshot<'_> {
 
         Ok(record)
     }
-
 }
 
 #[cfg(test)]

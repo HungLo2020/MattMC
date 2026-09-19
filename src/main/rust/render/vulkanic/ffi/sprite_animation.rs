@@ -12,36 +12,72 @@ const MAX_BYTES: usize = 96 * 1024 * 1024;
 /// accepted_out is zero on backpressure/error, one only after tick acceptance.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_vulkanic_gal_atlas_animation_tick(
-    context_id: u64, texture_id: u32, generation: u64, tick: u64,
-    visible_ids: *const u32, visible_count: u64, animate_only_visible: u32,
-    accepted_out: *mut u32, status_out: *mut FfiStatusResult,
+    context_id: u64,
+    texture_id: u32,
+    generation: u64,
+    tick: u64,
+    visible_ids: *const u32,
+    visible_count: u64,
+    animate_only_visible: u32,
+    accepted_out: *mut u32,
+    status_out: *mut FfiStatusResult,
 ) -> i32 {
-    if !accepted_out.is_null() { accepted_out.write(0); }
+    if !accepted_out.is_null() {
+        accepted_out.write(0);
+    }
     with_registry_mut(|registry| {
         let Some(context) = registry.contexts.get_mut(&context_id) else {
-            let error = GalError::ffi(StatusCode::StaleHandle, format!("unknown context id {context_id}"));
+            let error = GalError::ffi(
+                StatusCode::StaleHandle,
+                format!("unknown context id {context_id}"),
+            );
             write_status_out(status_out, status_result_from_error(&error));
             return error.code as i32;
         };
         context.ffi_calls += 1;
-        context.ffi_output_bytes = context.ffi_output_bytes.saturating_add(
-            (size_of::<FfiStatusResult>() + size_of::<u32>()) as u64);
+        context.ffi_output_bytes = context
+            .ffi_output_bytes
+            .saturating_add((size_of::<FfiStatusResult>() + size_of::<u32>()) as u64);
         let result = (|| {
-            if accepted_out.is_null() || texture_id == 0 || generation == 0
-                || visible_count > 16384 || animate_only_visible > 1 {
-                return Err(GalError::invalid_argument("invalid animation tick transport"));
+            if accepted_out.is_null()
+                || texture_id == 0
+                || generation == 0
+                || visible_count > 16384
+                || animate_only_visible > 1
+            {
+                return Err(GalError::invalid_argument(
+                    "invalid animation tick transport",
+                ));
             }
-            let ids = read_limited_slice(FfiSlice { ptr: visible_ids, count: visible_count },
-                true, "animation visible sprite ids")?;
+            let ids = read_limited_slice(
+                FfiSlice {
+                    ptr: visible_ids,
+                    count: visible_count,
+                },
+                true,
+                "animation visible sprite ids",
+            )?;
             let visible: std::collections::BTreeSet<u32> = ids.iter().copied().collect();
             if visible.len() != ids.len() || visible.contains(&0) {
-                return Err(GalError::invalid_argument("invalid animation visibility identities"));
+                return Err(GalError::invalid_argument(
+                    "invalid animation visibility identities",
+                ));
             }
-            context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(40 + visible_count * 4);
-            context.world_primitive_frontend.advance_atlas_animation_before_frame(&mut context.gal,
-                crate::render::vulkanic::sprite_interpolation::AtlasAnimationTickEvent {
-                    texture_id, generation, tick, visible, animate_only_visible: animate_only_visible != 0,
-                })
+            context.ffi_input_bytes = context
+                .ffi_input_bytes
+                .saturating_add(40 + visible_count * 4);
+            context
+                .world_primitive_frontend
+                .advance_atlas_animation_before_frame(
+                    &mut context.gal,
+                    crate::render::vulkanic::sprite_interpolation::AtlasAnimationTickEvent {
+                        texture_id,
+                        generation,
+                        tick,
+                        visible,
+                        animate_only_visible: animate_only_visible != 0,
+                    },
+                )
         })();
         match result {
             Ok(accepted) => {
@@ -280,7 +316,7 @@ pub(crate) unsafe fn decode_atlas_animation_update(
 mod tests {
     use super::*;
     use crate::render::vulkanic::sprite_interpolation::{
-        SpriteFrameUpdate, apply_sprite_sheet_update,
+        apply_sprite_sheet_update, SpriteFrameUpdate,
     };
 
     #[test]

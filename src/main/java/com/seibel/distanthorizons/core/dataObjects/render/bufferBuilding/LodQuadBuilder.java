@@ -242,9 +242,13 @@ public class LodQuadBuilder
 		this.recordSemanticQuad(semanticMaterialId, this.shouldUseTransparentBuffer(color, irisBlockMaterialId));
 		if (!quadList.isEmpty()
 			&& canMergeSemanticMaterials(
-				DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild(),
+				DistantHorizonsSemanticCollector.usesExactMaterialTopologyBuild(),
 				quadList.get(quadList.size() - 1).semanticMaterialId,
-				quad.semanticMaterialId
+				quadList.get(quadList.size() - 1).semanticVariantState,
+				quadList.get(quadList.size() - 1).semanticVariantPosition,
+				quad.semanticMaterialId,
+				quad.semanticVariantState,
+				quad.semanticVariantPosition
 			)
 			&& (
 				quadList.get(quadList.size() - 1).tryMerge(quad, BufferMergeDirectionEnum.EastWest)
@@ -368,9 +372,13 @@ public class LodQuadBuilder
 			BufferQuad nextQuad = iter.next();
 			
 			if (canMergeSemanticMaterials(
-				DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild(),
+				DistantHorizonsSemanticCollector.usesExactMaterialTopologyBuild(),
 				currentQuad.semanticMaterialId,
-				nextQuad.semanticMaterialId
+				currentQuad.semanticVariantState,
+				currentQuad.semanticVariantPosition,
+				nextQuad.semanticMaterialId,
+				nextQuad.semanticVariantState,
+				nextQuad.semanticVariantPosition
 			) && currentQuad.tryMerge(nextQuad, mergeDirection))
 			{
 				// merge successful, attempt to merge the next quad
@@ -396,7 +404,29 @@ public class LodQuadBuilder
 	 */
 	static boolean canMergeSemanticMaterials(boolean exactAtlasRoute, int leftMaterialId, int rightMaterialId)
 	{
-		return !exactAtlasRoute || leftMaterialId == rightMaterialId;
+		return canMergeSemanticMaterials(
+			exactAtlasRoute,
+			leftMaterialId, ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L,
+			rightMaterialId, ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L
+		);
+	}
+
+	/**
+	 * Exact-atlas geometry must not merge two equal material IDs when their
+	 * weighted-model selections differ. Legacy DH keeps its original greedy
+	 * merge behavior; only the Rust exact-atlas route uses this stricter
+	 * identity boundary.
+	 */
+	static boolean canMergeSemanticMaterials(
+		boolean exactAtlasRoute,
+		int leftMaterialId, byte leftVariantState, long leftVariantPosition,
+		int rightMaterialId, byte rightVariantState, long rightVariantPosition
+	)
+	{
+		if (!exactAtlasRoute) return true;
+		if (leftMaterialId != rightMaterialId || leftVariantState != rightVariantState) return false;
+		return leftVariantState != ColumnRenderSource.SEMANTIC_VARIANT_EXACT
+			|| leftVariantPosition == rightVariantPosition;
 	}
 
 	private void recordSemanticQuad(int semanticMaterialId, boolean transparent)
@@ -925,6 +955,10 @@ public class LodQuadBuilder
 		byte g = (byte) ColorUtil.getGreen(color);
 		byte b = (byte) ColorUtil.getBlue(color);
 		byte a = this.doTransparency ? (byte) ColorUtil.getAlpha(color) : (byte) 255;
+		if (irisBlockMaterialId == EDhApiBlockMaterial.WATER.index) {
+			DistantHorizonsSemanticCollector.recordPackedWaterVertexForAudit(
+				Byte.toUnsignedInt(r), Byte.toUnsignedInt(g), Byte.toUnsignedInt(b), Byte.toUnsignedInt(a));
+		}
 		bb.put(r);
 		bb.put(g);
 		bb.put(b);

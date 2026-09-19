@@ -819,33 +819,45 @@ public final class RustGalTerrainRenderer {
 			|| sections == null || camera == null) {
 			return;
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visibility-snapshot");
 		List<RenderSection> sectionSnapshot = snapshotBuiltTerrainSections(sections);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visibility-snapshot");
 		// Mesh residency is intentionally longer lived than visibility. Publish
 		// the complete semantic visibility replacement below so the primitive
 		// frame cannot replay terrain that this frame's CPU source did not select.
 		// This is derived only from the copied section/layer assets, never from a
 		// Sodium render list or a backend handle.
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.mesh-key-set");
 		Set<Long> visibleMeshKeys = visibleWholeFrameMeshKeys(sectionSnapshot);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.mesh-key-set");
 		Set<VisibleSubmitKey> visibleSubmissions = new HashSet<>();
 		int translucentDrawOrder = 0;
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.opaque-submit");
 		for (RenderSection section : sectionSnapshot) {
 			enqueueSectionLayer(section, ChunkSectionLayer.SOLID, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
 			enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.opaque-submit");
 		// Translucent sections are a single camera-sorted semantic stream. The
 		// legacy Sodium render list is unavailable on the Rust whole-frame route,
 		// so retain no list/GL state and order copied section centers explicitly.
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.translucent-sort");
 		sectionSnapshot.sort(Comparator.comparingDouble((RenderSection section) -> {
 			double dx = section.getOriginX() + 8.0D - camera.getPosition().x();
 			double dy = section.getOriginY() + 8.0D - camera.getPosition().y();
 			double dz = section.getOriginZ() + 8.0D - camera.getPosition().z();
 			return dx * dx + dy * dy + dz * dz;
 		}).reversed());
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.translucent-sort");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.translucent-submit");
 		for (RenderSection section : sectionSnapshot) {
 			enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight,
 				translucentDrawOrder++, visibleSubmissions);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.translucent-submit");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visibility-reconcile");
 		RustGalWorldPrimitiveRenderer.reconcileStaticTerrainVisibility(visibleMeshKeys);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visibility-reconcile");
 		// Report the semantic terrain workload at the producer boundary. These
 		// names are parity-family labels only: the work above is Rust-owned CPU
 		// extraction and explicit mesh submission, never a Java Sodium draw.
@@ -943,7 +955,12 @@ public final class RustGalTerrainRenderer {
 		TRANSLUCENT_EXECUTION_METADATA.clear();
 		TEXTURE_PROBE_QUADS.clear();
 		DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
-			synchronized (RustGalTerrainRenderer.class) {
+		// DH column provenance contains atlas sprite identities as well as copied
+		// geometry. Retire those generations with the same resource boundary so a
+		// pack replacement cannot submit pre-reload materials through the Rust
+		// whole-frame route.
+		DistantHorizonsSemanticCollector.invalidateForResourceReload();
+		synchronized (RustGalTerrainRenderer.class) {
 				atlasPayload = null;
 				atlasMipPayloads = List.of();
 				atlasAnimationSource = null;
@@ -965,6 +982,12 @@ public final class RustGalTerrainRenderer {
 		// Discard them with the existing terrain world epoch so no later Rust
 		// route can accidentally observe data from a disconnected level.
 		DistantHorizonsSemanticCollector.clear();
+		// The last submitted frame belongs to the disconnected level. Clear its
+		// per-frame visibility receipt as part of the same boundary so menu-state
+		// diagnostics cannot mistake stale submissions for active world work.
+		lastVisibleSubmissionFrameId.set(Long.MIN_VALUE);
+		currentFrameVisibleLayerSubmissions.set(0L);
+		currentFrameVisibleFingerprint.set(0L);
 		TRANSLUCENT_EXECUTION_METADATA.clear();
 		TEXTURE_PROBE_QUADS.clear();
 		for (LayerKey key : List.copyOf(SECTION_ASSETS.keySet())) {
@@ -3727,6 +3750,18 @@ public final class RustGalTerrainRenderer {
 			&& payload[7] == 0x0a;
 	}
 
+	/**
+	 * Frame selection is part of an animated resource's Rust-owned clock, while
+	 * the atlas declaration is replaced only by a semantic resource reload.
+	 * Keep this identity rule pure so the publication boundary cannot regress to
+	 * full-atlas uploads on every animation tick.
+	 */
+	static boolean canReuseSemanticAtlasPayload(long copiedSemanticGeneration, long semanticGeneration,
+		long copiedFrameKey, long semanticFrameKey, boolean animationDeclarationStable) {
+		return copiedSemanticGeneration == semanticGeneration
+			&& (animationDeclarationStable || copiedFrameKey == semanticFrameKey);
+	}
+
 	private static void removeLayer(long sectionPos, ChunkSectionLayer layer, String reason) {
 		TerrainSectionAsset removed = SECTION_ASSETS.remove(new LayerKey(sectionPos, layer));
 		if (removed != null) {
@@ -3755,12 +3790,25 @@ public final class RustGalTerrainRenderer {
 		long semanticGeneration = atlas.semanticReloadGeneration();
 		if (semanticGeneration <= 0L) return;
 		long semanticFrameKey = atlas.semanticSnapshotFrameKey();
-		if (atlasPayload != null && copiedAtlasSemanticGeneration == semanticGeneration
-			&& copiedAtlasSemanticFrameKey == semanticFrameKey) return;
 		synchronized (RustGalTerrainRenderer.class) {
+			/*
+			 * An animated atlas is an immutable declaration plus a Rust-owned pixel
+			 * clock.  Its Java frame key is not a resource identity: rebuilding the
+			 * full PNG atlas for each tick would replace the publication, clear queued
+			 * sprite uses, and bypass the bounded per-sprite patch path.  A fresh
+			 * semantic reload still changes both the atlas generation and resource
+			 * object, so it remains a real replacement here.
+			 */
+			AtlasAnimationResource currentAnimation = atlas.semanticAnimationResource();
+			boolean animationDeclarationStable = currentAnimation != null
+				&& atlasAnimationSource == currentAnimation;
+			if (atlasPayload != null && canReuseSemanticAtlasPayload(copiedAtlasSemanticGeneration,
+				semanticGeneration, copiedAtlasSemanticFrameKey, semanticFrameKey, animationDeclarationStable)) return;
 			semanticFrameKey = atlas.semanticSnapshotFrameKey();
-			if (atlasPayload != null && copiedAtlasSemanticGeneration == semanticGeneration
-				&& copiedAtlasSemanticFrameKey == semanticFrameKey) return;
+			currentAnimation = atlas.semanticAnimationResource();
+			animationDeclarationStable = currentAnimation != null && atlasAnimationSource == currentAnimation;
+			if (atlasPayload != null && canReuseSemanticAtlasPayload(copiedAtlasSemanticGeneration,
+				semanticGeneration, copiedAtlasSemanticFrameKey, semanticFrameKey, animationDeclarationStable)) return;
 				try {
 					// Keep the large base image's lifetime confined to this helper.  The
 					// derived PBR atlases are independently bounded images; retaining the

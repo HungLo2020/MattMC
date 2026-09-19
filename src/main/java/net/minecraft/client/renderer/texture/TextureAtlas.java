@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.CrashReport;
@@ -46,6 +47,14 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	public int mipLevel;
 	private long semanticSnapshotGeneration;
 	private long semanticReloadGeneration;
+	/** Semantic tick epoch retained across Rust atlas resource replacement. */
+	private long semanticAnimationTickEpoch;
+	/**
+	 * Resource reload may construct a fresh TextureAtlas object. Keep the
+	 * semantic clock epoch by atlas identity so that object replacement cannot
+	 * restart Rust's consecutive-tick contract at zero.
+	 */
+	private static final Map<ResourceLocation, Long> SEMANTIC_ANIMATION_TICK_EPOCHS = new ConcurrentHashMap<>();
 	/** Frame selection used to build the cached CPU semantic atlas snapshot. */
 	private long semanticSnapshotFrameKey = Long.MIN_VALUE;
 	@Nullable
@@ -144,13 +153,17 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 					&& net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(this.location))) {
 				// The incarnation starts with atlas upload, before any resource lookup
 				// or world publication can lose its semantic sprite-use events.
-				var resource = new net.vulkanic.world.AtlasAnimationResource(this.location,
-					LOCATION_BLOCKS.equals(this.location)
-						? net.vulkanic.world.RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS
+				this.semanticAnimationTickEpoch = Math.max(
+					this.semanticAnimationTickEpoch,
+					SEMANTIC_ANIMATION_TICK_EPOCHS.getOrDefault(this.location, 0L)
+				);
+				var resource = net.vulkanic.world.AtlasAnimationResource.runtime(this.location,
+						LOCATION_BLOCKS.equals(this.location)
+							? net.vulkanic.world.RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS
 						: LOCATION_PARTICLES.equals(this.location)
 							? net.vulkanic.world.RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_PARTICLE_ATLAS
 							: net.vulkanic.world.RustGalWorldPrimitiveRenderer.shieldAtlasTextureId(),
-					this.semanticAnimationSource());
+						this.semanticAnimationSource(), this.semanticAnimationTickEpoch);
 				for (var declaration : resource.source().sprites()) {
 					this.texturesByName.get(declaration.name()).bindSemanticAnimationResource(resource);
 				}
@@ -245,6 +258,9 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 				&& this.semanticAnimationResource.tickDeliveryEnabled()) {
 				this.semanticAnimationResource.enqueueNextTick(
 					net.sodium.client.SodiumClientMod.options().performance.animateOnlyVisibleTextures);
+				long producedTick = this.semanticAnimationResource.producedTickForDiagnostics();
+				this.semanticAnimationTickEpoch = Math.max(this.semanticAnimationTickEpoch, producedTick);
+				SEMANTIC_ANIMATION_TICK_EPOCHS.merge(this.location, producedTick, Long::max);
 			}
 			return;
 		}
@@ -287,6 +303,20 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 	public void clearTextureData() {
 		if (this.semanticAnimationResource != null) {
+			// Resource reload replaces the atlas incarnation, not the semantic game
+			// clock. Preserve the last produced event so Rust can validate the first
+			// event of the replacement as the next consecutive tick.
+			long producedTick = this.semanticAnimationResource.producedTickForDiagnostics();
+			this.semanticAnimationTickEpoch = Math.max(
+				this.semanticAnimationTickEpoch,
+				producedTick
+			);
+			SEMANTIC_ANIMATION_TICK_EPOCHS.merge(this.location, producedTick, Long::max);
+			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+				System.out.println("[MattMC graphics audit] atlas-animation.epoch atlas=" + this.location
+					+ " producedTick=" + producedTick
+					+ " retainedEpoch=" + this.semanticAnimationTickEpoch);
+			}
 			this.semanticAnimationResource.close();
 			this.semanticAnimationResource = null;
 		}

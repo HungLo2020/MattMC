@@ -309,6 +309,14 @@ class CaptureRunner:
             artifact_dir = root / artifact_dir
         resolved_root = root.resolve()
         resolved_artifact_dir = artifact_dir.resolve()
+        # The cross-repository graphics harness allocates an isolated,
+        # retention-managed artifact root outside the repository (normally
+        # under /tmp). It explicitly opts into that child process path so the
+        # runner's deterministic metadata and screenshots stay beside the
+        # matrix row instead of being redirected to the global capture tree.
+        # Standalone callers retain the path-safety redirect below.
+        if os.environ.get("MATTMC_ALLOW_EXTERNAL_ARTIFACT_DIR", "").lower() in {"1", "true", "yes"}:
+            return artifact_dir
         managed_roots = (
             artifact_root.resolve(),
             graphics_audit_root.resolve(),
@@ -1067,21 +1075,136 @@ class CaptureRunner:
         dh_opaque_only = os.environ.get("MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY", "false").lower() == "true"
         dh_non_water = os.environ.get("MATTMC_CAPTURE_DH_RUST_NON_WATER", "false").lower() == "true"
         dh_water = os.environ.get("MATTMC_CAPTURE_DH_RUST_WATER", "false").lower() == "true"
+        frozen_dh_baseline = os.environ.get("MATTMC_CAPTURE_FROZEN_DH_BASELINE", "false").lower() == "true"
+        dh_keep_fog = os.environ.get("MATTMC_CAPTURE_DH_KEEP_FOG", "false").lower() == "true"
+        dh_disable_fog = os.environ.get("MATTMC_CAPTURE_DH_DISABLE_FOG", "false").lower() == "true"
+        dh_generic = os.environ.get("MATTMC_CAPTURE_DH_GENERIC", "false").lower() == "true"
+        dh_ssao = os.environ.get("MATTMC_CAPTURE_DH_SSAO", "false").strip().lower()
+        if dh_ssao not in {"true", "false"}:
+            raise SystemExit("MATTMC_CAPTURE_DH_SSAO must be true or false")
+        amplified_ssao = os.environ.get("MATTMC_CAPTURE_DH_SSAO_AMPLIFIED", "false").strip().lower()
+        if amplified_ssao not in {"true", "false"}:
+            raise SystemExit("MATTMC_CAPTURE_DH_SSAO_AMPLIFIED must be true or false")
+        private_dh_probe = any(
+            os.environ.get(name, "false").lower() in {"1", "true", "yes"}
+            for name in (
+                "MATTMC_CAPTURE_DH_PRIVATE_COLOR_DEBUG",
+                "MATTMC_CAPTURE_DH_PRIVATE_DEPTH_DEBUG",
+                "MATTMC_CAPTURE_DH_PRIVATE_NO_FOG",
+                "MATTMC_CAPTURE_DH_PRIVATE_FOG_RECONSTRUCTION",
+                "MATTMC_CAPTURE_DH_PRIVATE_FOG_FACTOR_DEBUG",
+                "MATTMC_CAPTURE_DH_PRIVATE_VANILLA_COLOR_DEBUG",
+                "MATTMC_CAPTURE_DH_PRIVATE_VANILLA_FADE_FACTOR_DEBUG",
+                "MATTMC_CAPTURE_DH_PRIVATE_COVERAGE_MASK_DEBUG",
+                "MATTMC_CAPTURE_DH_PRIVATE_SKIP_OPAQUE_DOUBLE_PASS",
+                "MATTMC_CAPTURE_DH_PRIVATE_SKIP_FINAL_DOUBLE_PASS",
+                "MATTMC_CAPTURE_DH_PRIVATE_ISOLATE_VANILLA",
+                "MATTMC_CAPTURE_DH_PRIVATE_DISABLE_VANILLA_TRANSLUCENT",
+                "MATTMC_CAPTURE_DH_PRIVATE_DISABLE_VANILLA_OPAQUE",
+                "MATTMC_CAPTURE_DH_PRIVATE_NO_FADE",
+            )
+        )
+        dh_radius_override = os.environ.get("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE", "").strip()
+        if dh_radius_override:
+            if not dh_radius_override.isdigit() or not 1 <= int(dh_radius_override) <= 32:
+                raise SystemExit("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE must be an integer from 1 to 32")
+            if upsert_toml_value(dh_file, "lodChunkRenderDistanceRadius", dh_radius_override):
+                self.append_meta(f"forced_dh_radius_override={dh_radius_override}")
+        dh_dither_override = os.environ.get("MATTMC_CAPTURE_DH_DITHER", "").strip().lower()
+        if dh_dither_override:
+            if dh_dither_override not in {"true", "false"}:
+                raise SystemExit("MATTMC_CAPTURE_DH_DITHER must be true or false")
+            if upsert_toml_value(dh_file, "ditherDhFade", dh_dither_override):
+                self.append_meta(f"forced_dh_dither={dh_dither_override}")
+        dh_noise_override = os.environ.get("MATTMC_CAPTURE_DH_NOISE", "").strip().lower()
+        if dh_noise_override:
+            if dh_noise_override not in {"true", "false"}:
+                raise SystemExit("MATTMC_CAPTURE_DH_NOISE must be true or false")
+            if upsert_toml_value(dh_file, "enableNoiseTexture", dh_noise_override):
+                self.append_meta(f"forced_dh_noise={dh_noise_override}")
+        dh_far_clip_override = os.environ.get("MATTMC_CAPTURE_DH_FAR_CLIP", "false").strip().lower()
+        if dh_far_clip_override not in {"true", "false"}:
+            raise SystemExit("MATTMC_CAPTURE_DH_FAR_CLIP must be true or false")
+        dh_vanilla_fade_mode = os.environ.get(
+            "MATTMC_CAPTURE_DH_VANILLA_FADE_MODE", "NONE"
+        ).strip().upper()
+        if dh_vanilla_fade_mode not in {"NONE", "SINGLE_PASS", "DOUBLE_PASS"}:
+            raise SystemExit(
+                "MATTMC_CAPTURE_DH_VANILLA_FADE_MODE must be NONE, SINGLE_PASS, or DOUBLE_PASS"
+            )
+        if dh_far_clip_override == "true":
+            self.append_meta("forced_dh_far_clip_fade=true")
+        self.append_meta(f"forced_dh_vanilla_fade_mode={dh_vanilla_fade_mode}")
+        dh_lod_only_override = os.environ.get("MATTMC_CAPTURE_DH_LOD_ONLY", "").strip().lower()
+        if dh_lod_only_override:
+            if dh_lod_only_override not in {"true", "false"}:
+                raise SystemExit("MATTMC_CAPTURE_DH_LOD_ONLY must be true or false")
+            if upsert_toml_value(dh_file, "lodOnlyMode", dh_lod_only_override):
+                self.append_meta(f"forced_dh_lod_only={dh_lod_only_override}")
+        dh_throttle_for_terrain = (
+            os.environ.get("MATTMC_CAPTURE_DH_THROTTLE_FOR_TERRAIN", "false").lower() == "true"
+        )
+        if dh_throttle_for_terrain:
+            # Audit-only workload probe: keep DH's renderer and semantic route
+            # active, but remove its background generation CPU budget so the
+            # Rust/Sodium mesh-worker completion rate can be measured fairly.
+            for key, value in (
+                ("numberOfThreads", "1"),
+                ("threadRunTimeRatio", '"0.0"'),
+                ("enableRealTimeUpdates", "false"),
+                ("synchronizeOnLoad", "false"),
+                ("maxSyncOnLoadRequestDistance", "0"),
+                ("maxGenerationRequestDistance", "0"),
+            ):
+                if upsert_toml_value(dh_file, key, value):
+                    self.append_meta(f"forced_dh_throttle_for_terrain_{key}={value}")
         if dh_opaque_only or dh_non_water:
             # Both bounded routes exclude legacy auxiliary work. Keep DH's
             # renderer mode DEFAULT so the real CPU render-list traversal can
             # run; `enableRendering=false` below prevents the legacy GL draw
             # without making the semantic collector reject the frame.
-            for key, value in (
-                ("enableSsao", "false"),
-                ("enableGenericRendering", "false"),
-                ("dhFadeFarClipPlane", "false"),
-                ("enableDhFog", "false"),
-                ("enableRendering", "false"),
-                ("lodChunkRenderDistanceRadius", "4"),
-            ):
+            bounded_settings = [
+                # The normal matrix disables this auxiliary pass. A paired
+                # SSAO diagnostic explicitly enables the copied semantic
+                # route in both Current and Frozen.
+                ("enableSsao", dh_ssao),
+                ("enableGenericRendering", "true" if dh_generic else "false"),
+                ("dhFadeFarClipPlane", dh_far_clip_override),
+                ("vanillaFadeMode", f'"{dh_vanilla_fade_mode}"'),
+            ]
+            # Keep the canonical radius four unless the caller explicitly
+            # requested a diagnostic radius. The override is applied above,
+            # so appending the default here would silently erase it for the
+            # same DH opaque/non-water workload.
+            if not dh_radius_override:
+                bounded_settings.append(("lodChunkRenderDistanceRadius", "4"))
+            if not frozen_dh_baseline:
+                # Current Rust owns the whole-frame DH submission, so its
+                # legacy Java draw must stay disabled to prevent duplicate
+                # geometry. Frozen is the source baseline and deliberately
+                # retains Java OpenGL rendering under the same bounded inputs.
+                bounded_settings.insert(3, ("enableRendering", "false"))
+            for key, value in bounded_settings:
                 if upsert_toml_value(dh_file, key, value):
                     self.append_meta(f"forced_dh_non_water_{key}={value}")
+            if amplified_ssao == "true":
+                for key, value in (
+                    ("sampleCount", "32"),
+                    ("radius", "12.0"),
+                    ("strength", "1.0"),
+                    ("bias", "0.01"),
+                    ("minLight", "0.0"),
+                    ("blurRadius", "2"),
+                    ("fadeDistanceInBlocks", "1600"),
+                ):
+                    if upsert_toml_value(dh_file, key, value):
+                        self.append_meta(f"forced_dh_ssao_amplified_{key}={value}")
+            if dh_generic:
+                self.append_meta("forced_dh_generic_rendering=true")
+            if dh_ssao == "true":
+                self.append_meta("forced_dh_ssao=true")
+            if not dh_keep_fog and upsert_toml_value(dh_file, "enableDhFog", "false"):
+                self.append_meta("forced_dh_non_water_enableDhFog=false")
             if dh_opaque_only and upsert_toml_value(dh_file, "transparency", '"DISABLED"'):
                 self.append_meta('forced_dh_opaque_transparency="DISABLED"')
             if dh_non_water and upsert_toml_value(dh_file, "transparency", '"COMPLETE"'):
@@ -1092,8 +1215,25 @@ class CaptureRunner:
                 self.append_meta('forced_dh_non_water_transparency="COMPLETE"')
         if dh_water and upsert_toml_value(dh_file, "numberOfThreads", "1"):
             self.append_meta("forced_dh_water_numberOfThreads=1")
-        if dh_water and upsert_toml_value(dh_file, "lodChunkRenderDistanceRadius", "2"):
-            self.append_meta("forced_dh_water_lodChunkRenderDistanceRadius=2")
+        if dh_water and not frozen_dh_baseline and upsert_toml_value(dh_file, "enableRendering", "false"):
+            # The Rust water row owns the complete copied DH frame, including
+            # opaque and transparent streams.  Keep the legacy Java DH draw
+            # disabled on Current so it cannot duplicate or depth-conflict
+            # with the Rust presenter. Frozen deliberately retains Java GL.
+            self.append_meta("forced_dh_water_enableRendering=false")
+        # The canonical fixture establishes the same bounded radius for both
+        # Current and Frozen. Do not narrow Current's water run here: doing so
+        # makes the paired DH capture compare different visible-column sets.
+        if dh_water and not dh_radius_override and upsert_toml_value(dh_file, "lodChunkRenderDistanceRadius", "4"):
+            self.append_meta("forced_dh_water_lodChunkRenderDistanceRadius=4")
+        if dh_disable_fog and upsert_toml_value(dh_file, "enableDhFog", "false"):
+            self.append_meta("forced_dh_disable_fog_enableDhFog=false")
+        if private_dh_probe and not frozen_dh_baseline and upsert_toml_value(dh_file, "enableDhFog", "true"):
+            # The private compositor is only constructed for a DH frame whose
+            # copied fog block is enabled. Keep that prerequisite explicit in
+            # audit worlds; this never changes ordinary gameplay settings or
+            # the source/Frozen baseline.
+            self.append_meta("forced_dh_private_probe_enableDhFog=true")
         voxelmap_file = self.run_dir / "config" / "voxelmap.properties"
         if voxelmap_file.is_file():
             upsert_option(voxelmap_file, "Welcome Message", "false")
@@ -1480,6 +1620,8 @@ class CaptureRunner:
             and (
                 name.startswith("MATTMC_RUST_SELECTED_SOURCE_")
                 or name.startswith("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_")
+                or name.startswith("MATTMC_RUST_DH_")
+                or name.startswith("MATTMC_CAPTURE_DH_")
                 or name.startswith("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_")
                 or name.startswith("MATTMC_STATIC_TERRAIN_BATCH_TRACE_")
             )
@@ -1626,8 +1768,19 @@ class CaptureRunner:
                 f"-Dmattmc.dev.deterministicCameraCapture.world={self.config.world}",
                 "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
                 "-Dmattmc.dev.deterministicCameraCapture.ackTimeoutFrames=12000",
-                "-Dmattmc.vulkan.traceShaderInputParity.poseOnly=true",
             ]
+            # Keep the normal capture lightweight, but honor an explicit
+            # user-requested pose/full trace.  The previous unconditional
+            # append silently overrode --jvm-arg=...poseOnly=false because
+            # duplicate JVM properties use the last value.
+            existing_trace_override = any(
+                option.startswith("-Dmattmc.vulkan.traceShaderInputParity.poseOnly=")
+                for option in (*self.config.jvm_args, *shlex.split(self.env.get("JAVA_TOOL_OPTIONS", "")))
+            )
+            if not existing_trace_override:
+                deterministic_options.append(
+                    "-Dmattmc.vulkan.traceShaderInputParity.poseOnly=true"
+                )
             self.append_java_tool_options(deterministic_options)
             self.append_meta(f"deterministic_camera_capture_java_options={' '.join(deterministic_options)}")
             self.append_meta(f"java_tool_options={self.env.get('JAVA_TOOL_OPTIONS', '')}")
@@ -1924,16 +2077,19 @@ class CaptureRunner:
             self.platform_name,
             screenshot_file,
             client_pid,
-            require_client_window=self.config.title_screen_transition_capture,
+            # A gameplay/diagnostic screenshot is renderer evidence. Never
+            # fall back to the desktop (or accept a foreign X11 window) when
+            # the launched client cannot be identified.
+            require_client_window=True,
         )
         # A startup-transition frame is evidence only when it came from an
         # X11 window whose PID is the launched client.  In particular, before
         # that PID is known, a title/class heuristic can select an IDE window
         # that happens to mention Minecraft.
-        if self.config.title_screen_transition_capture and not target:
+        if not target:
             safe_unlink(screenshot_file)
             self.screenshot_count -= 1
-            self.append_meta(f"transition_screenshot_rejected_nonclient_target={elapsed_secs}")
+            self.append_meta(f"screenshot_rejected_nonclient_target={elapsed_secs}")
             return
         provenance = window_capture_provenance(self.platform_name, target, client_pid)
         # Timeline pixels can be retained for operator investigation only
@@ -1942,10 +2098,10 @@ class CaptureRunner:
         # backing-store pixels for a newly mapped GLFW drawable (including an
         # unrelated compositor surface). A title-presenter acknowledgement is
         # required for a frame to be accepted as an actual game presentation.
-        if self.config.title_screen_transition_capture and provenance.get("status") != "verified":
+        if self.platform_name == "linux" and provenance.get("status") != "verified":
             safe_unlink(screenshot_file)
             self.screenshot_count -= 1
-            self.append_meta(f"transition_screenshot_rejected_unverified_window={elapsed_secs}")
+            self.append_meta(f"screenshot_rejected_unverified_window={elapsed_secs}")
             return
         if target:
             if self.config.title_screen_transition_capture:
@@ -2048,18 +2204,27 @@ class CaptureRunner:
             if not str(screenshot):
                 self.append_meta(f"deterministic_capture_request_invalid={request}")
                 continue
-            target = capture_screenshot(self.platform_name, screenshot, client_pid)
-            if target:
+            target = capture_screenshot(
+                self.platform_name,
+                screenshot,
+                client_pid,
+                require_client_window=True,
+            )
+            provenance = window_capture_provenance(self.platform_name, target, client_pid)
+            if target and (
+                self.platform_name != "linux" or provenance.get("status") == "verified"
+            ):
                 data["status"] = "captured"
                 data["screenshot"] = str(screenshot)
                 data["targetWindow"] = target
+                data["windowProvenance"] = provenance
                 data["capturedAtEpoch"] = int(time.time())
                 ack.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
                 self.append_meta(f"deterministic_capture_ack={ack}")
                 self.append_meta(f"deterministic_capture_screenshot={screenshot}")
                 self.append_meta(f"deterministic_capture_target={target}")
             else:
-                self.append_meta(f"deterministic_capture_failed={request}")
+                self.append_meta(f"deterministic_capture_failed_unverified_window={request}")
 
     def capture_rust_title_presented_frame(self, client_pid: int | None) -> bool:
         """Acknowledge the held Rust-presented title image; never read Java's target."""

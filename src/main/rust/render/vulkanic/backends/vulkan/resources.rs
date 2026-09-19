@@ -1424,9 +1424,17 @@ impl VulkanObjects {
             _ => return Err(GalError::backend("resource set references missing layout")),
         };
         for binding in &desc.bindings {
-            if let Some(declaration) = layout_object.bindings.iter().find(|entry| entry.binding == binding.binding) {
-                validate_graphics_storage_access(declaration.kind, declaration.stages,
-                    binding.access, self.context.graphics_storage_writes)?;
+            if let Some(declaration) = layout_object
+                .bindings
+                .iter()
+                .find(|entry| entry.binding == binding.binding)
+            {
+                validate_graphics_storage_access(
+                    declaration.kind,
+                    declaration.stages,
+                    binding.access,
+                    self.context.graphics_storage_writes,
+                )?;
             }
         }
         let mut sizes: BTreeMap<vk::DescriptorType, u32> = BTreeMap::new();
@@ -1706,11 +1714,19 @@ impl VulkanObjects {
             .polygon_mode(vk::PolygonMode::FILL)
             .line_width(1.0)
             .cull_mode(cull_mode(desc.cull_mode))
-            .front_face(front_face(match (desc.front_face, desc.raster_y_direction) {
-                (crate::render::vulkanic::resources::FrontFace::Clockwise, RasterYDirection::Down) => crate::render::vulkanic::resources::FrontFace::CounterClockwise,
-                (crate::render::vulkanic::resources::FrontFace::CounterClockwise, RasterYDirection::Down) => crate::render::vulkanic::resources::FrontFace::Clockwise,
-                (face, RasterYDirection::Up) => face,
-            }))
+            .front_face(front_face(
+                match (desc.front_face, desc.raster_y_direction) {
+                    (
+                        crate::render::vulkanic::resources::FrontFace::Clockwise,
+                        RasterYDirection::Down,
+                    ) => crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+                    (
+                        crate::render::vulkanic::resources::FrontFace::CounterClockwise,
+                        RasterYDirection::Down,
+                    ) => crate::render::vulkanic::resources::FrontFace::Clockwise,
+                    (face, RasterYDirection::Up) => face,
+                },
+            ))
             .depth_bias_enable(depth_bias.is_some())
             .depth_bias_constant_factor(depth_bias.map_or(0.0, |bias| bias.constant_factor))
             .depth_bias_slope_factor(depth_bias.map_or(0.0, |bias| bias.slope_factor));
@@ -2082,10 +2098,20 @@ pub(super) struct ResourceLayoutObject {
     pub(super) bindings: Vec<ResourceBindingDesc>,
 }
 
-fn validate_graphics_storage_access(kind: ResourceBindingKind, stages: PipelineStageFlags,
-    access: AccessFlags, supported: bool) -> GalResult<()> {
-    if !supported && access.writes() && stages.0 & PipelineStageFlags::DRAW.0 != 0
-        && matches!(kind, ResourceBindingKind::StorageBuffer | ResourceBindingKind::StorageTexture) {
+fn validate_graphics_storage_access(
+    kind: ResourceBindingKind,
+    stages: PipelineStageFlags,
+    access: AccessFlags,
+    supported: bool,
+) -> GalResult<()> {
+    if !supported
+        && access.writes()
+        && stages.0 & PipelineStageFlags::DRAW.0 != 0
+        && matches!(
+            kind,
+            ResourceBindingKind::StorageBuffer | ResourceBindingKind::StorageTexture
+        )
+    {
         return Err(GalError::unsupported_feature(
             "writable DRAW storage requires Vulkan vertexPipelineStoresAndAtomics and fragmentStoresAndAtomics"));
     }
@@ -2094,12 +2120,25 @@ fn validate_graphics_storage_access(kind: ResourceBindingKind, stages: PipelineS
 
 #[test]
 fn graphics_storage_access_rejects_unsupported_writes_without_rejecting_reads_or_compute() {
-    for kind in [ResourceBindingKind::StorageBuffer, ResourceBindingKind::StorageTexture] {
+    for kind in [
+        ResourceBindingKind::StorageBuffer,
+        ResourceBindingKind::StorageTexture,
+    ] {
         let rw = AccessFlags(AccessFlags::READ.0 | AccessFlags::WRITE.0);
-        assert!(validate_graphics_storage_access(kind, PipelineStageFlags::DRAW, rw, false).is_err());
+        assert!(
+            validate_graphics_storage_access(kind, PipelineStageFlags::DRAW, rw, false).is_err()
+        );
         assert!(validate_graphics_storage_access(kind, PipelineStageFlags::DRAW, rw, true).is_ok());
-        assert!(validate_graphics_storage_access(kind, PipelineStageFlags::DRAW, AccessFlags::READ, false).is_ok());
-        assert!(validate_graphics_storage_access(kind, PipelineStageFlags::COMPUTE, rw, false).is_ok());
+        assert!(validate_graphics_storage_access(
+            kind,
+            PipelineStageFlags::DRAW,
+            AccessFlags::READ,
+            false
+        )
+        .is_ok());
+        assert!(
+            validate_graphics_storage_access(kind, PipelineStageFlags::COMPUTE, rw, false).is_ok()
+        );
     }
 }
 
@@ -2497,6 +2536,15 @@ pub(super) fn color_blend_attachment(
             .color_blend_op(vk::BlendOp::ADD)
             .src_alpha_blend_factor(vk::BlendFactor::ZERO)
             .dst_alpha_blend_factor(vk::BlendFactor::ONE)
+            .alpha_blend_op(vk::BlendOp::ADD)
+            .color_write_mask(vk::ColorComponentFlags::RGBA),
+        BlendMode::AlphaSource => vk::PipelineColorBlendAttachmentState::default()
+            .blend_enable(true)
+            .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+            .color_blend_op(vk::BlendOp::ADD)
+            .src_alpha_blend_factor(vk::BlendFactor::ONE)
+            .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
             .alpha_blend_op(vk::BlendOp::ADD)
             .color_write_mask(vk::ColorComponentFlags::RGBA),
         BlendMode::Premultiplied => vk::PipelineColorBlendAttachmentState::default()
@@ -3016,10 +3064,16 @@ mod tests {
         );
         second = first.clone();
         second.provoking_vertex = crate::render::vulkanic::resources::ProvokingVertex::First;
-        assert_ne!(GraphicsPipelineCacheKey::from_desc(&first), GraphicsPipelineCacheKey::from_desc(&second));
+        assert_ne!(
+            GraphicsPipelineCacheKey::from_desc(&first),
+            GraphicsPipelineCacheKey::from_desc(&second)
+        );
         second = first.clone();
         second.raster_y_direction = RasterYDirection::Down;
-        assert_ne!(GraphicsPipelineCacheKey::from_desc(&first), GraphicsPipelineCacheKey::from_desc(&second));
+        assert_ne!(
+            GraphicsPipelineCacheKey::from_desc(&first),
+            GraphicsPipelineCacheKey::from_desc(&second)
+        );
         second = first.clone();
         second.color_formats = vec![TextureFormat::Rgba16Float];
         assert_ne!(

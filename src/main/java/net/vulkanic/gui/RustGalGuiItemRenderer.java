@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.dev.GraphicsFrameBenchmark;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.state.GuiItemRenderState;
 import net.minecraft.client.gui.render.state.GuiRenderState;
@@ -873,8 +874,16 @@ public final class RustGalGuiItemRenderer {
 		if (!standard3dRouteEnabled()) {
 			return List.of();
 		}
+		boolean benchmarkTiming = GraphicsFrameBenchmark.isFrameBenchmarkActive();
+		long collectionStarted = benchmarkTiming ? System.nanoTime() : 0L;
 		GuiItemMeshSemanticCollector.CollectionResult collected = GuiItemMeshSemanticCollector.collectStandard3d(
 			item, Math.max(1, Minecraft.getInstance().getWindow().getGuiScale()));
+		if (benchmarkTiming) {
+			GraphicsFrameBenchmark.recordPhaseSample(
+				"gui.item.standard3d.collect",
+				Math.max(0L, System.nanoTime() - collectionStarted)
+			);
+		}
 		if (!collected.accepted()) {
 			recordDiagnostic("mesh-" + collected.rejection());
 			return List.of();
@@ -886,6 +895,7 @@ public final class RustGalGuiItemRenderer {
 			? GuiItemSemanticIdentities.identityOrZero(item.itemStackRenderState().getModelIdentity()) : 0;
 		VulkanicGalBridge.GuiItemCacheRecord itemCache = cacheIdentity != 0
 			? new VulkanicGalBridge.GuiItemCacheRecord(cacheIdentity, false) : null;
+		long batchStarted = benchmarkTiming ? System.nanoTime() : 0L;
 		var clip = item.scissorArea();
 		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>();
 		float[] guiPose = mesh.guiPose();
@@ -915,6 +925,12 @@ public final class RustGalGuiItemRenderer {
 			}
 		}
 		if (batches.isEmpty()) return List.of();
+		if (benchmarkTiming) {
+			GraphicsFrameBenchmark.recordPhaseSample(
+				"gui.item.standard3d.batch-build",
+				Math.max(0L, System.nanoTime() - batchStarted)
+			);
+		}
 		long startedNanos = System.nanoTime();
 		var token = dynamicLayerOrder == null
 			? RustGalFrameCoordinator.enqueueGuiMeshItemRequest(batches, GuiRenderStratum.GUI_ITEM, startedNanos)
@@ -977,9 +993,11 @@ public final class RustGalGuiItemRenderer {
 		GuiFlatItemMeshCollector.Snapshot snapshot;
 		try {
 			var options = Minecraft.getInstance().options;
+			var foil = item.itemStackRenderState().hasFoil()
+				? new VulkanicGalBridge.StandardItemFoilRecord(net.minecraft.Util.getMillis(), options.glintSpeed().get(), options.glintStrength().get().floatValue())
+				: null;
 			snapshot = GuiFlatItemMeshCollector.collect(item, guiWidth, guiHeight,
-				Minecraft.getInstance().getWindow().getGuiScale(), order,
-				new VulkanicGalBridge.StandardItemFoilRecord(net.minecraft.Util.getMillis(), options.glintSpeed().get(), options.glintStrength().get().floatValue()));
+				Minecraft.getInstance().getWindow().getGuiScale(), order, foil);
 		} catch (IllegalArgumentException | IllegalStateException rejection) {
 			recordDiagnostic("flat-mesh-rejected:" + rejection.getMessage());
 			return List.of();

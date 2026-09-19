@@ -91,6 +91,18 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		return false;
 	}
 
+	/**
+	 * Returns whether any resolved layer carries an authored item foil.  This
+	 * lets semantic collectors keep static topology reusable without creating a
+	 * frame-local foil payload for ordinary unfoiled items.
+	 */
+	public boolean hasFoil() {
+		for (int index = 0; index < this.activeLayerCount; index++) {
+			if (this.layers[index].foilType != FoilType.NONE) return true;
+		}
+		return false;
+	}
+
 	public void appendModelIdentityElement(Object object) {
 	}
 

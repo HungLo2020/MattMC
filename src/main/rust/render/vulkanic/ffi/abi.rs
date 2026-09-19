@@ -68,10 +68,12 @@ pub const FFI_ABI_V40_VERSION: u32 = 40;
 pub const FFI_ABI_V41_VERSION: u32 = 41;
 /// v42 appends standard world/held item foil semantics to mesh instances.
 pub const FFI_ABI_V42_VERSION: u32 = 42;
+/// v64 appends copied per-instance vanilla UV2 light for stable entity-model
+/// meshes. The field is ignored unless the explicit instance-light flag is set.
 /// v53 adds immutable orb appearance assets, lowered to geometry only in Rust.
 /// v54 adds semantic orb placement to the ordered entity mesh stream.
 /// v58 adds explicit equal-depth/write semantics for entity mesh layers.
-pub const FFI_ABI_VERSION: u32 = 63;
+pub const FFI_ABI_VERSION: u32 = 65;
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
@@ -553,9 +555,9 @@ pub struct FfiGuiItemRasterLayer {
     pub material_mode: u32,
     pub asset_id: u64,
     pub color_argb: u32,
-    pub corners: [f32;6],
-    pub uv: [f32;4],
-    pub model_transform: [f32;16],
+    pub corners: [f32; 6],
+    pub uv: [f32; 4],
+    pub model_transform: [f32; 16],
 }
 
 /// ABI v29 typed tiled-GUI semantics. The producer remains diagnostic-only
@@ -1370,6 +1372,13 @@ pub struct FfiWorldLodRenderFrame {
     pub camera_world_x: f32,
     pub camera_world_y: f32,
     pub camera_world_z: f32,
+    pub dh_fog_parameters: [f32; 20],
+    /// Copied level maximum used by Frozen's vanilla-fade cloud guard.
+    pub max_level_height: i32,
+    /// Explicit DH SSAO parameters: enabled, sample count, radius, strength,
+    /// minimum light, bias, fade distance, and blur radius. These are copied
+    /// configuration values only; Rust owns the SSAO image and pass.
+    pub ssao_parameters: [f32; 8],
 }
 
 #[repr(C)]
@@ -1420,6 +1429,9 @@ pub struct FfiWorldMeshInstanceRecord {
     /// Optional authored model collection order; mode 0 is absent, 1 is present.
     pub model_submission_order_mode: u32,
     pub model_submission_order: i32,
+    /// Copied packed vanilla UV2 light. This is an instance semantic lane, not
+    /// a Java lightmap object or backend resource.
+    pub packed_light: u32,
 }
 
 #[repr(C)]
@@ -1732,6 +1744,24 @@ pub struct FfiWholeFrameSubmitRequest {
     /// ABI v50: ordinary particle semantics; no Java-expanded vertices.
     pub world_particle_quads: FfiSlice<FfiWorldParticleQuadRequest>,
     pub world_experience_orbs: FfiSlice<FfiWorldExperienceOrbInstanceRecord>,
+    /// ABI v65: compact DH generic boxes. Rust expands the six semantic faces
+    /// into its cached material-instance topology; Java never constructs a
+    /// per-face vertex record for this stream.
+    pub world_distant_horizons_generic_boxes: FfiSlice<FfiWorldDistantHorizonsGenericBoxRecord>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiWorldDistantHorizonsGenericBoxRecord {
+    pub byte_size: u32,
+    /// Bit 0 retains the producer's SSAO request as semantic provenance.
+    pub flags: u32,
+    pub min: [f32; 3],
+    pub max: [f32; 3],
+    pub color_argb: u32,
+    pub packed_light: u32,
+    /// North, south, east, west, top, bottom directional multipliers.
+    pub shading: [f32; 6],
 }
 
 #[repr(C)]
@@ -1951,6 +1981,7 @@ pub struct FfiWholeFrameProfileSnapshot {
     pub world_mesh_dynamic_offset_count: u64,
     pub gui_mesh_prepare_nanos: u64,
     pub gui_mesh_lower_nanos: u64,
+    pub gpu_distant_horizons_opaque_nanos: u64,
 }
 
 impl Default for FfiGuiFrameSubmitResult {

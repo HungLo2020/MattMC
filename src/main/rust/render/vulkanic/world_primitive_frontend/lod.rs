@@ -8,39 +8,46 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    GalError, GalResult, WORLD_LOD_LAYER_OPAQUE, WORLD_LOD_LAYER_TRANSPARENT_SIDE,
-    WORLD_LOD_LAYER_TRANSPARENT_UP, WORLD_LOD_LAYER_TRANSPARENT_WATER_UP,
-    WORLD_LOD_MAX_NORMAL_INDEX, WorldLodColumnAsset, WorldLodColumnInstanceRequest,
-    WorldLodColumnMaterialProvenance, WorldLodFaceMaterial, WorldLodRenderFrame, WorldLodSegment,
-    WorldLodVertex, selected_source_raster_probe_cull_mode,
-    selected_source_raster_probe_front_face, validate_world_lod_column_asset,
+    selected_source_raster_probe_cull_mode, selected_source_raster_probe_depth_compare,
+    selected_source_raster_probe_front_face, validate_world_lod_column_asset, GalError, GalResult,
+    WorldLodColumnAsset, WorldLodColumnInstanceRequest, WorldLodColumnMaterialProvenance,
+    WorldLodFaceMaterial, WorldLodRenderFrame, WorldLodSegment, WorldLodVertex,
+    WORLD_LOD_LAYER_OPAQUE, WORLD_LOD_LAYER_TRANSPARENT_SIDE, WORLD_LOD_LAYER_TRANSPARENT_UP,
+    WORLD_LOD_LAYER_TRANSPARENT_WATER_UP, WORLD_LOD_MAX_NORMAL_INDEX,
 };
-use crate::render::vulkanic::CullMode;
 use crate::render::vulkanic::commands::{
-    AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment, ResourceBarrier,
-    TextureImageCopyRegion, TextureOrigin3d, TextureUsageState,
+    AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandOp, PassAttachment, ResourceBarrier,
+    TextureImageCopyRegion, TextureOrigin3d, TextureRowOrder, TextureUsageState,
 };
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::{
-    AccessFlags, BlendMode, BufferDesc, BufferUsage, CombinedTextureSamplerDesc, CompareOp,
-    Extent3d, FrontFace, GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc,
-    PrimitiveTopology, QueueClass, RenderPassDesc, RenderTargetDesc, ResourceBinding,
-    ResourceBindingKind, ResourceSetDesc, SamplerAddressMode, SamplerDesc, SamplerFilter,
-    TextureDesc, TextureDimension, TextureFormat, TextureUsage, TextureViewDesc,
+    AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, CombinedTextureSamplerDesc,
+    CompareOp, Extent3d, FrontFace, GraphicsPipelineDesc, IndexType, MemoryDomain,
+    PipelineLayoutDesc, PipelineStageFlags, PrimitiveTopology, QueueClass, RasterYDirection,
+    RenderPassDesc, RenderTargetDesc, ResourceBinding, ResourceBindingDesc, ResourceBindingKind,
+    ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc, SamplerFilter,
+    ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension, TextureFormat,
+    TextureUsage, TextureViewDesc,
 };
 use crate::render::vulkanic::shader_pack::distant_horizons_contract::DistantHorizonsPassKind;
 use crate::render::vulkanic::shader_pack::lightmap::VanillaLightmapBinding;
 use crate::render::vulkanic::shader_pack::programs::{
-    LoweredDistantHorizonsExactAtlasSourceProgram, LoweredDistantHorizonsSourceProgram,
     distant_horizons_exact_atlas_source_resource_layout,
     distant_horizons_lod_exact_atlas_resource_layouts,
     distant_horizons_lod_opaque_resource_layouts,
+    minimal_distant_horizons_lod_exact_atlas_forward_opaque_program,
     minimal_distant_horizons_lod_exact_atlas_opaque_program,
+    minimal_distant_horizons_lod_forward_opaque_program,
     minimal_distant_horizons_lod_opaque_program, minimal_distant_horizons_lod_transparent_program,
+    shader_stage_code_for_backend, LoweredDistantHorizonsExactAtlasSourceProgram,
+    LoweredDistantHorizonsSourceProgram, MINIMAL_DISTANT_HORIZONS_DIRECT_APPLY_FRAGMENT,
+    MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT,
+    MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_VERTEX,
+    MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT, MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT,
 };
 use crate::render::vulkanic::shader_pack::source_targets::{
-    ShaderPackColorTargets, TerrainSourceColorAttachment, source_color_clear_color,
+    source_color_clear_color, ShaderPackColorTargets, TerrainSourceColorAttachment,
 };
 use crate::render::vulkanic::shader_pack::source_uniforms::TerrainSourceUniformFrame;
 use crate::render::vulkanic::shader_pack::terrain_contract::TerrainPassOutput;
@@ -49,21 +56,27 @@ use crate::render::vulkanic::shader_pack::terrain_source_resources::{
     TerrainSourceResourceAvailabilitySet, TerrainSourceResourceRole,
     TerrainSourceSampledResourceShape,
 };
+use crate::render::vulkanic::CullMode;
 
 const MICRO_OFFSET_SCALE: f32 = 0.01;
 
 /// Distant Horizons preserves the source OpenGL quad order in both its
-/// reduced-color and provenance-resolved exact-atlas streams. The Rust Vulkan
-/// whole-frame target uses the standard Vulkan viewport orientation, so that
-/// source order remains counter-clockwise at rasterization.
-const WORLD_LOD_SOURCE_FRONT_FACE: FrontFace = FrontFace::CounterClockwise;
+/// reduced-color and provenance-resolved exact-atlas streams. The GAL
+/// `RasterYDirection::Up` contract keeps the source `FrontFace` semantic
+/// unchanged while each backend realizes its target coordinates, so source
+/// back-face classification remains counter-clockwise on every backend. Keep
+/// this DH-specific state separate from near-terrain winding; the source quad
+/// index contract is otherwise unchanged.
+fn world_lod_source_front_face(_api: BackendApi) -> FrontFace {
+    FrontFace::CounterClockwise
+}
 
 /// Private Rust shader-input layout for expanded DH columns. This is not the
 /// FFI record layout and intentionally has no OpenGL/Vulkan vertex-format
 /// meaning. Backends receive it only after a later LOD material pass defines
 /// an explicit pipeline interface.
-pub(crate) const WORLD_LOD_GPU_VERTEX_LAYOUT_V1: u32 = 1;
-pub(crate) const WORLD_LOD_GPU_VERTEX_BYTES: usize = 32;
+pub(crate) const WORLD_LOD_GPU_VERTEX_LAYOUT_V2: u32 = 2;
+pub(crate) const WORLD_LOD_GPU_VERTEX_BYTES: usize = 16;
 /// Private Rust-owned exact-atlas DH vertex ABI. Unlike the legacy DH stream,
 /// this carries copied atlas UVs and has no Java/OpenGL layout meaning.
 pub(crate) const WORLD_LOD_TEXTURED_GPU_VERTEX_LAYOUT_V2: u32 = 2;
@@ -76,12 +89,18 @@ pub(crate) struct WorldLodDrawUniform {
     pub column_origin_and_world_y: [f32; 4],
     /// Distant Horizons keeps its per-column geometry local and supplies the
     /// camera-relative column origin independently of its raw model-view
-    /// matrix. The copied column origin already contains the dimension's
-    /// minimum Y, so `world_y_offset` remains scalar source-pack context and
-    /// must not be applied a second time to clip-space placement.
+    /// matrix. `world_y_offset` remains retained in the trailing lane for
+    /// source-pack semantics and diagnostics; it is not applied to the
+    /// already dimension-local column origin a second time.
     pub model_offset_and_reserved: [f32; 4],
     pub clip_micro_noise_earth: [f32; 4],
     pub flags_and_noise: [u32; 4],
+    /// Copied vanilla fog color/alpha and range semantics. These are filled
+    /// at the whole-frame material boundary, never sourced from Java GL or
+    /// shader-pack state.
+    pub fog_color_and_alpha: [f32; 4],
+    pub fog_ranges: [f32; 4],
+    pub dh_fog_parameters: [f32; 20],
 }
 
 impl WorldLodDrawUniform {
@@ -102,7 +121,7 @@ impl WorldLodDrawUniform {
                 "world LOD draw uniform requires an enabled semantic render frame",
             ));
         }
-        if frame.flags & !0x1f != 0
+        if frame.flags & !0xff != 0
             || frame.micro_offset <= 0.0
             || frame.clip_distance < 0.0
             || frame
@@ -147,7 +166,127 @@ impl WorldLodDrawUniform {
                 frame.noise_dropoff as u32,
                 0,
             ],
+            fog_color_and_alpha: [0.0; 4],
+            fog_ranges: [0.0; 4],
+            dh_fog_parameters: frame.dh_fog_parameters,
         })
+    }
+
+    pub(crate) fn with_fog(mut self, fog_color_and_alpha: [f32; 4], fog_ranges: [f32; 4]) -> Self {
+        self.fog_color_and_alpha = fog_color_and_alpha;
+        self.fog_ranges = fog_ranges;
+        self
+    }
+
+    pub(crate) fn without_dh_fog(mut self) -> Self {
+        self.dh_fog_parameters[16] = 0.0;
+        self
+    }
+
+    /// Capture-only probe for the legacy DH Vulkan Y clip convention.  The
+    /// private direct compositor keeps this bit in the owned frame block so
+    /// the production route and all shader-pack/source routes remain
+    /// unchanged when the probe is disabled.
+    pub(crate) fn with_private_audit_flip_y(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] = 1;
+        }
+        self
+    }
+
+    /// Capture-only probe for the OpenGL-to-Vulkan clip-depth remap.  Bit 1
+    /// shares the existing private audit lane; normal frames leave it clear
+    /// and retain the backend's explicit zero-to-one conversion.
+    pub(crate) fn with_private_audit_no_depth_remap(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] |= 2;
+        }
+        self
+    }
+
+    /// Capture-only probe that paints each submitted DH column with a stable
+    /// origin-derived color. It is restricted to the private direct route by
+    /// the caller and leaves the production material contract unchanged.
+    pub(crate) fn with_private_audit_column_ids(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] |= 4;
+        }
+        self
+    }
+
+    /// Capture-only probe that bypasses the copied DH distance fade.  This is
+    /// restricted to the private direct route and exists only to distinguish
+    /// fragment discard coverage from missing source geometry.
+    pub(crate) fn with_private_audit_no_fade(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] |= 8;
+        }
+        self
+    }
+
+    /// Capture-only probe for the reduced-color DH transparent material. The
+    /// fragment shader uses this bit to bypass lightmap/noise/fog color while
+    /// retaining the normal raster coverage and blend state. It is never set
+    /// on a normal frame.
+    pub(crate) fn with_private_audit_raw_transparent_color(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] |= 16;
+        }
+        self
+    }
+
+    /// Capture-only probe that paints reduced-color DH water fragments a
+    /// stable diagnostic green. This distinguishes water coverage/blending
+    /// from its copied source color without changing pass ownership or depth
+    /// policy. It is never set on a normal frame.
+    pub(crate) fn with_private_audit_water_debug_color(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] |= 32;
+        }
+        self
+    }
+
+    /// Capture-only probe that outputs the sampled lightmap color from the
+    /// generic transparent DH material before vertex-color modulation. It
+    /// preserves coverage, depth, and blend state and is never set normally.
+    pub(crate) fn with_private_audit_raw_lightmap_color(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] |= 64;
+        }
+        self
+    }
+
+    /// Capture-only probe for provenance-resolved DH atlas sampling. It
+    /// outputs the sampled sprite color before semantic lighting and fog.
+    pub(crate) fn with_private_audit_raw_exact_atlas_color(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] |= 128;
+        }
+        self
+    }
+
+    /// Capture-only probe that forces exact-atlas samples to the copied base
+    /// mip.  Semantic atlas snapshots retain per-sprite mip rows, but a
+    /// distant merged face can select an atlas mip whose sprite footprint is
+    /// smaller than one texel.  This bit isolates that sampling boundary
+    /// without changing the normal sampler contract.
+    pub(crate) fn with_private_audit_exact_atlas_base_mip(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] |= 256;
+        }
+        self
+    }
+
+    /// Capture-only probe for the source OpenGL Bayer phase.  Vulkan's
+    /// fragment origin and the shared negative viewport can make the Y phase
+    /// ambiguous even when geometry is aligned.  Bit 512 selects the direct
+    /// `gl_FragCoord.y` phase; normal frames leave it clear and retain the
+    /// production Vulkan-to-OpenGL mapping.
+    pub(crate) fn with_private_audit_dither_y(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.flags_and_noise[3] |= 512;
+        }
+        self
     }
 
     /// Fixed backend-neutral buffer layout for the first Rust-owned LOD
@@ -155,7 +294,45 @@ impl WorldLodDrawUniform {
     /// float blocks, and one uvec4 block, so both Vulkan std140 and the OpenGL
     /// compatibility backend can bind the same owned bytes without decoding
     /// any DH or Java renderer state.
-    pub(crate) fn pack_std140(self) -> [u8; 128] {
+    pub(crate) fn pack_std140(self) -> [u8; 240] {
+        let mut bytes = [0u8; 240];
+        let mut offset = 0usize;
+        for value in self
+            .combined_matrix
+            .iter()
+            .chain(self.column_origin_and_world_y.iter())
+            .chain(self.model_offset_and_reserved.iter())
+            .chain(self.clip_micro_noise_earth.iter())
+        {
+            bytes[offset..offset + std::mem::size_of::<f32>()]
+                .copy_from_slice(&value.to_ne_bytes());
+            offset += std::mem::size_of::<f32>();
+        }
+        for value in self.flags_and_noise {
+            bytes[offset..offset + std::mem::size_of::<u32>()]
+                .copy_from_slice(&value.to_ne_bytes());
+            offset += std::mem::size_of::<u32>();
+        }
+        for value in self
+            .fog_color_and_alpha
+            .iter()
+            .chain(self.fog_ranges.iter())
+            .chain(self.dh_fog_parameters.iter())
+        {
+            bytes[offset..offset + std::mem::size_of::<f32>()]
+                .copy_from_slice(&value.to_ne_bytes());
+            offset += std::mem::size_of::<f32>();
+        }
+        debug_assert_eq!(offset, bytes.len());
+        bytes
+    }
+
+    /// Packs the reduced source-derived DH ABI. Lowered shader-pack source
+    /// programs consume only the first five std140 blocks (matrix, origin,
+    /// camera-relative offset, fade controls, and flags); fog and DH fog
+    /// fields belong to the ordinary Rust-owned material pass and must not be
+    /// written past the source descriptor's 128-byte contract.
+    pub(crate) fn pack_source_std140(self) -> [u8; 128] {
         let mut bytes = [0u8; 128];
         let mut offset = 0usize;
         for value in self
@@ -236,7 +413,14 @@ impl TryFrom<u8> for WorldLodMaterialCategory {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum WorldLodPassClass {
     Opaque,
-    Transparent,
+    /// DH's `TRANSPARENT_DETAIL` state for horizontal/side geometry. It uses
+    /// source-alpha blending, LESS depth testing, and preserves the existing
+    /// depth value while the vanilla renderer owns the final opaque history.
+    TransparentSide,
+    /// DH's inherited `TRANSPARENT` state for upward foliage geometry. It has
+    /// the same blend/depth comparison, but writes depth just like Frozen's
+    /// no-shader transparent pass.
+    TransparentUp,
     WaterSurface,
 }
 
@@ -257,16 +441,25 @@ pub(crate) struct WorldLodMaterialContract {
 impl WorldLodMaterialContract {
     pub(crate) const OPAQUE: Self = Self {
         pass: WorldLodPassClass::Opaque,
-        vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V1,
+        vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V2,
         requires_vanilla_lightmap: true,
         uses_vertex_color: true,
         uses_face_normal: true,
         uses_material_category: true,
     };
 
-    pub(crate) const TRANSPARENT: Self = Self {
-        pass: WorldLodPassClass::Transparent,
-        vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V1,
+    pub(crate) const TRANSPARENT_SIDE: Self = Self {
+        pass: WorldLodPassClass::TransparentSide,
+        vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V2,
+        requires_vanilla_lightmap: true,
+        uses_vertex_color: true,
+        uses_face_normal: true,
+        uses_material_category: true,
+    };
+
+    pub(crate) const TRANSPARENT_UP: Self = Self {
+        pass: WorldLodPassClass::TransparentUp,
+        vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V2,
         requires_vanilla_lightmap: true,
         uses_vertex_color: true,
         uses_face_normal: true,
@@ -275,7 +468,7 @@ impl WorldLodMaterialContract {
 
     pub(crate) const WATER_SURFACE: Self = Self {
         pass: WorldLodPassClass::WaterSurface,
-        vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V1,
+        vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V2,
         requires_vanilla_lightmap: true,
         uses_vertex_color: true,
         uses_face_normal: true,
@@ -348,6 +541,27 @@ pub(crate) struct WorldLodFramePlan {
     pub water_draws: Vec<WorldLodWaterDraw>,
 }
 
+/// A frame plan contains only copied DH draw classifications and uniforms.
+/// Reuse its vectors between ordinary frames, but do not retain an accidental
+/// very large visibility spike indefinitely on the render thread.
+const MAX_REUSABLE_WORLD_LOD_PLAN_ELEMENTS: usize = 4096;
+
+impl WorldLodFramePlan {
+    pub(crate) fn prepare_for_reuse(&mut self) {
+        clear_reusable_world_lod_plan_vec(&mut self.opaque_draws);
+        clear_reusable_world_lod_plan_vec(&mut self.transparent_draws);
+        clear_reusable_world_lod_plan_vec(&mut self.water_draws);
+    }
+}
+
+fn clear_reusable_world_lod_plan_vec<T>(draws: &mut Vec<T>) {
+    if draws.capacity() > MAX_REUSABLE_WORLD_LOD_PLAN_ELEMENTS {
+        *draws = Vec::new();
+    } else {
+        draws.clear();
+    }
+}
+
 pub(crate) fn plan_world_lod_frame(
     frame: &WorldLodRenderFrame,
     draws: &[WorldLodGpuDraw],
@@ -367,6 +581,20 @@ pub(crate) fn plan_world_lod_frame_with_camera(
         transparent_draws: Vec::new(),
         water_draws: Vec::new(),
     };
+    plan_world_lod_frame_with_camera_into(frame, draws, camera_world_position, &mut plan)?;
+    Ok(plan)
+}
+
+/// Resolves visible DH draws into caller-owned scratch storage. Only bounded
+/// vector capacity survives the call; classifications, uniforms, and ordering
+/// are rebuilt from the current copied frame and camera semantics.
+pub(crate) fn plan_world_lod_frame_with_camera_into(
+    frame: &WorldLodRenderFrame,
+    draws: &[WorldLodGpuDraw],
+    camera_world_position: [f32; 3],
+    plan: &mut WorldLodFramePlan,
+) -> GalResult<()> {
+    plan.prepare_for_reuse();
     for &draw in draws {
         match draw.layer {
             WORLD_LOD_LAYER_OPAQUE => plan.opaque_draws.push(admit_world_lod_draw_with_camera(
@@ -413,7 +641,7 @@ pub(crate) fn plan_world_lod_frame_with_camera(
             draw.draw.segment_index,
         )
     });
-    Ok(plan)
+    Ok(())
 }
 
 pub(crate) fn admit_world_lod_water_draw_with_camera(
@@ -488,8 +716,15 @@ pub(crate) fn admit_world_lod_transparent_draw_with_camera(
     draw: WorldLodGpuDraw,
     camera_world_position: [f32; 3],
 ) -> GalResult<WorldLodTransparentDraw> {
-    match draw.layer {
-        WORLD_LOD_LAYER_TRANSPARENT_SIDE | WORLD_LOD_LAYER_TRANSPARENT_UP => {}
+    let (pass, material_contract) = match draw.layer {
+        WORLD_LOD_LAYER_TRANSPARENT_SIDE => (
+            WorldLodPassClass::TransparentSide,
+            WorldLodMaterialContract::TRANSPARENT_SIDE,
+        ),
+        WORLD_LOD_LAYER_TRANSPARENT_UP => (
+            WorldLodPassClass::TransparentUp,
+            WorldLodMaterialContract::TRANSPARENT_UP,
+        ),
         WORLD_LOD_LAYER_TRANSPARENT_WATER_UP => {
             return Err(GalError::unsupported_feature(
                 WorldLodAdmissionError::WaterLayerRequiresWaterPath(draw.layer).to_string(),
@@ -505,14 +740,14 @@ pub(crate) fn admit_world_lod_transparent_draw_with_camera(
                 WorldLodAdmissionError::UnknownLayer(layer).to_string(),
             ));
         }
-    }
+    };
     let uniforms =
         WorldLodDrawUniform::from_semantics_with_camera(frame, draw, camera_world_position)?;
     Ok(WorldLodTransparentDraw {
         draw,
         uniforms,
-        pass: WorldLodPassClass::Transparent,
-        material_contract: WorldLodMaterialContract::TRANSPARENT,
+        pass,
+        material_contract,
     })
 }
 
@@ -520,6 +755,7 @@ pub(crate) fn admit_world_lod_transparent_draw_with_camera(
 struct WorldLodDrawResourceKey {
     column_key: u64,
     column_generation: u64,
+    layer: u32,
     segment_index: u32,
 }
 
@@ -528,11 +764,11 @@ impl WorldLodDrawResourceKey {
         Self {
             column_key: draw.column_key,
             column_generation: draw.column_generation,
-            // A column can legitimately contain several segments in the same
-            // layer, so the buffer handle is included in the private cache
-            // key's identity through this ordinal-like stable handle slot.
-            // The visible semantic request has already resolved it against
-            // the exact generation before reaching this pass owner.
+            // DH numbers VBO segments independently inside each material
+            // bucket. Keep the immutable layer in the residency key so a
+            // side, upward, or water segment with the same ordinal cannot
+            // borrow another bucket's storage buffer.
+            layer: draw.layer,
             segment_index: draw.segment_index,
         }
     }
@@ -545,10 +781,25 @@ struct WorldLodPipelineResources {
     lightmap_layout: Handle,
     pipeline_layout: Handle,
     pipeline: Handle,
+    /// Direct-route variant used by the Rust-owned DH offscreen color/depth
+    /// boundary. Opaque writes depth into the private DH target; transparent
+    /// streams retain their explicit no-write policy.
+    offscreen_pipeline: Option<Handle>,
+    /// The same water geometry is replayed in Frozen's transparent phase
+    /// after that phase installs accumulated-alpha blending. Keep this as a
+    /// distinct immutable pipeline state instead of mutating or inferring
+    /// blend state between draws.
+    offscreen_replay_pipeline: Option<Handle>,
 }
 
 impl WorldLodPipelineResources {
     fn destroy(self, gal: &mut VulkanicGal) {
+        if let Some(handle) = self.offscreen_pipeline {
+            let _ = gal.destroy(handle);
+        }
+        if let Some(handle) = self.offscreen_replay_pipeline {
+            let _ = gal.destroy(handle);
+        }
         for handle in [
             self.pipeline,
             self.pipeline_layout,
@@ -562,10 +813,16 @@ impl WorldLodPipelineResources {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 struct WorldLodDrawResources {
     uniform_buffer: Handle,
     resource_set: Handle,
+    /// The frame block is owned by this immutable column/segment resource.
+    /// Keep the last packed bytes so settled DH frames do not enqueue a
+    /// redundant host write and two buffer barriers for an unchanged draw.
+    /// This cache is discarded with the resource key at column-generation
+    /// retirement, so it cannot cross a DH asset or world generation.
+    last_uniform_bytes: Option<[u8; 240]>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -612,6 +869,8 @@ impl WorldLodDrawResources {
 /// semantic streams share no accidental blend/depth policy.
 struct WorldLodPassResources {
     pass: WorldLodPassClass,
+    deferred: bool,
+    color_format: Option<TextureFormat>,
     pipeline: Option<WorldLodPipelineResources>,
     draws: BTreeMap<WorldLodDrawResourceKey, WorldLodDrawResources>,
     lightmaps: BTreeMap<WorldLodLightmapResourceKey, WorldLodLightmapResources>,
@@ -620,6 +879,8 @@ struct WorldLodPassResources {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct WorldLodPreparedDraw {
     pub pipeline: Handle,
+    pub offscreen_pipeline: Option<Handle>,
+    pub offscreen_replay_pipeline: Option<Handle>,
     pub pipeline_layout: Handle,
     pub geometry_resource_set: Handle,
     pub lightmap_resource_set: Handle,
@@ -628,10 +889,1446 @@ pub(crate) struct WorldLodPreparedDraw {
     pub index_count: u32,
 }
 
+/// Rust-owned framebuffer boundary for the ordinary DH route.  The direct
+/// path renders every DH material stream into these private color/depth
+/// attachments, then samples them in one explicit fullscreen composite.  It
+/// never aliases the vanilla depth attachment or a shader-pack target.
+pub(crate) struct WorldLodDirectCompositionResources {
+    pub color_texture: Handle,
+    pub color_view: Handle,
+    pub depth_texture: Handle,
+    pub depth_view: Handle,
+    /// DH color after source-owned SSAO, far fade and fog. Frozen preserves
+    /// this image across the early apply and all later vanilla fade passes.
+    pub resolved_color_texture: Handle,
+    pub resolved_color_view: Handle,
+    /// Snapshot of the completed vanilla color target used by the explicit
+    /// MC/DH transition pass.  The acquired frame target is intentionally
+    /// opaque and cannot be sampled directly.
+    pub vanilla_color_texture: Handle,
+    pub vanilla_color_view: Handle,
+    /// Snapshot of the completed vanilla depth attachment used to reconstruct
+    /// the source MC fragment distance for the fade contract.
+    pub vanilla_depth_texture: Handle,
+    pub vanilla_depth_view: Handle,
+    pub target: Handle,
+    pub pass: Handle,
+    resolved_target: Handle,
+    resolved_pass: Handle,
+    color_sampler: Handle,
+    depth_sampler: Handle,
+    ssao_sampler: Handle,
+    uniform_buffer: Handle,
+    ssao_uniform_buffer: Handle,
+    resource_layout: Handle,
+    ssao_resource_layout: Handle,
+    pipeline_layout: Handle,
+    ssao_pipeline_layout: Handle,
+    resource_set: Handle,
+    resolved_resource_set: Handle,
+    ssao_resource_set: Handle,
+    vertex_shader: Handle,
+    fragment_shader: Handle,
+    pipeline: Handle,
+    apply_fragment_shader: Handle,
+    apply_pipeline: Handle,
+    fade_fragment_shader: Handle,
+    fade_pipeline: Handle,
+    ssao_fragment_shader: Handle,
+    ssao_pipeline: Handle,
+    ssao_texture: Handle,
+    ssao_view: Handle,
+    ssao_target: Handle,
+    ssao_pass: Handle,
+    pub extent: Extent3d,
+    pub color_format: TextureFormat,
+    pub raster_y_direction: RasterYDirection,
+}
+
+// Frozen uses a 16-bit intermediate for DH fog and fade before applying the
+// result to Minecraft's 8-bit target. Keep the resolved image equally
+// independent from the presentation format so later transition passes do not
+// accumulate an extra 8-bit quantization step.
+const WORLD_LOD_RESOLVED_COLOR_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
+
+impl WorldLodDirectCompositionResources {
+    /// Exposes the sparse pre-composite DH color only to the bounded
+    /// whole-frame diagnostic. Its alpha channel is the render target's
+    /// semantic geometry-coverage marker, so the capture can attribute final
+    /// pixels without changing the production compositor or sharing this
+    /// private image with another renderer.
+    pub(crate) fn private_color_texture(&self) -> Handle {
+        self.color_texture
+    }
+
+    /// Exposes the fog/fade-resolved DH image only to the bounded whole-frame
+    /// diagnostic. Production composition continues to consume it through
+    /// the private resource set.
+    pub(crate) fn resolved_color_texture(&self) -> Handle {
+        self.resolved_color_texture
+    }
+
+    /// Exposes the owned AO result only to the bounded whole-frame diagnostic.
+    /// Production composition continues to consume it through the private
+    /// resource set rather than sharing a backend object across renderers.
+    pub(crate) fn ssao_texture(&self) -> Handle {
+        self.ssao_texture
+    }
+
+    pub(crate) fn create(
+        gal: &mut VulkanicGal,
+        extent: Extent3d,
+        color_format: TextureFormat,
+        raster_y_direction: RasterYDirection,
+    ) -> GalResult<Self> {
+        if extent.width == 0 || extent.height == 0 || extent.depth != 1 {
+            return Err(GalError::invalid_argument(
+                "direct DH composition target requires a non-zero 2D extent",
+            ));
+        }
+        let label = format!(
+            "world-lod-direct-composition-{}x{}",
+            extent.width, extent.height
+        );
+        let resolved_color_format = WORLD_LOD_RESOLVED_COLOR_FORMAT;
+        let mut created = Vec::new();
+        let result = (|| -> GalResult<Self> {
+            let color_texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.color.texture"),
+                dimension: TextureDimension::D2,
+                format: color_format,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![
+                    TextureUsage::ColorAttachment,
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferSrc,
+                ],
+            })?;
+            created.push(color_texture);
+            let color_view = gal.create_texture_view(TextureViewDesc {
+                label: format!("{label}.color.view"),
+                texture: color_texture,
+                format: color_format,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })?;
+            created.push(color_view);
+            let depth_texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.depth.texture"),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Depth32Float,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::DepthStencilAttachment, TextureUsage::Sampled],
+            })?;
+            created.push(depth_texture);
+            let depth_view = gal.create_texture_view(TextureViewDesc {
+                label: format!("{label}.depth.view"),
+                texture: depth_texture,
+                format: TextureFormat::Depth32Float,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })?;
+            created.push(depth_view);
+            let resolved_color_texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.resolved-color.texture"),
+                dimension: TextureDimension::D2,
+                format: resolved_color_format,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![
+                    TextureUsage::ColorAttachment,
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferSrc,
+                ],
+            })?;
+            created.push(resolved_color_texture);
+            let resolved_color_view = gal.create_texture_view(TextureViewDesc {
+                label: format!("{label}.resolved-color.view"),
+                texture: resolved_color_texture,
+                format: resolved_color_format,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })?;
+            created.push(resolved_color_view);
+            let vanilla_color_texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.vanilla-color.texture"),
+                dimension: TextureDimension::D2,
+                format: color_format,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::Sampled, TextureUsage::TransferDst],
+            })?;
+            created.push(vanilla_color_texture);
+            let vanilla_color_view = gal.create_texture_view(TextureViewDesc {
+                label: format!("{label}.vanilla-color.view"),
+                texture: vanilla_color_texture,
+                format: color_format,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })?;
+            created.push(vanilla_color_view);
+            let vanilla_depth_texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.vanilla-depth.texture"),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Depth32Float,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![TextureUsage::Sampled, TextureUsage::TransferDst],
+            })?;
+            created.push(vanilla_depth_texture);
+            let vanilla_depth_view = gal.create_texture_view(TextureViewDesc {
+                label: format!("{label}.vanilla-depth.view"),
+                texture: vanilla_depth_texture,
+                format: TextureFormat::Depth32Float,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })?;
+            created.push(vanilla_depth_view);
+            let target = gal.create_render_target(RenderTargetDesc {
+                label: format!("{label}.target"),
+                color_views: vec![color_view],
+                depth_stencil_view: Some(depth_view),
+                extent,
+            })?;
+            created.push(target);
+            let pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.pass"),
+                target,
+                color_formats: vec![color_format],
+                depth_format: Some(TextureFormat::Depth32Float),
+            })?;
+            created.push(pass);
+            let resolved_target = gal.create_render_target(RenderTargetDesc {
+                label: format!("{label}.resolved.target"),
+                color_views: vec![resolved_color_view],
+                depth_stencil_view: None,
+                extent,
+            })?;
+            created.push(resolved_target);
+            let resolved_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.resolved.pass"),
+                target: resolved_target,
+                color_formats: vec![resolved_color_format],
+                depth_format: None,
+            })?;
+            created.push(resolved_pass);
+            let color_sampler = gal.create_sampler(SamplerDesc {
+                label: format!("{label}.color.sampler"),
+                min_filter: SamplerFilter::Nearest,
+                mag_filter: SamplerFilter::Nearest,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+                comparison: None,
+            })?;
+            created.push(color_sampler);
+            let depth_sampler = gal.create_sampler(SamplerDesc {
+                label: format!("{label}.depth.sampler"),
+                min_filter: SamplerFilter::Nearest,
+                mag_filter: SamplerFilter::Nearest,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+                comparison: None,
+            })?;
+            created.push(depth_sampler);
+            let ssao_texture = gal.create_texture(TextureDesc {
+                label: format!("{label}.ssao.texture"),
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba16Float,
+                extent,
+                mip_levels: 1,
+                array_layers: 1,
+                usages: vec![
+                    TextureUsage::ColorAttachment,
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferSrc,
+                ],
+            })?;
+            created.push(ssao_texture);
+            let ssao_view = gal.create_texture_view(TextureViewDesc {
+                label: format!("{label}.ssao.view"),
+                texture: ssao_texture,
+                format: TextureFormat::Rgba16Float,
+                base_mip: 0,
+                mip_count: 1,
+                base_layer: 0,
+                layer_count: 1,
+            })?;
+            created.push(ssao_view);
+            let ssao_target = gal.create_render_target(RenderTargetDesc {
+                label: format!("{label}.ssao.target"),
+                color_views: vec![ssao_view],
+                depth_stencil_view: None,
+                extent,
+            })?;
+            created.push(ssao_target);
+            let ssao_pass = gal.create_render_pass(RenderPassDesc {
+                label: format!("{label}.ssao.pass"),
+                target: ssao_target,
+                color_formats: vec![TextureFormat::Rgba16Float],
+                depth_format: None,
+            })?;
+            created.push(ssao_pass);
+            let ssao_sampler = gal.create_sampler(SamplerDesc {
+                label: format!("{label}.ssao.sampler"),
+                min_filter: SamplerFilter::Linear,
+                mag_filter: SamplerFilter::Linear,
+                mip_filter: SamplerFilter::Nearest,
+                address_u: SamplerAddressMode::ClampToEdge,
+                address_v: SamplerAddressMode::ClampToEdge,
+                address_w: SamplerAddressMode::ClampToEdge,
+                comparison: None,
+            })?;
+            created.push(ssao_sampler);
+            let ssao_uniform_buffer = gal.create_buffer(BufferDesc {
+                label: format!("{label}.ssao.uniform"),
+                size: 160,
+                memory: MemoryDomain::Upload,
+                usages: vec![
+                    BufferUsage::Uniform,
+                    BufferUsage::TransferDst,
+                    BufferUsage::HostWrite,
+                ],
+            })?;
+            created.push(ssao_uniform_buffer);
+            let uniform_buffer = gal.create_buffer(BufferDesc {
+                label: format!("{label}.uniform"),
+                size: 368,
+                memory: MemoryDomain::Upload,
+                usages: vec![
+                    BufferUsage::Uniform,
+                    BufferUsage::TransferDst,
+                    BufferUsage::HostWrite,
+                ],
+            })?;
+            created.push(uniform_buffer);
+            let resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
+                label: format!("{label}.resource-layout"),
+                bindings: vec![
+                    ResourceBindingDesc {
+                        binding: 0,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 1,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 2,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 3,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 4,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 5,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 6,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 7,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 8,
+                        kind: ResourceBindingKind::UniformBuffer,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 9,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 10,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                ],
+            })?;
+            created.push(resource_layout);
+            let resource_set = gal.create_resource_set(ResourceSetDesc {
+                label: format!("{label}.resource-set"),
+                layout: resource_layout,
+                bindings: vec![
+                    ResourceBinding {
+                        binding: 0,
+                        array_index: 0,
+                        resource: color_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 1,
+                        array_index: 0,
+                        resource: color_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 2,
+                        array_index: 0,
+                        resource: depth_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 3,
+                        array_index: 0,
+                        resource: depth_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 4,
+                        array_index: 0,
+                        resource: vanilla_color_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 5,
+                        array_index: 0,
+                        resource: color_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 6,
+                        array_index: 0,
+                        resource: vanilla_depth_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 7,
+                        array_index: 0,
+                        resource: depth_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 8,
+                        array_index: 0,
+                        resource: uniform_buffer,
+                        kind: ResourceBindingKind::UniformBuffer,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: Some(368),
+                    },
+                    ResourceBinding {
+                        binding: 9,
+                        array_index: 0,
+                        resource: ssao_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 10,
+                        array_index: 0,
+                        resource: ssao_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                ],
+            })?;
+            created.push(resource_set);
+            let resolved_resource_set = gal.create_resource_set(ResourceSetDesc {
+                label: format!("{label}.resolved.resource-set"),
+                layout: resource_layout,
+                bindings: vec![
+                    ResourceBinding {
+                        binding: 0,
+                        array_index: 0,
+                        resource: resolved_color_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 1,
+                        array_index: 0,
+                        resource: color_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 2,
+                        array_index: 0,
+                        resource: depth_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 3,
+                        array_index: 0,
+                        resource: depth_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 4,
+                        array_index: 0,
+                        resource: vanilla_color_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 5,
+                        array_index: 0,
+                        resource: color_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 6,
+                        array_index: 0,
+                        resource: vanilla_depth_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 7,
+                        array_index: 0,
+                        resource: depth_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 8,
+                        array_index: 0,
+                        resource: uniform_buffer,
+                        kind: ResourceBindingKind::UniformBuffer,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: Some(368),
+                    },
+                    ResourceBinding {
+                        binding: 9,
+                        array_index: 0,
+                        resource: ssao_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 10,
+                        array_index: 0,
+                        resource: ssao_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                ],
+            })?;
+            created.push(resolved_resource_set);
+            let pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+                label: format!("{label}.pipeline-layout"),
+                resource_layouts: vec![resource_layout],
+            })?;
+            created.push(pipeline_layout);
+            let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.vertex"),
+                stage: ShaderStage::Vertex,
+                code_format: ShaderCodeFormat::Glsl,
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_VERTEX,
+                ),
+                entry_point: "main".to_string(),
+            })?;
+            created.push(vertex_shader);
+            let fragment_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.fragment"),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT,
+                ),
+                entry_point: "main".to_string(),
+            })?;
+            created.push(fragment_shader);
+            let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                label: format!("{label}.resolve.pipeline"),
+                layout: pipeline_layout,
+                vertex_shader,
+                fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode: CullMode::None,
+                front_face: FrontFace::CounterClockwise,
+                provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                raster_y_direction,
+                blend: private_dh_compositor_blend_mode(),
+                depth_compare: None,
+                depth_write: false,
+                depth_bias: None,
+                color_formats: vec![resolved_color_format],
+                depth_format: None,
+                stencil: None,
+            })?;
+            created.push(pipeline);
+            let apply_fragment_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.apply.fragment"),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    MINIMAL_DISTANT_HORIZONS_DIRECT_APPLY_FRAGMENT,
+                ),
+                entry_point: "main".to_string(),
+            })?;
+            created.push(apply_fragment_shader);
+            let apply_pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                label: format!("{label}.apply.pipeline"),
+                layout: pipeline_layout,
+                vertex_shader,
+                fragment_shader: apply_fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode: CullMode::None,
+                front_face: FrontFace::CounterClockwise,
+                provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                raster_y_direction,
+                blend: private_dh_compositor_blend_mode(),
+                depth_compare: None,
+                depth_write: false,
+                depth_bias: None,
+                color_formats: vec![color_format],
+                depth_format: Some(TextureFormat::Depth32Float),
+                stencil: None,
+            })?;
+            created.push(apply_pipeline);
+            let fade_fragment_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.fade.fragment"),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT,
+                ),
+                entry_point: "main".to_string(),
+            })?;
+            created.push(fade_fragment_shader);
+            let fade_pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                label: format!("{label}.fade.pipeline"),
+                layout: pipeline_layout,
+                vertex_shader,
+                fragment_shader: fade_fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode: CullMode::None,
+                front_face: FrontFace::CounterClockwise,
+                provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                raster_y_direction,
+                blend: private_dh_compositor_blend_mode(),
+                depth_compare: private_dh_compositor_depth_compare(),
+                depth_write: false,
+                depth_bias: None,
+                color_formats: vec![color_format],
+                depth_format: Some(TextureFormat::Depth32Float),
+                stencil: None,
+            })?;
+            created.push(fade_pipeline);
+            let ssao_resource_layout = gal.create_resource_layout(ResourceLayoutDesc {
+                label: format!("{label}.ssao.resource-layout"),
+                bindings: vec![
+                    ResourceBindingDesc {
+                        binding: 0,
+                        kind: ResourceBindingKind::SampledTexture,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 1,
+                        kind: ResourceBindingKind::Sampler,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                    ResourceBindingDesc {
+                        binding: 2,
+                        kind: ResourceBindingKind::UniformBuffer,
+                        stages: PipelineStageFlags::DRAW,
+                        array_count: 1,
+                        optional: false,
+                        dynamic_offset_count: 0,
+                    },
+                ],
+            })?;
+            created.push(ssao_resource_layout);
+            let ssao_resource_set = gal.create_resource_set(ResourceSetDesc {
+                label: format!("{label}.ssao.resource-set"),
+                layout: ssao_resource_layout,
+                bindings: vec![
+                    ResourceBinding {
+                        binding: 0,
+                        array_index: 0,
+                        resource: depth_view,
+                        kind: ResourceBindingKind::SampledTexture,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 1,
+                        array_index: 0,
+                        resource: depth_sampler,
+                        kind: ResourceBindingKind::Sampler,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: None,
+                    },
+                    ResourceBinding {
+                        binding: 2,
+                        array_index: 0,
+                        resource: ssao_uniform_buffer,
+                        kind: ResourceBindingKind::UniformBuffer,
+                        access: AccessFlags::READ,
+                        dynamic_offsets: Vec::new(),
+                        buffer_range: Some(160),
+                    },
+                ],
+            })?;
+            created.push(ssao_resource_set);
+            let ssao_pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+                label: format!("{label}.ssao.pipeline-layout"),
+                resource_layouts: vec![ssao_resource_layout],
+            })?;
+            created.push(ssao_pipeline_layout);
+            let ssao_fragment_shader = gal.create_shader_module(ShaderModuleDesc {
+                label: format!("{label}.ssao.fragment"),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: shader_stage_code_for_backend(
+                    gal.capabilities().api,
+                    MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT,
+                ),
+                entry_point: "main".to_string(),
+            })?;
+            created.push(ssao_fragment_shader);
+            let ssao_pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                label: format!("{label}.ssao.pipeline"),
+                layout: ssao_pipeline_layout,
+                vertex_shader,
+                fragment_shader: ssao_fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode: CullMode::None,
+                front_face: FrontFace::CounterClockwise,
+                provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                raster_y_direction,
+                blend: private_dh_compositor_blend_mode(),
+                depth_compare: None,
+                depth_write: false,
+                depth_bias: None,
+                color_formats: vec![TextureFormat::Rgba16Float],
+                depth_format: None,
+                stencil: None,
+            })?;
+            created.push(ssao_pipeline);
+            Ok(Self {
+                color_texture,
+                color_view,
+                depth_texture,
+                depth_view,
+                resolved_color_texture,
+                resolved_color_view,
+                vanilla_color_texture,
+                vanilla_color_view,
+                vanilla_depth_texture,
+                vanilla_depth_view,
+                target,
+                pass,
+                resolved_target,
+                resolved_pass,
+                color_sampler,
+                depth_sampler,
+                ssao_sampler,
+                uniform_buffer,
+                ssao_uniform_buffer,
+                resource_layout,
+                ssao_resource_layout,
+                pipeline_layout,
+                ssao_pipeline_layout,
+                resource_set,
+                resolved_resource_set,
+                ssao_resource_set,
+                vertex_shader,
+                fragment_shader,
+                pipeline,
+                apply_fragment_shader,
+                apply_pipeline,
+                fade_fragment_shader,
+                fade_pipeline,
+                ssao_fragment_shader,
+                ssao_pipeline,
+                ssao_texture,
+                ssao_view,
+                ssao_target,
+                ssao_pass,
+                extent,
+                color_format,
+                raster_y_direction,
+            })
+        })();
+        if result.is_err() {
+            for handle in created.into_iter().rev() {
+                let _ = gal.destroy(handle);
+            }
+        }
+        result
+    }
+
+    pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
+        for handle in [
+            self.fade_pipeline,
+            self.apply_pipeline,
+            self.pipeline,
+            self.ssao_pipeline,
+            self.ssao_fragment_shader,
+            self.fade_fragment_shader,
+            self.apply_fragment_shader,
+            self.fragment_shader,
+            self.vertex_shader,
+            self.ssao_pipeline_layout,
+            self.pipeline_layout,
+            self.ssao_resource_set,
+            self.resolved_resource_set,
+            self.resource_set,
+            self.ssao_resource_layout,
+            self.resource_layout,
+            self.ssao_uniform_buffer,
+            self.uniform_buffer,
+            self.ssao_sampler,
+            self.depth_sampler,
+            self.color_sampler,
+            self.ssao_pass,
+            self.ssao_target,
+            self.ssao_view,
+            self.ssao_texture,
+            self.pass,
+            self.target,
+            self.resolved_pass,
+            self.resolved_target,
+            self.resolved_color_view,
+            self.resolved_color_texture,
+            self.depth_view,
+            self.depth_texture,
+            self.vanilla_depth_view,
+            self.vanilla_depth_texture,
+            self.vanilla_color_view,
+            self.vanilla_color_texture,
+            self.color_view,
+            self.color_texture,
+        ] {
+            let _ = gal.destroy(handle);
+        }
+    }
+
+    pub(crate) fn append_begin(
+        &self,
+        previous_color: TextureUsageState,
+        previous_depth: TextureUsageState,
+        source_clear_color: [f32; 4],
+        ops: &mut Vec<CommandOp>,
+    ) {
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.color_texture,
+            previous_color,
+            TextureUsageState::ColorAttachment,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.depth_texture,
+            previous_depth,
+            TextureUsageState::DepthStencilAttachment,
+        )));
+        ops.push(CommandOp::BeginPass {
+            pass: self.pass,
+            target: self.target,
+            colors: vec![PassAttachment {
+                view: self.color_view,
+                load_op: AttachmentLoadOp::Clear,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: Some(ClearColor {
+                    // Frozen clears DH's private color target with the active
+                    // Minecraft clear RGB and a zero alpha. The RGB remains
+                    // observable wherever DH's transparent streams blend
+                    // before the fog/apply passes, so transparent black is
+                    // not an equivalent initialization.
+                    r: source_clear_color[0],
+                    g: source_clear_color[1],
+                    b: source_clear_color[2],
+                    a: 0.0,
+                }),
+            }],
+            depth_stencil: Some(PassAttachment {
+                view: self.depth_view,
+                load_op: AttachmentLoadOp::Clear,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+    }
+
+    pub(crate) fn append_end(&self, ops: &mut Vec<CommandOp>) {
+        ops.push(CommandOp::EndPass);
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.color_texture,
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::ShaderRead,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.depth_texture,
+            TextureUsageState::DepthStencilAttachment,
+            TextureUsageState::ShaderRead,
+        )));
+    }
+
+    /// Resume the private DH target after SSAO has sampled its first depth
+    /// phase. Frozen draws non-SSAO generic objects and transparent LODs after
+    /// SSAO without clearing either attachment.
+    pub(crate) fn append_resume(&self, ops: &mut Vec<CommandOp>) {
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.color_texture,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::ColorAttachment,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.depth_texture,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::DepthStencilAttachment,
+        )));
+        ops.push(CommandOp::BeginPass {
+            pass: self.pass,
+            target: self.target,
+            colors: vec![PassAttachment {
+                view: self.color_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }],
+            depth_stencil: Some(PassAttachment {
+                view: self.depth_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+    }
+
+    /// Keep the optional vanilla bindings in a legal sampled state on the
+    /// no-fade path.  The fragment shader branches before sampling them, so a
+    /// no-fade frame does not pay for a frame-target copy or read undefined
+    /// snapshot contents.
+    pub(crate) fn append_vanilla_sample_state(
+        &self,
+        previous_color: TextureUsageState,
+        previous_depth: TextureUsageState,
+        ops: &mut Vec<CommandOp>,
+    ) {
+        if previous_color != TextureUsageState::ShaderRead {
+            ops.push(CommandOp::Barrier(texture_barrier(
+                self.vanilla_color_texture,
+                previous_color,
+                TextureUsageState::ShaderRead,
+            )));
+        }
+        if previous_depth != TextureUsageState::ShaderRead {
+            ops.push(CommandOp::Barrier(texture_barrier(
+                self.vanilla_depth_texture,
+                previous_depth,
+                TextureUsageState::ShaderRead,
+            )));
+        }
+    }
+
+    pub(crate) fn append_ssao_sample_state(
+        &self,
+        previous: TextureUsageState,
+        ops: &mut Vec<CommandOp>,
+    ) {
+        if previous != TextureUsageState::ShaderRead {
+            ops.push(CommandOp::Barrier(texture_barrier(
+                self.ssao_texture,
+                previous,
+                TextureUsageState::ShaderRead,
+            )));
+        }
+    }
+
+    /// Produce an owned DH AO image from the private depth attachment. This
+    /// is the Rust replacement for DH's Java SSAO framebuffer/pass.
+    pub(crate) fn append_ssao(
+        &self,
+        projection_matrix: [f32; 16],
+        inverse_projection_matrix: [f32; 16],
+        parameters: [f32; 8],
+        previous: TextureUsageState,
+        ops: &mut Vec<CommandOp>,
+    ) {
+        let mut data = Vec::with_capacity(160);
+        for value in projection_matrix
+            .into_iter()
+            .chain(inverse_projection_matrix)
+            .chain(parameters[0..4].iter().copied())
+            .chain(parameters[4..8].iter().copied())
+        {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            self.ssao_uniform_buffer,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::TransferDst,
+        )));
+        ops.push(CommandOp::HostWriteBuffer {
+            buffer: self.ssao_uniform_buffer,
+            offset: 0,
+            data,
+        });
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            self.ssao_uniform_buffer,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.ssao_texture,
+            previous,
+            TextureUsageState::ColorAttachment,
+        )));
+        ops.push(CommandOp::BeginPass {
+            pass: self.ssao_pass,
+            target: self.ssao_target,
+            colors: vec![PassAttachment {
+                view: self.ssao_view,
+                load_op: AttachmentLoadOp::Clear,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: Some(ClearColor {
+                    r: 1.0,
+                    g: 1.0,
+                    b: 1.0,
+                    a: 1.0,
+                }),
+            }],
+            depth_stencil: None,
+        });
+        ops.push(CommandOp::BindGraphicsPipeline(self.ssao_pipeline));
+        ops.push(CommandOp::BindResourceSet {
+            pipeline_layout: self.ssao_pipeline_layout,
+            set_index: 0,
+            set: self.ssao_resource_set,
+            dynamic_offsets: Vec::new(),
+        });
+        ops.push(CommandOp::Draw {
+            vertices: 3,
+            instances: 1,
+        });
+        ops.push(CommandOp::EndPass);
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.ssao_texture,
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::ShaderRead,
+        )));
+    }
+
+    /// Copy the completed vanilla frame target into Rust-owned sampleable
+    /// images.  Frame targets are opaque by design; this explicit operation
+    /// is the only route by which the compositor may inspect their pixels.
+    pub(crate) fn append_vanilla_snapshot(
+        &self,
+        frame_target: Handle,
+        vanilla_depth_source: Handle,
+        previous_color: TextureUsageState,
+        previous_depth: TextureUsageState,
+        ops: &mut Vec<CommandOp>,
+    ) {
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.vanilla_color_texture,
+            previous_color,
+            TextureUsageState::TransferDst,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.vanilla_depth_texture,
+            previous_depth,
+            TextureUsageState::TransferDst,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            vanilla_depth_source,
+            TextureUsageState::DepthStencilAttachment,
+            TextureUsageState::TransferSrc,
+        )));
+        ops.push(CommandOp::CopyFrameTargetToTexture {
+            src: frame_target,
+            dst: self.vanilla_color_texture,
+            extent: self.extent,
+        });
+        ops.push(CommandOp::CopyTexture(TextureImageCopyRegion {
+            row_order: TextureRowOrder::Preserve,
+            src_texture: vanilla_depth_source,
+            src_mip: 0,
+            src_layer: 0,
+            src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            dst_texture: self.vanilla_depth_texture,
+            dst_mip: 0,
+            dst_layer: 0,
+            dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            extent: self.extent,
+        }));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.vanilla_color_texture,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.vanilla_depth_texture,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            vanilla_depth_source,
+            TextureUsageState::TransferSrc,
+            TextureUsageState::DepthStencilAttachment,
+        )));
+    }
+
+    fn append_composite_uniforms(
+        &self,
+        combined_matrix: [f32; 16],
+        inverse_combined: [f32; 16],
+        inverse_vanilla: [f32; 16],
+        camera_position: [f32; 3],
+        fog_color: [f32; 4],
+        fog_ranges: [f32; 4],
+        dh_fog_parameters: [f32; 20],
+        fade_parameters: [f32; 4],
+        ssao_parameters: [f32; 8],
+        ops: &mut Vec<CommandOp>,
+    ) {
+        let mut data = Vec::with_capacity(368);
+        let camera_uniform = [
+            camera_position[0],
+            camera_position[1],
+            camera_position[2],
+            1.0,
+        ];
+        for value in combined_matrix
+            .into_iter()
+            .chain(inverse_combined)
+            .chain(inverse_vanilla)
+            .chain(camera_uniform)
+            .chain(fog_color)
+            .chain(fog_ranges)
+            .chain(dh_fog_parameters)
+            .chain(fade_parameters)
+            .chain(ssao_parameters[0..4].iter().copied())
+            .chain(ssao_parameters[4..8].iter().copied())
+        {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            self.uniform_buffer,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::TransferDst,
+        )));
+        ops.push(CommandOp::HostWriteBuffer {
+            buffer: self.uniform_buffer,
+            offset: 0,
+            data,
+        });
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            self.uniform_buffer,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
+    }
+
+    pub(crate) fn append_resolve(
+        &self,
+        previous_resolved: TextureUsageState,
+        combined_matrix: [f32; 16],
+        inverse_combined: [f32; 16],
+        camera_position: [f32; 3],
+        fog_color: [f32; 4],
+        fog_ranges: [f32; 4],
+        dh_fog_parameters: [f32; 20],
+        far_fade_parameters: [f32; 4],
+        ssao_parameters: [f32; 8],
+        ops: &mut Vec<CommandOp>,
+    ) {
+        self.append_composite_uniforms(
+            combined_matrix,
+            inverse_combined,
+            [0.0; 16],
+            camera_position,
+            fog_color,
+            fog_ranges,
+            dh_fog_parameters,
+            far_fade_parameters,
+            ssao_parameters,
+            ops,
+        );
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.resolved_color_texture,
+            previous_resolved,
+            TextureUsageState::ColorAttachment,
+        )));
+        ops.push(CommandOp::BeginPass {
+            pass: self.resolved_pass,
+            target: self.resolved_target,
+            colors: vec![PassAttachment {
+                view: self.resolved_color_view,
+                load_op: AttachmentLoadOp::Clear,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: Some(ClearColor {
+                    // Frozen's private DH color remains at Minecraft's active
+                    // clear RGB with zero alpha where no LOD was written.
+                    // Ordinary sparse apply discards these pixels, while
+                    // LOD-only mode deliberately copies them as its sky.
+                    r: fog_color[0],
+                    g: fog_color[1],
+                    b: fog_color[2],
+                    a: 0.0,
+                }),
+            }],
+            depth_stencil: None,
+        });
+        ops.push(CommandOp::BindGraphicsPipeline(self.pipeline));
+        ops.push(CommandOp::BindResourceSet {
+            pipeline_layout: self.pipeline_layout,
+            set_index: 0,
+            set: self.resource_set,
+            dynamic_offsets: Vec::new(),
+        });
+        ops.push(CommandOp::Draw {
+            vertices: 3,
+            instances: 1,
+        });
+        ops.push(CommandOp::EndPass);
+        ops.push(CommandOp::Barrier(texture_barrier(
+            self.resolved_color_texture,
+            TextureUsageState::ColorAttachment,
+            TextureUsageState::ShaderRead,
+        )));
+    }
+
+    pub(crate) fn append_apply(
+        &self,
+        target: Handle,
+        pass: Handle,
+        color_view: Handle,
+        depth_view: Handle,
+        ops: &mut Vec<CommandOp>,
+    ) {
+        ops.push(CommandOp::BeginPass {
+            pass,
+            target,
+            colors: vec![PassAttachment {
+                view: color_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }],
+            depth_stencil: Some(PassAttachment {
+                view: depth_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+        ops.push(CommandOp::BindGraphicsPipeline(self.apply_pipeline));
+        ops.push(CommandOp::BindResourceSet {
+            pipeline_layout: self.pipeline_layout,
+            set_index: 0,
+            set: self.resolved_resource_set,
+            dynamic_offsets: Vec::new(),
+        });
+        ops.push(CommandOp::Draw {
+            vertices: 3,
+            instances: 1,
+        });
+        ops.push(CommandOp::EndPass);
+    }
+
+    pub(crate) fn append_fade(
+        &self,
+        target: Handle,
+        pass: Handle,
+        color_view: Handle,
+        depth_view: Handle,
+        combined_matrix: [f32; 16],
+        inverse_combined: [f32; 16],
+        inverse_vanilla: [f32; 16],
+        camera_position: [f32; 3],
+        fog_color: [f32; 4],
+        fog_ranges: [f32; 4],
+        dh_fog_parameters: [f32; 20],
+        fade_parameters: [f32; 4],
+        ssao_parameters: [f32; 8],
+        ops: &mut Vec<CommandOp>,
+    ) {
+        self.append_composite_uniforms(
+            combined_matrix,
+            inverse_combined,
+            inverse_vanilla,
+            camera_position,
+            fog_color,
+            fog_ranges,
+            dh_fog_parameters,
+            fade_parameters,
+            ssao_parameters,
+            ops,
+        );
+        ops.push(CommandOp::BeginPass {
+            pass,
+            target,
+            colors: vec![PassAttachment {
+                view: color_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }],
+            depth_stencil: Some(PassAttachment {
+                view: depth_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+        ops.push(CommandOp::BindGraphicsPipeline(self.fade_pipeline));
+        ops.push(CommandOp::BindResourceSet {
+            pipeline_layout: self.pipeline_layout,
+            set_index: 0,
+            set: self.resolved_resource_set,
+            dynamic_offsets: Vec::new(),
+        });
+        ops.push(CommandOp::Draw {
+            vertices: 3,
+            instances: 1,
+        });
+        ops.push(CommandOp::EndPass);
+    }
+}
+
 impl WorldLodPassResources {
     fn new(pass: WorldLodPassClass) -> Self {
+        Self::new_with_mode(pass, true)
+    }
+
+    fn new_forward(pass: WorldLodPassClass) -> Self {
+        Self::new_with_mode(pass, false)
+    }
+
+    fn new_with_mode(pass: WorldLodPassClass, deferred: bool) -> Self {
         Self {
             pass,
+            deferred,
+            color_format: deferred.then_some(TextureFormat::Rgba8Unorm),
             pipeline: None,
             draws: BTreeMap::new(),
             lightmaps: BTreeMap::new(),
@@ -648,7 +2345,7 @@ impl WorldLodPassResources {
         ops: &mut Vec<CommandOp>,
     ) -> GalResult<WorldLodPreparedDraw> {
         if material_contract.pass != self.pass
-            || material_contract.vertex_layout_version != WORLD_LOD_GPU_VERTEX_LAYOUT_V1
+            || material_contract.vertex_layout_version != WORLD_LOD_GPU_VERTEX_LAYOUT_V2
             || draw.index_count == 0
             || draw.index_count % 3 != 0
         {
@@ -668,7 +2365,7 @@ impl WorldLodPassResources {
                     "world-lod-column{}-gen{}-segment{}.frame",
                     key.column_key, key.column_generation, key.segment_index
                 ),
-                size: 128,
+                size: 240,
                 memory: MemoryDomain::Upload,
                 usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
             })?;
@@ -710,48 +2407,79 @@ impl WorldLodPassResources {
                 WorldLodDrawResources {
                     uniform_buffer,
                     resource_set,
+                    last_uniform_bytes: None,
                 },
             );
         }
-        let resources = self
-            .draws
-            .get(&key)
-            .copied()
-            .expect("world LOD material resource entry exists after creation");
+        let packed_uniform = uniforms.pack_std140();
+        let (uniform_buffer, geometry_resource_set, uniform_changed) = {
+            let resources = self
+                .draws
+                .get_mut(&key)
+                .expect("world LOD material resource entry exists after creation");
+            let uniform_changed = resources.last_uniform_bytes != Some(packed_uniform);
+            if uniform_changed {
+                resources.last_uniform_bytes = Some(packed_uniform);
+            }
+            (
+                resources.uniform_buffer,
+                resources.resource_set,
+                uniform_changed,
+            )
+        };
         let lightmap_resource_set = match self.ensure_lightmap_resource_set(gal, lightmap) {
             Ok(resource_set) => resource_set,
             Err(error) => return Err(error),
         };
-        ops.extend([
-            CommandOp::Barrier(buffer_barrier(
-                resources.uniform_buffer,
-                TextureUsageState::ShaderRead,
-                TextureUsageState::TransferDst,
-            )),
-            CommandOp::HostWriteBuffer {
-                buffer: resources.uniform_buffer,
-                offset: 0,
-                data: uniforms.pack_std140().to_vec(),
-            },
-            CommandOp::Barrier(buffer_barrier(
-                resources.uniform_buffer,
-                TextureUsageState::TransferDst,
-                TextureUsageState::ShaderRead,
-            )),
-        ]);
+        if uniform_changed {
+            ops.extend([
+                CommandOp::Barrier(buffer_barrier(
+                    uniform_buffer,
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::TransferDst,
+                )),
+                CommandOp::HostWriteBuffer {
+                    buffer: uniform_buffer,
+                    offset: 0,
+                    data: packed_uniform.to_vec(),
+                },
+                CommandOp::Barrier(buffer_barrier(
+                    uniform_buffer,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                )),
+            ]);
+        }
         let pipeline = self
             .pipeline
             .as_ref()
             .expect("world LOD pipeline remains alive while draw resources are live");
         Ok(WorldLodPreparedDraw {
             pipeline: pipeline.pipeline,
+            offscreen_pipeline: pipeline.offscreen_pipeline,
+            offscreen_replay_pipeline: pipeline.offscreen_replay_pipeline,
             pipeline_layout: pipeline.pipeline_layout,
-            geometry_resource_set: resources.resource_set,
+            geometry_resource_set,
             lightmap_resource_set,
             index_buffer: draw.index_buffer,
             index_type: draw.index_type,
             index_count: draw.index_count,
         })
+    }
+
+    fn set_forward_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
+        if self.deferred && self.pass == WorldLodPassClass::Opaque {
+            return Err(GalError::invalid_argument(
+                "deferred DH pass cannot be rebound to a forward color format",
+            ));
+        }
+        if self.pipeline.is_some() && self.color_format != Some(format) {
+            return Err(GalError::invalid_argument(
+                "forward DH pass color format changed after pipeline creation",
+            ));
+        }
+        self.color_format = Some(format);
+        Ok(())
     }
 
     pub(crate) fn destroy(&mut self, gal: &mut VulkanicGal) {
@@ -829,34 +2557,79 @@ impl WorldLodPassResources {
         }
         let (label, program, blend, cull_mode, depth_compare, depth_write, color_formats) =
             match self.pass {
+                WorldLodPassClass::Opaque if !self.deferred => (
+                    "world-lod-forward-opaque",
+                    minimal_distant_horizons_lod_forward_opaque_program(),
+                    BlendMode::Disabled,
+                    CullMode::Back,
+                    CompareOp::LessOrEqual,
+                    // Vanilla terrain has already populated the shared depth
+                    // target, so LESS_OR_EQUAL keeps it authoritative. Opaque
+                    // DH must still write the farther surviving depth so later
+                    // LOD surfaces can be rejected instead of shading every
+                    // hidden layer. The deferred/Iris path below remains a
+                    // non-writing G-buffer input.
+                    true,
+                    vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm)],
+                ),
                 WorldLodPassClass::Opaque => (
                     "world-lod-opaque",
                     minimal_distant_horizons_lod_opaque_program(),
                     BlendMode::Disabled,
                     CullMode::Back,
                     CompareOp::LessOrEqual,
-                    true,
-                    vec![TextureFormat::Rgba8Unorm; 4],
+                    // Keep coarse DH LOD out of the shared G-buffer depth
+                    // history; the source-faithful depth state belongs to
+                    // the private DH target variant below.
+                    false,
+                    vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm); 4],
                 ),
-                WorldLodPassClass::Transparent => (
-                    "world-lod-transparent",
+                WorldLodPassClass::TransparentSide => (
+                    "world-lod-transparent-side",
                     minimal_distant_horizons_lod_transparent_program(),
                     BlendMode::Alpha,
                     CullMode::Back,
                     CompareOp::LessOrEqual,
                     false,
-                    vec![TextureFormat::Rgba8Unorm],
+                    vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm)],
+                ),
+                WorldLodPassClass::TransparentUp => (
+                    "world-lod-transparent-up",
+                    minimal_distant_horizons_lod_transparent_program(),
+                    BlendMode::Alpha,
+                    CullMode::Back,
+                    CompareOp::LessOrEqual,
+                    false,
+                    vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm)],
                 ),
                 WorldLodPassClass::WaterSurface => (
                     "world-lod-water-surface",
                     minimal_distant_horizons_lod_transparent_program(),
-                    BlendMode::Alpha,
+                    BlendMode::AlphaSource,
                     CullMode::None,
-                    CompareOp::Always,
-                    true,
-                    vec![TextureFormat::Rgba8Unorm],
+                    // Frozen's water surface intentionally ignores the
+                    // existing depth inside the private compositor. The
+                    // shared target retains its prior conservative policy.
+                    CompareOp::LessOrEqual,
+                    false,
+                    vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm)],
                 ),
             };
+        // Capture-only raster isolation for the direct DH stream. Production
+        // keeps the explicit pass policy above; a probe can temporarily remove
+        // culling to distinguish winding loss from coverage/material defects.
+        let cull_mode = if matches!(selected_source_raster_probe_cull_mode()?, CullMode::None) {
+            CullMode::None
+        } else {
+            cull_mode
+        };
+        // The capture-only probe can invert the explicit source winding for a
+        // paired raster experiment. Production remains pinned to the copied
+        // DH source contract.
+        let front_face = selected_source_raster_probe_front_face(world_lod_source_front_face(
+            gal.capabilities().api,
+        ))?;
+        let depth_compare = selected_source_raster_probe_depth_compare(Some(depth_compare))?;
         let [geometry_and_frame_desc, lightmap_desc] =
             distant_horizons_lod_opaque_resource_layouts(label);
         let mut created = Vec::new();
@@ -883,18 +2656,96 @@ impl WorldLodPassResources {
                 fragment_shader,
                 topology: PrimitiveTopology::Triangles,
                 cull_mode,
-                front_face: FrontFace::CounterClockwise,
+                front_face,
                 provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
                 raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
                 blend,
-                depth_compare: Some(depth_compare),
+                depth_compare,
                 depth_write,
                 depth_bias: None,
-                color_formats,
+                color_formats: color_formats.clone(),
                 depth_format: Some(TextureFormat::Depth32Float),
                 stencil: None,
             })?;
             created.push(pipeline);
+            // Transparent and water resources are shared by the deferred
+            // source graph and the direct DH color/depth boundary.  They
+            // keep the same one-color attachment contract in both cases, so
+            // give those pass classes an explicit private-target variant
+            // even when their owner was initialized in deferred mode.  The
+            // opaque deferred owner remains source/G-buffer-only and is not
+            // admitted to the direct compositor.
+            let offscreen_pipeline = if !self.deferred || self.pass != WorldLodPassClass::Opaque {
+                // The private DH color/depth boundary has its own depth
+                // domain, so it can reproduce Frozen's no-shader render
+                // states without weakening the shared whole-frame target.
+                // Opaque, transparent-side, and transparent-up phases use
+                // LESS; water uses ALWAYS and writes its source surface into
+                // that private depth image.  Each state keeps the exact
+                // source blend/depth contract used by Frozen's no-shader
+                // renderer.
+                let (offscreen_blend, offscreen_depth_compare, offscreen_depth_write) =
+                    private_dh_source_raster_policy(self.pass);
+                // The selector is capture-only instrumentation. Apply it to
+                // the private direct target as well as the shared pipeline so
+                // a depth-disabled probe actually tests the raster boundary
+                // that owns the DH attachment. Normal production state stays
+                // on the source-faithful LESS/ALWAYS policy above.
+                let offscreen_depth_compare =
+                    selected_source_raster_probe_depth_compare(Some(offscreen_depth_compare))?;
+                let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                    label: format!("{label}.offscreen.pipeline"),
+                    layout: pipeline_layout,
+                    vertex_shader,
+                    fragment_shader,
+                    topology: PrimitiveTopology::Triangles,
+                    cull_mode,
+                    front_face,
+                    provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                    raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
+                    blend: offscreen_blend,
+                    depth_compare: offscreen_depth_compare,
+                    depth_write: offscreen_depth_write,
+                    depth_bias: None,
+                    color_formats,
+                    depth_format: Some(TextureFormat::Depth32Float),
+                    stencil: None,
+                })?;
+                created.push(pipeline);
+                Some(pipeline)
+            } else {
+                None
+            };
+            let offscreen_replay_pipeline = if self.pass == WorldLodPassClass::WaterSurface {
+                let (_, offscreen_depth_compare, offscreen_depth_write) =
+                    private_dh_source_raster_policy(self.pass);
+                let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                    label: format!("{label}.offscreen-transparent-replay.pipeline"),
+                    layout: pipeline_layout,
+                    vertex_shader,
+                    fragment_shader,
+                    topology: PrimitiveTopology::Triangles,
+                    cull_mode,
+                    front_face,
+                    provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                    raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
+                    // Frozen's transparent pass changes alpha to
+                    // ONE/ONE_MINUS_SRC_ALPHA before replaying water.
+                    blend: private_dh_water_replay_blend_mode(),
+                    depth_compare: selected_source_raster_probe_depth_compare(Some(
+                        offscreen_depth_compare,
+                    ))?,
+                    depth_write: offscreen_depth_write,
+                    depth_bias: None,
+                    color_formats: vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm)],
+                    depth_format: Some(TextureFormat::Depth32Float),
+                    stencil: None,
+                })?;
+                created.push(pipeline);
+                Some(pipeline)
+            } else {
+                None
+            };
             Ok(WorldLodPipelineResources {
                 vertex_shader,
                 fragment_shader,
@@ -902,6 +2753,8 @@ impl WorldLodPassResources {
                 lightmap_layout,
                 pipeline_layout,
                 pipeline,
+                offscreen_pipeline,
+                offscreen_replay_pipeline,
             })
         })();
         if result.is_err() {
@@ -977,6 +2830,65 @@ impl WorldLodPassResources {
     }
 }
 
+/// Frozen's no-shader DH pass uses a distinct state block for the private LOD
+/// framebuffer. Keep this policy separate from the shared Rust world target
+/// and from deferred/source-derived shader-pack passes.
+fn private_dh_source_raster_policy(pass: WorldLodPassClass) -> (BlendMode, CompareOp, bool) {
+    match pass {
+        WorldLodPassClass::Opaque => (BlendMode::Disabled, CompareOp::Less, true),
+        // Frozen enters the transparent pass by installing
+        // SRC_ALPHA/ONE_MINUS_SRC_ALPHA for RGB and ONE/ONE_MINUS_SRC_ALPHA
+        // for alpha. TRANSPARENT_DETAIL changes depth writes but deliberately
+        // leaves those blend factors in place, so overlapping side faces
+        // accumulate coverage instead of replacing it with the last face.
+        WorldLodPassClass::TransparentSide => (BlendMode::Alpha, CompareOp::Less, false),
+        WorldLodPassClass::TransparentUp => (BlendMode::Alpha, CompareOp::Less, true),
+        WorldLodPassClass::WaterSurface => (BlendMode::AlphaSource, CompareOp::Always, true),
+    }
+}
+
+/// Frozen replays upward water after the transparent pass has replaced the
+/// initial alpha source factors with the accumulated transparent blend state.
+fn private_dh_water_replay_blend_mode() -> BlendMode {
+    BlendMode::Alpha
+}
+
+/// The private DH attachment is a sparse replace source. The compositor
+/// fragment discards its clear pixels, so the pipeline must not blend covered
+/// pixels with the already-rendered vanilla target. Keep this decision named
+/// and tested against Frozen's `DhApplyShader` contract.
+fn private_dh_compositor_blend_mode() -> BlendMode {
+    BlendMode::Disabled
+}
+
+fn private_dh_compositor_depth_compare() -> Option<CompareOp> {
+    let enabled = matches!(
+        std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_DEPTH_TEST").as_deref(),
+        Ok("1") | Ok("true") | Ok("TRUE")
+    ) && matches!(
+        std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+        Ok("1") | Ok("true") | Ok("TRUE")
+    );
+    if !enabled {
+        return None;
+    }
+    let greater = matches!(
+        std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_DEPTH_GREATER").as_deref(),
+        Ok("1") | Ok("true") | Ok("TRUE")
+    );
+    let strict_less = matches!(
+        std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_DEPTH_LESS").as_deref(),
+        Ok("1") | Ok("true") | Ok("TRUE")
+    );
+    Some(if greater {
+        CompareOp::Greater
+    } else if strict_less {
+        CompareOp::Less
+    } else {
+        CompareOp::LessOrEqual
+    })
+}
+
 /// Compatibility wrapper for the first Rust-owned DH opaque material pass.
 /// The shared internal owner keeps opaque and transparent resource policy
 /// physically separate while avoiding producer-specific duplicate plumbing.
@@ -1042,34 +2954,38 @@ impl WorldLodOpaquePassResources {
     }
 }
 
-/// Rust-owned non-water transparent DH pass resources. The public type makes
-/// its separate blend/depth execution policy explicit; water is intentionally
-/// not admitted here.
-pub(crate) struct WorldLodTransparentPassResources {
+/// Forward-color DH opaque resources used by vanilla Rust Vulkan when no
+/// shader-pack G-buffer is active. This keeps the deferred four-target pass
+/// separate from the one-target presentation pass.
+pub(crate) struct WorldLodForwardOpaquePassResources {
     inner: WorldLodPassResources,
 }
 
-impl Default for WorldLodTransparentPassResources {
+impl Default for WorldLodForwardOpaquePassResources {
     fn default() -> Self {
         Self {
-            inner: WorldLodPassResources::new(WorldLodPassClass::Transparent),
+            inner: WorldLodPassResources::new_forward(WorldLodPassClass::Opaque),
         }
     }
 }
 
-impl WorldLodTransparentPassResources {
+impl WorldLodForwardOpaquePassResources {
+    pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
+        self.inner.set_forward_color_format(format)
+    }
+
     pub(crate) fn stage_draw(
         &mut self,
         gal: &mut VulkanicGal,
-        draw: WorldLodTransparentDraw,
+        draw: WorldLodOpaqueDraw,
         lightmap: VanillaLightmapBinding,
         ops: &mut Vec<CommandOp>,
     ) -> GalResult<WorldLodPreparedDraw> {
-        if draw.pass != WorldLodPassClass::Transparent
-            || draw.material_contract != WorldLodMaterialContract::TRANSPARENT
+        if draw.pass != WorldLodPassClass::Opaque
+            || draw.material_contract != WorldLodMaterialContract::OPAQUE
         {
             return Err(GalError::invalid_argument(
-                "world LOD transparent pass received a non-transparent admitted draw",
+                "world LOD forward opaque pass received a non-opaque admitted draw",
             ));
         }
         self.inner.stage_draw(
@@ -1085,7 +3001,6 @@ impl WorldLodTransparentPassResources {
     pub(crate) fn destroy(&mut self, gal: &mut VulkanicGal) {
         self.inner.destroy(gal);
     }
-
     pub(crate) fn retain_lightmap_binding(
         &mut self,
         gal: &mut VulkanicGal,
@@ -1093,9 +3008,116 @@ impl WorldLodTransparentPassResources {
     ) {
         self.inner.retain_lightmap_binding(gal, binding);
     }
-
     pub(crate) fn clear_lightmap_bindings(&mut self, gal: &mut VulkanicGal) {
         self.inner.clear_lightmap_bindings(gal);
+    }
+    pub(crate) fn reconcile_assets(
+        &mut self,
+        gal: &mut VulkanicGal,
+        assets: &BTreeMap<u64, WorldLodGpuColumnAsset>,
+    ) {
+        self.inner.reconcile_assets(gal, assets);
+    }
+}
+
+/// Rust-owned non-water transparent DH pass resources. The public type keeps
+/// DH's side/detail and upward transparent buckets on separate pipelines so
+/// their blend/depth state cannot be inferred from a shared layer or leak
+/// across the private compositor; water is intentionally not admitted here.
+pub(crate) struct WorldLodTransparentPassResources {
+    inner_side: WorldLodPassResources,
+    inner_up: WorldLodPassResources,
+}
+
+impl Default for WorldLodTransparentPassResources {
+    fn default() -> Self {
+        Self {
+            inner_side: WorldLodPassResources::new(WorldLodPassClass::TransparentSide),
+            inner_up: WorldLodPassResources::new(WorldLodPassClass::TransparentUp),
+        }
+    }
+}
+
+impl WorldLodTransparentPassResources {
+    pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
+        self.inner_side.set_forward_color_format(format)?;
+        self.inner_up.set_forward_color_format(format)
+    }
+
+    pub(crate) fn stage_draw(
+        &mut self,
+        gal: &mut VulkanicGal,
+        draw: WorldLodTransparentDraw,
+        lightmap: VanillaLightmapBinding,
+        ops: &mut Vec<CommandOp>,
+    ) -> GalResult<WorldLodPreparedDraw> {
+        match (draw.pass, draw.material_contract) {
+            (WorldLodPassClass::TransparentSide, WorldLodMaterialContract::TRANSPARENT_SIDE) => {
+                self.inner_side.stage_draw(
+                    gal,
+                    draw.draw,
+                    draw.uniforms,
+                    draw.material_contract,
+                    lightmap,
+                    ops,
+                )
+            }
+            (WorldLodPassClass::TransparentUp, WorldLodMaterialContract::TRANSPARENT_UP) => {
+                self.inner_up.stage_draw(
+                    gal,
+                    draw.draw,
+                    draw.uniforms,
+                    draw.material_contract,
+                    lightmap,
+                    ops,
+                )
+            }
+            _ => Err(GalError::invalid_argument(
+                "world LOD transparent pass received a non-transparent admitted draw",
+            )),
+        }
+    }
+
+    /// Frozen OpenGL renders every transparent bucket under the inherited
+    /// TRANSPARENT state. The Rust planner keeps side/up/water identities
+    /// distinct, but the ordinary forward compositor must lower all three to
+    /// that one source raster policy rather than inheriting the Java Vulkan
+    /// compatibility renderer's water-specific replay.
+    pub(crate) fn stage_frozen_opengl_draw(
+        &mut self,
+        gal: &mut VulkanicGal,
+        draw: WorldLodGpuDraw,
+        uniforms: WorldLodDrawUniform,
+        lightmap: VanillaLightmapBinding,
+        ops: &mut Vec<CommandOp>,
+    ) -> GalResult<WorldLodPreparedDraw> {
+        self.inner_up.stage_draw(
+            gal,
+            draw,
+            uniforms,
+            WorldLodMaterialContract::TRANSPARENT_UP,
+            lightmap,
+            ops,
+        )
+    }
+
+    pub(crate) fn destroy(&mut self, gal: &mut VulkanicGal) {
+        self.inner_side.destroy(gal);
+        self.inner_up.destroy(gal);
+    }
+
+    pub(crate) fn retain_lightmap_binding(
+        &mut self,
+        gal: &mut VulkanicGal,
+        binding: VanillaLightmapBinding,
+    ) {
+        self.inner_side.retain_lightmap_binding(gal, binding);
+        self.inner_up.retain_lightmap_binding(gal, binding);
+    }
+
+    pub(crate) fn clear_lightmap_bindings(&mut self, gal: &mut VulkanicGal) {
+        self.inner_side.clear_lightmap_bindings(gal);
+        self.inner_up.clear_lightmap_bindings(gal);
     }
 
     pub(crate) fn reconcile_assets(
@@ -1103,7 +3125,8 @@ impl WorldLodTransparentPassResources {
         gal: &mut VulkanicGal,
         assets: &BTreeMap<u64, WorldLodGpuColumnAsset>,
     ) {
-        self.inner.reconcile_assets(gal, assets);
+        self.inner_side.reconcile_assets(gal, assets);
+        self.inner_up.reconcile_assets(gal, assets);
     }
 }
 
@@ -1123,6 +3146,10 @@ impl Default for WorldLodWaterPassResources {
 }
 
 impl WorldLodWaterPassResources {
+    pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
+        self.inner.set_forward_color_format(format)
+    }
+
     pub(crate) fn stage_draw(
         &mut self,
         gal: &mut VulkanicGal,
@@ -1185,6 +3212,8 @@ pub(crate) struct WorldLodTerrainAtlasBinding {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct WorldLodExactAtlasPreparedDraw {
     pub pipeline: Handle,
+    pub offscreen_pipeline: Option<Handle>,
+    pub offscreen_replay_pipeline: Option<Handle>,
     pub pipeline_layout: Handle,
     pub geometry_resource_set: Handle,
     pub atlas_and_lightmap_resource_set: Handle,
@@ -1208,10 +3237,20 @@ struct WorldLodExactAtlasPipelineResources {
     atlas_and_lightmap_layout: Handle,
     pipeline_layout: Handle,
     pipeline: Handle,
+    /// Direct-route variant for the Rust-owned DH color/depth boundary. The
+    /// shared forward pipeline remains a separate target/state contract.
+    offscreen_pipeline: Option<Handle>,
+    offscreen_replay_pipeline: Option<Handle>,
 }
 
 impl WorldLodExactAtlasPipelineResources {
     fn destroy(self, gal: &mut VulkanicGal) {
+        if let Some(handle) = self.offscreen_pipeline {
+            let _ = gal.destroy(handle);
+        }
+        if let Some(handle) = self.offscreen_replay_pipeline {
+            let _ = gal.destroy(handle);
+        }
         for handle in [
             self.pipeline,
             self.pipeline_layout,
@@ -1225,18 +3264,171 @@ impl WorldLodExactAtlasPipelineResources {
     }
 }
 
-/// Private exact-atlas opaque DH pass. It is intentionally unable to receive
+/// Material state for a provenance-resolved exact-atlas DH pass. The vertex
+/// and descriptor contracts are shared, while blend/cull/depth state remains
+/// explicit per DH material layer. Keeping this state in one owner avoids
+/// duplicating resource lifetime code without making transparent geometry use
+/// opaque raster policy.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) enum WorldLodExactAtlasPassKind {
+    Opaque,
+    TransparentSide,
+    TransparentUp,
+    WaterSurface,
+}
+
+impl WorldLodExactAtlasPassKind {
+    fn expected_layer(self) -> u32 {
+        match self {
+            Self::Opaque => WORLD_LOD_LAYER_OPAQUE,
+            Self::TransparentSide => WORLD_LOD_LAYER_TRANSPARENT_SIDE,
+            Self::TransparentUp => WORLD_LOD_LAYER_TRANSPARENT_UP,
+            Self::WaterSurface => WORLD_LOD_LAYER_TRANSPARENT_WATER_UP,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Opaque => "opaque",
+            Self::TransparentSide => "transparent-side",
+            Self::TransparentUp => "transparent-up",
+            Self::WaterSurface => "water-surface",
+        }
+    }
+
+    fn shared_raster_policy(self) -> (BlendMode, CullMode, CompareOp, bool) {
+        match self {
+            Self::Opaque => (
+                BlendMode::Disabled,
+                CullMode::Back,
+                CompareOp::LessOrEqual,
+                true,
+            ),
+            Self::TransparentSide => (
+                BlendMode::Alpha,
+                CullMode::Back,
+                CompareOp::LessOrEqual,
+                false,
+            ),
+            Self::TransparentUp => (
+                BlendMode::Alpha,
+                CullMode::Back,
+                CompareOp::LessOrEqual,
+                false,
+            ),
+            Self::WaterSurface => (
+                BlendMode::AlphaSource,
+                CullMode::None,
+                CompareOp::LessOrEqual,
+                false,
+            ),
+        }
+    }
+
+    fn private_raster_policy(self) -> (BlendMode, CompareOp, bool) {
+        match self {
+            Self::Opaque => (BlendMode::Disabled, CompareOp::Less, true),
+            Self::TransparentSide => (BlendMode::Alpha, CompareOp::Less, false),
+            Self::TransparentUp => (BlendMode::Alpha, CompareOp::Less, true),
+            Self::WaterSurface => (BlendMode::AlphaSource, CompareOp::Always, true),
+        }
+    }
+}
+
+/// Private exact-atlas DH pass. It is intentionally unable to receive
 /// incomplete source ranges: callers construct it only from
 /// `WorldLodTexturedGpuDraw`, whose source ordinal has already been paired to
-/// complete copied material provenance.
-#[derive(Default)]
-pub(crate) struct WorldLodExactAtlasOpaquePassResources {
+/// complete copied material provenance. Partial transparent ranges stay on
+/// their single reduced-color draw so alpha ordering cannot be changed by
+/// splitting one source segment into two passes.
+pub(crate) struct WorldLodExactAtlasPassResources {
     pipeline: Option<WorldLodExactAtlasPipelineResources>,
     draws: BTreeMap<WorldLodDrawResourceKey, WorldLodDrawResources>,
     material_sets: BTreeMap<WorldLodExactAtlasBindingKey, Handle>,
+    deferred: bool,
+    color_format: Option<TextureFormat>,
+    pass: WorldLodExactAtlasPassKind,
 }
 
-impl WorldLodExactAtlasOpaquePassResources {
+impl Default for WorldLodExactAtlasPassResources {
+    fn default() -> Self {
+        Self {
+            pipeline: None,
+            draws: BTreeMap::new(),
+            material_sets: BTreeMap::new(),
+            deferred: true,
+            color_format: Some(TextureFormat::Rgba8Unorm),
+            pass: WorldLodExactAtlasPassKind::Opaque,
+        }
+    }
+}
+
+impl WorldLodExactAtlasPassResources {
+    pub(crate) fn new_deferred_transparent_side() -> Self {
+        Self::new_deferred_for(WorldLodExactAtlasPassKind::TransparentSide)
+    }
+
+    pub(crate) fn new_deferred_transparent_up() -> Self {
+        Self::new_deferred_for(WorldLodExactAtlasPassKind::TransparentUp)
+    }
+
+    pub(crate) fn new_deferred_water_surface() -> Self {
+        Self::new_deferred_for(WorldLodExactAtlasPassKind::WaterSurface)
+    }
+
+    pub(crate) fn new_forward() -> Self {
+        Self::new_forward_for(WorldLodExactAtlasPassKind::Opaque)
+    }
+
+    pub(crate) fn new_forward_transparent_side() -> Self {
+        Self::new_forward_for(WorldLodExactAtlasPassKind::TransparentSide)
+    }
+
+    pub(crate) fn new_forward_transparent_up() -> Self {
+        Self::new_forward_for(WorldLodExactAtlasPassKind::TransparentUp)
+    }
+
+    pub(crate) fn new_forward_water_surface() -> Self {
+        Self::new_forward_for(WorldLodExactAtlasPassKind::WaterSurface)
+    }
+
+    fn new_deferred_for(pass: WorldLodExactAtlasPassKind) -> Self {
+        Self {
+            pipeline: None,
+            draws: BTreeMap::new(),
+            material_sets: BTreeMap::new(),
+            deferred: true,
+            color_format: Some(TextureFormat::Rgba8Unorm),
+            pass,
+        }
+    }
+
+    fn new_forward_for(pass: WorldLodExactAtlasPassKind) -> Self {
+        Self {
+            pipeline: None,
+            draws: BTreeMap::new(),
+            material_sets: BTreeMap::new(),
+            deferred: false,
+            color_format: None,
+            pass,
+        }
+    }
+
+    pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
+        if self.deferred {
+            return Err(GalError::invalid_argument(
+                "deferred exact-atlas pass cannot change target format",
+            ));
+        }
+        if self.pipeline.is_some() && self.color_format != Some(format) {
+            return Err(GalError::invalid_argument(
+                "forward exact-atlas target format changed after pipeline creation",
+            ));
+        }
+        self.color_format = Some(format);
+        Ok(())
+    }
+
     pub(crate) fn stage_draw(
         &mut self,
         gal: &mut VulkanicGal,
@@ -1246,10 +3438,12 @@ impl WorldLodExactAtlasOpaquePassResources {
         lightmap: VanillaLightmapBinding,
         ops: &mut Vec<CommandOp>,
     ) -> GalResult<WorldLodExactAtlasPreparedDraw> {
-        if draw.layer != WORLD_LOD_LAYER_OPAQUE {
-            return Err(GalError::invalid_argument(
-                "world LOD exact-atlas pass accepts opaque segments only",
-            ));
+        if draw.layer != self.pass.expected_layer() {
+            return Err(GalError::invalid_argument(format!(
+                "world LOD exact-atlas {} pass received layer {}",
+                self.pass.label(),
+                draw.layer
+            )));
         }
         if atlas.mesh_generation == 0
             || lightmap.world_generation == 0
@@ -1263,6 +3457,7 @@ impl WorldLodExactAtlasOpaquePassResources {
         let key = WorldLodDrawResourceKey {
             column_key: draw.column_key,
             column_generation: draw.column_generation,
+            layer: draw.layer,
             segment_index: draw.source_segment_index,
         };
         if !self.draws.contains_key(&key) {
@@ -1272,7 +3467,7 @@ impl WorldLodExactAtlasOpaquePassResources {
                     "world-lod-exact-atlas-column{}-gen{}-segment{}.frame",
                     key.column_key, key.column_generation, key.segment_index
                 ),
-                size: 128,
+                size: 240,
                 memory: MemoryDomain::Upload,
                 usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
             })?;
@@ -1314,40 +3509,56 @@ impl WorldLodExactAtlasOpaquePassResources {
                 WorldLodDrawResources {
                     uniform_buffer,
                     resource_set,
+                    last_uniform_bytes: None,
                 },
             );
         }
-        let resources = self
-            .draws
-            .get(&key)
-            .copied()
-            .expect("exact-atlas draw resources exist");
+        let packed_uniform = uniforms.pack_std140();
+        let (uniform_buffer, geometry_resource_set, uniform_changed) = {
+            let resources = self
+                .draws
+                .get_mut(&key)
+                .expect("exact-atlas draw resources exist");
+            let uniform_changed = resources.last_uniform_bytes != Some(packed_uniform);
+            if uniform_changed {
+                resources.last_uniform_bytes = Some(packed_uniform);
+            }
+            (
+                resources.uniform_buffer,
+                resources.resource_set,
+                uniform_changed,
+            )
+        };
         let material_set = self.ensure_material_set(gal, atlas, lightmap)?;
-        ops.extend([
-            CommandOp::Barrier(buffer_barrier(
-                resources.uniform_buffer,
-                TextureUsageState::ShaderRead,
-                TextureUsageState::TransferDst,
-            )),
-            CommandOp::HostWriteBuffer {
-                buffer: resources.uniform_buffer,
-                offset: 0,
-                data: uniforms.pack_std140().to_vec(),
-            },
-            CommandOp::Barrier(buffer_barrier(
-                resources.uniform_buffer,
-                TextureUsageState::TransferDst,
-                TextureUsageState::ShaderRead,
-            )),
-        ]);
+        if uniform_changed {
+            ops.extend([
+                CommandOp::Barrier(buffer_barrier(
+                    uniform_buffer,
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::TransferDst,
+                )),
+                CommandOp::HostWriteBuffer {
+                    buffer: uniform_buffer,
+                    offset: 0,
+                    data: packed_uniform.to_vec(),
+                },
+                CommandOp::Barrier(buffer_barrier(
+                    uniform_buffer,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                )),
+            ]);
+        }
         let pipeline = self
             .pipeline
             .as_ref()
             .expect("exact-atlas pipeline remains alive");
         Ok(WorldLodExactAtlasPreparedDraw {
             pipeline: pipeline.pipeline,
+            offscreen_pipeline: pipeline.offscreen_pipeline,
+            offscreen_replay_pipeline: pipeline.offscreen_replay_pipeline,
             pipeline_layout: pipeline.pipeline_layout,
-            geometry_resource_set: resources.resource_set,
+            geometry_resource_set,
             atlas_and_lightmap_resource_set: material_set,
             index_buffer: draw.index_buffer,
             index_type: draw.index_type,
@@ -1426,9 +3637,9 @@ impl WorldLodExactAtlasOpaquePassResources {
         if self.pipeline.is_some() {
             return Ok(());
         }
-        let label = "world-lod-exact-atlas-opaque";
+        let label = format!("world-lod-exact-atlas-{}", self.pass.label());
         let [geometry_and_frame_desc, atlas_and_lightmap_desc] =
-            distant_horizons_lod_exact_atlas_resource_layouts(label);
+            distant_horizons_lod_exact_atlas_resource_layouts(&label);
         let mut created = Vec::new();
         let result = (|| -> GalResult<WorldLodExactAtlasPipelineResources> {
             let geometry_and_frame_layout = gal.create_resource_layout(geometry_and_frame_desc)?;
@@ -1440,32 +3651,127 @@ impl WorldLodExactAtlasOpaquePassResources {
                 resource_layouts: vec![geometry_and_frame_layout, atlas_and_lightmap_layout],
             })?;
             created.push(pipeline_layout);
-            let [vertex_desc, fragment_desc] =
+            let [vertex_desc, fragment_desc] = if self.deferred {
                 minimal_distant_horizons_lod_exact_atlas_opaque_program()
-                    .shader_module_descriptors(gal.capabilities().api);
+                    .shader_module_descriptors(gal.capabilities().api)
+            } else {
+                minimal_distant_horizons_lod_exact_atlas_forward_opaque_program()
+                    .shader_module_descriptors(gal.capabilities().api)
+            };
             let vertex_shader = gal.create_shader_module(vertex_desc)?;
             created.push(vertex_shader);
             let fragment_shader = gal.create_shader_module(fragment_desc)?;
             created.push(fragment_shader);
+            let (blend, cull_mode, depth_compare, depth_write) = self.pass.shared_raster_policy();
             let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
                 label: format!("{label}.pipeline"),
                 layout: pipeline_layout,
                 vertex_shader,
                 fragment_shader,
                 topology: PrimitiveTopology::Triangles,
-                cull_mode: CullMode::Back,
-                front_face: FrontFace::CounterClockwise,
+                cull_mode: if matches!(selected_source_raster_probe_cull_mode()?, CullMode::None) {
+                    CullMode::None
+                } else {
+                    cull_mode
+                },
+                front_face: selected_source_raster_probe_front_face(world_lod_source_front_face(
+                    gal.capabilities().api,
+                ))?,
                 provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
                 raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
-                blend: BlendMode::Disabled,
-                depth_compare: Some(CompareOp::LessOrEqual),
-                depth_write: true,
+                blend,
+                depth_compare: selected_source_raster_probe_depth_compare(Some(depth_compare))?,
+                depth_write,
                 depth_bias: None,
-                color_formats: vec![TextureFormat::Rgba8Unorm; 4],
+                color_formats: if self.deferred {
+                    vec![TextureFormat::Rgba8Unorm; 4]
+                } else {
+                    vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm)]
+                },
                 depth_format: Some(TextureFormat::Depth32Float),
                 stencil: None,
             })?;
             created.push(pipeline);
+            let offscreen_pipeline = if !self.deferred {
+                // The direct DH compositor owns a separate color/depth
+                // attachment. Keep its exact-atlas state explicit rather than
+                // reusing the shared forward pipeline: opaque LODs use the
+                // source no-shader LESS/depth-write contract in that private
+                // domain, while the shared target retains LEQUAL semantics.
+                let (offscreen_blend, offscreen_depth_compare, offscreen_depth_write) =
+                    self.pass.private_raster_policy();
+                let offscreen_pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                    label: format!("{label}.offscreen.pipeline"),
+                    layout: pipeline_layout,
+                    vertex_shader,
+                    fragment_shader,
+                    topology: PrimitiveTopology::Triangles,
+                    cull_mode: if matches!(
+                        selected_source_raster_probe_cull_mode()?,
+                        CullMode::None
+                    ) {
+                        CullMode::None
+                    } else {
+                        cull_mode
+                    },
+                    front_face: selected_source_raster_probe_front_face(
+                        world_lod_source_front_face(gal.capabilities().api),
+                    )?,
+                    provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                    raster_y_direction: RasterYDirection::Up,
+                    blend: offscreen_blend,
+                    depth_compare: selected_source_raster_probe_depth_compare(Some(
+                        offscreen_depth_compare,
+                    ))?,
+                    depth_write: offscreen_depth_write,
+                    depth_bias: None,
+                    color_formats: vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm)],
+                    depth_format: Some(TextureFormat::Depth32Float),
+                    stencil: None,
+                })?;
+                created.push(offscreen_pipeline);
+                Some(offscreen_pipeline)
+            } else {
+                None
+            };
+            let offscreen_replay_pipeline =
+                if !self.deferred && self.pass == WorldLodExactAtlasPassKind::WaterSurface {
+                    let (_, offscreen_depth_compare, offscreen_depth_write) =
+                        self.pass.private_raster_policy();
+                    let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                        label: format!("{label}.offscreen-transparent-replay.pipeline"),
+                        layout: pipeline_layout,
+                        vertex_shader,
+                        fragment_shader,
+                        topology: PrimitiveTopology::Triangles,
+                        cull_mode: if matches!(
+                            selected_source_raster_probe_cull_mode()?,
+                            CullMode::None
+                        ) {
+                            CullMode::None
+                        } else {
+                            cull_mode
+                        },
+                        front_face: selected_source_raster_probe_front_face(
+                            world_lod_source_front_face(gal.capabilities().api),
+                        )?,
+                        provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                        raster_y_direction: RasterYDirection::Up,
+                        blend: private_dh_water_replay_blend_mode(),
+                        depth_compare: selected_source_raster_probe_depth_compare(Some(
+                            offscreen_depth_compare,
+                        ))?,
+                        depth_write: offscreen_depth_write,
+                        depth_bias: None,
+                        color_formats: vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm)],
+                        depth_format: Some(TextureFormat::Depth32Float),
+                        stencil: None,
+                    })?;
+                    created.push(pipeline);
+                    Some(pipeline)
+                } else {
+                    None
+                };
             Ok(WorldLodExactAtlasPipelineResources {
                 vertex_shader,
                 fragment_shader,
@@ -1473,6 +3779,8 @@ impl WorldLodExactAtlasOpaquePassResources {
                 atlas_and_lightmap_layout,
                 pipeline_layout,
                 pipeline,
+                offscreen_pipeline,
+                offscreen_replay_pipeline,
             })
         })();
         if result.is_err() {
@@ -1554,6 +3862,11 @@ impl WorldLodExactAtlasOpaquePassResources {
         Ok(set)
     }
 }
+
+/// Compatibility name retained for the deferred/source opaque owner and its
+/// existing tests. Transparent direct owners use the same explicit resource
+/// implementation with a different pass kind.
+pub(crate) type WorldLodExactAtlasOpaquePassResources = WorldLodExactAtlasPassResources;
 
 /// Source-frame counterpart of the regular exact-atlas DH pass. It shares
 /// immutable copied geometry and Rust-owned atlas/lightmap semantics, then
@@ -1656,8 +3969,12 @@ impl WorldLodExactAtlasSourcePassResources {
                 "world LOD exact-atlas source pass requires a complete atlas generation",
             ));
         }
-        let pipeline_key =
-            exact_atlas_source_pipeline_key(program, color_attachment, pack_resources_layout)?;
+        let pipeline_key = exact_atlas_source_pipeline_key(
+            program,
+            color_attachment,
+            pack_resources_layout,
+            gal.capabilities().api,
+        )?;
         self.ensure_pipeline(gal, program, &pipeline_key)?;
         let scalar_uniforms = program.source.pack_scalar_uniforms(source_uniforms)?;
         let draw_key = WorldLodExactAtlasSourceDrawKey {
@@ -1665,6 +3982,7 @@ impl WorldLodExactAtlasSourcePassResources {
             draw: WorldLodDrawResourceKey {
                 column_key: draw.column_key,
                 column_generation: draw.column_generation,
+                layer: draw.layer,
                 segment_index: draw.source_segment_index,
             },
         };
@@ -1680,7 +3998,7 @@ impl WorldLodExactAtlasSourcePassResources {
                     draw_key.draw.column_generation,
                     draw_key.draw.segment_index
                 ),
-                size: 128,
+                size: 240,
                 memory: MemoryDomain::Upload,
                 usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
             })?;
@@ -1779,7 +4097,11 @@ impl WorldLodExactAtlasSourcePassResources {
             })
             .expect("exact-atlas source draw resources exist");
         let atlas_set = self.ensure_material_set(gal, &pipeline_key, atlas)?;
-        append_source_uniform_upload(ops, column_frame_buffer, uniforms.pack_std140().to_vec());
+        append_source_uniform_upload(
+            ops,
+            column_frame_buffer,
+            uniforms.pack_source_std140().to_vec(),
+        );
         if let Some(buffer) = scalar_uniform_buffer {
             append_source_uniform_upload(ops, buffer, scalar_uniforms);
         }
@@ -2015,6 +4337,7 @@ impl WorldLodSourceProgramKey {
     fn from_program(
         program: &LoweredDistantHorizonsSourceProgram,
         color_format: TextureFormat,
+        api: BackendApi,
     ) -> GalResult<Self> {
         Ok(Self {
             identity: program.identity.as_str().to_string(),
@@ -2024,7 +4347,7 @@ impl WorldLodSourceProgramKey {
             // pipeline identity so a cached normal pipeline cannot make an
             // experiment silently ineffective.
             cull_mode: selected_source_raster_probe_cull_mode()? as u32,
-            front_face: selected_source_raster_probe_front_face(WORLD_LOD_SOURCE_FRONT_FACE)?,
+            front_face: selected_source_raster_probe_front_face(world_lod_source_front_face(api))?,
         })
     }
 }
@@ -2181,6 +4504,7 @@ fn exact_atlas_source_pipeline_key(
     program: &LoweredDistantHorizonsExactAtlasSourceProgram,
     attachment: &TerrainSourceColorAttachment,
     pack_resources_layout: Handle,
+    api: BackendApi,
 ) -> GalResult<WorldLodExactAtlasSourcePipelineKey> {
     if attachment.output != TerrainPassOutput::LitTerrainColor {
         return Err(GalError::invalid_argument(
@@ -2192,7 +4516,7 @@ fn exact_atlas_source_pipeline_key(
         shader_pack_generation: program.source.shader_pack_generation,
         primary_format: attachment.format,
         pack_resources_layout,
-        front_face: selected_source_raster_probe_front_face(WORLD_LOD_SOURCE_FRONT_FACE)?,
+        front_face: selected_source_raster_probe_front_face(world_lod_source_front_face(api))?,
     })
 }
 
@@ -2490,6 +4814,173 @@ impl WorldLodSourcePassResources {
         Ok(())
     }
 
+    /// Appends a compatible opaque DH range in one render pass.
+    ///
+    /// Opaque reduced-color and exact-atlas draws write the same named source
+    /// attachments with the same depth domain.  Keeping that attachment open
+    /// across the range preserves draw order and per-draw pipeline/resource
+    /// bindings while avoiding a pass/barrier round trip for every segment.
+    /// The caller still performs the one opaque-depth snapshot after this
+    /// range, before any translucent source work can read it.
+    pub(crate) fn append_opaque_batch(
+        target: &WorldLodPreparedSourceTarget,
+        draws: &[(WorldLodPreparedSourceDraw, Handle)],
+        fog_color: crate::render::vulkanic::commands::ClearColor,
+        clear_primary_color: bool,
+        color_before: TextureUsageState,
+        depth_before: TextureUsageState,
+        depth_after: Option<TextureUsageState>,
+        ops: &mut Vec<CommandOp>,
+    ) -> GalResult<()> {
+        if draws.is_empty() {
+            return Ok(());
+        }
+        if color_before == TextureUsageState::ColorAttachment
+            || depth_before == TextureUsageState::DepthStencilAttachment
+        {
+            return Err(GalError::invalid_argument(
+                "Distant Horizons source opaque batch cannot begin while a target attachment is already in a pass",
+            ));
+        }
+        if color_before == TextureUsageState::Undefined && !clear_primary_color {
+            return Err(GalError::invalid_argument(
+                "Distant Horizons source primary color is undefined but the combined source frame did not schedule its initial clear",
+            ));
+        }
+        if clear_primary_color && !target.primary_color_clears_each_frame {
+            return Err(GalError::invalid_argument(
+                "Distant Horizons source primary color clear conflicts with the shader-pack target declaration",
+            ));
+        }
+        if clear_primary_color && color_before != TextureUsageState::ShaderRead {
+            return Err(GalError::invalid_argument(
+                "Distant Horizons source primary color can clear only from the source-frame shader-read boundary",
+            ));
+        }
+        for (draw, pack_resources) in draws {
+            if pack_resources.kind()
+                != Some(crate::render::vulkanic::handles::HandleKind::ResourceSet)
+            {
+                return Err(GalError::invalid_argument(
+                    "Distant Horizons source opaque batch requires GAL pack resource-set handles",
+                ));
+            }
+            if draw.source_data_dynamic_offset_count > 2 {
+                return Err(GalError::invalid_argument(
+                    "Distant Horizons source opaque batch has an invalid set-zero dynamic-offset count",
+                ));
+            }
+            if draw.index_count == 0 || draw.index_count % 3 != 0 {
+                return Err(GalError::invalid_argument(
+                    "Distant Horizons source opaque batch requires triangle-aligned indices",
+                ));
+            }
+        }
+        for attachment in &target.color_attachments {
+            ops.push(CommandOp::Barrier(texture_barrier(
+                attachment.texture,
+                color_before,
+                TextureUsageState::ColorAttachment,
+            )));
+        }
+        ops.push(CommandOp::Barrier(texture_barrier(
+            target.distant_depth_texture,
+            depth_before,
+            TextureUsageState::DepthStencilAttachment,
+        )));
+        ops.push(CommandOp::BeginPass {
+            pass: target.pass,
+            target: target.target,
+            colors: target
+                .color_attachments
+                .iter()
+                .map(|attachment| PassAttachment {
+                    view: attachment.view,
+                    load_op: if clear_primary_color
+                        && attachment.output == TerrainPassOutput::LitTerrainColor
+                    {
+                        AttachmentLoadOp::Clear
+                    } else {
+                        AttachmentLoadOp::Load
+                    },
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: (clear_primary_color
+                        && attachment.output == TerrainPassOutput::LitTerrainColor)
+                        .then(|| {
+                            source_color_clear_color(
+                                attachment.source_slot,
+                                attachment.clear_color_bits,
+                                fog_color,
+                            )
+                        }),
+                })
+                .collect(),
+            depth_stencil: Some(PassAttachment {
+                view: target.distant_depth_view,
+                load_op: if depth_before == TextureUsageState::Undefined {
+                    AttachmentLoadOp::Clear
+                } else {
+                    AttachmentLoadOp::Load
+                },
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+        for (draw, pack_resources) in draws {
+            ops.push(CommandOp::BindGraphicsPipeline(draw.pipeline));
+            ops.push(CommandOp::BindResourceSet {
+                pipeline_layout: draw.pipeline_layout,
+                set_index: 0,
+                set: draw.source_data_set,
+                dynamic_offsets: draw.source_data_dynamic_offsets
+                    [..usize::from(draw.source_data_dynamic_offset_count)]
+                    .iter()
+                    .copied()
+                    .map(u64::from)
+                    .collect(),
+            });
+            ops.push(CommandOp::BindResourceSet {
+                pipeline_layout: draw.pipeline_layout,
+                set_index: 1,
+                set: *pack_resources,
+                dynamic_offsets: Vec::new(),
+            });
+            if let Some(extra_resources) = draw.source_extra_resource_set {
+                ops.push(CommandOp::BindResourceSet {
+                    pipeline_layout: draw.pipeline_layout,
+                    set_index: 2,
+                    set: extra_resources,
+                    dynamic_offsets: Vec::new(),
+                });
+            }
+            ops.push(CommandOp::SetIndexBuffer {
+                buffer: draw.index_buffer,
+                offset: 0,
+                index_type: draw.index_type,
+            });
+            ops.push(CommandOp::DrawIndexed {
+                indices: draw.index_count,
+                instances: 1,
+            });
+        }
+        ops.push(CommandOp::EndPass);
+        if let Some(depth_after) = depth_after {
+            ops.push(CommandOp::Barrier(texture_barrier(
+                target.distant_depth_texture,
+                TextureUsageState::DepthStencilAttachment,
+                depth_after,
+            )));
+        }
+        for attachment in &target.color_attachments {
+            ops.push(CommandOp::Barrier(texture_barrier(
+                attachment.texture,
+                TextureUsageState::ColorAttachment,
+                TextureUsageState::ShaderRead,
+            )));
+        }
+        Ok(())
+    }
+
     pub(crate) fn stage_draw(
         &mut self,
         gal: &mut VulkanicGal,
@@ -2506,7 +4997,8 @@ impl WorldLodSourcePassResources {
                 "source-derived Distant Horizons draw requires triangle-aligned indices",
             ));
         }
-        let key = WorldLodSourceProgramKey::from_program(program, color_format)?;
+        let key =
+            WorldLodSourceProgramKey::from_program(program, color_format, gal.capabilities().api)?;
         self.ensure_pipeline(gal, program, &key)?;
         let scalar_uniforms = program.pack_scalar_uniforms(source_uniforms)?;
         if program.execution_interface.scalar_uniforms.is_none() && !scalar_uniforms.is_empty() {
@@ -2620,7 +5112,7 @@ impl WorldLodSourcePassResources {
         append_source_uniform_upload(
             ops,
             resources.column_frame_buffer,
-            column_frame.pack_std140().to_vec(),
+            column_frame.pack_source_std140().to_vec(),
         );
         if let Some(buffer) = resources.scalar_uniform_buffer {
             append_source_uniform_upload(ops, buffer, scalar_uniforms);
@@ -2669,7 +5161,8 @@ impl WorldLodSourcePassResources {
                 "Distant Horizons source pack resources require a non-zero world generation",
             ));
         }
-        let program_key = WorldLodSourceProgramKey::from_program(program, color_format)?;
+        let program_key =
+            WorldLodSourceProgramKey::from_program(program, color_format, gal.capabilities().api)?;
         self.ensure_pipeline(gal, program, &program_key)?;
         let key = WorldLodSourcePackKey {
             program: program_key.clone(),
@@ -2723,7 +5216,8 @@ impl WorldLodSourcePassResources {
         program: &LoweredDistantHorizonsSourceProgram,
         color_format: TextureFormat,
     ) -> GalResult<Handle> {
-        let key = WorldLodSourceProgramKey::from_program(program, color_format)?;
+        let key =
+            WorldLodSourceProgramKey::from_program(program, color_format, gal.capabilities().api)?;
         self.ensure_pipeline(gal, program, &key)?;
         Ok(self
             .pipelines
@@ -3500,6 +5994,7 @@ pub(crate) enum WorldLodTexturedQuadUnavailableReason {
     VariantMixed,
     InconsistentFace,
     MissingFaceMaterial,
+    UnsupportedAtlas,
 }
 
 impl WorldLodTexturedQuadUnavailableReason {
@@ -3514,6 +6009,7 @@ impl WorldLodTexturedQuadUnavailableReason {
             Self::VariantMixed => "variant-mixed",
             Self::InconsistentFace => "inconsistent-face",
             Self::MissingFaceMaterial => "missing-face-material",
+            Self::UnsupportedAtlas => "unsupported-atlas",
         }
     }
 }
@@ -3529,10 +6025,10 @@ pub(crate) struct WorldLodTexturedQuadUnavailable {
     pub reason: WorldLodTexturedQuadUnavailableReason,
 }
 
-/// Exact-atlas planning result for one already copied DH segment. A future
-/// textured route must require `unavailable.is_empty()` for a segment it
-/// admits; it may not silently substitute the old color-only material for an
-/// incomplete quad.
+/// Exact-atlas planning result for one already copied DH segment. A segment
+/// may be partial: unavailable source quads remain explicit so the later
+/// packer can retain their reduced-color index range without substituting a
+/// guessed texture identity.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct WorldLodTexturedSegmentPlan {
     pub layer: u32,
@@ -3620,7 +6116,7 @@ pub(crate) struct WorldLodGpuColumnResources {
 /// material pass. This is deliberately an internal frontend record: it keeps
 /// the stable semantic column identity alongside private GAL buffers without
 /// exposing either native backend state or the original DH vertex layout.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct WorldLodGpuDraw {
     pub column_key: u64,
     pub column_generation: u64,
@@ -3654,6 +6150,11 @@ impl WorldLodGpuColumnResources {
 pub(crate) struct WorldLodGpuResidency {
     active: BTreeMap<u64, WorldLodGpuColumnResources>,
     pending: Option<BTreeMap<u64, WorldLodGpuColumnResources>>,
+    /// Validated visible ranges for the current immutable asset generations.
+    /// The instance list is retained as the cache key so camera/order changes
+    /// cannot reuse a stale draw list. This cache owns only copied Rust
+    /// metadata and private GAL handles; it never retains Java or DH objects.
+    visible_draw_cache: Option<(Vec<WorldLodColumnInstanceRequest>, Vec<WorldLodGpuDraw>)>,
 }
 
 impl WorldLodGpuResidency {
@@ -3727,6 +6228,10 @@ impl WorldLodGpuResidency {
         if !created.is_empty() {
             ops.append(&mut staged_ops);
             self.pending = Some(created);
+            // A replacement generation may use the same column key. Do not
+            // let a cached draw list retain the previous generation's handles
+            // while the upload is awaiting submission confirmation.
+            self.visible_draw_cache = None;
         }
         Ok(())
     }
@@ -3769,7 +6274,7 @@ impl WorldLodGpuResidency {
                     "world LOD draw instance layer differs from cached payload",
                 ));
             }
-            if segment.vertex_layout_version != WORLD_LOD_GPU_VERTEX_LAYOUT_V1
+            if segment.vertex_layout_version != WORLD_LOD_GPU_VERTEX_LAYOUT_V2
                 || segment.vertex_bytes.len() % WORLD_LOD_GPU_VERTEX_BYTES != 0
             {
                 return Err(GalError::invalid_argument(
@@ -3819,6 +6324,26 @@ impl WorldLodGpuResidency {
         Ok(draws)
     }
 
+    /// Resolve a visible list once per immutable asset/instance identity.
+    /// Callers receive an owned vector because the surrounding frontend may
+    /// need to mutably borrow other Rust-owned pass state while it plans and
+    /// stages materials. The expensive generation, payload, and resource
+    /// validation still happens only when the semantic instance list changes.
+    pub(crate) fn resolve_visible_draws_cached(
+        &mut self,
+        assets: &BTreeMap<u64, WorldLodGpuColumnAsset>,
+        instances: &[WorldLodColumnInstanceRequest],
+    ) -> GalResult<Vec<WorldLodGpuDraw>> {
+        if let Some((cached_instances, cached_draws)) = &self.visible_draw_cache {
+            if cached_instances.as_slice() == instances {
+                return Ok(cached_draws.clone());
+            }
+        }
+        let draws = self.resolve_visible_draws(assets, instances)?;
+        self.visible_draw_cache = Some((instances.to_vec(), draws.clone()));
+        Ok(draws)
+    }
+
     pub(crate) fn confirm_submission(&mut self, gal: &mut VulkanicGal) -> GalResult<()> {
         let Some(created) = self.pending.take() else {
             return Ok(());
@@ -3837,6 +6362,9 @@ impl WorldLodGpuResidency {
                 resources.destroy(gal);
             }
         }
+        // Pending resources may be referenced by a resolved draw list. A
+        // failed submission must retire both together.
+        self.visible_draw_cache = None;
     }
 
     pub(crate) fn reconcile_assets(
@@ -3845,6 +6373,7 @@ impl WorldLodGpuResidency {
         assets: &BTreeMap<u64, WorldLodGpuColumnAsset>,
     ) {
         self.discard_submission(gal);
+        self.visible_draw_cache = None;
         let stale = self
             .active
             .iter()
@@ -3864,6 +6393,7 @@ impl WorldLodGpuResidency {
 
     pub(crate) fn destroy(&mut self, gal: &mut VulkanicGal) {
         self.discard_submission(gal);
+        self.visible_draw_cache = None;
         for (_, resources) in std::mem::take(&mut self.active) {
             resources.destroy(gal);
         }
@@ -4313,6 +6843,23 @@ fn world_lod_face_material_index(
     index
 }
 
+/// Capture-only exact-atlas layer selector used to isolate base-face versus
+/// alpha-tested overlay behavior. It is deliberately unavailable outside an
+/// explicit graphics-audit process and never changes normal admission.
+fn world_lod_audit_face_layer_limit() -> Option<u32> {
+    let audit_enabled = matches!(
+        std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+        Ok("1") | Ok("true") | Ok("TRUE")
+    );
+    audit_enabled
+        .then(|| {
+            std::env::var("MATTMC_RUST_DH_EXACT_ATLAS_MAX_FACE_LAYER")
+                .ok()
+                .and_then(|value| value.trim().parse::<u32>().ok())
+        })
+        .flatten()
+}
+
 fn plan_world_lod_textured_segment_with_material_index(
     segment: &WorldLodSegment,
     quad_material_ids: &[u32],
@@ -4403,7 +6950,11 @@ fn plan_world_lod_textured_segment_with_material_index(
             expand_vertex(&vertices[2])?,
             expand_vertex(&vertices[3])?,
         ];
+        let audit_face_layer_limit = world_lod_audit_face_layer_limit();
         for material in materials {
+            if audit_face_layer_limit.is_some_and(|limit| material.face_layer > limit) {
+                continue;
+            }
             let tile_uv = world_lod_face_tile_coordinates(&expanded, face, material)?;
             let vertices = expanded.map(|vertex| WorldLodTexturedVertex {
                 local_position: vertex.local_position,
@@ -4413,7 +6964,11 @@ fn plan_world_lod_textured_segment_with_material_index(
                         material.tint_rgb[0],
                         material.tint_rgb[1],
                         material.tint_rgb[2],
-                        1.0,
+                        // The copied tint changes RGB only. DH water and
+                        // other translucent source materials carry opacity
+                        // in semantic vertex alpha; replacing it with one
+                        // makes exact-atlas water opaque.
+                        vertex.color_rgba[3],
                     ]
                 } else {
                     vertex.color_rgba
@@ -4516,27 +7071,60 @@ pub(crate) fn pack_world_lod_textured_column_asset(
         let source_segment_index = u32::try_from(source_segment_index).map_err(|_| {
             GalError::invalid_argument("world LOD textured source segment index exceeds u32")
         })?;
-        if segment
+
+        // Atlas identity is a property of the source quad, not the whole
+        // segment. DH columns commonly merge thousands of quads into one
+        // transport segment; rejecting that segment because a few records
+        // have an unsupported atlas silently discarded all otherwise valid
+        // exact-atlas work. If one material layer for a source quad cannot
+        // use the block atlas, keep that source quad entirely on the coarse
+        // path so layered geometry cannot overlap between the two streams.
+        let mut unavailable = segment.unavailable.clone();
+        let mut unavailable_quad_indices = unavailable
+            .iter()
+            .map(|quad| quad.quad_index)
+            .collect::<BTreeSet<_>>();
+        for quad in &segment.quads {
+            if quad.atlas_identity != WORLD_LOD_TERRAIN_ATLAS_IDENTITY
+                && unavailable_quad_indices.insert(quad.quad_index)
+            {
+                unavailable.push(WorldLodTexturedQuadUnavailable {
+                    quad_index: quad.quad_index,
+                    material_id: quad.material_id,
+                    face: quad.face,
+                    reason: WorldLodTexturedQuadUnavailableReason::UnsupportedAtlas,
+                });
+            }
+        }
+        unavailable.sort_by_key(|quad| quad.quad_index);
+        if !unavailable.is_empty() {
+            unavailable_source_segments.push(source_segment_index);
+        }
+
+        let quads = segment
             .quads
             .iter()
-            .any(|quad| quad.atlas_identity != WORLD_LOD_TERRAIN_ATLAS_IDENTITY)
-        {
-            unavailable_source_segments.push(source_segment_index);
-            continue;
-        }
-        if !segment.unavailable.is_empty() {
-            unavailable_source_segments.push(source_segment_index);
-        }
-        if segment.quads.is_empty() {
+            .filter(|quad| {
+                quad.atlas_identity == WORLD_LOD_TERRAIN_ATLAS_IDENTITY
+                    && !unavailable_quad_indices.contains(&quad.quad_index)
+            })
+            .collect::<Vec<_>>();
+        if quads.is_empty() {
             continue;
         }
 
-        validate_world_lod_textured_segment_coverage(segment)?;
+        let partial_segment = WorldLodTexturedSegmentPlan {
+            layer: segment.layer,
+            source_quad_count: segment.source_quad_count,
+            quads: quads.iter().map(|quad| (*quad).clone()).collect(),
+            unavailable,
+        };
+        validate_world_lod_textured_segment_coverage(&partial_segment)?;
 
-        let vertex_count = segment.quads.len().checked_mul(4).ok_or_else(|| {
+        let vertex_count = partial_segment.quads.len().checked_mul(4).ok_or_else(|| {
             GalError::invalid_argument("world LOD textured vertex count overflows usize")
         })?;
-        let index_count = segment.quads.len().checked_mul(6).ok_or_else(|| {
+        let index_count = partial_segment.quads.len().checked_mul(6).ok_or_else(|| {
             GalError::invalid_argument("world LOD textured index count overflows usize")
         })?;
         let mut vertex_bytes = Vec::with_capacity(
@@ -4553,7 +7141,7 @@ pub(crate) fn pack_world_lod_textured_column_asset(
                     GalError::invalid_argument("world LOD textured index byte count overflows")
                 })?,
         );
-        for quad in &segment.quads {
+        for quad in &partial_segment.quads {
             let base = u32::try_from(vertex_bytes.len() / WORLD_LOD_TEXTURED_GPU_VERTEX_BYTES)
                 .map_err(|_| {
                     GalError::invalid_argument("world LOD textured vertex index exceeds u32")
@@ -4569,8 +7157,8 @@ pub(crate) fn pack_world_lod_textured_column_asset(
             vertex_count * WORLD_LOD_TEXTURED_GPU_VERTEX_BYTES,
             vertex_bytes.len()
         );
-        let unresolved_index_bytes = (!segment.unavailable.is_empty())
-            .then(|| world_lod_unresolved_quad_indices(&segment.unavailable))
+        let unresolved_index_bytes = (!partial_segment.unavailable.is_empty())
+            .then(|| world_lod_unresolved_quad_indices(&partial_segment.unavailable))
             .transpose()?;
         segments.push(WorldLodTexturedGpuSegment {
             source_segment_index,
@@ -4784,11 +7372,11 @@ fn world_lod_serialized_vertex_canonical_corner(
 }
 
 /// Converts typed semantic LOD geometry into a fixed, backend-neutral binary
-/// payload. Vertex data is little-endian and contains, in order:
-/// position `f32x3`, micro offset `f32x3`, unpremultiplied RGBA8, and four
-/// semantic bytes for sky light, block light, material category, and face.
-/// Indices are explicitly u32; this avoids treating DH's shared index buffer
-/// as a native resource or relying on backend-default index typing.
+/// payload. Each little-endian 16-byte vertex retains DH's complete compact
+/// semantics: signed i16 XYZ, the three signed micro-offset states, RGBA8,
+/// sky/block light, material category, and face. Segments use u16 indices
+/// whenever their vertex range permits it and otherwise retain explicit u32
+/// indices. Neither representation imports DH's native GL buffer layout.
 pub(crate) fn pack_world_lod_gpu_column_asset(
     asset: &WorldLodExpandedColumnAsset,
 ) -> GalResult<WorldLodGpuColumnAsset> {
@@ -4799,10 +7387,19 @@ pub(crate) fn pack_world_lod_gpu_column_asset(
             .len()
             .checked_mul(WORLD_LOD_GPU_VERTEX_BYTES)
             .ok_or_else(|| GalError::invalid_argument("world LOD GPU vertex payload overflows"))?;
+        let index_type = if segment.vertices.len() <= (u16::MAX as usize + 1) {
+            IndexType::U16
+        } else {
+            IndexType::U32
+        };
+        let index_stride = match index_type {
+            IndexType::U16 => std::mem::size_of::<u16>(),
+            IndexType::U32 => std::mem::size_of::<u32>(),
+        };
         let index_capacity = segment
             .indices
             .len()
-            .checked_mul(std::mem::size_of::<u32>())
+            .checked_mul(index_stride)
             .ok_or_else(|| GalError::invalid_argument("world LOD GPU index payload overflows"))?;
         let mut vertex_bytes = Vec::with_capacity(vertex_capacity);
         for vertex in &segment.vertices {
@@ -4816,13 +7413,20 @@ pub(crate) fn pack_world_lod_gpu_column_asset(
                     segment.vertices.len()
                 )));
             }
-            index_bytes.extend_from_slice(&index.to_le_bytes());
+            match index_type {
+                IndexType::U16 => index_bytes.extend_from_slice(
+                    &u16::try_from(index)
+                        .map_err(|_| GalError::invalid_argument("world LOD u16 index overflow"))?
+                        .to_le_bytes(),
+                ),
+                IndexType::U32 => index_bytes.extend_from_slice(&index.to_le_bytes()),
+            }
         }
         segments.push(WorldLodGpuSegment {
             layer: segment.layer,
-            vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V1,
+            vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V2,
             vertex_bytes,
-            index_type: IndexType::U32,
+            index_type,
             index_bytes,
         });
     }
@@ -4910,11 +7514,14 @@ fn decode_micro_axis(bits: u8) -> f32 {
 
 fn write_vertex(bytes: &mut Vec<u8>, vertex: &WorldLodExpandedVertex) {
     for component in vertex.local_position {
-        bytes.extend_from_slice(&component.to_le_bytes());
+        debug_assert!(component.fract() == 0.0);
+        debug_assert!((i16::MIN as f32..=i16::MAX as f32).contains(&component));
+        bytes.extend_from_slice(&(component as i16).to_le_bytes());
     }
-    for component in vertex.micro_offset {
-        bytes.extend_from_slice(&component.to_le_bytes());
-    }
+    let micro = encode_micro_axis(vertex.micro_offset[0])
+        | (encode_micro_axis(vertex.micro_offset[1]) << 2)
+        | (encode_micro_axis(vertex.micro_offset[2]) << 4);
+    bytes.extend_from_slice(&[micro, 0]);
     for component in vertex.color_rgba {
         bytes.push((component * 255.0).round().clamp(0.0, 255.0) as u8);
     }
@@ -4927,7 +7534,43 @@ fn write_vertex(bytes: &mut Vec<u8>, vertex: &WorldLodExpandedVertex) {
     debug_assert_eq!(0, bytes.len() % WORLD_LOD_GPU_VERTEX_BYTES);
 }
 
-fn material_category_id(value: WorldLodMaterialCategory) -> u8 {
+fn encode_micro_axis(value: f32) -> u8 {
+    if value < 0.0 {
+        0b10
+    } else if value > 0.0 {
+        0b01
+    } else {
+        0
+    }
+}
+
+pub(crate) fn decode_world_lod_gpu_vertex(bytes: &[u8]) -> Option<WorldLodExpandedVertex> {
+    if bytes.len() != WORLD_LOD_GPU_VERTEX_BYTES {
+        return None;
+    }
+    let local_position = [
+        i16::from_le_bytes(bytes[0..2].try_into().ok()?) as f32,
+        i16::from_le_bytes(bytes[2..4].try_into().ok()?) as f32,
+        i16::from_le_bytes(bytes[4..6].try_into().ok()?) as f32,
+    ];
+    let micro = bytes[6];
+    let color_rgba = [bytes[8], bytes[9], bytes[10], bytes[11]].map(|value| value as f32 / 255.0);
+    Some(WorldLodExpandedVertex {
+        local_position,
+        micro_offset: [
+            decode_micro_axis(micro & 0b11),
+            decode_micro_axis((micro >> 2) & 0b11),
+            decode_micro_axis((micro >> 4) & 0b11),
+        ],
+        color_rgba,
+        sky_light: bytes[12],
+        block_light: bytes[13],
+        material: WorldLodMaterialCategory::try_from(bytes[14]).ok()?,
+        normal: WorldLodFaceNormal::try_from(bytes[15]).ok()?,
+    })
+}
+
+pub(crate) fn material_category_id(value: WorldLodMaterialCategory) -> u8 {
     match value {
         WorldLodMaterialCategory::Unknown => 0,
         WorldLodMaterialCategory::Leaves => 1,
@@ -4948,7 +7591,7 @@ fn material_category_id(value: WorldLodMaterialCategory) -> u8 {
     }
 }
 
-fn face_normal_id(value: WorldLodFaceNormal) -> u8 {
+pub(crate) fn face_normal_id(value: WorldLodFaceNormal) -> u8 {
     match value {
         WorldLodFaceNormal::Down => 0,
         WorldLodFaceNormal::Up => 1,
@@ -5219,7 +7862,7 @@ mod tests {
         complete_bundled_pack_source_for_test, preprocess_distant_horizons_sources,
     };
     use crate::render::vulkanic::shader_pack::programs::{
-        TerrainSourceTextureTransforms, prepare_lowered_distant_horizons_source_program,
+        prepare_lowered_distant_horizons_source_program, TerrainSourceTextureTransforms,
     };
     use crate::render::vulkanic::shader_pack::runtime::ShaderPackRuntimeExecutor;
     use crate::render::vulkanic::shader_pack::source_targets::ShaderPackColorBootstrapClearValues;
@@ -5231,12 +7874,29 @@ mod tests {
         TerrainSourceResourceRole, TerrainSourceSampledResourceShape,
     };
     use crate::render::vulkanic::world_primitive_frontend::{
-        WORLD_LOD_MATERIAL_MIXED, WORLD_LOD_MATERIAL_UNAVAILABLE, WORLD_LOD_VERTEX_LAYOUT_V1,
         WorldLodColumnAsset, WorldLodColumnMaterialProvenance, WorldLodFaceMaterial,
         WorldLodMaterialIdentity, WorldLodRenderFrame, WorldLodSegment,
-        WorldLodSegmentMaterialProvenance, WorldLodVertex,
+        WorldLodSegmentMaterialProvenance, WorldLodVertex, WORLD_LOD_MATERIAL_MIXED,
+        WORLD_LOD_MATERIAL_UNAVAILABLE, WORLD_LOD_VERTEX_LAYOUT_V1,
     };
     use crate::render::vulkanic::{CommandList, CommandListDesc, SubmissionBatch};
+
+    #[test]
+    fn world_lod_frame_plan_reuses_bounded_capacity_and_drops_spikes() {
+        let mut plan = WorldLodFramePlan::default();
+        plan.opaque_draws.reserve(4);
+        let retained_capacity = plan.opaque_draws.capacity();
+        plan.prepare_for_reuse();
+        assert!(plan.opaque_draws.is_empty());
+        assert_eq!(plan.opaque_draws.capacity(), retained_capacity);
+
+        plan.opaque_draws
+            .reserve(MAX_REUSABLE_WORLD_LOD_PLAN_ELEMENTS + 1);
+        assert!(plan.opaque_draws.capacity() > MAX_REUSABLE_WORLD_LOD_PLAN_ELEMENTS);
+        plan.prepare_for_reuse();
+        assert!(plan.opaque_draws.is_empty());
+        assert_eq!(plan.opaque_draws.capacity(), 0);
+    }
 
     fn asset() -> WorldLodColumnAsset {
         WorldLodColumnAsset {
@@ -5288,6 +7948,29 @@ mod tests {
         vertices[2].local_position = [2, 2, 4];
         vertices[3].local_position = [2, 2, 3];
         asset
+    }
+
+    #[test]
+    fn private_dh_source_raster_policy_matches_no_shader_states() {
+        assert_eq!(TextureFormat::Rgba16Float, WORLD_LOD_RESOLVED_COLOR_FORMAT);
+        assert_eq!(
+            (BlendMode::Disabled, CompareOp::Less, true),
+            private_dh_source_raster_policy(WorldLodPassClass::Opaque)
+        );
+        assert_eq!(
+            (BlendMode::Alpha, CompareOp::Less, false),
+            private_dh_source_raster_policy(WorldLodPassClass::TransparentSide)
+        );
+        assert_eq!(
+            (BlendMode::Alpha, CompareOp::Less, true),
+            private_dh_source_raster_policy(WorldLodPassClass::TransparentUp)
+        );
+        assert_eq!(
+            (BlendMode::AlphaSource, CompareOp::Always, true),
+            private_dh_source_raster_policy(WorldLodPassClass::WaterSurface)
+        );
+        assert_eq!(BlendMode::Alpha, private_dh_water_replay_blend_mode());
+        assert_eq!(BlendMode::Disabled, private_dh_compositor_blend_mode());
     }
 
     fn lowered_source_program() -> LoweredDistantHorizonsSourceProgram {
@@ -5628,9 +8311,22 @@ mod tests {
 
     #[test]
     fn source_pipeline_uses_the_dh_quad_raster_convention() {
-        // QuadElementBuffer emits 0,1,2,2,3,0. With the Rust Vulkan
-        // whole-frame viewport convention, that DH source order is CCW.
-        assert_eq!(FrontFace::CounterClockwise, WORLD_LOD_SOURCE_FRONT_FACE);
+        // QuadElementBuffer emits 0,1,2,2,3,0. RasterYDirection::Up is a GAL
+        // coordinate contract; each backend realizes that contract without
+        // changing the copied DH source winding, so no source-index rewrite is
+        // needed on any backend.
+        assert_eq!(
+            FrontFace::CounterClockwise,
+            world_lod_source_front_face(BackendApi::Vulkan)
+        );
+        assert_eq!(
+            FrontFace::CounterClockwise,
+            world_lod_source_front_face(BackendApi::OpenGl)
+        );
+        assert_eq!(
+            FrontFace::CounterClockwise,
+            world_lod_source_front_face(BackendApi::Mock)
+        );
     }
 
     #[test]
@@ -5899,7 +8595,10 @@ mod tests {
             &[base.clone(), positioned],
         )
         .unwrap();
-        assert_eq!([0.2, 0.7, 0.3, 1.0], exact.quads[0].vertices[0].color_rgba);
+        assert_eq!(
+            [0.2, 0.7, 0.3, 192.0 / 255.0],
+            exact.quads[0].vertices[0].color_rgba
+        );
 
         let merged = plan_world_lod_textured_segment_with_variants(
             segment,
@@ -5909,8 +8608,36 @@ mod tests {
             &[base],
         )
         .unwrap();
-        assert_eq!([1.0, 1.0, 1.0, 1.0], merged.quads[0].vertices[0].color_rgba);
+        assert_eq!(
+            [1.0, 1.0, 1.0, 192.0 / 255.0],
+            merged.quads[0].vertices[0].color_rgba
+        );
         assert!(merged.unavailable.is_empty());
+    }
+
+    #[test]
+    fn exact_atlas_tint_preserves_source_alpha_for_translucent_materials() {
+        let mut asset = single_block_face_asset();
+        for vertex in &mut asset.segments[0].vertices {
+            vertex.color_rgba[3] = 192;
+        }
+        let material = WorldLodFaceMaterial {
+            material_id: 1,
+            face: 1,
+            face_layer: 0,
+            tinted: true,
+            tint_rgb: [0.2, 0.7, 0.3],
+            atlas_identity: "minecraft:textures/atlas/blocks.png".to_string(),
+            sprite_identity: "minecraft:block/water_still".to_string(),
+            atlas_uv: [0.25, 0.5, 0.375, 0.625],
+            uv_corner_order: 0x78,
+            variant_position: 0,
+        };
+        let plan = plan_world_lod_textured_segment(&asset.segments[0], &[1], &[material]).unwrap();
+        assert_eq!(
+            [0.2, 0.7, 0.3, 192.0 / 255.0],
+            plan.quads[0].vertices[0].color_rgba
+        );
     }
 
     #[test]
@@ -5987,6 +8714,24 @@ mod tests {
         assert!(wrong_atlas.segments.is_empty());
         assert_eq!(vec![0], wrong_atlas.unavailable_source_segments);
 
+        let mut mixed_atlas = plan.clone();
+        let mut unsupported_quad = plan.segments[0].quads[0].clone();
+        unsupported_quad.quad_index = 1;
+        unsupported_quad.atlas_identity = "minecraft:textures/atlas/items.png".to_string();
+        mixed_atlas.segments[0].source_quad_count = 2;
+        mixed_atlas.segments[0].quads = vec![plan.segments[0].quads[0].clone(), unsupported_quad];
+        let mixed_atlas = pack_world_lod_textured_column_asset(&mixed_atlas).unwrap();
+        assert_eq!(1, mixed_atlas.segments.len());
+        assert_eq!(vec![0], mixed_atlas.unavailable_source_segments);
+        assert_eq!(
+            6 * std::mem::size_of::<u32>(),
+            mixed_atlas.segments[0]
+                .unresolved_index_bytes
+                .as_ref()
+                .map(Vec::len)
+                .expect("mixed atlas keeps an explicit coarse range")
+        );
+
         let partial = WorldLodTexturedColumnPlan {
             column_key: plan.column_key,
             column_generation: plan.column_generation,
@@ -6034,12 +8779,10 @@ mod tests {
             column_generation: asset.column_generation + 1,
             ..provenance.clone()
         };
-        assert!(
-            plan_world_lod_textured_column(&asset, &wrong_generation)
-                .unwrap_err()
-                .to_string()
-                .contains("generation")
-        );
+        assert!(plan_world_lod_textured_column(&asset, &wrong_generation)
+            .unwrap_err()
+            .to_string()
+            .contains("generation"));
 
         let wrong_segment = WorldLodColumnMaterialProvenance {
             segments: vec![WorldLodSegmentMaterialProvenance {
@@ -6048,12 +8791,10 @@ mod tests {
             }],
             ..provenance
         };
-        assert!(
-            plan_world_lod_textured_column(&asset, &wrong_segment)
-                .unwrap_err()
-                .to_string()
-                .contains("layer/order")
-        );
+        assert!(plan_world_lod_textured_column(&asset, &wrong_segment)
+            .unwrap_err()
+            .to_string()
+            .contains("layer/order"));
     }
 
     #[test]
@@ -6085,12 +8826,10 @@ mod tests {
             [3.0, 0.0],
             world_lod_textured_quad_tile_span(&plan.quads[0])
         );
-        assert!(
-            plan.quads[0]
-                .vertices
-                .iter()
-                .all(|vertex| vertex.atlas_rect == material.atlas_uv)
-        );
+        assert!(plan.quads[0]
+            .vertices
+            .iter()
+            .all(|vertex| vertex.atlas_rect == material.atlas_uv));
     }
 
     #[test]
@@ -6127,20 +8866,27 @@ mod tests {
         let packed = pack_world_lod_gpu_column_asset(&expanded).unwrap();
         let segment = &packed.segments[0];
         assert_eq!(
-            WORLD_LOD_GPU_VERTEX_LAYOUT_V1,
+            WORLD_LOD_GPU_VERTEX_LAYOUT_V2,
             segment.vertex_layout_version
         );
-        assert_eq!(IndexType::U32, segment.index_type);
+        assert_eq!(IndexType::U16, segment.index_type);
         assert_eq!(4 * WORLD_LOD_GPU_VERTEX_BYTES, segment.vertex_bytes.len());
-        assert_eq!(6 * std::mem::size_of::<u32>(), segment.index_bytes.len());
-        assert_eq!(1.0f32.to_le_bytes(), segment.vertex_bytes[0..4]);
-        assert_eq!(0.01f32.to_le_bytes(), segment.vertex_bytes[12..16]);
-        assert_eq!([64, 128, 255, 192], segment.vertex_bytes[24..28]);
-        assert_eq!([2, 3, 4, 1], segment.vertex_bytes[28..32]);
+        assert_eq!(6 * std::mem::size_of::<u16>(), segment.index_bytes.len());
+        let vertex = decode_world_lod_gpu_vertex(&segment.vertex_bytes[..16]).unwrap();
+        assert_eq!([1.0, 2.0, 3.0], vertex.local_position);
+        assert_eq!([0.01, 0.0, 0.0], vertex.micro_offset);
         assert_eq!(
-            [0u32, 1, 2, 2, 3, 0]
+            [64, 128, 255, 192],
+            vertex.color_rgba.map(|v| (v * 255.0).round() as u8)
+        );
+        assert_eq!(2, vertex.sky_light);
+        assert_eq!(3, vertex.block_light);
+        assert_eq!(WorldLodMaterialCategory::Metal, vertex.material);
+        assert_eq!(WorldLodFaceNormal::Up, vertex.normal);
+        assert_eq!(
+            [0u16, 1, 2, 2, 3, 0]
                 .into_iter()
-                .flat_map(u32::to_le_bytes)
+                .flat_map(u16::to_le_bytes)
                 .collect::<Vec<_>>(),
             segment.index_bytes
         );
@@ -6185,10 +8931,21 @@ mod tests {
         assert_eq!(3, draws[0].column_generation);
         assert_eq!([-128, 64, 256], draws[0].origin);
         assert_eq!(WORLD_LOD_LAYER_OPAQUE, draws[0].layer);
-        assert_eq!(IndexType::U32, draws[0].index_type);
+        assert_eq!(IndexType::U16, draws[0].index_type);
         assert_eq!(6, draws[0].index_count);
         assert!(!draws[0].vertex_buffer.is_null());
         assert!(!draws[0].index_buffer.is_null());
+
+        // The second lookup reuses the validated generation-bound record;
+        // callers still receive an owned list so later planning can borrow
+        // other frontend state mutably.
+        let cached = residency
+            .resolve_visible_draws_cached(&assets, &[instance])
+            .unwrap();
+        let cached_again = residency
+            .resolve_visible_draws_cached(&assets, &[instance])
+            .unwrap();
+        assert_eq!(cached, cached_again);
 
         let stale = WorldLodColumnInstanceRequest {
             column_generation: 4,
@@ -6196,6 +8953,9 @@ mod tests {
         };
         assert!(residency.resolve_visible_draws(&assets, &[stale]).is_err());
         residency.discard_submission(&mut gal);
+        assert!(residency
+            .resolve_visible_draws_cached(&assets, &[instance])
+            .is_err());
     }
 
     #[test]
@@ -6253,11 +9013,29 @@ mod tests {
             uniform.clip_micro_noise_earth
         );
         assert_eq!([0b1011, 4, 96, 0], uniform.flags_and_noise);
+        assert_eq!(
+            [0b1011, 4, 96, 519],
+            uniform
+                .with_private_audit_flip_y(true)
+                .with_private_audit_no_depth_remap(true)
+                .with_private_audit_column_ids(true)
+                .with_private_audit_dither_y(true)
+                .flags_and_noise
+        );
+        let uniform = uniform.with_fog([0.1, 0.2, 0.4, 0.8], [12.0, 96.0, 24.0, 128.0]);
+        assert_eq!([0.1, 0.2, 0.4, 0.8], uniform.fog_color_and_alpha);
+        assert_eq!([12.0, 96.0, 24.0, 128.0], uniform.fog_ranges);
         let packed = uniform.pack_std140();
-        assert_eq!(128, packed.len());
+        assert_eq!(240, packed.len());
         assert_eq!(1.0f32.to_ne_bytes(), packed[0..4]);
         assert_eq!((-128.0f32).to_ne_bytes(), packed[64..68]);
         assert_eq!(0b1011u32.to_ne_bytes(), packed[112..116]);
+        assert_eq!(0.1f32.to_ne_bytes(), packed[128..132]);
+        assert_eq!(128.0f32.to_ne_bytes(), packed[156..160]);
+        let source_packed = uniform.pack_source_std140();
+        assert_eq!(128, source_packed.len());
+        assert_eq!(1.0f32.to_ne_bytes(), source_packed[0..4]);
+        assert_eq!(0b1011u32.to_ne_bytes(), source_packed[112..116]);
         residency.discard_submission(&mut gal);
     }
 
@@ -6382,10 +9160,9 @@ mod tests {
                 .filter(|op| matches!(op, CommandOp::HostWriteBuffer { .. }))
                 .count()
         );
-        assert!(
-            ops.iter()
-                .all(|op| !format!("{op:?}").contains("material-id"))
-        );
+        assert!(ops
+            .iter()
+            .all(|op| !format!("{op:?}").contains("material-id")));
 
         let mut cached_ops = Vec::new();
         let cached = source_resources
@@ -6490,22 +9267,18 @@ mod tests {
             },
         )
         .unwrap_err();
-        assert!(
-            water_error
-                .to_string()
-                .contains("explicit water-surface admission path")
-        );
+        assert!(water_error
+            .to_string()
+            .contains("explicit water-surface admission path"));
 
         let transparent = WorldLodGpuDraw {
             layer: WORLD_LOD_LAYER_TRANSPARENT_SIDE,
             ..draw
         };
         let error = admit_world_lod_draw(&frame, transparent).unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("explicit transparent admission path")
-        );
+        assert!(error
+            .to_string()
+            .contains("explicit transparent admission path"));
 
         let unknown = WorldLodGpuDraw { layer: 99, ..draw };
         let error = admit_world_lod_draw(&frame, unknown).unwrap_err();
@@ -6584,19 +9357,90 @@ mod tests {
             plan.transparent_draws[0].draw.layer
         );
         assert_eq!(
-            WorldLodPassClass::Transparent,
+            WorldLodPassClass::TransparentSide,
             plan.transparent_draws[0].pass
         );
         assert_eq!(
-            WorldLodMaterialContract::TRANSPARENT,
+            WorldLodMaterialContract::TRANSPARENT_SIDE,
             plan.transparent_draws[0].material_contract
+        );
+        assert_eq!(
+            WorldLodPassClass::TransparentUp,
+            plan.transparent_draws[1].pass
+        );
+        assert_eq!(
+            WorldLodMaterialContract::TRANSPARENT_UP,
+            plan.transparent_draws[1].material_contract
         );
         assert_eq!(9, plan.transparent_draws[1].draw.order);
         residency.discard_submission(&mut gal);
     }
 
     #[test]
-    fn opaque_pass_resources_reuse_generation_keyed_bindings_and_only_write_frame_uniforms() {
+    fn distant_horizons_exact_atlas_forward_pass_policies_stay_layer_specific() {
+        let cases = [
+            (
+                WorldLodExactAtlasPassKind::Opaque,
+                WORLD_LOD_LAYER_OPAQUE,
+                (
+                    BlendMode::Disabled,
+                    CullMode::Back,
+                    CompareOp::LessOrEqual,
+                    true,
+                ),
+                (BlendMode::Disabled, CompareOp::Less, true),
+            ),
+            (
+                WorldLodExactAtlasPassKind::TransparentSide,
+                WORLD_LOD_LAYER_TRANSPARENT_SIDE,
+                (
+                    BlendMode::Alpha,
+                    CullMode::Back,
+                    CompareOp::LessOrEqual,
+                    false,
+                ),
+                (BlendMode::Alpha, CompareOp::Less, false),
+            ),
+            (
+                WorldLodExactAtlasPassKind::TransparentUp,
+                WORLD_LOD_LAYER_TRANSPARENT_UP,
+                (
+                    BlendMode::Alpha,
+                    CullMode::Back,
+                    CompareOp::LessOrEqual,
+                    false,
+                ),
+                (BlendMode::Alpha, CompareOp::Less, true),
+            ),
+            (
+                WorldLodExactAtlasPassKind::WaterSurface,
+                WORLD_LOD_LAYER_TRANSPARENT_WATER_UP,
+                (
+                    BlendMode::AlphaSource,
+                    CullMode::None,
+                    CompareOp::LessOrEqual,
+                    false,
+                ),
+                (BlendMode::AlphaSource, CompareOp::Always, true),
+            ),
+        ];
+        for (pass, layer, shared, private) in cases {
+            assert_eq!(layer, pass.expected_layer());
+            assert_eq!(shared, pass.shared_raster_policy());
+            assert_eq!(private, pass.private_raster_policy());
+        }
+        assert!(
+            WorldLodExactAtlasPassResources::new_forward_transparent_side()
+                .color_format
+                .is_none()
+        );
+        assert!(WorldLodExactAtlasPassResources::new_forward_water_surface()
+            .color_format
+            .is_none());
+    }
+
+    #[test]
+    fn opaque_pass_resources_reuse_generation_keyed_bindings_and_skip_unchanged_frame_uniforms() {
         let expanded = expand_world_lod_column_asset(&asset()).unwrap();
         let packed = pack_world_lod_gpu_column_asset(&expanded).unwrap();
         let assets = BTreeMap::from([(packed.column_key, packed)]);
@@ -6642,7 +9486,7 @@ mod tests {
         assert!(matches!(first_ops[0], CommandOp::Barrier(_)));
         assert!(matches!(
             &first_ops[1],
-            CommandOp::HostWriteBuffer { data, .. } if data.len() == 128
+            CommandOp::HostWriteBuffer { data, .. } if data.len() == 240
         ));
         assert!(matches!(first_ops[2], CommandOp::Barrier(_)));
 
@@ -6656,12 +9500,24 @@ mod tests {
         assert_eq!(first.geometry_resource_set, second.geometry_resource_set);
         assert_eq!(first.lightmap_resource_set, second.lightmap_resource_set);
         assert_eq!(first.index_buffer, second.index_buffer);
-        assert_eq!(IndexType::U32, first.index_type);
+        assert_eq!(IndexType::U16, first.index_type);
         assert_eq!(6, first.index_count);
-        assert_eq!(3, second_ops.len());
+        assert!(second_ops.is_empty());
+
+        let changed = WorldLodOpaqueDraw {
+            uniforms: admitted
+                .uniforms
+                .with_fog([0.2, 0.3, 0.4, 0.9], [8.0, 64.0, 16.0, 96.0]),
+            ..admitted
+        };
+        let mut changed_ops = Vec::new();
+        pass_resources
+            .stage_draw(&mut gal, changed, lightmap, &mut changed_ops)
+            .unwrap();
+        assert_eq!(3, changed_ops.len());
         assert!(matches!(
-            &second_ops[1],
-            CommandOp::HostWriteBuffer { data, .. } if data.len() == 128
+            &changed_ops[1],
+            CommandOp::HostWriteBuffer { data, .. } if data.len() == 240
         ));
 
         pass_resources.reconcile_assets(&mut gal, &BTreeMap::new());
@@ -6720,9 +9576,9 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(WorldLodPassClass::Transparent, admitted.pass);
+        assert_eq!(WorldLodPassClass::TransparentSide, admitted.pass);
         assert_eq!(
-            WorldLodMaterialContract::TRANSPARENT,
+            WorldLodMaterialContract::TRANSPARENT_SIDE,
             admitted.material_contract
         );
         let (lightmap, lightmap_handles) = lightmap_binding(&mut gal);
@@ -6736,10 +9592,76 @@ mod tests {
         assert_eq!(3, ops.len());
         assert!(matches!(
             &ops[1],
-            CommandOp::HostWriteBuffer { data, .. } if data.len() == 128
+            CommandOp::HostWriteBuffer { data, .. } if data.len() == 240
         ));
-        assert_eq!(1, pass_resources.inner.draws.len());
-        assert_eq!(1, pass_resources.inner.lightmaps.len());
+        assert_eq!(1, pass_resources.inner_side.draws.len());
+        assert!(pass_resources.inner_up.draws.is_empty());
+        assert_eq!(1, pass_resources.inner_side.lightmaps.len());
+        assert!(pass_resources.inner_up.lightmaps.is_empty());
+        pass_resources.destroy(&mut gal);
+        for handle in lightmap_handles {
+            gal.destroy(handle).unwrap();
+        }
+        residency.discard_submission(&mut gal);
+    }
+
+    #[test]
+    fn frozen_forward_transparent_cache_keeps_equal_bucket_ordinals_distinct() {
+        let expanded = expand_world_lod_column_asset(&asset()).unwrap();
+        let packed = pack_world_lod_gpu_column_asset(&expanded).unwrap();
+        let assets = BTreeMap::from([(packed.column_key, packed)]);
+        let instance = WorldLodColumnInstanceRequest {
+            column_key: 7,
+            column_generation: 3,
+            layer: WORLD_LOD_LAYER_OPAQUE,
+            segment_index: 0,
+            order: 4,
+        };
+        let mut gal = VulkanicGal::new_with_backend(
+            Box::new(MockBackend::with_capabilities(presentation_capabilities(
+                vulkan_capabilities(),
+            ))),
+            false,
+        );
+        let mut residency = WorldLodGpuResidency::default();
+        let mut upload_ops = Vec::new();
+        residency
+            .stage_visible_uploads(&mut gal, &assets, &[instance], &mut upload_ops)
+            .unwrap();
+        let draw = residency
+            .resolve_visible_draws(&assets, &[instance])
+            .unwrap()[0];
+        let uniforms = WorldLodDrawUniform::from_semantics(
+            &WorldLodRenderFrame {
+                enabled: true,
+                combined_matrix: [1.0; 16],
+                micro_offset: MICRO_OFFSET_SCALE,
+                ..WorldLodRenderFrame::default()
+            },
+            draw,
+        )
+        .unwrap();
+        let (lightmap, lightmap_handles) = lightmap_binding(&mut gal);
+        let mut pass_resources = WorldLodTransparentPassResources::default();
+        pass_resources
+            .set_color_format(TextureFormat::Bgra8Unorm)
+            .unwrap();
+        let mut ops = Vec::new();
+        for layer in [
+            WORLD_LOD_LAYER_TRANSPARENT_SIDE,
+            WORLD_LOD_LAYER_TRANSPARENT_WATER_UP,
+        ] {
+            pass_resources
+                .stage_frozen_opengl_draw(
+                    &mut gal,
+                    WorldLodGpuDraw { layer, ..draw },
+                    uniforms,
+                    lightmap,
+                    &mut ops,
+                )
+                .unwrap();
+        }
+        assert_eq!(2, pass_resources.inner_up.draws.len());
         pass_resources.destroy(&mut gal);
         for handle in lightmap_handles {
             gal.destroy(handle).unwrap();
@@ -7242,10 +10164,9 @@ mod tests {
         )
         .unwrap();
         depth.append_opaque_depth_snapshot(&mut ops);
-        assert!(
-            ops.iter()
-                .any(|op| matches!(op, CommandOp::DrawIndexed { .. }))
-        );
+        assert!(ops
+            .iter()
+            .any(|op| matches!(op, CommandOp::DrawIndexed { .. })));
         assert!(ops.iter().any(|op| matches!(
             op,
             CommandOp::BeginPass { colors, .. }
@@ -7275,6 +10196,39 @@ mod tests {
             "the source-frame scheduler must clear the shared named target once, then preserve the prior producer output",
         );
         assert!(ops.iter().any(|op| matches!(op, CommandOp::CopyTexture(_))));
+        let mut batched_ops = Vec::new();
+        WorldLodSourcePassResources::append_opaque_batch(
+            &opaque_target,
+            &[(source_draw, pack_set), (source_draw, pack_set)],
+            crate::render::vulkanic::commands::ClearColor {
+                r: 0.1,
+                g: 0.2,
+                b: 0.3,
+                a: 1.0,
+            },
+            false,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::ShaderRead,
+            None,
+            &mut batched_ops,
+        )
+        .unwrap();
+        depth.append_opaque_depth_snapshot(&mut batched_ops);
+        assert_eq!(
+            1,
+            batched_ops
+                .iter()
+                .filter(|op| matches!(op, CommandOp::BeginPass { .. }))
+                .count(),
+            "compatible opaque DH segments must share one attachment pass"
+        );
+        assert_eq!(
+            2,
+            batched_ops
+                .iter()
+                .filter(|op| matches!(op, CommandOp::DrawIndexed { .. }))
+                .count()
+        );
         source_color_transaction
             .record_external_outputs(&[TerrainSourceResourceRole::ShaderPackColor(
                 "primary".to_string(),
@@ -7429,10 +10383,9 @@ mod tests {
             op,
             CommandOp::BeginPass { colors, .. } if colors.is_empty()
         )));
-        assert!(
-            !ops.iter()
-                .any(|op| matches!(op, CommandOp::Draw { .. } | CommandOp::DrawIndexed { .. }))
-        );
+        assert!(!ops
+            .iter()
+            .any(|op| matches!(op, CommandOp::Draw { .. } | CommandOp::DrawIndexed { .. })));
         gal.submit(SubmissionBatch {
             label: "world-lod-source.empty-depth-initial".to_string(),
             command_lists: vec![CommandList::from(CommandListDesc {
@@ -7446,18 +10399,14 @@ mod tests {
             .active_semantic_resources(identity)
             .unwrap()
             .expect("the confirmed empty snapshot must remain available to a later source frame");
-        assert!(
-            active_resources
-                .availability()
-                .resource_for(TerrainSourceResourceRole::DistantHorizonsOpaqueDepth)
-                .is_some()
-        );
-        assert!(
-            active_resources
-                .availability()
-                .resource_for(TerrainSourceResourceRole::DistantHorizonsDepthBeforeTranslucency)
-                .is_some()
-        );
+        assert!(active_resources
+            .availability()
+            .resource_for(TerrainSourceResourceRole::DistantHorizonsOpaqueDepth)
+            .is_some());
+        assert!(active_resources
+            .availability()
+            .resource_for(TerrainSourceResourceRole::DistantHorizonsDepthBeforeTranslucency)
+            .is_some());
 
         let (reused, reuse_usage, recreated) = cache
             .stage_for_empty_depth_snapshot(&mut gal, identity)

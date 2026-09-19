@@ -282,9 +282,7 @@ const MATERIALS: &[SemanticMaterial] = &[
 /// composition; neither is ordinary translucency.
 pub(crate) fn blend_override(material_key: u32) -> Option<BlendMode> {
     match material_key {
-        WORLD_MATERIAL_ID_SKY_STARS | WORLD_MATERIAL_ID_CELESTIAL => {
-            Some(BlendMode::Overlay)
-        }
+        WORLD_MATERIAL_ID_SKY_STARS | WORLD_MATERIAL_ID_CELESTIAL => Some(BlendMode::Overlay),
         WORLD_MATERIAL_ID_ENERGY_SWIRL => Some(BlendMode::Additive),
         WORLD_MATERIAL_ID_MODEL_CRUMBLING => Some(BlendMode::Crumbling),
         _ => None,
@@ -639,9 +637,12 @@ pub(crate) fn cutout_threshold(material_key: u32) -> f32 {
 }
 
 pub(crate) fn per_face_lighting(material_key: u32) -> bool {
-    matches!(material_key, WORLD_MATERIAL_ID_PER_FACE_MODEL_CUTOUT_TEXTURED
-        | WORLD_MATERIAL_ID_PER_FACE_TRANSLUCENT_CUTOUT_TEXTURED
-        | WORLD_MATERIAL_ID_MODEL_TRANSLUCENT_EMISSIVE)
+    matches!(
+        material_key,
+        WORLD_MATERIAL_ID_PER_FACE_MODEL_CUTOUT_TEXTURED
+            | WORLD_MATERIAL_ID_PER_FACE_TRANSLUCENT_CUTOUT_TEXTURED
+            | WORLD_MATERIAL_ID_MODEL_TRANSLUCENT_EMISSIVE
+    )
 }
 
 pub(crate) fn fullbright_without_cardinal_lighting(material_key: u32) -> bool {

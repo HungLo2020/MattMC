@@ -57,7 +57,11 @@ impl OpenGlBackend {
         let context = OpenGlContext::new(label)?;
         let objects = OpenGlObjects::new(context.gl().clone());
         Ok(Self {
-            lowerer: Mutex::new(OpenGlLowerer::new(context.gl().clone(), context.provoking_vertex, context.clip_control)),
+            lowerer: Mutex::new(OpenGlLowerer::new(
+                context.gl().clone(),
+                context.provoking_vertex,
+                context.clip_control,
+            )),
             context,
             objects,
             presentation: None,
@@ -75,7 +79,11 @@ impl OpenGlBackend {
         let context = OpenGlContext::from_existing_context(desc)?;
         let objects = OpenGlObjects::new(context.gl().clone());
         Ok(Self {
-            lowerer: Mutex::new(OpenGlLowerer::new(context.gl().clone(), context.provoking_vertex, context.clip_control)),
+            lowerer: Mutex::new(OpenGlLowerer::new(
+                context.gl().clone(),
+                context.provoking_vertex,
+                context.clip_control,
+            )),
             context,
             objects,
             presentation: Some(OpenGlPresentationState {

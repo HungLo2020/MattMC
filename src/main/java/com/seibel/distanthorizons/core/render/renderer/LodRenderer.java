@@ -171,6 +171,15 @@ public class LodRenderer
 			DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("route-policy-not-rust-vulkan", 0, 0, 0);
 			return false;
 		}
+		// Capture-only diagnostic: skip DH's render-list traversal to test whether
+		// preflight itself changes vanilla Sodium terrain readiness. This is gated
+		// to graphics-audit runs and cannot affect normal route selection.
+		if (Boolean.parseBoolean(System.getenv().getOrDefault("MATTMC_RUST_DH_SKIP_PREFLIGHT", "false"))
+			&& Boolean.parseBoolean(System.getenv().getOrDefault("MATTMC_GRAPHICS_AUDIT", "false")))
+		{
+			DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected("audit-skipped-preflight", 0, 0, 0);
+			return false;
+		}
 			String unsupportedFeature = unsupportedRustWholeFrameFeature();
 		if (unsupportedFeature != null)
 		{
@@ -207,11 +216,9 @@ public class LodRenderer
 		try
 		{
 			// Quadtree readiness tracks copied CPU columns so DH does not continue
-			// requesting the same work.  Visibility, however, is restricted to
-			// acknowledged Rust assets. Advance one bounded explicit transaction
-			// before building that visible list to make progress without admitting
-			// an unacknowledged column or a Java draw.
-			net.vulkanic.gui.RustGalFrameCoordinator.flushPendingWorldLodAssetsForSemanticPreflight();
+			// requesting the same work. Visibility is established by the traversal
+			// below before any upload is selected; publishing here would spend the
+			// bounded Rust upload budget on arbitrary background columns.
 			buffers.buildRenderList(renderParams);
 			List<Long> semanticColumns = buffers.getSemanticColumnRenderPositions();
 			if (semanticColumns.isEmpty())
@@ -244,6 +251,18 @@ public class LodRenderer
 						: "no-visible-supported-segments",
 					opaqueSegments, transparentSegments, waterSegments
 				);
+				return false;
+			}
+			// Java DH's generic-object renderer cannot run once Rust owns the
+			// presenter: it would try to bind Java buffers and issue a second
+			// backend draw. Copy its primitive box semantics before route
+			// admission so custom objects, beacons, and DH generic cloud groups
+			// remain part of the selected frame.
+			if (renderParams.genericRenderer != null
+				&& !renderParams.genericRenderer.collectRustSemantic(renderParams))
+			{
+				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected(
+					"unsupported-dh-generic-object-semantics", opaqueSegments, transparentSegments, waterSegments);
 				return false;
 			}
 			/*
@@ -281,6 +300,10 @@ public class LodRenderer
 		 * admission rule: DebugRenderer traverses the real registry and copies
 		 * bounded box edges into the Rust-owned semantic line stream.
 		 */
+		// The legacy SSAO hook is intentionally fenced while Rust owns the
+		// presenter. The semantic frame now carries the explicit SSAO contract;
+		// Rust consumes it in the DH compositor, so this feature no longer needs
+		// to reject the route or open a Java framebuffer.
 		return null;
 	}
 

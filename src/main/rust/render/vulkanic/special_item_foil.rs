@@ -22,11 +22,20 @@ pub(super) struct SpecialFoilProjection {
 impl SpecialFoilProjection {
     /// Native GUI layout owns both the raster pose and its normal basis. No
     /// Java offscreen transform or inverse projection is needed for flat items.
-    pub(super) fn from_native_gui_model(model_pose: [f32;16]) -> GalResult<Self> {
-        let inverse = inverse3([model_pose[0],model_pose[1],model_pose[2],
-            model_pose[4],model_pose[5],model_pose[6],model_pose[8],model_pose[9],model_pose[10]])?;
-        let normal_pose = std::array::from_fn(|index| inverse[(index % 3)*3 + index/3]);
-        Self::new(model_pose,normal_pose,FoilDisplayContext::Gui)
+    pub(super) fn from_native_gui_model(model_pose: [f32; 16]) -> GalResult<Self> {
+        let inverse = inverse3([
+            model_pose[0],
+            model_pose[1],
+            model_pose[2],
+            model_pose[4],
+            model_pose[5],
+            model_pose[6],
+            model_pose[8],
+            model_pose[9],
+            model_pose[10],
+        ])?;
+        let normal_pose = std::array::from_fn(|index| inverse[(index % 3) * 3 + index / 3]);
+        Self::new(model_pose, normal_pose, FoilDisplayContext::Gui)
     }
     pub(super) fn new(
         model_pose: [f32; 16],

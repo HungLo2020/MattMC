@@ -380,7 +380,10 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 			LodBufferContainer previousContainer = this.bufferContainer;
 			
 			// upload complete
-			this.bufferContainer = buffer.buffersUploaded ? buffer : null;
+			// The Rust whole-frame route owns no Java VBO, but its immutable CPU
+			// semantic publication still has the same DH section lifetime. Keep the
+			// container so close/reload retires that publication exactly once.
+			this.bufferContainer = buffer.renderDataReady() ? buffer : null;
 			this.getAndBuildRenderDataFuture = null;
 			
 			if (previousContainer != null)
@@ -401,9 +404,15 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	
 	public boolean canRender()
 	{
-		return this.bufferContainer != null
-			|| (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
-				&& net.vulkanic.world.DistantHorizonsSemanticCollector.hasColumn(this.pos));
+		if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild())
+		{
+			// The retained container owns lifecycle only. If bounded collector
+			// pressure evicted its semantic generation, report the section missing
+			// so DH rebuilds it; the real visible-candidate set then protects the
+			// replacement from byte-LRU eviction.
+			return net.vulkanic.world.DistantHorizonsSemanticCollector.hasColumn(this.pos);
+		}
+		return this.bufferContainer != null;
 	}
 	
 	public boolean getRenderingEnabled() { return this.renderingEnabled; }

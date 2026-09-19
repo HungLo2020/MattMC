@@ -369,6 +369,7 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
             world_mesh_dynamic_offset_count: profile.world_mesh_dynamic_offset_count,
             gui_mesh_prepare_nanos: profile.gui_mesh_prepare_nanos,
             gui_mesh_lower_nanos: profile.gui_mesh_lower_nanos,
+            gpu_distant_horizons_opaque_nanos: profile.gpu_distant_horizons_opaque_nanos,
         }
     }
 }
@@ -531,7 +532,12 @@ pub(crate) fn input_bytes_for_submission(batch: &FfiSubmissionBatchAbi) -> u64 {
 
 pub(crate) fn input_bytes_for_gui_frame(request: &FfiGuiFrameSubmitRequest) -> u64 {
     (size_of::<FfiGuiFrameSubmitRequest>() as u64)
-        .saturating_add(request.tiled_quads.count.saturating_mul(size_of::<FfiGuiTiledQuadRequest>() as u64))
+        .saturating_add(
+            request
+                .tiled_quads
+                .count
+                .saturating_mul(size_of::<FfiGuiTiledQuadRequest>() as u64),
+        )
         .saturating_add(
             request
                 .sprites
@@ -548,9 +554,24 @@ pub(crate) fn input_bytes_for_gui_frame(request: &FfiGuiFrameSubmitRequest) -> u
 
 pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) -> u64 {
     (size_of::<FfiWholeFrameSubmitRequest>() as u64)
-        .saturating_add(request.world_particle_quads.count.saturating_mul(size_of::<FfiWorldParticleQuadRequest>() as u64))
-        .saturating_add(request.world_experience_orbs.count.saturating_mul(size_of::<FfiWorldExperienceOrbInstanceRecord>() as u64))
-        .saturating_add(request.gui_tiled_quads.count.saturating_mul(size_of::<FfiGuiTiledQuadRequest>() as u64))
+        .saturating_add(
+            request
+                .world_particle_quads
+                .count
+                .saturating_mul(size_of::<FfiWorldParticleQuadRequest>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_experience_orbs
+                .count
+                .saturating_mul(size_of::<FfiWorldExperienceOrbInstanceRecord>() as u64),
+        )
+        .saturating_add(
+            request
+                .gui_tiled_quads
+                .count
+                .saturating_mul(size_of::<FfiGuiTiledQuadRequest>() as u64),
+        )
         .saturating_add(
             request
                 .world_segments
@@ -628,6 +649,12 @@ pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) 
                 .world_first_person_mesh_instances
                 .count
                 .saturating_mul(size_of::<FfiWorldMeshInstanceRecord>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_distant_horizons_generic_boxes
+                .count
+                .saturating_mul(size_of::<FfiWorldDistantHorizonsGenericBoxRecord>() as u64),
         )
         .saturating_add(request.post_effect_id.len)
 }
@@ -764,7 +791,12 @@ pub(crate) fn input_bytes_for_world_mesh_asset_update(
     .unwrap_or(0);
     (size_of::<FfiWorldMeshAssetUpdateRequest>() as u64)
         .saturating_add(mesh_headers)
-        .saturating_add(request.experience_orbs.count.saturating_mul(size_of::<FfiWorldExperienceOrbAssetRecord>() as u64))
+        .saturating_add(
+            request
+                .experience_orbs
+                .count
+                .saturating_mul(size_of::<FfiWorldExperienceOrbAssetRecord>() as u64),
+        )
         .saturating_add(texture_headers)
         .saturating_add(sorted_index_headers)
         .saturating_add(retirement_headers)
@@ -1246,6 +1278,7 @@ pub(crate) fn blend_mode(raw: u32) -> GalResult<BlendMode> {
         10 => Ok(BlendMode::TerrainTranslucent),
         11 => Ok(BlendMode::AlphaPreserveAlpha),
         12 => Ok(BlendMode::Crumbling),
+        13 => Ok(BlendMode::AlphaSource),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown blend mode {raw}"),

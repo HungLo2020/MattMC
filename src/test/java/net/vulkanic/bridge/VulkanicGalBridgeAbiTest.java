@@ -37,6 +37,42 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VulkanicGalBridgeAbiTest {
 	@Test
+	void distantHorizonsTintPackingPreservesJavaRgbChannelOrder() {
+		assertEquals((0x4f << 3) | (0xa1 << 11) | (0x3c << 19),
+			VulkanicGalBridge.packWorldLodTint(0xff4fa13c));
+	}
+
+	@Test
+	void settledDistantHorizonsInstancesReuseExactCopiedStaging() throws Exception {
+		try (var bridge = VulkanicGalBridge.create("rust-vulkan")) {
+			var pack = VulkanicGalBridge.class.getDeclaredMethod(
+				"encodeWorldLodInstances", List.class);
+			pack.setAccessible(true);
+			var first = List.of(
+				new VulkanicGalBridge.WorldLodColumnInstanceRecord(17L, 3L, 1, 2, 4),
+				new VulkanicGalBridge.WorldLodColumnInstanceRecord(23L, 3L, 3, 0, 5));
+			MemorySegment initial = (MemorySegment) pack.invoke(bridge, first);
+			MemorySegment settled = (MemorySegment) pack.invoke(bridge, List.copyOf(first));
+			assertEquals(initial.address(), settled.address(), "settled DH lists should reuse the native slice");
+			MemorySegment item = VulkanicGalBridge.Abi.item(
+				initial, VulkanicGalBridge.Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD, 1);
+			assertEquals(23L, VulkanicGalBridge.Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.getLong(item, 4));
+
+			var changed = List.of(
+				new VulkanicGalBridge.WorldLodColumnInstanceRecord(17L, 3L, 1, 2, 4),
+				new VulkanicGalBridge.WorldLodColumnInstanceRecord(23L, 4L, 3, 0, 5));
+			MemorySegment updated = (MemorySegment) pack.invoke(bridge, changed);
+			assertEquals(initial.address(), updated.address(), "generation changes should reuse bounded capacity");
+			MemorySegment updatedItem = VulkanicGalBridge.Abi.item(
+				updated, VulkanicGalBridge.Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD, 1);
+			assertEquals(4L, VulkanicGalBridge.Struct.WORLD_LOD_COLUMN_INSTANCE_RECORD.getLong(updatedItem, 5));
+
+			MemorySegment empty = (MemorySegment) pack.invoke(bridge, List.of());
+			assertTrue(empty.equals(MemorySegment.NULL));
+		}
+	}
+
+	@Test
 	void itemRasterPreservesBoundedAuthoredUvSubrectangles() {
 		var quad = new VulkanicGalBridge.GuiAffineQuadRecord(1,7L,
 			0,0,16,0,0,16,0,0.25F,0,0.75F,0.5F,-1,100,100)
@@ -1363,6 +1399,17 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(deterministicCapture.contains("decision.rustSelected() && decision.rustQueued() && !decision.javaDrawn()"));
 		assertTrue(deterministicCapture.contains("RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()"),
 			"settled capture readiness must use the Rust whole-frame terrain queue when Java Sodium identities are absent");
+		assertTrue(deterministicCapture.contains("distantHorizonsGenerationSettledForCapture()"),
+			"DH capture readiness must include the real asynchronous generation queue");
+		assertTrue(deterministicCapture.contains("progress.remainingChunks() != 0")
+			&& deterministicCapture.contains("progress.inProgressTasks() != 0"),
+			"a stable visible DH payload must not pass while generation work remains");
+		String lodRequestModule = Files.readString(Path.of(
+			"src/main/java/com/seibel/distanthorizons/core/level/LodRequestModule.java"));
+		assertTrue(lodRequestModule.contains("getWorldGenerationProgress()")
+			&& lodRequestModule.contains("getRetrievalEstimatedRemainingChunkCount()")
+			&& lodRequestModule.contains("getQueuedChunkCount()"),
+			"the readiness snapshot must observe DH's queue rather than renderer or GPU state");
 		assertTrue(deterministicCapture.contains("server.execute(() -> applySourceEntityIsolationOnServer(server, dimension))"));
 		assertTrue(deterministicCapture.contains("private static void applySourceEntityIsolationOnServer"));
 		int captureAfterRender = deterministicCapture.indexOf("public static void afterRender(Minecraft minecraft)");
@@ -2021,6 +2068,7 @@ class VulkanicGalBridgeAbiTest {
 		String rustMeshFrontend = Files.readString(Path.of("src/main/rust/render/vulkanic/world_primitive_frontend.rs"));
 		String rustOpenGlLowering = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/opengl/lowering.rs"));
 		String rustVulkanResources = Files.readString(Path.of("src/main/rust/render/vulkanic/backends/vulkan/resources.rs"));
+		String normalizedVulkanResources = rustVulkanResources.replaceAll("\\s+", " ");
 
 		assertTrue(worldRenderer.contains("return dot >= 0.0F ? WORLD_WINDING_CCW : WORLD_WINDING_CW;"),
 			"baked quads whose emitted indices face the baked Direction must be tagged as CCW for GAL culling");
@@ -2028,12 +2076,13 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(rustMeshFrontend.contains("(WORLD_CULL_BACK, WORLD_WINDING_CW) => Ok(CullMode::Front)"));
 		assertTrue(rustOpenGlLowering.contains(".front_face(if front_face_ccw { glow::CCW } else { glow::CW })"),
 			"OpenGL backend must apply the explicit GAL front-face convention instead of inheriting Java/Iris state");
-		assertTrue(rustVulkanResources.contains(".front_face(front_face(match (desc.front_face, desc.raster_y_direction)"),
+		assertTrue(rustVulkanResources.contains(".front_face(front_face(")
+			&& rustVulkanResources.contains("match (desc.front_face, desc.raster_y_direction)"),
 			"Vulkan must lower the explicit logical front face together with the declared raster direction");
 		assertTrue(rustVulkanResources.contains("(face, RasterYDirection::Up) => face"),
 			"the existing Up convention must preserve logical winding");
-		assertTrue(rustVulkanResources.contains("(crate::render::vulkanic::resources::FrontFace::Clockwise, RasterYDirection::Down) => crate::render::vulkanic::resources::FrontFace::CounterClockwise"));
-		assertTrue(rustVulkanResources.contains("(crate::render::vulkanic::resources::FrontFace::CounterClockwise, RasterYDirection::Down) => crate::render::vulkanic::resources::FrontFace::Clockwise"),
+		assertTrue(normalizedVulkanResources.contains("( crate::render::vulkanic::resources::FrontFace::Clockwise, RasterYDirection::Down, ) => crate::render::vulkanic::resources::FrontFace::CounterClockwise"));
+		assertTrue(normalizedVulkanResources.contains("( crate::render::vulkanic::resources::FrontFace::CounterClockwise, RasterYDirection::Down, ) => crate::render::vulkanic::resources::FrontFace::Clockwise"),
 			"Down must compensate both windings so logical culling does not change");
 		assertTrue(rustVulkanResources.contains("FrontFace::CounterClockwise"));
 		assertTrue(rustVulkanResources.contains("vk::FrontFace::COUNTER_CLOCKWISE"));
@@ -4145,7 +4194,7 @@ class VulkanicGalBridgeAbiTest {
 		String experienceBar = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/contextualbar/ExperienceBarRenderer.java"));
 		String bossOverlay = Files.readString(Path.of("src/main/java/net/minecraft/client/gui/components/BossHealthOverlay.java"));
 
-		assertEquals(63, VulkanicGalBridge.ABI_VERSION);
+		assertEquals(65, VulkanicGalBridge.ABI_VERSION);
 		assertTrue(bridge.contains("GUI_TILED_QUAD_REQUEST(101)"));
 		assertTrue(bridge.contains("Struct.WHOLE_FRAME_SUBMIT.setFloat(request, 34, guiProjection.width())"));
 		assertTrue(bridge.contains("Struct.GUI_FRAME_SUBMIT.setFloat(request, 10, guiProjection.width())"));
@@ -6017,9 +6066,9 @@ class VulkanicGalBridgeAbiTest {
 		assertTrue(fogRenderer.contains("collectFogParametersForRust"));
 		assertTrue(fogRenderer.contains("computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true, true)"),
 			"the normal Java fog renderer must retain its legacy-Iris side effect explicitly");
-		assertTrue(fogRenderer.contains("false, false);")
-			&& fogRenderer.contains("legacy Iris/DH sentinel range"),
-			"Rust fog extraction must omit both Java/Iris and unavailable-DH cancellation side effects");
+		assertTrue(fogRenderer.contains("false, true);")
+			&& fogRenderer.contains("DH's vanilla-fog setting is gameplay policy"),
+			"Rust fog extraction must copy DH's vanilla-fog policy without publishing Java/Iris state");
 		assertTrue(fogRenderer.contains("if (updateLegacyIrisFogState && camera.getFluidInCamera()"),
 			"the copied whole-frame fog record must not update Iris runtime state");
 		assertTrue(vulkanicApi.contains("RustGalVulkanWholeFrameMode.enabled()"));

@@ -73,7 +73,30 @@ class RustGalWholeFrameTerrainSourceTest {
 		int evict = source.indexOf("this.evictOutsideWindow(cameraSection, horizontalRadius);", reset);
 
 		assertTrue(radius >= 0 && reset > radius && clear > reset && evict > clear,
-				"a changed effective render distance must discard the old semantic visibility domain before admission");
+			"a changed effective render distance must discard the old semantic visibility domain before admission");
+	}
+
+	@Test
+	void captureViewDistanceActionsRevokeThePreviousSettledReceipt() throws Exception {
+		String source = Files.readString(ROOT.resolve(
+			"src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
+		int decrease = source.indexOf("case \"view-distance-decrease\"");
+		int increase = source.indexOf("case \"view-distance-increase\"");
+		assertTrue(decrease >= 0 && increase > decrease,
+			"the capture harness must keep both view-distance lifecycle actions explicit");
+		assertViewDistanceActionInvalidatesSettledReceipt(source, decrease, increase);
+		assertViewDistanceActionInvalidatesSettledReceipt(source, increase, source.length());
+	}
+
+	private static void assertViewDistanceActionInvalidatesSettledReceipt(String source, int actionStart, int actionEnd) {
+		int renderDistance = source.indexOf("minecraft.options.renderDistance().set", actionStart);
+		int simulationDistance = source.indexOf("minecraft.options.simulationDistance().set", renderDistance);
+		int invalidation = source.indexOf("invalidateRustWholeFrameTerrainReadiness();", simulationDistance);
+		assertTrue(renderDistance >= actionStart
+			&& simulationDistance > renderDistance
+			&& invalidation > simulationDistance
+			&& invalidation < actionEnd,
+			"a view-distance action must invalidate the pre-change settled receipt");
 	}
 
 	@Test
@@ -217,11 +240,12 @@ class RustGalWholeFrameTerrainSourceTest {
 	@Test
 	void visibilityReceiptSeparatesPortalAndNearbySelectionsWithoutChangingTheRenderDomain() throws Exception {
 		String source = Files.readString(ROOT.resolve("src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
-		int portalSnapshot = source.indexOf("var portalVisibleKeys = new LongOpenHashSet(visibleKeys);");
+		int portalSnapshot = source.indexOf("var portalVisibleKeys = new LongOpenHashSet();");
+		int portalCopy = source.indexOf("portalVisibleKeys.addAll(visibleKeys);", portalSnapshot);
 		int nearby = source.indexOf("this.addNearbyVisibleSections(visibleSections, visibleKeys);", portalSnapshot);
 		int receipt = source.indexOf("portalVisibleKeys::contains", nearby);
-		assertTrue(portalSnapshot >= 0 && nearby > portalSnapshot && receipt > nearby,
-			"the diagnostic receipt must classify the already-selected portal domain before nearby enlargement");
+		assertTrue(portalSnapshot >= 0 && portalCopy > portalSnapshot && nearby > portalCopy && receipt > nearby,
+			"the diagnostic receipt must snapshot the selected portal domain before nearby enlargement");
 	}
 
 	@Test
@@ -265,8 +289,10 @@ class RustGalWholeFrameTerrainSourceTest {
 		String level = Files.readString(ROOT.resolve("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
 		String source = Files.readString(ROOT.resolve("src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
 
-		assertTrue(shell.contains("wholeFrameFog") && shell.contains("useFogOcclusion"),
-			"the semantic frame must pass vanilla fog and the matching user culling option to terrain admission");
+		assertTrue(shell.contains("wholeFrameFog") && shell.contains("enqueueRustGalStaticTerrainForWholeFrame"),
+			"the semantic frame must pass vanilla fog to the Rust terrain admission boundary");
+		assertTrue(shell.contains("wholeFrameFog,") && shell.contains("\n\t\t\t\t\tfalse"),
+			"Rust Vulkan terrain admission must keep fog occlusion disabled");
 		assertTrue(level.contains("RustGalWholeFrameTerrainSource.terrainSelectionDistance("),
 			"the LevelRenderer boundary must reduce the fog record to explicit terrain-selection distance");
 		assertTrue(source.contains("this.terrainSelectionDistance")

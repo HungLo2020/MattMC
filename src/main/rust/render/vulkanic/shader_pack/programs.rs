@@ -554,8 +554,8 @@ vec4 vulkanic_source_dh_position() {
             // perturb the horizontal quad edges only.
             + vec3(vulkanic_source_dh_vertex.micro_x, 0.0, vulkanic_source_dh_vertex.micro_z)
             // The column origin already carries the dimension's minimum Y.
-            // Keep worldYOffset as source-pack context, never as a second
-            // geometry translation.
+            // This source shader consumes the copied DH model offset without
+            // adding worldYOffset a second time.
             + vulkanic_source_dh_model_offset_and_reserved.xyz,
         1.0
     );
@@ -3966,6 +3966,28 @@ pub fn minimal_distant_horizons_lod_opaque_program() -> TerrainMaterialProgram {
     }
 }
 
+/// Forward-color variant used when vanilla Rust Vulkan presents DH without a
+/// shader-pack G-buffer. It keeps the same copied semantic inputs and depth
+/// policy while writing the single acquired color attachment.
+pub fn minimal_distant_horizons_lod_forward_opaque_program() -> TerrainMaterialProgram {
+    TerrainMaterialProgram {
+        identity: ProgramIdentity::new("vulkanic:builtin/distant_horizons_lod_forward_opaque_v1"),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: "minimal-distant-horizons-lod-forward-opaque.vertex".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX.to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: "minimal-distant-horizons-lod-forward-opaque.fragment".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT.to_string(),
+            entry_point: "main".to_string(),
+        },
+        required_resources: Vec::new(),
+    }
+}
+
 /// Rust-owned alpha-blended material program for Distant Horizons' non-water
 /// transparent CPU LOD streams. It shares the copied DH vertex and semantic
 /// lightmap contract with the opaque program, but writes one composited color
@@ -4010,6 +4032,31 @@ pub fn minimal_distant_horizons_lod_exact_atlas_opaque_program() -> TerrainMater
             stage: ShaderStageKind::Fragment,
             label: "minimal-distant-horizons-lod-exact-atlas-opaque.fragment".to_string(),
             source: MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_FRAGMENT.to_string(),
+            entry_point: "main".to_string(),
+        },
+        required_resources: Vec::new(),
+    }
+}
+
+/// Forward-color exact-atlas DH material program used by the vanilla Rust
+/// Vulkan one-target presentation graph. It shares the immutable atlas
+/// geometry and descriptor layout with the deferred variant while emitting
+/// only the target's color attachment.
+pub fn minimal_distant_horizons_lod_exact_atlas_forward_opaque_program() -> TerrainMaterialProgram {
+    TerrainMaterialProgram {
+        identity: ProgramIdentity::new(
+            "vulkanic:builtin/distant_horizons_lod_exact_atlas_forward_opaque_v1",
+        ),
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: "minimal-distant-horizons-lod-exact-atlas-forward-opaque.vertex".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX.to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: "minimal-distant-horizons-lod-exact-atlas-forward-opaque.fragment".to_string(),
+            source: MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_FORWARD_OPAQUE_FRAGMENT.to_string(),
             entry_point: "main".to_string(),
         },
         required_resources: Vec::new(),
@@ -4197,10 +4244,16 @@ pub fn minimal_direct_model_translucent_cutout_program() -> TerrainMaterialProgr
     program.identity = ProgramIdentity::new("vulkanic:builtin/direct_model_translucent_cutout_v1");
     program.vertex.label = "direct-model-translucent-cutout.vertex".to_string();
     program.vertex.source = program.vertex.source.replacen(
-        "#version 450\n", "#version 450\n#define VULKANIC_MODEL_TRANSLUCENT_CUTOUT 1\n", 1);
+        "#version 450\n",
+        "#version 450\n#define VULKANIC_MODEL_TRANSLUCENT_CUTOUT 1\n",
+        1,
+    );
     program.fragment.label = "direct-model-translucent-cutout.fragment".to_string();
     program.fragment.source = program.fragment.source.replacen(
-        "#version 450\n", "#version 450\n#define VULKANIC_MODEL_TRANSLUCENT_CUTOUT 1\n", 1);
+        "#version 450\n",
+        "#version 450\n#define VULKANIC_MODEL_TRANSLUCENT_CUTOUT 1\n",
+        1,
+    );
     program
 }
 
@@ -4214,7 +4267,10 @@ pub fn minimal_direct_standard_item_foil_program() -> TerrainMaterialProgram {
     program.identity = ProgramIdentity::new(STANDARD_ITEM_FOIL_PROGRAM_ID);
     program.vertex.label = "direct-standard-item-foil.vertex".to_string();
     program.vertex.source = MINIMAL_TERRAIN_MATERIAL_VERTEX.replacen(
-        "#version 450\n", "#version 450\n#define VULKANIC_STANDARD_ITEM_FOIL 1\n", 1);
+        "#version 450\n",
+        "#version 450\n#define VULKANIC_STANDARD_ITEM_FOIL 1\n",
+        1,
+    );
     program.fragment.label = "direct-standard-item-foil.fragment".to_string();
     program.fragment.source = STANDARD_ITEM_FOIL_FRAGMENT.to_string();
     program
@@ -4227,7 +4283,9 @@ pub fn minimal_direct_world_decal_foil_program() -> TerrainMaterialProgram {
     program.identity = ProgramIdentity::new(WORLD_DECAL_FOIL_PROGRAM_ID);
     program.vertex.label = "direct-world-decal-foil.vertex".to_string();
     program.vertex.source = program.vertex.source.replace(
-        "    ItemFoilInstance foil_instances[];", "    uint foil_words[];");
+        "    ItemFoilInstance foil_instances[];",
+        "    uint foil_words[];",
+    );
     let helpers = r#"
 vec4 decal_foil_vec4(uint offset) {
     return uintBitsToFloat(uvec4(foil_words[offset], foil_words[offset+1u],
@@ -4382,8 +4440,14 @@ pub fn minimal_direct_terrain_material_program(
 }
 
 fn minimal_direct_terrain_fragment_source(kind: TerrainMaterialProgramKind) -> String {
-    let source = terrain_fragment_source_with_pass_define(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT, kind);
-    terrain_fragment_coordinate_probe(source, std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE").ok().as_deref())
+    let source =
+        terrain_fragment_source_with_pass_define(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT, kind);
+    terrain_fragment_coordinate_probe(
+        source,
+        std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
+            .ok()
+            .as_deref(),
+    )
 }
 
 /// Opt-in diagnostic output, never a normal material or parity result. The
@@ -4392,7 +4456,11 @@ fn minimal_direct_terrain_fragment_source(kind: TerrainMaterialProgramKind) -> S
 /// the copied CPU source. No backend objects or GPU state enter the callsite.
 pub(crate) fn terrain_fragment_coordinate_probe(source: String, probe: Option<&str>) -> String {
     if probe == Some("clip-bits") {
-        let source = source.replacen("#version 450\n", "#version 450\nlayout(location = 14) flat in vec4 diagnostic_clip;\n", 1);
+        let source = source.replacen(
+            "#version 450\n",
+            "#version 450\nlayout(location = 14) flat in vec4 diagnostic_clip;\n",
+            1,
+        );
         let anchor = "vec2 sample_uv = v_animation_region.xy + v_uv * v_animation_region.zw;";
         return source.replacen(anchor, &format!("{anchor}\n\
             // DIAGNOSTIC ONLY: complete clip float bits across eight adjacent pixels.\n\
@@ -4433,7 +4501,11 @@ fn terrain_fragment_source_with_pass_define(
     kind: TerrainMaterialProgramKind,
 ) -> String {
     let discard_define = terrain_fragment_discard_define(kind);
-    source.replacen("#version 450\n", &format!("#version 450\n{discard_define}"), 1)
+    source.replacen(
+        "#version 450\n",
+        &format!("#version 450\n{discard_define}"),
+        1,
+    )
 }
 
 fn terrain_fragment_discard_define(kind: TerrainMaterialProgramKind) -> &'static str {
@@ -4452,18 +4524,32 @@ fn terrain_fragment_discard_define(kind: TerrainMaterialProgramKind) -> &'static
 /// texel-centre coordinate.
 /// Both direct and deferred builtin terrain use this exact vertex contract.
 fn minimal_direct_terrain_vertex_source() -> String {
-    terrain_vertex_coordinate_probe(MINIMAL_TERRAIN_MATERIAL_VERTEX.to_string(),
-        std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE").ok().as_deref())
+    terrain_vertex_coordinate_probe(
+        MINIMAL_TERRAIN_MATERIAL_VERTEX.to_string(),
+        std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
+            .ok()
+            .as_deref(),
+    )
 }
 
 /// Observe the actual vertex expression before backend clip-depth conversion.
 /// Flat transport carries the pipeline's explicitly selected vertex unchanged;
 /// it does not replace position arithmetic or inspect backend resources.
 pub(crate) fn terrain_vertex_coordinate_probe(source: String, probe: Option<&str>) -> String {
-    if probe != Some("clip-bits") { return source; }
-    source.replacen("#version 450\n", "#version 450\nlayout(location = 14) flat out vec4 diagnostic_clip;\n", 1)
-        .replacen("vec4 clip = projection * view * world;",
-            "vec4 clip = projection * view * world;\n    diagnostic_clip = clip;", 1)
+    if probe != Some("clip-bits") {
+        return source;
+    }
+    source
+        .replacen(
+            "#version 450\n",
+            "#version 450\nlayout(location = 14) flat out vec4 diagnostic_clip;\n",
+            1,
+        )
+        .replacen(
+            "vec4 clip = projection * view * world;",
+            "vec4 clip = projection * view * world;\n    diagnostic_clip = clip;",
+            1,
+        )
 }
 
 pub fn minimal_g_buffer_composite_program() -> CompositeProgram {
@@ -4678,7 +4764,9 @@ void main() {
     v_uv = (material_semantics & 1u) != 0u
         ? vertex.shader_data.xy
         : vec2(vertex.position_uv.w, vertex.color_uv.w);
-    v_uv = v_uv * instance.texture_transform.xy + instance.texture_transform.zw;
+    v_uv = v_uv * instance.texture_transform.xy
+        + vec2(instance.texture_transform.z,
+            (uint(instance.material.w) & 1024u) != 0u ? 0.0 : instance.texture_transform.w);
     // Frozen OpenGL Sodium preserves UV2 byte coordinates (including smooth
     // lighting's fractional levels) and divides by 256 in chunk_vertex.glsl.
     // The copied vertex lane is byte/240; rescale without nibble truncation.
@@ -4687,6 +4775,7 @@ void main() {
     // interpolation between neighbouring lightmap texels. Do not replace it
     // with texel-centre coordinates: that is a different lighting contract.
     // The resulting lit vertex color is then interpolated across the triangle.
+    vec2 light_coordinates = vertex.extra_data.xy;
 #ifdef VULKANIC_STANDARD_ITEM_FOIL
     ItemFoilInstance foil = foil_instances[gl_InstanceIndex];
     vec3 original_uv = vec3(vertex.position_uv.w, vertex.color_uv.w, 1.0);
@@ -4696,7 +4785,13 @@ void main() {
     v_color = instance.color;
     v_back_color = v_color;
 #else
-    vec2 light_uv = clamp(vertex.extra_data.xy, vec2(0.0), vec2(255.0 / 240.0)) * (15.0 / 16.0);
+    if ((material_semantics & 1024u) != 0u) {
+        uint packed_instance_light = floatBitsToUint(instance.texture_transform.w);
+        light_coordinates = vec2(
+            float(packed_instance_light & 0xffu) / 240.0,
+            float((packed_instance_light >> 16u) & 0xffu) / 240.0);
+    }
+    vec2 light_uv = clamp(light_coordinates, vec2(0.0), vec2(255.0 / 240.0)) * (15.0 / 16.0);
     // Frozen's standalone baked blocks use core/terrain.vsh, not Sodium's
     // chunk shader. Its half-texel offset samples the lightmap texel centres.
     if ((material_semantics & 8u) != 0u) {
@@ -4706,7 +4801,7 @@ void main() {
         ? vec4(1.0)
         : texture(sampler2D(LightmapTexture, LightmapSampler), light_uv);
     if ((material_semantics & 16u) != 0u) {
-        ivec2 light_texel = ivec2(round(clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0)) * 15.0));
+        ivec2 light_texel = ivec2(round(clamp(light_coordinates, vec2(0.0), vec2(1.0)) * 15.0));
         light_color = texelFetch(sampler2D(LightmapTexture, LightmapSampler), light_texel, 0);
     }
     v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color
@@ -4751,7 +4846,7 @@ void main() {
     v_animation_next_region = instance.animation_next_region;
     v_overlay_color = instance.overlay_color;
     v_normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));
-    v_light = clamp(vertex.extra_data.xy, vec2(0.0), vec2(1.0));
+    v_light = clamp(light_coordinates, vec2(0.0), vec2(1.0));
     v_terrain_material_bits = uint(clamp(vertex.extra_data.w, 0.0, 255.0));
     // Frozen's terrain vertex shader resolves both fog distances from
     // `Position + ModelOffset` before applying ModelViewMat.  `world` is this
@@ -4815,7 +4910,9 @@ void main() {
     v_outline_color = instance.color;
     v_outline_uv = (uint(instance.material.w) & 1u) != 0u
         ? vertex.shader_data.xy : vec2(vertex.position_uv.w, vertex.color_uv.w);
-    v_outline_uv = v_outline_uv * instance.texture_transform.xy + instance.texture_transform.zw;
+    v_outline_uv = v_outline_uv * instance.texture_transform.xy
+        + vec2(instance.texture_transform.z,
+            (uint(instance.material.w) & 1024u) != 0u ? 0.0 : instance.texture_transform.w);
 }
 "#;
 
@@ -4856,6 +4953,540 @@ void main() {
 #ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y
     v_uv.y = 1.0 - v_uv.y;
 #endif
+}
+"#;
+
+/// Rust-owned fullscreen vertex contract for the ordinary Distant Horizons
+/// color/depth composition boundary.  This is deliberately independent of
+/// shader-pack fullscreen stages: the direct vanilla DH route owns both
+/// sampled images and its fog semantic block.
+pub const MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_VERTEX: &str = r#"#version 450
+const vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+layout(location = 0) out vec2 v_uv;
+void main() {
+    vec2 position = positions[gl_VertexIndex];
+    gl_Position = vec4(position, 0.0, 1.0);
+    v_uv = position * 0.5 + 0.5;
+#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y
+    v_uv.y = 1.0 - v_uv.y;
+#endif
+}
+"#;
+
+/// Rust-owned DH SSAO producer. It mirrors Frozen's spiral depth test while
+/// consuming only the private Rust DH depth attachment and copied frame
+/// matrices/configuration. The result is an owned sampled AO image used by
+/// the direct compositor; no Java framebuffer or GL texture is involved.
+pub const MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT: &str = r#"#version 450
+layout(set = 0, binding = 0) uniform texture2D DhDepthTexture;
+layout(set = 0, binding = 1) uniform sampler DhDepthSampler;
+layout(set = 0, binding = 2, std140) uniform DistantHorizonsSsao {
+    mat4 projection_matrix;
+    mat4 inverse_projection_matrix;
+    vec4 ssao_parameters0;
+    vec4 ssao_parameters1;
+};
+layout(location = 0) in vec2 v_uv;
+layout(location = 0) out vec4 out_color;
+
+const float EPSILON = 1.0e-6;
+const float GOLDEN_ANGLE = 2.39996323;
+const float PI = 3.1415926538;
+const float TAU = PI * 2.0;
+const vec3 MAGIC = vec3(0.06711056, 0.00583715, 52.9829189);
+
+vec3 unproject(vec4 value) {
+    return value.xyz / max(abs(value.w), 1.0e-6) * (value.w < 0.0 ? -1.0 : 1.0);
+}
+
+vec3 view_position(vec2 uv, float depth) {
+    vec2 reconstruction_uv = uv;
+#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y
+    reconstruction_uv.y = 1.0 - reconstruction_uv.y;
+#endif
+    vec4 value = inverse_projection_matrix * vec4(reconstruction_uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    return unproject(value);
+}
+
+vec2 project_uv(vec3 position) {
+    vec4 clip = projection_matrix * vec4(position, 1.0);
+    vec2 uv = clip.xy / max(abs(clip.w), 1.0e-6) * 0.5 + 0.5;
+#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y
+    uv.y = 1.0 - uv.y;
+#endif
+    return clamp(uv, vec2(0.0), vec2(1.0));
+}
+
+float interleaved_gradient_noise(vec2 pixel) {
+    float x = dot(pixel, MAGIC.xy);
+    return fract(MAGIC.z * fract(x));
+}
+
+void main() {
+    float enabled = ssao_parameters0.x;
+    float depth = textureLod(sampler2D(DhDepthTexture, DhDepthSampler), v_uv, 0.0).r;
+    if (enabled < 0.5 || depth >= 1.0 - EPSILON || ssao_parameters0.z <= 0.0) {
+        out_color = vec4(1.0);
+        return;
+    }
+    int sample_count = clamp(int(ssao_parameters0.y + 0.5), 1, 64);
+    float radius = ssao_parameters0.z;
+    float strength = max(ssao_parameters0.w, 0.0);
+    float min_light = clamp(ssao_parameters1.x, 0.0, 1.0);
+    float bias = max(ssao_parameters1.y, 0.0);
+    float fade_distance = max(ssao_parameters1.z, 0.0);
+    vec3 view_pos = view_position(v_uv, depth);
+    float distance_from_camera = length(view_pos);
+    if (fade_distance <= 0.0 || distance_from_camera >= fade_distance) {
+        out_color = vec4(1.0);
+        return;
+    }
+    vec3 view_normal = normalize(cross(dFdxFine(view_pos), dFdyFine(view_pos)));
+    float phase = interleaved_gradient_noise(gl_FragCoord.xy) * TAU;
+    float radius_step = radius / float(sample_count);
+    float current_radius = radius_step;
+    float occlusion = 0.0;
+    int valid_samples = 0;
+    for (int i = 0; i < 64; i++) {
+        if (i >= sample_count) break;
+        vec2 offset = vec2(sin(phase), cos(phase)) * current_radius;
+        phase += GOLDEN_ANGLE;
+        current_radius += radius_step;
+        vec3 sample_view_pos = view_pos + vec3(offset, -0.1);
+        vec2 sample_uv = project_uv(sample_view_pos);
+        float sample_depth = textureLod(sampler2D(DhDepthTexture, DhDepthSampler), sample_uv, 0.0).r;
+        if (sample_depth >= 1.0 - EPSILON) continue;
+        sample_view_pos = view_position(sample_uv, sample_depth);
+        vec3 difference = sample_view_pos - view_pos;
+        float sample_distance = length(difference);
+        if (sample_distance <= EPSILON) continue;
+        vec3 sample_normal = difference / sample_distance;
+        float sample_no_lighting = max(dot(view_normal, sample_normal) - bias, 0.0);
+        float attenuation = 1.0 - clamp(sample_distance / radius, 0.0, 1.0);
+        occlusion += sample_no_lighting * attenuation;
+        valid_samples++;
+    }
+    occlusion /= max(float(valid_samples), 1.0);
+    occlusion = smoothstep(0.0, max(strength, EPSILON), occlusion);
+    occlusion *= (1.0 - min_light);
+    occlusion *= clamp((fade_distance - distance_from_camera) / fade_distance, 0.0, 1.0);
+    out_color = vec4(vec3(1.0 - occlusion), 1.0);
+}
+"#;
+
+/// Applies the copied DH fog contract after the direct LOD color/depth pass.
+/// The depth image is reconstructed through the copied combined matrix rather
+/// than borrowing a Java framebuffer or relying on the main terrain depth.
+pub const MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT: &str = r#"#version 450
+layout(set = 0, binding = 0) uniform texture2D DhColorTexture;
+layout(set = 0, binding = 1) uniform sampler DhColorSampler;
+layout(set = 0, binding = 2) uniform texture2D DhDepthTexture;
+layout(set = 0, binding = 3) uniform sampler DhDepthSampler;
+layout(set = 0, binding = 4) uniform texture2D VanillaColorTexture;
+layout(set = 0, binding = 5) uniform sampler VanillaColorSampler;
+layout(set = 0, binding = 6) uniform texture2D VanillaDepthTexture;
+layout(set = 0, binding = 7) uniform sampler VanillaDepthSampler;
+layout(set = 0, binding = 9) uniform texture2D DhSsaoTexture;
+layout(set = 0, binding = 10) uniform sampler DhSsaoSampler;
+layout(set = 0, binding = 8, std140) uniform DistantHorizonsDirectFog {
+    mat4 combined_matrix;
+    mat4 inverse_combined_matrix;
+    mat4 inverse_vanilla_matrix;
+    vec4 camera_position;
+    vec4 fog_color_and_alpha;
+    vec4 fog_ranges;
+    vec4 dh_fog_parameters[5];
+    vec4 fade_parameters;
+    vec4 ssao_parameters0;
+    vec4 ssao_parameters1;
+};
+layout(location = 0) in vec2 v_uv;
+layout(location = 0) out vec4 out_color;
+
+float dh_fog_curve(float value, float start, float length, float minimum, float range, float density, float falloff) {
+    if (falloff < 0.5) {
+        return minimum + range * clamp((value - start) / max(length, 0.0001), 0.0, 1.0);
+    }
+    float x = max((value - start) / max(length, 0.0001), 0.0) * density;
+    float attenuation = falloff < 1.5 ? exp(-x) : exp(-x * x);
+    return minimum + range - range * attenuation;
+}
+
+float dh_fog_factor(vec3 world_position, vec3 camera_position, float absolute_camera_y) {
+    if (dh_fog_parameters[4].x < 0.5) return -1.0;
+    float lod_distance = max(dh_fog_parameters[1].y, 1.0);
+    float horizontal_distance = length((world_position - camera_position).xz);
+    float spherical_distance = distance(world_position, camera_position);
+    float active_distance = dh_fog_parameters[4].z > 0.5 ? spherical_distance : horizontal_distance;
+    float far = dh_fog_curve(
+        active_distance, dh_fog_parameters[0].x * lod_distance,
+        (dh_fog_parameters[0].y - dh_fog_parameters[0].x) * lod_distance,
+        dh_fog_parameters[0].z, dh_fog_parameters[0].w - dh_fog_parameters[0].z,
+        dh_fog_parameters[1].x, dh_fog_parameters[3].x);
+    float height = 0.0;
+    if (dh_fog_parameters[4].y > 0.5) {
+        float height_position = world_position.y;
+        float direction = dh_fog_parameters[3].w;
+        if (mod(direction, 2.0) < 0.5) {
+            // The inverse combined matrix returns view-space coordinates, but
+            // DH's height-base rule uses the absolute camera block Y. Keep
+            // those coordinate spaces separate: camera_position remains the
+            // view origin for horizontal/spherical distance, while the
+            // copied camera uniform supplies the source height reference.
+            height_position -= dh_fog_parameters[1].z - absolute_camera_y;
+        }
+        bool applies_up = mod(floor(direction / 2.0), 2.0) > 0.5;
+        bool applies_down = mod(floor(direction / 4.0), 2.0) > 0.5;
+        float vertical_distance = applies_up && applies_down
+            ? abs(height_position)
+            : (applies_down ? -height_position : height_position);
+        float vertical_scale = dh_fog_parameters[4].w > 0.0
+            ? dh_fog_parameters[4].w : (1.0 / 384.0);
+        vertical_distance *= vertical_scale;
+        height = dh_fog_curve(
+            vertical_distance, dh_fog_parameters[1].w, dh_fog_parameters[2].x - dh_fog_parameters[1].w,
+            dh_fog_parameters[2].y, dh_fog_parameters[2].z - dh_fog_parameters[2].y,
+            dh_fog_parameters[2].w, dh_fog_parameters[3].y);
+    }
+    int mode = int(dh_fog_parameters[3].z + 0.5);
+    if (mode == 0 || mode == 1) return clamp(far, 0.0, 1.0);
+    if (mode == 2) return clamp(max(far, height), 0.0, 1.0);
+    if (mode == 3) return clamp(far + height, 0.0, 1.0);
+    if (mode == 4) return clamp(far * height, 0.0, 1.0);
+    if (mode == 5) return clamp(1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 6) return clamp(far + max(far, height), 0.0, 1.0);
+    if (mode == 7) return clamp(far + far * height, 0.0, 1.0);
+    if (mode == 8) return clamp(far + 1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 9) return clamp(far * 0.5 + height * 0.5, 0.0, 1.0);
+    return clamp(far, 0.0, 1.0);
+}
+
+float dh_ssao_value(vec2 uv, float center_depth) {
+    if (ssao_parameters0.x < 0.5) return 1.0;
+    int radius = clamp(int(ssao_parameters1.w + 0.5), 0, 3);
+    if (radius == 0) {
+        return textureLod(sampler2D(DhSsaoTexture, DhSsaoSampler), uv, 0.0).r;
+    }
+    vec2 pixel_size = 1.0 / vec2(textureSize(sampler2D(DhSsaoTexture, DhSsaoSampler), 0));
+    float sigma = 1.6;
+    float accum = 0.0;
+    float total = 0.0;
+    for (int y = -3; y <= 3; y++) {
+        if (abs(y) > radius) continue;
+        for (int x = -3; x <= 3; x++) {
+            if (abs(x) > radius) continue;
+            vec2 sample_uv = uv + vec2(x, y) * pixel_size;
+            float spatial = exp(-float(x * x + y * y) / (2.0 * sigma * sigma));
+            float sample_depth = textureLod(sampler2D(DhDepthTexture, DhDepthSampler), sample_uv, 0.0).r;
+            float depth_weight = exp(-abs(sample_depth - center_depth) * 48.0);
+            float weight = spatial * depth_weight;
+            accum += weight * textureLod(sampler2D(DhSsaoTexture, DhSsaoSampler), sample_uv, 0.0).r;
+            total += weight;
+        }
+    }
+    return total > 1.0e-4 ? accum / total : 1.0;
+}
+
+void main() {
+    vec4 dh_color = texture(sampler2D(DhColorTexture, DhColorSampler), v_uv);
+    float depth = texture(sampler2D(DhDepthTexture, DhDepthSampler), v_uv).r;
+    // Frozen's DH fade shader uses an exact white color as its clear/unwritten
+    // sentinel.  Keep that distinction after replacing the sentinel with the
+    // vanilla snapshot: an uncovered sky pixel must not receive DH fog from
+    // the reconstructed far-plane depth.
+    bool dh_clear_color = all(equal(dh_color, vec4(1.0)));
+    // The private target is cleared transparent; its depth clear value is a
+    // backend detail and cannot be used as the coverage test.  Alpha is the
+    // semantic write marker for this color attachment.
+    bool dh_has_coverage = !dh_clear_color && dh_color.a > 0.0;
+    // Frozen runs SSAO after opaque DH and before the transparent/fog stages.
+    // The private color alpha is the copied pass coverage marker, so preserve
+    // translucent/water layers while applying AO to opaque DH pixels.
+    if (dh_has_coverage && dh_color.a >= 0.999 && ssao_parameters0.x >= 0.5) {
+        dh_color.rgb *= dh_ssao_value(v_uv, depth);
+    }
+    // The audit-only depth-test compositor writes the private DH depth into
+    // the normal Vulkan depth test. The pipeline leaves depth writes off, so
+    // a nearer vanilla fragment remains authoritative for later passes. A
+    // separate negative sentinel can invert the value for a capture-only
+    // projection/depth-convention probe; the production fog block never uses
+    // negative DH parameters.
+    float comparison_depth = depth;
+    if (dh_fog_parameters[4].z < -3.5 && dh_fog_parameters[4].z > -4.5) {
+        comparison_depth = 1.0 - depth;
+    }
+    gl_FragDepth = comparison_depth;
+    // Audit-only negative enable sentinel from the Rust-owned compositor
+    // boundary. It never occurs in the copied DH fog contract.
+    if (dh_fog_parameters[4].x < -0.5) {
+        out_color = vec4(depth, depth, depth, 1.0);
+        return;
+    }
+    // Audit-only sentinel: expose the private DH color attachment before
+    // fullscreen fog/depth reconstruction. This separates raster coverage
+    // from compositor UV or depth-coordinate errors and is never supplied by
+    // the production fog contract.
+    if (dh_fog_parameters[4].z < -2.5 && dh_fog_parameters[4].z > -3.5) {
+        out_color = dh_color;
+        return;
+    }
+    // Capture-only coverage probe for the ordinary no-fade route. The same
+    // sentinel is also understood by the later vanilla-fade shader, but a
+    // NONE fade policy never executes that pass. Resolve it here as a full
+    // red/black mask so the retained frame proves which pixels came from the
+    // private DH target even when vanilla terrain and DH fog are disabled.
+    // The opaque alpha deliberately lets the subsequent sparse apply replace
+    // every pixel for this diagnostic frame; production fog parameters never
+    // contain this negative vertical-scale sentinel.
+    if (dh_fog_parameters[4].w < -4.5 && dh_fog_parameters[4].w > -5.5) {
+        out_color = vec4(dh_has_coverage ? 1.0 : 0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+    if (depth >= 1.0 && dh_color.a <= 0.0) discard;
+    // The fullscreen vertex contract flips v_uv to address the Vulkan image
+    // row origin. Depth reconstruction must use the original clip-space Y,
+    // just as the deferred terrain fog path does, or the copied DH fog ramp
+    // is evaluated at the wrong view-space height and distance. The source
+    // FogShader receives the unflipped screen-quad coordinate, while this
+    // Rust-owned sampler receives the Vulkan-oriented coordinate.
+    vec2 reconstruction_uv = v_uv;
+#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y
+    reconstruction_uv.y = 1.0 - reconstruction_uv.y;
+#endif
+    vec4 clip = vec4(reconstruction_uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 world = inverse_combined_matrix * clip;
+    // Frozen's FogShader divides by the signed inverse-MVP w. Preserve that
+    // projective convention while still avoiding a zero divide for cleared or
+    // malformed depth samples; using abs(w) would mirror points behind the
+    // camera and change the copied fog distance contract.
+    float world_w = abs(world.w) > 0.000001
+        ? world.w
+        : (world.w < 0.0 ? -0.000001 : 0.000001);
+    world.xyz /= world_w;
+    // Audit-only reconstruction sentinel. Encode the copied source view-space
+    // position into RGB so a retained capture can distinguish an inverse
+    // matrix/depth convention error from a fog-curve error. Production fog
+    // never supplies a negative vertical-scale sentinel.
+    if (dh_fog_parameters[4].w < -0.5 && dh_fog_parameters[4].w > -1.5) {
+        vec3 encoded_position = clamp(world.xyz / 256.0 + vec3(0.5), 0.0, 1.0);
+        out_color = vec4(encoded_position, 1.0);
+        return;
+    }
+    // The low two bits carry Frozen's NONE/SINGLE/DOUBLE vanilla transition;
+    // bit 2 carries the independent DH far-clip fade policy. Both use the
+    // copied vanilla color snapshot, never the acquired frame target.
+    float fade_policy = fade_parameters.z;
+    float fade_mode = mod(fade_policy, 4.0);
+    bool far_clip_fade = fade_policy >= 4.0;
+    vec4 vanilla_color = vec4(0.0);
+    if (fade_mode >= 0.5 || far_clip_fade) {
+        vanilla_color = texture(sampler2D(VanillaColorTexture, VanillaColorSampler), v_uv);
+    }
+	// Capture-only source snapshots for separating transition input from fade
+	// distance. Normal copied DH fog parameters never use negative vertical
+	// scale values.
+	if (dh_fog_parameters[4].w < -2.5 && dh_fog_parameters[4].w > -3.5) {
+		out_color = vec4(vanilla_color.rgb, 1.0);
+		return;
+	}
+    if (far_clip_fade) {
+        // RenderUtil.getFarClipPlaneDistanceInBlocks() is
+        // (lodChunkDistance * 16 + regionWidth) * 2. The copied fog block
+        // carries the same lod block distance in lane [1].y.
+        float far_clip_distance = (dh_fog_parameters[1].y + 64.0) * 2.0;
+        float far_fade = smoothstep(
+            far_clip_distance * 0.9,
+            far_clip_distance * 0.5,
+            length(world.xzy));
+        // Frozen's DH fade shader mixes MC color with the private DH color
+        // before DH fog is applied. Recompute that ordering in the single
+        // Rust-owned compositor so the later fog operation sees the same
+        // source color.
+        if (!dh_has_coverage) {
+            dh_color = vanilla_color;
+        } else {
+            dh_color = mix(vanilla_color, dh_color, far_fade);
+        }
+    }
+    // Frozen does not invoke FogRenderer at all when enableDhFog is false.
+    // In particular, its translucent-alpha floor belongs to that skipped fog
+    // pass; applying the floor after dh_fog_factor reports "disabled" washes
+    // water toward the fog colour even though the source renderer leaves the
+    // private DH colour unchanged. Far-clip fade and SSAO are independent and
+    // have already been applied above, so preserve their result here.
+    if (dh_fog_parameters[4].x < 0.5) {
+        out_color = dh_color;
+        return;
+    }
+    // DH's inverse model-view-projection returns view-space coordinates. The
+    // source fog shader measures from the view origin, while the copied frame
+    // still carries the absolute camera for the height-fog base-height rule.
+    // Do not translate this position into absolute world space.
+    float dh_fog = dh_has_coverage
+        ? dh_fog_factor(world.xyz, vec3(0.0), camera_position.y)
+        : 0.0;
+    float fog = dh_fog >= 0.0 ? dh_fog : 0.0;
+    // Frozen's FogShader preserves partial DH coverage when it raises fog
+    // alpha: FogApplyShader then blends that fog over the DH color before the
+    // final replace pass. Match that semantic rule here so water and other
+    // translucent LODs cannot become less fogged merely because their fog
+    // curve is below their copied source alpha.
+    if (dh_color.a > 0.0 && dh_color.a < 1.0) {
+        fog = max(fog, dh_color.a);
+    }
+    // Audit-only sentinel: expose the copied DH fog factor as grayscale so a
+    // capture can distinguish a saturated fog ramp from missing private
+    // geometry or an incorrect color/depth attachment. The sentinel is
+    // supplied only by the Rust-owned diagnostic boundary below.
+	if (dh_fog_parameters[4].w < -1.5 && dh_fog_parameters[4].w > -2.5) {
+        out_color = vec4(fog, fog, fog, 1.0);
+        return;
+    }
+    // FogApplyShader source-alpha blends the fog texture over DH's color
+    // attachment. Its separate alpha factors are ONE and ONE_MINUS_SRC_ALPHA,
+    // so fog also raises partial/depth-only DH coverage. Preserve that result
+    // in the resolved image consumed by apply and later vanilla-fade passes.
+    float resolved_alpha = fog + dh_color.a * (1.0 - fog);
+    out_color = vec4(mix(dh_color.rgb, fog_color_and_alpha.rgb, fog), resolved_alpha);
+}
+"#;
+
+/// Sparse equivalent of Frozen's DhApplyShader. The resolved DH color is
+/// copied into the main target before vanilla opaque terrain, while uncovered
+/// pixels leave the existing sky/background untouched. Frozen's fullscreen
+/// apply disables depth testing and does not write the sampled DH depth.
+pub const MINIMAL_DISTANT_HORIZONS_DIRECT_APPLY_FRAGMENT: &str = r#"#version 450
+layout(set = 0, binding = 0) uniform texture2D DhResolvedColorTexture;
+layout(set = 0, binding = 1) uniform sampler DhResolvedColorSampler;
+layout(set = 0, binding = 2) uniform texture2D DhDepthTexture;
+layout(set = 0, binding = 3) uniform sampler DhDepthSampler;
+layout(location = 0) in vec2 v_uv;
+layout(location = 0) out vec4 out_color;
+void main() {
+    vec4 dh_color = texture(sampler2D(DhResolvedColorTexture, DhResolvedColorSampler), v_uv);
+    float dh_depth = texture(sampler2D(DhDepthTexture, DhDepthSampler), v_uv).r;
+    if (dh_depth >= 1.0 && dh_color.a <= 0.0) discard;
+    out_color = dh_color;
+}
+"#;
+
+/// Equivalent of Frozen's VanillaFadeShader. `VanillaColorTexture` is a
+/// snapshot taken at the particular opaque or transparent boundary, while
+/// `DhResolvedColorTexture` is the immutable DH result produced before
+/// vanilla terrain began.
+pub const MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT: &str = r#"#version 450
+layout(set = 0, binding = 0) uniform texture2D DhResolvedColorTexture;
+layout(set = 0, binding = 1) uniform sampler DhResolvedColorSampler;
+layout(set = 0, binding = 2) uniform texture2D DhDepthTexture;
+layout(set = 0, binding = 3) uniform sampler DhDepthSampler;
+layout(set = 0, binding = 4) uniform texture2D VanillaColorTexture;
+layout(set = 0, binding = 5) uniform sampler VanillaColorSampler;
+layout(set = 0, binding = 6) uniform texture2D VanillaDepthTexture;
+layout(set = 0, binding = 7) uniform sampler VanillaDepthSampler;
+layout(set = 0, binding = 8, std140) uniform DistantHorizonsDirectFade {
+    mat4 combined_matrix;
+    mat4 inverse_combined_matrix;
+    mat4 inverse_vanilla_matrix;
+    vec4 camera_position;
+    vec4 fog_color_and_alpha;
+    vec4 fog_ranges;
+    vec4 dh_fog_parameters[5];
+    vec4 fade_parameters;
+    vec4 ssao_parameters0;
+    vec4 ssao_parameters1;
+};
+layout(location = 0) in vec2 v_uv;
+layout(location = 0) out vec4 out_color;
+
+vec3 reconstruct_position(mat4 inverse_matrix, vec2 uv, float depth) {
+    vec2 reconstruction_uv = uv;
+#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y
+    reconstruction_uv.y = 1.0 - reconstruction_uv.y;
+#endif
+    vec4 clip = vec4(reconstruction_uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 position = inverse_matrix * clip;
+    float position_w = abs(position.w) > 0.000001
+        ? position.w : (position.w < 0.0 ? -0.000001 : 0.000001);
+    return position.xyz / position_w;
+}
+
+void main() {
+    vec4 combined_color = texture(sampler2D(VanillaColorTexture, VanillaColorSampler), v_uv);
+    vec4 dh_color = texture(sampler2D(DhResolvedColorTexture, DhResolvedColorSampler), v_uv);
+    float dh_depth = texture(sampler2D(DhDepthTexture, DhDepthSampler), v_uv).r;
+    bool dh_has_coverage = dh_depth < 1.0 || dh_color.a > 0.0;
+
+    // Audit-only source snapshot. Production fog never supplies this negative
+    // vertical-scale sentinel.
+    if (dh_fog_parameters[4].w < -2.5 && dh_fog_parameters[4].w > -3.5) {
+        out_color = vec4(combined_color.rgb, 1.0);
+        return;
+    }
+
+    // Capture-only coverage probe: red is resolved DH coverage, green is
+    // vanilla depth coverage at this fade boundary, and blue preserves the
+    // sampled vanilla depth. Production fog parameters never use this
+    // negative vertical-scale sentinel.
+    if (dh_fog_parameters[4].w < -4.5 && dh_fog_parameters[4].w > -5.5) {
+        float probe_vanilla_depth = texture(
+            sampler2D(VanillaDepthTexture, VanillaDepthSampler), v_uv
+        ).r;
+        out_color = vec4(
+            dh_has_coverage ? 1.0 : 0.0,
+            probe_vanilla_depth < 1.0 ? 1.0 : 0.0,
+            probe_vanilla_depth,
+            1.0
+        );
+        return;
+    }
+
+    vec3 dh_position = reconstruct_position(inverse_combined_matrix, v_uv, dh_depth);
+    // Capture-only classification for the high-altitude cloud guard. Red is
+    // the guard predicate, green is resolved DH coverage, and blue is vanilla
+    // depth coverage at this exact fade boundary. Production fog semantics
+    // never contain this negative vertical-scale sentinel.
+    if (dh_fog_parameters[4].w < -5.5 && dh_fog_parameters[4].w > -6.5) {
+        float probe_vanilla_depth = texture(
+            sampler2D(VanillaDepthTexture, VanillaDepthSampler), v_uv
+        ).r;
+        out_color = vec4(
+            dh_position.y > fade_parameters.w ? 1.0 : 0.0,
+            dh_has_coverage ? 1.0 : 0.0,
+            probe_vanilla_depth < 1.0 ? 1.0 : 0.0,
+            1.0
+        );
+        return;
+    }
+    // Frozen's LOD-only debug mode invokes this shader at both vanilla fade
+    // boundaries and immediately replaces the combined Minecraft image with
+    // DH's private color texture. The CPU contract reserves fade mode 3 for
+    // that source behavior; normal NONE/SINGLE/DOUBLE modes are 0/1/2.
+    if (fade_parameters.z > 2.5 && fade_parameters.z < 3.5) {
+        out_color = dh_color;
+        return;
+    }
+    // Frozen only substitutes Minecraft color for an unwritten DH pixel in
+    // the ordinary fade modes. LOD-only returns the private DH target exactly,
+    // including its fog-colored, zero-alpha clear pixels.
+    if (!dh_has_coverage) dh_color = combined_color;
+    if (dh_position.y > fade_parameters.w) {
+        out_color = vec4(combined_color.rgb, 0.0);
+        return;
+    }
+    float vanilla_depth = texture(sampler2D(VanillaDepthTexture, VanillaDepthSampler), v_uv).r;
+    if (vanilla_depth >= 1.0) {
+        out_color = vec4(combined_color.rgb, 0.0);
+        return;
+    }
+    vec3 vanilla_position = reconstruct_position(inverse_vanilla_matrix, v_uv, vanilla_depth);
+    float vanilla_distance = length(vanilla_position.xzy);
+    float fade = smoothstep(fade_parameters.x, fade_parameters.y, vanilla_distance);
+    if (dh_fog_parameters[4].w < -3.5) {
+        out_color = vec4(fade, fade, fade, 1.0);
+        return;
+    }
+    out_color = mix(combined_color, dh_color, fade);
+    out_color.a = 1.0;
 }
 "#;
 
@@ -4909,20 +5540,15 @@ void main() {
 }
 "#;
 
-/// Rust-owned DH vertex contract. The semantic record is exactly the private
-/// 32-byte expansion produced by `world_primitive_frontend::lod`, not DH's
-/// legacy GL vertex format. `LightmapTexture` and `LightmapSampler` are a
-/// separately bound Rust-owned 16x16 semantic vanilla lightmap.
+/// Rust-owned DH vertex contract. The private 16-byte record retains signed
+/// i16 position, signed micro-offset states, color, light, material, and face;
+/// it is not DH's legacy GL vertex format. `LightmapTexture` and
+/// `LightmapSampler` are a separately bound Rust-owned 16x16 lightmap.
 pub const MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX: &str = r#"#version 450
+layout(set = 1, binding = 0) uniform texture2D LightmapTexture;
+layout(set = 1, binding = 1) uniform sampler LightmapSampler;
 struct DistantHorizonsLodVertex {
-    float local_x;
-    float local_y;
-    float local_z;
-    float micro_x;
-    float micro_y;
-    float micro_z;
-    uint color_rgba;
-    uint light_material_normal;
+    uvec4 data;
 };
 layout(set = 0, binding = 0, std430) readonly buffer DistantHorizonsLodVertices {
     DistantHorizonsLodVertex vertices[];
@@ -4933,12 +5559,19 @@ layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
     vec4 model_offset_and_reserved;
     vec4 clip_micro_noise_earth;
     uvec4 flags_and_noise;
+    vec4 fog_color_and_alpha;
+    vec4 fog_ranges;
+    vec4 dh_fog_parameters[5];
 };
 layout(location = 0) out vec4 v_color;
 layout(location = 1) flat out uvec2 v_light;
 layout(location = 2) flat out uint v_material;
 layout(location = 3) flat out uint v_normal;
 layout(location = 4) out vec3 v_world_position;
+layout(location = 5) out vec3 v_source_position;
+layout(location = 6) out float v_dh_fade;
+layout(location = 7) out vec3 v_light_color;
+layout(location = 8) out vec3 v_unlit_color;
 
 vec3 dh_normal(uint normal) {
     if (normal == 0u) return vec3(0.0, -1.0, 0.0);
@@ -4951,40 +5584,85 @@ vec3 dh_normal(uint normal) {
 
 void main() {
     DistantHorizonsLodVertex vertex = vertices[gl_VertexIndex];
-    // DH's compact stream stores a third micro field, but its terrain
-    // transformer applies edge perturbation in the horizontal plane only.
-    // Treating micro_y as height moves otherwise flat water geometry away
-    // from the source terrain surface.
-    vec3 local = vec3(vertex.local_x, vertex.local_y, vertex.local_z)
-        + vec3(vertex.micro_x, 0.0, vertex.micro_z);
-    vec3 world = local + column_origin_and_world_y.xyz;
+    int local_x = int(vertex.data.x & 0xffffu);
+    int local_y = int(vertex.data.x >> 16u);
+    int local_z = int(vertex.data.y & 0xffffu);
+    if (local_x >= 32768) local_x -= 65536;
+    if (local_y >= 32768) local_y -= 65536;
+    if (local_z >= 32768) local_z -= 65536;
+    uint micro = (vertex.data.y >> 16u) & 0xffu;
+    float micro_x = (micro & 2u) != 0u ? -clip_micro_noise_earth.y
+        : ((micro & 1u) != 0u ? clip_micro_noise_earth.y : 0.0);
+    float micro_z = (micro & 32u) != 0u ? -clip_micro_noise_earth.y
+        : ((micro & 16u) != 0u ? clip_micro_noise_earth.y : 0.0);
+    vec3 base_local = vec3(local_x, local_y, local_z);
+    vec3 local = base_local + vec3(micro_x, 0.0, micro_z);
+    // Frozen's standard.vert keeps vertexWorldPos at the raw packed position;
+    // the micro offset affects clip placement only.
+    vec3 world = base_local + column_origin_and_world_y.xyz;
     vec4 clip = combined_matrix * vec4(
         local + model_offset_and_reserved.xyz,
         1.0
     );
 #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
-    clip.z = clip.z * 0.5 + clip.w * 0.5;
+    if ((flags_and_noise.w & 2u) == 0u) {
+        clip.z = clip.z * 0.5 + clip.w * 0.5;
+    }
 #endif
+    // Capture-only probe for the legacy DH Vulkan backend convention. The
+    // private Rust-owned route normally relies on its explicit negative
+    // viewport and leaves Y untouched; this sentinel isolates a possible
+    // source-side clip inversion without changing source/shader-pack paths.
+    if ((flags_and_noise.w & 1u) != 0u) clip.y = -clip.y;
     gl_Position = clip;
     v_color = vec4(
-        float(vertex.color_rgba & 0xffu),
-        float((vertex.color_rgba >> 8u) & 0xffu),
-        float((vertex.color_rgba >> 16u) & 0xffu),
-        float((vertex.color_rgba >> 24u) & 0xffu)
+        float(vertex.data.z & 0xffu),
+        float((vertex.data.z >> 8u) & 0xffu),
+        float((vertex.data.z >> 16u) & 0xffu),
+        float((vertex.data.z >> 24u) & 0xffu)
     ) / 255.0;
+    // Frozen's DH standard.vert samples the lightmap per vertex and
+    // multiplies that result into vertexColor before raster interpolation.
+    // Keep the light result smooth instead of sampling one flat provoking
+    // vertex in the fragment stage.
+    float light_sky = float(vertex.data.w & 0x0fu);
+    vec2 light_uv = (vec2(
+        float((vertex.data.w >> 4u) & 0x0fu),
+        light_sky
+    ) + vec2(0.5)) / 16.0;
+    v_unlit_color = v_color.rgb;
+    v_light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
+    v_color.rgb *= v_light_color;
     v_light = uvec2(
-        vertex.light_material_normal & 0xffu,
-        (vertex.light_material_normal >> 8u) & 0xffu
+        vertex.data.w & 0xffu,
+        (vertex.data.w >> 8u) & 0xffu
     );
-    v_material = (vertex.light_material_normal >> 16u) & 0xffu;
-    v_normal = (vertex.light_material_normal >> 24u) & 0xffu;
+    v_material = (vertex.data.w >> 16u) & 0xffu;
+    v_normal = (vertex.data.w >> 24u) & 0xffu;
     v_world_position = world;
+    // Frozen's noise shader receives the raw column-local position (`vPos`),
+    // not an absolute world position reconstructed by subtracting a large
+    // column origin in the fragment stage. Preserve that source precision
+    // and derivative domain explicitly; absolute world coordinates remain
+    // available separately for fog, fade, and depth semantics.
+    v_source_position = base_local;
+    vec3 dh_camera = column_origin_and_world_y.xyz - model_offset_and_reserved.xyz;
+    float dh_distance = distance(world, dh_camera);
+    float dh_clip = clip_micro_noise_earth.x;
+    // Match DH's terrain shader: discard/dither LOD fragments until the
+    // vanilla-to-DH transition begins, then fade them in over 1.5x the
+    // copied near-clip distance.  The collector already includes DH's
+    // 16-block separation margin in this value.
+    v_dh_fade = ((flags_and_noise.w & 8u) != 0u || dh_clip <= 0.0)
+        ? 1.0 : smoothstep(dh_clip, dh_clip * 1.5, dh_distance);
 }
 "#;
 
 /// Private Rust vertex stream for the exact-atlas DH subset. Its 56-byte
 /// layout is owned by the world frontend and is not DH's legacy GL format.
 pub const MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX: &str = r#"#version 450
+layout(set = 1, binding = 2) uniform texture2D LightmapTexture;
+layout(set = 1, binding = 3) uniform sampler LightmapSampler;
 struct DistantHorizonsLodExactAtlasVertex {
     float local_x;
     float local_y;
@@ -5010,6 +5688,9 @@ layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
     vec4 model_offset_and_reserved;
     vec4 clip_micro_noise_earth;
     uvec4 flags_and_noise;
+    vec4 fog_color_and_alpha;
+    vec4 fog_ranges;
+    vec4 dh_fog_parameters[5];
 };
 layout(location = 0) out vec2 v_tile_uv;
 layout(location = 1) flat out vec4 v_atlas_rect;
@@ -5017,22 +5698,32 @@ layout(location = 2) out vec4 v_color;
 layout(location = 3) flat out uvec2 v_light;
 layout(location = 4) flat out uint v_normal;
 layout(location = 5) out vec3 v_world_position;
-layout(location = 6) flat out uint v_material_flags;
+layout(location = 6) out vec3 v_source_position;
+layout(location = 7) flat out uint v_material_flags;
+layout(location = 8) out float v_dh_fade;
+layout(location = 9) out vec3 v_light_color;
 
 void main() {
     DistantHorizonsLodExactAtlasVertex vertex = vertices[gl_VertexIndex];
-    // Keep the exact-atlas stream on the same DH X/Z-only micro-offset
-    // contract as the reduced-color stream.
-    vec3 local = vec3(vertex.local_x, vertex.local_y, vertex.local_z)
-        + vec3(vertex.micro_x, 0.0, vertex.micro_z);
-    vec3 world = local + column_origin_and_world_y.xyz;
+    // Keep the exact-atlas stream on the same DH micro-offset contract as
+    // the reduced-color stream. DH's standard vertex shader applies the
+    // packed offset to horizontal X/Z only; the Y bits remain serialized
+    // source data but do not move the rasterized vertex.
+    vec3 base_local = vec3(vertex.local_x, vertex.local_y, vertex.local_z);
+    vec3 local = base_local + vec3(vertex.micro_x, 0.0, vertex.micro_z);
+    // Match Frozen's raw vertexWorldPos; micro offsets affect clip placement,
+    // not the distance/fog/noise coordinate passed to the fragment stage.
+    vec3 world = base_local + column_origin_and_world_y.xyz;
     vec4 clip = combined_matrix * vec4(
         local + model_offset_and_reserved.xyz,
         1.0
     );
 #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
-    clip.z = clip.z * 0.5 + clip.w * 0.5;
+    if ((flags_and_noise.w & 2u) == 0u) {
+        clip.z = clip.z * 0.5 + clip.w * 0.5;
+    }
 #endif
+    if ((flags_and_noise.w & 1u) != 0u) clip.y = -clip.y;
     gl_Position = clip;
     v_tile_uv = vec2(vertex.tile_u, vertex.tile_v);
     v_atlas_rect = vec4(vertex.atlas_u0, vertex.atlas_v0, vertex.atlas_u1, vertex.atlas_v1);
@@ -5042,6 +5733,16 @@ void main() {
         float((vertex.color_rgba >> 16u) & 0xffu),
         float((vertex.color_rgba >> 24u) & 0xffu)
     ) / 255.0;
+    // Exact-atlas DH keeps the copied vertex tint separate from the
+    // lightmap result because the fragment stage uses that tint to modulate
+    // the resolved sprite. The lightmap is still sampled per vertex, as in
+    // Frozen's standard.vert.
+    float light_sky = float(vertex.light_normal_pad & 0x0fu);
+    vec2 light_uv = (vec2(
+        float((vertex.light_normal_pad >> 4u) & 0x0fu),
+        light_sky
+    ) + vec2(0.5)) / 16.0;
+    v_light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
     v_light = uvec2(
         vertex.light_normal_pad & 0xffu,
         (vertex.light_normal_pad >> 8u) & 0xffu
@@ -5049,21 +5750,47 @@ void main() {
     v_normal = (vertex.light_normal_pad >> 16u) & 0xffu;
     v_material_flags = (vertex.light_normal_pad >> 24u) & 0xffu;
     v_world_position = world;
+    v_source_position = base_local;
+    vec3 dh_camera = column_origin_and_world_y.xyz - model_offset_and_reserved.xyz;
+    float dh_distance = distance(world, dh_camera);
+    float dh_clip = clip_micro_noise_earth.x;
+    v_dh_fade = ((flags_and_noise.w & 8u) != 0u || dh_clip <= 0.0)
+        ? 1.0 : smoothstep(dh_clip, dh_clip * 1.5, dh_distance);
 }
 "#;
 
 pub const MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_FRAGMENT: &str = r#"#version 450
-layout(set = 1, binding = 0) uniform texture2D LightmapTexture;
-layout(set = 1, binding = 1) uniform sampler LightmapSampler;
 layout(location = 0) in vec4 v_color;
 layout(location = 1) flat in uvec2 v_light;
 layout(location = 2) flat in uint v_material;
 layout(location = 3) flat in uint v_normal;
 layout(location = 4) in vec3 v_world_position;
+layout(location = 5) in vec3 v_source_position;
+layout(location = 6) in float v_dh_fade;
+layout(location = 7) in vec3 v_light_color;
+layout(location = 8) in vec3 v_unlit_color;
+layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
+    mat4 combined_matrix;
+    vec4 column_origin_and_world_y;
+    vec4 model_offset_and_reserved;
+    vec4 clip_micro_noise_earth;
+    uvec4 flags_and_noise;
+    vec4 fog_color_and_alpha;
+    vec4 fog_ranges;
+    vec4 dh_fog_parameters[5];
+};
 layout(location = 0) out vec4 out_terrain_lit_color;
 layout(location = 1) out vec4 out_terrain_view_space_normal;
 layout(location = 2) out vec4 out_terrain_material_auxiliary;
 layout(location = 3) out vec4 out_world_position;
+
+float dh_fragment_fade() {
+    if ((flags_and_noise.w & 8u) != 0u) return 1.0;
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    float dh_clip = clip_micro_noise_earth.x;
+    return dh_clip > 0.0 ? smoothstep(dh_clip, dh_clip * 1.5, distance_to_camera) : 1.0;
+}
 
 vec3 dh_normal(uint normal) {
     if (normal == 0u) return vec3(0.0, -1.0, 0.0);
@@ -5074,23 +5801,334 @@ vec3 dh_normal(uint normal) {
     return vec3(1.0, 0.0, 0.0);
 }
 
+float dh_fog_curve(float value, float start, float length, float minimum, float range, float density, float falloff) {
+    if (falloff < 0.5) {
+        return minimum + range * clamp((value - start) / max(length, 0.0001), 0.0, 1.0);
+    }
+    float x = max((value - start) / max(length, 0.0001), 0.0) * density;
+    float attenuation = falloff < 1.5 ? exp(-x) : exp(-x * x);
+    return minimum + range - range * attenuation;
+}
+
+float dh_fog_factor(vec3 world_position) {
+    // DH far/height fog is normalized to the configured LOD draw distance.
+    // A disabled DH fog block deliberately leaves vanilla DH fragments
+    // unfogged. Frozen applies DH fog in its separate FogRenderer pass, and
+    // that pass is skipped when enableDhFog is false.
+    if (dh_fog_parameters[4].x < 0.5) return -1.0;
+    vec3 camera_position = column_origin_and_world_y.xyz - model_offset_and_reserved.xyz;
+    float lod_distance = max(dh_fog_parameters[1].y, 1.0);
+    float horizontal_distance = length((world_position - camera_position).xz);
+    float spherical_distance = distance(world_position, camera_position);
+    float active_distance = dh_fog_parameters[4].z > 0.5 ? spherical_distance : horizontal_distance;
+    float far = dh_fog_curve(
+        active_distance, dh_fog_parameters[0].x * lod_distance,
+        (dh_fog_parameters[0].y - dh_fog_parameters[0].x) * lod_distance,
+        dh_fog_parameters[0].z, dh_fog_parameters[0].w - dh_fog_parameters[0].z,
+        dh_fog_parameters[1].x, dh_fog_parameters[3].x);
+    float height = 0.0;
+    if (dh_fog_parameters[4].y > 0.5) {
+        float camera_y = camera_position.y;
+        float height_position = world_position.y;
+        float direction = dh_fog_parameters[3].w;
+        if (mod(direction, 2.0) < 0.5) {
+            height_position -= dh_fog_parameters[1].z - camera_y;
+        }
+        bool applies_up = mod(floor(direction / 2.0), 2.0) > 0.5;
+        bool applies_down = mod(floor(direction / 4.0), 2.0) > 0.5;
+        float vertical_distance = applies_up && applies_down
+            ? abs(height_position)
+            : (applies_down ? -height_position : height_position);
+        float vertical_scale = dh_fog_parameters[4].w > 0.0
+            ? dh_fog_parameters[4].w : (1.0 / 384.0);
+        vertical_distance *= vertical_scale;
+        height = dh_fog_curve(
+            vertical_distance, dh_fog_parameters[1].w, dh_fog_parameters[2].x - dh_fog_parameters[1].w,
+            dh_fog_parameters[2].y, dh_fog_parameters[2].z - dh_fog_parameters[2].y,
+            dh_fog_parameters[2].w, dh_fog_parameters[3].y);
+    }
+    int mode = int(dh_fog_parameters[3].z + 0.5);
+    if (mode == 0 || mode == 1) return clamp(far, 0.0, 1.0);
+    if (mode == 2) return clamp(max(far, height), 0.0, 1.0);
+    if (mode == 3) return clamp(far + height, 0.0, 1.0);
+    if (mode == 4) return clamp(far * height, 0.0, 1.0);
+    if (mode == 5) return clamp(1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 6) return clamp(far + max(far, height), 0.0, 1.0);
+    if (mode == 7) return clamp(far + far * height, 0.0, 1.0);
+    if (mode == 8) return clamp(far + 1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 9) return clamp(far * 0.5 + height * 0.5, 0.0, 1.0);
+    return clamp(far, 0.0, 1.0);
+}
+
+
+float dh_rand(float co) { return fract(sin(co * 91.3458) * 47453.5453); }
+float dh_rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
+float dh_rand(vec3 co) { return dh_rand(co.xy + dh_rand(co.z)); }
+
+vec3 dh_apply_noise(vec3 color, float alpha, float view_distance, vec3 local_position) {
+    if ((flags_and_noise.x & 4u) == 0u || clip_micro_noise_earth.z <= 0.0) return color;
+    float steps = float(max(flags_and_noise.y, 1u));
+    // Frozen's flat_shaded.frag derives this normal from the interpolated raw
+    // position, rather than the packed face-normal metadata. Keep the raw
+    // position contract so the quantized noise coordinate matches source DH.
+    vec3 vertex_normal = normalize(cross(dFdy(v_source_position), dFdx(v_source_position)));
+    vec3 fixed_position = local_position + vertex_normal * 0.001;
+    vec3 quantized = floor(fixed_position * steps) / steps;
+    float random_value = dh_rand(quantized);
+    float noise_amplification = clip_micro_noise_earth.z * 0.01;
+    float luminance = (color.r + color.g + color.b) / 3.0;
+    noise_amplification = (1.0 - pow(luminance * 2.0 - 1.0, 2.0)) * noise_amplification;
+    noise_amplification *= alpha;
+    random_value = random_value * 2.0 * noise_amplification - noise_amplification;
+    vec3 noisy = clamp(color + (1.0 - color) * random_value, 0.0, 1.0);
+    if (flags_and_noise.z != 0u) {
+        float distance_factor = min(view_distance / float(flags_and_noise.z), 1.0);
+        noisy = mix(noisy, color, distance_factor);
+    }
+    return noisy;
+}
+
 void main() {
-    vec2 light_uv = (vec2(v_light) + vec2(0.5)) / 16.0;
-    vec3 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
-    vec4 color = vec4(v_color.rgb * light_color, v_color.a);
+    // DH's packed vertex metadata stores sky light in byte zero and block
+    // light in byte one; the per-vertex lightmap result was applied by the
+    // matching vertex shader before interpolation, as in Frozen DH.
+    float dh_fade = dh_fragment_fade();
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    // The copied DH fog block is part of this LOD material's semantic frame.
+    // Apply it inline for the Rust-owned coarse geometry and retain vanilla
+    // fog as the fallback when DH fog is disabled or unavailable.
+    float dh_fog = dh_fog_factor(v_world_position);
+    float fog = dh_fog >= 0.0 ? dh_fog : 0.0;
+    // Frozen DH only uses Bayer coverage when the copied dither-fade flag is
+    // enabled. Otherwise its flat_shaded path performs a hard near-clip
+    // discard; applying the Bayer matrix unconditionally creates speckled
+    // holes across every opaque LOD surface.
+    if ((flags_and_noise.x & 2u) != 0u) {
+        int dither_x = int(mod(gl_FragCoord.x, 4.0));
+        // Frozen OpenGL's gl_FragCoord origin is lower-left. Vulkan GLSL
+        // keeps the fragment origin upper-left even when the GAL flips the
+        // viewport for the shared world output, so mirror Y for the source
+        // Bayer phase rather than changing geometry or attachment layout.
+        int dither_y = (flags_and_noise.w & 512u) != 0u
+            ? int(mod(gl_FragCoord.y, 4.0))
+            : int(mod(-gl_FragCoord.y, 4.0));
+        int dither_index = dither_y * 4 + dither_x;
+        float dither_threshold = (float[16](0.0, 8.0, 2.0, 10.0,
+            12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0,
+            15.0, 7.0, 13.0, 5.0)[dither_index] / 16.0) + 0.001;
+        if (dh_fade <= dither_threshold) discard;
+    } else if (dh_fade <= 0.0) {
+        discard;
+    }
+    vec3 noisy_material = dh_apply_noise(v_color.rgb, 1.0, distance_to_camera, v_source_position);
+    vec4 color = vec4(mix(noisy_material, fog_color_and_alpha.rgb, fog), 1.0);
+    // Opaque DH geometry carries RGB coverage in its compact stream; the
+    // producer's alpha byte is not an opacity signal. Use only the semantic
+    // distance fade for deferred coverage and depth ordering.
+    // The material category is the explicit coverage contract. RGB may be
+    // legitimately black for a dark block or resource-pack tint, so it must
+    // never be treated as an existence bit.
+    if (color.a < 0.1) discard;
     vec3 normal = dh_normal(v_normal);
     out_terrain_lit_color = color;
     out_terrain_view_space_normal = vec4(normal * 0.5 + 0.5, color.a);
     out_terrain_material_auxiliary = vec4(
         float(v_material) / 255.0,
-        float(v_light.x) / 15.0,
         float(v_light.y) / 15.0,
+        float(v_light.x) / 15.0,
         color.a
     );
     // The existing minimal deferred path stores a bounded world-space
     // encoding. LOD admission is not enabled until its exact frame range is
     // supplied by the future LOD pass/resource contract.
-    out_world_position = vec4(clamp(v_world_position / 1024.0 * 0.5 + 0.5, 0.0, 1.0), color.a);
+    // The deferred lighting pass decodes this attachment with the explicit
+    // 64-block shadow domain used by the Rust-owned terrain graph.  Keep DH
+    // opaque pixels on that same normalized world-position contract; a
+    // separate 1024-block scale makes shadow lookup reconstruct a different
+    // world and turns valid far terrain into dark/incorrect pixels.
+    out_world_position = vec4(clamp(v_world_position / 64.0 * 0.5 + 0.5, 0.0, 1.0), color.a);
+}
+"#;
+
+pub const MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT: &str = r#"#version 450
+layout(location = 0) in vec4 v_color;
+layout(location = 4) in vec3 v_world_position;
+layout(location = 5) in vec3 v_source_position;
+layout(location = 7) in vec3 v_light_color;
+layout(location = 8) in vec3 v_unlit_color;
+layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
+    mat4 combined_matrix;
+    vec4 column_origin_and_world_y;
+    vec4 model_offset_and_reserved;
+    vec4 clip_micro_noise_earth;
+    uvec4 flags_and_noise;
+    vec4 fog_color_and_alpha;
+    vec4 fog_ranges;
+    vec4 dh_fog_parameters[5];
+};
+layout(location = 0) out vec4 out_color;
+
+vec3 dh_normal(uint normal) {
+    if (normal == 0u) return vec3(0.0, -1.0, 0.0);
+    if (normal == 1u) return vec3(0.0, 1.0, 0.0);
+    if (normal == 2u) return vec3(0.0, 0.0, -1.0);
+    if (normal == 3u) return vec3(0.0, 0.0, 1.0);
+    if (normal == 4u) return vec3(-1.0, 0.0, 0.0);
+    return vec3(1.0, 0.0, 0.0);
+}
+
+float dh_fragment_fade() {
+    if ((flags_and_noise.w & 8u) != 0u) return 1.0;
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    float dh_clip = clip_micro_noise_earth.x;
+    return dh_clip > 0.0 ? smoothstep(dh_clip, dh_clip * 1.5, distance_to_camera) : 1.0;
+}
+
+float dh_fog_curve(float value, float start, float length, float minimum, float range, float density, float falloff) {
+    if (falloff < 0.5) {
+        return minimum + range * clamp((value - start) / max(length, 0.0001), 0.0, 1.0);
+    }
+    float x = max((value - start) / max(length, 0.0001), 0.0) * density;
+    float attenuation = falloff < 1.5 ? exp(-x) : exp(-x * x);
+    return minimum + range - range * attenuation;
+}
+
+float dh_fog_factor(vec3 world_position) {
+    // DH far/height fog is normalized to the configured LOD draw distance.
+    // A disabled DH fog block deliberately falls back to copied vanilla fog.
+    if (dh_fog_parameters[4].x < 0.5) return -1.0;
+    vec3 camera_position = column_origin_and_world_y.xyz - model_offset_and_reserved.xyz;
+    float lod_distance = max(dh_fog_parameters[1].y, 1.0);
+    float horizontal_distance = length((world_position - camera_position).xz);
+    float spherical_distance = distance(world_position, camera_position);
+    float active_distance = dh_fog_parameters[4].z > 0.5 ? spherical_distance : horizontal_distance;
+    float far = dh_fog_curve(
+        active_distance, dh_fog_parameters[0].x * lod_distance,
+        (dh_fog_parameters[0].y - dh_fog_parameters[0].x) * lod_distance,
+        dh_fog_parameters[0].z, dh_fog_parameters[0].w - dh_fog_parameters[0].z,
+        dh_fog_parameters[1].x, dh_fog_parameters[3].x);
+    float height = 0.0;
+    if (dh_fog_parameters[4].y > 0.5) {
+        float camera_y = camera_position.y;
+        float height_position = world_position.y;
+        float direction = dh_fog_parameters[3].w;
+        if (mod(direction, 2.0) < 0.5) {
+            height_position -= dh_fog_parameters[1].z - camera_y;
+        }
+        bool applies_up = mod(floor(direction / 2.0), 2.0) > 0.5;
+        bool applies_down = mod(floor(direction / 4.0), 2.0) > 0.5;
+        float vertical_distance = applies_up && applies_down
+            ? abs(height_position)
+            : (applies_down ? -height_position : height_position);
+        float vertical_scale = dh_fog_parameters[4].w > 0.0
+            ? dh_fog_parameters[4].w : (1.0 / 384.0);
+        vertical_distance *= vertical_scale;
+        height = dh_fog_curve(
+            vertical_distance, dh_fog_parameters[1].w, dh_fog_parameters[2].x - dh_fog_parameters[1].w,
+            dh_fog_parameters[2].y, dh_fog_parameters[2].z - dh_fog_parameters[2].y,
+            dh_fog_parameters[2].w, dh_fog_parameters[3].y);
+    }
+    int mode = int(dh_fog_parameters[3].z + 0.5);
+    if (mode == 0 || mode == 1) return clamp(far, 0.0, 1.0);
+    if (mode == 2) return clamp(max(far, height), 0.0, 1.0);
+    if (mode == 3) return clamp(far + height, 0.0, 1.0);
+    if (mode == 4) return clamp(far * height, 0.0, 1.0);
+    if (mode == 5) return clamp(1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 6) return clamp(far + max(far, height), 0.0, 1.0);
+    if (mode == 7) return clamp(far + far * height, 0.0, 1.0);
+    if (mode == 8) return clamp(far + 1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 9) return clamp(far * 0.5 + height * 0.5, 0.0, 1.0);
+    return clamp(far, 0.0, 1.0);
+}
+
+
+float dh_rand(float co) { return fract(sin(co * 91.3458) * 47453.5453); }
+float dh_rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
+float dh_rand(vec3 co) { return dh_rand(co.xy + dh_rand(co.z)); }
+
+vec3 dh_apply_noise(vec3 color, float alpha, float view_distance, vec3 local_position) {
+    if ((flags_and_noise.x & 4u) == 0u || clip_micro_noise_earth.z <= 0.0) return color;
+    float steps = float(max(flags_and_noise.y, 1u));
+    // Frozen's flat_shaded.frag derives this normal from the interpolated raw
+    // position, rather than the packed face-normal metadata. Keep the raw
+    // position contract so the quantized noise coordinate matches source DH.
+    vec3 vertex_normal = normalize(cross(dFdy(v_source_position), dFdx(v_source_position)));
+    vec3 fixed_position = local_position + vertex_normal * 0.001;
+    vec3 quantized = floor(fixed_position * steps) / steps;
+    float random_value = dh_rand(quantized);
+    float noise_amplification = clip_micro_noise_earth.z * 0.01;
+    float luminance = (color.r + color.g + color.b) / 3.0;
+    noise_amplification = (1.0 - pow(luminance * 2.0 - 1.0, 2.0)) * noise_amplification;
+    noise_amplification *= alpha;
+    random_value = random_value * 2.0 * noise_amplification - noise_amplification;
+    vec3 noisy = clamp(color + (1.0 - color) * random_value, 0.0, 1.0);
+    if (flags_and_noise.z != 0u) {
+        float distance_factor = min(view_distance / float(flags_and_noise.z), 1.0);
+        noisy = mix(noisy, color, distance_factor);
+    }
+    return noisy;
+}
+
+void main() {
+    // Capture-only diagnostic: encode the submitted column origin before any
+    // DH fade, fog, or material discard. This answers whether the visible
+    // coarse-field holes are absent column draws or geometry inside columns;
+    // the flag is never set on the production route.
+    if ((flags_and_noise.w & 4u) != 0u) {
+        vec2 cell = floor(column_origin_and_world_y.xz / 64.0);
+        vec3 id_color = vec3(
+            0.15 + 0.8 * fract(cell.x * 0.37),
+            0.15 + 0.8 * fract(cell.y * 0.53),
+            0.9
+        );
+        out_color = vec4(id_color, 1.0);
+        return;
+    }
+    float dh_fade = dh_fragment_fade();
+    // DH's standard vertex shader already multiplied every material by the
+    // copied lightmap per vertex, before flat_shaded.frag receives
+    // vertexColor. `v_color` is therefore the interpolated lit result.
+    vec3 material_color = v_color.rgb;
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    // Apply copied DH fog in the forward material. Frozen's vanilla DH path
+    // has no vanilla-fog fallback; the dedicated DH fog pass is disabled
+    // together with this semantic block.
+    float dh_fog = dh_fog_factor(v_world_position);
+    float fog = dh_fog >= 0.0 ? dh_fog : 0.0;
+    // Vanilla terrain is submitted first and owns near-field depth. Match DH
+    // by honoring its copied dither-fade flag before rejecting the transition.
+    if ((flags_and_noise.x & 2u) != 0u) {
+        int dither_x = int(mod(gl_FragCoord.x, 4.0));
+        int dither_y = (flags_and_noise.w & 512u) != 0u
+            ? int(mod(gl_FragCoord.y, 4.0))
+            : int(mod(-gl_FragCoord.y, 4.0));
+        int dither_index = dither_y * 4 + dither_x;
+        float dither_threshold = (float[16](0.0, 8.0, 2.0, 10.0,
+            12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0,
+            15.0, 7.0, 13.0, 5.0)[dither_index] / 16.0) + 0.001;
+        if (dh_fade <= dither_threshold) discard;
+    } else if (dh_fade <= 0.0) {
+        discard;
+    }
+    // Graphics-audit-only material probes. The canonical water fixture uses
+    // DH's opaque stream when transparency is disabled, so expose the same
+    // raw packed-color and raw lightmap stages here as the transparent probe.
+    // These flags are never set on a normal frame and preserve coverage,
+    // depth, and ownership when disabled.
+    if ((flags_and_noise.w & 64u) != 0u) {
+        out_color = vec4(v_light_color, 1.0);
+        return;
+    }
+    if ((flags_and_noise.w & 16u) != 0u) {
+        out_color = vec4(v_unlit_color, 1.0);
+        return;
+    }
+    vec3 noisy_material = dh_apply_noise(material_color, 1.0, distance_to_camera, v_source_position);
+    vec4 color = vec4(mix(noisy_material, fog_color_and_alpha.rgb, fog), 1.0);
+    out_color = color;
 }
 "#;
 
@@ -5105,11 +6143,32 @@ layout(location = 2) in vec4 v_color;
 layout(location = 3) flat in uvec2 v_light;
 layout(location = 4) flat in uint v_normal;
 layout(location = 5) in vec3 v_world_position;
-layout(location = 6) flat in uint v_material_flags;
+layout(location = 6) in vec3 v_source_position;
+layout(location = 7) flat in uint v_material_flags;
+layout(location = 8) in float v_dh_fade;
+layout(location = 9) in vec3 v_light_color;
+layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
+    mat4 combined_matrix;
+    vec4 column_origin_and_world_y;
+    vec4 model_offset_and_reserved;
+    vec4 clip_micro_noise_earth;
+    uvec4 flags_and_noise;
+    vec4 fog_color_and_alpha;
+    vec4 fog_ranges;
+    vec4 dh_fog_parameters[5];
+};
 layout(location = 0) out vec4 out_terrain_lit_color;
 layout(location = 1) out vec4 out_terrain_view_space_normal;
 layout(location = 2) out vec4 out_terrain_material_auxiliary;
 layout(location = 3) out vec4 out_world_position;
+
+float dh_fragment_fade() {
+    if ((flags_and_noise.w & 8u) != 0u) return 1.0;
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    float dh_clip = clip_micro_noise_earth.x;
+    return dh_clip > 0.0 ? smoothstep(dh_clip, dh_clip * 1.5, distance_to_camera) : 1.0;
+}
 
 vec3 dh_normal(uint normal) {
     if (normal == 0u) return vec3(0.0, -1.0, 0.0);
@@ -5120,7 +6179,93 @@ vec3 dh_normal(uint normal) {
     return vec3(1.0, 0.0, 0.0);
 }
 
+float dh_fog_curve(float value, float start, float length, float minimum, float range, float density, float falloff) {
+    if (falloff < 0.5) {
+        return minimum + range * clamp((value - start) / max(length, 0.0001), 0.0, 1.0);
+    }
+    float x = max((value - start) / max(length, 0.0001), 0.0) * density;
+    float attenuation = falloff < 1.5 ? exp(-x) : exp(-x * x);
+    return minimum + range - range * attenuation;
+}
+
+float dh_fog_factor(vec3 world_position) {
+    // DH far/height fog is normalized to the configured LOD draw distance.
+    // A disabled DH fog block deliberately falls back to copied vanilla fog.
+    if (dh_fog_parameters[4].x < 0.5) return -1.0;
+    vec3 camera_position = column_origin_and_world_y.xyz - model_offset_and_reserved.xyz;
+    float lod_distance = max(dh_fog_parameters[1].y, 1.0);
+    float horizontal_distance = length((world_position - camera_position).xz);
+    float spherical_distance = distance(world_position, camera_position);
+    float active_distance = dh_fog_parameters[4].z > 0.5 ? spherical_distance : horizontal_distance;
+    float far = dh_fog_curve(
+        active_distance, dh_fog_parameters[0].x * lod_distance,
+        (dh_fog_parameters[0].y - dh_fog_parameters[0].x) * lod_distance,
+        dh_fog_parameters[0].z, dh_fog_parameters[0].w - dh_fog_parameters[0].z,
+        dh_fog_parameters[1].x, dh_fog_parameters[3].x);
+    float height = 0.0;
+    if (dh_fog_parameters[4].y > 0.5) {
+        float camera_y = camera_position.y;
+        float height_position = world_position.y;
+        float direction = dh_fog_parameters[3].w;
+        if (mod(direction, 2.0) < 0.5) {
+            height_position -= dh_fog_parameters[1].z - camera_y;
+        }
+        bool applies_up = mod(floor(direction / 2.0), 2.0) > 0.5;
+        bool applies_down = mod(floor(direction / 4.0), 2.0) > 0.5;
+        float vertical_distance = applies_up && applies_down
+            ? abs(height_position)
+            : (applies_down ? -height_position : height_position);
+        float vertical_scale = dh_fog_parameters[4].w > 0.0
+            ? dh_fog_parameters[4].w : (1.0 / 384.0);
+        vertical_distance *= vertical_scale;
+        height = dh_fog_curve(
+            vertical_distance, dh_fog_parameters[1].w, dh_fog_parameters[2].x - dh_fog_parameters[1].w,
+            dh_fog_parameters[2].y, dh_fog_parameters[2].z - dh_fog_parameters[2].y,
+            dh_fog_parameters[2].w, dh_fog_parameters[3].y);
+    }
+    int mode = int(dh_fog_parameters[3].z + 0.5);
+    if (mode == 0 || mode == 1) return clamp(far, 0.0, 1.0);
+    if (mode == 2) return clamp(max(far, height), 0.0, 1.0);
+    if (mode == 3) return clamp(far + height, 0.0, 1.0);
+    if (mode == 4) return clamp(far * height, 0.0, 1.0);
+    if (mode == 5) return clamp(1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 6) return clamp(far + max(far, height), 0.0, 1.0);
+    if (mode == 7) return clamp(far + far * height, 0.0, 1.0);
+    if (mode == 8) return clamp(far + 1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 9) return clamp(far * 0.5 + height * 0.5, 0.0, 1.0);
+    return clamp(far, 0.0, 1.0);
+}
+
+
+float dh_rand(float co) { return fract(sin(co * 91.3458) * 47453.5453); }
+float dh_rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
+float dh_rand(vec3 co) { return dh_rand(co.xy + dh_rand(co.z)); }
+
+vec3 dh_apply_noise(vec3 color, float alpha, float view_distance, vec3 local_position) {
+    if ((flags_and_noise.x & 4u) == 0u || clip_micro_noise_earth.z <= 0.0) return color;
+    float steps = float(max(flags_and_noise.y, 1u));
+    // Frozen's flat_shaded.frag derives this normal from the interpolated raw
+    // position, rather than the packed face-normal metadata. Keep the raw
+    // position contract so the quantized noise coordinate matches source DH.
+    vec3 vertex_normal = normalize(cross(dFdy(v_source_position), dFdx(v_source_position)));
+    vec3 fixed_position = local_position + vertex_normal * 0.001;
+    vec3 quantized = floor(fixed_position * steps) / steps;
+    float random_value = dh_rand(quantized);
+    float noise_amplification = clip_micro_noise_earth.z * 0.01;
+    float luminance = (color.r + color.g + color.b) / 3.0;
+    noise_amplification = (1.0 - pow(luminance * 2.0 - 1.0, 2.0)) * noise_amplification;
+    noise_amplification *= alpha;
+    random_value = random_value * 2.0 * noise_amplification - noise_amplification;
+    vec3 noisy = clamp(color + (1.0 - color) * random_value, 0.0, 1.0);
+    if (flags_and_noise.z != 0u) {
+        float distance_factor = min(view_distance / float(flags_and_noise.z), 1.0);
+        noisy = mix(noisy, color, distance_factor);
+    }
+    return noisy;
+}
+
 void main() {
+    float dh_fade = dh_fragment_fade();
     vec2 atlas_extent = vec2(textureSize(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), 0));
     vec2 texel = vec2(0.5) / atlas_extent;
     vec2 sprite_min = v_atlas_rect.xy + texel;
@@ -5129,17 +6274,237 @@ void main() {
     // that named sprite instead of letting a large face stretch one tile or
     // escape into a neighbour in the global Minecraft atlas.
     vec2 atlas_uv = mix(sprite_min, max(sprite_min, sprite_max), fract(v_tile_uv));
-    vec4 atlas_color = texture(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv);
-    vec2 light_uv = (vec2(v_light) + vec2(0.5)) / 16.0;
-    vec3 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
+    // Capture-only probe: force the sprite sample to the copied base mip so
+    // sparse atlas mip rows cannot masquerade as a material or alpha failure.
+    vec4 atlas_color = (flags_and_noise.w & 256u) != 0u
+        ? textureLod(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv, 0.0)
+        : texture(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv);
     vec3 semantic_tint = (v_material_flags & 1u) != 0u ? v_color.rgb : vec3(1.0);
-    vec4 color = vec4(atlas_color.rgb * semantic_tint * light_color, atlas_color.a * v_color.a);
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    // Apply copied DH fog in the forward material. Frozen's vanilla DH path
+    // has no vanilla-fog fallback; the dedicated DH fog pass is disabled
+    // together with this semantic block.
+    float dh_fog = dh_fog_factor(v_world_position);
+    float fog = dh_fog >= 0.0 ? dh_fog : 0.0;
+    // Match Frozen's flag-gated dither transition. Without the flag, retain
+    // the hard near clip instead of introducing patterned holes in the LOD.
+    if ((flags_and_noise.x & 2u) != 0u) {
+        int dither_x = int(mod(gl_FragCoord.x, 4.0));
+        int dither_y = (flags_and_noise.w & 512u) != 0u
+            ? int(mod(gl_FragCoord.y, 4.0))
+            : int(mod(-gl_FragCoord.y, 4.0));
+        int dither_index = dither_y * 4 + dither_x;
+        float dither_threshold = (float[16](0.0, 8.0, 2.0, 10.0,
+            12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0,
+            15.0, 7.0, 13.0, 5.0)[dither_index] / 16.0) + 0.001;
+        if (dh_fade <= dither_threshold) discard;
+    } else if (dh_fade <= 0.0) {
+        discard;
+    }
+    if ((flags_and_noise.w & 128u) != 0u) {
+        if (atlas_color.a < 0.1) discard;
+        out_terrain_lit_color = atlas_color;
+        out_terrain_view_space_normal = vec4(dh_normal(v_normal) * 0.5 + 0.5, atlas_color.a);
+        out_terrain_material_auxiliary = vec4(0.0, float(v_light.y) / 15.0, float(v_light.x) / 15.0, atlas_color.a);
+        out_world_position = vec4(clamp(v_world_position / 64.0 * 0.5 + 0.5, 0.0, 1.0), atlas_color.a);
+        return;
+    }
+    // The copied DH vertex alpha remains a material input after a face is
+    // resolved to an atlas sprite. Water and other translucent layers use it
+    // to carry source opacity; dropping it makes the exact route overwrite
+    // the scene with an opaque atlas sheet.
+    float source_alpha = atlas_color.a * v_color.a;
+    vec3 noisy_material = dh_apply_noise(atlas_color.rgb * semantic_tint * v_light_color, source_alpha, distance_to_camera, v_source_position);
+    vec4 color = vec4(mix(noisy_material, fog_color_and_alpha.rgb, fog), source_alpha);
     if (color.a < 0.1) discard;
     vec3 normal = dh_normal(v_normal);
     out_terrain_lit_color = color;
     out_terrain_view_space_normal = vec4(normal * 0.5 + 0.5, color.a);
-    out_terrain_material_auxiliary = vec4(0.0, float(v_light.x) / 15.0, float(v_light.y) / 15.0, color.a);
-    out_world_position = vec4(clamp(v_world_position / 1024.0 * 0.5 + 0.5, 0.0, 1.0), color.a);
+    out_terrain_material_auxiliary = vec4(0.0, float(v_light.y) / 15.0, float(v_light.x) / 15.0, color.a);
+    // Keep exact-atlas DH replacements on the same deferred world-position
+    // encoding as the reduced opaque stream. The compositor owns the decode
+    // scale, so both material owners must write the identical attachment ABI.
+    out_world_position = vec4(clamp(v_world_position / 64.0 * 0.5 + 0.5, 0.0, 1.0), color.a);
+}
+"#;
+
+pub const MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_FORWARD_OPAQUE_FRAGMENT: &str = r#"#version 450
+layout(set = 1, binding = 0) uniform texture2D TerrainAtlasColor;
+layout(set = 1, binding = 1) uniform sampler TerrainAtlasSampler;
+layout(set = 1, binding = 2) uniform texture2D LightmapTexture;
+layout(set = 1, binding = 3) uniform sampler LightmapSampler;
+layout(location = 0) in vec2 v_tile_uv;
+layout(location = 1) flat in vec4 v_atlas_rect;
+layout(location = 2) in vec4 v_color;
+layout(location = 3) flat in uvec2 v_light;
+layout(location = 4) flat in uint v_normal;
+layout(location = 5) in vec3 v_world_position;
+layout(location = 6) in vec3 v_source_position;
+layout(location = 7) flat in uint v_material_flags;
+layout(location = 8) in float v_dh_fade;
+layout(location = 9) in vec3 v_light_color;
+layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
+    mat4 combined_matrix;
+    vec4 column_origin_and_world_y;
+    vec4 model_offset_and_reserved;
+    vec4 clip_micro_noise_earth;
+    uvec4 flags_and_noise;
+    vec4 fog_color_and_alpha;
+    vec4 fog_ranges;
+    vec4 dh_fog_parameters[5];
+};
+layout(location = 0) out vec4 out_color;
+
+vec3 dh_normal(uint normal) {
+    if (normal == 0u) return vec3(0.0, -1.0, 0.0);
+    if (normal == 1u) return vec3(0.0, 1.0, 0.0);
+    if (normal == 2u) return vec3(0.0, 0.0, -1.0);
+    if (normal == 3u) return vec3(0.0, 0.0, 1.0);
+    if (normal == 4u) return vec3(-1.0, 0.0, 0.0);
+    return vec3(1.0, 0.0, 0.0);
+}
+
+float dh_fragment_fade() {
+    if ((flags_and_noise.w & 8u) != 0u) return 1.0;
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    float dh_clip = clip_micro_noise_earth.x;
+    return dh_clip > 0.0 ? smoothstep(dh_clip, dh_clip * 1.5, distance_to_camera) : 1.0;
+}
+
+float dh_fog_curve(float value, float start, float length, float minimum, float range, float density, float falloff) {
+    if (falloff < 0.5) {
+        return minimum + range * clamp((value - start) / max(length, 0.0001), 0.0, 1.0);
+    }
+    float x = max((value - start) / max(length, 0.0001), 0.0) * density;
+    float attenuation = falloff < 1.5 ? exp(-x) : exp(-x * x);
+    return minimum + range - range * attenuation;
+}
+
+float dh_fog_factor(vec3 world_position) {
+    // DH far/height fog is normalized to the configured LOD draw distance.
+    // A disabled DH fog block deliberately falls back to copied vanilla fog.
+    if (dh_fog_parameters[4].x < 0.5) return -1.0;
+    vec3 camera_position = column_origin_and_world_y.xyz - model_offset_and_reserved.xyz;
+    float lod_distance = max(dh_fog_parameters[1].y, 1.0);
+    float horizontal_distance = length((world_position - camera_position).xz);
+    float spherical_distance = distance(world_position, camera_position);
+    float active_distance = dh_fog_parameters[4].z > 0.5 ? spherical_distance : horizontal_distance;
+    float far = dh_fog_curve(
+        active_distance, dh_fog_parameters[0].x * lod_distance,
+        (dh_fog_parameters[0].y - dh_fog_parameters[0].x) * lod_distance,
+        dh_fog_parameters[0].z, dh_fog_parameters[0].w - dh_fog_parameters[0].z,
+        dh_fog_parameters[1].x, dh_fog_parameters[3].x);
+    float height = 0.0;
+    if (dh_fog_parameters[4].y > 0.5) {
+        float camera_y = camera_position.y;
+        float height_position = world_position.y;
+        float direction = dh_fog_parameters[3].w;
+        if (mod(direction, 2.0) < 0.5) {
+            height_position -= dh_fog_parameters[1].z - camera_y;
+        }
+        bool applies_up = mod(floor(direction / 2.0), 2.0) > 0.5;
+        bool applies_down = mod(floor(direction / 4.0), 2.0) > 0.5;
+        float vertical_distance = applies_up && applies_down
+            ? abs(height_position)
+            : (applies_down ? -height_position : height_position);
+        float vertical_scale = dh_fog_parameters[4].w > 0.0
+            ? dh_fog_parameters[4].w : (1.0 / 384.0);
+        vertical_distance *= vertical_scale;
+        height = dh_fog_curve(
+            vertical_distance, dh_fog_parameters[1].w, dh_fog_parameters[2].x - dh_fog_parameters[1].w,
+            dh_fog_parameters[2].y, dh_fog_parameters[2].z - dh_fog_parameters[2].y,
+            dh_fog_parameters[2].w, dh_fog_parameters[3].y);
+    }
+    int mode = int(dh_fog_parameters[3].z + 0.5);
+    if (mode == 0 || mode == 1) return clamp(far, 0.0, 1.0);
+    if (mode == 2) return clamp(max(far, height), 0.0, 1.0);
+    if (mode == 3) return clamp(far + height, 0.0, 1.0);
+    if (mode == 4) return clamp(far * height, 0.0, 1.0);
+    if (mode == 5) return clamp(1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 6) return clamp(far + max(far, height), 0.0, 1.0);
+    if (mode == 7) return clamp(far + far * height, 0.0, 1.0);
+    if (mode == 8) return clamp(far + 1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 9) return clamp(far * 0.5 + height * 0.5, 0.0, 1.0);
+    return clamp(far, 0.0, 1.0);
+}
+
+
+float dh_rand(float co) { return fract(sin(co * 91.3458) * 47453.5453); }
+float dh_rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
+float dh_rand(vec3 co) { return dh_rand(co.xy + dh_rand(co.z)); }
+
+vec3 dh_apply_noise(vec3 color, float alpha, float view_distance, vec3 local_position) {
+    if ((flags_and_noise.x & 4u) == 0u || clip_micro_noise_earth.z <= 0.0) return color;
+    float steps = float(max(flags_and_noise.y, 1u));
+    // Frozen's flat_shaded.frag derives this normal from the interpolated raw
+    // position, rather than the packed face-normal metadata. Keep the raw
+    // position contract so the quantized noise coordinate matches source DH.
+    vec3 vertex_normal = normalize(cross(dFdy(v_source_position), dFdx(v_source_position)));
+    vec3 fixed_position = local_position + vertex_normal * 0.001;
+    vec3 quantized = floor(fixed_position * steps) / steps;
+    float random_value = dh_rand(quantized);
+    float noise_amplification = clip_micro_noise_earth.z * 0.01;
+    float luminance = (color.r + color.g + color.b) / 3.0;
+    noise_amplification = (1.0 - pow(luminance * 2.0 - 1.0, 2.0)) * noise_amplification;
+    noise_amplification *= alpha;
+    random_value = random_value * 2.0 * noise_amplification - noise_amplification;
+    vec3 noisy = clamp(color + (1.0 - color) * random_value, 0.0, 1.0);
+    if (flags_and_noise.z != 0u) {
+        float distance_factor = min(view_distance / float(flags_and_noise.z), 1.0);
+        noisy = mix(noisy, color, distance_factor);
+    }
+    return noisy;
+}
+
+void main() {
+    float dh_fade = dh_fragment_fade();
+    vec2 atlas_extent = vec2(textureSize(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), 0));
+    vec2 texel = vec2(0.5) / atlas_extent;
+    vec2 sprite_min = v_atlas_rect.xy + texel;
+    vec2 sprite_max = v_atlas_rect.zw - texel;
+    vec2 atlas_uv = mix(sprite_min, max(sprite_min, sprite_max), fract(v_tile_uv));
+    // Capture-only probe: force the sprite sample to the copied base mip so
+    // sparse atlas mip rows cannot masquerade as a material or alpha failure.
+    vec4 atlas_color = (flags_and_noise.w & 256u) != 0u
+        ? textureLod(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv, 0.0)
+        : texture(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv);
+    vec3 semantic_tint = (v_material_flags & 1u) != 0u ? v_color.rgb : vec3(1.0);
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    // Apply copied DH fog in the forward material. Frozen's vanilla DH path
+    // has no vanilla-fog fallback; the dedicated DH fog pass is disabled
+    // together with this semantic block.
+    float dh_fog = dh_fog_factor(v_world_position);
+    float fog = dh_fog >= 0.0 ? dh_fog : 0.0;
+    // Match the reduced-color forward path and honor DH's copied dither flag.
+    if ((flags_and_noise.x & 2u) != 0u) {
+        int dither_x = int(mod(gl_FragCoord.x, 4.0));
+        int dither_y = (flags_and_noise.w & 512u) != 0u
+            ? int(mod(gl_FragCoord.y, 4.0))
+            : int(mod(-gl_FragCoord.y, 4.0));
+        int dither_index = dither_y * 4 + dither_x;
+        float dither_threshold = (float[16](0.0, 8.0, 2.0, 10.0,
+            12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0,
+            15.0, 7.0, 13.0, 5.0)[dither_index] / 16.0) + 0.001;
+        if (dh_fade <= dither_threshold) discard;
+    } else if (dh_fade <= 0.0) {
+        discard;
+    }
+    if ((flags_and_noise.w & 128u) != 0u) {
+        if (atlas_color.a < 0.1) discard;
+        out_color = atlas_color;
+        return;
+    }
+    // Preserve the source DH opacity for atlas-backed transparent and water
+    // layers. The reduced-color path already carries this alpha in v_color;
+    // the exact route must retain the same blend semantics.
+    float source_alpha = atlas_color.a * v_color.a;
+    vec3 noisy_material = dh_apply_noise(atlas_color.rgb * semantic_tint * v_light_color, source_alpha, distance_to_camera, v_source_position);
+    vec4 color = vec4(mix(noisy_material, fog_color_and_alpha.rgb, fog), source_alpha);
+    if (color.a < 0.1) discard;
+    out_color = color;
 }
 "#;
 
@@ -5157,20 +6522,68 @@ layout(location = 2) in vec4 v_color;
 layout(location = 3) flat in uvec2 v_light;
 layout(location = 4) flat in uint v_normal;
 layout(location = 5) in vec3 v_world_position;
-layout(location = 6) flat in uint v_material_flags;
+layout(location = 6) in vec3 v_source_position;
+layout(location = 7) flat in uint v_material_flags;
+layout(location = 8) in float v_dh_fade;
+layout(location = 9) in vec3 v_light_color;
 layout(location = 0) out vec4 out_source_primary;
 
+float dh_fragment_fade() {
+    if ((flags_and_noise.w & 8u) != 0u) return 1.0;
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    float dh_clip = clip_micro_noise_earth.x;
+    return dh_clip > 0.0 ? smoothstep(dh_clip, dh_clip * 1.5, distance_to_camera) : 1.0;
+}
+
+
+float dh_rand(float co) { return fract(sin(co * 91.3458) * 47453.5453); }
+float dh_rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
+float dh_rand(vec3 co) { return dh_rand(co.xy + dh_rand(co.z)); }
+
+vec3 dh_apply_noise(vec3 color, float alpha, float view_distance, vec3 local_position) {
+    if ((flags_and_noise.x & 4u) == 0u || clip_micro_noise_earth.z <= 0.0) return color;
+    float steps = float(max(flags_and_noise.y, 1u));
+    // Frozen's flat_shaded.frag derives this normal from the interpolated raw
+    // position, rather than the packed face-normal metadata. Keep the raw
+    // position contract so the quantized noise coordinate matches source DH.
+    vec3 vertex_normal = normalize(cross(dFdy(v_source_position), dFdx(v_source_position)));
+    vec3 fixed_position = local_position + vertex_normal * 0.001;
+    vec3 quantized = floor(fixed_position * steps) / steps;
+    float random_value = dh_rand(quantized);
+    float noise_amplification = clip_micro_noise_earth.z * 0.01;
+    float luminance = (color.r + color.g + color.b) / 3.0;
+    noise_amplification = (1.0 - pow(luminance * 2.0 - 1.0, 2.0)) * noise_amplification;
+    noise_amplification *= alpha;
+    random_value = random_value * 2.0 * noise_amplification - noise_amplification;
+    vec3 noisy = clamp(color + (1.0 - color) * random_value, 0.0, 1.0);
+    if (flags_and_noise.z != 0u) {
+        float distance_factor = min(view_distance / float(flags_and_noise.z), 1.0);
+        noisy = mix(noisy, color, distance_factor);
+    }
+    return noisy;
+}
+
 void main() {
+    float dh_fade = dh_fragment_fade();
     vec2 atlas_extent = vec2(textureSize(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), 0));
     vec2 texel = vec2(0.5) / atlas_extent;
     vec2 sprite_min = v_atlas_rect.xy + texel;
     vec2 sprite_max = v_atlas_rect.zw - texel;
     vec2 atlas_uv = mix(sprite_min, max(sprite_min, sprite_max), fract(v_tile_uv));
-    vec4 atlas_color = texture(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv);
-    vec2 light_uv = (vec2(v_light) + vec2(0.5)) / 16.0;
-    vec3 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
+    // Capture-only probe: force the sprite sample to the copied base mip so
+    // sparse atlas mip rows cannot masquerade as a material or alpha failure.
+    vec4 atlas_color = (flags_and_noise.w & 256u) != 0u
+        ? textureLod(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv, 0.0)
+        : texture(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv);
     vec3 semantic_tint = (v_material_flags & 1u) != 0u ? v_color.rgb : vec3(1.0);
-    vec4 color = vec4(atlas_color.rgb * semantic_tint * light_color, atlas_color.a * v_color.a);
+    if ((flags_and_noise.w & 128u) != 0u) {
+        if (atlas_color.a * v_color.a * dh_fade < 0.1) discard;
+        out_source_primary = vec4(atlas_color.rgb, atlas_color.a * v_color.a * dh_fade);
+        return;
+    }
+    vec3 noisy_material = dh_apply_noise(atlas_color.rgb * semantic_tint * v_light_color, atlas_color.a * v_color.a * dh_fade, distance(v_world_position, column_origin_and_world_y.xyz - model_offset_and_reserved.xyz), v_source_position);
+    vec4 color = vec4(noisy_material, atlas_color.a * v_color.a * dh_fade);
     if (color.a < 0.1) discard;
     out_source_primary = color;
 }
@@ -5180,16 +6593,174 @@ void main() {
 /// keeps DH's source-visible alpha and lightmap result intact, with blend and
 /// depth-write policy declared by the backend-neutral graphics pipeline.
 pub const MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT: &str = r#"#version 450
-layout(set = 1, binding = 0) uniform texture2D LightmapTexture;
-layout(set = 1, binding = 1) uniform sampler LightmapSampler;
 layout(location = 0) in vec4 v_color;
 layout(location = 1) flat in uvec2 v_light;
+layout(location = 2) flat in uint v_material;
+layout(location = 3) flat in uint v_normal;
+layout(location = 4) in vec3 v_world_position;
+layout(location = 5) in vec3 v_source_position;
+layout(location = 6) in float v_dh_fade;
+layout(location = 7) in vec3 v_light_color;
+layout(location = 8) in vec3 v_unlit_color;
+layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
+    mat4 combined_matrix;
+    vec4 column_origin_and_world_y;
+    vec4 model_offset_and_reserved;
+    vec4 clip_micro_noise_earth;
+    uvec4 flags_and_noise;
+    vec4 fog_color_and_alpha;
+    vec4 fog_ranges;
+    vec4 dh_fog_parameters[5];
+};
 layout(location = 0) out vec4 out_color;
 
+vec3 dh_normal(uint normal) {
+    if (normal == 0u) return vec3(0.0, -1.0, 0.0);
+    if (normal == 1u) return vec3(0.0, 1.0, 0.0);
+    if (normal == 2u) return vec3(0.0, 0.0, -1.0);
+    if (normal == 3u) return vec3(0.0, 0.0, 1.0);
+    if (normal == 4u) return vec3(-1.0, 0.0, 0.0);
+    return vec3(1.0, 0.0, 0.0);
+}
+
+float dh_fragment_fade() {
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    float dh_clip = clip_micro_noise_earth.x;
+    return dh_clip > 0.0 ? smoothstep(dh_clip, dh_clip * 1.5, distance_to_camera) : 1.0;
+}
+
+float dh_fog_curve(float value, float start, float length, float minimum, float range, float density, float falloff) {
+    if (falloff < 0.5) {
+        return minimum + range * clamp((value - start) / max(length, 0.0001), 0.0, 1.0);
+    }
+    float x = max((value - start) / max(length, 0.0001), 0.0) * density;
+    float attenuation = falloff < 1.5 ? exp(-x) : exp(-x * x);
+    return minimum + range - range * attenuation;
+}
+
+float dh_fog_factor(vec3 world_position) {
+    // DH far/height fog is normalized to the configured LOD draw distance.
+    // A disabled DH fog block deliberately falls back to copied vanilla fog.
+    if (dh_fog_parameters[4].x < 0.5) return -1.0;
+    vec3 camera_position = column_origin_and_world_y.xyz - model_offset_and_reserved.xyz;
+    float lod_distance = max(dh_fog_parameters[1].y, 1.0);
+    float horizontal_distance = length((world_position - camera_position).xz);
+    float spherical_distance = distance(world_position, camera_position);
+    float active_distance = dh_fog_parameters[4].z > 0.5 ? spherical_distance : horizontal_distance;
+    float far = dh_fog_curve(
+        active_distance, dh_fog_parameters[0].x * lod_distance,
+        (dh_fog_parameters[0].y - dh_fog_parameters[0].x) * lod_distance,
+        dh_fog_parameters[0].z, dh_fog_parameters[0].w - dh_fog_parameters[0].z,
+        dh_fog_parameters[1].x, dh_fog_parameters[3].x);
+    float height = 0.0;
+    if (dh_fog_parameters[4].y > 0.5) {
+        float camera_y = camera_position.y;
+        float height_position = world_position.y;
+        float direction = dh_fog_parameters[3].w;
+        if (mod(direction, 2.0) < 0.5) {
+            height_position -= dh_fog_parameters[1].z - camera_y;
+        }
+        bool applies_up = mod(floor(direction / 2.0), 2.0) > 0.5;
+        bool applies_down = mod(floor(direction / 4.0), 2.0) > 0.5;
+        float vertical_distance = applies_up && applies_down
+            ? abs(height_position)
+            : (applies_down ? -height_position : height_position);
+        float vertical_scale = dh_fog_parameters[4].w > 0.0
+            ? dh_fog_parameters[4].w : (1.0 / 384.0);
+        vertical_distance *= vertical_scale;
+        height = dh_fog_curve(
+            vertical_distance, dh_fog_parameters[1].w, dh_fog_parameters[2].x - dh_fog_parameters[1].w,
+            dh_fog_parameters[2].y, dh_fog_parameters[2].z - dh_fog_parameters[2].y,
+            dh_fog_parameters[2].w, dh_fog_parameters[3].y);
+    }
+    int mode = int(dh_fog_parameters[3].z + 0.5);
+    if (mode == 0 || mode == 1) return clamp(far, 0.0, 1.0);
+    if (mode == 2) return clamp(max(far, height), 0.0, 1.0);
+    if (mode == 3) return clamp(far + height, 0.0, 1.0);
+    if (mode == 4) return clamp(far * height, 0.0, 1.0);
+    if (mode == 5) return clamp(1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 6) return clamp(far + max(far, height), 0.0, 1.0);
+    if (mode == 7) return clamp(far + far * height, 0.0, 1.0);
+    if (mode == 8) return clamp(far + 1.0 - (1.0 - far) * (1.0 - height), 0.0, 1.0);
+    if (mode == 9) return clamp(far * 0.5 + height * 0.5, 0.0, 1.0);
+    return clamp(far, 0.0, 1.0);
+}
+
+
+float dh_rand(float co) { return fract(sin(co * 91.3458) * 47453.5453); }
+float dh_rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
+float dh_rand(vec3 co) { return dh_rand(co.xy + dh_rand(co.z)); }
+
+vec3 dh_apply_noise(vec3 color, float alpha, float view_distance, vec3 local_position) {
+    if ((flags_and_noise.x & 4u) == 0u || clip_micro_noise_earth.z <= 0.0) return color;
+    float steps = float(max(flags_and_noise.y, 1u));
+    // Frozen's flat_shaded.frag derives this normal from the interpolated raw
+    // position, rather than the packed face-normal metadata. Keep the raw
+    // position contract so the quantized noise coordinate matches source DH.
+    vec3 vertex_normal = normalize(cross(dFdy(v_source_position), dFdx(v_source_position)));
+    vec3 fixed_position = local_position + vertex_normal * 0.001;
+    vec3 quantized = floor(fixed_position * steps) / steps;
+    float random_value = dh_rand(quantized);
+    float noise_amplification = clip_micro_noise_earth.z * 0.01;
+    float luminance = (color.r + color.g + color.b) / 3.0;
+    noise_amplification = (1.0 - pow(luminance * 2.0 - 1.0, 2.0)) * noise_amplification;
+    noise_amplification *= alpha;
+    random_value = random_value * 2.0 * noise_amplification - noise_amplification;
+    vec3 noisy = clamp(color + (1.0 - color) * random_value, 0.0, 1.0);
+    if (flags_and_noise.z != 0u) {
+        float distance_factor = min(view_distance / float(flags_and_noise.z), 1.0);
+        noisy = mix(noisy, color, distance_factor);
+    }
+    return noisy;
+}
+
 void main() {
-    vec2 light_uv = (vec2(v_light) + vec2(0.5)) / 16.0;
-    vec3 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
-    out_color = vec4(v_color.rgb * light_color, v_color.a);
+    float dh_fade = dh_fragment_fade();
+    // The matching vertex shader applied the copied lightmap before
+    // interpolation, preserving Frozen DH's standard.vert contract.
+    vec3 material_color = v_color.rgb;
+    float distance_to_camera = distance(v_world_position,
+        column_origin_and_world_y.xyz - model_offset_and_reserved.xyz);
+    // Apply copied DH fog in the forward material. Frozen's vanilla DH path
+    // has no vanilla-fog fallback; the dedicated DH fog pass is disabled
+    // together with this semantic block.
+    float dh_fog = dh_fog_factor(v_world_position);
+    float fog = dh_fog >= 0.0 ? dh_fog : 0.0;
+    // Frozen's flat_shaded.frag uses the fade only for coverage discard;
+    // it preserves the source vertex alpha for translucent composition.
+    if ((flags_and_noise.x & 2u) != 0u) {
+        int dither_x = int(mod(gl_FragCoord.x, 4.0));
+        int dither_y = (flags_and_noise.w & 512u) != 0u
+            ? int(mod(gl_FragCoord.y, 4.0))
+            : int(mod(-gl_FragCoord.y, 4.0));
+        int dither_index = dither_y * 4 + dither_x;
+        float dither_threshold = (float[16](0.0, 8.0, 2.0, 10.0,
+            12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0,
+            15.0, 7.0, 13.0, 5.0)[dither_index] / 16.0) + 0.001;
+        if (dh_fade <= dither_threshold) discard;
+    } else if (dh_fade <= 0.0) {
+        discard;
+    }
+    // Graphics-audit-only material probes. They intentionally run after the
+    // source fade/discard test so coverage, culling, depth, and blend state
+    // remain unchanged while color provenance is isolated. Normal frames
+    // leave this private flag lane clear.
+    if ((flags_and_noise.w & 32u) != 0u && v_material == 12u) {
+        out_color = vec4(0.0, 1.0, 0.0, v_color.a);
+        return;
+    }
+    if ((flags_and_noise.w & 64u) != 0u) {
+        out_color = vec4(v_light_color, v_color.a);
+        return;
+    }
+    if ((flags_and_noise.w & 16u) != 0u) {
+        out_color = vec4(v_unlit_color, v_color.a);
+        return;
+    }
+    vec3 noisy_material = dh_apply_noise(material_color, v_color.a, distance_to_camera, v_source_position);
+    vec3 shaded = mix(noisy_material, fog_color_and_alpha.rgb, fog);
+    out_color = vec4(shaded, v_color.a);
 }
 "#;
 
@@ -5734,7 +7305,9 @@ void main() {
 #endif
     gl_Position = clip;
     v_uv = vec2(vertex.position_uv.w, vertex.color_uv.w);
-    v_uv = v_uv * instance.texture_transform.xy + instance.texture_transform.zw;
+    v_uv = v_uv * instance.texture_transform.xy
+        + vec2(instance.texture_transform.z,
+            (uint(instance.material.w) & 1024u) != 0u ? 0.0 : instance.texture_transform.w);
     v_color = vec4(vertex.color_uv.rgb * vertex.normal_light.x, vertex.normal_light.w) * instance.color;
     v_material = instance.material;
     v_animation_region = instance.animation_region;
@@ -5835,16 +7408,244 @@ mod tests {
     }
 
     #[test]
-    fn minimal_distant_horizons_streams_keep_compact_micro_y_non_positional() {
+    fn distant_horizons_direct_composite_contract_owns_color_depth_and_fog_inputs() {
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_VERTEX.contains("gl_VertexIndex"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("DhColorTexture"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("DhDepthTexture"));
+        assert!(
+            MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("inverse_combined_matrix")
+        );
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("camera_position"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("dh_fog_factor(world.xyz, vec3(0.0), camera_position.y)"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("dh_fog_factor"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("dh_fog_parameters[4].w < -4.5"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("dh_has_coverage ? 1.0 : 0.0"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("if (depth >= 1.0 && dh_color.a <= 0.0) discard;"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("float resolved_alpha = fog + dh_color.a * (1.0 - fog);"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains(
+            "out_color = vec4(mix(dh_color.rgb, fog_color_and_alpha.rgb, fog), resolved_alpha);"
+        ));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("VanillaColorTexture"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT.contains("inverse_vanilla_matrix"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT
+            .contains("smoothstep(fade_parameters.x, fade_parameters.y, vanilla_distance)"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT
+            .contains("dh_position.y > fade_parameters.w"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT
+            .contains("fade_parameters.z > 2.5 && fade_parameters.z < 3.5"));
+        let lod_only_branch = MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT
+            .find("fade_parameters.z > 2.5 && fade_parameters.z < 3.5")
+            .expect("LOD-only branch");
+        let ordinary_unwritten_fallback = MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT
+            .find("if (!dh_has_coverage) dh_color = combined_color;")
+            .expect("ordinary unwritten-DH fallback");
+        assert!(
+            lod_only_branch < ordinary_unwritten_fallback,
+            "Frozen returns the private DH target in LOD-only mode before the ordinary unwritten-pixel fallback"
+        );
+        assert!(
+            MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT.contains("dh_fog_parameters[4].w < -5.5")
+        );
+        assert!(
+            MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT.contains("vec4(combined_color.rgb, 0.0)")
+        );
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT.contains("vanilla_depth >= 1.0"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT.contains("DhResolvedColorTexture"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_APPLY_FRAGMENT
+            .contains("if (dh_depth >= 1.0 && dh_color.a <= 0.0) discard;"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("fog = max(fog, dh_color.a);"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("fade_policy"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("far_clip_distance"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("dh_has_coverage"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("dh_color.a > 0.0"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("smoothstep(\n            far_clip_distance * 0.9"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("dh_color = mix(vanilla_color, dh_color, far_fade);"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("if (dh_fog_parameters[4].x < 0.5) {\n        out_color = dh_color;"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("discard"));
+    }
+
+    #[test]
+    fn distant_horizons_fog_reconstruction_keeps_source_and_vulkan_depth_conventions_explicit() {
+        // The copied DH combined matrix is source/OpenGL-style. The Rust LOD
+        // vertex lowers its clip depth into Vulkan's zero-to-one attachment,
+        // while the private compositor converts the sampled depth back before
+        // multiplying by the inverse source matrix.
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX
+            .contains("clip.z = clip.z * 0.5 + clip.w * 0.5;"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("depth * 2.0 - 1.0"));
+        assert!(
+            MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT.contains("world.xyz /= world_w;")
+        );
+        assert!(!MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
+            .contains("world /= max(abs(world.w)"));
+    }
+
+    #[test]
+    fn minimal_distant_horizons_streams_follow_horizontal_compact_micro_contract() {
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX
+            .contains("vec3 local = base_local + vec3(micro_x, 0.0, micro_z);"));
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX
+            .contains("vec3 base_local = vec3(local_x, local_y, local_z);"));
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX
+            .contains("vec3(vertex.micro_x, 0.0, vertex.micro_z)"));
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX
+            .contains("vec3 base_local = vec3(vertex.local_x, vertex.local_y, vertex.local_z);"));
         for source in [
             MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX,
             MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX,
         ] {
-            assert!(source.contains("vec3(vertex.micro_x, 0.0, vertex.micro_z)"));
+            assert!(source.contains("vec3 world = base_local + column_origin_and_world_y.xyz;"));
+            assert!(source.contains("v_source_position = base_local;"));
+            assert!(source.contains("smoothstep(dh_clip, dh_clip * 1.5, dh_distance)"));
+            assert!(source.contains("(flags_and_noise.w & 2u) == 0u"));
+            assert!(source.contains("(flags_and_noise.w & 1u) != 0u"));
+        }
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT
+            .contains("mix(noisy_material, fog_color_and_alpha.rgb, fog), 1.0"));
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT
+            .contains("(flags_and_noise.w & 4u) != 0u"));
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_SOURCE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT,
+        ] {
+            assert!(source.contains("dh_apply_noise"));
+            assert!(source.contains("(flags_and_noise.x & 4u)"));
+            // Frozen flat_shaded.frag derives the noise offset from the
+            // interpolated raw position derivatives, rather than the packed
+            // face-normal metadata used for lighting/G-buffer output.
+            assert!(source
+                .contains("normalize(cross(dFdy(v_source_position), dFdx(v_source_position)))"));
+        }
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT
+            .contains("vec4 dh_fog_parameters[5];"));
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_FRAGMENT,
+        ] {
+            assert!(source.contains("float dh_fog_factor(vec3 world_position)"));
+            assert!(source.contains("float dh_fog = dh_fog_factor(v_world_position);"));
+            assert!(source.contains("float fog = dh_fog >= 0.0 ? dh_fog : 0.0;"));
+        }
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT
+            .contains("float dh_fade = dh_fragment_fade();"));
+        assert!(
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_FORWARD_OPAQUE_FRAGMENT
+                .contains("fog), source_alpha")
+        );
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_SOURCE_FRAGMENT,
+        ] {
+            assert!(source.contains("(flags_and_noise.w & 256u) != 0u"));
+            assert!(source.contains(
+                "textureLod(sampler2D(TerrainAtlasColor, TerrainAtlasSampler), atlas_uv, 0.0)"
+            ));
+        }
+        assert!(
+            !MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_FORWARD_OPAQUE_FRAGMENT
+                .contains("atlas_color.a * v_dh_fade")
+        );
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_SOURCE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT,
+        ] {
+            // Lightmap sampling happens in the matching vertex stage so the
+            // result is interpolated exactly as Frozen's standard.vert does.
+            assert!(source.contains("v_light_color"));
+            assert!(!source.contains("vec2 light_uv = (vec2(v_light.y, v_light.x)"));
+            assert!(!source.contains("light_uv.y = max(light_uv.y, 1.0 - light_uv.y);"));
+        }
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX,
+        ] {
             assert!(
-                !source.contains("vec3(vertex.micro_x, vertex.micro_y, vertex.micro_z)"),
-                "DH micro_y is payload metadata, not a terrain height offset"
+                source.contains("layout(set = 1, binding = 0) uniform texture2D LightmapTexture")
+                    || source
+                        .contains("layout(set = 1, binding = 2) uniform texture2D LightmapTexture")
             );
+            assert!(source.contains("v_light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;"));
+            assert!(
+                source.contains("float(vertex.data.w & 0x0fu)")
+                    || source.contains("float(vertex.light_normal_pad & 0x0fu)")
+            );
+        }
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT
+            .contains("out_color = vec4(shaded, v_color.a);"));
+        assert!(!MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT
+            .contains("out_color = vec4(shaded, v_color.a * dh_fade);"));
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT,
+        ] {
+            // DH's standard.vert multiplies all copied vertex colors by the
+            // lightmap before flat_shaded.frag, including water materials.
+            assert!(source.contains("vec3 material_color = v_color.rgb;"));
+            assert!(source.contains("v_light_color"));
+            assert!(!source.contains("v_material == 12u ? v_color.rgb"));
+        }
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_FORWARD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT,
+        ] {
+            assert!(source.contains("(flags_and_noise.x & 2u) != 0u"));
+            // Bundled DH flat_shaded.frag adds only 0.001 after normalizing
+            // the Bayer value; retaining the old +0.5/16 changes transition
+            // coverage and is visibly different at the LOD boundary.
+            assert!(source.contains("[dither_index] / 16.0) + 0.001"));
+            assert!(source.contains("if (dh_fade <= dither_threshold) discard;"));
+            assert!(source.contains("else if (dh_fade <= 0.0)"));
+        }
+    }
+
+    #[test]
+    fn distant_horizons_deferred_world_position_matches_shadow_domain() {
+        // The shared deferred lighting pass decodes G-buffer positions with
+        // the Rust-owned 64-block shadow range. Both reduced and exact DH
+        // opaque writers must publish that same normalized attachment ABI.
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_FRAGMENT,
+        ] {
+            assert!(source.contains("v_world_position / 64.0 * 0.5 + 0.5"));
+            assert!(!source.contains("v_world_position / 1024.0 * 0.5 + 0.5"));
+        }
+    }
+
+    #[test]
+    fn distant_horizons_black_materials_are_not_treated_as_missing_coverage() {
+        for source in [
+            MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_FRAGMENT,
+            MINIMAL_DISTANT_HORIZONS_LOD_FORWARD_OPAQUE_FRAGMENT,
+        ] {
+            // DH's UNKNOWN material category (zero) is still a valid source
+            // category; coverage comes from the copied vertex stream rather
+            // than a guessed category sentinel.
+            assert!(!source.contains("v_material == 0u"));
+            assert!(!source.contains("max(max(v_color.r, v_color.g), v_color.b) < 0.003"));
         }
     }
 
@@ -5856,7 +7657,7 @@ mod tests {
         ] {
             assert!(
                 !source.contains("+ vec3(0.0, column_origin_and_world_y.w, 0.0)"),
-                "the column origin already contains DH's min-world-Y"
+                "the DH model offset already carries the copied column Y"
             );
         }
     }
@@ -5985,7 +7786,9 @@ mod tests {
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("NETHER_LIGHT1_DIRECTION"));
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("v_color.rgb *= diffuse"));
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("(material_semantics & 1u) != 0u"));
-        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("transpose(inverse(mat3(instance.model)))"));
+        assert!(
+            MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("transpose(inverse(mat3(instance.model)))")
+        );
     }
 
     #[test]
@@ -5995,12 +7798,10 @@ mod tests {
         // model-view transform. The deferred Rust route transports that
         // immutable factor through the explicit G-buffer and applies it once
         // after deferred lighting.
-        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
-            .contains("vec3 fog_position = world.xyz;"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("vec3 fog_position = world.xyz;"));
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("v_fog_distances = vec2("));
-        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX.contains(
-            "max(length(fog_position.xz), abs(fog_position.y))"
-        ));
+        assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
+            .contains("max(length(fog_position.xz), abs(fog_position.y))"));
         assert!(!MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("view_position"));
         assert!(!MINIMAL_TERRAIN_MATERIAL_FRAGMENT.contains("v_fog_factor"));
         assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains(
@@ -6009,9 +7810,8 @@ mod tests {
         assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains(
             "frozen_linear_fog_value(v_fog_distances.y, v_fog_ranges.y, v_fog_ranges.z)"
         ));
-        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains(
-            "clamp(fog_value * v_fog_ranges.w, 0.0, 1.0)"
-        ));
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT
+            .contains("clamp(fog_value * v_fog_ranges.w, 0.0, 1.0)"));
         assert!(!MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.contains("v_fog_factor"));
         for source in [
             MINIMAL_TERRAIN_MATERIAL_FRAGMENT,
@@ -6022,16 +7822,15 @@ mod tests {
             assert!(source.contains("return distance > start ? 1.0 : 0.0;"));
             assert!(source.contains("frozen_fog_range_disabled(start, end)"));
         }
-        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT
-            .contains("out_terrain_view_space_normal = vec4(n, max(environmental_fog, render_distance_fog));"));
-        assert!(MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT
-            .contains("uniform texture2D NormalTex"));
+        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT.contains(
+            "out_terrain_view_space_normal = vec4(n, max(environmental_fog, render_distance_fog));"
+        ));
+        assert!(MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT.contains("uniform texture2D NormalTex"));
         assert!(MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT
             .contains("texture(sampler2D(NormalTex, Samp0), v_uv).a"));
         assert!(MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT
             .contains("clamp(fog_factor * fog_ranges.w, 0.0, 1.0)"));
-        assert!(!MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT
-            .contains("fog_factor * color.a"));
+        assert!(!MINIMAL_COMPOSITE_DEPTH_FOG_FRAGMENT.contains("fog_factor * color.a"));
     }
 
     #[test]
@@ -6041,8 +7840,7 @@ mod tests {
             .contains("(material_semantics & 1u) != 0u\n        ? vertex.shader_data.xy"));
         assert!(MINIMAL_TERRAIN_MATERIAL_VERTEX
             .contains(": vec2(vertex.position_uv.w, vertex.color_uv.w);"));
-        assert!(!MINIMAL_TERRAIN_MATERIAL_VERTEX
-            .contains("instance.material.w > 0.5"));
+        assert!(!MINIMAL_TERRAIN_MATERIAL_VERTEX.contains("instance.material.w > 0.5"));
     }
 
     #[test]
@@ -6051,7 +7849,8 @@ mod tests {
         assert!(source.contains("(material_semantics & 8u) != 0u"));
         assert!(source.contains("light_uv += vec2(0.5 / 16.0)"));
         assert!(source.contains("(material_semantics & 16u) != 0u"));
-        assert!(source.contains("texelFetch(sampler2D(LightmapTexture, LightmapSampler), light_texel, 0)"));
+        assert!(source
+            .contains("texelFetch(sampler2D(LightmapTexture, LightmapSampler), light_texel, 0)"));
     }
 
     #[test]
@@ -6062,9 +7861,11 @@ mod tests {
             );
             assert!(source.contains("layout(set = 1, binding = 1) uniform sampler LightmapSampler"));
             assert!(source.contains(
-                "clamp(vertex.extra_data.xy, vec2(0.0), vec2(255.0 / 240.0)) * (15.0 / 16.0);"
+                "clamp(light_coordinates, vec2(0.0), vec2(255.0 / 240.0)) * (15.0 / 16.0);"
             ));
-            assert!(source.contains("texture(sampler2D(LightmapTexture, LightmapSampler), light_uv)"));
+            assert!(
+                source.contains("texture(sampler2D(LightmapTexture, LightmapSampler), light_uv)")
+            );
         }
         assert!(!MINIMAL_TERRAIN_MATERIAL_FRAGMENT.contains("LightmapTexture"));
     }
@@ -6080,10 +7881,11 @@ mod tests {
         // the fragment—
         // also preserves Frozen's interpolation of already-lit vertex color.
         assert!(vertex.contains("layout(set = 1, binding = 0) uniform texture2D LightmapTexture"));
+        assert!(vertex
+            .contains("clamp(light_coordinates, vec2(0.0), vec2(255.0 / 240.0)) * (15.0 / 16.0);"));
         assert!(vertex.contains(
-            "clamp(vertex.extra_data.xy, vec2(0.0), vec2(255.0 / 240.0)) * (15.0 / 16.0);"
+            "v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color"
         ));
-        assert!(vertex.contains("v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color"));
         assert!(vertex.contains("texture(sampler2D(LightmapTexture, LightmapSampler), light_uv)"));
         // Frozen carries the blend alpha independently in `a_Color`; it never
         // multiplies the AO-baked RGB vertex color by that alpha or derives it
@@ -6108,13 +7910,18 @@ mod tests {
                 "texture(sampler2D(Tex0, Samp0), sample_uv, -FROZEN_MAX_TEXTURE_LOD_BIAS)"
             ));
             assert!(!fragment.contains("textureLod(sampler2D(Tex0, Samp0), sample_uv, 0.0)"));
-            assert!(fragment.contains("uint alpha_cutoff_class = (v_terrain_material_bits >> 1u) & 3u;"));
+            assert!(fragment
+                .contains("uint alpha_cutoff_class = (v_terrain_material_bits >> 1u) & 3u;"));
             // Frozen Sodium leaves face selection to the raster pipeline and
             // performs no fragment-side `gl_FrontFacing` discard.
             if fragment == MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT {
                 assert_eq!(fragment.matches("gl_FrontFacing").count(), 1);
-                assert!(fragment.contains("color *= per_face_lighting && !gl_FrontFacing ? v_back_color : v_color;"));
-                assert!(fragment.contains("bool per_face_lighting = (uint(v_material.w) & 64u) != 0u;"));
+                assert!(fragment.contains(
+                    "color *= per_face_lighting && !gl_FrontFacing ? v_back_color : v_color;"
+                ));
+                assert!(
+                    fragment.contains("bool per_face_lighting = (uint(v_material.w) & 64u) != 0u;")
+                );
             } else {
                 assert!(!fragment.contains("gl_FrontFacing"));
             }
@@ -6124,31 +7931,68 @@ mod tests {
     #[test]
     fn terrain_coordinate_probe_is_explicit_and_preserves_normal_source() {
         let normal = terrain_fragment_source_with_pass_define(
-            MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT, TerrainMaterialProgramKind::Opaque);
-        assert_eq!(terrain_fragment_coordinate_probe(normal.clone(), None), normal);
-        assert_eq!(terrain_fragment_coordinate_probe(normal.clone(), Some("unknown")), normal);
-        for (mode, coordinate) in [("u-bits", "sample_uv.x"), ("v-bits", "sample_uv.y"), ("depth-bits", "gl_FragCoord.z")] {
+            MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT,
+            TerrainMaterialProgramKind::Opaque,
+        );
+        assert_eq!(
+            terrain_fragment_coordinate_probe(normal.clone(), None),
+            normal
+        );
+        assert_eq!(
+            terrain_fragment_coordinate_probe(normal.clone(), Some("unknown")),
+            normal
+        );
+        for (mode, coordinate) in [
+            ("u-bits", "sample_uv.x"),
+            ("v-bits", "sample_uv.y"),
+            ("depth-bits", "gl_FragCoord.z"),
+        ] {
             let probe = terrain_fragment_coordinate_probe(normal.clone(), Some(mode));
             assert_eq!(probe.matches("DIAGNOSTIC ONLY").count(), 1);
             assert!(probe.contains(&format!("floatBitsToUint({coordinate})")));
             assert!(!probe.contains("gl_FragDepth ="));
             assert!(probe.contains("(coordinate_bits >> 16u) & 255u"));
-            assert!(probe.find("uint coordinate_bits").unwrap() < probe.find("bool use_mipmaps").unwrap());
+            assert!(
+                probe.find("uint coordinate_bits").unwrap()
+                    < probe.find("bool use_mipmaps").unwrap()
+            );
         }
     }
 
     #[test]
     fn terrain_clip_probe_observes_without_replacing_position_or_depth_math() {
-        for mode in [None, Some("unknown"), Some("u-bits"), Some("v-bits"), Some("depth-bits")] {
-            assert_eq!(terrain_vertex_coordinate_probe(MINIMAL_TERRAIN_MATERIAL_VERTEX.into(), mode),
-                MINIMAL_TERRAIN_MATERIAL_VERTEX);
+        for mode in [
+            None,
+            Some("unknown"),
+            Some("u-bits"),
+            Some("v-bits"),
+            Some("depth-bits"),
+        ] {
+            assert_eq!(
+                terrain_vertex_coordinate_probe(MINIMAL_TERRAIN_MATERIAL_VERTEX.into(), mode),
+                MINIMAL_TERRAIN_MATERIAL_VERTEX
+            );
         }
-        let vertex = terrain_vertex_coordinate_probe(MINIMAL_TERRAIN_MATERIAL_VERTEX.into(), Some("clip-bits"));
-        assert_eq!(vertex.matches("vec4 clip = projection * view * world;").count(), 1);
+        let vertex = terrain_vertex_coordinate_probe(
+            MINIMAL_TERRAIN_MATERIAL_VERTEX.into(),
+            Some("clip-bits"),
+        );
+        assert_eq!(
+            vertex
+                .matches("vec4 clip = projection * view * world;")
+                .count(),
+            1
+        );
         assert!(vertex.contains("layout(location = 14) flat out vec4 diagnostic_clip;"));
-        assert!(vertex.find("diagnostic_clip = clip;").unwrap() < vertex.find("clip.z = clip.z * 0.5").unwrap());
+        assert!(
+            vertex.find("diagnostic_clip = clip;").unwrap()
+                < vertex.find("clip.z = clip.z * 0.5").unwrap()
+        );
         assert_eq!(vertex.matches("gl_Position = clip;").count(), 1);
-        let fragment = terrain_fragment_coordinate_probe(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.into(), Some("clip-bits"));
+        let fragment = terrain_fragment_coordinate_probe(
+            MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.into(),
+            Some("clip-bits"),
+        );
         assert!(fragment.contains("layout(location = 14) flat in vec4 diagnostic_clip;"));
         assert!(fragment.contains("(coordinate_bits >> 24u) & 255u, 165u, 90u"));
         assert!(fragment.contains("ivec2(764, 320)"));
@@ -6220,8 +8064,9 @@ mod tests {
         let opaque = minimal_terrain_solid_program();
         let translucent = minimal_terrain_material_program(TerrainMaterialProgramKind::Translucent);
 
-        assert!(MINIMAL_TERRAIN_MATERIAL_FRAGMENT
-            .contains("#ifdef VULKANIC_TERRAIN_FRAGMENT_DISCARD"));
+        assert!(
+            MINIMAL_TERRAIN_MATERIAL_FRAGMENT.contains("#ifdef VULKANIC_TERRAIN_FRAGMENT_DISCARD")
+        );
         assert!(cutout
             .fragment
             .source
@@ -7095,7 +8940,7 @@ mod tests {
         assert!(program
             .vertex
             .source
-            .contains("vulkanic_source_dh_vertex.light_material_normal >> 16u"));
+            .contains("vulkanic_source_dh_vertex.data.w >> 16u"));
         assert!(!program
             .vertex
             .source

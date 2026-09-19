@@ -37,7 +37,12 @@ pub struct StandardItemFoil {
 }
 
 impl StandardItemFoil {
-    pub fn decode(mode: u32, clock_millis: u64, speed: f64, strength: f32) -> GalResult<Option<Self>> {
+    pub fn decode(
+        mode: u32,
+        clock_millis: u64,
+        speed: f64,
+        strength: f32,
+    ) -> GalResult<Option<Self>> {
         match mode {
             0 if clock_millis == 0 && speed.to_bits() == 0 && strength.to_bits() == 0 => Ok(None),
             1..=4 => {
@@ -47,11 +52,18 @@ impl StandardItemFoil {
                     3 => StandardFoilKind::Armor,
                     _ => StandardFoilKind::ArmorOrthographic,
                 };
-                let value = Self { kind, clock_millis, speed, strength };
+                let value = Self {
+                    kind,
+                    clock_millis,
+                    speed,
+                    strength,
+                };
                 value.validate()?;
                 Ok(Some(value))
             }
-            _ => Err(GalError::invalid_argument("invalid or noncanonical standard item foil mode")),
+            _ => Err(GalError::invalid_argument(
+                "invalid or noncanonical standard item foil mode",
+            )),
         }
     }
 
@@ -62,7 +74,9 @@ impl StandardItemFoil {
             || !self.strength.is_finite()
             || !(0.0..=1.0).contains(&self.strength)
         {
-            return Err(GalError::invalid_argument("invalid standard item foil inputs"));
+            return Err(GalError::invalid_argument(
+                "invalid standard item foil inputs",
+            ));
         }
         Ok(())
     }
@@ -113,8 +127,7 @@ impl StandardItemFoil {
     /// view, before the model transform; scaling model-local coordinates alone
     /// would miss camera-relative model translation. Projection is semantic
     /// input, not inferred from arbitrary matrix coefficients.
-    pub fn layered_view(self, view: [f32; 16], projection: FoilProjection)
-        -> GalResult<[f32; 16]> {
+    pub fn layered_view(self, view: [f32; 16], projection: FoilProjection) -> GalResult<[f32; 16]> {
         self.validate()?;
         super::view_layering::apply(view, self.kind.armor_projection().map(|_| projection))
     }
@@ -124,9 +137,18 @@ impl StandardItemFoil {
     pub fn packed_instance(self) -> GalResult<[u8; 48]> {
         let matrix = self.texture_transform()?;
         let values = [
-            matrix[0][0], matrix[1][0], matrix[2][0], 0.0,
-            matrix[0][1], matrix[1][1], matrix[2][1], 0.0,
-            self.strength, 0.0, 0.0, 0.0,
+            matrix[0][0],
+            matrix[1][0],
+            matrix[2][0],
+            0.0,
+            matrix[0][1],
+            matrix[1][1],
+            matrix[2][1],
+            0.0,
+            self.strength,
+            0.0,
+            0.0,
+            0.0,
         ];
         let mut bytes = [0u8; 48];
         for (target, value) in bytes.chunks_exact_mut(4).zip(values) {
@@ -148,83 +170,180 @@ mod tests {
     use super::*;
 
     fn foil(clock_millis: u64) -> StandardItemFoil {
-        StandardItemFoil { kind: StandardFoilKind::Item, clock_millis, speed: 0.5, strength: 0.5 }
+        StandardItemFoil {
+            kind: StandardFoilKind::Item,
+            clock_millis,
+            speed: 0.5,
+            strength: 0.5,
+        }
     }
 
     #[test]
     fn entity_foil_uses_frozen_half_scale_without_scaling_clock_translation() {
-        let entity = StandardItemFoil { kind: StandardFoilKind::Entity, ..foil(12_345) };
+        let entity = StandardItemFoil {
+            kind: StandardFoilKind::Entity,
+            ..foil(12_345)
+        };
         let matrix = entity.texture_transform().unwrap();
         // Frozen ENTITY_GLINT_TEXTURING: translate(-g,h), rotateZ(PI/18),
         // scale(0.5). This differs from ITEM only in its source-space basis.
-        let expected = [[0.492403895, 0.086824089], [-0.086824089, 0.492403895],
-                        [-0.448909104, 0.646000028]];
-        for column in 0..3 { for row in 0..2 {
-            assert!((matrix[column][row] - expected[column][row]).abs() < 0.000002);
-        }}
-        assert_eq!(entity.texture_uv([0.0, 0.0]).unwrap(), foil(12_345).texture_uv([0.0, 0.0]).unwrap());
+        let expected = [
+            [0.492403895, 0.086824089],
+            [-0.086824089, 0.492403895],
+            [-0.448909104, 0.646000028],
+        ];
+        for column in 0..3 {
+            for row in 0..2 {
+                assert!((matrix[column][row] - expected[column][row]).abs() < 0.000002);
+            }
+        }
+        assert_eq!(
+            entity.texture_uv([0.0, 0.0]).unwrap(),
+            foil(12_345).texture_uv([0.0, 0.0]).unwrap()
+        );
         let uv = entity.texture_uv([0.25, 0.75]).unwrap();
         assert!((uv[0] - -0.390926212).abs() < 0.000002);
         assert!((uv[1] - 1.037008881).abs() < 0.000002);
-        assert_ne!(entity.packed_instance().unwrap(), foil(12_345).packed_instance().unwrap());
-        assert_eq!(StandardItemFoil::decode(2, 12_345, 0.5, 0.5).unwrap(), Some(entity));
+        assert_ne!(
+            entity.packed_instance().unwrap(),
+            foil(12_345).packed_instance().unwrap()
+        );
+        assert_eq!(
+            StandardItemFoil::decode(2, 12_345, 0.5, 0.5).unwrap(),
+            Some(entity)
+        );
         assert!(StandardItemFoil::decode(5, 0, 0.0, 0.0).is_err());
         assert!(StandardItemFoil::decode(2, u64::MAX, 0.0, 0.0).is_err());
     }
 
     #[test]
     fn armor_foil_has_independent_uv_basis_and_explicit_projection_transport() {
-        let armor = StandardItemFoil { kind: StandardFoilKind::Armor, ..foil(12_345) };
+        let armor = StandardItemFoil {
+            kind: StandardFoilKind::Armor,
+            ..foil(12_345)
+        };
         let matrix = armor.texture_transform().unwrap();
         // RenderStateShard: translate(-g,h), rotateZ(PI/18), scale(0.16).
-        let expected = [[0.15756924, 0.02778371], [-0.02778371, 0.15756924],
-            [-0.448909104, 0.646000028]];
-        for column in 0..3 { for row in 0..2 {
-            assert!((matrix[column][row] - expected[column][row]).abs() < 0.000002);
-        }}
-        assert_eq!(armor.texture_uv([0.0, 0.0]).unwrap(), foil(12_345).texture_uv([0.0, 0.0]).unwrap());
-        assert_eq!(StandardItemFoil::decode(3, 12_345, 0.5, 0.5).unwrap(), Some(armor));
-        let orthographic = StandardItemFoil { kind: StandardFoilKind::ArmorOrthographic, ..armor };
-        assert_eq!(StandardItemFoil::decode(4, 12_345, 0.5, 0.5).unwrap(), Some(orthographic));
+        let expected = [
+            [0.15756924, 0.02778371],
+            [-0.02778371, 0.15756924],
+            [-0.448909104, 0.646000028],
+        ];
+        for column in 0..3 {
+            for row in 0..2 {
+                assert!((matrix[column][row] - expected[column][row]).abs() < 0.000002);
+            }
+        }
+        assert_eq!(
+            armor.texture_uv([0.0, 0.0]).unwrap(),
+            foil(12_345).texture_uv([0.0, 0.0]).unwrap()
+        );
+        assert_eq!(
+            StandardItemFoil::decode(3, 12_345, 0.5, 0.5).unwrap(),
+            Some(armor)
+        );
+        let orthographic = StandardItemFoil {
+            kind: StandardFoilKind::ArmorOrthographic,
+            ..armor
+        };
+        assert_eq!(
+            StandardItemFoil::decode(4, 12_345, 0.5, 0.5).unwrap(),
+            Some(orthographic)
+        );
         assert_eq!(orthographic.texture_transform().unwrap(), matrix);
     }
 
     #[test]
     fn armor_layering_postmultiplies_view_and_preserves_other_foil() {
-        let armor = StandardItemFoil { kind: StandardFoilKind::Armor, ..foil(0) };
+        let armor = StandardItemFoil {
+            kind: StandardFoilKind::Armor,
+            ..foil(0)
+        };
         // Rotated view with translation: catches world-axis translateZ and
         // accidental scaling of the view translation column.
-        let view = [0., 0., -1., 0., 0., 1., 0., 0., 1., 0., 0., 0., 7., 8., 9., 1.];
+        let view = [
+            0., 0., -1., 0., 0., 1., 0., 0., 1., 0., 0., 0., 7., 8., 9., 1.,
+        ];
         let s = 4095.0 / 4096.0;
-        assert_eq!(armor.layered_view(view, FoilProjection::Perspective).unwrap(),
-            [0., 0., -s, 0., 0., s, 0., 0., s, 0., 0., 0., 7., 8., 9., 1.]);
-        assert_eq!(armor.layered_view(view, FoilProjection::Orthographic).unwrap(),
-            [0., 0., -1., 0., 0., 1., 0., 0., 1., 0., 0., 0., 7. + 1./512., 8., 9., 1.]);
+        assert_eq!(
+            armor
+                .layered_view(view, FoilProjection::Perspective)
+                .unwrap(),
+            [0., 0., -s, 0., 0., s, 0., 0., s, 0., 0., 0., 7., 8., 9., 1.]
+        );
+        assert_eq!(
+            armor
+                .layered_view(view, FoilProjection::Orthographic)
+                .unwrap(),
+            [
+                0.,
+                0.,
+                -1.,
+                0.,
+                0.,
+                1.,
+                0.,
+                0.,
+                1.,
+                0.,
+                0.,
+                0.,
+                7. + 1. / 512.,
+                8.,
+                9.,
+                1.
+            ]
+        );
         for kind in [StandardFoilKind::Item, StandardFoilKind::Entity] {
             for projection in [FoilProjection::Perspective, FoilProjection::Orthographic] {
-                assert_eq!(StandardItemFoil { kind, ..armor }.layered_view(view, projection).unwrap(), view);
+                assert_eq!(
+                    StandardItemFoil { kind, ..armor }
+                        .layered_view(view, projection)
+                        .unwrap(),
+                    view
+                );
             }
         }
         let mut invalid = view;
         invalid[4] = f32::NAN;
-        assert!(armor.layered_view(invalid, FoilProjection::Perspective).is_err());
+        assert!(armor
+            .layered_view(invalid, FoilProjection::Perspective)
+            .is_err());
         let mut overflow = view;
         overflow[8] = f32::MAX;
         overflow[12] = f32::MAX;
-        assert!(armor.layered_view(overflow, FoilProjection::Orthographic).is_err());
+        assert!(armor
+            .layered_view(overflow, FoilProjection::Orthographic)
+            .is_err());
     }
 
     #[test]
     fn instance_packing_keeps_affine_rows_and_unquantized_rgb_strength() {
-        let input = StandardItemFoil { strength: 0.1234567, ..foil(12_345) };
+        let input = StandardItemFoil {
+            strength: 0.1234567,
+            ..foil(12_345)
+        };
         let bytes = input.packed_instance().unwrap();
-        let values = bytes.chunks_exact(4).map(|v| f32::from_le_bytes(v.try_into().unwrap()))
+        let values = bytes
+            .chunks_exact(4)
+            .map(|v| f32::from_le_bytes(v.try_into().unwrap()))
             .collect::<Vec<_>>();
         let matrix = input.texture_transform().unwrap();
-        assert_eq!(&values[..4], &[matrix[0][0], matrix[1][0], matrix[2][0], 0.0]);
-        assert_eq!(&values[4..8], &[matrix[0][1], matrix[1][1], matrix[2][1], 0.0]);
+        assert_eq!(
+            &values[..4],
+            &[matrix[0][0], matrix[1][0], matrix[2][0], 0.0]
+        );
+        assert_eq!(
+            &values[4..8],
+            &[matrix[0][1], matrix[1][1], matrix[2][1], 0.0]
+        );
         assert_eq!(&values[8..], &[input.strength, 0.0, 0.0, 0.0]);
-        assert!(StandardItemFoil { strength: f32::NAN, ..input }.packed_instance().is_err());
+        assert!(StandardItemFoil {
+            strength: f32::NAN,
+            ..input
+        }
+        .packed_instance()
+        .is_err());
     }
 
     #[test]
@@ -241,8 +360,15 @@ mod tests {
             }
         }
         // Strength belongs to fragment RGB, never UV animation or alpha.
-        assert_eq!(matrix, StandardItemFoil { strength: 0.0, ..foil(12_345) }
-            .texture_transform().unwrap());
+        assert_eq!(
+            matrix,
+            StandardItemFoil {
+                strength: 0.0,
+                ..foil(12_345)
+            }
+            .texture_transform()
+            .unwrap()
+        );
         // Animated translation must not alter the source-space basis.
         assert_eq!(&matrix[..2], &foil(0).texture_transform().unwrap()[..2]);
         assert!(foil(u64::MAX).texture_transform().is_err());
@@ -266,19 +392,30 @@ mod tests {
         for (clock, source, expected) in cases {
             let actual = foil(clock).texture_uv(source).unwrap();
             for axis in 0..2 {
-                assert!((actual[axis] - expected[axis]).abs() <= 0.000002,
-                    "clock={clock} source={source:?}: {actual:?} != {expected:?}");
+                assert!(
+                    (actual[axis] - expected[axis]).abs() <= 0.000002,
+                    "clock={clock} source={source:?}: {actual:?} != {expected:?}"
+                );
             }
         }
     }
 
     #[test]
     fn standard_foil_has_independent_periods_and_static_zero_speed() {
-        assert_eq!(foil(7_500).texture_uv([0.0; 2]).unwrap(), [-30_000.0 / 110_000.0, 0.0]);
-        assert_eq!(foil(27_500).texture_uv([0.0; 2]).unwrap(), [0.0, 20_000.0 / 30_000.0]);
+        assert_eq!(
+            foil(7_500).texture_uv([0.0; 2]).unwrap(),
+            [-30_000.0 / 110_000.0, 0.0]
+        );
+        assert_eq!(
+            foil(27_500).texture_uv([0.0; 2]).unwrap(),
+            [0.0, 20_000.0 / 30_000.0]
+        );
         let mut stopped = foil(i64::MAX as u64);
         stopped.speed = 0.0;
-        assert_eq!(stopped.texture_uv([0.25, 0.75]).unwrap(), foil(0).texture_uv([0.25, 0.75]).unwrap());
+        assert_eq!(
+            stopped.texture_uv([0.25, 0.75]).unwrap(),
+            foil(0).texture_uv([0.25, 0.75]).unwrap()
+        );
     }
 
     #[test]
@@ -293,10 +430,17 @@ mod tests {
     #[test]
     fn standard_foil_rejects_invalid_semantics_and_overflow() {
         for speed in [f64::NAN, f64::INFINITY, -0.01, 1.01] {
-            assert!(StandardItemFoil { speed, ..foil(0) }.texture_transform().is_err());
+            assert!(StandardItemFoil { speed, ..foil(0) }
+                .texture_transform()
+                .is_err());
         }
         for strength in [f32::NAN, f32::INFINITY, -0.01, 1.01] {
-            assert!(StandardItemFoil { strength, ..foil(0) }.color().is_err());
+            assert!(StandardItemFoil {
+                strength,
+                ..foil(0)
+            }
+            .color()
+            .is_err());
         }
         assert!(foil(u64::MAX).validate().is_err());
         for uv in [[f32::NAN, 0.0], [0.0, f32::INFINITY], [f32::MAX, 0.0]] {

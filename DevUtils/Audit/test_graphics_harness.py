@@ -594,7 +594,7 @@ def write_vanilla_dh_snapshot(capture: Path) -> None:
     snapshot = capture / "config_after_test"
     snapshot.mkdir(exist_ok=True)
     (snapshot / "DistantHorizons.toml").write_text(
-        'rendererMode = "DISABLED"\nenableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\n',
+        'rendererMode = "DISABLED"\nenableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\nlodChunkRenderDistanceRadius = 4\n',
         encoding="utf-8")
 
 
@@ -685,6 +685,116 @@ class CapturedAnimationSpriteTests(unittest.TestCase):
 
 
 class GraphicsAuditHarnessTests(unittest.TestCase):
+    def test_distant_horizons_resource_reload_requires_retirement_and_new_generation(self) -> None:
+        complete = {
+            "resourceReloadResetCount": 1,
+            "lastLifecycleResetReason": "resource-reload",
+            "lastLifecyclePublishedRetirements": 9,
+            "lastLifecycleRetirementsAcknowledged": 6,
+            "lastLifecycleRetirementsSupersededByReplacement": 3,
+            "lastLifecycleRetirementsOutstanding": 0,
+            "pendingRetirements": 0,
+            "invalidatedInFlight": 0,
+            "lastLifecycleGenerationFloor": 24,
+            "minimumPublishedGeneration": 24,
+        }
+        self.assertTrue(
+            harness.distant_horizons_resource_reload_evidence(complete, "resource-reload")["passed"]
+        )
+        stale = dict(complete, pendingRetirements=1, minimumPublishedGeneration=23)
+        self.assertFalse(
+            harness.distant_horizons_resource_reload_evidence(stale, "resource-reload")["passed"]
+        )
+        self.assertEqual(
+            "not_requested",
+            harness.distant_horizons_resource_reload_evidence({}, "real-world")["status"],
+        )
+
+    def test_distant_horizons_world_unload_requires_retirement_and_new_generation(self) -> None:
+        complete = {
+            "worldUnloadResetCount": 2,
+            "lastLifecycleResetReason": "world-unload",
+            "lastLifecyclePublishedRetirements": 9,
+            "lastLifecycleRetirementsAcknowledged": 6,
+            "lastLifecycleRetirementsSupersededByReplacement": 3,
+            "lastLifecycleRetirementsOutstanding": 0,
+            "pendingRetirements": 0,
+            "invalidatedInFlight": 0,
+            "lastLifecycleGenerationFloor": 24,
+            "minimumPublishedGeneration": 26,
+        }
+        self.assertTrue(
+            harness.distant_horizons_world_unload_evidence(complete, "world-unload-reload")["passed"]
+        )
+        self.assertTrue(
+            harness.distant_horizons_world_unload_evidence(complete, "world-different-reload")["passed"]
+        )
+        stale = dict(complete, lastLifecycleRetirementsOutstanding=1)
+        self.assertFalse(
+            harness.distant_horizons_world_unload_evidence(stale, "world-unload-reload")["passed"]
+        )
+        self.assertEqual(
+            "not_requested",
+            harness.distant_horizons_world_unload_evidence({}, "resource-reload")["status"],
+        )
+
+    def test_distant_horizons_recreation_preserves_bounded_published_residency(self) -> None:
+        complete = {
+            "beforeDhCachedColumns": 14,
+            "afterDhCachedColumns": 14,
+            "beforeDhVisibleColumns": 9,
+            "afterDhVisibleColumns": 9,
+            "afterDhUnpublishedVisibleColumns": 0,
+            "afterDhPendingRetirements": 0,
+            "beforeDhRetainedBytes": 62_000_000,
+            "afterDhRetainedBytes": 62_000_000,
+            "beforeDhMinimumGeneration": 20,
+            "afterDhMinimumGeneration": 20,
+            "beforeDhResetCount": 2,
+            "afterDhResetCount": 2,
+        }
+        self.assertTrue(harness.distant_horizons_recreation_evidence(complete, "resize-cycle")["passed"])
+        self.assertTrue(harness.distant_horizons_recreation_evidence(complete, "swapchain-recreate")["passed"])
+        self.assertFalse(
+            harness.distant_horizons_recreation_evidence(
+                dict(complete, afterDhPendingRetirements=1), "resize-cycle"
+            )["passed"]
+        )
+        self.assertFalse(
+            harness.distant_horizons_recreation_evidence(
+                dict(complete, afterDhResetCount=3), "swapchain-recreate"
+            )["passed"]
+        )
+
+    def test_distant_horizons_revisit_and_soak_require_fresh_bounded_residency(self) -> None:
+        complete = {
+            "beforeDhCachedColumns": 25,
+            "afterDhCachedColumns": 48,
+            "beforeDhVisibleColumns": 13,
+            "afterDhVisibleColumns": 13,
+            "afterDhUnpublishedVisibleColumns": 0,
+            "afterDhPendingRetirements": 0,
+            "beforeDhRetainedBytes": 36_000_000,
+            "afterDhRetainedBytes": 63_000_000,
+            "beforeDhMinimumGeneration": 2,
+            "afterDhMinimumGeneration": 2,
+            "beforeDhResetCount": 2,
+            "afterDhResetCount": 2,
+            "beforeDhExecutionSubmission": 300,
+            "afterDhExecutionSubmission": 450,
+            "afterDhExecutionInstances": 55,
+            "beforeUsedMemoryBytes": 1_800_000_000,
+            "afterUsedMemoryBytes": 2_100_000_000,
+        }
+        for scenario in ("return-visited-terrain", "memory-cache-soak", "steady-state-performance"):
+            self.assertTrue(harness.distant_horizons_cache_bound_evidence(complete, scenario)["passed"])
+        self.assertFalse(harness.distant_horizons_cache_bound_evidence(
+            dict(complete, afterDhRetainedBytes=65 * 1024 * 1024), "memory-cache-soak"
+        )["passed"])
+        self.assertFalse(harness.distant_horizons_cache_bound_evidence(
+            dict(complete, afterDhPendingRetirements=1), "return-visited-terrain"
+        )["passed"])
+
     def test_capture_files_never_mix_retries_or_substitute_tail_for_full_log(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -11986,11 +12096,11 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "config_after_test" / "DistantHorizons.toml"
             path.parent.mkdir()
-            original = 'rendererMode = "DEFAULT"\nenableRendering = true\nvanillaFadeMode = "DOUBLE_PASS"\nlodOnlyMode = true\nother = 42\n'
+            original = 'rendererMode = "DEFAULT"\nenableRendering = true\nvanillaFadeMode = "DOUBLE_PASS"\nlodOnlyMode = true\nlodChunkRenderDistanceRadius = 4\nother = 42\n'
             path.write_text(original)
             harness.apply_canonical_vanilla_dh_isolation(path)
-            self.assertEqual('rendererMode = "DISABLED"\nenableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\nother = 42\n', path.read_text())
-            self.assertEqual({"status": "recorded", "rendererMode": "DISABLED", "enableRendering": "false", "vanillaFadeMode": "NONE", "lodOnlyMode": "false"},
+            self.assertEqual('rendererMode = "DISABLED"\nenableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\nlodChunkRenderDistanceRadius = 4\nother = 42\n', path.read_text())
+            self.assertEqual({"status": "recorded", "rendererMode": "DISABLED", "enableRendering": "false", "vanillaFadeMode": "NONE", "lodOnlyMode": "false", "lodChunkRenderDistanceRadius": "4"},
                              harness.dh_composition_settings(Path(temp)))
             for invalid in (original.replace('rendererMode = "DEFAULT"\n', ''),
                             original.replace('lodOnlyMode = true\n', ''), original + 'vanillaFadeMode = "NONE"\n'):
@@ -12000,21 +12110,402 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
                 self.assertEqual(invalid, path.read_text())
                 self.assertEqual("invalid", harness.dh_composition_settings(Path(temp))["status"])
 
+    def test_dh_private_probe_requires_an_explicit_dh_workload(self):
+        ordinary = harness.parse_args([
+            "capture",
+            "--world-static-terrain-scenario",
+            "translucent-water",
+        ])
+        with mock.patch.dict(
+            os.environ,
+            {"MATTMC_CAPTURE_DH_PRIVATE_DITHER_Y": "true"},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(ValueError, "DH capture-only probes require"):
+                harness.validate_fixture_combinations(ordinary)
+
+        dh = harness.parse_args([
+            "capture",
+            "--world-distant-horizons-opaque",
+        ])
+        with mock.patch.dict(
+            os.environ,
+            {"MATTMC_CAPTURE_DH_PRIVATE_DITHER_Y": "true"},
+            clear=True,
+        ):
+            harness.validate_fixture_combinations(dh)
+
+        with mock.patch.dict(
+            os.environ,
+            {"MATTMC_CAPTURE_DH_PRIVATE_DITHER_Y": "false"},
+            clear=True,
+        ):
+            harness.validate_fixture_combinations(ordinary)
+
+    def test_canonical_dh_capture_settings_enable_source_renderer_and_bound_producer(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "DistantHorizons.toml"
+            path.write_text(
+                'numberOfThreads = 10\n'
+                'lodChunkRenderDistanceRadius = 256\n'
+                'rendererMode = "DISABLED"\n'
+                'enableRendering = false\n'
+                'enableSsao = true\n'
+                'enableGenericRendering = true\n'
+                'dhFadeFarClipPlane = true\n'
+                'vanillaFadeMode = "DOUBLE_PASS"\n'
+                'other = 42\n',
+                encoding="utf-8",
+            )
+            args = harness.parse_args([
+                "capture",
+                "--world-distant-horizons-non-water",
+            ])
+            harness.apply_canonical_dh_capture_settings(path, args)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("numberOfThreads = 1", text)
+            self.assertIn("lodChunkRenderDistanceRadius = 4", text)
+            self.assertIn("enableSsao = false", text)
+            self.assertIn("enableGenericRendering = false", text)
+            self.assertIn("dhFadeFarClipPlane = false", text)
+            self.assertIn('vanillaFadeMode = "NONE"', text)
+            self.assertIn('rendererMode = "DEFAULT"', text)
+            self.assertIn("enableRendering = true", text)
+            self.assertIn("other = 42", text)
+
+    def test_dh_visible_extension_visual_evidence_uses_private_coverage_beyond_vanilla_depth(self):
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            artifact = root / "current" / "run-01" / "graphics_audit_artifact.json"
+            attachment_root = artifact.parent / "capture" / "whole_frame_gameplay_attachments"
+            attachment_root.mkdir(parents=True)
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_text(json.dumps({
+                "capture": {
+                    "whole_frame_gameplay_attachments": {
+                        "correlation_doc": {"world_lod_route_selected": True}
+                    }
+                }
+            }), encoding="utf-8")
+            private = Image.new("RGBA", (64, 64), (10, 20, 30, 255))
+            depth = Image.new("L", (64, 64), 0)
+            private.save(attachment_root / "attachment-dh_private_color.png")
+            depth.save(attachment_root / "attachment-main_depth.png")
+            frozen = Image.new("RGB", (64, 64), (100, 100, 100))
+            current = Image.new("RGB", (64, 64), (102, 103, 104))
+            output = root / "mask.png"
+            evidence = harness.dh_visible_extension_visual_evidence(
+                artifact, frozen, current, 6.0, output
+            )
+            self.assertIsNotNone(evidence)
+            self.assertTrue(evidence["passed"])
+            self.assertEqual(4096, evidence["pixel_count"])
+            self.assertEqual([2.0, 3.0, 4.0], evidence["mean_rgb_abs"])
+            self.assertTrue(output.is_file())
+
+    def test_canonical_dh_capture_settings_can_select_vanilla_fade_mode(self):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.dict(
+            os.environ,
+            {"MATTMC_CAPTURE_DH_VANILLA_FADE_MODE": "DOUBLE_PASS"},
+            clear=False,
+        ):
+            path = Path(temp) / "DistantHorizons.toml"
+            path.write_text(
+                'numberOfThreads = 2\n'
+                'lodChunkRenderDistanceRadius = 8\n'
+                'rendererMode = "DISABLED"\n'
+                'enableRendering = false\n'
+                'enableSsao = false\n'
+                'enableGenericRendering = false\n'
+                'dhFadeFarClipPlane = false\n'
+                'vanillaFadeMode = "NONE"\n',
+                encoding="utf-8",
+            )
+            args = harness.parse_args(["capture", "--world-distant-horizons-non-water"])
+            harness.apply_canonical_dh_capture_settings(path, args)
+            self.assertIn('vanillaFadeMode = "DOUBLE_PASS"', path.read_text(encoding="utf-8"))
+
+    def test_explicit_dh_composition_mode_configures_and_identifies_each_parity_fixture(self):
+        for mode, fade_mode, lod_only in (
+            ("NONE", "NONE", "false"),
+            ("SINGLE_PASS", "SINGLE_PASS", "false"),
+            ("DOUBLE_PASS", "DOUBLE_PASS", "false"),
+            ("LOD_ONLY", "NONE", "true"),
+        ):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temp:
+                path = Path(temp) / "DistantHorizons.toml"
+                path.write_text(
+                    'numberOfThreads = 2\n'
+                    'lodChunkRenderDistanceRadius = 4\n'
+                    'rendererMode = "DISABLED"\n'
+                    'enableRendering = false\n'
+                    'enableSsao = false\n'
+                    'enableGenericRendering = false\n'
+                    'dhFadeFarClipPlane = false\n'
+                    'vanillaFadeMode = "NONE"\n'
+                    'lodOnlyMode = false\n',
+                    encoding="utf-8",
+                )
+                args = harness.parse_args([
+                    "capture",
+                    "--world-distant-horizons-non-water",
+                    "--dh-composition-mode",
+                    mode,
+                ])
+                harness.apply_canonical_dh_capture_settings(path, args)
+                text = path.read_text(encoding="utf-8")
+                self.assertIn(f'vanillaFadeMode = "{fade_mode}"', text)
+                self.assertIn(f"lodOnlyMode = {lod_only}", text)
+                fixture_mode = mode.lower().replace("_", "-")
+                self.assertIn(
+                    f"dh-composition-{fixture_mode}",
+                    harness.canonical_fixture_id(args),
+                )
+
+    def test_canonical_dh_capture_settings_apply_lod_only_fog_and_opaque_isolation(self):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.dict(
+            os.environ,
+            {
+                "MATTMC_CAPTURE_DH_LOD_ONLY": "true",
+                "MATTMC_CAPTURE_DH_DISABLE_FOG": "true",
+            },
+            clear=False,
+        ):
+            path = Path(temp) / "DistantHorizons.toml"
+            path.write_text(
+                'numberOfThreads = 2\n'
+                'lodChunkRenderDistanceRadius = 8\n'
+                'rendererMode = "DISABLED"\n'
+                'enableRendering = false\n'
+                'enableSsao = false\n'
+                'enableGenericRendering = false\n'
+                'dhFadeFarClipPlane = false\n'
+                'vanillaFadeMode = "DOUBLE_PASS"\n'
+                'lodOnlyMode = false\n'
+                'enableDhFog = true\n'
+                'transparency = "COMPLETE"\n',
+                encoding="utf-8",
+            )
+            args = harness.parse_args(["capture", "--world-distant-horizons-opaque"])
+            harness.apply_canonical_dh_capture_settings(path, args)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("lodOnlyMode = true", text)
+            self.assertIn("enableDhFog = false", text)
+            self.assertIn('transparency = "DISABLED"', text)
+
+    def test_canonical_dh_capture_settings_share_explicit_radius_override(self):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.dict(
+            os.environ,
+            {"MATTMC_CAPTURE_DH_RADIUS_OVERRIDE": "8"},
+            clear=False,
+        ):
+            path = Path(temp) / "DistantHorizons.toml"
+            path.write_text(
+                'numberOfThreads = 2\n'
+                'lodChunkRenderDistanceRadius = 4\n'
+                'rendererMode = "DISABLED"\n'
+                'enableRendering = false\n'
+                'enableSsao = false\n'
+                'enableGenericRendering = false\n'
+                'dhFadeFarClipPlane = false\n'
+                'vanillaFadeMode = "NONE"\n',
+                encoding="utf-8",
+            )
+            args = harness.parse_args(["capture", "--world-distant-horizons-non-water"])
+            harness.apply_canonical_dh_capture_settings(path, args)
+            self.assertIn("lodChunkRenderDistanceRadius = 8", path.read_text(encoding="utf-8"))
+            self.assertIn("dh-radius-8", harness.canonical_fixture_id(args))
+
+    def test_canonical_dh_capture_settings_reject_invalid_radius_override(self):
+        with mock.patch.dict(
+            os.environ,
+            {"MATTMC_CAPTURE_DH_RADIUS_OVERRIDE": "64"},
+            clear=False,
+        ):
+            with self.assertRaisesRegex(ValueError, "must be an integer from 1 to 32"):
+                harness.canonical_dh_capture_radius()
+
+    def test_canonical_dh_capture_settings_reject_invalid_vanilla_fade_mode(self):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.dict(
+            os.environ,
+            {"MATTMC_CAPTURE_DH_VANILLA_FADE_MODE": "SOMETIMES"},
+            clear=False,
+        ):
+            path = Path(temp) / "DistantHorizons.toml"
+            path.write_text("numberOfThreads = 1\n", encoding="utf-8")
+            args = harness.parse_args(["capture", "--world-distant-horizons-non-water"])
+            with self.assertRaisesRegex(ValueError, "must be NONE, SINGLE_PASS, or DOUBLE_PASS"):
+                harness.apply_canonical_dh_capture_settings(path, args)
+
+    def test_canonical_dh_capture_settings_can_opt_into_generic_semantic_capture(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "DistantHorizons.toml"
+            path.write_text(
+                'numberOfThreads = 10\n'
+                'lodChunkRenderDistanceRadius = 256\n'
+                'rendererMode = "DISABLED"\n'
+                'enableRendering = false\n'
+                'enableSsao = true\n'
+                'enableGenericRendering = false\n'
+                'dhFadeFarClipPlane = true\n'
+                'vanillaFadeMode = "SINGLE_PASS"\n',
+                encoding="utf-8",
+            )
+            args = harness.parse_args(["capture", "--world-distant-horizons-non-water"])
+            with mock.patch.dict(os.environ, {"MATTMC_CAPTURE_DH_GENERIC": "true"}, clear=True):
+                harness.apply_canonical_dh_capture_settings(path, args)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("enableGenericRendering = true", text)
+            self.assertTrue(getattr(args, "_dh_generic_rendering_capture", False))
+
+    def test_dh_generic_private_evidence_rejects_delegated_vanilla_clouds(self):
+        delegated = harness.distant_horizons_generic_private_evidence({
+            "rustGalSubmittedWorkIdentities": {
+                "distant-horizons-generic-semantics": [
+                    "rust-vulkan-whole-frame:groups=122:active=10:cloudDelegated=9:boxes=0:faces=0"
+                ]
+            }
+        })
+        self.assertFalse(delegated["passed"])
+        self.assertEqual("delegated", delegated["status"])
+
+        private = harness.distant_horizons_generic_private_evidence({
+            "rustGalSubmittedWorkIdentities": {
+                "distant-horizons-generic-semantics": [
+                    "rust-vulkan-whole-frame:groups=122:active=10:cloudDelegated=0:cloudPrivate=9:boxes=9:faces=54:ssaoBoxes=1:nonSsaoBoxes=8"
+                ]
+            }
+        })
+        self.assertTrue(private["passed"])
+        self.assertEqual("private", private["status"])
+        self.assertTrue(private["mixed_ssao_phases"])
+        self.assertEqual(1, private["ssao_boxes"])
+        self.assertEqual(8, private["non_ssao_boxes"])
+
+    def test_canonical_dh_capture_settings_can_opt_into_ssao_pair(self):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.dict(
+            os.environ, {"MATTMC_CAPTURE_DH_SSAO": "true"}, clear=False
+        ):
+            path = Path(temp) / "DistantHorizons.toml"
+            path.write_text(
+                'numberOfThreads = 2\n'
+                'lodChunkRenderDistanceRadius = 8\n'
+                'rendererMode = "DISABLED"\n'
+                'enableRendering = false\n'
+                'enableSsao = false\n'
+                'enableGenericRendering = false\n'
+                'dhFadeFarClipPlane = false\n'
+                'vanillaFadeMode = "NONE"\n',
+                encoding="utf-8",
+            )
+            args = harness.parse_args(["capture", "--world-distant-horizons-non-water"])
+            harness.apply_canonical_dh_capture_settings(path, args)
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("enableSsao = true", text)
+
+    def test_canonical_dh_capture_settings_can_amplify_ssao_pair(self):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.dict(
+            os.environ,
+            {
+                "MATTMC_CAPTURE_DH_SSAO": "true",
+                "MATTMC_CAPTURE_DH_SSAO_AMPLIFIED": "true",
+            },
+            clear=False,
+        ):
+            path = Path(temp) / "DistantHorizons.toml"
+            path.write_text(
+                'numberOfThreads = 2\n'
+                'lodChunkRenderDistanceRadius = 8\n'
+                'rendererMode = "DISABLED"\n'
+                'enableRendering = false\n'
+                'enableSsao = false\n'
+                'enableGenericRendering = false\n'
+                'dhFadeFarClipPlane = false\n'
+                'vanillaFadeMode = "NONE"\n'
+                'sampleCount = 6\n'
+                'radius = 4.0\n'
+                'strength = 0.2\n'
+                'bias = 0.02\n'
+                'minLight = 0.25\n'
+                'blurRadius = 2\n'
+                'fadeDistanceInBlocks = 1600\n',
+                encoding="utf-8",
+            )
+            args = harness.parse_args(["capture", "--world-distant-horizons-non-water"])
+            harness.apply_canonical_dh_capture_settings(path, args)
+            text = path.read_text(encoding="utf-8")
+            for expected in (
+                "enableSsao = true",
+                "sampleCount = 32",
+                "radius = 12.0",
+                "strength = 1.0",
+                "bias = 0.01",
+                "minLight = 0.0",
+                "blurRadius = 2",
+                "fadeDistanceInBlocks = 1600",
+            ):
+                self.assertIn(expected, text)
+
+    def test_dh_fog_settings_are_recorded_for_cross_repository_workload_identity(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "config_after_test" / "DistantHorizons.toml"
+            path.parent.mkdir()
+            path.write_text('enableDhFog = true\n', encoding="utf-8")
+            self.assertEqual(
+                {"status": "recorded", "enableDhFog": "true"},
+                harness.dh_fog_settings(root),
+            )
+            path.write_text('enableDhFog = false\n', encoding="utf-8")
+            self.assertEqual(
+                {"status": "recorded", "enableDhFog": "false"},
+                harness.dh_fog_settings(root),
+            )
+
     def test_cross_repository_comparison_rejects_dh_fade_mismatch(self):
         settings = {"status": "recorded", "rendererMode": "DISABLED", "enableRendering": "false",
-                    "vanillaFadeMode": "NONE", "lodOnlyMode": "false"}
+                    "vanillaFadeMode": "NONE", "lodOnlyMode": "false",
+                    "lodChunkRenderDistanceRadius": "4"}
         baseline = {"benchmark_fingerprint": {"workload_signature": {
             "dh_composition": settings}}}
         current = json.loads(json.dumps(baseline))
         self.assertTrue(harness.compare_workloads(baseline, current, cross_repository=True)["comparable"])
         for field, value in (("rendererMode", "DEFAULT"), ("enableRendering", "true"),
-                             ("vanillaFadeMode", "DOUBLE_PASS"), ("lodOnlyMode", "true")):
+                             ("vanillaFadeMode", "DOUBLE_PASS"), ("lodOnlyMode", "true"),
+                             ("lodChunkRenderDistanceRadius", "8")):
             with self.subTest(field=field):
                 different = json.loads(json.dumps(current))
                 different["benchmark_fingerprint"]["workload_signature"]["dh_composition"][field] = value
                 result = harness.compare_workloads(baseline, different, cross_repository=True)
                 self.assertFalse(result["comparable"])
                 self.assertTrue(result["differences"])
+
+    def test_cross_repository_comparison_allows_only_route_owned_dh_presenter_handoff(self):
+        baseline = {
+            "mode": {"target": "frozen", "backend": "opengl"},
+            "benchmark_fingerprint": {"workload_signature": {
+                "dh_composition": {"status": "recorded", "rendererMode": "DEFAULT",
+                    "enableRendering": "true", "vanillaFadeMode": "DOUBLE_PASS", "lodOnlyMode": "false",
+                    "lodChunkRenderDistanceRadius": "4"},
+            }},
+        }
+        current = {
+            "mode": {"target": "current", "backend": "rust-vulkan"},
+            "benchmark_fingerprint": {"workload_signature": {
+                "dh_composition": {"status": "recorded", "rendererMode": "DEFAULT",
+                    "enableRendering": "false", "vanillaFadeMode": "DOUBLE_PASS", "lodOnlyMode": "false",
+                    "lodChunkRenderDistanceRadius": "4"},
+            }},
+        }
+        self.assertTrue(harness.compare_workloads(baseline, current, cross_repository=True)["comparable"])
+        broken = json.loads(json.dumps(current))
+        broken["benchmark_fingerprint"]["workload_signature"]["dh_composition"]["rendererMode"] = "DISABLED"
+        self.assertFalse(harness.compare_workloads(baseline, broken, cross_repository=True)["comparable"])
+        broken = json.loads(json.dumps(current))
+        broken["benchmark_fingerprint"]["workload_signature"]["dh_composition"]["enableRendering"] = "true"
+        self.assertFalse(harness.compare_workloads(baseline, broken, cross_repository=True)["comparable"])
 
     def test_vanilla_isolation_rejects_wireframe_only_disable_and_missing_evidence(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -12023,7 +12514,7 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             self.assertFalse(harness.vanilla_dh_isolation_evidence(root, meta)["passed"])
             path = root / "config_after_test" / "DistantHorizons.toml"
             path.parent.mkdir()
-            path.write_text('rendererMode = "DEFAULT"\nenableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\n')
+            path.write_text('rendererMode = "DEFAULT"\nenableRendering = false\nvanillaFadeMode = "NONE"\nlodOnlyMode = false\nlodChunkRenderDistanceRadius = 4\n')
             self.assertFalse(harness.vanilla_dh_isolation_evidence(root, meta)["passed"])
             harness.apply_canonical_vanilla_dh_isolation(path)
             self.assertTrue(harness.vanilla_dh_isolation_evidence(root, meta)["passed"])
@@ -12145,6 +12636,24 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
             "passed",
             harness.deterministic_visual_fixture_equivalence(baseline, current)["status"],
         )
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            shared = {
+                "benchmark_fingerprint": {
+                    "workload_signature": {
+                        "parity_config": {"fixture": {"id": "world-hidden-ordinary-hidden"}}
+                    }
+                }
+            }
+            left = root / "left.json"
+            right = root / "right.json"
+            left.write_text(json.dumps(shared), encoding="utf-8")
+            right.write_text(json.dumps(shared), encoding="utf-8")
+            self.assertTrue(harness.shared_world_beacon_fixture_requested(left, right))
+            right.write_text(json.dumps({**shared, "benchmark_fingerprint": {
+                "workload_signature": {"parity_config": {"fixture": {"id": "world-hidden-hidden-hidden"}}}
+            }}), encoding="utf-8")
+            self.assertFalse(harness.shared_world_beacon_fixture_requested(left, right))
         current["captures"][0]["observedYaw"] = 104.0
         evidence = harness.deterministic_visual_fixture_equivalence(baseline, current)
         self.assertEqual("failed", evidence["status"])
@@ -12153,6 +12662,50 @@ class GraphicsAuditHarnessTests(unittest.TestCase):
         current["shadowReceiverFixture"] = "red-glass-v1"
         self.assertIn("shadowReceiverFixture", harness.deterministic_visual_fixture_equivalence(baseline, current)["mismatches"])
         self.assertNotEqual(harness.deterministic_camera_signature(baseline), harness.deterministic_camera_signature(current))
+
+        # A beacon fixture must exist in both clients before its pixels can be
+        # compared.  The unchanged Frozen runner may omit the receipt when a
+        # Current-only JVM property injected the beacon.
+        baseline = manifest()
+        current = manifest()
+        current["rustGalWorldBeaconBeamScenario"] = "ordinary"
+        current["rustGalWorldBeaconBeamSetup"] = {
+            "status": "spawned",
+            "origin": "145,102,529",
+            "clientBeamSectionsReady": True,
+            "serverBeamSectionsReady": True,
+        }
+        evidence = harness.deterministic_visual_fixture_equivalence(baseline, current)
+        self.assertEqual("failed", evidence["status"])
+        self.assertIn("beacon-beam-fixture-state", evidence["mismatches"])
+        # A paired canonical world may contain the same beacon structure even
+        # when an older Frozen runner omits the newer runtime receipt. The
+        # explicit shared-world opt-in admits that legacy asymmetry while the
+        # default gate above remains strict.
+        self.assertEqual(
+            "passed",
+            harness.deterministic_visual_fixture_equivalence(
+                baseline, current, shared_world_beacon=True
+            )["status"],
+        )
+        for doc in (baseline, current):
+            doc["rustGalWorldBeaconBeamScenario"] = "ordinary"
+            doc["rustGalWorldBeaconBeamSetup"] = {
+                "status": "spawned",
+                "origin": "145,102,529",
+                "clientBeamSectionsReady": True,
+                "serverBeamSectionsReady": True,
+            }
+        self.assertEqual(
+            "passed",
+            harness.deterministic_visual_fixture_equivalence(baseline, current)["status"],
+        )
+        current["rustGalWorldBeaconBeamSetup"]["status"] = "inactive"
+        self.assertIn(
+            "beacon-beam-fixture-state",
+            harness.deterministic_visual_fixture_equivalence(baseline, current)["mismatches"],
+        )
+        baseline = manifest()
         current = manifest()
         fingerprint = "0,1,1.5,0,0,0,0.5,1,1,1,1,1,1"
         baseline["captures"][0]["lightmapSemanticFingerprint"] = fingerprint
@@ -19579,6 +20132,66 @@ rust_gal_world_background_sky_type=1 rust_gal_world_background_color_argb=ff78a7
             self.assertEqual("palette_mismatch", insufficient["status"])
             self.assertEqual("insufficient_texture_footprint", insufficient["targets"][0]["status"])
 
+    def test_distant_horizons_palette_unions_adjacent_matching_quads(self) -> None:
+        from PIL import Image
+
+        def ndc(pixel_x: int, pixel_y: int) -> list[float]:
+            return [pixel_x / 255.0 * 2.0 - 1.0, 1.0 - pixel_y / 255.0 * 2.0, 0.0]
+
+        def target(x: int, y: int, sprite: str) -> dict[str, object]:
+            matches = []
+            # Nine adjacent reduced quads represent one material footprint.
+            # Each individual quad is below the final-frame threshold; their
+            # projected union is the evidence the gate is meant to measure.
+            for row in range(3):
+                for column in range(3):
+                    left = x + column * 6
+                    top = y + row * 6
+                    matches.append({
+                        "sprite": sprite,
+                        "tileSpan": [1.0, 1.0],
+                        "atlasRect": [0.0, 0.0, 0.25, 0.25],
+                        "projection": {
+                            "status": "ok",
+                            "insideClip": True,
+                            "ndcVertices": [
+                                ndc(left, top), ndc(left + 6, top),
+                                ndc(left + 6, top + 6), ndc(left, top + 6),
+                            ],
+                        },
+                    })
+            return {
+                "matched": True,
+                "tileRepeatRequired": False,
+                "expectedSprites": [sprite],
+                "matches": matches,
+            }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            screenshot = Path(temp_dir) / "adjacent-palette.png"
+            image = Image.new("RGB", (256, 256), (18, 18, 18))
+            palette = [
+                (24, 24, (42, 98, 190), "minecraft:block/lapis_block"),
+                (144, 24, (116, 45, 62), "minecraft:block/redstone_ore"),
+                (24, 144, (168, 101, 39), "minecraft:block/yellow_terracotta"),
+                (144, 144, (54, 190, 190), "minecraft:block/diamond_block"),
+            ]
+            targets = []
+            for x, y, color, sprite in palette:
+                for pixel_x in range(x, x + 18):
+                    for pixel_y in range(y, y + 18):
+                        image.putpixel((pixel_x, pixel_y), color)
+                targets.append(target(x, y, sprite))
+            image.save(screenshot)
+
+            evidence = harness.deterministic_distant_horizons_texture_palette_pixel_evidence(
+                {"captures": [{"screenshot": str(screenshot)}]},
+                {"paletteTargetCoverage": targets},
+            )
+            self.assertEqual("present", evidence["status"])
+            self.assertEqual(4, evidence["passed_targets"])
+            self.assertTrue(all(target["footprint_pixels"] >= 96 for target in evidence["targets"]))
+
     def test_distant_horizons_source_palette_uses_its_declared_row_orientation(self) -> None:
         from PIL import Image
 
@@ -20993,7 +21606,9 @@ else:
             _, source_dh_env = harness.build_capture_command(
                 target, rust_mode, root / "distant-horizons", "correctness", source_dh_args, "capture"
             )
-            self.assertEqual("true", source_dh_env["MATTMC_CAPTURE_RESET_DH_DATABASE"])
+            self.assertEqual("10", source_dh_env["MATTMC_CAPTURE_RENDER_DISTANCE"])
+            self.assertEqual("12", source_dh_env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
+            self.assertNotIn("MATTMC_CAPTURE_RESET_DH_DATABASE", source_dh_env)
             self.assertNotIn("-Dmattmc.dev.rustGalDistantHorizons.opaqueV1=true", source_dh_env["JAVA_TOOL_OPTIONS"])
             self.assertIn("-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true", source_dh_env["JAVA_TOOL_OPTIONS"])
             self.assertIn(
@@ -21020,7 +21635,9 @@ else:
             _command, frozen_dh_env = harness.build_capture_command(
                 frozen_target, frozen_mode, root / "frozen-distant-horizons", "correctness", frozen_dh_args, "capture"
             )
-            self.assertEqual("true", frozen_dh_env["MATTMC_CAPTURE_RESET_DH_DATABASE"])
+            self.assertEqual("10", frozen_dh_env["MATTMC_CAPTURE_RENDER_DISTANCE"])
+            self.assertEqual("12", frozen_dh_env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
+            self.assertNotIn("MATTMC_CAPTURE_RESET_DH_DATABASE", frozen_dh_env)
             self.assertNotIn(
                 "-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true",
                 frozen_dh_env["JAVA_TOOL_OPTIONS"],
@@ -21030,7 +21647,7 @@ else:
                 frozen_dh_env["JAVA_TOOL_OPTIONS"],
             )
             self.assertIn(
-                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons",
                 frozen_dh_env["JAVA_TOOL_OPTIONS"],
             )
             self.assertIn(
@@ -21605,23 +22222,92 @@ else:
             _command, env = harness.build_capture_command(
                 target, mode, root / "capture", "correctness", args, "capture"
             )
-            self.assertEqual("6", env["MATTMC_CAPTURE_RENDER_DISTANCE"])
-            self.assertEqual("5", env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
+            self.assertEqual("10", env["MATTMC_CAPTURE_RENDER_DISTANCE"])
+            self.assertEqual("12", env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
             self.assertIn(
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=2",
                 env["JAVA_TOOL_OPTIONS"],
             )
             self.assertIn(
-                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons",
                 env["JAVA_TOOL_OPTIONS"],
             )
             self.assertIn(
                 "-Dmattmc.dev.deterministicCameraCapture.sourceEntityIsolation=true",
                 env["JAVA_TOOL_OPTIONS"],
             )
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.dhFarOnlyRenderDistance=2",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.dhRequested=true",
+                env["JAVA_TOOL_OPTIONS"],
+            )
             self.assertNotIn(
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=static-terrain",
                 env["JAVA_TOOL_OPTIONS"],
+            )
+
+    def test_frozen_dh_palette_uses_the_same_far_only_capture_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "frozen")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-distant-horizons-opaque",
+                    "--world-distant-horizons-texture-palette",
+                ]
+            )
+            _command, env = harness.build_capture_command(
+                target, mode, root / "capture", "correctness", args, "capture"
+            )
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.dhFarOnlyRenderDistance=2",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.dhRequested=true",
+                env["JAVA_TOOL_OPTIONS"],
+            )
+            java_options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertGreater(
+                java_options.index("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=240"),
+                java_options.index("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=9600"),
+            )
+
+    def test_dh_view_distance_lifecycle_replaces_the_blind_frozen_warmup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = fake_repo(root, "frozen")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            args = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-distant-horizons-opaque",
+                    "--world-distant-horizons-real-world",
+                    "--world-static-terrain-scenario",
+                    "view-distance-decrease",
+                ]
+            )
+            _command, env = harness.build_capture_command(
+                target, mode, root / "capture", "correctness", args, "capture"
+            )
+            java_options = shlex.split(env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.deterministicCameraCapture.dhRequested=true", java_options)
+            self.assertGreater(
+                java_options.index("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=8"),
+                java_options.index("-Dmattmc.dev.deterministicCameraCapture.framesPerPose=9600"),
             )
 
     def test_capture_runner_keeps_dh_palette_source_radius_bounded(self) -> None:
@@ -21972,6 +22658,11 @@ else:
                             "semanticFrameEnabled": True,
                         },
                         "rustGalDistantHorizonsTextureProbeReceipt": {"matched": True, "status": "ok"},
+                        "rustGalDistantHorizonsReducedColorPaletteReceipt": {
+                            "contract": "reduced-color-material-category",
+                            "matched": True,
+                            "status": "consumed-column-materials-present",
+                        },
                     }
                 ),
                 encoding="utf-8",
@@ -22108,6 +22799,60 @@ else:
             self.assertFalse(
                 any("exact source-stage material identity" in message for message in vanilla["validation"]["messages"]),
                 vanilla["validation"]["messages"],
+            )
+
+            # The ordinary shader-off route deliberately retains Frozen DH's
+            # reduced vertex-color contract and therefore has no exact sprite
+            # matches. Its same-frame receipt must pass without pretending an
+            # atlas stream was executed.
+            reduced_plan = {
+                "frameId": 42,
+                "atlasAdmission": "ordinary-direct-reduced-color-contract",
+                "executedExactSegments": 0,
+                "selectedSpriteCounts": {},
+                "paletteTargetCoverage": [
+                    {"position": [88, 80, 552], "matched": False},
+                    {"position": [104, 80, 552], "matched": False},
+                    {"position": [88, 80, 536], "matched": False},
+                    {"position": [104, 80, 536], "matched": False},
+                ],
+            }
+            (contract_dir / "world-lod-exact-atlas-plan-frame-42.json").write_text(
+                json.dumps(reduced_plan), encoding="utf-8"
+            )
+            reduced_vanilla = harness.normalize_capture_artifact(
+                target, vanilla_mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            reduced_messages = reduced_vanilla["validation"]["messages"]
+            self.assertFalse(
+                any("exact semantic sprite coverage" in message for message in reduced_messages),
+                reduced_messages,
+            )
+            self.assertFalse(
+                any("screenshot-frame-correlated Rust exact-atlas receipt" in message for message in reduced_messages),
+                reduced_messages,
+            )
+            self.assertFalse(
+                any("ordinary reduced-color contract lacks" in message for message in reduced_messages),
+                reduced_messages,
+            )
+
+            ack_path = receipt_dir / "capture_request_01_distant-horizons-texture-palette.ack.json"
+            invalid_ack = json.loads(ack_path.read_text(encoding="utf-8"))
+            invalid_ack["rustGalDistantHorizonsReducedColorPaletteReceipt"]["matched"] = False
+            invalid_ack["rustGalDistantHorizonsReducedColorPaletteReceipt"]["status"] = (
+                "consumed-column-materials-missing"
+            )
+            ack_path.write_text(json.dumps(invalid_ack), encoding="utf-8")
+            invalid_reduced_vanilla = harness.normalize_capture_artifact(
+                target, vanilla_mode, capture, "correctness", True, ["fake"], 0, False, tool_kind="capture"
+            )
+            self.assertTrue(
+                any(
+                    "ordinary reduced-color contract lacks" in message
+                    for message in invalid_reduced_vanilla["validation"]["messages"]
+                ),
+                invalid_reduced_vanilla["validation"]["messages"],
             )
 
     def test_capture_runner_receives_profile_shutdown_budget(self) -> None:
@@ -22573,6 +23318,21 @@ else:
             meta_lines,
         )
 
+        runner.env = {
+            "MATTMC_RUST_DH_DISABLE_VANILLA_FOG_OCCLUSION": "true",
+            "MATTMC_CAPTURE_DH_RADIUS_OVERRIDE": "8",
+        }
+        meta_lines.clear()
+        self.assertEqual(
+            runner.fresh_environment_launch_command(["./gradlew", "runClient"]),
+            ["./gradlew", "--no-daemon", "runClient"],
+        )
+        self.assertIn("native_diagnostic_forced_gradle_no_daemon=true", meta_lines)
+        self.assertIn(
+            "native_diagnostic_inputs=MATTMC_CAPTURE_DH_RADIUS_OVERRIDE,MATTMC_RUST_DH_DISABLE_VANILLA_FOG_OCCLUSION",
+            meta_lines,
+        )
+
         runner.env = {}
         self.assertEqual(
             runner.fresh_environment_launch_command(["./gradlew", "runClient"]),
@@ -22758,6 +23518,15 @@ else:
                 "forced_dh_ordinary_enableRendering": "false",
             },
         )
+        self.assertFalse(state["generating"])
+        self.assertEqual("logged", state["state"])
+
+    def test_dh_initialization_banner_alone_is_not_active_generation(self) -> None:
+        state = harness.dh_state_from_text(
+            "DistantHorizons Batch Chunk Generator initialized",
+            {},
+        )
+        self.assertTrue(state["present_or_logged"])
         self.assertFalse(state["generating"])
         self.assertEqual("logged", state["state"])
 
@@ -23558,11 +24327,57 @@ else:
             self.assertEqual((fixture_function / "load.mcfunction").read_text(encoding="utf-8"), "schedule function mattmc:fixture 1t replace\n")
             self.assertIn("tellraw @a", (fixture_function / "fixture.mcfunction").read_text(encoding="utf-8"))
             self.assertIn("fill 92 82 536 95 82 539 minecraft:water", (fixture_function / "fixture.mcfunction").read_text(encoding="utf-8"))
+            self.assertIn("fill 91 82 535 96 82 535 minecraft:stone", (fixture_function / "fixture.mcfunction").read_text(encoding="utf-8"))
+            self.assertIn("fill 91 82 536 91 82 539 minecraft:stone", (fixture_function / "fixture.mcfunction").read_text(encoding="utf-8"))
             self.assertIn("unless block 77 81 537", (fixture_function / "tick.mcfunction").read_text(encoding="utf-8"))
             self.assertEqual(
                 json.loads((run_root / "saves" / "Origin" / "datapacks" / "mattmc_dh_fixture" / "data" / "minecraft" / "tags" / "function" / "tick.json").read_text(encoding="utf-8")),
                 {"values": ["mattmc:tick"]},
             )
+
+    def test_dh_source_save_fixture_skips_external_witness_datapack(self) -> None:
+        with tempfile.TemporaryDirectory() as temp, mock.patch.dict(
+            os.environ, {"MATTMC_CAPTURE_DH_SKIP_EXTERNAL_FIXTURE": "1"}, clear=False
+        ):
+            root = Path(temp)
+            current = fake_repo(root, "current")
+            source_world = current.root / "run" / "saves" / "Origin" / "region"
+            source_world.mkdir(parents=True)
+            (source_world / "r.0.0.mca").write_bytes(b"pre-generated-dh-region")
+            (current.root / "run" / "options.txt").write_text("graphicsMode:1\n", encoding="utf-8")
+            (current.root / "run" / "config").mkdir(parents=True)
+            (current.root / "run" / "config" / "DistantHorizons.toml").write_text(
+                "numberOfThreads = 2\n"
+                "lodChunkRenderDistanceRadius = 8\n"
+                "enableSsao = true\n"
+                "enableGenericRendering = true\n"
+                "dhFadeFarClipPlane = true\n"
+                "vanillaFadeMode = \"NONE\"\n"
+                "lodOnlyMode = false\n"
+                "transparency = \"COMPLETE\"\n"
+                "rendererMode = \"DISABLED\"\n"
+                "enableRendering = false\n",
+                encoding="utf-8",
+            )
+            args = Namespace(
+                world="Origin",
+                world_profile="migration-gate",
+                world_static_terrain_scenario="real-world",
+                world_static_terrain_resource_pack_scenario="vanilla",
+                world_distant_horizons_opaque=True,
+                world_distant_horizons_non_water=False,
+                world_distant_horizons_water=False,
+                world_distant_horizons_texture_palette=False,
+                graphics_mode="fabulous",
+            )
+            run_root = harness.materialize_canonical_fixture(
+                args, {"current": current}, root / "artifacts"
+            )
+            self.assertFalse(
+                (run_root / "saves" / "Origin" / "datapacks" / "mattmc_dh_fixture").exists()
+            )
+            manifest = json.loads(Path(args._canonical_fixture_manifest).read_text(encoding="utf-8"))
+            self.assertIn("dh-source-save", manifest["fixture_id"])
 
     def test_current_only_terrain_capture_requests_canonical_fixture(self) -> None:
         args = Namespace(
@@ -24654,6 +25469,32 @@ else:
             self.assertEqual("x11-identity-only", evidence["status"])
             self.assertEqual("unverified-without-renderer-frame-correlation", evidence["pixelAttribution"])
 
+    def test_gameplay_screenshot_rejects_a_foreign_client_window(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runner = capture_runner.CaptureRunner.__new__(capture_runner.CaptureRunner)
+            runner.config = type("Config", (), {
+                "title_screen_transition_capture": False,
+                "screenshot_max_count": 1,
+            })()
+            runner.screenshot_enabled = True
+            runner.screenshot_count = 0
+            runner.run_id = "test"
+            runner.artifact_dir = Path(temp)
+            runner.platform_name = "linux"
+            runner.append_meta = lambda _value: None
+
+            def capture(_platform: str, destination: Path, _pid: int, **_kwargs: object) -> str:
+                destination.write_bytes(b"foreign-window")
+                return "0x123"
+
+            with mock.patch.object(capture_runner, "capture_screenshot", side_effect=capture), mock.patch.object(
+                capture_runner, "window_capture_provenance", return_value={"status": "unverified"}
+            ):
+                runner.capture_root_screenshot("tick", 1, 42)
+
+            self.assertEqual(0, runner.screenshot_count)
+            self.assertEqual([], list(Path(temp).glob("*.png")))
+
     def test_strict_linux_capture_requires_a_known_client_window(self) -> None:
         with tempfile.TemporaryDirectory() as temp, mock.patch.object(
             capture_runner, "find_linux_client_window_id", return_value=None
@@ -24791,6 +25632,91 @@ else:
             dh_text = dh_file.read_text(encoding="utf-8")
             self.assertIn("enableRendering = false", dh_text)
             self.assertNotIn("rendererMode", dh_text)
+
+    def test_capture_runner_frozen_dh_baseline_keeps_java_renderer_enabled(self) -> None:
+        """Frozen's paired DH row must contain the source LOD contribution."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game_dir = root / "game"
+            (game_dir / "config").mkdir(parents=True)
+            (game_dir / "options.txt").write_text("graphics_backend=opengl\n", encoding="utf-8")
+            dh_file = game_dir / "config" / "DistantHorizons.toml"
+            dh_file.write_text(
+                'rendererMode = "DEFAULT"\nenableRendering = true\n'
+                'lodChunkRenderDistanceRadius = 256\n',
+                encoding="utf-8",
+            )
+            config = isolated_capture_config(root, scenario="real-world")
+            config.game_dir = str(game_dir)
+            runner = capture_runner.CaptureRunner(config)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY": "true",
+                    "MATTMC_CAPTURE_DH_RUST_NON_WATER": "false",
+                    "MATTMC_CAPTURE_FROZEN_DH_BASELINE": "true",
+                },
+                clear=False,
+            ):
+                runner.configure_backend_and_validation()
+            dh_text = dh_file.read_text(encoding="utf-8")
+            self.assertIn("enableRendering = true", dh_text)
+            self.assertIn("lodChunkRenderDistanceRadius = 4", dh_text)
+
+    def test_capture_runner_dh_water_disables_legacy_java_draw_on_current(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game_dir = root / "game"
+            (game_dir / "config").mkdir(parents=True)
+            (game_dir / "options.txt").write_text("graphics_backend=vulkan\n", encoding="utf-8")
+            dh_file = game_dir / "config" / "DistantHorizons.toml"
+            dh_file.write_text(
+                'rendererMode = "DEFAULT"\nenableRendering = true\n',
+                encoding="utf-8",
+            )
+            config = isolated_capture_config(root, scenario="real-world")
+            config.game_dir = str(game_dir)
+            runner = capture_runner.CaptureRunner(config)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MATTMC_CAPTURE_DH_RUST_WATER": "true",
+                    "MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY": "false",
+                    "MATTMC_CAPTURE_DH_RUST_NON_WATER": "false",
+                    "MATTMC_CAPTURE_FROZEN_DH_BASELINE": "false",
+                },
+                clear=False,
+            ):
+                runner.configure_backend_and_validation()
+            self.assertIn("enableRendering = false", dh_file.read_text(encoding="utf-8"))
+
+    def test_capture_runner_preserves_explicit_dh_radius_override(self) -> None:
+        """A diagnostic DH radius must survive the opaque-row default settings."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            game_dir = root / "game"
+            (game_dir / "config").mkdir(parents=True)
+            (game_dir / "options.txt").write_text("graphics_backend=vulkan\n", encoding="utf-8")
+            (game_dir / "config" / "DistantHorizons.toml").write_text(
+                'rendererMode = "DEFAULT"\nenableRendering = true\n'
+                "lodChunkRenderDistanceRadius = 4\n",
+                encoding="utf-8",
+            )
+            config = isolated_capture_config(root, scenario="real-world")
+            config.game_dir = str(game_dir)
+            runner = capture_runner.CaptureRunner(config)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY": "true",
+                    "MATTMC_CAPTURE_DH_RADIUS_OVERRIDE": "16",
+                    "MATTMC_CAPTURE_FROZEN_DH_BASELINE": "false",
+                },
+                clear=False,
+            ):
+                runner.configure_backend_and_validation()
+            dh_text = (game_dir / "config" / "DistantHorizons.toml").read_text(encoding="utf-8")
+            self.assertIn("lodChunkRenderDistanceRadius = 16", dh_text)
 
     def test_capture_runner_isolated_vanilla_route_disables_dh_rendering_for_both_repositories(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -25786,6 +26712,31 @@ else:
             set(harness.static_terrain_covered_records(records)),
         )
 
+    def test_dh_view_distance_lifecycle_does_not_require_ordinary_draw_aggregate_parity(self) -> None:
+        args = harness.parse_args(
+            [
+                "capture",
+                "--profile",
+                "standard",
+                "--world-distant-horizons-opaque",
+                "--world-distant-horizons-real-world",
+                "--world-static-terrain-scenario",
+                "translucent-view-distance-increase",
+            ]
+        )
+        self.assertFalse(harness.static_terrain_draw_coverage_applicable(args))
+
+        ordinary_args = harness.parse_args(
+            [
+                "capture",
+                "--profile",
+                "standard",
+                "--world-static-terrain-scenario",
+                "view-distance-increase",
+            ]
+        )
+        self.assertTrue(harness.static_terrain_draw_coverage_applicable(ordinary_args))
+
     def test_static_terrain_coverage_does_not_compare_truncated_record_samples_as_sets(self) -> None:
         """A bounded receipt reports its limit, while aggregate parity stays strict."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -26017,6 +26968,35 @@ else:
                 self.assertEqual("260", env["MATTMC_CAPTURE_MAX_FPS"])
                 self.assertEqual("4", env["MATTMC_CAPTURE_RENDER_DISTANCE"])
                 self.assertEqual("5", env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
+
+    def test_static_terrain_gameplay_honors_explicit_distance_override_for_ab_measurement(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
+            os.environ,
+            {
+                "MATTMC_CAPTURE_RENDER_DISTANCE": "10",
+                "MATTMC_CAPTURE_SIMULATION_DISTANCE": "12",
+            },
+            clear=False,
+        ):
+            root = Path(temp_dir)
+            target = fake_repo(root, "current")
+            mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-off")
+            args = harness.parse_args(
+                [
+                    "gameplay",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    mode.name,
+                    "--world-static-terrain-scenario",
+                    "steady-state-performance",
+                ]
+            )
+            _, env = harness.build_capture_command(
+                target, mode, root / "gameplay", "gameplay", args, "gameplay"
+            )
+            self.assertEqual("10", env["MATTMC_CAPTURE_RENDER_DISTANCE"])
+            self.assertEqual("12", env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
 
     def test_frozen_shell_settled_static_capture_waits_for_the_same_terrain_readiness(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -26670,9 +27650,11 @@ else:
             _, dh_env = harness.build_capture_command(
                 target, harness.MATRIX_MODES[0], root / "capture-dh", "correctness", dh, "capture"
             )
+            self.assertEqual("10", dh_env["MATTMC_CAPTURE_RENDER_DISTANCE"])
+            self.assertEqual("12", dh_env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
             dh_options = shlex.split(dh_env["JAVA_TOOL_OPTIONS"])
             self.assertIn(
-                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=distant-horizons",
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons",
                 dh_options,
             )
 
@@ -26704,10 +27686,85 @@ else:
                 target, harness.MATRIX_MODES[0], root / "capture-dh-water", "correctness", dh_water, "capture"
             )
             self.assertEqual("false", dh_water_env["MATTMC_CAPTURE_DH_RUST_OPAQUE_ONLY"])
+            dh_water_options = shlex.split(dh_water_env["JAVA_TOOL_OPTIONS"])
+            self.assertIn("-Dmattmc.dev.rustGalDistantHorizons.requireWater=true", dh_water_options)
             self.assertIn(
-                "-Dmattmc.dev.rustGalDistantHorizons.requireWater=true",
-                shlex.split(dh_water_env["JAVA_TOOL_OPTIONS"]),
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons",
+                dh_water_options,
             )
+            frozen_dh_water = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    "frozen-opengl-shaders-off",
+                    "--world",
+                    "Origin",
+                    "--world-distant-horizons-opaque",
+                    "--world-distant-horizons-water",
+                ]
+            )
+            frozen_mode = next(mode for mode in harness.MATRIX_MODES if mode.name == "frozen-opengl-shaders-off")
+            _, frozen_dh_water_env = harness.build_capture_command(
+                target, frozen_mode, root / "capture-frozen-dh-water", "correctness", frozen_dh_water, "capture"
+            )
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames=8",
+                shlex.split(frozen_dh_water_env["JAVA_TOOL_OPTIONS"]),
+            )
+
+            dh_real_world = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    "current-rust-vulkan-shaders-off",
+                    "--world",
+                    "Origin",
+                    "--world-distant-horizons-opaque",
+                    "--world-distant-horizons-real-world",
+                ]
+            )
+            _, dh_real_world_env = harness.build_capture_command(
+                target,
+                next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-off"),
+                root / "capture-dh-real-world",
+                "correctness",
+                dh_real_world,
+                "capture",
+            )
+            self.assertIn(
+                "-Dmattmc.dev.rustGalDistantHorizons.realWorld=true",
+                shlex.split(dh_real_world_env["JAVA_TOOL_OPTIONS"]),
+            )
+
+            dh_water_static = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "standard",
+                    "--mode",
+                    "current-rust-vulkan-shaders-on",
+                    "--world",
+                    "Origin",
+                    "--world-distant-horizons-opaque",
+                    "--world-distant-horizons-water",
+                    "--world-static-terrain-scenario",
+                    "translucent-water",
+                ]
+            )
+            _, dh_water_static_env = harness.build_capture_command(
+                target,
+                next(mode for mode in harness.MATRIX_MODES if mode.name == "current-rust-vulkan-shaders-on"),
+                root / "capture-dh-water-static",
+                "correctness",
+                dh_water_static,
+                "capture",
+            )
+            self.assertEqual("10", dh_water_static_env["MATTMC_CAPTURE_RENDER_DISTANCE"])
+            self.assertEqual("12", dh_water_static_env["MATTMC_CAPTURE_SIMULATION_DISTANCE"])
 
             ordinary_source = harness.parse_args(
                 [
@@ -26773,6 +27830,38 @@ else:
             self.assertIn(
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain",
                 resource_pack_options,
+            )
+
+            dh_resource_pack = harness.parse_args(
+                [
+                    "capture",
+                    "--profile",
+                    "extended",
+                    "--mode",
+                    "current-rust-vulkan-shaders-on",
+                    "--world",
+                    "Origin",
+                    "--world-distant-horizons-opaque",
+                    "--world-static-terrain-resource-pack-scenario",
+                    "pack-a",
+                ]
+            )
+            _, dh_resource_pack_env = harness.build_capture_command(
+                target,
+                rust_vulkan,
+                root / "capture-dh-resource-pack",
+                "correctness",
+                dh_resource_pack,
+                "capture",
+            )
+            dh_resource_pack_options = shlex.split(dh_resource_pack_env["JAVA_TOOL_OPTIONS"])
+            self.assertNotEqual("true", dh_resource_pack_env.get("MATTMC_CAPTURE_DISABLE_DH_FOR_ORDINARY_SOURCE", "false"))
+            self.assertNotIn("-Dmattmc.dev.rustGalDistantHorizons.disabled=true", dh_resource_pack_options)
+            self.assertIn("-Dmattmc.dev.rustGalStaticTerrain.scenario=real-world", dh_resource_pack_options)
+            self.assertIn("-Dmattmc.dev.rustGalStaticTerrain.resourcePackScenario=pack-a", dh_resource_pack_options)
+            self.assertIn(
+                "-Dmattmc.dev.deterministicCameraCapture.settledReadyFamilies=sodium-terrain,distant-horizons",
+                dh_resource_pack_options,
             )
             resource_pack_gameplay = harness.parse_args(
                 [
@@ -29499,6 +30588,65 @@ else:
         evidence = harness.static_terrain_lifecycle_evidence({}, {}, "translucent-glass")
         self.assertEqual(evidence["status"], "skip")
         self.assertIsNone(evidence["failure"])
+
+    def test_frozen_static_terrain_resource_lifecycle_receipt_passes(self) -> None:
+        evidence = harness.frozen_static_terrain_lifecycle_evidence(
+            {
+                "setup": True,
+                "afterRecorded": True,
+                "stage": "replacement-visible",
+                "scenario": "pack-priority-reversal",
+                "resourcePackScenario": "priority-a-b",
+                "beforeVisibleList": "sections=222,hash=ead059c9e2f5a92e,stableFrames=1525,readyFrames=1525,gameTime=6000",
+                "afterVisibleList": "sections=222,hash=ead059c9e2f5a92e,stableFrames=9,readyFrames=9,gameTime=6000",
+                "waitFrames": 8,
+            },
+            "pack-priority-reversal",
+        )
+        self.assertEqual(evidence["status"], "pass")
+        self.assertEqual(evidence["failures"], [])
+
+    def test_frozen_static_terrain_resource_lifecycle_receipt_rejects_missing_settlement(self) -> None:
+        evidence = harness.frozen_static_terrain_lifecycle_evidence(
+            {
+                "setup": True,
+                "afterRecorded": True,
+                "stage": "replacement-visible",
+                "scenario": "resource-reload",
+                "beforeVisibleList": "sections=222,hash=ead059c9e2f5a92e,stableFrames=4,readyFrames=4",
+                "afterVisibleList": "sections=222,hash=ead059c9e2f5a92e,stableFrames=3,readyFrames=3",
+                "waitFrames": 3,
+            },
+            "resource-reload",
+        )
+        self.assertEqual(evidence["status"], "fail")
+        self.assertIn("frozen_lifecycle_settlement_incomplete", evidence["failures"])
+        self.assertIn("frozen_lifecycle_wait_incomplete", evidence["failures"])
+
+    def test_frozen_static_terrain_lifecycle_skips_unimplemented_action(self) -> None:
+        evidence = harness.frozen_static_terrain_lifecycle_evidence({}, "world-unload-reload")
+        self.assertEqual(evidence["status"], "skip")
+        self.assertIsNone(evidence["failure"])
+
+    def test_frozen_static_terrain_view_distance_receipt_validates_direction(self) -> None:
+        evidence = harness.frozen_static_terrain_lifecycle_evidence(
+            {
+                "setup": True,
+                "afterRecorded": True,
+                "stage": "replacement-visible",
+                "scenario": "view-distance-decrease",
+                "action": "view-distance-decreased",
+                "beforeRenderDistance": 10,
+                "afterRenderDistance": 4,
+                "beforeSimulationDistance": 12,
+                "afterSimulationDistance": 4,
+                "beforeVisibleList": "sections=222,hash=ead059c9e2f5a92e,stableFrames=20,readyFrames=20",
+                "afterVisibleList": "sections=83,hash=32f5e5f1,stableFrames=9,readyFrames=9",
+                "waitFrames": 8,
+            },
+            "view-distance-decrease",
+        )
+        self.assertEqual(evidence["status"], "pass")
 
     def test_static_terrain_lifecycle_allows_translucent_prefixed_air_placement(self) -> None:
         diagnostics = {

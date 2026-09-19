@@ -211,6 +211,39 @@ public class LodRequestModule implements Closeable
 	//=========//
 	
 	public boolean isWorldGenRunning() { return this.lodRequestStateRef.get() != null; }
+
+	/**
+	 * Returns a renderer-neutral snapshot of the generation queue. This is used
+	 * by deterministic capture diagnostics so a stable render list is not
+	 * mistaken for a fully generated LOD set.
+	 */
+	public WorldGenerationProgress getWorldGenerationProgress()
+	{
+		AbstractLodRequestState state = this.lodRequestStateRef.get();
+		if (state == null || state.retrievalQueue == null)
+		{
+			return new WorldGenerationProgress(false, -1, -1, -1, -1);
+		}
+
+		IFullDataSourceRetrievalQueue queue = state.retrievalQueue;
+		int estimatedRemaining = Math.max(0, queue.getRetrievalEstimatedRemainingChunkCount());
+		int queued = Math.max(0, queue.getQueuedChunkCount());
+		return new WorldGenerationProgress(
+			true,
+			estimatedRemaining + queued,
+			Math.max(0, queue.getWaitingTaskCount()),
+			Math.max(0, queue.getInProgressTaskCount()),
+			queued
+		);
+	}
+
+	public record WorldGenerationProgress(
+		boolean running,
+		int remainingChunks,
+		int waitingTasks,
+		int inProgressTasks,
+		int queuedChunks
+	) { }
 	
 	/** mutates a list so it can be added to an existing {@link IDhLevel}'s debug list  */
 	public void addDebugMenuStringsToList(List<String> messageList)

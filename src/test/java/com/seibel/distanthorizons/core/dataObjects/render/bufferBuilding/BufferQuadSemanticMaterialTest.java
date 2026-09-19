@@ -34,6 +34,22 @@ class BufferQuadSemanticMaterialTest {
 	}
 
 	@Test
+	void exactAtlasRouteKeepsDifferentWeightedVariantPositionsSeparate() {
+		assertTrue(!LodQuadBuilder.canMergeSemanticMaterials(
+			true, 11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 100L,
+			11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 200L
+		));
+		assertTrue(LodQuadBuilder.canMergeSemanticMaterials(
+			true, 11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 100L,
+			11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 100L
+		));
+		assertTrue(LodQuadBuilder.canMergeSemanticMaterials(
+			false, 11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 100L,
+			11, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 200L
+		));
+	}
+
+	@Test
 	void contributorSpansClipIntoContiguousVerticalExactSegments() {
 		ColumnRenderSource.SemanticHorizontalContributor contributor =
 			new ColumnRenderSource.SemanticHorizontalContributor(java.util.List.of(

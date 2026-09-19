@@ -171,14 +171,14 @@ public class RustGalTerrainRendererLightingContractTest {
 		String body = source.substring(method, nextMethod < 0 ? source.length() : nextMethod);
 		assertTrue(body.contains("semanticRawSnapshot()"));
 		assertTrue(body.contains("semanticSnapshotFrameKey()"));
-		assertTrue(body.contains("copiedAtlasSemanticGeneration == semanticGeneration"));
-		assertTrue(body.contains("copiedAtlasSemanticFrameKey == semanticFrameKey"));
+		assertTrue(body.contains("canReuseSemanticAtlasPayload(copiedAtlasSemanticGeneration"));
+		assertTrue(body.contains("copiedAtlasSemanticFrameKey, semanticFrameKey, animationDeclarationStable"));
 		assertTrue(body.contains("snapshotFrameKey"));
 		int copySprite = source.indexOf("private static void copySprite");
 		String copyBody = source.substring(copySprite, source.indexOf("\n\tprivate static long rgbaHash", copySprite));
 		assertTrue(copyBody.contains("contents.semanticFrameIndex()"));
-		assertTrue(copyBody.contains("getFrameX(frame) * contents.width()"));
-		assertTrue(copyBody.contains("getFrameY(frame) * contents.height()"));
+		assertTrue(copyBody.contains("contents.animatedTexture.getFrameX(frame) * contents.width()"));
+		assertTrue(copyBody.contains("contents.animatedTexture.getFrameY(frame) * contents.height()"));
 	}
 
 	@Test

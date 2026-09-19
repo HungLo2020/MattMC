@@ -6,7 +6,7 @@ use super::backends::{
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, CommandList, CommandListDesc,
     CommandOp, ResourceBarrier, SubmissionBatch, TextureImageCopyRegion, TextureOrigin3d,
-    ValidatedSubmissionBatch, TextureUsageState,
+    TextureUsageState, ValidatedSubmissionBatch,
 };
 use super::error::{GalError, GalResult, StatusCode};
 use super::frame::{
@@ -333,6 +333,8 @@ pub(super) struct CommandNormalizationStats {
 struct CommandStateTracker {
     graphics_pipeline: Option<Handle>,
     compute_pipeline: Option<Handle>,
+    pipeline_layout: Option<Handle>,
+    pipeline_layout_known: bool,
     resource_sets: BTreeMap<(Handle, u32), (Handle, Vec<u64>)>,
     vertex_buffers: BTreeMap<u32, (Handle, u64)>,
     index_buffer: Option<(Handle, u64, IndexType)>,
@@ -342,6 +344,8 @@ impl CommandStateTracker {
     fn invalidate(&mut self) {
         self.graphics_pipeline = None;
         self.compute_pipeline = None;
+        self.pipeline_layout = None;
+        self.pipeline_layout_known = false;
         self.resource_sets.clear();
         self.vertex_buffers.clear();
         self.index_buffer = None;
@@ -571,7 +575,17 @@ impl VulkanicGal {
             extent: desc.extent,
             mip_levels: 1,
             array_layers: 1,
-            usages: vec![TextureUsage::DepthStencilAttachment, TextureUsage::Sampled, TextureUsage::TransferDst],
+            usages: vec![
+                TextureUsage::DepthStencilAttachment,
+                TextureUsage::Sampled,
+                TextureUsage::TransferDst,
+                // The opt-in whole-frame attachment audit copies the
+                // Rust-owned forward depth image once after rendering. Keep
+                // this capability on the same owned image so the diagnostic
+                // does not introduce a second depth domain or a presenter
+                // handoff.
+                TextureUsage::TransferSrc,
+            ],
         })?;
         let depth_view = match self.create_texture_view(TextureViewDesc {
             label: format!("{}.depth-view", desc.label),
@@ -1847,7 +1861,9 @@ impl VulkanicGal {
                 if let CommandOp::TrackSubmission(usage) = op {
                     submission_usages.push(usage.clone());
                     false
-                } else { true }
+                } else {
+                    true
+                }
             });
         }
         for list in &batch.command_lists {
@@ -1868,7 +1884,36 @@ impl VulkanicGal {
                     .saturating_add(elapsed_nanos_u64(validate_ops_started));
             }
         }
-        let normalization = normalize_submission_batch(&mut batch);
+        // Normalization may retain descriptor sets across a pipeline switch
+        // only when the two pipeline objects explicitly share the same layout.
+        // Resolve those immutable layout identities once before mutating the
+        // command lists; an unknown handle remains conservatively incompatible.
+        let mut graphics_pipeline_layouts = BTreeMap::new();
+        let mut compute_pipeline_layouts = BTreeMap::new();
+        for list in &batch.command_lists {
+            for operation in &list.operations {
+                match operation {
+                    CommandOp::BindGraphicsPipeline(handle) => {
+                        if !graphics_pipeline_layouts.contains_key(handle) {
+                            graphics_pipeline_layouts
+                                .insert(*handle, self.graphics_pipelines.get(*handle)?.desc.layout);
+                        }
+                    }
+                    CommandOp::BindComputePipeline(handle) => {
+                        if !compute_pipeline_layouts.contains_key(handle) {
+                            compute_pipeline_layouts
+                                .insert(*handle, self.compute_pipelines.get(*handle)?.desc.layout);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let normalization = normalize_submission_batch_with_pipeline_layouts(
+            &mut batch,
+            &graphics_pipeline_layouts,
+            &compute_pipeline_layouts,
+        );
         if let Some(profile) = profile.as_deref_mut() {
             profile.gal_command_ops_before_normalize = profile
                 .gal_command_ops_before_normalize
@@ -1927,7 +1972,9 @@ impl VulkanicGal {
         self.backend.submit(id, &validated)?;
         self.latest_accepted_submission = id;
         self.buffer_upload_capture.accept(id);
-        for usage in &submission_usages { usage.accept(id); }
+        for usage in &submission_usages {
+            usage.accept(id);
+        }
         submission_trace(&format!("gal.submit.queue.end id={}", id.0));
         if let Some(profile) = profile.as_deref_mut() {
             profile.backend_submit_nanos = profile
@@ -1982,7 +2029,8 @@ impl VulkanicGal {
     }
 
     pub(in crate::render::vulkanic) fn render_pass_last_submission(
-        &self, pass: Handle,
+        &self,
+        pass: Handle,
     ) -> GalResult<Option<SubmissionId>> {
         Ok(self.render_passes.get(pass)?.last_submission)
     }
@@ -1999,7 +2047,9 @@ impl VulkanicGal {
         id: SubmissionId,
     ) -> GalResult<Vec<Handle>> {
         if id > self.latest_submission_id() {
-            return Err(GalError::invalid_argument("cannot wait for an unsubmitted completion id"));
+            return Err(GalError::invalid_argument(
+                "cannot wait for an unsubmitted completion id",
+            ));
         }
         self.backend.retire(id)?;
         if id > self.completed_submission {
@@ -2932,9 +2982,14 @@ impl VulkanicGal {
                     // A write-after-write/read dependency is meaningful even
                     // when the resource keeps its layout and semantic usage.
                     // Read-only same-usage barriers still describe no work.
-                    if barrier.before == barrier.after && !matches!(barrier.before,
-                        TextureUsageState::ShaderWrite | TextureUsageState::ColorAttachment
-                        | TextureUsageState::DepthStencilAttachment | TextureUsageState::TransferDst)
+                    if barrier.before == barrier.after
+                        && !matches!(
+                            barrier.before,
+                            TextureUsageState::ShaderWrite
+                                | TextureUsageState::ColorAttachment
+                                | TextureUsageState::DepthStencilAttachment
+                                | TextureUsageState::TransferDst
+                        )
                     {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
@@ -3125,19 +3180,30 @@ impl VulkanicGal {
                             self.record_access(&mut accesses, event, profile.as_deref_mut())?;
                         }
                     }
-                    CommandOp::BindResourceSet { set, dynamic_offsets, .. } => {
+                    CommandOp::BindResourceSet {
+                        set,
+                        dynamic_offsets,
+                        ..
+                    } => {
                         let binding_count = self.resource_sets.get(*set)?.desc.bindings.len();
                         let mut offset_index = 0;
                         for index in 0..binding_count {
-                            let count = self.resource_sets.get(*set)?.desc.bindings[index].dynamic_offsets.len();
+                            let count = self.resource_sets.get(*set)?.desc.bindings[index]
+                                .dynamic_offsets
+                                .len();
                             // Keep normal binding validation allocation-free;
                             // each declared range contributes one access event.
                             for slot in 0..count.max(1) {
                                 let event = {
-                                    let binding = &self.resource_sets.get(*set)?.desc.bindings[index];
-                                    let offset = if count == 0 { 0 }
-                                        else if dynamic_offsets.is_empty() { binding.dynamic_offsets[slot] }
-                                        else { dynamic_offsets[offset_index + slot] };
+                                    let binding =
+                                        &self.resource_sets.get(*set)?.desc.bindings[index];
+                                    let offset = if count == 0 {
+                                        0
+                                    } else if dynamic_offsets.is_empty() {
+                                        binding.dynamic_offsets[slot]
+                                    } else {
+                                        dynamic_offsets[offset_index + slot]
+                                    };
                                     self.resource_binding_access(binding, offset)?
                                 };
                                 self.record_access(&mut accesses, event, profile.as_deref_mut())?;
@@ -3421,7 +3487,8 @@ impl VulkanicGal {
                             },
                             profile.as_deref_mut(),
                         )?;
-                        self.buffer_upload_capture.host_write(*buffer,*offset,data);
+                        self.buffer_upload_capture
+                            .host_write(*buffer, *offset, data);
                     }
                     CommandOp::HostReadBuffer {
                         buffer,
@@ -3489,7 +3556,11 @@ impl VulkanicGal {
         Ok(())
     }
 
-    fn resource_binding_access(&self, binding: &ResourceBinding, offset: u64) -> GalResult<AccessEvent> {
+    fn resource_binding_access(
+        &self,
+        binding: &ResourceBinding,
+        offset: u64,
+    ) -> GalResult<AccessEvent> {
         let mode = if binding.access.writes() {
             AccessMode::Write
         } else {
@@ -3504,14 +3575,22 @@ impl VulkanicGal {
         };
         match binding.kind {
             ResourceBindingKind::UniformBuffer => Ok(AccessEvent {
-                target: self.buffer_access_target(binding.resource, offset, Some(buffer_size()?))?,
+                target: self.buffer_access_target(
+                    binding.resource,
+                    offset,
+                    Some(buffer_size()?),
+                )?,
                 mode: AccessMode::Read,
                 family: AccessFamily::Uniform,
                 attachment_load_op: None,
                 attachment_store_op: None,
             }),
             ResourceBindingKind::StorageBuffer => Ok(AccessEvent {
-                target: self.buffer_access_target(binding.resource, offset, Some(buffer_size()?))?,
+                target: self.buffer_access_target(
+                    binding.resource,
+                    offset,
+                    Some(buffer_size()?),
+                )?,
                 mode,
                 family: AccessFamily::Storage,
                 attachment_load_op: None,
@@ -3561,9 +3640,14 @@ impl VulkanicGal {
         event: AccessEvent,
         mut profile: Option<&mut WholeFrameProfile>,
     ) -> GalResult<()> {
-        if event.mode==AccessMode::Write {
-            if let AccessTarget::Buffer {handle,offset,size}=event.target {
-                self.buffer_upload_capture.write(handle,offset,size);
+        if event.mode == AccessMode::Write {
+            if let AccessTarget::Buffer {
+                handle,
+                offset,
+                size,
+            } = event.target
+            {
+                self.buffer_upload_capture.write(handle, offset, size);
             }
         }
         if event.target.is_zero_sized_sampler_marker() {
@@ -3913,7 +3997,9 @@ impl VulkanicGal {
 
     fn validate_texture_copy_region(&mut self, region: &TextureImageCopyRegion) -> GalResult<()> {
         if region.row_order == super::commands::TextureRowOrder::Reverse
-            && !self.capabilities().supports(BackendFeature::TextureRowReversal)
+            && !self
+                .capabilities()
+                .supports(BackendFeature::TextureRowReversal)
         {
             return self.validation_error(GalError::unsupported_feature(
                 "backend does not support explicit texture row reversal",
@@ -4312,41 +4398,74 @@ impl VulkanicGal {
         Ok(&self.samplers.get(handle)?.desc)
     }
 
-    pub(super) fn watch_buffer_upload_for_capture(&mut self,buffer:Handle,offset:u64,size:usize)->GalResult<()> {
-        let limit=self.buffers.get(buffer)?.desc.size;
-        if offset.checked_add(size as u64).is_none_or(|end|end>limit) {
-            return Err(GalError::invalid_argument("capture range exceeds owned buffer"));
+    pub(super) fn watch_buffer_upload_for_capture(
+        &mut self,
+        buffer: Handle,
+        offset: u64,
+        size: usize,
+    ) -> GalResult<()> {
+        let limit = self.buffers.get(buffer)?.desc.size;
+        if offset
+            .checked_add(size as u64)
+            .is_none_or(|end| end > limit)
+        {
+            return Err(GalError::invalid_argument(
+                "capture range exceeds owned buffer",
+            ));
         }
-        self.buffer_upload_capture.watch(buffer,offset,size)
+        self.buffer_upload_capture.watch(buffer, offset, size)
     }
 
-    pub(super) fn buffer_upload_for_capture(&self,buffer:Handle,offset:u64,size:usize)->GalResult<(&[u8],SubmissionId)> {
+    pub(super) fn buffer_upload_for_capture(
+        &self,
+        buffer: Handle,
+        offset: u64,
+        size: usize,
+    ) -> GalResult<(&[u8], SubmissionId)> {
         self.buffers.get(buffer)?;
-        self.buffer_upload_capture.get(buffer,offset,size)
-            .ok_or_else(||GalError::invalid_argument("missing accepted buffer upload proof"))
+        self.buffer_upload_capture
+            .get(buffer, offset, size)
+            .ok_or_else(|| GalError::invalid_argument("missing accepted buffer upload proof"))
     }
-    pub(super) fn unwatch_buffer_upload_for_capture(&mut self,buffer:Handle,offset:u64,size:usize) {
-        self.buffer_upload_capture.unwatch(buffer,offset,size);
+    pub(super) fn unwatch_buffer_upload_for_capture(
+        &mut self,
+        buffer: Handle,
+        offset: u64,
+        size: usize,
+    ) {
+        self.buffer_upload_capture.unwatch(buffer, offset, size);
     }
 
     #[cfg(test)]
-    pub(super) fn resource_set_descriptor_for_test(&self, handle: Handle) -> GalResult<&ResourceSetDesc> {
+    pub(super) fn resource_set_descriptor_for_test(
+        &self,
+        handle: Handle,
+    ) -> GalResult<&ResourceSetDesc> {
         self.resource_set_descriptor_for_capture(handle)
     }
 
     /// Immutable GAL declaration for a selected submission diagnostic. This
     /// exposes no backend descriptor, native handle, or reconstructed state.
-    pub(super) fn resource_set_descriptor_for_capture(&self, handle: Handle) -> GalResult<&ResourceSetDesc> {
+    pub(super) fn resource_set_descriptor_for_capture(
+        &self,
+        handle: Handle,
+    ) -> GalResult<&ResourceSetDesc> {
         Ok(&self.resource_sets.get(handle)?.desc)
     }
 
     /// Immutable GAL pipeline declaration; no backend GPU state is exposed.
-    pub(super) fn graphics_pipeline_descriptor_for_capture(&self, handle: Handle) -> GalResult<&GraphicsPipelineDesc> {
+    pub(super) fn graphics_pipeline_descriptor_for_capture(
+        &self,
+        handle: Handle,
+    ) -> GalResult<&GraphicsPipelineDesc> {
         Ok(&self.graphics_pipelines.get(handle)?.desc)
     }
 
     #[cfg(test)]
-    pub(super) fn graphics_pipeline_descriptor_for_test(&self, handle: Handle) -> GalResult<&GraphicsPipelineDesc> {
+    pub(super) fn graphics_pipeline_descriptor_for_test(
+        &self,
+        handle: Handle,
+    ) -> GalResult<&GraphicsPipelineDesc> {
         self.graphics_pipeline_descriptor_for_capture(handle)
     }
 
@@ -4487,6 +4606,14 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
 }
 
 pub(super) fn normalize_submission_batch(batch: &mut SubmissionBatch) -> CommandNormalizationStats {
+    normalize_submission_batch_with_pipeline_layouts(batch, &BTreeMap::new(), &BTreeMap::new())
+}
+
+pub(super) fn normalize_submission_batch_with_pipeline_layouts(
+    batch: &mut SubmissionBatch,
+    graphics_pipeline_layouts: &BTreeMap<Handle, Handle>,
+    compute_pipeline_layouts: &BTreeMap<Handle, Handle>,
+) -> CommandNormalizationStats {
     let mut stats = CommandNormalizationStats::default();
     for list in &mut batch.command_lists {
         stats.ops_before = stats
@@ -4510,6 +4637,20 @@ pub(super) fn normalize_submission_batch(batch: &mut SubmissionBatch) -> Command
                     } else {
                         state.graphics_pipeline = Some(*handle);
                         state.compute_pipeline = None;
+                        let layout = graphics_pipeline_layouts.get(handle).copied();
+                        if layout.is_none()
+                            || !state.pipeline_layout_known
+                            || state.pipeline_layout != layout
+                        {
+                            // Descriptor sets are bound against a pipeline
+                            // layout. If the identity is unknown or changes,
+                            // replay every set; this is what protects DH's
+                            // four-binding exact-atlas set from being reused
+                            // by a two-binding reduced-color pipeline.
+                            state.resource_sets.clear();
+                        }
+                        state.pipeline_layout = layout;
+                        state.pipeline_layout_known = layout.is_some();
                         true
                     }
                 }
@@ -4521,6 +4662,15 @@ pub(super) fn normalize_submission_batch(batch: &mut SubmissionBatch) -> Command
                     } else {
                         state.compute_pipeline = Some(*handle);
                         state.graphics_pipeline = None;
+                        let layout = compute_pipeline_layouts.get(handle).copied();
+                        if layout.is_none()
+                            || !state.pipeline_layout_known
+                            || state.pipeline_layout != layout
+                        {
+                            state.resource_sets.clear();
+                        }
+                        state.pipeline_layout = layout;
+                        state.pipeline_layout_known = layout.is_some();
                         true
                     }
                 }
@@ -4712,6 +4862,7 @@ fn add_backend_metric_deltas(
     profile.gpu_composite1_nanos = after.gpu_composite1_nanos;
     profile.gpu_final_output_nanos = after.gpu_final_output_nanos;
     profile.gpu_frame_total_nanos = after.gpu_frame_total_nanos;
+    profile.gpu_distant_horizons_opaque_nanos = after.gpu_distant_horizons_opaque_nanos;
 }
 
 fn is_depth_stencil_format(format: TextureFormat) -> bool {

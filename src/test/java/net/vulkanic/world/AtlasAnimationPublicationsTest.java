@@ -202,4 +202,38 @@ class AtlasAnimationPublicationsTest {
             assertTrue(registry.drain(bridge::stageAtlasAnimationAssets, (i,g,t,v,o) -> true));
         }
     }
+
+    @Test
+    void reusesLiveSemanticResourceAfterPublicationResetAtItsCurrentClock() {
+        var registry = new AtlasAnimationPublications();
+        var resource = new AtlasAnimationResource(
+            ResourceLocation.withDefaultNamespace("atlas/live"), 101,
+            new SemanticAtlasAnimationSource(77, 1, 1, 1, List.of()));
+        var texture = texture(101, 0);
+        registry.register(new AtlasAnimationPublication(texture, resource), () -> {});
+        registry.textureAccepted(1, texture);
+        resource.enqueueNextTick(false);
+        var firstStage = new ArrayList<Long>();
+        assertTrue(registry.drain((id, generation, initialTick, source) -> {
+            firstStage.add(initialTick);
+            return null;
+        }, (id, generation, tick, visible, onlyVisible) -> true));
+        assertEquals(List.of(0L), firstStage);
+
+        resource.enqueueNextTick(false);
+        registry.clear();
+        registry.register(new AtlasAnimationPublication(texture, resource), () -> {});
+        registry.textureAccepted(2, texture);
+        resource.enqueueNextTick(false);
+        var replacementStage = new ArrayList<Long>();
+        assertTrue(registry.drain((id, generation, initialTick, source) -> {
+            replacementStage.add(initialTick);
+            assertEquals(2, generation);
+            return null;
+        }, (id, generation, tick, visible, onlyVisible) -> {
+            assertEquals(3, tick);
+            return true;
+        }));
+        assertEquals(List.of(2L), replacementStage);
+    }
 }

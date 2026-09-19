@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use ash::vk;
@@ -42,6 +42,7 @@ pub(super) struct VulkanLoweringMetrics {
     pub(super) gpu_composite0_nanos: u64,
     pub(super) gpu_composite1_nanos: u64,
     pub(super) gpu_final_output_nanos: u64,
+    pub(super) gpu_distant_horizons_opaque_nanos: u64,
     pub(super) gpu_frame_total_nanos: u64,
 }
 
@@ -56,10 +57,17 @@ pub(super) struct SubmissionLowerer {
     next_timestamp_set: u32,
     live_command_buffers: HashSet<vk::CommandBuffer>,
     recycled_command_buffers: Vec<vk::CommandBuffer>,
+    // Presentation uses one bounded binary semaphore per swapchain image.
+    // An image cannot be acquired again until its presentation wait has been
+    // consumed, so semaphore ownership remains independent of frame count.
+    present_semaphores: HashMap<u32, vk::Semaphore>,
+    // Keep the submission receipt until queuePresent consumes its wait. A
+    // timeline retirement can happen before the Java present callback arrives.
+    pending_present_semaphores: BTreeMap<SubmissionId, (u32, vk::Semaphore)>,
 }
 
 const GPU_TIMESTAMP_SET_COUNT: u32 = 8;
-const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 16;
+const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 18;
 // Whole-frame submissions are independent of swapchain acquire/present
 // slots, so bound their native command-buffer window explicitly.
 const MAX_IN_FLIGHT_SUBMISSIONS: usize = 8;
@@ -84,7 +92,9 @@ enum GpuTimestampQuery {
     Composite1End = 12,
     FinalOutputStart = 13,
     FinalOutputEnd = 14,
-    FrameEnd = 15,
+    DistantHorizonsOpaqueStart = 15,
+    DistantHorizonsOpaqueEnd = 16,
+    FrameEnd = 17,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -103,6 +113,7 @@ struct GpuTimestampResult {
     composite0_nanos: u64,
     composite1_nanos: u64,
     final_output_nanos: u64,
+    distant_horizons_opaque_nanos: u64,
     frame_total_nanos: u64,
 }
 
@@ -115,6 +126,7 @@ enum TimestampPassKind {
     Composite0,
     Composite1,
     FinalOutput,
+    DistantHorizonsOpaque,
 }
 
 impl TimestampPassKind {
@@ -127,6 +139,7 @@ impl TimestampPassKind {
             Self::Composite0 => GpuTimestampQuery::Composite0Start,
             Self::Composite1 => GpuTimestampQuery::Composite1Start,
             Self::FinalOutput => GpuTimestampQuery::FinalOutputStart,
+            Self::DistantHorizonsOpaque => GpuTimestampQuery::DistantHorizonsOpaqueStart,
         }
     }
 
@@ -139,6 +152,7 @@ impl TimestampPassKind {
             Self::Composite0 => GpuTimestampQuery::Composite0End,
             Self::Composite1 => GpuTimestampQuery::Composite1End,
             Self::FinalOutput => GpuTimestampQuery::FinalOutputEnd,
+            Self::DistantHorizonsOpaque => GpuTimestampQuery::DistantHorizonsOpaqueEnd,
         }
     }
 }
@@ -161,6 +175,8 @@ impl SubmissionLowerer {
             next_timestamp_set: 0,
             live_command_buffers: HashSet::new(),
             recycled_command_buffers: Vec::new(),
+            present_semaphores: HashMap::new(),
+            pending_present_semaphores: BTreeMap::new(),
         }
     }
 
@@ -186,6 +202,7 @@ impl SubmissionLowerer {
             ..EncodingState::default()
         };
         let mut command_buffers = Vec::with_capacity(batch.command_lists.len().max(1));
+        let mut present_image_index = None;
         let result: GalResult<()> = (|| {
             let count = batch.command_lists.len().max(1);
             for index in 0..count {
@@ -283,6 +300,20 @@ impl SubmissionLowerer {
                     ));
                 }
                 if index + 1 == count {
+                    present_image_index = state
+                        .pending_frame_presents
+                        .values()
+                        .map(|present| present.image_index)
+                        .next();
+                    if state
+                        .pending_frame_presents
+                        .values()
+                        .any(|present| Some(present.image_index) != present_image_index)
+                    {
+                        return Err(GalError::backend(
+                            "one Vulkan submission cannot present multiple swapchain images",
+                        ));
+                    }
                     self.transition_pending_frame_targets_to_present(command_buffer, &mut state);
                     if timestamp_set.active {
                         unsafe {
@@ -322,6 +353,7 @@ impl SubmissionLowerer {
             command_buffers,
             host_reads: state.host_reads,
             timestamp_set,
+            present_image_index,
         });
         Ok(())
     }
@@ -351,10 +383,21 @@ impl SubmissionLowerer {
                 vk::CommandBufferSubmitInfo::default().command_buffer(*command_buffer)
             })
             .collect::<Vec<_>>();
-        let signal_info = [vk::SemaphoreSubmitInfo::default()
+        let present_semaphore = encoded
+            .present_image_index
+            .map(|image_index| self.ensure_present_semaphore(image_index))
+            .transpose()?;
+        let mut signal_info = vec![vk::SemaphoreSubmitInfo::default()
             .semaphore(self.context.timeline)
             .value(id.0)
             .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)];
+        if let Some(semaphore) = present_semaphore {
+            signal_info.push(
+                vk::SemaphoreSubmitInfo::default()
+                    .semaphore(semaphore)
+                    .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS),
+            );
+        }
         let submit = vk::SubmitInfo2::default()
             .command_buffer_infos(&command_buffer_infos)
             .signal_semaphore_infos(&signal_info);
@@ -396,7 +439,14 @@ impl SubmissionLowerer {
             command_buffers: encoded.command_buffers,
             host_reads: encoded.host_reads,
             timestamp_set: encoded.timestamp_set,
+            publishes_frame_timestamps: encoded.present_image_index.is_some(),
         });
+        if let (Some(image_index), Some(semaphore)) =
+            (encoded.present_image_index, present_semaphore)
+        {
+            self.pending_present_semaphores
+                .insert(id, (image_index, semaphore));
+        }
         debug_assert!(
             self.in_flight.len() <= MAX_IN_FLIGHT_SUBMISSIONS,
             "Vulkan lowerer exceeded its bounded in-flight submission window"
@@ -450,8 +500,10 @@ impl SubmissionLowerer {
             let _zone = trace::Zone::new("vulkan.backend.wait-timeline");
             let wait_started = std::time::Instant::now();
             let context = &self.context;
-            let complete = wait_then_pop_front(&mut self.in_flight,
-                |entry| wait_timeline(context, entry.id))?.expect("front existed");
+            let complete = wait_then_pop_front(&mut self.in_flight, |entry| {
+                wait_timeline(context, entry.id)
+            })?
+            .expect("front existed");
             self.metrics.timeline_wait_nanos = self
                 .metrics
                 .timeline_wait_nanos
@@ -479,6 +531,48 @@ impl SubmissionLowerer {
             return Ok(());
         };
         self.retire(latest)
+    }
+
+    /// Return the binary semaphore signaled by `submission` for the acquired
+    /// swapchain image. The receipt intentionally outlives timeline retirement
+    /// until queue presentation consumes it.
+    pub(super) fn present_semaphore_for(
+        &self,
+        submission: SubmissionId,
+        image_index: u32,
+    ) -> Option<vk::Semaphore> {
+        self.pending_present_semaphores
+            .get(&submission)
+            .and_then(|(pending_image, semaphore)| {
+                (*pending_image == image_index).then_some(*semaphore)
+            })
+    }
+
+    /// Mark a present wait semaphore consumed by queuePresent. A failed
+    /// present keeps the receipt alive so it cannot be reused while Vulkan may
+    /// still own the wait operation.
+    pub(super) fn complete_present(&mut self, submission: SubmissionId) {
+        self.pending_present_semaphores.remove(&submission);
+    }
+
+    fn ensure_present_semaphore(&mut self, image_index: u32) -> GalResult<vk::Semaphore> {
+        if let Some(semaphore) = self.present_semaphores.get(&image_index) {
+            return Ok(*semaphore);
+        }
+        let semaphore = unsafe {
+            self.context
+                .device
+                .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)
+        }
+        .map_err(|error| {
+            GalError::backend(format!(
+                "failed to create Vulkan presentation semaphore for image {image_index}: {error:?}"
+            ))
+        })?;
+        self.context
+            .set_object_name(semaphore, &format!("gal.present.image.{image_index}"));
+        self.present_semaphores.insert(image_index, semaphore);
+        Ok(semaphore)
     }
 
     pub(super) fn completed_host_reads_snapshot(&self) -> &[CompletedHostRead] {
@@ -676,7 +770,11 @@ impl SubmissionLowerer {
     ) -> GalResult<()> {
         unsafe {
             match op {
-                CommandOp::TrackSubmission(_) => return Err(GalError::backend("GAL submission receipt reached Vulkan lowering")),
+                CommandOp::TrackSubmission(_) => {
+                    return Err(GalError::backend(
+                        "GAL submission receipt reached Vulkan lowering",
+                    ))
+                }
                 CommandOp::BeginPass {
                     pass,
                     target,
@@ -883,7 +981,8 @@ impl SubmissionLowerer {
                         max_depth: 1.0,
                     };
                     state.pass_extent = Some(extent);
-                    state.raster_y_direction = Some(crate::render::vulkanic::resources::RasterYDirection::Up);
+                    state.raster_y_direction =
+                        Some(crate::render::vulkanic::resources::RasterYDirection::Up);
                     let scissor = vk::Rect2D {
                         offset: vk::Offset2D { x: 0, y: 0 },
                         extent: vk::Extent2D {
@@ -924,20 +1023,37 @@ impl SubmissionLowerer {
                 CommandOp::BindGraphicsPipeline(handle) => {
                     let pipeline = objects.graphics_pipeline(*handle)?;
                     if state.raster_y_direction != Some(pipeline.raster_y_direction) {
-                        let extent = state.pass_extent.ok_or_else(|| GalError::backend("raster viewport requires an active pass extent"))?;
-                        let down = pipeline.raster_y_direction == crate::render::vulkanic::resources::RasterYDirection::Down;
-                        self.context.device.cmd_set_viewport(command_buffer, 0, &[vk::Viewport {
-                            x: 0.0, y: if down { 0.0 } else { extent.height as f32 },
-                            width: extent.width as f32,
-                            height: if down { extent.height as f32 } else { -(extent.height as f32) },
-                            min_depth: 0.0, max_depth: 1.0,
-                        }]);
+                        let extent = state.pass_extent.ok_or_else(|| {
+                            GalError::backend("raster viewport requires an active pass extent")
+                        })?;
+                        let down = pipeline.raster_y_direction
+                            == crate::render::vulkanic::resources::RasterYDirection::Down;
+                        self.context.device.cmd_set_viewport(
+                            command_buffer,
+                            0,
+                            &[vk::Viewport {
+                                x: 0.0,
+                                y: if down { 0.0 } else { extent.height as f32 },
+                                width: extent.width as f32,
+                                height: if down {
+                                    extent.height as f32
+                                } else {
+                                    -(extent.height as f32)
+                                },
+                                min_depth: 0.0,
+                                max_depth: 1.0,
+                            }],
+                        );
                         state.raster_y_direction = Some(pipeline.raster_y_direction);
                     }
-                    if !self.context.provoking_vertex_per_pipeline && state.provoking_vertex
-                        .is_some_and(|previous| previous != pipeline.provoking_vertex) {
+                    if !self.context.provoking_vertex_per_pipeline
+                        && state
+                            .provoking_vertex
+                            .is_some_and(|previous| previous != pipeline.provoking_vertex)
+                    {
                         return Err(GalError::unsupported_feature(
-                            "Vulkan device forbids mixed provoking vertex modes in one render pass"));
+                            "Vulkan device forbids mixed provoking vertex modes in one render pass",
+                        ));
                     }
                     state.provoking_vertex = Some(pipeline.provoking_vertex);
                     self.context.device.cmd_bind_pipeline(
@@ -952,6 +1068,14 @@ impl SubmissionLowerer {
                             state,
                             Some(pipeline_timestamp_pass),
                         );
+                    } else if state.current_timestamp_pass
+                        == Some(TimestampPassKind::DistantHorizonsOpaque)
+                    {
+                        // The dedicated DH query measures only the contiguous
+                        // opaque pipeline span. Transparent/water pipelines are
+                        // intentionally unclassified and must close that span
+                        // rather than inheriting its timestamp until EndPass.
+                        self.switch_timestamp_pass(command_buffer, state, None);
                     }
                     state.graphics_pipeline = Some(*handle);
                     state.compute_pipeline = None;
@@ -1169,28 +1293,46 @@ impl SubmissionLowerer {
                     let source = objects.texture(region.src_texture)?;
                     let destination = objects.texture(region.dst_texture)?;
                     if region.row_order == TextureRowOrder::Reverse {
-                        let source_features = self.context.instance
-                            .get_physical_device_format_properties(self.context.physical_device, source.format)
+                        let source_features = self
+                            .context
+                            .instance
+                            .get_physical_device_format_properties(
+                                self.context.physical_device,
+                                source.format,
+                            )
                             .optimal_tiling_features;
-                        let destination_features = self.context.instance
-                            .get_physical_device_format_properties(self.context.physical_device, destination.format)
+                        let destination_features = self
+                            .context
+                            .instance
+                            .get_physical_device_format_properties(
+                                self.context.physical_device,
+                                destination.format,
+                            )
                             .optimal_tiling_features;
-                        validate_row_reversal_format_features(source_features, destination_features)?;
-                        let blit = texture_row_reversal_blit(region, source.aspect, destination.aspect)?;
+                        validate_row_reversal_format_features(
+                            source_features,
+                            destination_features,
+                        )?;
+                        let blit =
+                            texture_row_reversal_blit(region, source.aspect, destination.aspect)?;
                         self.context.device.cmd_blit_image(
-                            command_buffer, source.image, vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                            destination.image, vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                            &[blit], vk::Filter::NEAREST,
+                            command_buffer,
+                            source.image,
+                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                            destination.image,
+                            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                            &[blit],
+                            vk::Filter::NEAREST,
                         );
                     } else {
                         let copy = texture_image_copy(region, source.aspect, destination.aspect);
                         self.context.device.cmd_copy_image(
-                        command_buffer,
-                        source.image,
-                        vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                        destination.image,
-                        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                        &[copy],
+                            command_buffer,
+                            source.image,
+                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                            destination.image,
+                            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                            &[copy],
                         );
                     }
                 }
@@ -1339,10 +1481,16 @@ impl SubmissionLowerer {
                         .insert(*dst, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
                     // Copy-only world output (for example hidden HUD) still
                     // belongs to this frame's existing presentation boundary.
-                    state.pending_frame_presents.insert(*dst, FramePresentTransition {
-                        target: *dst, image: frame.image, image_index: frame.image_index,
-                        frame_id: frame.frame_id, range,
-                    });
+                    state.pending_frame_presents.insert(
+                        *dst,
+                        FramePresentTransition {
+                            target: *dst,
+                            image: frame.image,
+                            image_index: frame.image_index,
+                            frame_id: frame.frame_id,
+                            range,
+                        },
+                    );
                 }
                 CommandOp::GenerateMipmaps {
                     texture,
@@ -1689,6 +1837,13 @@ impl SubmissionLowerer {
     }
 
     fn complete_gpu_timestamps(&mut self, complete: &InFlightSubmission) {
+        // Resource uploads and other auxiliary submissions share this lowerer,
+        // but their few-microsecond spans are not GPU frame measurements. Keep
+        // the last completed presented frame visible until a newer presented
+        // frame retires.
+        if !complete.publishes_frame_timestamps {
+            return;
+        }
         let Some(pool) = self.timestamp_pool else {
             self.apply_gpu_timestamp_result(GpuTimestampResult::default());
             return;
@@ -1721,11 +1876,15 @@ impl SubmissionLowerer {
                 }
             }
         }
-        self.apply_gpu_timestamp_result(decode_gpu_timestamp_result(
-            &values,
-            &ready,
-            self.context.timestamp_period,
-        ));
+        let mut result =
+            decode_gpu_timestamp_result(&values, &ready, self.context.timestamp_period);
+        if result.status != 0 {
+            // A nonzero value identifies the exact asynchronously completed
+            // presentation submission. Consumers can therefore avoid sampling
+            // the same retired frame again while newer GPU work is in flight.
+            result.status = complete.id.0;
+        }
+        self.apply_gpu_timestamp_result(result);
     }
 
     fn apply_gpu_timestamp_result(&mut self, result: GpuTimestampResult) {
@@ -1737,6 +1896,7 @@ impl SubmissionLowerer {
         self.metrics.gpu_composite0_nanos = result.composite0_nanos;
         self.metrics.gpu_composite1_nanos = result.composite1_nanos;
         self.metrics.gpu_final_output_nanos = result.final_output_nanos;
+        self.metrics.gpu_distant_horizons_opaque_nanos = result.distant_horizons_opaque_nanos;
         self.metrics.gpu_frame_total_nanos = result.frame_total_nanos;
     }
 }
@@ -1757,6 +1917,10 @@ fn sanitize_label(label: &str) -> String {
 impl Drop for SubmissionLowerer {
     fn drop(&mut self) {
         self.wait_idle_and_clear();
+        for (_, semaphore) in self.present_semaphores.drain() {
+            unsafe { self.context.device.destroy_semaphore(semaphore, None) };
+        }
+        self.pending_present_semaphores.clear();
         if let Some(pool) = self.timestamp_pool.take() {
             unsafe { self.context.device.destroy_query_pool(pool, None) };
         }
@@ -1811,7 +1975,9 @@ fn timestamp_pass_kind(label: &str) -> Option<TimestampPassKind> {
 
 fn timestamp_pipeline_kind(label: &str) -> Option<TimestampPassKind> {
     let label = label.trim();
-    if label.contains("shadow_depth") || label.contains("shadow-pipeline") {
+    if label.contains("world-lod-forward-opaque") {
+        Some(TimestampPassKind::DistantHorizonsOpaque)
+    } else if label.contains("shadow_depth") || label.contains("shadow-pipeline") {
         Some(TimestampPassKind::ShadowDepth)
     } else if label.contains("terrain_opaque")
         || (label.contains("world-mesh-gbuffer") && label.contains("-mode1-"))
@@ -1927,6 +2093,13 @@ fn decode_gpu_timestamp_result(
             GpuTimestampQuery::FinalOutputEnd,
             timestamp_period,
         ),
+        distant_horizons_opaque_nanos: ready_delta(
+            values,
+            ready,
+            GpuTimestampQuery::DistantHorizonsOpaqueStart,
+            GpuTimestampQuery::DistantHorizonsOpaqueEnd,
+            timestamp_period,
+        ),
         frame_total_nanos: frame_total,
     };
     result
@@ -1938,17 +2111,23 @@ mod timestamp_tests {
 
     #[test]
     fn retirement_wait_failure_preserves_in_flight_ownership_and_order() {
-        let mut pending = VecDeque::from([(SubmissionId(3), vec![7, 8]), (SubmissionId(4), vec![9])]);
+        let mut pending =
+            VecDeque::from([(SubmissionId(3), vec![7, 8]), (SubmissionId(4), vec![9])]);
         let before = pending.clone();
         assert!(wait_then_pop_front(&mut pending, |entry| {
             assert_eq!(entry.0, SubmissionId(3));
             Err(GalError::backend("injected timeline timeout"))
-        }).is_err());
+        })
+        .is_err());
         assert_eq!(pending, before);
-        assert_eq!(wait_then_pop_front(&mut pending, |entry| {
-            assert_eq!(entry.0, SubmissionId(3));
-            Ok(())
-        }).unwrap(), Some(before[0].clone()));
+        assert_eq!(
+            wait_then_pop_front(&mut pending, |entry| {
+                assert_eq!(entry.0, SubmissionId(3));
+                Ok(())
+            })
+            .unwrap(),
+            Some(before[0].clone())
+        );
         assert_eq!(pending, VecDeque::from([before[1].clone()]));
     }
 
@@ -2000,26 +2179,60 @@ mod timestamp_tests {
         let src = vk::FormatFeatureFlags::BLIT_SRC;
         let dst = vk::FormatFeatureFlags::BLIT_DST;
         validate_row_reversal_format_features(src, dst).unwrap();
-        assert!(validate_row_reversal_format_features(vk::FormatFeatureFlags::empty(), dst).is_err());
-        assert!(validate_row_reversal_format_features(src, vk::FormatFeatureFlags::empty()).is_err());
+        assert!(
+            validate_row_reversal_format_features(vk::FormatFeatureFlags::empty(), dst).is_err()
+        );
+        assert!(
+            validate_row_reversal_format_features(src, vk::FormatFeatureFlags::empty()).is_err()
+        );
         let mut region = TextureImageCopyRegion {
             row_order: TextureRowOrder::Reverse,
             src_texture: Handle::new(HandleKind::Texture, 1, 1).unwrap(),
-            src_mip: 1, src_layer: 2, src_origin: TextureOrigin3d { x: 3, y: 5, z: 0 },
+            src_mip: 1,
+            src_layer: 2,
+            src_origin: TextureOrigin3d { x: 3, y: 5, z: 0 },
             dst_texture: Handle::new(HandleKind::Texture, 2, 1).unwrap(),
-            dst_mip: 2, dst_layer: 3, dst_origin: TextureOrigin3d { x: 7, y: 11, z: 0 },
-            extent: Extent3d { width: 13, height: 17, depth: 1 },
+            dst_mip: 2,
+            dst_layer: 3,
+            dst_origin: TextureOrigin3d { x: 7, y: 11, z: 0 },
+            extent: Extent3d {
+                width: 13,
+                height: 17,
+                depth: 1,
+            },
         };
-        let blit = texture_row_reversal_blit(&region, vk::ImageAspectFlags::COLOR, vk::ImageAspectFlags::COLOR).unwrap();
+        let blit = texture_row_reversal_blit(
+            &region,
+            vk::ImageAspectFlags::COLOR,
+            vk::ImageAspectFlags::COLOR,
+        )
+        .unwrap();
         let coordinates = |offsets: [vk::Offset3D; 2]| offsets.map(|p| (p.x, p.y, p.z));
         assert_eq!([(3, 5, 0), (16, 22, 1)], coordinates(blit.src_offsets));
         assert_eq!([(7, 28, 0), (20, 11, 1)], coordinates(blit.dst_offsets));
-        assert_eq!((1, 2), (blit.src_subresource.mip_level, blit.src_subresource.base_array_layer));
-        assert_eq!((2, 3), (blit.dst_subresource.mip_level, blit.dst_subresource.base_array_layer));
+        assert_eq!(
+            (1, 2),
+            (
+                blit.src_subresource.mip_level,
+                blit.src_subresource.base_array_layer
+            )
+        );
+        assert_eq!(
+            (2, 3),
+            (
+                blit.dst_subresource.mip_level,
+                blit.dst_subresource.base_array_layer
+            )
+        );
         let combined = vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL;
         assert!(texture_row_reversal_blit(&region, combined, combined).is_err());
         region.dst_origin.y = i32::MAX as u32;
-        assert!(texture_row_reversal_blit(&region, vk::ImageAspectFlags::COLOR, vk::ImageAspectFlags::COLOR).is_err());
+        assert!(texture_row_reversal_blit(
+            &region,
+            vk::ImageAspectFlags::COLOR,
+            vk::ImageAspectFlags::COLOR
+        )
+        .is_err());
     }
 
     #[test]
@@ -2121,6 +2334,14 @@ mod timestamp_tests {
             Some(TimestampPassKind::TerrainCutout),
             timestamp_pipeline_kind("world-mesh-gbuffer-stratum4-leaves-gen7-section0-texture9-mode2-depth2-cull1.pipeline")
         );
+        assert_eq!(
+            Some(TimestampPassKind::DistantHorizonsOpaque),
+            timestamp_pipeline_kind("world-lod-forward-opaque.offscreen.pipeline")
+        );
+        assert_eq!(
+            Some(TimestampPassKind::DistantHorizonsOpaque),
+            timestamp_pipeline_kind("world-lod-forward-opaque.pipeline")
+        );
     }
 
     #[test]
@@ -2130,14 +2351,19 @@ mod timestamp_tests {
         values[GpuTimestampQuery::FrameStart as usize] = 10;
         values[GpuTimestampQuery::ShadowDepthStart as usize] = 12;
         values[GpuTimestampQuery::ShadowDepthEnd as usize] = 18;
+        values[GpuTimestampQuery::DistantHorizonsOpaqueStart as usize] = 19;
+        values[GpuTimestampQuery::DistantHorizonsOpaqueEnd as usize] = 27;
         values[GpuTimestampQuery::FrameEnd as usize] = 30;
         ready[GpuTimestampQuery::FrameStart as usize] = true;
         ready[GpuTimestampQuery::ShadowDepthStart as usize] = true;
         ready[GpuTimestampQuery::ShadowDepthEnd as usize] = true;
+        ready[GpuTimestampQuery::DistantHorizonsOpaqueStart as usize] = true;
+        ready[GpuTimestampQuery::DistantHorizonsOpaqueEnd as usize] = true;
         ready[GpuTimestampQuery::FrameEnd as usize] = true;
         let result = decode_gpu_timestamp_result(&values, &ready, 2.0);
         assert_eq!(1, result.status);
         assert_eq!(12, result.shadow_depth_nanos);
+        assert_eq!(16, result.distant_horizons_opaque_nanos);
         assert_eq!(40, result.frame_total_nanos);
         assert_eq!(0, result.terrain_opaque_nanos);
     }
@@ -2209,10 +2435,14 @@ mod timestamp_tests {
             vk::AccessFlags2::TRANSFER_READ
                 == frame_layout_access_mask(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
         );
-        assert!(vk::PipelineStageFlags2::COPY
-            == frame_layout_stage_mask(vk::ImageLayout::TRANSFER_DST_OPTIMAL));
-        assert!(vk::AccessFlags2::TRANSFER_WRITE
-            == frame_layout_access_mask(vk::ImageLayout::TRANSFER_DST_OPTIMAL));
+        assert!(
+            vk::PipelineStageFlags2::COPY
+                == frame_layout_stage_mask(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+        );
+        assert!(
+            vk::AccessFlags2::TRANSFER_WRITE
+                == frame_layout_access_mask(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+        );
         assert!(
             vk::PipelineStageFlags2::NONE
                 == frame_layout_stage_mask(vk::ImageLayout::PRESENT_SRC_KHR)
@@ -2238,15 +2468,25 @@ mod timestamp_tests {
         let access = access_mask(TextureUsageState::ShaderWrite);
         assert!(access.contains(vk::AccessFlags2::SHADER_STORAGE_READ));
         assert!(access.contains(vk::AccessFlags2::SHADER_STORAGE_WRITE));
-        assert!(stage_mask(TextureUsageState::ShaderWrite).contains(vk::PipelineStageFlags2::VERTEX_SHADER));
+        assert!(stage_mask(TextureUsageState::ShaderWrite)
+            .contains(vk::PipelineStageFlags2::VERTEX_SHADER));
     }
 
     #[test]
     fn image_shader_read_excludes_uniform_buffer_access_without_weakening_buffer_barriers() {
-        assert_eq!(image_access_mask(TextureUsageState::ShaderRead).as_raw(), vk::AccessFlags2::SHADER_SAMPLED_READ.as_raw());
+        assert_eq!(
+            image_access_mask(TextureUsageState::ShaderRead).as_raw(),
+            vk::AccessFlags2::SHADER_SAMPLED_READ.as_raw()
+        );
         assert!(access_mask(TextureUsageState::ShaderRead).contains(vk::AccessFlags2::UNIFORM_READ));
-        assert_eq!(image_access_mask(TextureUsageState::TransferDst).as_raw(), vk::AccessFlags2::TRANSFER_WRITE.as_raw());
-        assert_eq!(image_access_mask(TextureUsageState::ShaderStorageRead).as_raw(), vk::AccessFlags2::SHADER_STORAGE_READ.as_raw());
+        assert_eq!(
+            image_access_mask(TextureUsageState::TransferDst).as_raw(),
+            vk::AccessFlags2::TRANSFER_WRITE.as_raw()
+        );
+        assert_eq!(
+            image_access_mask(TextureUsageState::ShaderStorageRead).as_raw(),
+            vk::AccessFlags2::SHADER_STORAGE_READ.as_raw()
+        );
     }
 
     #[test]
@@ -2291,6 +2531,7 @@ struct EncodedSubmission {
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
+    present_image_index: Option<u32>,
 }
 
 struct InFlightSubmission {
@@ -2298,6 +2539,7 @@ struct InFlightSubmission {
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
+    publishes_frame_timestamps: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -2378,7 +2620,9 @@ fn frame_layout_stage_mask(layout: vk::ImageLayout) -> vk::PipelineStageFlags2 {
         vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL => {
             vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT
         }
-        vk::ImageLayout::TRANSFER_SRC_OPTIMAL | vk::ImageLayout::TRANSFER_DST_OPTIMAL => vk::PipelineStageFlags2::COPY,
+        vk::ImageLayout::TRANSFER_SRC_OPTIMAL | vk::ImageLayout::TRANSFER_DST_OPTIMAL => {
+            vk::PipelineStageFlags2::COPY
+        }
         _ => vk::PipelineStageFlags2::TOP_OF_PIPE,
     }
 }
@@ -2453,13 +2697,16 @@ pub(super) fn access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
         // parameters. Image barriers use image_access_mask instead, because
         // their explicit resource type excludes uniform-buffer accesses.
         TextureUsageState::ShaderRead => {
-            vk::AccessFlags2::SHADER_SAMPLED_READ | vk::AccessFlags2::UNIFORM_READ
+            vk::AccessFlags2::SHADER_SAMPLED_READ
+                | vk::AccessFlags2::UNIFORM_READ
                 | vk::AccessFlags2::SHADER_STORAGE_READ
         }
         // Writable bindings may be read/modify/write (including atomics).
         // The coarse GAL shader-write state must make initial data visible
         // to those reads, as well as ordering the resulting writes.
-        TextureUsageState::ShaderWrite => vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+        TextureUsageState::ShaderWrite => {
+            vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE
+        }
         TextureUsageState::ShaderStorageRead => vk::AccessFlags2::SHADER_STORAGE_READ,
         TextureUsageState::ColorAttachment => {
             vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
@@ -2536,9 +2783,11 @@ fn texture_row_reversal_blit(
         ));
     }
     let offset = |origin: crate::render::vulkanic::commands::TextureOrigin3d,
-                  end: bool| -> GalResult<vk::Offset3D> {
+                  end: bool|
+     -> GalResult<vk::Offset3D> {
         let component = |start: u32, size: u32| -> GalResult<i32> {
-            let value = start.checked_add(if end { size } else { 0 })
+            let value = start
+                .checked_add(if end { size } else { 0 })
                 .ok_or_else(|| GalError::backend("row reversal offset overflows"))?;
             i32::try_from(value).map_err(|_| GalError::backend("row reversal offset exceeds i32"))
         };
@@ -2548,20 +2797,30 @@ fn texture_row_reversal_blit(
             z: component(origin.z, region.extent.depth)?,
         })
     };
-    let src_offsets = [offset(region.src_origin, false)?, offset(region.src_origin, true)?];
-    let mut dst_offsets = [offset(region.dst_origin, false)?, offset(region.dst_origin, true)?];
+    let src_offsets = [
+        offset(region.src_origin, false)?,
+        offset(region.src_origin, true)?,
+    ];
+    let mut dst_offsets = [
+        offset(region.dst_origin, false)?,
+        offset(region.dst_origin, true)?,
+    ];
     let y = dst_offsets[0].y;
     dst_offsets[0].y = dst_offsets[1].y;
     dst_offsets[1].y = y;
     Ok(vk::ImageBlit::default()
         .src_subresource(vk::ImageSubresourceLayers {
-            aspect_mask: src_aspect, mip_level: region.src_mip,
-            base_array_layer: region.src_layer, layer_count: 1,
+            aspect_mask: src_aspect,
+            mip_level: region.src_mip,
+            base_array_layer: region.src_layer,
+            layer_count: 1,
         })
         .src_offsets(src_offsets)
         .dst_subresource(vk::ImageSubresourceLayers {
-            aspect_mask: dst_aspect, mip_level: region.dst_mip,
-            base_array_layer: region.dst_layer, layer_count: 1,
+            aspect_mask: dst_aspect,
+            mip_level: region.dst_mip,
+            base_array_layer: region.dst_layer,
+            layer_count: 1,
         })
         .dst_offsets(dst_offsets))
 }
@@ -2602,7 +2861,10 @@ fn texture_image_copy(
 }
 
 /// A failed wait must retain all submission-owned commands, reads and queries.
-fn wait_then_pop_front<T>(queue: &mut VecDeque<T>, wait: impl FnOnce(&T) -> GalResult<()>) -> GalResult<Option<T>> {
+fn wait_then_pop_front<T>(
+    queue: &mut VecDeque<T>,
+    wait: impl FnOnce(&T) -> GalResult<()>,
+) -> GalResult<Option<T>> {
     if let Some(front) = queue.front() {
         wait(front)?;
     }

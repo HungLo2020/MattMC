@@ -217,17 +217,15 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
                 correlation_id: FrameCorrelationId(request.correlation_id),
                 wait_for: SubmissionId(request.wait_submission_id),
             })?;
-            // `present_frame` has already waited for this frame's declared
-            // submission. Retire exactly that completed prefix. Waiting for
-            // the latest unrelated upload here serializes the producer and
-            // turns presentation into a hidden queue-idle boundary.
-            context.gal.retire_through(presented.completed_submission)?;
+            // Vulkan presentation waits on the queue's render-finished
+            // semaphore. Poll completed timeline work here so resource
+            // retirement remains bounded without reintroducing a CPU wait for
+            // the frame that was just queued for presentation.
+            context.gal.retire_completed()?;
             if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
                 println!(
                     "vulkan.submission.present-retire frame={} waited={} retired_through={}",
-                    presented.frame.0,
-                    request.wait_submission_id,
-                    presented.completed_submission.0,
+                    presented.frame.0, request.wait_submission_id, presented.completed_submission.0,
                 );
             }
             Ok(FfiFramePresentResult {
@@ -290,7 +288,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_cancel(
             context
                 .gal
                 .cancel_frame(crate::render::vulkanic::frame::FrameId(request.frame_id))?;
-            context.gui_frontend.discard_prepared_post_effects(&mut context.gal);
+            context
+                .gui_frontend
+                .discard_prepared_post_effects(&mut context.gal);
             // The swapchain recreation waits for device quiescence, so all
             // cached frame-target wrappers are now safe to retire as well.
             destroy_all_frame_targets(context)

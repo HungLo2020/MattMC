@@ -1179,7 +1179,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 					view,
 					projection,
 					wholeFrameFog,
-					net.sodium.client.SodiumClientMod.options().performance.useFogOcclusion
+					false
 				);
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.enqueue");
 				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.weather.enqueue");
@@ -1353,12 +1353,16 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.text-semantic-enqueue");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.item-semantic-enqueue");
 		this.guiRenderer.collectRustGalItemSemantics();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.item-semantic-enqueue");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.picture-in-picture-semantic-enqueue");
 		this.guiRenderer.collectRustGalPictureInPictureSemantics();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.picture-in-picture-semantic-enqueue");
 		// Item activation is an explicit item-model submission. Extract it on the
 		// Rust route without invoking ScreenEffectRenderer's Java buffer-backed
 		// underwater/fire overlays.
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.item-activation-semantic-enqueue");
 		this.screenEffectRenderer.renderRustVulkanItemActivation(f, this.submitNodeStorage);
-		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.item-semantic-enqueue");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.item-activation-semantic-enqueue");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.rectangle-semantic-enqueue");
 		this.guiRenderer.collectRustGalRectangleSemantics();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("gui.rectangle-semantic-enqueue");

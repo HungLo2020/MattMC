@@ -95,6 +95,90 @@ class DistantHorizonsFaceMaterialResolverTest {
 	}
 
 	@Test
+	void uniformModelMaterialMayCoverOmittedCardinalFaces() {
+		var uniform = DistantHorizonsFaceMaterialResolver.resolveCandidates(List.of(
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.NORTH, material("minecraft:block/seagrass"), false, false),
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.SOUTH, material("minecraft:block/seagrass"), false, false)
+		)).withUniformFaceCoverageIfSafe();
+
+		assertEquals(DistantHorizonsFaceMaterialResolver.Status.COMPLETE, uniform.status());
+		assertEquals(6, uniform.faceLayers().size());
+		assertTrue(uniform.faceLayers().values().stream().allMatch(layers -> layers.equals(uniform.faceLayers().get(Direction.NORTH))));
+	}
+
+	@Test
+	void mixedModelMaterialsDoNotReceiveUniformFaceCoverage() {
+		var mixed = DistantHorizonsFaceMaterialResolver.resolveCandidates(List.of(
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.NORTH, material("minecraft:block/stone"), false, false),
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.SOUTH, material("minecraft:block/dirt"), false, false)
+		)).withUniformFaceCoverageIfSafe();
+
+		assertEquals(2, mixed.faceLayers().size());
+		assertFalse(mixed.faceLayers().containsKey(Direction.UP));
+	}
+
+	@Test
+	void atlasRegionsWithDifferentV0DoNotReceiveUniformFaceCoverage() {
+		var north = material("minecraft:block/seagrass");
+		var south = new DistantHorizonsFaceMaterialResolver.FaceMaterial(
+			"minecraft:textures/atlas/blocks.png", "minecraft:block/seagrass",
+			0.25F, 0.51F, 0.3125F, 0.5625F
+		);
+		var mixedUv = DistantHorizonsFaceMaterialResolver.resolveCandidates(List.of(
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.NORTH, north, false, false),
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.SOUTH, south, false, false)
+		)).withUniformFaceCoverageIfSafe();
+
+		assertEquals(2, mixedUv.faceLayers().size());
+		assertFalse(mixedUv.faceLayers().containsKey(Direction.UP));
+	}
+
+	@Test
+	void uniformCrossedModelMayCanonicalizeOmittedFaceUvOrientation() {
+		var sprite = "minecraft:block/seagrass";
+		var north = material(sprite);
+		var south = new DistantHorizonsFaceMaterialResolver.FaceMaterial(
+			"minecraft:textures/atlas/blocks.png", sprite, 0.25F, 0.5F, 0.3125F, 0.5625F, 0x87
+		);
+		var west = new DistantHorizonsFaceMaterialResolver.FaceMaterial(
+			"minecraft:textures/atlas/blocks.png", sprite, 0.25F, 0.5F, 0.3125F, 0.5625F, 0xd2
+		);
+		var east = new DistantHorizonsFaceMaterialResolver.FaceMaterial(
+			"minecraft:textures/atlas/blocks.png", sprite, 0.25F, 0.5F, 0.3125F, 0.5625F, 0x2d
+		);
+		var uniform = DistantHorizonsFaceMaterialResolver.resolveCandidates(List.of(
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.NORTH, north, false, false),
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.SOUTH, south, false, false),
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.WEST, west, false, false),
+			new DistantHorizonsFaceMaterialResolver.FaceCandidate(Direction.EAST, east, false, false)
+		)).withUniformFaceCoverageIfSafe();
+
+		assertEquals(6, uniform.faceLayers().size());
+		assertEquals(DistantHorizonsFaceMaterialResolver.FaceMaterial.CANONICAL_UV_CORNER_ORDER,
+			uniform.faceLayers().get(Direction.UP).getFirst().uvCornerOrder());
+		assertEquals(0x87, uniform.faceLayers().get(Direction.SOUTH).getFirst().uvCornerOrder());
+	}
+
+	@Test
+	void builtInFluidRecordsKeepWaterTintAndLavaAuthoredColorContracts() {
+		var water = DistantHorizonsFaceMaterialResolver.copiedFluidResolution(
+			"minecraft:textures/atlas/blocks.png", "minecraft:block/water_still",
+			0.25F, 0.5F, 0.3125F, 0.5625F, true, 0xff3f76e4
+		);
+		var lava = DistantHorizonsFaceMaterialResolver.copiedFluidResolution(
+			"minecraft:textures/atlas/blocks.png", "minecraft:block/lava_still",
+			0.375F, 0.625F, 0.4375F, 0.6875F, false, 0xffffffff
+		);
+
+		assertTrue(water.isExactAtlasAdmissible());
+		assertTrue(water.faces().values().stream().allMatch(material -> material.tinted()));
+		assertEquals(0xff3f76e4, water.faces().get(Direction.UP).tintArgb());
+		assertTrue(lava.isExactAtlasAdmissible());
+		assertTrue(lava.faces().values().stream().noneMatch(material -> material.tinted()));
+		assertEquals("minecraft:block/lava_still", lava.faces().get(Direction.UP).spriteIdentity());
+	}
+
+	@Test
 	void usesStableSemanticFaceIds() {
 		assertEquals(0, DistantHorizonsFaceMaterialResolver.faceId(Direction.DOWN));
 		assertEquals(1, DistantHorizonsFaceMaterialResolver.faceId(Direction.UP));

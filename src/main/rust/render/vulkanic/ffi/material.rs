@@ -102,7 +102,10 @@ unsafe fn read_world_mesh_asset_update_request(
 ) -> GalResult<FfiWorldMeshAssetUpdateRequest> {
     // Read only the common header until the caller's full layout is proven.
     // In particular, old ABI requests do not contain the appended orb slice.
-    let header = read_struct(request.cast::<FfiHeader>(), "world mesh asset update header")?;
+    let header = read_struct(
+        request.cast::<FfiHeader>(),
+        "world mesh asset update header",
+    )?;
     validate_header::<FfiWorldMeshAssetUpdateRequest>(header)?;
     read_struct(request, "world mesh asset update request")
 }
@@ -168,10 +171,14 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
                 format!("duplicate world mesh texture {}", texture.texture_id),
             ));
         }
-        let raw_mip_pngs = read_limited_slice(texture.mip_png_bytes, true, "world mesh texture mip PNGs")?;
+        let raw_mip_pngs =
+            read_limited_slice(texture.mip_png_bytes, true, "world mesh texture mip PNGs")?;
         let mip_png_byte_count = raw_mip_pngs.iter().try_fold(0usize, |total, mip| {
             total.checked_add(mip.len as usize).ok_or_else(|| {
-                GalError::ffi(StatusCode::LengthOverflow, "world mesh texture mip PNG byte count overflow")
+                GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    "world mesh texture mip PNG byte count overflow",
+                )
             })
         })?;
         texture_png_bytes_total = texture_png_bytes_total
@@ -201,12 +208,14 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
         let mip_png_bytes = raw_mip_pngs
             .iter()
             .enumerate()
-            .map(|(mip, bytes)| read_bounded_bytes(
-                *bytes,
-                true,
-                FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES,
-                &format!("world mesh texture mip {} PNG bytes", mip + 1),
-            ))
+            .map(|(mip, bytes)| {
+                read_bounded_bytes(
+                    *bytes,
+                    true,
+                    FFI_MAX_WORLD_MESH_TEXTURE_ASSET_BYTES,
+                    &format!("world mesh texture mip {} PNG bytes", mip + 1),
+                )
+            })
             .collect::<GalResult<Vec<_>>>()?;
         let raw_frames = read_limited_slice(
             texture.animation_frames,
@@ -235,7 +244,9 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             });
         }
         if texture.requested_mip_levels > 32 {
-            return Err(GalError::invalid_argument("invalid explicit texture mip count"));
+            return Err(GalError::invalid_argument(
+                "invalid explicit texture mip count",
+            ));
         }
         textures.push(WorldMeshTextureAssetPayload {
             requested_mip_levels: texture.requested_mip_levels,
@@ -252,7 +263,9 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             animation_frames,
             coordinate_origin: texture.reserved0,
             sampling: super::super::texture_sampling::TextureSampling::decode(
-                texture.sampling_filter, texture.sampling_address)?,
+                texture.sampling_filter,
+                texture.sampling_address,
+            )?,
         });
     }
     let raw_meshes = read_limited_slice(request.meshes, true, "world mesh assets")?;
@@ -266,9 +279,12 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
         ));
     }
     // Check the combined residency before dereferencing the semantic array.
-    let total_meshes = (raw_meshes.len() as u64).checked_add(request.experience_orbs.count)
+    let total_meshes = (raw_meshes.len() as u64)
+        .checked_add(request.experience_orbs.count)
         .filter(|&count| count <= WORLD_MESH_ASSET_RESIDENCY as u64)
-        .ok_or_else(|| GalError::invalid_argument("combined world mesh/orb asset count exceeds residency"))?;
+        .ok_or_else(|| {
+            GalError::invalid_argument("combined world mesh/orb asset count exceeds residency")
+        })?;
     let raw_orbs = read_limited_slice(request.experience_orbs, true, "experience orb assets")?;
     let mut seen_meshes = BTreeMap::new();
     let mut meshes = Vec::with_capacity(total_meshes as usize);
@@ -376,12 +392,19 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
         });
     }
     for orb in raw_orbs {
-        validate_item_size::<FfiWorldExperienceOrbAssetRecord>(orb.byte_size, "experience orb asset")?;
+        validate_item_size::<FfiWorldExperienceOrbAssetRecord>(
+            orb.byte_size,
+            "experience orb asset",
+        )?;
         if orb.reserved0 != 0 || orb.red > 255 || orb.blue > 255 {
-            return Err(GalError::invalid_argument("invalid experience orb appearance channels or reserved bits"));
+            return Err(GalError::invalid_argument(
+                "invalid experience orb appearance channels or reserved bits",
+            ));
         }
         if seen_meshes.insert(orb.mesh_key, ()).is_some() {
-            return Err(GalError::invalid_argument("duplicate world mesh/orb asset identity"));
+            return Err(GalError::invalid_argument(
+                "duplicate world mesh/orb asset identity",
+            ));
         }
         meshes.push(crate::render::vulkanic::world_primitive_frontend::experience_orb::ExperienceOrbAppearance {
             icon: orb.icon, red: orb.red as u8, blue: orb.blue as u8, packed_light: orb.packed_light,
@@ -528,30 +551,37 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_mesh_update_assets(
             return error.code as i32;
         };
         let checked_request = read_world_mesh_asset_update_request(request);
-        let input_bytes = checked_request.as_ref()
-            .map(input_bytes_for_world_mesh_asset_update).unwrap_or(0);
+        let input_bytes = checked_request
+            .as_ref()
+            .map(input_bytes_for_world_mesh_asset_update)
+            .unwrap_or(0);
         context.ffi_calls += 1;
         context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
         context.ffi_output_bytes = context
             .ffi_output_bytes
             .saturating_add(size_of::<FfiStatusResult>() as u64);
-        let result = checked_request.and_then(|request|
-            decode_world_mesh_asset_update(&request, context.gal.capabilities())).and_then(
-            |(generation, meshes, textures, sorted_indices, retirements)| {
-                context.gui_frontend.invalidate_atlas_texture_views(
-                    &mut context.gal, textures.iter().map(|texture| texture.texture_id))?;
-                context
-                    .world_primitive_frontend
-                    .apply_world_mesh_asset_update_with_sorted_and_retirements(
+        let result = checked_request
+            .and_then(|request| {
+                decode_world_mesh_asset_update(&request, context.gal.capabilities())
+            })
+            .and_then(
+                |(generation, meshes, textures, sorted_indices, retirements)| {
+                    context.gui_frontend.invalidate_atlas_texture_views(
                         &mut context.gal,
-                        generation,
-                        meshes,
-                        textures,
-                        sorted_indices,
-                        retirements,
-                    )
-            },
-        );
+                        textures.iter().map(|texture| texture.texture_id),
+                    )?;
+                    context
+                        .world_primitive_frontend
+                        .apply_world_mesh_asset_update_with_sorted_and_retirements(
+                            &mut context.gal,
+                            generation,
+                            meshes,
+                            textures,
+                            sorted_indices,
+                            retirements,
+                        )
+                },
+            );
         match result {
             Ok(()) => {
                 write_status_out(status_out, status_ok(context));

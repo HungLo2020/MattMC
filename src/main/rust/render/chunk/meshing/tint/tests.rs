@@ -25,9 +25,18 @@ fn native_vertex_tint_matches_frozen_fixed_point_biome_blend() {
     block.tint_lattice[1][0][0] = 0xff00_0000u32 as i32;
     block.tint_lattice[1][0][1] = 0xff40_0000u32 as i32;
     block.tint_lattice[1][1][0] = 0xff00_4000u32 as i32;
-    let state = NativeMeshingState { tint_type: TINT_GRASS, ..NativeMeshingState::default() };
-    assert_eq!(0xff40_4000u32 as i32, native_vertex_tint_color(&block, state, 0.5, 0.5, 0.5));
-    assert_eq!(0xff20_2000u32 as i32, native_vertex_tint_color(&block, state, 0.0, 0.5, 0.0));
+    let state = NativeMeshingState {
+        tint_type: TINT_GRASS,
+        ..NativeMeshingState::default()
+    };
+    assert_eq!(
+        0xff40_4000u32 as i32,
+        native_vertex_tint_color(&block, state, 0.5, 0.5, 0.5)
+    );
+    assert_eq!(
+        0xff20_2000u32 as i32,
+        native_vertex_tint_color(&block, state, 0.0, 0.5, 0.0)
+    );
 }
 
 #[test]
@@ -39,12 +48,18 @@ fn copied_per_block_dry_foliage_tint_is_not_replaced_by_neighbour_blending() {
         tint_lattice: [[[0xff38_9824u32 as i32; 4]; 4]; 4],
         ..NativeSectionBlockRecord::default()
     };
-    let state = NativeMeshingState { tint_type: TINT_CONSTANT, ..NativeMeshingState::default() };
+    let state = NativeMeshingState {
+        tint_type: TINT_CONSTANT,
+        ..NativeMeshingState::default()
+    };
     for x in [-0.5, 0.0, 0.5, 1.0, 1.5] {
         for y in [0.0, 0.125, 1.0] {
             for z in [-0.5, 0.0, 0.5, 1.0, 1.5] {
                 assert_eq!(native_vertex_tint_color(&block, state, x, y, z), dry);
-                assert_eq!(multiply_argb(-1, native_vertex_tint_color(&block, state, x, y, z)), dry);
+                assert_eq!(
+                    multiply_argb(-1, native_vertex_tint_color(&block, state, x, y, z)),
+                    dry
+                );
             }
         }
     }

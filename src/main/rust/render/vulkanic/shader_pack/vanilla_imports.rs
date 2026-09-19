@@ -94,7 +94,10 @@ impl Imports<'_> {
                 }
                 let name = format!("{prefix}{name}");
                 let (namespace, path) = if quoted {
-                    (self.namespace, normalize_path(&format!("{}/{name}", self.directory))?)
+                    (
+                        self.namespace,
+                        normalize_path(&format!("{}/{name}", self.directory))?,
+                    )
                 } else {
                     let (namespace, path) = name.split_once(':').unwrap_or(("minecraft", &name));
                     if !self.qualified && namespace != self.namespace {
@@ -102,7 +105,11 @@ impl Imports<'_> {
                     }
                     (namespace, normalize_path(&format!("include/{path}"))?)
                 };
-                let path = if self.qualified { super::vanilla_sources::key(namespace, &path)? } else { path };
+                let path = if self.qualified {
+                    super::vanilla_sources::key(namespace, &path)?
+                } else {
+                    path
+                };
                 if self.seen.insert(path.clone()) {
                     let included = self.source.get(&path).ok_or_else(|| {
                         GalError::unsupported_feature(format!(
@@ -202,7 +209,9 @@ fn directive_after_comments(mut tail: &str, keyword: &str) -> bool {
     loop {
         tail = tail.trim_start_matches([' ', '\t']);
         if let Some(comment) = tail.strip_prefix("/*") {
-            let Some((_, rest)) = comment.split_once("*/") else { return false; };
+            let Some((_, rest)) = comment.split_once("*/") else {
+                return false;
+            };
             tail = rest;
         } else {
             return tail.strip_prefix(keyword).is_some_and(|rest| {
@@ -244,12 +253,14 @@ fn without_comments(source: &str) -> GalResult<String> {
             // never join physical newlines or comments in ordinary GLSL code.
             let prefix = std::str::from_utf8(&output[line_start..i])
                 .expect("comment masking preserves UTF-8");
-            join_block_lines = (prefix.trim() == "#" && directive_after_comments(&source[i..], "moj_import"))
+            join_block_lines = (prefix.trim() == "#"
+                && directive_after_comments(&source[i..], "moj_import"))
                 || directive(prefix, "moj_import").is_some_and(|tail| tail.trim().is_empty());
             // Frozen leaves version-token comments for the OpenGL compiler,
             // unlike imports which it expands itself. The real paired version
             // fixture was rejected there; do not normalize it into valid GLSL.
-            version_block_lines = (prefix.trim() == "#" && directive_after_comments(&source[i..], "version"))
+            version_block_lines = (prefix.trim() == "#"
+                && directive_after_comments(&source[i..], "version"))
                 || directive(prefix, "version").is_some_and(|tail| tail.trim().is_empty());
             block = true;
             output[i] = b' ';
@@ -302,16 +313,46 @@ mod tests {
         assert!(result.starts_with("#version 330\n"));
         assert_eq!(1, result.matches("float imported;").count());
         assert!(!result.contains("moj_import"));
-        assert_eq!("float a;     \n       float b;\n", without_comments("float a; /* x\n y */  float b;\n").unwrap());
-        assert_eq!("#\nmoj_import <a.glsl>\n", without_comments("#\nmoj_import <a.glsl>\n").unwrap());
-        assert_eq!("#       \n      define VALUE 1\n", without_comments("#/* keep\nme */ define VALUE 1\n").unwrap());
-        assert!(!directive_after_comments("/* joined\n*/\nmoj_import <a.glsl>", "moj_import"));
-        assert!(!directive_after_comments("/* joined\n*/moj_import_invalid <a.glsl>", "moj_import"));
+        assert_eq!(
+            "float a;     \n       float b;\n",
+            without_comments("float a; /* x\n y */  float b;\n").unwrap()
+        );
+        assert_eq!(
+            "#\nmoj_import <a.glsl>\n",
+            without_comments("#\nmoj_import <a.glsl>\n").unwrap()
+        );
+        assert_eq!(
+            "#       \n      define VALUE 1\n",
+            without_comments("#/* keep\nme */ define VALUE 1\n").unwrap()
+        );
+        assert!(!directive_after_comments(
+            "/* joined\n*/\nmoj_import <a.glsl>",
+            "moj_import"
+        ));
+        assert!(!directive_after_comments(
+            "/* joined\n*/moj_import_invalid <a.glsl>",
+            "moj_import"
+        ));
         for version in ["#/* gap\n*/version 330\n", "#version/* gap\n*/330\n"] {
-            assert!(expand(&source, "minecraft", "post/test.fsh", version).unwrap_err().message.contains("multiline GLSL version"));
+            assert!(expand(&source, "minecraft", "post/test.fsh", version)
+                .unwrap_err()
+                .message
+                .contains("multiline GLSL version"));
         }
-        assert!(expand(&source, "minecraft", "post/test.fsh", "#moj_import\n<a.glsl>\n").is_err());
-        assert!(expand(&source, "minecraft", "post/test.fsh", "#moj_import /* unterminated\n").is_err());
+        assert!(expand(
+            &source,
+            "minecraft",
+            "post/test.fsh",
+            "#moj_import\n<a.glsl>\n"
+        )
+        .is_err());
+        assert!(expand(
+            &source,
+            "minecraft",
+            "post/test.fsh",
+            "#moj_import /* unterminated\n"
+        )
+        .is_err());
     }
 
     #[test]

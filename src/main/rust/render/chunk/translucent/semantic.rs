@@ -38,23 +38,40 @@ impl SemanticTranslucentGeometry {
             quads.push(build_quad_info(&record));
         }
         let aligned_separator_distances = build_aligned_separator_distances(&quads);
-        Some(Self(NativeTranslucentSectionGeometry { quads, aligned_separator_distances }))
+        Some(Self(NativeTranslucentSectionGeometry {
+            quads,
+            aligned_separator_distances,
+        }))
     }
 
     pub(crate) fn order(&self, camera: [f32; 3]) -> Option<Vec<usize>> {
         if !camera.iter().all(|value| value.is_finite()) {
             return None;
         }
-        if let Some(order) = dynamic_topo_graph_sort(&self.0, (camera[0], camera[1], camera[2]), false) {
+        if let Some(order) =
+            dynamic_topo_graph_sort(&self.0, (camera[0], camera[1], camera[2]), false)
+        {
             return Some(order.into_iter().map(|i| i as usize).collect());
         }
         // This is the native dynamic sorter's cycle policy, not a backend or
         // Java rendering fallback. Preserve its index-key/tie semantics.
         let mut indices = vec![0; self.0.quads.len().checked_mul(6)?];
-        if write_distance_sorted_index_buffer(&self.0, &mut indices, camera[0], camera[1], camera[2]) != OK {
+        if write_distance_sorted_index_buffer(
+            &self.0,
+            &mut indices,
+            camera[0],
+            camera[1],
+            camera[2],
+        ) != OK
+        {
             return None;
         }
-        Some(indices.chunks_exact(6).map(|quad| quad[0] as usize / 4).collect())
+        Some(
+            indices
+                .chunks_exact(6)
+                .map(|quad| quad[0] as usize / 4)
+                .collect(),
+        )
     }
 }
 
@@ -64,19 +81,21 @@ mod tests {
 
     fn pane(z: f32, reverse: bool) -> [[f32; 3]; 4] {
         let mut p = [[-1., -1., z], [1., -1., z], [1., 1., z], [-1., 1., z]];
-        if reverse { p.reverse(); }
+        if reverse {
+            p.reverse();
+        }
         p
     }
 
     #[test]
     fn semantic_order_preserves_source_ordinals_across_facing_buckets() {
-        let geometry = SemanticTranslucentGeometry::new(&[
-            pane(1., false), pane(3., false), pane(2., false),
-        ]).unwrap();
+        let geometry =
+            SemanticTranslucentGeometry::new(&[pane(1., false), pane(3., false), pane(2., false)])
+                .unwrap();
         assert_eq!(geometry.order([0., 0., 5.]).unwrap(), vec![0, 2, 1]);
-        let reverse = SemanticTranslucentGeometry::new(&[
-            pane(1., true), pane(3., true), pane(2., true),
-        ]).unwrap();
+        let reverse =
+            SemanticTranslucentGeometry::new(&[pane(1., true), pane(3., true), pane(2., true)])
+                .unwrap();
         assert_eq!(reverse.order([0., 0., 0.]).unwrap(), vec![1, 2, 0]);
     }
 
@@ -86,8 +105,12 @@ mod tests {
         bad[2][0] = f32::NAN;
         assert!(SemanticTranslucentGeometry::new(&[bad]).is_none());
         let geometry = SemanticTranslucentGeometry::new(&[
-            pane(1., false), pane(1., true), pane(3., false), pane(3., true),
-        ]).unwrap();
+            pane(1., false),
+            pane(1., true),
+            pane(3., false),
+            pane(3., true),
+        ])
+        .unwrap();
         assert!(geometry.order([f32::INFINITY, 0., 0.]).is_none());
         for camera in [[0., 0., 0.], [0., 0., 2.], [0., 0., 5.]] {
             let mut order = geometry.order(camera).unwrap();

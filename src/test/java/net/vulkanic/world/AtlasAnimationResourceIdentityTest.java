@@ -37,6 +37,30 @@ class AtlasAnimationResourceIdentityTest {
     @Test void zeroIsNotASemanticTextureIdentity() {
         assertThrows(IllegalArgumentException.class, () -> new AtlasAnimationResource(GUI, 0, source()));
         assertThrows(IllegalArgumentException.class, () -> new AtlasAnimationTickDelivery(0, 1, 0));
+        assertThrows(IllegalArgumentException.class, () -> new AtlasAnimationResource(GUI, 1, source(), -1));
+    }
+
+    @Test
+    void resourceReplacementRetainsThePriorSemanticTickEpoch() {
+        try (var resource = new AtlasAnimationResource(GUI, 202, source(), 5772)) {
+            assertEquals(5772, resource.initialTick());
+            assertEquals(5772, resource.producedTickForDiagnostics());
+            resource.enqueueNextTick(true);
+            assertEquals(5773, resource.producedTickForDiagnostics());
+        }
+    }
+
+    @Test
+    void runtimeAtlasReplacementReadsTheRetainedEpochAcrossFreshResources() {
+        int textureId = 0x12345;
+        try (var first = AtlasAnimationResource.runtime(GUI, textureId, source(), 7)) {
+            first.enqueueNextTick(true);
+            assertEquals(8, first.producedTickForDiagnostics());
+        }
+        try (var replacement = AtlasAnimationResource.runtime(GUI, textureId, source(), 0)) {
+            assertEquals(8, replacement.initialTick());
+            assertEquals(8, replacement.producedTickForDiagnostics());
+        }
     }
 
     private static final ResourceLocation BLOCKS = ResourceLocation.withDefaultNamespace("textures/atlas/blocks.png");

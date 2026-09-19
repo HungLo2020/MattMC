@@ -148,13 +148,21 @@ mod tests {
     #[test]
     fn copied_stage_cannot_alias_an_unrepresented_namespace() {
         use super::super::source::{ShaderPackSource, ShaderSourceFile};
-        let source = ShaderPackSource::new("namespace-fixture", 1, vec![
-            ShaderSourceFile::new("post/probe.vsh", "#version 330\nvoid main(){}\n"),
-            ShaderSourceFile::new("post/probe.fsh", "#version 330\nvoid main(){}\n"),
-        ]).unwrap();
+        let source = ShaderPackSource::new(
+            "namespace-fixture",
+            1,
+            vec![
+                ShaderSourceFile::new("post/probe.vsh", "#version 330\nvoid main(){}\n"),
+                ShaderSourceFile::new("post/probe.fsh", "#version 330\nvoid main(){}\n"),
+            ],
+        )
+        .unwrap();
         let contract = VanillaPostEffectContract::parse("minecraft:fixture",
             br#"{"targets":{},"passes":[{"vertex_shader":"other:post/probe","fragment_shader":"minecraft:post/probe","inputs":[{"sampler_name":"In","target":"minecraft:main"}],"output":"minecraft:main"}]}"#).unwrap();
-        assert!(contract.expanded_shader_sources_from_source(&source).unwrap_err()
-            .message.contains("namespace-qualified"));
+        assert!(contract
+            .expanded_shader_sources_from_source(&source)
+            .unwrap_err()
+            .message
+            .contains("namespace-qualified"));
     }
 }

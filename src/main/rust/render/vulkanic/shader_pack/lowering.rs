@@ -4710,19 +4710,12 @@ const int vulkanic_source_textured_quad_indices[6] = int[6](0, 1, 2, 2, 3, 0);
 "#;
 
 /// Rust-owned source interface for the copied DH CPU stream. The storage
-/// layout matches `world_primitive_frontend::lod`'s 32-byte expanded vertex
+/// layout matches `world_primitive_frontend::lod`'s 16-byte packed vertex
 /// record. The per-draw column origin comes from the owned LOD frame block;
 /// source-declared `dhModelView`/`dhProjection` remain scalar semantic
 /// uniforms and therefore must be supplied before a route can be admitted.
 const DISTANT_HORIZONS_VERTEX_SEMANTIC_PREAMBLE: &str = r#"struct VulkanicDistantHorizonsVertex {
-    float local_x;
-    float local_y;
-    float local_z;
-    float micro_x;
-    float micro_y;
-    float micro_z;
-    uint color_rgba;
-    uint light_material_normal;
+    uvec4 data;
 };
 layout(set = 0, binding = 0, std430) readonly buffer VulkanicDistantHorizonsVertices {
     VulkanicDistantHorizonsVertex vulkanic_source_dh_vertices[];
@@ -4735,6 +4728,14 @@ layout(set = 0, binding = 1, std140) uniform VulkanicDistantHorizonsColumnFrame 
     uvec4 vulkanic_source_dh_flags_and_noise;
 };
 #define vulkanic_source_dh_vertex vulkanic_source_dh_vertices[gl_VertexIndex]
+int vulkanic_source_dh_i16(uint value) {
+    int decoded = int(value & 0xffffu);
+    return decoded >= 32768 ? decoded - 65536 : decoded;
+}
+float vulkanic_source_dh_micro(uint bits) {
+    return (bits & 2u) != 0u ? -vulkanic_source_dh_clip_micro_noise_earth.y
+        : ((bits & 1u) != 0u ? vulkanic_source_dh_clip_micro_noise_earth.y : 0.0);
+}
 vec3 vulkanic_source_dh_normal(uint normal) {
     if (normal == 0u) return vec3(0.0, -1.0, 0.0);
     if (normal == 1u) return vec3(0.0, 1.0, 0.0);
@@ -4744,25 +4745,34 @@ vec3 vulkanic_source_dh_normal(uint normal) {
     return vec3(1.0, 0.0, 0.0);
 }
 vec4 vulkanic_source_dh_position() {
+    uint micro = (vulkanic_source_dh_vertex.data.y >> 16u) & 0xffu;
     return vec4(
-        vec3(vulkanic_source_dh_vertex.local_x, vulkanic_source_dh_vertex.local_y, vulkanic_source_dh_vertex.local_z)
+        vec3(
+            vulkanic_source_dh_i16(vulkanic_source_dh_vertex.data.x),
+            vulkanic_source_dh_i16(vulkanic_source_dh_vertex.data.x >> 16u),
+            vulkanic_source_dh_i16(vulkanic_source_dh_vertex.data.y)
+        )
             // Iris's DHTerrainTransformer applies compact micro offsets only
             // on X/Z. Preserve the copied Y bits as semantic data, but do not
             // turn them into terrain height offsets in this source pass.
-            + vec3(vulkanic_source_dh_vertex.micro_x, 0.0, vulkanic_source_dh_vertex.micro_z)
-            // The model offset already contains the column's min-world-Y
-            // relative to the camera. `worldYOffset` is source-pack scalar
-            // context, not a second geometry translation.
+            + vec3(
+                vulkanic_source_dh_micro(micro),
+                0.0,
+                vulkanic_source_dh_micro(micro >> 4u)
+            )
+            // The copied DH model offset already carries the column's
+            // dimension-local minimum Y. `worldYOffset` remains source-pack
+            // scalar context, not a second geometry translation.
             + vulkanic_source_dh_model_offset_and_reserved.xyz,
         1.0
     );
 }
 vec4 vulkanic_source_dh_vertex_color() {
     return vec4(
-        float(vulkanic_source_dh_vertex.color_rgba & 0xffu),
-        float((vulkanic_source_dh_vertex.color_rgba >> 8u) & 0xffu),
-        float((vulkanic_source_dh_vertex.color_rgba >> 16u) & 0xffu),
-        float((vulkanic_source_dh_vertex.color_rgba >> 24u) & 0xffu)
+        float(vulkanic_source_dh_vertex.data.z & 0xffu),
+        float((vulkanic_source_dh_vertex.data.z >> 8u) & 0xffu),
+        float((vulkanic_source_dh_vertex.data.z >> 16u) & 0xffu),
+        float((vulkanic_source_dh_vertex.data.z >> 24u) & 0xffu)
     ) / 255.0;
 }
 vec2 vulkanic_source_dh_packed_lightmap_coordinates() {
@@ -4771,20 +4781,20 @@ vec2 vulkanic_source_dh_packed_lightmap_coordinates() {
         // Iris's terrain transformer expands it as `(blockLight, skyLight)`
         // before the shader pack's lightmap conversion. Keep the generic
         // lowered stream aligned with the exact-atlas DH stream.
-        float((vulkanic_source_dh_vertex.light_material_normal >> 8u) & 0xffu),
-        float(vulkanic_source_dh_vertex.light_material_normal & 0xffu)
+        float((vulkanic_source_dh_vertex.data.w >> 8u) & 0xffu),
+        float(vulkanic_source_dh_vertex.data.w & 0xffu)
     ) + vec2(0.5)) / 16.0;
 }
 #define vulkanic_source_texture_matrix (mat4[2](mat4(1.0), mat4(1.0)))
 #define vulkanic_source_lightmap_uv vec4(vulkanic_source_dh_packed_lightmap_coordinates(), 0.0, 1.0)
 #define vulkanic_source_position vulkanic_source_dh_position()
 #define vulkanic_source_vertex_color vulkanic_source_dh_vertex_color()
-#define vulkanic_source_normal vulkanic_source_dh_normal((vulkanic_source_dh_vertex.light_material_normal >> 24u) & 0xffu)
+#define vulkanic_source_normal vulkanic_source_dh_normal((vulkanic_source_dh_vertex.data.w >> 24u) & 0xffu)
 // Complementary's dh_terrain contract consumes DH's own coarse material
 // category (leaves/grass/lava/etc.), not a Minecraft atlas or a guessed block
 // state. Keep that category in the copied semantic vertex stream so reduced
 // mixed tiles remain representable without inventing per-quad identities.
-#define vulkanic_source_dh_material_id int((vulkanic_source_dh_vertex.light_material_normal >> 16u) & 0xffu)
+#define vulkanic_source_dh_material_id int((vulkanic_source_dh_vertex.data.w >> 16u) & 0xffu)
 #define vulkanic_source_model_view dhModelView
 #define vulkanic_source_normal_matrix transpose(inverse(mat3(vulkanic_source_model_view)))
 #define vulkanic_source_ftransform() (dhProjection * vulkanic_source_model_view * vulkanic_source_position)
@@ -5004,25 +5014,57 @@ pub fn derive_terrain_source_varying_contract(
 }
 
 /// Shared source-level interface linking. No runtime renderer state is used.
-pub(in crate::render::vulkanic) fn bind_simple_paired_varyings(vertex: &str, fragment: &str) -> GalResult<(String, String)> {
+pub(in crate::render::vulkanic) fn bind_simple_paired_varyings(
+    vertex: &str,
+    fragment: &str,
+) -> GalResult<(String, String)> {
     let contract = derive_simple_varying_contract(vertex, fragment)?;
-    if contract.fields.iter().any(|field| !matches!(field.type_name.as_str(),
-        "float" | "vec2" | "vec3" | "vec4" | "int" | "ivec2" | "ivec3" | "ivec4"
-        | "uint" | "uvec2" | "uvec3" | "uvec4")) {
-        return Err(GalError::unsupported_feature("post-effect varying requires a multi-location interface contract"));
+    if contract.fields.iter().any(|field| {
+        !matches!(
+            field.type_name.as_str(),
+            "float"
+                | "vec2"
+                | "vec3"
+                | "vec4"
+                | "int"
+                | "ivec2"
+                | "ivec3"
+                | "ivec4"
+                | "uint"
+                | "uvec2"
+                | "uvec3"
+                | "uvec4"
+        )
+    }) {
+        return Err(GalError::unsupported_feature(
+            "post-effect varying requires a multi-location interface contract",
+        ));
     }
-    for (source, storage) in [(vertex, VaryingStorage::Out), (fragment, VaryingStorage::In)] {
+    for (source, storage) in [
+        (vertex, VaryingStorage::Out),
+        (fragment, VaryingStorage::In),
+    ] {
         if !collect_stage_varyings(source, storage)?.is_empty()
-            && source.lines().any(|line| line.trim().starts_with("layout")
-                && line.contains(&format!(" {} ", storage.keyword()))) {
-            return Err(GalError::unsupported_feature("post-effect mixed explicit and implicit varying locations are unavailable"));
+            && source.lines().any(|line| {
+                line.trim().starts_with("layout")
+                    && line.contains(&format!(" {} ", storage.keyword()))
+            })
+        {
+            return Err(GalError::unsupported_feature(
+                "post-effect mixed explicit and implicit varying locations are unavailable",
+            ));
         }
     }
-    Ok((apply_varying_locations(vertex, VaryingStorage::Out, &contract)?,
-        apply_varying_locations(fragment, VaryingStorage::In, &contract)?))
+    Ok((
+        apply_varying_locations(vertex, VaryingStorage::Out, &contract)?,
+        apply_varying_locations(fragment, VaryingStorage::In, &contract)?,
+    ))
 }
 
-fn derive_simple_varying_contract(vertex: &str, fragment: &str) -> GalResult<TerrainSourceVaryingContract> {
+fn derive_simple_varying_contract(
+    vertex: &str,
+    fragment: &str,
+) -> GalResult<TerrainSourceVaryingContract> {
     let mut vertex_outputs = BTreeMap::new();
     for field in collect_stage_varyings(vertex, VaryingStorage::Out)? {
         insert_stage_varying(&mut vertex_outputs, field, "vertex output")?;
@@ -7733,27 +7775,23 @@ mod tests {
             .expect("the lowered DH source must declare packed light coordinates");
         let light_source = &lowered.vertex().source()[light_coordinates..];
         let block_shift = light_source
-            .find("light_material_normal >> 8u")
+            .find("data.w >> 8u")
             .expect("DH block light must occupy the first lightmap component");
         let sky_component = light_source
-            .find("light_material_normal & 0xffu")
+            .find("data.w & 0xffu")
             .expect("DH sky light must occupy the second lightmap component");
         assert!(
             block_shift < sky_component,
             "the generic DH source adapter must preserve Iris's (blockLight, skyLight) order"
         );
-        assert!(
-            lowered.vertex().source().contains(
-                "vec3(vulkanic_source_dh_vertex.micro_x, 0.0, vulkanic_source_dh_vertex.micro_z)"
-            ),
-            "DH terrain must match Iris's X/Z-only compact micro-offset reconstruction"
-        );
-        assert!(
-            !lowered.vertex().source().contains(
-                "vec3(vulkanic_source_dh_vertex.micro_x, vulkanic_source_dh_vertex.micro_y, vulkanic_source_dh_vertex.micro_z)"
-            ),
-            "DH terrain must not turn compact Y offset bits into terrain height"
-        );
+        assert!(lowered
+            .vertex()
+            .source()
+            .contains("vulkanic_source_dh_micro(micro >> 4u)"));
+        assert!(!lowered
+            .vertex()
+            .source()
+            .contains("vulkanic_source_dh_micro(micro >> 2u)"));
         assert!(lowered
             .uniform_contract()
             .fields()
@@ -8356,18 +8394,29 @@ mod tests {
     fn post_effect_interface_linking_matches_names_not_declaration_order() {
         let (vertex, fragment) = bind_simple_paired_varyings(
             "out vec2 first;\nout vec3 second;\n",
-            "in vec3 second;\nin vec2 first;\n").unwrap();
+            "in vec3 second;\nin vec2 first;\n",
+        )
+        .unwrap();
         assert!(vertex.contains("layout(location = 0) out vec2 first;"));
         assert!(fragment.contains("layout(location = 0) in vec2 first;"));
         assert!(vertex.contains("layout(location = 1) out vec3 second;"));
         assert!(fragment.contains("layout(location = 1) in vec3 second;"));
-        for input in ["in vec3 first;\n", "in vec2 missing;\n", "flat in vec2 first;\n"] {
+        for input in [
+            "in vec3 first;\n",
+            "in vec2 missing;\n",
+            "flat in vec2 first;\n",
+        ] {
             assert!(bind_simple_paired_varyings("out vec2 first;\n", input).is_err());
         }
         assert!(bind_simple_paired_varyings("out mat4 matrix;\n", "in mat4 matrix;\n").is_err());
-        assert!(bind_simple_paired_varyings("out vec2 values[2];\n", "in vec2 values[2];\n").is_err());
-        assert!(bind_simple_paired_varyings("layout(location=0) out vec2 fixed;\nout vec2 other;\n",
-            "in vec2 other;\n").is_err());
+        assert!(
+            bind_simple_paired_varyings("out vec2 values[2];\n", "in vec2 values[2];\n").is_err()
+        );
+        assert!(bind_simple_paired_varyings(
+            "layout(location=0) out vec2 fixed;\nout vec2 other;\n",
+            "in vec2 other;\n"
+        )
+        .is_err());
     }
 
     #[test]

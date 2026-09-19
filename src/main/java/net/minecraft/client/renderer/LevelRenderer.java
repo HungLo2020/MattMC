@@ -1384,8 +1384,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.frustum-prepare");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.real-state-extraction");
 		this.levelRenderState.reset();
-		this.extractVisibleEntities(camera, frustum, deltaTracker, this.levelRenderState);
-		this.extractVisibleBlockEntities(camera, deltaTracker.getGameTimeDeltaPartialTick(false), this.levelRenderState);
+		if (!net.minecraft.client.dev.DeterministicCameraCapture.suppressWorldEntitiesForCapture()) {
+			this.extractVisibleEntities(camera, frustum, deltaTracker, this.levelRenderState);
+			this.extractVisibleBlockEntities(camera, deltaTracker.getGameTimeDeltaPartialTick(false), this.levelRenderState);
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.real-state-extraction");
 		PoseStack poseStack = new PoseStack();
 		boolean selectedSourceCoverage = net.vulkanic.world.RustGalWorldPrimitiveRenderer.requiresSelectedSourceFeatureCoverage();
@@ -2678,6 +2680,13 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.cull");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visible-submit");
+		boolean auditDisableDhFogOcclusion = Boolean.parseBoolean(
+			System.getenv().getOrDefault("MATTMC_RUST_DH_DISABLE_VANILLA_FOG_OCCLUSION", "false"))
+			&& Boolean.parseBoolean(System.getenv().getOrDefault("MATTMC_GRAPHICS_AUDIT", "false"));
+		boolean effectiveFogOcclusion = useFogOcclusion
+			&& !(auditDisableDhFogOcclusion
+				&& net.vulkanic.world.WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute()
+					.usesRustWholeFrameVulkan());
 		this.rustGalWholeFrameTerrainSource.enqueue(
 			camera,
 			frustum,
@@ -2687,7 +2696,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				this.minecraft.options.getEffectiveRenderDistance() * 16.0f,
 				fogParameters == null ? 0.0f : fogParameters.alpha(),
 				fogParameters == null ? 0.0f : fogParameters.renderEnd(),
-				useFogOcclusion
+				effectiveFogOcclusion
 			)
 		);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-submit");
@@ -2757,6 +2766,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public void enqueueRustGalCloudsForWholeFrame(Camera camera, float partialTick) {
 		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentCloudRoute().usesRustWholeFrameVulkan()
 			|| this.level == null || camera == null) {
+			return;
+		}
+		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasDistantHorizonsPrivateClouds()) {
 			return;
 		}
 		CloudStatus cloudStatus = this.minecraft.options.getCloudsType();

@@ -17,10 +17,10 @@ use super::super::handles::Handle;
 use super::super::resources::{
     AccessFlags, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, DepthBias, Extent3d,
     FrontFace, GraphicsPipelineDesc, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags,
-    PrimitiveTopology, QueueClass, RasterYDirection, ResourceBinding, ResourceBindingDesc, ResourceBindingKind,
-    ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc, SamplerFilter,
-    ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension, TextureFormat,
-    TextureUsage, TextureViewDesc,
+    PrimitiveTopology, QueueClass, RasterYDirection, ResourceBinding, ResourceBindingDesc,
+    ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc, SamplerAddressMode, SamplerDesc,
+    SamplerFilter, ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension,
+    TextureFormat, TextureUsage, TextureViewDesc,
 };
 use super::super::shader_pack::programs::shader_stage_code_for_backend;
 use super::super::{BufferImageCopyRegion, CullMode};
@@ -1363,11 +1363,9 @@ mod tests {
         frontend.apply_image_update(1, vec![asset()]).unwrap();
         let mut stale = quad(WORLD_TEXT_DEPTH_NORMAL);
         stale.atlas_revision = 5;
-        assert!(
-            frontend
-                .prepare_frame(&WorldTextFrame { quads: vec![stale] })
-                .is_err()
-        );
+        assert!(frontend
+            .prepare_frame(&WorldTextFrame { quads: vec![stale] })
+            .is_err());
     }
 
     #[test]
@@ -1710,32 +1708,62 @@ mod tests {
         );
         let up_pipelines = bound_pipelines;
         let mut down_ops = Vec::new();
-        frontend.append_frame_ops(
-            &mut gal, target, pass, target, depth_texture, depth_view,
-            TextureUsageState::DepthStencilAttachment, ColorFormat::Bgra8Unorm,
-            RasterYDirection::Down,
-            super::super::matrix4_identity(), super::super::matrix4_identity(),
-            &[quad(WORLD_TEXT_DEPTH_SEE_THROUGH), quad(WORLD_TEXT_DEPTH_NORMAL),
-                quad(WORLD_TEXT_DEPTH_POLYGON_OFFSET)], &mut down_ops, false,
-        ).unwrap();
-        assert_eq!(frontend.resources.len(), 2,
-            "the same atlas must not alias opposite target orientations");
-        let down_pipelines = down_ops.iter().filter_map(|op| match op {
-            CommandOp::BindGraphicsPipeline(handle) => Some(*handle), _ => None,
-        }).collect::<Vec<_>>();
+        frontend
+            .append_frame_ops(
+                &mut gal,
+                target,
+                pass,
+                target,
+                depth_texture,
+                depth_view,
+                TextureUsageState::DepthStencilAttachment,
+                ColorFormat::Bgra8Unorm,
+                RasterYDirection::Down,
+                super::super::matrix4_identity(),
+                super::super::matrix4_identity(),
+                &[
+                    quad(WORLD_TEXT_DEPTH_SEE_THROUGH),
+                    quad(WORLD_TEXT_DEPTH_NORMAL),
+                    quad(WORLD_TEXT_DEPTH_POLYGON_OFFSET),
+                ],
+                &mut down_ops,
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            frontend.resources.len(),
+            2,
+            "the same atlas must not alias opposite target orientations"
+        );
+        let down_pipelines = down_ops
+            .iter()
+            .filter_map(|op| match op {
+                CommandOp::BindGraphicsPipeline(handle) => Some(*handle),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
         assert_eq!(down_pipelines.len(), 3);
-        for (direction, pipelines) in [(RasterYDirection::Up, up_pipelines),
-            (RasterYDirection::Down, down_pipelines)] {
+        for (direction, pipelines) in [
+            (RasterYDirection::Up, up_pipelines),
+            (RasterYDirection::Down, down_pipelines),
+        ] {
             for pipeline in pipelines {
-                assert_eq!(gal.graphics_pipeline_descriptor_for_test(pipeline).unwrap()
-                    .raster_y_direction, direction);
+                assert_eq!(
+                    gal.graphics_pipeline_descriptor_for_test(pipeline)
+                        .unwrap()
+                        .raster_y_direction,
+                    direction
+                );
             }
         }
         frontend.reset(&mut gal);
         for handle in [pass, depth_view, depth_texture, target] {
             gal.destroy(handle).unwrap();
         }
-        assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+        assert_eq!(
+            gal.metrics().resource_creates,
+            gal.metrics().resource_destroys
+        );
     }
 
     #[test]
