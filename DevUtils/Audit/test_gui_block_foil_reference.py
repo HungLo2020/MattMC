@@ -11,7 +11,7 @@ class BlockFoilTest(unittest.TestCase):
     def test_unenchanted_reference_keeps_same_static_camera_on_both_launchers(self):
         import shlex
         import graphics_harness as h
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         for fixture in ("standard-3d","standard-3d-logs",None):
             args=h.parse_args(["capture","--gui-resource-pack-scenario","vanilla","--item-gui-scale","3"]
                 + (["--hotbar-item-fixture",fixture] if fixture else []))
@@ -98,7 +98,7 @@ class BlockFoilTest(unittest.TestCase):
     def test_moving_launch_keeps_pack_geometry_and_static_camera(self):
         import graphics_harness as h
         from capture_runner import gui_resource_pack_specs
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         self.assertEqual(gui_resource_pack_specs("block-item-foil"),gui_resource_pack_specs("block-item-foil-moving"))
         args=h.parse_args(["capture","--hotbar-item-fixture","standard-3d-logs",
             "--gui-resource-pack-scenario","block-item-foil-moving","--item-gui-scale","2"])
@@ -117,7 +117,7 @@ class BlockFoilTest(unittest.TestCase):
     def test_glint_only_pack_and_matching_launch_configuration(self):
         import graphics_harness as h
         from capture_runner import gui_resource_pack_specs,write_gui_resource_pack
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         args=h.parse_args(["capture","--hotbar-item-fixture","standard-3d-logs",
             "--gui-resource-pack-scenario","block-item-foil","--item-gui-scale","2"])
         with tempfile.TemporaryDirectory() as temporary:

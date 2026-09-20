@@ -307,7 +307,7 @@ public final class RustGalFrameCoordinator {
 				&& previous.height() == asset.height()
 				&& previous.samplingFilter() == asset.samplingFilter()
 				&& previous.samplingAddress() == asset.samplingAddress()
-				&& Arrays.equals(previous.pixels(), asset.pixels())) {
+				&& previous.hasSamePixels(asset)) {
 				return;
 			}
 			if (previous == null && pendingRawImages.size() >= MAX_PENDING_RAW_IMAGES) {
@@ -315,9 +315,9 @@ public final class RustGalFrameCoordinator {
 			}
 			long projectedBytes = 0L;
 			for (VulkanicGalBridge.GuiRawImageAssetRecord candidate : pendingRawImages.values()) {
-				if (candidate != previous) projectedBytes = Math.addExact(projectedBytes, candidate.pixels().length);
+				if (candidate != previous) projectedBytes = Math.addExact(projectedBytes, candidate.pixelByteLength());
 			}
-			projectedBytes = Math.addExact(projectedBytes, asset.pixels().length);
+			projectedBytes = Math.addExact(projectedBytes, asset.pixelByteLength());
 			if (projectedBytes > MAX_PENDING_RAW_IMAGE_BYTES) {
 				throw new IllegalStateException(
 					"semantic GUI raw-image byte bound exceeded " + MAX_PENDING_RAW_IMAGE_BYTES
@@ -864,7 +864,7 @@ public final class RustGalFrameCoordinator {
 					// copied block atlas. Flush it before this same frame reaches native
 					// execution; otherwise the first selected draw observes no atlas and
 					// can only fail or render with an unrelated later-frame resource.
-					flushPendingWorldAssetsAfterFrameConsumeLocked();
+					flushPendingWorldAssetsAfterFrameConsumeLocked(primitiveFrame);
 				}
 				GraphicsFrameBenchmark.endPhase("rust-gal.frame.consume-and-flush-world");
 				if (!primitiveFrame.segments().isEmpty()
@@ -2298,8 +2298,15 @@ public final class RustGalFrameCoordinator {
 	 * terrain atlas generation available to already-admitted terrain work and
 	 * avoids an unknown-texture failure during the next whole-frame submit.
 	 */
-	private static void flushPendingWorldAssetsAfterFrameConsumeLocked() {
-		flushPendingWorldAssetsLocked(true);
+	private static void flushPendingWorldAssetsAfterFrameConsumeLocked(
+		RustGalWorldPrimitiveRenderer.PrimitiveFrame frozenFrame
+	) {
+		flushPendingWorldAssetsLocked(false);
+		var status = RustGalWorldPrimitiveRenderer.flushPendingWorldMeshAssetsProtectingFrame(bridge, frozenFrame);
+		if (status != null) {
+			recordStatus(Operation.WORLD_MESH_ASSET_UPDATE, status);
+		}
+		RustGalWorldPrimitiveRenderer.flushPendingAtlasAnimationTicks(bridge);
 	}
 
 	private static void flushPendingWorldAssetsLocked(boolean includeWorldMeshAssets) {
@@ -2841,7 +2848,35 @@ public final class RustGalFrameCoordinator {
 	}
 
 	private static String metricValue(String value) {
-		return value == null || value.isBlank() ? "unset" : value.replaceAll("\\s+", "_");
+		if (value == null || value.isBlank()) return "unset";
+		int length = value.length();
+		int firstWhitespace = -1;
+		for (int index = 0; index < length; index++) {
+			if (isMetricWhitespace(value.charAt(index))) {
+				firstWhitespace = index;
+				break;
+			}
+		}
+		if (firstWhitespace < 0) return value;
+		StringBuilder sanitized = new StringBuilder(length);
+		sanitized.append(value, 0, firstWhitespace).append('_');
+		boolean whitespace = true;
+		for (int index = firstWhitespace + 1; index < length; index++) {
+			char character = value.charAt(index);
+			if (isMetricWhitespace(character)) {
+				if (!whitespace) sanitized.append('_');
+				whitespace = true;
+			} else {
+				sanitized.append(character);
+				whitespace = false;
+			}
+		}
+		return sanitized.toString();
+	}
+
+	private static boolean isMetricWhitespace(char character) {
+		return character == ' ' || character == '\t' || character == '\n'
+			|| character == '\u000B' || character == '\f' || character == '\r';
 	}
 
 	private static String clearColorString(int colorArgb) {

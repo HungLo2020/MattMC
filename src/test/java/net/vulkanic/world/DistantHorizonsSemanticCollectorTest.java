@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -24,6 +26,29 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DistantHorizonsSemanticCollectorTest {
+	@Test
+	void quadtreeRenderabilityWaitsForAcknowledgedRustAssetPublication() throws Exception {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		DistantHorizonsSemanticCollector.resetForTest();
+		long columnKey = 73L;
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			columnKey, new DhBlockPos(0, 64, 0),
+			List.of(quadBuffer(0, 0, 0, 0xB7, 1, 2, 3, 255, 1, 2)), List.of(), List.of(), List.of()
+		);
+
+		assertFalse(DistantHorizonsSemanticCollector.requestColumnPublication(columnKey),
+			"a CPU-built child must not disable its covering parent before native acknowledgement");
+		var first = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		assertEquals(columnKey, first.assets().getFirst().columnKey());
+		DistantHorizonsSemanticCollector.acknowledgeForTest(first);
+		assertTrue(DistantHorizonsSemanticCollector.requestColumnPublication(columnKey));
+
+		String renderSection = Files.readString(Path.of(
+			"src/main/java/com/seibel/distanthorizons/core/render/LodRenderSection.java"));
+		assertTrue(renderSection.contains("DistantHorizonsSemanticCollector.requestColumnPublication(this.pos)"),
+			"DH parent/child transitions must use acknowledged Rust readiness rather than CPU cache membership");
+	}
+
 	@Test
 	void primitiveColumnMembershipTracksTheSemanticSnapshotLifecycle() {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");

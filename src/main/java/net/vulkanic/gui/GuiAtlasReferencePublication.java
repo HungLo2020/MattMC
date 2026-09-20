@@ -3,10 +3,10 @@ package net.vulkanic.gui;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashSet;
 import java.util.stream.LongStream;
 import java.util.function.BiConsumer;
 import java.util.function.ToLongFunction;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.vulkanic.bridge.VulkanicGalBridge.GuiAtlasReferenceRecord;
 import net.vulkanic.bridge.VulkanicGalBridge.GuiAffineQuadRecord;
 import net.vulkanic.bridge.VulkanicGalBridge.GuiTiledQuadRecord;
@@ -42,24 +42,35 @@ final class GuiAtlasReferencePublication {
     /** Retire declarations absent from the exact command batch about to submit. */
     void retainUsedCommands(List<GuiAffineQuadRecord> affine, List<GuiTiledQuadRecord> tiled,
                             List<GuiMeshBatchRecord> meshes) {
+        if (references.isEmpty()) return;
         // Nested layers carry their own semantic source dependencies even when
         // no top-level draw names that source. Retire only after all uses end.
-        retainUsed(LongStream.concat(affine.stream().flatMapToLong(quad -> LongStream.concat(
-                LongStream.of(quad.assetId()), quad.itemRasterLayers().stream().mapToLong(layer -> layer.assetId()))),
-            LongStream.concat(tiled.stream().mapToLong(GuiTiledQuadRecord::assetId),
-                meshes.stream().mapToLong(GuiMeshBatchRecord::assetId))));
+        var active = new LongOpenHashSet();
+        for (GuiAffineQuadRecord quad : affine) {
+            retainIfPresent(active, quad.assetId());
+            for (var layer : quad.itemRasterLayers()) retainIfPresent(active, layer.assetId());
+        }
+        for (GuiTiledQuadRecord quad : tiled) retainIfPresent(active, quad.assetId());
+        for (GuiMeshBatchRecord mesh : meshes) retainIfPresent(active, mesh.assetId());
+        retainOnly(active);
     }
 
     /** Retire declarations absent from the exact command batch about to submit. */
     void retainUsed(LongStream assetIds) {
         if (references.isEmpty()) return;
-        var active = new HashSet<Long>();
-        assetIds.forEach(id -> {
-            if (references.containsKey(id)) active.add(id);
-        });
+        var active = new LongOpenHashSet();
+        assetIds.forEach(id -> retainIfPresent(active, id));
+        retainOnly(active);
+    }
+
+    private void retainIfPresent(LongOpenHashSet active, long assetId) {
+        if (references.containsKey(assetId)) active.add(assetId);
+    }
+
+    private void retainOnly(LongOpenHashSet active) {
         if (active.size() == references.size()) return;
         long next = Math.incrementExact(revision);
-        references.keySet().retainAll(active);
+        references.keySet().removeIf(assetId -> !active.contains(assetId.longValue()));
         revision = next;
     }
 

@@ -3092,7 +3092,7 @@ def static_terrain_water_animation_dense_evidence(doc: dict[str, object] | None)
                     image = image.convert("RGB")
                     visual_hashes.add(hashlib.sha256(image.tobytes()).hexdigest()[:16])
                     image.thumbnail((64, 36))
-                    pixels = list(image.getdata())
+                    pixels = list(image.get_flattened_data())
                     visible_pixels = sum(1 for red, green, blue in pixels if max(red, green, blue) > 24)
                     if not pixels or visible_pixels / max(1, len(pixels)) < 0.05:
                         failures.append("terrain_animation_presented_frame_mismatch")
@@ -4753,7 +4753,7 @@ def deterministic_block_outline_pixel_evidence(doc: dict[str, object] | None, st
             bottom = min(height, height // 2 + 140)
             crop = rgb.crop((left, top, right, bottom))
             matching = 0
-            for red, green, blue in crop.getdata():
+            for red, green, blue in crop.get_flattened_data():
                 if red <= 120 and green >= 120 and blue >= 100 and green >= red + 45 and blue >= red + 35:
                     matching += 1
             evidence.update(
@@ -4933,7 +4933,7 @@ def deterministic_world_crack_pixel_evidence(doc: dict[str, object] | None, scen
             pack_a_signature = 0
             pack_b_signature = 0
             pack_colored_signature = 0
-            for red, green, blue in crop.getdata():
+            for red, green, blue in crop.get_flattened_data():
                 if red >= 180 and green >= 180 and blue >= 180:
                     bright_target += 1
                 dark_crack = red <= 120 and green <= 130 and blue <= 150
@@ -5857,7 +5857,7 @@ def deterministic_distant_horizons_texture_palette_pixel_evidence(
                     )
                 pixels = [
                     pixel
-                    for pixel, included in zip(crop.getdata(), mask.getdata())
+                    for pixel, included in zip(crop.get_flattened_data(), mask.get_flattened_data())
                     if included
                 ]
                 if len(pixels) < 9:
@@ -5890,7 +5890,7 @@ def deterministic_distant_horizons_texture_palette_pixel_evidence(
                     )
                 surrounding_pixels = [
                     pixel
-                    for pixel, included in zip(surround.getdata(), surround_mask.getdata())
+                    for pixel, included in zip(surround.get_flattened_data(), surround_mask.get_flattened_data())
                     if not included
                 ]
                 surrounding_mean = (
@@ -6144,7 +6144,7 @@ def deterministic_static_terrain_texture_palette_pixel_evidence(
                 if right - left < 9 or bottom - top < 9:
                     results.append({"status": "projected_crop_outside_frame", "target": probe.get("position")})
                     continue
-                pixels = list(rgb.crop((left, top, right, bottom)).getdata())
+                pixels = list(rgb.crop((left, top, right, bottom)).get_flattened_data())
                 red = sum(pixel[0] for pixel in pixels) / (255.0 * len(pixels))
                 green = sum(pixel[1] for pixel in pixels) / (255.0 * len(pixels))
                 blue = sum(pixel[2] for pixel in pixels) / (255.0 * len(pixels))
@@ -6942,7 +6942,7 @@ def deterministic_world_beacon_beam_capture_evidence(
             if crop_box is None:
                 continue
             crop = rgb.crop(crop_box)
-            pixels = list(crop.getdata())
+            pixels = list(crop.get_flattened_data())
             border = [
                 pixel for y in range(crop.height) for x in range(crop.width)
                 if x < 2 or y < 2 or x >= crop.width - 2 or y >= crop.height - 2
@@ -21537,7 +21537,7 @@ def deterministic_rust_vulkan_shell_scene_evidence(
         return left, top, right, bottom
 
     def region_summary(image: object, expected_rgb: tuple[int, int, int] | None) -> dict[str, object]:
-        data = list(image.getdata())
+        data = list(image.get_flattened_data())
         total = max(1, len(data))
         average = tuple(int(sum(pixel[channel] for pixel in data) / total) for channel in range(3))
         non_background = 0
@@ -23740,7 +23740,7 @@ def celestial_image_pair(baseline_path, current_path, tolerance=6.0, body="sun")
     width, height = baseline.size
     box = (width // 4, height // 5, width * 3 // 4, height * 4 // 5)
     images = [image.crop(box) for image in (baseline, current)]
-    pixels = [list(image.getdata()) for image in images]
+    pixels = [list(image.get_flattened_data()) for image in images]
     witnesses = [celestial_body_witness(image, body) for image in (baseline, current)]
     masks = [witness["mask"] for witness in witnesses]
     counts = [sum(mask) for mask in masks]
@@ -24881,7 +24881,7 @@ def night_star_image_pair(baseline_path, current_path, tolerance=6.0):
         # positive difference excludes dark geometry silhouettes and avoids
         # admitting a blank frame merely because its sky color is similar.
         delta = ImageChops.subtract(image, image.filter(ImageFilter.MedianFilter(5)))
-        masks.append([max(pixel) >= 8 for pixel in delta.getdata()])
+        masks.append([max(pixel) >= 8 for pixel in delta.get_flattened_data()])
     counts = [sum(mask) for mask in masks]
     crop_width, crop_height = images[0].size
 
@@ -24912,7 +24912,7 @@ def night_star_image_pair(baseline_path, current_path, tolerance=6.0):
     baseline_components, missing_stars = unmatched_components(masks[0], masks[1])
     current_components, extra_stars = unmatched_components(masks[1], masks[0])
     selected = [index for index, pair in enumerate(zip(*masks)) if any(pair)]
-    pixels = [list(image.getdata()) for image in images]
+    pixels = [list(image.get_flattened_data()) for image in images]
     errors = [sum(abs(pixels[0][index][channel] - pixels[1][index][channel])
                   for index in selected) / max(1, len(selected)) for channel in range(3)]
     passed = (counts[0] >= 20 and counts[1] >= 0.9 * counts[0] and max(errors) <= tolerance
@@ -24997,7 +24997,7 @@ def particle_animation_transition_report(visual_report, reference_run, tolerance
             baseline_change = [0, 0, 0]
             current_change = [0, 0, 0]
             delta_error = [0, 0, 0]
-            for before_b, before_c, after_b, after_c in zip(*(image.getdata() for image in images)):
+            for before_b, before_c, after_b, after_c in zip(*(image.get_flattened_data() for image in images)):
                 for channel in range(3):
                     db = after_b[channel] - before_b[channel]
                     dc = after_c[channel] - before_c[channel]
@@ -25061,7 +25061,7 @@ def static_particle_replacement_report(visual_report, reference_run, tolerance, 
         if any(image.size != (box[2] - box[0], box[3] - box[1]) for image in images):
             raise ValueError("static particle crop pixel extent mismatch")
         frozen_change, current_change, error = [0]*3, [0]*3, [0]*3
-        for fb, cb, fa, ca in zip(*(image.getdata() for image in images)):
+        for fb, cb, fa, ca in zip(*(image.get_flattened_data() for image in images)):
             for c in range(3):
                 df, dc = fa[c] - fb[c], ca[c] - cb[c]
                 frozen_change[c] += abs(df)
@@ -25160,7 +25160,7 @@ def dh_visible_extension_visual_evidence(
         depth = depth.resize(current_image.size, Image.Resampling.NEAREST)
     mask_values = [
         255 if alpha > 0 and encoded_depth == 0 else 0
-        for alpha, encoded_depth in zip(private.getchannel("A").getdata(), depth.getdata())
+        for alpha, encoded_depth in zip(private.getchannel("A").get_flattened_data(), depth.get_flattened_data())
     ]
     mask = Image.new("L", current_image.size, 0)
     mask.putdata(mask_values)
@@ -25171,7 +25171,7 @@ def dh_visible_extension_visual_evidence(
     maxima = [0, 0, 0]
     pixel_count = 0
     for included, frozen_pixel, current_pixel in zip(
-        mask_values, frozen_image.getdata(), current_image.getdata()
+        mask_values, frozen_image.get_flattened_data(), current_image.get_flattened_data()
     ):
         if included == 0:
             continue
@@ -25302,7 +25302,7 @@ def write_cross_repo_visual_pairs(
             right = right.resize(left.size)
         diff = ImageChops.difference(left, right)
         stat = ImageStat.Stat(diff)
-        nonzero_pixels = sum(1 for pixel in diff.getdata() if pixel != (0, 0, 0))
+        nonzero_pixels = sum(1 for pixel in diff.get_flattened_data() if pixel != (0, 0, 0))
         total_pixels = left.size[0] * left.size[1]
         amplified = diff.point(lambda value: min(255, value * 4))
         side_by_side = Image.new("RGB", (left.width * 3, left.height), (0, 0, 0))
@@ -25338,7 +25338,7 @@ def write_cross_repo_visual_pairs(
                 "diff": {
                     "mean_rgb_abs": mean_rgb_abs,
                     "rms_rgb_abs": [round(value, 3) for value in stat.rms],
-                    "max_channel_abs": max(max(pixel) for pixel in diff.getdata()),
+                    "max_channel_abs": max(max(pixel) for pixel in diff.get_flattened_data()),
                     "nonzero_pixels": nonzero_pixels,
                     "nonzero_fraction": nonzero_pixels / total_pixels if total_pixels else 0.0,
                 },
@@ -28744,7 +28744,7 @@ def normalize_capture_artifact(
                         world_pixels = world.width * world.height
                         nonblack_pixels = sum(
                             1
-                            for red, green, blue in world.getdata()
+                            for red, green, blue in world.get_flattened_data()
                             if red > 8 or green > 8 or blue > 8
                         )
                         minimum_nonblack_pixels = max(1024, world_pixels // 100)
@@ -41276,15 +41276,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             capability_admitted=False)
     targets = select_targets(args)
     args.artifact_dir = normalize_configured_artifact_dir(targets["current"].root, args.artifact_dir)
-    retention_root = (
-        args.artifact_dir.resolve()
-        if args.artifact_dir
-        else (
-            args.artifact_root.resolve()
-            if args.artifact_root
-            else artifact_retention.default_artifact_base(targets["current"].root)
-        )
+    default_retention_root = (
+        args.artifact_root.resolve()
+        if args.artifact_root
+        else artifact_retention.default_artifact_base(targets["current"].root)
     )
+    retention_root = default_retention_root
+    if args.artifact_dir:
+        configured_artifact_dir = args.artifact_dir.resolve()
+        try:
+            configured_artifact_dir.relative_to(default_retention_root)
+        except ValueError:
+            # External temporary roots remain self-contained for CI and unit
+            # tests. Repository-local paths were normalized under the shared
+            # managed root above.
+            retention_root = configured_artifact_dir
     retention_policy = artifact_retention.policy_for(
         args.profile,
         retention_root,
@@ -41297,6 +41303,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         keep_failed=args.retain_failed_runs,
     )
     artifact_retention.ensure_marker(retention_policy.root)
+    if args.artifact_preserve_current_run and not args.artifact_preserve and not args.dry_run:
+        artifact_retention.clear_auto_preserve_markers(retention_policy.root)
     if matrix_progress_enabled(args):
         emit_matrix_progress(args, "matrix", "preflight-started", f"artifact_root={retention_policy.root}")
     if args.dry_run:

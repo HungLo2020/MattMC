@@ -57,6 +57,11 @@ pub(super) struct SubmissionLowerer {
     next_timestamp_set: u32,
     live_command_buffers: HashSet<vk::CommandBuffer>,
     recycled_command_buffers: Vec<vk::CommandBuffer>,
+    // Swapchain acquisition signals bounded binary semaphores. A semaphore is
+    // returned to this pool only after the timeline proves that the submission
+    // which waited on it has completed.
+    acquire_semaphores: Vec<vk::Semaphore>,
+    available_acquire_semaphores: Vec<vk::Semaphore>,
     // Presentation uses one bounded binary semaphore per swapchain image.
     // An image cannot be acquired again until its presentation wait has been
     // consumed, so semaphore ownership remains independent of frame count.
@@ -175,6 +180,8 @@ impl SubmissionLowerer {
             next_timestamp_set: 0,
             live_command_buffers: HashSet::new(),
             recycled_command_buffers: Vec::new(),
+            acquire_semaphores: Vec::new(),
+            available_acquire_semaphores: Vec::new(),
             present_semaphores: HashMap::new(),
             pending_present_semaphores: BTreeMap::new(),
         }
@@ -358,7 +365,11 @@ impl SubmissionLowerer {
         Ok(())
     }
 
-    pub(super) fn submit(&mut self, id: SubmissionId) -> GalResult<()> {
+    pub(super) fn submit(
+        &mut self,
+        id: SubmissionId,
+        acquire_wait_semaphore: Option<vk::Semaphore>,
+    ) -> GalResult<()> {
         if self.in_flight.len() >= MAX_IN_FLIGHT_SUBMISSIONS {
             let oldest = self
                 .in_flight
@@ -398,8 +409,15 @@ impl SubmissionLowerer {
                     .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS),
             );
         }
+        let wait_info = acquire_wait_semaphore.map(|semaphore| {
+            vk::SemaphoreSubmitInfo::default()
+                .semaphore(semaphore)
+                .stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+        });
+        let wait_infos = wait_info.into_iter().collect::<Vec<_>>();
         let submit = vk::SubmitInfo2::default()
             .command_buffer_infos(&command_buffer_infos)
+            .wait_semaphore_infos(&wait_infos)
             .signal_semaphore_infos(&signal_info);
         let queue_submit_started = std::time::Instant::now();
         let submit_result = unsafe {
@@ -440,6 +458,7 @@ impl SubmissionLowerer {
             host_reads: encoded.host_reads,
             timestamp_set: encoded.timestamp_set,
             publishes_frame_timestamps: encoded.present_image_index.is_some(),
+            acquire_wait_semaphore,
         });
         if let (Some(image_index), Some(semaphore)) =
             (encoded.present_image_index, present_semaphore)
@@ -488,6 +507,7 @@ impl SubmissionLowerer {
             self.free_command_buffers(&complete.command_buffers)
                 .expect("retiring a Vulkan submission must own its command buffers");
             self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
+            self.recycle_acquire_semaphore(complete.acquire_wait_semaphore);
         }
         self.completed
     }
@@ -513,6 +533,7 @@ impl SubmissionLowerer {
             self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
             self.complete_host_reads(&complete);
             self.complete_gpu_timestamps(&complete);
+            self.recycle_acquire_semaphore(complete.acquire_wait_semaphore);
             self.completed = complete.id;
         }
         Ok(())
@@ -531,6 +552,75 @@ impl SubmissionLowerer {
             return Ok(());
         };
         self.retire(latest)
+    }
+
+    pub(super) fn pending_present_image_index(&self) -> Option<u32> {
+        self.pending
+            .front()
+            .and_then(|submission| submission.present_image_index)
+    }
+
+    pub(super) fn checkout_acquire_semaphore(&mut self) -> GalResult<vk::Semaphore> {
+        self.completed_submission();
+        if let Some(semaphore) = self.available_acquire_semaphores.pop() {
+            return Ok(semaphore);
+        }
+        if self.acquire_semaphores.len() >= MAX_IN_FLIGHT_SUBMISSIONS {
+            let Some(oldest) = self.in_flight.front().map(|submission| submission.id) else {
+                return Err(GalError::submission(
+                    crate::render::vulkanic::StatusCode::InFlight,
+                    "Vulkan acquire semaphore pool exhausted by unsubmitted frames",
+                ));
+            };
+            self.retire(oldest)?;
+            return self.available_acquire_semaphores.pop().ok_or_else(|| {
+                GalError::backend("retired Vulkan submission did not release its acquire semaphore")
+            });
+        }
+        let semaphore = unsafe {
+            self.context
+                .device
+                .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)
+        }
+        .map_err(|error| {
+            GalError::backend(format!(
+                "failed to create Vulkan acquire semaphore: {error:?}"
+            ))
+        })?;
+        self.context.set_object_name(
+            semaphore,
+            &format!("gal.acquire.slot.{}", self.acquire_semaphores.len()),
+        );
+        self.acquire_semaphores.push(semaphore);
+        Ok(semaphore)
+    }
+
+    pub(super) fn release_unsubmitted_acquire_semaphore(&mut self, semaphore: vk::Semaphore) {
+        self.recycle_acquire_semaphore(Some(semaphore));
+    }
+
+    /// Destroy an acquisition semaphore whose signal was never consumed by a
+    /// queue submission. The caller must first make the device quiescent.
+    pub(super) fn discard_quiescent_acquire_semaphore(&mut self, semaphore: vk::Semaphore) {
+        debug_assert!(!self.available_acquire_semaphores.contains(&semaphore));
+        if let Some(position) = self
+            .acquire_semaphores
+            .iter()
+            .position(|candidate| *candidate == semaphore)
+        {
+            self.acquire_semaphores.swap_remove(position);
+            unsafe { self.context.device.destroy_semaphore(semaphore, None) };
+        } else {
+            debug_assert!(false, "discarded acquisition semaphore was not pool-owned");
+        }
+    }
+
+    fn recycle_acquire_semaphore(&mut self, semaphore: Option<vk::Semaphore>) {
+        if let Some(semaphore) = semaphore {
+            debug_assert!(self.acquire_semaphores.contains(&semaphore));
+            debug_assert!(!self.available_acquire_semaphores.contains(&semaphore));
+            self.available_acquire_semaphores.push(semaphore);
+        }
     }
 
     /// Return the binary semaphore signaled by `submission` for the acquired
@@ -1188,12 +1278,21 @@ impl SubmissionLowerer {
                     draw_count,
                 } => {
                     let buffer = objects.buffer(*buffer)?;
-                    self.context.device.cmd_draw_indirect(
-                        command_buffer,
-                        buffer.buffer,
+                    let stride = std::mem::size_of::<vk::DrawIndirectCommand>() as u32;
+                    for_each_indirect_draw_batch(
+                        self.context.multi_draw_indirect,
                         *offset,
                         *draw_count,
-                        std::mem::size_of::<vk::DrawIndirectCommand>() as u32,
+                        stride,
+                        |native_offset, native_count| {
+                            self.context.device.cmd_draw_indirect(
+                                command_buffer,
+                                buffer.buffer,
+                                native_offset,
+                                native_count,
+                                stride,
+                            );
+                        },
                     );
                 }
                 CommandOp::DrawIndexedIndirect {
@@ -1202,12 +1301,21 @@ impl SubmissionLowerer {
                     draw_count,
                 } => {
                     let buffer = objects.buffer(*buffer)?;
-                    self.context.device.cmd_draw_indexed_indirect(
-                        command_buffer,
-                        buffer.buffer,
+                    let stride = std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as u32;
+                    for_each_indirect_draw_batch(
+                        self.context.multi_draw_indirect,
                         *offset,
                         *draw_count,
-                        std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as u32,
+                        stride,
+                        |native_offset, native_count| {
+                            self.context.device.cmd_draw_indexed_indirect(
+                                command_buffer,
+                                buffer.buffer,
+                                native_offset,
+                                native_count,
+                                stride,
+                            );
+                        },
                     );
                 }
                 CommandOp::Dispatch {
@@ -1921,6 +2029,10 @@ impl Drop for SubmissionLowerer {
             unsafe { self.context.device.destroy_semaphore(semaphore, None) };
         }
         self.pending_present_semaphores.clear();
+        for semaphore in self.acquire_semaphores.drain(..) {
+            unsafe { self.context.device.destroy_semaphore(semaphore, None) };
+        }
+        self.available_acquire_semaphores.clear();
         if let Some(pool) = self.timestamp_pool.take() {
             unsafe { self.context.device.destroy_query_pool(pool, None) };
         }
@@ -2108,6 +2220,25 @@ fn decode_gpu_timestamp_result(
 #[cfg(test)]
 mod timestamp_tests {
     use super::*;
+
+    #[test]
+    fn indirect_draws_split_when_multi_draw_is_not_enabled() {
+        let collect = |multi_draw_indirect| {
+            let mut batches = Vec::new();
+            for_each_indirect_draw_batch(multi_draw_indirect, 32, 3, 20, |offset, count| {
+                batches.push((offset, count))
+            });
+            batches
+        };
+        assert_eq!(collect(true), vec![(32, 3)]);
+        assert_eq!(collect(false), vec![(32, 1), (52, 1), (72, 1)]);
+
+        let mut single = Vec::new();
+        for_each_indirect_draw_batch(false, 32, 1, 20, |offset, count| {
+            single.push((offset, count));
+        });
+        assert_eq!(single, vec![(32, 1)]);
+    }
 
     #[test]
     fn retirement_wait_failure_preserves_in_flight_ownership_and_order() {
@@ -2540,6 +2671,7 @@ struct InFlightSubmission {
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
     publishes_frame_timestamps: bool,
+    acquire_wait_semaphore: Option<vk::Semaphore>,
 }
 
 #[derive(Clone, Debug)]
@@ -2858,6 +2990,25 @@ fn texture_image_copy(
             height: region.extent.height,
             depth: region.extent.depth,
         })
+}
+
+/// Preserve the GAL's packed indirect-list contract on devices that do not
+/// expose core multiDrawIndirect. Each fallback call advances to the next
+/// already validated record and remains legal with a native draw count of one.
+fn for_each_indirect_draw_batch(
+    multi_draw_indirect: bool,
+    offset: u64,
+    draw_count: u32,
+    stride: u32,
+    mut emit: impl FnMut(u64, u32),
+) {
+    if multi_draw_indirect || draw_count <= 1 {
+        emit(offset, draw_count);
+        return;
+    }
+    for index in 0..draw_count {
+        emit(offset + u64::from(index) * u64::from(stride), 1);
+    }
 }
 
 /// A failed wait must retain all submission-owned commands, reads and queries.

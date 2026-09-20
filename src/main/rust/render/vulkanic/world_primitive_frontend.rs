@@ -5451,6 +5451,10 @@ pub struct WorldPrimitiveFrontend {
     /// the previous generation.  Destroying them during asset replacement
     /// invalidates those queued handles before GAL can mark them in flight.
     deferred_mesh_resource_destroys: Vec<Handle>,
+    /// Stream buffers superseded while a whole-frame command transaction is
+    /// still being assembled. Their descriptor sets retire first, after the
+    /// complete submission has validated and claimed every recorded handle.
+    deferred_mesh_stream_buffer_destroys: Vec<Handle>,
     /// Immutable geometry ranges retire with their descriptor sets and are
     /// reusable only after GAL reports the associated submission complete.
     deferred_mesh_geometry_range_releases: Vec<MeshGeometryResources>,
@@ -11753,6 +11757,10 @@ impl WorldPrimitiveFrontend {
     fn flush_deferred_mesh_resource_destroys(&mut self, gal: &mut VulkanicGal) {
         let deferred = std::mem::take(&mut self.deferred_mesh_resource_destroys);
         for handle in deferred {
+            let _ = gal.destroy(handle);
+        }
+        let deferred_streams = std::mem::take(&mut self.deferred_mesh_stream_buffer_destroys);
+        for handle in deferred_streams {
             let _ = gal.destroy(handle);
         }
         let submission = gal.latest_submission_id();
@@ -22023,11 +22031,21 @@ impl WorldPrimitiveFrontend {
             None
         };
         // Keep the Fabulous handoff's filtered graph separate from the full
-        // semantic frame. The ordinary route still uses the existing cloned
-        // graph because later handoff preparation reads the original frame;
-        // the admission snapshot above is the allocation we can safely omit
-        // for normal vanilla/DH frames.
-        let graph_frame = if self.pending_terrain_fabulous_handoff {
+        // semantic frame. Full attachment capture also needs the original for
+        // post-graph observations. Ordinary vanilla/DH frames have no later
+        // reader, so move their frame directly into graph construction instead
+        // of cloning every mesh instance and semantic vector each render.
+        let preserve_world_text_receipt = !frame.text_quads.is_empty()
+            && matches!(
+                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                    .as_deref()
+                    .map(str::trim),
+                Ok("1") | Ok("true") | Ok("TRUE")
+            );
+        let preserve_post_graph_frame = self.pending_terrain_fabulous_handoff
+            || gameplay_attachment_capture.is_some()
+            || preserve_world_text_receipt;
+        let (graph_frame, post_graph_frame) = if self.pending_terrain_fabulous_handoff {
             let mut graph_frame = frame.clone();
             graph_frame
                 .material_quads
@@ -22046,9 +22064,11 @@ impl WorldPrimitiveFrontend {
             graph_frame.segments.clear();
             graph_frame.crack_quads.clear();
             graph_frame.border_quads.clear();
-            graph_frame
+            (graph_frame, Some(frame))
+        } else if preserve_post_graph_frame {
+            (frame.clone(), Some(frame))
         } else {
-            frame.clone()
+            (frame, None)
         };
         let graph_target = if owned_world_target {
             let desc = oriented_target::WorldTargetDesc {
@@ -22130,7 +22150,10 @@ impl WorldPrimitiveFrontend {
             mut terrain_external_roles_written,
             external_material_stats,
         ) = if self.pending_terrain_fabulous_handoff {
-            match self.prepare_terrain_external_material_ops(gal, &frame) {
+            let frame = post_graph_frame
+                .as_ref()
+                .expect("Fabulous handoff retains the complete semantic frame");
+            match self.prepare_terrain_external_material_ops(gal, frame) {
                 Ok(plan) => plan,
                 Err(error) => {
                     gal.rollback_frame_target_depth_write(frame_target);
@@ -22201,66 +22224,70 @@ impl WorldPrimitiveFrontend {
             ops = observation_reset_ops;
         }
         ops.extend(graph_ops);
-        let distant_depth_started = std::time::Instant::now();
-        if let Err(error) = self.append_candidate_source_distant_depth_for_admission(
-            gal,
-            source_frame_for_admission,
-            &mut ops,
-        ) {
-            gal.rollback_frame_target_depth_write(frame_target);
-            self.discard_pending_lowered_source_terrain_submission(gal);
-            self.discard_pending_g_buffer_depth_history_submission();
-            self.lod_gpu_residency.discard_submission(gal);
-            self.lod_textured_gpu_residency.discard_submission(gal);
-            if let Some(runtime) = self.shader_runtime.as_mut() {
-                runtime.discard_private_terrain_occupancy_submission();
-                runtime.discard_vanilla_lightmap_submission(gal);
+        if let Some(source_frame_for_admission) = source_activation_frame.as_ref() {
+            let distant_depth_started = std::time::Instant::now();
+            if let Err(error) = self.append_candidate_source_distant_depth_for_admission(
+                gal,
+                source_frame_for_admission,
+                &mut ops,
+            ) {
+                gal.rollback_frame_target_depth_write(frame_target);
+                self.discard_pending_lowered_source_terrain_submission(gal);
+                self.discard_pending_g_buffer_depth_history_submission();
+                self.lod_gpu_residency.discard_submission(gal);
+                self.lod_textured_gpu_residency.discard_submission(gal);
+                if let Some(runtime) = self.shader_runtime.as_mut() {
+                    runtime.discard_private_terrain_occupancy_submission();
+                    runtime.discard_vanilla_lightmap_submission(gal);
+                }
+                return Err(error);
             }
-            return Err(error);
+            whole_frame_phase_trace(
+                "candidate-distant-depth",
+                world_frame_id,
+                Some(distant_depth_started),
+            );
+            // DH depth joins the same source snapshot after named color targets
+            // have already been staged by frame preparation. Re-run that bounded
+            // color assembly so its declared output roles remain explicit in the
+            // completeness check instead of being mistaken for missing samplers.
+            let source_color_started = std::time::Instant::now();
+            if let Err(error) = self.prepare_candidate_source_color_resources_for_admission(
+                gal,
+                source_frame_for_admission.voxel_volume.world_generation,
+                Extent3d {
+                    width: source_frame_for_admission.viewport_width,
+                    height: source_frame_for_admission.viewport_height,
+                    depth: 1,
+                },
+                source_frame_includes_distant_horizons(source_frame_for_admission),
+            ) {
+                gal.rollback_frame_target_depth_write(frame_target);
+                return Err(error);
+            }
+            whole_frame_phase_trace(
+                "candidate-source-colors",
+                world_frame_id,
+                Some(source_color_started),
+            );
+            // Refresh source admission only when that explicit path retained a
+            // frame snapshot. Normal direct frames have no candidate resource
+            // transaction to prepare after graph construction.
+            self.write_runtime_source_admission_status(
+                gal,
+                source_frame_for_admission,
+                "post-distant-depth-preparation",
+                true,
+            );
         }
-        whole_frame_phase_trace(
-            "candidate-distant-depth",
-            world_frame_id,
-            Some(distant_depth_started),
-        );
-        // DH depth joins the same source snapshot after named color targets
-        // have already been staged by frame preparation. Re-run that bounded
-        // color assembly so its declared output roles remain explicit in the
-        // completeness check instead of being mistaken for missing samplers.
-        let source_color_started = std::time::Instant::now();
-        if let Err(error) = self.prepare_candidate_source_color_resources_for_admission(
-            gal,
-            source_frame_for_admission.voxel_volume.world_generation,
-            Extent3d {
-                width: source_frame_for_admission.viewport_width,
-                height: source_frame_for_admission.viewport_height,
-                depth: 1,
-            },
-            source_frame_includes_distant_horizons(source_frame_for_admission),
-        ) {
-            gal.rollback_frame_target_depth_write(frame_target);
-            return Err(error);
-        }
-        whole_frame_phase_trace(
-            "candidate-source-colors",
-            world_frame_id,
-            Some(source_color_started),
-        );
-        // The earlier post-resource record is intentionally written before
-        // command recording. Refresh it after the optional DH clear/snapshot
-        // transaction so audit evidence distinguishes a genuinely absent
-        // far-depth role from one awaiting this exact submission.
-        self.write_runtime_source_admission_status(
-            gal,
-            source_frame_for_admission,
-            "post-distant-depth-preparation",
-            true,
-        );
         let mut terrain_presentation_pass = Handle::NULL;
         if self.pending_terrain_fabulous_handoff {
+            let frame = post_graph_frame
+                .as_ref()
+                .expect("Fabulous handoff retains the complete semantic frame");
             let extent = Extent3d {
-                width: source_frame_for_admission.viewport_width,
-                height: source_frame_for_admission.viewport_height,
+                width: frame.viewport_width,
+                height: frame.viewport_height,
                 depth: 1,
             };
             let (
@@ -22323,7 +22350,10 @@ impl WorldPrimitiveFrontend {
             };
         }
         if self.pending_terrain_fabulous_handoff {
-            let (overlay_ops, overlay_stats) = match self.prepare_terrain_overlay_ops(gal, &frame) {
+            let frame = post_graph_frame
+                .as_ref()
+                .expect("Fabulous handoff retains the complete semantic frame");
+            let (overlay_ops, overlay_stats) = match self.prepare_terrain_overlay_ops(gal, frame) {
                 Ok(result) => result,
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
@@ -22366,11 +22396,14 @@ impl WorldPrimitiveFrontend {
         }
         if self.pending_terrain_fabulous_handoff {
             if let Some((hand, hand_instances)) = deferred_handoff_first_person {
+                let frame = post_graph_frame
+                    .as_ref()
+                    .expect("Fabulous handoff retains the complete semantic frame");
                 let (hand_ops, hand_stats) = match self.append_builtin_first_person_ops(
                     gal,
                     generation,
                     frame_target,
-                    &frame,
+                    frame,
                     hand,
                     hand_instances,
                     RasterYDirection::Up,
@@ -22399,6 +22432,9 @@ impl WorldPrimitiveFrontend {
             }
         }
         if self.pending_terrain_fabulous_handoff && !deferred_handoff_text_quads.is_empty() {
+            let frame = post_graph_frame
+                .as_ref()
+                .expect("Fabulous handoff retains the complete semantic frame");
             let (world_text_depth_texture, world_text_depth_view) =
                 match self.g_buffer_resources.as_ref() {
                     Some(resources) => (resources.depth_texture, resources.depth_view),
@@ -22664,9 +22700,12 @@ impl WorldPrimitiveFrontend {
             }
         }
         if let Some(capture) = gameplay_attachment_capture.as_mut() {
-            capture.decal_inputs = decal_capture::observe(gal, self, &frame, &ops);
-            capture.equipment_inputs = equipment_capture::observe(gal, self, &frame, &ops);
-            capture.wolf_inputs = equipment_capture::observe_wolf(gal, self, &frame, &ops);
+            let frame = post_graph_frame
+                .as_ref()
+                .expect("attachment capture retains the complete semantic frame");
+            capture.decal_inputs = decal_capture::observe(gal, self, frame, &ops);
+            capture.equipment_inputs = equipment_capture::observe(gal, self, frame, &ops);
+            capture.wolf_inputs = equipment_capture::observe_wolf(gal, self, frame, &ops);
         }
         let command_lists = match Self::partition_command_lists_at_pass_boundaries(
             "minecraft.world-and-gui.frame.commands",
@@ -22921,11 +22960,12 @@ impl WorldPrimitiveFrontend {
                 }
             }
         }
-        self.write_runtime_world_text_execution_receipt(
-            source_frame_for_admission,
-            &stats,
-            token.submission.0,
-        );
+        if let Some(frame) = source_activation_frame
+            .as_ref()
+            .or(post_graph_frame.as_ref())
+        {
+            self.write_runtime_world_text_execution_receipt(frame, &stats, token.submission.0);
+        }
         if let Some(capture) = gameplay_attachment_capture {
             gal.retire_through(token.submission)?;
             let reads = gal.completed_host_reads().to_vec();
@@ -22935,17 +22975,29 @@ impl WorldPrimitiveFrontend {
         // submission has confirmed its voxel/lightmap work. A later frame
         // performs its own exact-frame preparation before it is allowed to
         // execute the selected source graph.
-        self.arm_runtime_source_execution_if_ready(source_frame_for_admission);
-        // Pre-submit status establishes that source resources were staged;
-        // capture the separate route decision only after the normal Rust
-        // submission has confirmed that exact-frame work. This remains a
-        // bounded audit record and has no rendering effect.
-        self.write_runtime_source_admission_status(
-            gal,
-            source_frame_for_admission,
-            "post-normal-submission-confirmation",
-            true,
-        );
+        if let Some(source_frame_for_admission) = source_activation_frame.as_ref() {
+            self.arm_runtime_source_execution_if_ready(source_frame_for_admission);
+            // Pre-submit status establishes that source resources were staged;
+            // capture the separate route decision only after the normal Rust
+            // submission has confirmed that exact-frame work. This remains a
+            // bounded audit record and has no rendering effect.
+            self.write_runtime_source_admission_status(
+                gal,
+                source_frame_for_admission,
+                "post-normal-submission-confirmation",
+                true,
+            );
+        } else {
+            // The opt-in source route is disabled, so no frame snapshot was
+            // retained. Keep the admission state explicitly disarmed without
+            // copying the ordinary direct frame solely to reach the early-exit
+            // branch of `arm_runtime_source_execution_if_ready`.
+            self.source_execution_armed = false;
+            self.source_execution_activation_reported = false;
+            self.source_execution_distant_horizons_reported = false;
+            self.source_execution_admission_reason =
+                Some("runtime-selected-source-opt-in-disabled".to_string());
+        }
         Ok(stats)
     }
 
@@ -30425,13 +30477,16 @@ impl WorldPrimitiveFrontend {
                     self,
                     &mesh_batches,
                     stats.profile.world_prepare_mesh_stream_required_bytes,
-                    use_g_buffer_mesh_path && source_terrain_programs.is_none(),
+                    source_terrain_programs.is_none(),
                 )?;
                 stats.profile.world_mesh_stream_payload_pack_nanos =
                     elapsed_nanos_u64(mesh_pack_started);
                 stats.profile.world_mesh_stream_payload_bytes = packed_stream.payload.len() as u64;
-                stats.profile.world_mesh_dynamic_offset_count =
-                    packed_stream.dynamic_offsets.len() as u64;
+                stats.profile.world_mesh_dynamic_offset_count = packed_stream
+                    .first_instances
+                    .iter()
+                    .filter(|first_instance| first_instance.is_none())
+                    .count() as u64;
                 let mesh_stream_binding =
                     self.ensure_mesh_instance_stream(gal, packed_stream.payload.len() as u64)?;
                 ops.push(CommandOp::Barrier(buffer_barrier(
@@ -30469,7 +30524,7 @@ impl WorldPrimitiveFrontend {
                 let mut indirect_payload = Vec::with_capacity(
                     indirect_draw_count * WORLD_MESH_INDEXED_INDIRECT_COMMAND_BYTES as usize,
                 );
-                let mut draws = Vec::new();
+                let mut pending_draws = Vec::with_capacity(mesh_batches.len());
                 let mesh_draw_record_started = std::time::Instant::now();
                 for (batch_index, batch) in mesh_batches.iter().enumerate() {
                     let (index_buffer, geometry_index_offset, vertex_offset) = self
@@ -30526,7 +30581,7 @@ impl WorldPrimitiveFrontend {
                             builtin_terrain_lightmap_resource_set,
                         )
                     };
-                    let (resource_set, dynamic_offsets, draw_index_offset, indexed_indirect) =
+                    let (resource_set, dynamic_offsets, draw_index_offset, page_command) =
                         if use_indirect {
                             let page_set = self.ensure_mesh_page_resource_set(
                                 gal,
@@ -30565,25 +30620,17 @@ impl WorldPrimitiveFrontend {
                                         "world mesh vertex offset exceeds i32",
                                     )
                                 })?;
-                            let command_offset = indirect_payload.len() as u64;
-                            indirect_payload.extend_from_slice(&batch.index_count.to_le_bytes());
-                            indirect_payload
-                                .extend_from_slice(&(batch.count() as u32).to_le_bytes());
-                            indirect_payload.extend_from_slice(&first_index.to_le_bytes());
-                            indirect_payload
-                                .extend_from_slice(&vertex_offset_records.to_le_bytes());
-                            indirect_payload.extend_from_slice(
-                                &packed_stream.first_instances[batch_index]
-                                    .expect("indirect batch has first instance")
-                                    .to_le_bytes(),
-                            );
                             (
                                 page_set,
                                 vec![0, 0],
                                 0,
-                                indirect_stream.map(|stream| TerrainIndexedIndirect {
-                                    buffer: stream.buffer,
-                                    offset: command_offset,
+                                Some(PageIndexedDrawCommand {
+                                    index_count: batch.index_count,
+                                    instance_count: batch.count() as u32,
+                                    first_index,
+                                    vertex_offset: vertex_offset_records,
+                                    first_instance: packed_stream.first_instances[batch_index]
+                                        .expect("indirect batch has first instance"),
                                 }),
                             )
                         } else {
@@ -30604,31 +30651,51 @@ impl WorldPrimitiveFrontend {
                                 None,
                             )
                         };
-                    draws.push(TerrainMeshDraw {
-                        shadow: shadow_pipeline.map(|pipeline| TerrainShadowDraw {
+                    pending_draws.push(PendingMeshDraw {
+                        draw: TerrainMeshDraw {
+                            shadow: shadow_pipeline.map(|pipeline| TerrainShadowDraw {
+                                pipeline,
+                                pipeline_layout,
+                                resource_set,
+                                resource_set_dynamic_offsets: dynamic_offsets.clone(),
+                                shader_resource_set,
+                            }),
                             pipeline,
+                            offscreen_pipeline: None,
                             pipeline_layout,
                             resource_set,
-                            resource_set_dynamic_offsets: dynamic_offsets.clone(),
+                            resource_set_dynamic_offsets: dynamic_offsets,
                             shader_resource_set,
-                        }),
-                        pipeline,
-                        offscreen_pipeline: None,
-                        pipeline_layout,
-                        resource_set,
-                        resource_set_dynamic_offsets: dynamic_offsets,
-                        shader_resource_set,
-                        index_buffer,
-                        index_offset: draw_index_offset,
-                        index_type,
-                        index_count: batch.index_count,
-                        instance_count: batch.count() as u32,
-                        indexed_indirect,
-                        stratum: batch.key.stratum,
-                        material_mode: terrain_material_pass_mode(batch.key.material_mode)?,
-                        shadow_participation: TerrainShadowParticipation::Required,
+                            index_buffer,
+                            index_offset: draw_index_offset,
+                            index_type,
+                            index_count: batch.index_count,
+                            instance_count: batch.count() as u32,
+                            indexed_indirect: None,
+                            stratum: batch.key.stratum,
+                            material_mode: terrain_material_pass_mode(batch.key.material_mode)?,
+                            shadow_participation: TerrainShadowParticipation::Required,
+                        },
+                        page_command,
                     });
                 }
+                order_compatible_page_indirect_draws(&mut pending_draws);
+                for pending in &mut pending_draws {
+                    let Some(command) = pending.page_command else {
+                        continue;
+                    };
+                    let command_offset = indirect_payload.len() as u64;
+                    command.append_bytes(&mut indirect_payload);
+                    pending.draw.indexed_indirect =
+                        indirect_stream.map(|stream| TerrainIndexedIndirect {
+                            buffer: stream.buffer,
+                            offset: command_offset,
+                        });
+                }
+                let draws = pending_draws
+                    .into_iter()
+                    .map(|pending| pending.draw)
+                    .collect();
                 if let Some(stream) = indirect_stream {
                     debug_assert_eq!(indirect_payload.len(), indirect_draw_count * 20);
                     ops.push(CommandOp::Barrier(buffer_barrier(
@@ -34056,9 +34123,8 @@ impl WorldPrimitiveFrontend {
         // capacity made repeated terrain visibility growth accumulate native
         // allocations even though only the newest stream could be selected.
         let previous_slots = std::mem::take(&mut self.mesh_instance_stream_slots);
-        for slot in previous_slots {
-            let _ = gal.destroy(slot.buffer);
-        }
+        self.deferred_mesh_stream_buffer_destroys
+            .extend(previous_slots.into_iter().map(|slot| slot.buffer));
         self.mesh_instance_stream_slots
             .push(MeshInstanceStreamSlot { buffer, capacity });
         Ok(MeshInstanceStreamBinding {
@@ -34072,13 +34138,17 @@ impl WorldPrimitiveFrontend {
     /// native buffer is part of every mesh resource-set binding, so growing it
     /// retires old stream buffers through GAL and lets the existing immutable
     /// geometry, material, and pipeline caches rebuild against the replacement.
-    fn invalidate_mesh_instance_stream_bindings(&mut self, gal: &mut VulkanicGal) {
-        self.destroy_mesh_page_resource_sets(gal);
+    fn invalidate_mesh_instance_stream_bindings(&mut self, _gal: &mut VulkanicGal) {
+        for (_, set) in std::mem::take(&mut self.mesh_page_resource_sets) {
+            self.deferred_mesh_resource_destroys.push(set);
+        }
         for (_, resources) in std::mem::take(&mut self.mesh_resources) {
-            let _ = gal.destroy(resources.resource_set);
+            self.deferred_mesh_resource_destroys
+                .push(resources.resource_set);
         }
         for (_, resources) in std::mem::take(&mut self.source_mesh_resources) {
-            let _ = gal.destroy(resources.resource_set);
+            self.deferred_mesh_resource_destroys
+                .push(resources.resource_set);
         }
     }
 
@@ -34173,7 +34243,8 @@ impl WorldPrimitiveFrontend {
             capacity,
             initialized: false,
         }) {
-            let _ = gal.destroy(previous.buffer);
+            self.deferred_mesh_stream_buffer_destroys
+                .push(previous.buffer);
         }
         Ok(self
             .mesh_indirect_stream
@@ -39783,6 +39854,98 @@ struct MeshBatch {
     /// heap vector per section; larger batches spill to the same SmallVec
     /// storage without changing ordering or draw semantics.
     indices: SmallVec<[usize; 4]>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PageIndexedDrawCommand {
+    index_count: u32,
+    instance_count: u32,
+    first_index: u32,
+    vertex_offset: i32,
+    first_instance: u32,
+}
+
+impl PageIndexedDrawCommand {
+    fn append_bytes(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.index_count.to_le_bytes());
+        out.extend_from_slice(&self.instance_count.to_le_bytes());
+        out.extend_from_slice(&self.first_index.to_le_bytes());
+        out.extend_from_slice(&self.vertex_offset.to_le_bytes());
+        out.extend_from_slice(&self.first_instance.to_le_bytes());
+    }
+}
+
+struct PendingMeshDraw {
+    draw: TerrainMeshDraw,
+    page_command: Option<PageIndexedDrawCommand>,
+}
+
+/// Groups only adjacent page-addressed draws inside one opaque/cutout phase.
+/// Non-page draws are hard ordering boundaries, so entities, authored models,
+/// foil and translucent work cannot move. The command payload is emitted only
+/// after this ordering step, which keeps compatible records contiguous for
+/// backend-neutral indexed multidraw without changing semantic frame data.
+fn order_compatible_page_indirect_draws(draws: &mut [PendingMeshDraw]) {
+    let mut start = 0usize;
+    while start < draws.len() {
+        if draws[start].page_command.is_none() {
+            start += 1;
+            continue;
+        }
+        let mode = draws[start].draw.material_mode;
+        let mut end = start + 1;
+        while end < draws.len()
+            && draws[end].page_command.is_some()
+            && draws[end].draw.material_mode == mode
+        {
+            end += 1;
+        }
+        draws[start..end].sort_by(page_indirect_draw_order);
+        start = end;
+    }
+}
+
+fn page_indirect_draw_order(left: &PendingMeshDraw, right: &PendingMeshDraw) -> std::cmp::Ordering {
+    let left_draw = &left.draw;
+    let right_draw = &right.draw;
+    let left_shadow = left_draw.shadow.as_ref();
+    let right_shadow = right_draw.shadow.as_ref();
+    left_draw
+        .pipeline
+        .cmp(&right_draw.pipeline)
+        .then_with(|| left_draw.pipeline_layout.cmp(&right_draw.pipeline_layout))
+        .then_with(|| left_draw.resource_set.cmp(&right_draw.resource_set))
+        .then_with(|| {
+            left_draw
+                .shader_resource_set
+                .map(|binding| (binding.set_index, binding.set))
+                .cmp(
+                    &right_draw
+                        .shader_resource_set
+                        .map(|binding| (binding.set_index, binding.set)),
+                )
+        })
+        .then_with(|| left_draw.index_buffer.cmp(&right_draw.index_buffer))
+        .then_with(|| (left_draw.index_type as u32).cmp(&(right_draw.index_type as u32)))
+        .then_with(|| {
+            left_shadow
+                .map(|shadow| (shadow.pipeline, shadow.pipeline_layout, shadow.resource_set))
+                .cmp(
+                    &right_shadow.map(|shadow| {
+                        (shadow.pipeline, shadow.pipeline_layout, shadow.resource_set)
+                    }),
+                )
+        })
+        .then_with(|| {
+            left_shadow
+                .and_then(|shadow| shadow.shader_resource_set)
+                .map(|binding| (binding.set_index, binding.set))
+                .cmp(
+                    &right_shadow
+                        .and_then(|shadow| shadow.shader_resource_set)
+                        .map(|binding| (binding.set_index, binding.set)),
+                )
+        })
 }
 
 /// Semantic identity for the part of a mesh instance that affects batch
@@ -46518,6 +46681,75 @@ mod tests {
         VoxelLightVolumeDescriptor, VoxelLightVolumeExtent, VoxelLightVolumeIdentity,
         VoxelLightVolumeMapping, VoxelLightVolumeRequirements,
     };
+
+    fn pending_page_draw(
+        identity: u32,
+        pipeline_index: u32,
+        mode: TerrainMaterialPassMode,
+        page_addressed: bool,
+    ) -> PendingMeshDraw {
+        let handle = |kind, index| Handle::new(kind, index, 1).unwrap();
+        let pipeline = handle(HandleKind::GraphicsPipeline, pipeline_index);
+        let layout = handle(HandleKind::PipelineLayout, 1);
+        let set = handle(HandleKind::ResourceSet, 1);
+        PendingMeshDraw {
+            draw: TerrainMeshDraw {
+                shadow: Some(TerrainShadowDraw {
+                    pipeline,
+                    pipeline_layout: layout,
+                    resource_set: set,
+                    resource_set_dynamic_offsets: vec![0, 0],
+                    shader_resource_set: None,
+                }),
+                pipeline,
+                offscreen_pipeline: None,
+                pipeline_layout: layout,
+                resource_set: set,
+                resource_set_dynamic_offsets: vec![0, 0],
+                shader_resource_set: None,
+                index_buffer: handle(HandleKind::Buffer, 1),
+                index_offset: 0,
+                index_type: IndexType::U16,
+                index_count: identity,
+                instance_count: 1,
+                indexed_indirect: None,
+                stratum: WORLD_STRATUM_TERRAIN,
+                material_mode: mode,
+                shadow_participation: TerrainShadowParticipation::Required,
+            },
+            page_command: page_addressed.then_some(PageIndexedDrawCommand {
+                index_count: identity,
+                instance_count: 1,
+                first_index: identity,
+                vertex_offset: 0,
+                first_instance: identity,
+            }),
+        }
+    }
+
+    #[test]
+    fn page_indirect_order_groups_compatible_draws_without_crossing_boundaries() {
+        let mut draws = vec![
+            pending_page_draw(30, 3, TerrainMaterialPassMode::Opaque, true),
+            pending_page_draw(10, 1, TerrainMaterialPassMode::Opaque, true),
+            pending_page_draw(99, 9, TerrainMaterialPassMode::Opaque, false),
+            pending_page_draw(40, 4, TerrainMaterialPassMode::Cutout, true),
+            pending_page_draw(20, 2, TerrainMaterialPassMode::Cutout, true),
+        ];
+
+        order_compatible_page_indirect_draws(&mut draws);
+
+        assert_eq!(
+            vec![10, 30, 99, 20, 40],
+            draws
+                .iter()
+                .map(|pending| pending.draw.index_count)
+                .collect::<Vec<_>>()
+        );
+        assert!(draws[2].page_command.is_none());
+        assert_eq!(TerrainMaterialPassMode::Opaque, draws[1].draw.material_mode);
+        assert_eq!(TerrainMaterialPassMode::Cutout, draws[3].draw.material_mode);
+    }
 
     #[test]
     fn only_deferred_dh_stages_water_in_the_opaque_phase() {
@@ -62877,6 +63109,8 @@ mod tests {
             .unwrap();
         assert!(replacement.grew);
         frontend.invalidate_mesh_instance_stream_bindings(&mut gal);
+        assert!(gal.resource_set_descriptor_for_test(foil_set).is_ok());
+        frontend.flush_deferred_mesh_resource_destroys(&mut gal);
         assert!(gal.resource_set_descriptor_for_test(foil_set).is_err());
         frontend
             .ensure_mesh_resources(&mut gal, batches[1].key)
@@ -63428,6 +63662,40 @@ mod tests {
             WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
             WORLD_MATERIAL_ID_TRANSLUCENT_CUTOUT_TEXTURED,
         );
+    }
+
+    #[test]
+    fn whole_frame_keeps_world_bindings_live_when_hand_stream_grows() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(9_184, 1, IndexType::U16)],
+                Vec::new(),
+            )
+            .unwrap();
+
+        let mut scene = frame(Vec::new());
+        scene.mesh_instances.push(mesh_instance(9_184, 1));
+        scene.first_person = WorldFirstPersonFrame {
+            enabled: true,
+            clear_depth_before: true,
+            main_hand_instance_count: WORLD_MAX_MESH_INSTANCES as u32,
+            projection_matrix: matrix4_identity(),
+            model_view_matrix: matrix4_identity(),
+        };
+        let mut hand = mesh_instance(9_184, 1);
+        hand.stratum = WORLD_STRATUM_ENTITY_MESH;
+        scene.first_person_mesh_instances = vec![hand; WORLD_MAX_MESH_INSTANCES];
+
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, scene, Vec::new())
+            .expect(
+                "growing the shared hand stream must retain bindings already recorded by the world pass",
+            );
     }
 
     #[test]

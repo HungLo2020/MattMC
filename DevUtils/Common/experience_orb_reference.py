@@ -161,7 +161,7 @@ def _crop(image):
 
 def local_difference(current, frozen):
     delta = ImageChops.difference(_crop(current), _crop(frozen))
-    pixels = list(delta.getdata())
+    pixels = list(delta.get_flattened_data())
     return {
         "box": list(BOX),
         "max_channel_abs": max(max(pixel) for pixel in pixels),
@@ -173,7 +173,7 @@ def local_difference(current, frozen):
 def frame_effect(cv, ch, fv, fh):
     current_effect = ImageChops.difference(_crop(cv), _crop(ch))
     frozen_effect = ImageChops.difference(_crop(fv), _crop(fh))
-    changes = [sum(max(pixel) > 3 for pixel in image.getdata())
+    changes = [sum(max(pixel) > 3 for pixel in image.get_flattened_data())
                for image in (current_effect, frozen_effect)]
     effect_error = max(high for low, high in ImageChops.difference(current_effect, frozen_effect).getextrema())
     visible_error = local_difference(cv, fv)["max_channel_abs"]

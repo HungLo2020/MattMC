@@ -98,7 +98,7 @@ def _lava_image_change_evidence(before, after, *, mip_sampling):
             raise ValueError("unchanged phase uploads")
         changes = []
         for box in boxes[0]:
-            pixels = [[list(image.crop(tuple(box)).getdata()) for image in phase] for phase in images]
+            pixels = [[list(image.crop(tuple(box)).get_flattened_data()) for image in phase] for phase in images]
             # Signed differences reject motion in the wrong direction; magnitude
             # alone could accept an unrelated animated pattern.
             deltas = [[[b - a for a, b in zip(old, new)]
@@ -168,7 +168,7 @@ def lava_surface_evidence(baseline_doc, current_doc, baseline, current, *, flowi
                 raise ValueError("lava witness outside screenshot")
             crops = [image.convert("RGB").crop(box) for image in (baseline, current)]
             orange = [sum(r > 80 and r > g * 1.2 and g > b * 1.2
-                          for r, g, b in crop.getdata()) for crop in crops]
+                          for r, g, b in crop.get_flattened_data()) for crop in crops]
             error = ImageStat.Stat(ImageChops.difference(*crops)).mean
             patches.append({"box": box, "lava_pixels": orange, "mean_rgb_abs": error,
                             "passed": min(orange) >= 13 and max(error) <= 6})

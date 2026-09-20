@@ -168,7 +168,7 @@ def report(manifest, hidden_control=None, scenario="barrier", source_variant=Non
         for delta in differences:
             crop = delta.crop(BOX)
             means = ImageStat.Stat(crop).mean
-            changed = sum(max(p)>3 for p in crop.getdata())
+            changed = sum(max(p)>3 for p in crop.get_flattened_data())
             result["effects"].append({"changed_pixels": changed, "mean_rgb_change": means,
                 "passed": changed >= 32 and max(means) > .1})
         result["effect_parity"] = local(*differences)
@@ -201,7 +201,7 @@ def replacement_report(before, after, scenario, before_variant, after_variant, g
         for delta in deltas:
             crop = delta.crop(BOX)
             means = ImageStat.Stat(crop).mean
-            changed = sum(max(p)>3 for p in crop.getdata())
+            changed = sum(max(p)>3 for p in crop.get_flattened_data())
             result["effects"].append({"changed_pixels":changed,"mean_rgb_change":means,
                 "passed":changed>=32 and max(means)>.1})
         result["effect_parity"] = local(*deltas)

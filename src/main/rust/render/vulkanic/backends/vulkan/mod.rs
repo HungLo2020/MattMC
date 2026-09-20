@@ -14,10 +14,10 @@ use super::{
     BackendCreateDesc, BackendRuntimeMetrics, BackendToken, CompletedHostRead,
 };
 use crate::render::vulkanic::commands::ValidatedSubmissionBatch;
-use crate::render::vulkanic::error::GalResult;
+use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::frame::{
-    AcquiredFrame, FrameAcquireDesc, FrameResizeDesc, FrameResizeResult, FrameSurfaceDesc,
-    PresentFrameDesc, PresentedFrame,
+    AcquiredFrame, FrameAcquireDesc, FrameAcquireStatus, FrameResizeDesc, FrameResizeResult,
+    FrameSurfaceDesc, PresentFrameDesc, PresentedFrame,
 };
 use crate::render::vulkanic::handles::{Handle, HandleKind};
 use crate::render::vulkanic::resources::BackendCapabilities;
@@ -299,12 +299,31 @@ impl Backend for VulkanBackend {
     fn submit(&mut self, id: SubmissionId, _batch: &ValidatedSubmissionBatch) -> GalResult<()> {
         let _zone = trace::Zone::new("vulkan.backend.submit");
         trace::message(&format!("gal.submission backend=vulkan id={}", id.0));
-        self.lowerer
-            .lock()
-            .map_err(|_| {
-                crate::render::vulkanic::error::GalError::backend("Vulkan lowerer lock poisoned")
-            })?
-            .submit(id)
+        let mut lowerer = self.lowerer.lock().map_err(|_| {
+            crate::render::vulkanic::error::GalError::backend("Vulkan lowerer lock poisoned")
+        })?;
+        let present_image_index = lowerer.pending_present_image_index();
+        let acquire_wait = present_image_index
+            .map(|image_index| {
+                self.swapchain
+                    .as_ref()
+                    .and_then(|swapchain| swapchain.acquire_semaphore_for_image(image_index))
+                    .ok_or_else(|| {
+                        GalError::backend(format!(
+                            "Vulkan presentation submission for image {image_index} has no acquisition semaphore"
+                        ))
+                    })
+            })
+            .transpose()?;
+        lowerer.submit(id, acquire_wait)?;
+        if let Some(image_index) = present_image_index {
+            let consumed = self
+                .swapchain
+                .as_mut()
+                .and_then(|swapchain| swapchain.take_acquire_semaphore_for_image(image_index));
+            debug_assert_eq!(consumed, acquire_wait);
+        }
+        Ok(())
     }
 
     fn completed_submission(&self) -> SubmissionId {
@@ -401,14 +420,42 @@ impl Backend for VulkanBackend {
     }
 
     fn acquire_frame(&mut self, desc: &FrameAcquireDesc) -> GalResult<AcquiredFrame> {
-        let Some(swapchain) = &mut self.swapchain else {
+        if self.swapchain.is_none() {
             return Err(
                 crate::render::vulkanic::error::GalError::unsupported_feature(
                     "Vulkan backend was not created with a presentation surface",
                 ),
             );
+        }
+        let acquire_semaphore = {
+            let mut lowerer = self.lowerer.lock().map_err(|_| {
+                crate::render::vulkanic::error::GalError::backend("Vulkan lowerer lock poisoned")
+            })?;
+            lowerer.checkout_acquire_semaphore()?
         };
-        swapchain.acquire(desc)
+        let result = self
+            .swapchain
+            .as_mut()
+            .expect("swapchain presence checked")
+            .acquire(desc, acquire_semaphore);
+        let release_unsubmitted = match &result {
+            Ok(frame) => matches!(
+                frame.status,
+                FrameAcquireStatus::Minimized | FrameAcquireStatus::Resized
+            ),
+            Err(_) => true,
+        };
+        if release_unsubmitted {
+            self.lowerer
+                .lock()
+                .map_err(|_| {
+                    crate::render::vulkanic::error::GalError::backend(
+                        "Vulkan lowerer lock poisoned",
+                    )
+                })?
+                .release_unsubmitted_acquire_semaphore(acquire_semaphore);
+        }
+        result
     }
 
     fn resize_frame_surface(&mut self, desc: &FrameResizeDesc) -> GalResult<FrameResizeResult> {
@@ -461,7 +508,19 @@ impl Backend for VulkanBackend {
                 ),
             );
         };
-        swapchain.cancel(frame)
+        let acquire_semaphore = swapchain.acquire_semaphore_for_frame(frame);
+        swapchain.cancel(frame)?;
+        if let Some(semaphore) = acquire_semaphore {
+            self.lowerer
+                .lock()
+                .map_err(|_| {
+                    crate::render::vulkanic::error::GalError::backend(
+                        "Vulkan lowerer lock poisoned",
+                    )
+                })?
+                .discard_quiescent_acquire_semaphore(semaphore);
+        }
+        Ok(())
     }
 
     fn shutdown_frame_surface(&mut self) -> GalResult<()> {

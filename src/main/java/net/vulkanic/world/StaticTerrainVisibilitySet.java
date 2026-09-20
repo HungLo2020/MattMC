@@ -21,4 +21,28 @@ final class StaticTerrainVisibilitySet {
 		activeInstances.keySet().removeIf(meshKey -> !visibleMeshKeys.contains(meshKey));
 		return activeBefore - activeInstances.size();
 	}
+
+	static boolean isAcceptedGeneration(
+		long requestedGeneration,
+		Long uploadedGeneration,
+		Long registeredGeneration,
+		Long acknowledgedGeneration
+	) {
+		return uploadedGeneration != null
+			&& uploadedGeneration.longValue() == requestedGeneration
+			&& ((acknowledgedGeneration != null
+					&& acknowledgedGeneration.longValue() == requestedGeneration)
+				|| (registeredGeneration != null
+					&& registeredGeneration.longValue() == requestedGeneration));
+	}
+
+	/** A post-freeze upload may not replace a mesh referenced by that frame. */
+	static boolean mayPublishGeneration(
+		Map<Long, Long> protectedGenerations,
+		long meshKey,
+		long candidateGeneration
+	) {
+		Long protectedGeneration = protectedGenerations.get(meshKey);
+		return protectedGeneration == null || protectedGeneration.longValue() == candidateGeneration;
+	}
 }

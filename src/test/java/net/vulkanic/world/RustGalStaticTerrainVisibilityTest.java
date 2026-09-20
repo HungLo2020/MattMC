@@ -54,6 +54,28 @@ class RustGalStaticTerrainVisibilityTest {
 	}
 
 	@Test
+	void acknowledgedGenerationRemainsDrawableWhileReplacementIsRegistered() {
+		assertTrue(StaticTerrainVisibilitySet.isAcceptedGeneration(
+			7L, 7L, 8L, 7L
+		));
+		assertTrue(!StaticTerrainVisibilitySet.isAcceptedGeneration(
+			8L, 7L, 8L, 7L
+		));
+		assertTrue(StaticTerrainVisibilitySet.isAcceptedGeneration(
+			8L, 8L, 8L, 8L
+		));
+	}
+
+	@Test
+	void postConsumePublicationCannotReplaceAFrozenFrameMeshGeneration() {
+		Map<Long, Long> frozen = Map.of(41L, 7L);
+
+		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 41L, 7L));
+		assertTrue(!StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 41L, 8L));
+		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 42L, 8L));
+	}
+
+	@Test
 	void wholeFrameTerrainPublishesAReplacementVisibilitySetBeforeFrameDiagnostics() throws IOException {
 		String source = Files.readString(Path.of(
 			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
@@ -80,5 +102,27 @@ class RustGalStaticTerrainVisibilityTest {
 		assertTrue(body.contains("StaticTerrainVisibilitySet.reconcile(ACTIVE_STATIC_TERRAIN_INSTANCES, visibleSnapshot)"));
 		assertTrue(!body.contains("WORLD_MESH_ASSETS.remove"),
 			"culling a section must not destroy the reusable Rust mesh asset");
+	}
+
+	@Test
+	void replacementGenerationDoesNotDisplaceAcknowledgedTerrainBeforeAssetAcceptance() throws IOException {
+		String source = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
+		));
+		int enqueue = source.indexOf("public static boolean enqueueStaticTerrainMeshInstance(");
+		int pending = source.indexOf("PENDING_MESH_INSTANCES.add(instance);", enqueue);
+		String enqueueBody = source.substring(enqueue, pending);
+		assertTrue(!enqueueBody.contains("rememberActiveStaticTerrainInstanceLocked(instance)"),
+			"a pending replacement must not displace the last acknowledged active terrain generation");
+
+		int consume = source.indexOf("public static PrimitiveFrame consumeFrame()");
+		int admitted = source.indexOf("if (!isWorldMeshInstanceUploadedLocked(instance))", consume);
+		int promote = source.indexOf("rememberActiveStaticTerrainInstanceLocked(instance);", admitted);
+		assertTrue(admitted > consume && promote > admitted,
+			"consume must promote a terrain replacement only after exact upload admission");
+
+		assertTrue(source.contains("ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY"),
+			"the accepted generation needs dependency state independent of a newer registered replacement");
+		assertTrue(source.contains("ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY.put(mesh.meshKey(), terrainResidency.copy())"));
 	}
 }

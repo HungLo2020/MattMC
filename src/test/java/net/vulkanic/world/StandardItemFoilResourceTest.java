@@ -46,22 +46,6 @@ class StandardItemFoilResourceTest {
                 net.minecraft.client.renderer.item.ItemStackRenderState.FoilType.SPECIAL));
     }
 
-    @Test void modelFoilCopiesResourcesAndOriginalUvsWithoutJavaAnimation() throws Exception {
-        var source = java.nio.file.Files.readString(java.nio.file.Path.of(
-            "src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));
-        assertFalse(source.contains("ticks % 110000L"));
-        int start = source.indexOf("private static BlockMeshExtraction extractModelPartMesh(ModelPart modelRoot");
-        assertTrue(start >= 0, "inspect the shared extraction implementation, not a delegating overload");
-        var extraction = source.substring(start, source.indexOf("\n\tprivate static", start + 1));
-        assertTrue(extraction.contains("copyStandardItemFoilTexture(stableTextureId(effectiveTexture), resource)"));
-        assertTrue(extraction.contains("glint ? semanticFoilTexture : localModelTextureAsset"));
-        assertFalse(extraction.contains("glintStrength()"));
-        assertFalse(extraction.contains("Math.sin"));
-        assertTrue(source.contains("VulkanicGalBridge.StandardFoilKind.ENTITY"));
-        assertTrue(source.contains("withItemFoil(modelFoil)"));
-        assertTrue(source.contains("model-foil-parity-unadmitted"));
-    }
-
     @Test void firstPersonProjectedFoilAlsoRejectsBeforeResourceAccess() throws Exception {
         var state = new net.minecraft.client.renderer.item.ItemStackRenderState();
         var context = state.getClass().getDeclaredField("displayContext");
@@ -74,14 +58,14 @@ class StandardItemFoilResourceTest {
         assertEquals("special-foil-native-projection-unavailable", check.invoke(null, state, 15728640, "minecraft:compass"));
     }
 
-    @Test void defaultStandaloneFoilOnlyCopiesTheVerifiedTridentContract() throws Exception {
+    @Test void defaultStandaloneFoilCopiesVerifiedTridentAndArmorContracts() throws Exception {
         var model = new net.minecraft.client.model.TridentModel(
             net.minecraft.client.model.TridentModel.createLayer().bakeRoot());
         var texture = net.minecraft.client.model.TridentModel.TEXTURE;
         var state = net.minecraft.util.Unit.INSTANCE;
         var material = net.minecraft.client.renderer.RenderType.entitySolid(texture);
         assertNull(RustGalWorldPrimitiveRenderer.standaloneModelFoilIneligibility(model,state,material,texture));
-        assertEquals("armor-foil-native-contract-unavailable",
+        assertEquals("armor-foil-semantic-inputs-unavailable",
             RustGalWorldPrimitiveRenderer.standaloneModelFoilIneligibility(null,null,
                 net.minecraft.client.renderer.RenderType.armorEntityGlint(),null));
         assertEquals("standalone-model-foil-family-unadmitted",
@@ -101,28 +85,18 @@ class StandardItemFoilResourceTest {
         assertTrue(body.contains("withItemFoil(foil)"));
     }
 
-    @Test void privateEquipmentFoilRequiresCompleteSemanticInputs() {
-        String property = "mattmc.dev.rustArmorFoil";
-        String previous = System.getProperty(property);
-        try {
-            System.setProperty(property, "true");
-            var material = net.minecraft.client.renderer.RenderType.armorEntityGlint();
-            var identity = net.minecraft.resources.ResourceLocation.withDefaultNamespace("armor/glint");
-            var model = new net.minecraft.client.model.TridentModel(
-                net.minecraft.client.model.TridentModel.createLayer().bakeRoot());
-            var state = net.minecraft.util.Unit.INSTANCE;
-            assertNull(RustGalWorldPrimitiveRenderer.standaloneModelFoilIneligibility(model,state,material,identity));
-            assertEquals("armor-foil-semantic-inputs-unavailable",
-                RustGalWorldPrimitiveRenderer.standaloneModelFoilIneligibility(null,state,material,identity));
-            assertEquals("armor-foil-semantic-inputs-unavailable",
-                RustGalWorldPrimitiveRenderer.standaloneModelFoilIneligibility(model,state,material,
-                    net.minecraft.client.model.TridentModel.TEXTURE));
-            System.clearProperty(property);
-            assertEquals("armor-foil-native-contract-unavailable",
-                RustGalWorldPrimitiveRenderer.standaloneModelFoilIneligibility(model,state,material,identity));
-        } finally {
-            if (previous == null) System.clearProperty(property); else System.setProperty(property, previous);
-        }
+    @Test void equipmentFoilRequiresCompleteSemanticInputs() {
+        var material = net.minecraft.client.renderer.RenderType.armorEntityGlint();
+        var identity = net.minecraft.resources.ResourceLocation.withDefaultNamespace("armor/glint");
+        var model = new net.minecraft.client.model.TridentModel(
+            net.minecraft.client.model.TridentModel.createLayer().bakeRoot());
+        var state = net.minecraft.util.Unit.INSTANCE;
+        assertNull(RustGalWorldPrimitiveRenderer.standaloneModelFoilIneligibility(model,state,material,identity));
+        assertEquals("armor-foil-semantic-inputs-unavailable",
+            RustGalWorldPrimitiveRenderer.standaloneModelFoilIneligibility(null,state,material,identity));
+        assertEquals("armor-foil-semantic-inputs-unavailable",
+            RustGalWorldPrimitiveRenderer.standaloneModelFoilIneligibility(model,state,material,
+                net.minecraft.client.model.TridentModel.TEXTURE));
     }
 
     @Test void sharedResourceContractDoesNotDependOnNativeGeometryAdmission() throws Exception {

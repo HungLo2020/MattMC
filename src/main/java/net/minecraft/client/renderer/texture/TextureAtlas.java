@@ -57,6 +57,8 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	private static final Map<ResourceLocation, Long> SEMANTIC_ANIMATION_TICK_EPOCHS = new ConcurrentHashMap<>();
 	/** Frame selection used to build the cached CPU semantic atlas snapshot. */
 	private long semanticSnapshotFrameKey = Long.MIN_VALUE;
+	/** Rust advances atlas animation from copied declarations, so its raw atlas snapshot remains the immutable first frame. */
+	private boolean semanticSnapshotUsesRustAnimationClock;
 	@Nullable
 	private TextureAtlas.SemanticRawSnapshot semanticRawSnapshot;
 	@Nullable
@@ -109,6 +111,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 			this.createTexture(preparations.width(), preparations.height(), preparations.mipLevel());
 		}
 		this.clearTextureData();
+		this.semanticSnapshotUsesRustAnimationClock = rustWholeFrame;
 		if (!rustWholeFrame) {
 			this.setFilter(false, this.mipLevel > 1);
 		}
@@ -329,6 +332,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		this.semanticSnapshotGeneration++;
 		this.semanticReloadGeneration++;
 		this.semanticRawSnapshot = null;
+		this.semanticSnapshotUsesRustAnimationClock = false;
 	}
 
 	/** Resource declarations only; the Vulkan incarnation retains its immutable copy. */
@@ -443,6 +447,11 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	}
 
 	private long semanticFrameKey() {
+		// The Rust route uploads the authored first-frame atlas once and advances
+		// animation through AtlasAnimationResource tick events. Java sprite tickers
+		// are deliberately absent on this route, so rescanning the immutable atlas
+		// map cannot discover a frame change and only allocates Map.Entry wrappers.
+		if (this.semanticSnapshotUsesRustAnimationClock) return this.semanticSnapshotGeneration;
 		long frameKey = 0xcbf29ce484222325L;
 		for (TextureAtlasSprite sprite : this.texturesByName.values()) {
 			frameKey ^= sprite.contents().semanticFrameIndex() & 0xffffffffL;

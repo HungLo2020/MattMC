@@ -53,6 +53,11 @@ public final class StaticTerrainParityDiagnostics {
 
     private static final boolean ENABLED =
             Boolean.getBoolean("mattmc.dev.staticTerrainParityDiagnostics");
+
+    /** Lets producers avoid constructing detailed receipts when diagnostics are disabled. */
+    public static boolean isEnabled() {
+        return ENABLED;
+    }
     private static final int MAX_EVENTS = Math.max(
             1,
             Integer.getInteger("mattmc.dev.staticTerrainParityDiagnostics.maxEvents", 512)

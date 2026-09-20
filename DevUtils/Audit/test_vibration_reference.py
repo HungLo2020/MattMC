@@ -22,7 +22,7 @@ class VibrationReferenceTest(unittest.TestCase):
         for x,y in corners: self.assertTrue(left<x<right and top<y<bottom,(x,y))
 
     def test_elevated_launcher_input_reaches_both_repositories(self):
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
             for name in ("current-rust-vulkan-shaders-off","frozen-opengl-shaders-off"):
@@ -111,7 +111,7 @@ class VibrationReferenceTest(unittest.TestCase):
             self.assertFalse(vibration.fixture(doc,False,0))
 
     def test_six_step_launcher_input_reaches_both_repositories(self):
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             for name in ("current-rust-vulkan-shaders-off","frozen-opengl-shaders-off"):
@@ -123,7 +123,7 @@ class VibrationReferenceTest(unittest.TestCase):
                 self.assertIn("-Dmattmc.dev.graphicsAuditVibrationSteps=6",shlex.split(env["JAVA_TOOL_OPTIONS"]))
 
     def test_both_launchers_set_identical_simulation_and_animation_inputs(self):
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         for scenario in ("hidden","visible"):
             with tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)

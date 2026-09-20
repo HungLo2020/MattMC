@@ -12,7 +12,7 @@ from capture_runner import gui_resource_pack_specs, write_gui_resource_pack
 class BlockLayoutTest(unittest.TestCase):
     def test_ordinary_block_scale_reaches_both_launchers_without_a_pack(self):
         import graphics_harness as harness
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         args=harness.parse_args(["capture","--hotbar-item-fixture","standard-3d-logs","--item-gui-scale","2"])
         self.assertEqual(args.flat_item_gui_scale,2)
         with tempfile.TemporaryDirectory() as temporary:
@@ -37,7 +37,7 @@ class BlockLayoutTest(unittest.TestCase):
 
     def test_placement_flag_reaches_both_launchers(self):
         import graphics_harness as harness
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         args=harness.parse_args(["capture","--hotbar-item-fixture","standard-3d-logs",
             "--gui-resource-pack-scenario","block-item-oversized","--gui-item-placement"])
         with tempfile.TemporaryDirectory() as temporary:
@@ -119,7 +119,7 @@ class BlockLayoutTest(unittest.TestCase):
     def test_both_launchers_use_same_single_pose(self):
         import shlex
         import graphics_harness as harness
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         args=harness.parse_args(["capture","--hotbar-item-fixture","standard-3d-logs",
             "--gui-resource-pack-scenario","block-item-expanded","--world-resource-reload",
             "--gui-block-layout-reference","before.json"])

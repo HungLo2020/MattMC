@@ -119,7 +119,7 @@ class SpecialFoilReferenceTest(unittest.TestCase):
     def test_pattern_launches_keep_shared_fixture_single_pose_and_no_implicit_admission(self):
         import tempfile
         import graphics_harness as h
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         args = h.parse_args(["capture", "--gui-resource-pack-scenario", "special-item-foil-pattern",
                              "--hotbar-item-fixture", "special-foil"])
         with tempfile.TemporaryDirectory() as directory:
@@ -154,7 +154,7 @@ class SpecialFoilReferenceTest(unittest.TestCase):
     def test_recovery_fixture_launches_both_clients_but_cannot_silently_skip_parity(self):
         import tempfile
         import graphics_harness as h
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         from gui_special_foil_reference import report
         args=h.parse_args(["capture", "--hotbar-item-fixture", "recovery-foil",
                            "--gui-resource-pack-scenario", "special-item-foil-pattern"])

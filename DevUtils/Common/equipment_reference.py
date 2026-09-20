@@ -150,8 +150,8 @@ def compare_images(frozen, current, mode, *, phase=None, pose=0, trim=None):
     errors = []
     for x,y,expected in probes:
         box=(x-1,y-1,x+2,y+2)
-        baseline=list(frozen.crop(box).getdata())
-        candidate=list(current.crop(box).getdata())
+        baseline=list(frozen.crop(box).get_flattened_data())
+        candidate=list(current.crop(box).get_flattened_data())
         require(all(abs(a-b)<=2 for pixel,ref in zip(baseline,expected) for a,b in zip(pixel,ref)),
                 "Frozen equipment anchor changed")
         error=max(abs(a-b) for pixel,ref in zip(candidate,baseline) for a,b in zip(pixel,ref))

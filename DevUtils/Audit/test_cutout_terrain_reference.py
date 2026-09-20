@@ -104,7 +104,7 @@ class CutoutTerrainReferenceTest(unittest.TestCase):
                 self.assertEqual(expected,cutout.report({"pairs":[{}]},"visible","control")["passed"])
 
     def test_both_launchers_receive_explicit_fixture_and_visibility(self):
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
             for name in ("current-rust-vulkan-shaders-off","frozen-opengl-shaders-off"):
@@ -120,7 +120,7 @@ class CutoutTerrainReferenceTest(unittest.TestCase):
                     self.assertNotIn("-Dmattmc.dev.graphicsAuditMagmaCycleCapture=true",flags)
 
     def test_both_launchers_receive_translucent_fixture_and_reject_ambiguous_surface(self):
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
             for name in ("current-rust-vulkan-shaders-off","frozen-opengl-shaders-off"):

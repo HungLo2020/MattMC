@@ -15,6 +15,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.AbstractList;
 import java.util.Arrays;
 import java.util.ArrayDeque;
 import java.util.LinkedHashMap;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.RandomAccess;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class VulkanicGalBridge implements AutoCloseable {
@@ -793,6 +795,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	private static MemorySegment encodeGuiMeshVertices(Arena targetArena, List<GuiMeshVertexRecord> records) {
+		if (records instanceof PackedGuiMeshVertices packed) return packed.encode(targetArena);
 		MemorySegment vertices = Struct.GUI_MESH_VERTEX.array(targetArena, records.size());
 		for (int vertexIndex = 0; vertexIndex < records.size(); vertexIndex++) {
 			GuiMeshVertexRecord vertex = records.get(vertexIndex);
@@ -809,6 +812,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	}
 
 	private static MemorySegment encodeGuiMeshIndices(Arena targetArena, List<Integer> records) {
+		if (records instanceof PackedGuiMeshIndices packed) return packed.encode(targetArena);
 		MemorySegment indices = targetArena.allocate((long)records.size() * Integer.BYTES, Integer.BYTES);
 		for (int index = 0; index < records.size(); index++) indices.setAtIndex(ValueLayout.JAVA_INT, index, records.get(index));
 		return indices;
@@ -3153,6 +3157,19 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		public byte[] pixels() {
 			return this.pixels.clone();
 		}
+
+		/**
+		 * Allocation-free metadata for bounded staging. The backing pixels remain
+		 * private and immutable after the constructor's defensive copy.
+		 */
+		public int pixelByteLength() {
+			return this.pixels.length;
+		}
+
+		/** Compares immutable payloads without exposing or cloning either array. */
+		public boolean hasSamePixels(GuiRawImageAssetRecord other) {
+			return other != null && Arrays.equals(this.pixels, other.pixels);
+		}
 	}
 
 	/** Immutable copied world-text image with semantic atlas generation data. */
@@ -4769,6 +4786,108 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		@Override public float[] localUv() { return this.localUv.clone(); }
 	}
 
+	/**
+	 * Copies a dense CPU semantic vertex stream into an immutable list view. The
+	 * bridge recognizes the private view and writes its primitive arrays directly
+	 * into the confined FFI arena, avoiding one object and three tiny arrays per
+	 * vertex. This is still ordinary owned CPU data; no native or renderer state is
+	 * retained by the view.
+	 */
+	public static List<GuiMeshVertexRecord> packedGuiMeshVertices(
+		float[] positions, float[] atlasUvs, float[] localUvs, int[] colors, int[] normals, int vertexCount
+	) {
+		return new PackedGuiMeshVertices(positions, atlasUvs, localUvs, colors, normals, vertexCount);
+	}
+
+	/** Copies a dense CPU index stream into the matching immutable list contract. */
+	public static List<Integer> packedGuiMeshIndices(int[] indices, int indexCount) {
+		return new PackedGuiMeshIndices(indices, indexCount);
+	}
+
+	private static final class PackedGuiMeshVertices extends AbstractList<GuiMeshVertexRecord> implements RandomAccess {
+		private final float[] positions;
+		private final float[] atlasUvs;
+		private final float[] localUvs;
+		private final int[] colors;
+		private final int[] normals;
+
+		private PackedGuiMeshVertices(
+			float[] positions, float[] atlasUvs, float[] localUvs, int[] colors, int[] normals, int vertexCount
+		) {
+			if (vertexCount <= 0 || positions == null || atlasUvs == null || localUvs == null
+				|| colors == null || normals == null || positions.length < vertexCount * 3
+				|| atlasUvs.length < vertexCount * 2 || localUvs.length < vertexCount * 2
+				|| colors.length < vertexCount || normals.length < vertexCount) {
+				throw new IllegalArgumentException("invalid packed GUI mesh vertex stream");
+			}
+			this.positions = Arrays.copyOf(positions, vertexCount * 3);
+			this.atlasUvs = Arrays.copyOf(atlasUvs, vertexCount * 2);
+			this.localUvs = Arrays.copyOf(localUvs, vertexCount * 2);
+			this.colors = Arrays.copyOf(colors, vertexCount);
+			this.normals = Arrays.copyOf(normals, vertexCount);
+			for (float value : this.positions) if (!Float.isFinite(value)) throw new IllegalArgumentException("GUI mesh position must be finite");
+			for (float value : this.atlasUvs) if (!Float.isFinite(value)) throw new IllegalArgumentException("GUI mesh atlas UV must be finite");
+			for (float value : this.localUvs) if (!Float.isFinite(value)) throw new IllegalArgumentException("GUI mesh local UV must be finite");
+		}
+
+		@Override public int size() { return colors.length; }
+
+		@Override public GuiMeshVertexRecord get(int index) {
+			Objects.checkIndex(index, size());
+			int position = index * 3;
+			int uv = index * 2;
+			return new GuiMeshVertexRecord(
+				new float[] {positions[position], positions[position + 1], positions[position + 2]},
+				new float[] {atlasUvs[uv], atlasUvs[uv + 1]},
+				new float[] {localUvs[uv], localUvs[uv + 1]}, colors[index], normals[index]
+			);
+		}
+
+		private MemorySegment encode(Arena targetArena) {
+			MemorySegment vertices = Struct.GUI_MESH_VERTEX.array(targetArena, size());
+			for (int vertexIndex = 0; vertexIndex < size(); vertexIndex++) {
+				MemorySegment item = Abi.item(vertices, Struct.GUI_MESH_VERTEX, vertexIndex);
+				int position = vertexIndex * 3;
+				int uv = vertexIndex * 2;
+				for (int component = 0; component < 3; component++) item.set(ValueLayout.JAVA_FLOAT,
+					Struct.GUI_MESH_VERTEX.offset(0) + component * 4L, positions[position + component]);
+				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT,
+					Struct.GUI_MESH_VERTEX.offset(1) + component * 4L, atlasUvs[uv + component]);
+				for (int component = 0; component < 2; component++) item.set(ValueLayout.JAVA_FLOAT,
+					Struct.GUI_MESH_VERTEX.offset(2) + component * 4L, localUvs[uv + component]);
+				Struct.GUI_MESH_VERTEX.setInt(item, 3, colors[vertexIndex]);
+				Struct.GUI_MESH_VERTEX.setInt(item, 4, normals[vertexIndex]);
+				Struct.GUI_MESH_VERTEX.setInt(item, 5, 0);
+				Struct.GUI_MESH_VERTEX.setInt(item, 6, 0);
+			}
+			return vertices;
+		}
+	}
+
+	private static final class PackedGuiMeshIndices extends AbstractList<Integer> implements RandomAccess {
+		private final int[] values;
+
+		private PackedGuiMeshIndices(int[] indices, int indexCount) {
+			if (indices == null || indexCount <= 0 || indices.length < indexCount)
+				throw new IllegalArgumentException("invalid packed GUI mesh index stream");
+			this.values = Arrays.copyOf(indices, indexCount);
+			for (int index : values) if (index < 0) throw new IllegalArgumentException("GUI mesh index must be nonnegative");
+		}
+
+		@Override public int size() { return values.length; }
+		@Override public Integer get(int index) { return values[Objects.checkIndex(index, values.length)]; }
+
+		private void validateVertexCount(int vertexCount) {
+			for (int index : values) if (index >= vertexCount) throw new IllegalArgumentException("GUI mesh index out of range");
+		}
+
+		private MemorySegment encode(Arena targetArena) {
+			MemorySegment indices = targetArena.allocate((long)values.length * Integer.BYTES, Integer.BYTES);
+			MemorySegment.copy(values, 0, indices, ValueLayout.JAVA_INT, 0, values.length);
+			return indices;
+		}
+	}
+
 	/** One coarse copied material layer. Backends see no Java renderer state. */
 	/** Immutable standard foil inputs; texture coordinates are computed only in Rust. */
 	public enum StandardFoilKind {
@@ -4954,11 +5073,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			if (!TRUSTED_COPY.get()) {
 				modelTransform = checkedFiniteCopy(modelTransform, 16, "GUI mesh model transform");
 				guiPose = checkedFiniteCopy(guiPose, 6, "GUI mesh GUI pose");
-				vertices = List.copyOf(vertices);
-				indices = List.copyOf(indices);
+				vertices = vertices instanceof PackedGuiMeshVertices ? vertices : List.copyOf(vertices);
+				indices = indices instanceof PackedGuiMeshIndices ? indices : List.copyOf(indices);
 			}
 			if (vertices.isEmpty() || indices.isEmpty()) throw new IllegalArgumentException("GUI mesh batch requires geometry");
-			for (int index : indices) if (index < 0 || index >= vertices.size()) throw new IllegalArgumentException("GUI mesh index out of range");
+			if (indices instanceof PackedGuiMeshIndices packed) packed.validateVertexCount(vertices.size());
+			else for (int index : indices) if (index < 0 || index >= vertices.size()) throw new IllegalArgumentException("GUI mesh index out of range");
 		}
 
 		@Override public float[] modelTransform() { return this.modelTransform.clone(); }

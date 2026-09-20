@@ -24,7 +24,7 @@ def moving_changes(before_frozen, before_current, after_frozen, after_current):
         probes = []
         for index, (x, y, _) in enumerate(REFERENCES['foil']['probes']):
             box = (x - 1, y - 1, x + 2, y + 2)
-            pixels = [list(image.crop(box).getdata()) for image in images]
+            pixels = [list(image.crop(box).get_flattened_data()) for image in images]
             deltas = [[[b - a for a, b in zip(old, new)]
                        for old, new in zip(pixels[side], pixels[side + 2])]
                       for side in (0, 1)]

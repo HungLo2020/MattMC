@@ -71,6 +71,7 @@ struct AcquiredImage {
     image_index: u32,
     render_target: FrameRenderTargetId,
     suboptimal: bool,
+    acquire_semaphore: Option<vk::Semaphore>,
 }
 
 impl VulkanSwapchain {
@@ -113,7 +114,11 @@ impl VulkanSwapchain {
         self.recreate(self.swapchain)
     }
 
-    pub(super) fn acquire(&mut self, desc: &FrameAcquireDesc) -> GalResult<AcquiredFrame> {
+    pub(super) fn acquire(
+        &mut self,
+        desc: &FrameAcquireDesc,
+        acquire_semaphore: vk::Semaphore,
+    ) -> GalResult<AcquiredFrame> {
         let _zone = trace::Zone::new("vulkan.swapchain.acquire");
         let acquire_started = std::time::Instant::now();
         self.next_frame += 1;
@@ -141,35 +146,17 @@ impl VulkanSwapchain {
                 ),
             ));
         }
-        let fence_info = vk::FenceCreateInfo::default();
-        let acquire_fence = unsafe { self.context.device.create_fence(&fence_info, None) }
-            .map_err(|error| {
-                GalError::backend(format!("failed to create Vulkan acquire fence: {error:?}"))
-            })?;
         let acquire_result = unsafe {
             self.loader.acquire_next_image(
                 self.swapchain,
                 1_000_000_000,
-                vk::Semaphore::null(),
-                acquire_fence,
+                acquire_semaphore,
+                vk::Fence::null(),
             )
         };
         let (image_index, suboptimal) = match acquire_result {
-            Ok(result) => {
-                if let Err(error) = unsafe {
-                    self.context
-                        .device
-                        .wait_for_fences(&[acquire_fence], true, 1_000_000_000)
-                } {
-                    unsafe { self.context.device.destroy_fence(acquire_fence, None) };
-                    return Err(GalError::backend(format!(
-                        "Vulkan acquire fence wait failed: {error:?}"
-                    )));
-                }
-                result
-            }
+            Ok(result) => result,
             Err(error) => {
-                unsafe { self.context.device.destroy_fence(acquire_fence, None) };
                 if error == vk::Result::ERROR_OUT_OF_DATE_KHR {
                     self.desc.extent = desc.expected_extent;
                     self.recreate(self.swapchain)?;
@@ -191,13 +178,13 @@ impl VulkanSwapchain {
                 )));
             }
         };
-        unsafe { self.context.device.destroy_fence(acquire_fence, None) };
         let render_target = self.render_target_for_image(image_index);
         self.acquired.push(AcquiredImage {
             frame,
             image_index,
             render_target,
             suboptimal,
+            acquire_semaphore: Some(acquire_semaphore),
         });
         self.metrics.acquire_nanos = self.metrics.acquire_nanos.saturating_add(
             crate::render::vulkanic::metrics::elapsed_nanos_u64(acquire_started),
@@ -260,6 +247,30 @@ impl VulkanSwapchain {
                     "Vulkan frame was not acquired before present",
                 )
             })
+    }
+
+    pub(super) fn take_acquire_semaphore_for_image(
+        &mut self,
+        image_index: u32,
+    ) -> Option<vk::Semaphore> {
+        self.acquired
+            .iter_mut()
+            .find(|acquired| acquired.image_index == image_index)
+            .and_then(|acquired| acquired.acquire_semaphore.take())
+    }
+
+    pub(super) fn acquire_semaphore_for_image(&self, image_index: u32) -> Option<vk::Semaphore> {
+        self.acquired
+            .iter()
+            .find(|acquired| acquired.image_index == image_index)
+            .and_then(|acquired| acquired.acquire_semaphore)
+    }
+
+    pub(super) fn acquire_semaphore_for_frame(&self, frame: FrameId) -> Option<vk::Semaphore> {
+        self.acquired
+            .iter()
+            .find(|acquired| acquired.frame == frame)
+            .and_then(|acquired| acquired.acquire_semaphore)
     }
 
     pub(super) fn present(

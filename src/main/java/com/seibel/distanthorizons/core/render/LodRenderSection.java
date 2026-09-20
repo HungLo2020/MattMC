@@ -406,11 +406,11 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	{
 		if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild())
 		{
-			// The retained container owns lifecycle only. If bounded collector
-			// pressure evicted its semantic generation, report the section missing
-			// so DH rebuilds it; the real visible-candidate set then protects the
-			// replacement from byte-LRU eviction.
-			return net.vulkanic.world.DistantHorizonsSemanticCollector.hasColumn(this.pos);
+			// The retained container owns lifecycle only. A CPU-built column is not
+			// renderable until Rust acknowledges its immutable asset. Requesting the
+			// bounded publication here keeps a covering parent enabled while child
+			// assets arrive, matching DH's no-hole parent/child transition contract.
+			return net.vulkanic.world.DistantHorizonsSemanticCollector.requestColumnPublication(this.pos);
 		}
 		return this.bufferContainer != null;
 	}

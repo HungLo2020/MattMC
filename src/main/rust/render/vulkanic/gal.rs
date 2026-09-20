@@ -4619,7 +4619,7 @@ pub(super) fn normalize_submission_batch_with_pipeline_layouts(
         stats.ops_before = stats
             .ops_before
             .saturating_add(list.operations.len() as u64);
-        let original = std::mem::take(&mut list.operations);
+        let original = fuse_adjacent_identical_passes(std::mem::take(&mut list.operations));
         let mut normalized = Vec::with_capacity(original.len());
         let mut state = CommandStateTracker::default();
         for op in original {
@@ -4749,6 +4749,38 @@ pub(super) fn normalize_submission_batch_with_pipeline_layouts(
         list.operations = normalized;
     }
     stats
+}
+
+fn fuse_adjacent_identical_passes(original: Vec<CommandOp>) -> Vec<CommandOp> {
+    let mut source = original.into_iter().peekable();
+    let mut fused = Vec::new();
+    let mut active_begin: Option<CommandOp> = None;
+    while let Some(operation) = source.next() {
+        match &operation {
+            CommandOp::BeginPass { .. } => {
+                active_begin = Some(operation.clone());
+                fused.push(operation);
+            }
+            CommandOp::EndPass => {
+                let same_pass = active_begin
+                    .as_ref()
+                    .is_some_and(|begin| source.peek().is_some_and(|next| next == begin));
+                if same_pass {
+                    // The second pass has the exact same target, attachments,
+                    // and load/store contract. Keep the first pass open so
+                    // adjacent ordered draws do not manufacture a Vulkan pass
+                    // boundary. Barriers, uploads, and ownership receipts are
+                    // hard boundaries because they prevent this adjacency.
+                    source.next();
+                } else {
+                    active_begin = None;
+                    fused.push(operation);
+                }
+            }
+            _ => fused.push(operation),
+        }
+    }
+    fused
 }
 
 fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch) {

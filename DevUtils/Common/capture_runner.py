@@ -3653,7 +3653,7 @@ def lava_minification_image(source):
     source = source.convert("RGBA")
     scaled = source.resize((source.width * 8, source.height * 8), Image.Resampling.NEAREST)
     values = []
-    for index, pixel in enumerate(scaled.getdata()):
+    for index, pixel in enumerate(scaled.get_flattened_data()):
         sign = 1 if ((index % scaled.width) + (index // scaled.width)) % 2 else -1
         values.append(tuple(value + sign * min(limit, value, 255 - value)
                             for value, limit in zip(pixel[:3], (24, 24, 8))) + (pixel[3],))
@@ -4482,7 +4482,7 @@ def celestial_body_witness(image, body: str):
     box = (width // 4, height // 5, width * 3 // 4, height * 4 // 5)
     crop = image.convert("RGB").crop(box)
     threshold = 224 if body == "sun" else 96
-    mask = [min(pixel) >= threshold for pixel in crop.getdata()]
+    mask = [min(pixel) >= threshold for pixel in crop.get_flattened_data()]
     pending = {index for index, present in enumerate(mask) if present}
     cw, ch = crop.size
     largest = []
@@ -4565,7 +4565,7 @@ def validate_deterministic_metadata(metadata_path: Path, screenshot_dir: Path, t
                 rgb = image.convert("RGB")
                 celestial = celestial_body_witness(rgb, celestial_body) if celestial_body else None
                 rgb.thumbnail((64, 36))
-                pixels = list(rgb.getdata())
+                pixels = list(rgb.get_flattened_data())
         except Exception as exc:
             raise RuntimeError(
                 f"deterministic screenshot is not a readable rendered image for {capture.get('poseName')}: {screenshot}: {exc}"

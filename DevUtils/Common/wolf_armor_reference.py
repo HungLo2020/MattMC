@@ -53,7 +53,7 @@ def compare_images(frozen,current,pose,mode="high"):
     errors=[]
     for x,y,expected in references[pose]['probes']:
         box=(x-1,y-1,x+2,y+2)
-        baseline=list(frozen.crop(box).getdata());candidate=list(current.crop(box).getdata())
+        baseline=list(frozen.crop(box).get_flattened_data());candidate=list(current.crop(box).get_flattened_data())
         require(all(abs(a-b)<=2 for rgb,ref in zip(baseline,expected) for a,b in zip(rgb,ref)),
                 'Frozen wolf anchor changed')
         error=max(abs(a-b) for rgb,ref in zip(candidate,baseline) for a,b in zip(rgb,ref))

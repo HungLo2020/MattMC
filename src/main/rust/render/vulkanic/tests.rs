@@ -4421,6 +4421,46 @@ fn command_normalization_removes_redundant_state_binds() {
 }
 
 #[test]
+fn command_normalization_fuses_adjacent_identical_loaded_passes() {
+    let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+    let begin = minimal_begin_pass();
+    let (stats, operations) = normalize_ops_for_test(vec![
+        begin.clone(),
+        CommandOp::BindGraphicsPipeline(pipeline),
+        CommandOp::Draw {
+            vertices: 6,
+            instances: 1,
+        },
+        CommandOp::EndPass,
+        begin,
+        CommandOp::BindGraphicsPipeline(pipeline),
+        CommandOp::Draw {
+            vertices: 6,
+            instances: 1,
+        },
+        CommandOp::EndPass,
+    ]);
+
+    assert_eq!(stats.ops_before, 8);
+    assert_eq!(stats.ops_after, 5);
+    assert_eq!(stats.pipeline_binds_removed, 1);
+    assert_eq!(
+        operations
+            .iter()
+            .filter(|operation| matches!(operation, CommandOp::BeginPass { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(
+        operations
+            .iter()
+            .filter(|operation| matches!(operation, CommandOp::EndPass))
+            .count(),
+        1
+    );
+}
+
+#[test]
 fn command_normalization_keeps_resource_binds_with_distinct_dynamic_offsets() {
     let layout = test_handle(HandleKind::PipelineLayout, 1);
     let set = test_handle(HandleKind::ResourceSet, 1);
@@ -4548,7 +4588,7 @@ fn command_normalization_retains_sets_for_pipelines_sharing_a_layout() {
 }
 
 #[test]
-fn command_normalization_respects_pass_and_barrier_boundaries() {
+fn command_normalization_respects_barriers_while_fusing_identical_passes() {
     let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
     let texture = test_handle(HandleKind::Texture, 1);
     let barrier = CommandOp::Barrier(ResourceBarrier {
@@ -4573,13 +4613,13 @@ fn command_normalization_respects_pass_and_barrier_boundaries() {
     ]);
 
     assert_eq!(stats.ops_before, 9);
-    assert_eq!(stats.ops_after, 8);
-    assert_eq!(stats.pipeline_binds_removed, 1);
+    assert_eq!(stats.ops_after, 5);
+    assert_eq!(stats.pipeline_binds_removed, 2);
     let kept_pipeline_binds = operations
         .iter()
         .filter(|op| matches!(op, CommandOp::BindGraphicsPipeline(_)))
         .count();
-    assert_eq!(kept_pipeline_binds, 3);
+    assert_eq!(kept_pipeline_binds, 2);
 }
 
 #[test]

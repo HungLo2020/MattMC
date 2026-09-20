@@ -18,7 +18,7 @@ def full_quad_changed_pixel_parity(hidden, baseline, current, elevation=0):
     box = elevated_metrics.BOX if elevation else FULL_ZERO_STEP_BOX
     changes = ImageChops.difference(hidden.crop(box),baseline.crop(box))
     errors = ImageChops.difference(baseline.crop(box),current.crop(box))
-    selected = [e for c,e in zip(changes.getdata(),errors.getdata()) if max(c)>3]
+    selected = [e for c,e in zip(changes.get_flattened_data(),errors.get_flattened_data()) if max(c)>3]
     mean = [sum(p[c] for p in selected)/len(selected) for c in range(3)] if selected else []
     return {"passed":len(selected)>=32 and max(mean)<=6,
         "box":box,"pixels":len(selected),"mean_rgb_abs":mean}

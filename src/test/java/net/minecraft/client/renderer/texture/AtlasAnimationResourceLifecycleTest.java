@@ -79,6 +79,7 @@ class AtlasAnimationResourceLifecycleTest {
             atlas.upload(first);
             var oldResource = atlas.semanticAnimationResource();
             assertNotNull(oldResource);
+			long firstFrameKey = atlas.semanticSnapshotFrameKey();
             assertEquals(location, oldResource.atlas());
             assertEquals(location.equals(TextureAtlas.LOCATION_BLOCKS)
                 ? net.vulkanic.world.RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS
@@ -96,7 +97,8 @@ class AtlasAnimationResourceLifecycleTest {
             new SpriteUtilImpl().markSpriteActive(oldSprite);
             assertFalse(oldResource.recordUse(location, name),
                 "the real use hook must collect before a world publication exists");
-            oldResource.enqueueTick(1, true);
+			long initialTick = oldResource.producedTickForDiagnostics() + 1;
+			oldResource.enqueueTick(initialTick, true);
             var tickers = TextureAtlas.class.getDeclaredField("animatedTextures");
             tickers.setAccessible(true);
             tickers.set(atlas, List.of(new TextureAtlasSprite.Ticker() {
@@ -110,12 +112,14 @@ class AtlasAnimationResourceLifecycleTest {
             }));
             System.clearProperty(tickProperty);
             atlas.cycleAnimationFrames();
-            long firstTick = 2;
+			long firstTick = initialTick + 1;
             assertEquals(firstTick, oldResource.producedTickForDiagnostics(),
                 "standard-atlas events must progress without private consumer flags");
             System.setProperty(tickProperty, "true");
             atlas.cycleAnimationFrames();
             assertEquals(firstTick+1, oldResource.producedTickForDiagnostics());
+			assertEquals(firstFrameKey, atlas.semanticSnapshotFrameKey(),
+				"Rust tick events must not invalidate the immutable first-frame atlas snapshot");
             assertThrows(IllegalArgumentException.class, () -> oldResource.enqueueTick(firstTick+1, true),
                 "the real texture tick must enqueue exactly the next semantic event");
             oldResource.enqueueTick(firstTick+2, false);
@@ -124,17 +128,20 @@ class AtlasAnimationResourceLifecycleTest {
             var replacement = atlas.semanticAnimationResource();
             assertNotSame(oldResource, replacement);
             assertTrue(replacement.source().generation() > oldResource.source().generation());
+			assertNotEquals(firstFrameKey, atlas.semanticSnapshotFrameKey(),
+				"resource reload must still invalidate the semantic atlas snapshot");
             assertThrows(IllegalStateException.class, () -> oldResource.enqueueTick(2, true));
             new SpriteUtilImpl().markSpriteActive(oldSprite);
             assertTrue(replacement.recordUse(location, name),
                 "a late old-sprite use must not activate the same name in the replacement");
-            replacement.enqueueTick(1, true);
+			long replacementTick = replacement.producedTickForDiagnostics() + 1;
+			replacement.enqueueTick(replacementTick, true);
             new SpriteUtilImpl().markSpriteActive(second.regions().get(name));
             assertFalse(replacement.recordUse(location, name));
             atlas.clearTextureData();
             assertNull(atlas.semanticAnimationResource());
             assertFalse(replacement.recordUse(location, name));
-            assertThrows(IllegalStateException.class, () -> replacement.enqueueTick(2, true));
+			assertThrows(IllegalStateException.class, () -> replacement.enqueueTick(replacementTick + 1, true));
         } finally {
             if (atlas != null) atlas.clearTextureData();
             device.set(null, previousDevice);

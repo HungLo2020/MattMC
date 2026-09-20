@@ -43,7 +43,7 @@ pub const GUI_MESH_MAX_FRAME_PAYLOAD_BYTES: u64 = 128 * 1024 * 1024;
 /// Maximum dimension of a Rust-owned GUI item offscreen raster.
 pub const GUI_MESH_MAX_OFFSCREEN_AXIS: u32 = 4096;
 const GUI_MESH_FRAME_UNIFORM_BYTES: usize = 48;
-const GUI_MESH_COMPOSITE_UNIFORM_BYTES: usize = 80;
+pub(crate) const GUI_MESH_COMPOSITE_UNIFORM_BYTES: usize = 80;
 /// Conservative dynamic-UBO alignment valid for both backend lowerings.
 pub const GUI_MESH_COMPOSITE_UNIFORM_STRIDE: u64 = 256;
 const GUI_MESH_MAX_COMPOSITE_UNIFORM_BYTES: u64 =
@@ -1560,9 +1560,14 @@ pub struct GuiMeshCompositeResources {
     pub resource_set: Handle,
     pub pipeline_layout: Handle,
     pub pipeline: Handle,
+    owns_shared: bool,
 }
 
 impl GuiMeshCompositeResources {
+    pub(crate) fn owns_shared_resources(self) -> bool {
+        self.owns_shared
+    }
+
     pub fn create(
         gal: &mut VulkanicGal,
         label: &str,
@@ -1677,6 +1682,7 @@ impl GuiMeshCompositeResources {
                 resource_set,
                 pipeline_layout,
                 pipeline,
+                owns_shared: true,
             })
         })();
         if result.is_err() {
@@ -1685,6 +1691,33 @@ impl GuiMeshCompositeResources {
             }
         }
         result
+    }
+
+    pub fn create_binding(
+        gal: &mut VulkanicGal,
+        label: &str,
+        source_color_view: Handle,
+        shared: Self,
+    ) -> GalResult<Self> {
+        let resource_set = gal.create_resource_set(ResourceSetDesc {
+            label: format!("{label}.set"),
+            layout: shared.resource_layout,
+            bindings: vec![
+                dynamic_read_binding(
+                    0,
+                    shared.uniform_buffer,
+                    ResourceBindingKind::UniformBuffer,
+                    GUI_MESH_COMPOSITE_UNIFORM_BYTES as u64,
+                ),
+                read_binding(1, source_color_view, ResourceBindingKind::SampledTexture),
+                read_binding(2, shared.sampler, ResourceBindingKind::Sampler),
+            ],
+        })?;
+        Ok(Self {
+            resource_set,
+            owns_shared: false,
+            ..shared
+        })
     }
 
     pub fn append_composite(
@@ -1890,10 +1923,13 @@ impl GuiMeshCompositeResources {
     }
 
     pub fn destroy(self, gal: &mut VulkanicGal) {
+        let _ = gal.destroy(self.resource_set);
+        if !self.owns_shared {
+            return;
+        }
         for handle in [
             self.pipeline,
             self.pipeline_layout,
-            self.resource_set,
             self.resource_layout,
             self.fragment_shader,
             self.vertex_shader,

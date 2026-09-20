@@ -240,7 +240,7 @@ class HeldSpecialFoilReferenceTest(unittest.TestCase):
     def test_phase_alignment_launch_is_explicit_ordered_and_requires_observed_center(self):
         import graphics_harness as h
         import tempfile
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         args=h.parse_args(["capture","--align-held-special-foil-phase",
             "--mode","current-rust-vulkan-shaders-off","--mode","frozen-opengl-shaders-off",
             "--hotbar-item-fixture","special-foil","--selected-hotbar-slot","2",

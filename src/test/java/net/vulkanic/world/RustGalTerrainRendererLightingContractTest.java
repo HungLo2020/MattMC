@@ -231,17 +231,29 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
-	public void visibleTerrainDoesNotClassifyPendingRustUploadsAsStaleGenerations() throws Exception {
+	public void visibleTerrainQueuesPendingReplacementBeforeThePreConsumeAssetFlush() throws Exception {
 		String source = Files.readString(Path.of(
 			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
 		));
 		int enqueue = source.indexOf("private static boolean enqueueSectionLayer");
 		int submission = source.indexOf("boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainMeshInstance", enqueue);
 		assertTrue(enqueue >= 0 && submission > enqueue);
-		String body = source.substring(enqueue, submission);
-		assertTrue(body.contains("isStaticTerrainMeshGenerationUploaded"));
-		assertTrue(body.contains("asset-upload-pending"));
-		assertTrue(body.contains("!\"stale-generation\".equals(activeFault())"));
+		String beforeSubmission = source.substring(enqueue, submission);
+		assertFalse(beforeSubmission.contains("isStaticTerrainMeshGenerationUploaded"),
+			"a visible replacement must be queued before its asset upload so the coordinator can publish and consume it atomically");
+		int methodEnd = source.indexOf("private static float[] cameraRelativeTranslationTransform", submission);
+		String afterSubmission = source.substring(submission, methodEnd);
+		assertTrue(afterSubmission.contains("isStaticTerrainMeshGenerationUploaded"));
+		assertTrue(afterSubmission.contains("asset-upload-pending"));
+
+		String coordinator = Files.readString(Path.of(
+			"src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java"
+		));
+		int wholeFrame = coordinator.indexOf("if (wholeFrameVulkan)");
+		int assetFlush = coordinator.indexOf("flushPendingWorldAssetsLocked();", wholeFrame);
+		int consume = coordinator.indexOf("primitiveFrame = RustGalWorldPrimitiveRenderer.consumeFrame();", wholeFrame);
+		assertTrue(assetFlush > wholeFrame && consume > assetFlush,
+			"the queued replacement must be uploaded before consumeFrame admits its generation");
 	}
 
 	@Test

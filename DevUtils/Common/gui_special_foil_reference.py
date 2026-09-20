@@ -136,7 +136,7 @@ def temporal_images(before_frozen, before_current, after_frozen, after_current, 
         raise ValueError("both temporal special foil image pairs must pass independently")
     rows = []
     for probe in before["probes"]:
-        pixels = [list(im.crop(probe["box"]).getdata()) for im in images]
+        pixels = [list(im.crop(probe["box"]).get_flattened_data()) for im in images]
         count = len(pixels[0])
         changes = [[sum(abs(pixels[b+2][i][c]-pixels[b][i][c]) for i in range(count))/count
                     for c in range(3)] for b in range(2)]

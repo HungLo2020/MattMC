@@ -28,10 +28,10 @@ def effect(hidden, visible):
     change = ImageStat.Stat(ImageChops.difference(before, after)).mean
     # The fixture overlay is green; foliage alone cannot satisfy the required
     # change from an otherwise identical independently captured hidden control.
-    green = sum(g > r + 8 and g > b + 8 for r, g, b in after.getdata())
+    green = sum(g > r + 8 and g > b + 8 for r, g, b in after.get_flattened_data())
     changed_green = sum(
         g > r + 8 and g > b + 8 and max(abs(a - b) for a, b in zip(old, new)) > 3
-        for old, new in zip(before.getdata(), after.getdata())
+        for old, new in zip(before.get_flattened_data(), after.get_flattened_data())
         for r, g, b in (new,))
     return {"passed": max(change) > 3 and green >= 256 and changed_green >= 256,
             "mean_rgb_change": change, "green_pixels": green,

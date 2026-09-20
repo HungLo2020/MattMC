@@ -15,8 +15,8 @@ def compare_images(baseline, current):
     baseline, current = baseline.convert("RGB"), current.convert("RGB")
     rows = []
     for name,x,y,golden in PROBES:
-        a = list(baseline.crop((x-1,y-1,x+2,y+2)).getdata())
-        b = list(current.crop((x-1,y-1,x+2,y+2)).getdata())
+        a = list(baseline.crop((x-1,y-1,x+2,y+2)).get_flattened_data())
+        b = list(current.crop((x-1,y-1,x+2,y+2)).get_flattened_data())
         error = lambda p,q: max(abs(u-v) for lhs,rhs in zip(p,q) for u,v in zip(lhs,rhs))
         anchor, pair = error(a,golden), error(a,b)
         rows.append(dict(name=name, baseline_max_channel_error=anchor,

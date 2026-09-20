@@ -117,7 +117,7 @@ def load(pair, hidden, fixture_name=NAME):
 def effect(before, after):
     delta = ImageChops.difference(before.crop(BOX),after.crop(BOX))
     means = ImageStat.Stat(delta).mean
-    changed = sum(max(p)>3 for p in delta.getdata())
+    changed = sum(max(p)>3 for p in delta.get_flattened_data())
     return {"passed":max(means)>.1 and changed>=32,"changed_pixels":changed,"mean_rgb_change":means}
 
 

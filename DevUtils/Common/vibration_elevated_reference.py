@@ -18,7 +18,7 @@ def effect(a,b):
     if a.size != (1280,720) or b.size != a.size: return {"passed":False,"error":"extent"}
     delta=ImageChops.difference(a.crop(BOX),b.crop(BOX))
     mean=ImageStat.Stat(delta).mean
-    changed=sum(max(p)>3 for p in delta.getdata())
+    changed=sum(max(p)>3 for p in delta.get_flattened_data())
     return {"passed":max(mean)>0.1 and changed>=32,"mean_rgb_change":mean,"changed_pixels":changed}
 
 def changed_pixel_parity(hidden,baseline,current):

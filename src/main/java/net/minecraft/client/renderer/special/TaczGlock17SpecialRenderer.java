@@ -86,6 +86,8 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	// 256-section split. Bound the aggregate copied stream separately so large
 	// Bedrock models remain admitted without allowing unbounded frame growth.
 	private static final int MAX_SEMANTIC_BEDROCK_QUADS = 65_536;
+	private static final ThreadLocal<SemanticBedrockBatchPool> SEMANTIC_BATCH_POOL =
+		ThreadLocal.withInitial(SemanticBedrockBatchPool::new);
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
 	private static final Pattern TACZ_NUMBERED_NODE = Pattern.compile("^(.*?)(?:_(\\d+))?$");
@@ -251,10 +253,12 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		int light,
 		int overlay
 	) {
+		SemanticBedrockBatchPool batchPool = SEMANTIC_BATCH_POOL.get();
+		batchPool.reset();
 		Map<Integer, List<SemanticBedrockBatch>> batches = new LinkedHashMap<>();
 		SemanticBedrockBudget budget = new SemanticBedrockBudget();
 		for (BedrockNode root : roots) {
-			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, null, gunRenderContext, root, light, batches, budget);
+			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, null, gunRenderContext, root, light, batches, budget, batchPool);
 		}
 		if (batches.isEmpty()) return false;
 		PoseStack identityPoseStack = new PoseStack();
@@ -317,10 +321,12 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		int materialMode,
 		AttachmentRenderData attachmentData
 	) {
+		SemanticBedrockBatchPool batchPool = SEMANTIC_BATCH_POOL.get();
+		batchPool.reset();
 		Map<Integer, List<SemanticBedrockBatch>> batches = new LinkedHashMap<>();
 		SemanticBedrockBudget budget = new SemanticBedrockBudget();
 		for (BedrockNode root : roots) {
-			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentData, gunRenderContext, root, light, batches, budget);
+			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentData, gunRenderContext, root, light, batches, budget, batchPool);
 		}
 		if (batches.isEmpty()) return false;
 		PoseStack identityPoseStack = new PoseStack();
@@ -342,7 +348,8 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		BedrockNode node,
 		int baseLight,
 		Map<Integer, List<SemanticBedrockBatch>> batches,
-		SemanticBedrockBudget budget
+		SemanticBedrockBudget budget,
+		SemanticBedrockBatchPool batchPool
 	) {
 		if (node.cubes.isEmpty() && node.children.isEmpty()) return;
 		poseStack.pushPose();
@@ -364,7 +371,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 						// Rust asset section budget, so choose/split per polygon.
 						SemanticBedrockBatch batch = lightBatches.isEmpty()
 							|| lightBatches.get(lightBatches.size() - 1).isFull()
-							? new SemanticBedrockBatch()
+							? batchPool.acquire()
 							: lightBatches.get(lightBatches.size() - 1);
 						if (lightBatches.isEmpty() || lightBatches.get(lightBatches.size() - 1) != batch) {
 							lightBatches.add(batch);
@@ -374,15 +381,19 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				}
 			}
 		}
-		for (BedrockNode child : node.children) collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentRenderData, gunRenderContext, child, childLight, batches, budget);
+		for (BedrockNode child : node.children) collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, attachmentRenderData, gunRenderContext, child, childLight, batches, budget, batchPool);
 		poseStack.popPose();
 	}
 
 	private static final class SemanticBedrockBatch {
-		private final List<Float> vertexList = new ArrayList<>();
-		private final List<Float> uvList = new ArrayList<>();
-		private final List<Float> normalList = new ArrayList<>();
-		private final List<Integer> colorList = new ArrayList<>();
+		private static final int MAX_QUADS = 256;
+		private float[] vertexValues = new float[4 * 3];
+		private float[] uvValues = new float[4 * 2];
+		private float[] normalValues = new float[4 * 3];
+		private int[] colorValues = new int[1];
+		private int quadCount;
+
+		private void clear() { quadCount = 0; }
 
 		private void append(PoseStack.Pose pose, BedrockPolygon polygon, SemanticBedrockBudget budget) {
 			if (isFull()) {
@@ -396,29 +407,71 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			if (!Float.isFinite(normal.x()) || !Float.isFinite(normal.y()) || !Float.isFinite(normal.z())) {
 				throw new IllegalStateException("Rust TACZ semantic Bedrock mesh contains non-finite transformed normals");
 			}
-			for (BedrockVertex vertex : polygon.vertices) {
+			int vertexOffset = quadCount * 4 * 3;
+			int uvOffset = quadCount * 4 * 2;
+			vertexValues = grow(vertexValues, vertexOffset + 4 * 3, MAX_QUADS * 4 * 3);
+			normalValues = grow(normalValues, vertexOffset + 4 * 3, MAX_QUADS * 4 * 3);
+			uvValues = grow(uvValues, uvOffset + 4 * 2, MAX_QUADS * 4 * 2);
+			if (quadCount == colorValues.length) {
+				colorValues = java.util.Arrays.copyOf(colorValues, Math.min(MAX_QUADS, colorValues.length * 2));
+			}
+			for (int corner = 0; corner < polygon.vertices.length; corner++) {
+				BedrockVertex vertex = polygon.vertices[corner];
 				org.joml.Matrix4f transform = pose.pose();
 				Vector3f position = transform.transformPosition(vertex.x / 16.0F, vertex.y / 16.0F, vertex.z / 16.0F, new Vector3f());
 				if (!Float.isFinite(position.x()) || !Float.isFinite(position.y()) || !Float.isFinite(position.z())
 					|| !Float.isFinite(vertex.u) || !Float.isFinite(vertex.v)) {
 					throw new IllegalStateException("Rust TACZ semantic Bedrock mesh contains non-finite transformed geometry");
 				}
-				vertexList.add(position.x()); vertexList.add(position.y()); vertexList.add(position.z());
-				uvList.add(vertex.u); uvList.add(vertex.v);
-				normalList.add(normal.x()); normalList.add(normal.y()); normalList.add(normal.z());
+				int positionIndex = vertexOffset + corner * 3;
+				vertexValues[positionIndex] = position.x();
+				vertexValues[positionIndex + 1] = position.y();
+				vertexValues[positionIndex + 2] = position.z();
+				normalValues[positionIndex] = normal.x();
+				normalValues[positionIndex + 1] = normal.y();
+				normalValues[positionIndex + 2] = normal.z();
+				int textureIndex = uvOffset + corner * 2;
+				uvValues[textureIndex] = vertex.u;
+				uvValues[textureIndex + 1] = vertex.v;
 			}
 			// The Rust first-person textured-quad ABI carries one color per
 			// quad, while positions and UVs carry four vertices per quad. Keep
 			// this producer cardinality aligned with that explicit contract.
-			colorList.add(0xFFFFFFFF);
+			colorValues[quadCount++] = 0xFFFFFFFF;
 		}
 
-		private boolean isFull() { return colorList.size() >= 256; }
+		private boolean isFull() { return quadCount >= MAX_QUADS; }
 
-		private float[] vertices() { float[] values = new float[vertexList.size()]; for (int i = 0; i < values.length; i++) values[i] = vertexList.get(i); return values; }
-		private float[] uvs() { float[] values = new float[uvList.size()]; for (int i = 0; i < values.length; i++) values[i] = uvList.get(i); return values; }
-		private float[] normals() { float[] values = new float[normalList.size()]; for (int i = 0; i < values.length; i++) values[i] = normalList.get(i); return values; }
-		private int[] colors() { int[] values = new int[colorList.size()]; for (int i = 0; i < values.length; i++) values[i] = colorList.get(i); return values; }
+		private static float[] grow(float[] values, int required, int maximum) {
+			if (required <= values.length) return values;
+			return java.util.Arrays.copyOf(values, Math.min(maximum, Math.max(required, values.length * 2)));
+		}
+
+		private float[] vertices() { return java.util.Arrays.copyOf(vertexValues, quadCount * 4 * 3); }
+		private float[] uvs() { return java.util.Arrays.copyOf(uvValues, quadCount * 4 * 2); }
+		private float[] normals() { return java.util.Arrays.copyOf(normalValues, quadCount * 4 * 3); }
+		private int[] colors() { return java.util.Arrays.copyOf(colorValues, quadCount); }
+	}
+
+	private static final class SemanticBedrockBatchPool {
+		private static final int MAX_RETAINED_BATCHES = 16;
+		private final List<SemanticBedrockBatch> retained = new ArrayList<>();
+		private int next;
+
+		private void reset() { next = 0; }
+
+		private SemanticBedrockBatch acquire() {
+			if (next < retained.size()) {
+				SemanticBedrockBatch batch = retained.get(next++);
+				batch.clear();
+				return batch;
+			}
+			next++;
+			if (retained.size() >= MAX_RETAINED_BATCHES) return new SemanticBedrockBatch();
+			SemanticBedrockBatch batch = new SemanticBedrockBatch();
+			retained.add(batch);
+			return batch;
+		}
 	}
 
 	private static final class SemanticBedrockBudget {

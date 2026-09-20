@@ -32,7 +32,7 @@ def pixels(frozen,current,pose, *, age=None):
         a,b=a.convert('RGB'),b.convert('RGB');errors=[]
         for x,y,expected in reference(age)['poses'][pose]['probes']:
             box=(x-1,y-1,x+2,y+2)
-            av,bv=list(a.crop(box).getdata()),list(b.crop(box).getdata())
+            av,bv=list(a.crop(box).get_flattened_data()),list(b.crop(box).get_flattened_data())
             anchor=max(abs(v-e) for pixel,ref in zip(av,expected) for v,e in zip(pixel,ref))
             error=max(abs(v-e) for pixel,ref in zip(av,bv) for v,e in zip(pixel,ref))
             require(anchor<=2 and error<=2,'leather pixel probe differs from independent Frozen reference')

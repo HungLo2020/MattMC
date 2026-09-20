@@ -35,7 +35,7 @@ def effect(before, after):
         return {"passed":False, "error":"extent"}
     delta = ImageChops.difference(before.crop(BOX),after.crop(BOX))
     mean = ImageStat.Stat(delta).mean
-    changed = sum(max(pixel)>3 for pixel in delta.getdata())
+    changed = sum(max(pixel)>3 for pixel in delta.get_flattened_data())
     return {"passed":max(mean)>0.1 and changed>=32,"mean_rgb_change":mean,"changed_pixels":changed}
 
 def load(pair, delayed):
@@ -54,7 +54,7 @@ def changed_pixel_parity(hidden, baseline, current):
         return {"passed":False,"error":"extent"}
     changes = ImageChops.difference(hidden.crop(BOX),baseline.crop(BOX))
     errors = ImageChops.difference(baseline.crop(BOX),current.crop(BOX))
-    selected = [error for change,error in zip(changes.getdata(),errors.getdata()) if max(change)>3]
+    selected = [error for change,error in zip(changes.get_flattened_data(),errors.get_flattened_data()) if max(change)>3]
     means = [sum(pixel[c] for pixel in selected)/len(selected) for c in range(3)] if selected else []
     return {"passed":len(selected)>=32 and max(means)<=6,
             "pixels":len(selected),"mean_rgb_abs":means}

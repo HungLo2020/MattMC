@@ -10,7 +10,7 @@ import shriek_reference as shriek
 class ShriekReferenceTest(unittest.TestCase):
     def test_both_launchers_receive_one_pose_and_same_control(self):
         import graphics_harness as harness
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         for scenario in ("delayed","visible"):
             with tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)

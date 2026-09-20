@@ -81,6 +81,8 @@ public final class RustGalGuiItemRenderer {
 	private static final boolean DEBUG_STANDARD_3D_ITEM_ENABLED = Boolean.getBoolean("mattmc.rustGal.gui.standard3d.debugItem");
 	private static final int MAX_DIAGNOSTIC_ENTRIES = 256;
 	private static final Map<String, Boolean> DIAGNOSTICS = new HashMap<>();
+	private static final ThreadLocal<TaczGuiPackedStaging> TACZ_GUI_STAGING =
+		ThreadLocal.withInitial(TaczGuiPackedStaging::new);
 
 	private RustGalGuiItemRenderer() {
 	}
@@ -608,7 +610,11 @@ public final class RustGalGuiItemRenderer {
 					for (int vertex = 0; vertex < 4; vertex++) perVertexColors[quad * 4 + vertex] = colors[quad];
 				}
 			}
-			batches.add(new Batch(asset, vertices.clone(), uvs.clone(), normals == null ? null : normals.clone(), perVertexColors));
+			// The private TACZ submitter hands this capture freshly materialized
+			// primitive arrays and never observes them again. Transfer those arrays
+			// directly; the capture remains the sole owner until immutable bridge
+			// records copy the values required by Rust submission.
+			batches.add(new Batch(asset, vertices, uvs, normals, perVertexColors));
 			return true;
 		}
 
@@ -635,11 +641,18 @@ public final class RustGalGuiItemRenderer {
 				glintColor = ARGB.color(strength, 255, 255, 255);
 			}
 			List<VulkanicGalBridge.GuiMeshBatchRecord> records = new ArrayList<>(batches.size());
+			TaczGuiPackedStaging staging = TACZ_GUI_STAGING.get();
 			for (Batch batch : batches) {
-				List<VulkanicGalBridge.GuiMeshVertexRecord> copied = new ArrayList<>(batch.vertices.length / 3);
-				List<float[]> glintUvs = new ArrayList<>(batch.vertices.length / 3);
+				int maximumVertices = batch.vertices.length / 3;
+				staging.ensureCapacity(maximumVertices, glintAsset != null);
+				float[] positions = staging.positions;
+				float[] atlasUvs = staging.atlasUvs;
+				float[] localUvs = staging.localUvs;
+				int[] colors = staging.colors;
+				int[] normals = staging.normals;
+				float[] glintUvs = glintAsset == null ? null : staging.glintUvs;
+				int vertexCount = 0;
 				for (int quad = 0; quad < batch.vertices.length / 12; quad++) {
-					int vertexOffset = quad * 4;
 					int floatOffset = quad * 12;
 					Vector3f normal = batch.normals == null
 						? reconstructedNormal(batch.vertices, floatOffset, transform)
@@ -654,26 +667,37 @@ public final class RustGalGuiItemRenderer {
 					if (!Float.isFinite(alignment)) return List.of();
 					if (Math.abs(alignment) <= 1.0e-6F) continue;
 					for (int corner = 0; corner < 4; corner++) {
-						int vertex = vertexOffset + corner;
+						int vertex = quad * 4 + corner;
 						Vector3f position = transformedPosition(batch.vertices, vertex * 3, transform);
 						Vector3f vertexNormal = batch.normals == null ? normal : normalTransform.transform(
 							batch.normals[vertex * 3], batch.normals[vertex * 3 + 1], batch.normals[vertex * 3 + 2], new Vector3f()).normalize();
 						if (!Float.isFinite(vertexNormal.x()) || !Float.isFinite(vertexNormal.y()) || !Float.isFinite(vertexNormal.z())) return List.of();
-						copied.add(new VulkanicGalBridge.GuiMeshVertexRecord(
-							new float[] {position.x, position.y, position.z},
-							new float[] {batch.uvs[vertex * 2], batch.uvs[vertex * 2 + 1]},
-							new float[] {batch.uvs[vertex * 2], batch.uvs[vertex * 2 + 1]},
-							batch.colors[vertex], packGuiNormal(vertexNormal.x(), vertexNormal.y(), vertexNormal.z())));
-						glintUvs.add(new float[] {-batch.vertices[vertex * 3] * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE,
-							-batch.vertices[vertex * 3 + 1] * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE});
+						int positionOffset = vertexCount * 3;
+						positions[positionOffset] = position.x;
+						positions[positionOffset + 1] = position.y;
+						positions[positionOffset + 2] = position.z;
+						int uvOffset = vertexCount * 2;
+						atlasUvs[uvOffset] = localUvs[uvOffset] = batch.uvs[vertex * 2];
+						atlasUvs[uvOffset + 1] = localUvs[uvOffset + 1] = batch.uvs[vertex * 2 + 1];
+						colors[vertexCount] = batch.colors[vertex];
+						normals[vertexCount] = packGuiNormal(vertexNormal.x(), vertexNormal.y(), vertexNormal.z());
+						if (glintUvs != null) {
+							glintUvs[uvOffset] = -batch.vertices[vertex * 3] * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE;
+							glintUvs[uvOffset + 1] = -batch.vertices[vertex * 3 + 1] * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE;
+						}
+						vertexCount++;
 					}
 				}
-				if (copied.isEmpty()) continue;
-				List<Integer> indices = new ArrayList<>(batch.vertices.length / 2);
-				for (int vertex = 0; vertex < copied.size(); vertex += 4) {
-					indices.add(vertex); indices.add(vertex + 1); indices.add(vertex + 2);
-					indices.add(vertex + 2); indices.add(vertex + 3); indices.add(vertex);
+				if (vertexCount == 0) continue;
+				int[] indexValues = staging.indices;
+				int indexCount = vertexCount / 4 * 6;
+				for (int vertex = 0, index = 0; vertex < vertexCount; vertex += 4) {
+					indexValues[index++] = vertex; indexValues[index++] = vertex + 1; indexValues[index++] = vertex + 2;
+					indexValues[index++] = vertex + 2; indexValues[index++] = vertex + 3; indexValues[index++] = vertex;
 				}
+				List<VulkanicGalBridge.GuiMeshVertexRecord> copied = VulkanicGalBridge.packedGuiMeshVertices(
+					positions, atlasUvs, localUvs, colors, normals, vertexCount);
+				List<Integer> indices = VulkanicGalBridge.packedGuiMeshIndices(indexValues, indexCount);
 				int layerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder;
 				records.add(new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, records.size(),
 					VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL,
@@ -684,15 +708,10 @@ public final class RustGalGuiItemRenderer {
 					left, top, right, bottom, guiWidth, guiHeight, width, height, 1, 0, 0, 0, 0, 0,
 					copied, indices));
 				if (glintAsset != null) {
-					List<VulkanicGalBridge.GuiMeshVertexRecord> glintVertices = new ArrayList<>(copied.size());
-					for (int vertex = 0; vertex < copied.size(); vertex++) {
-						float u = glintUvs.get(vertex)[0];
-						float v = glintUvs.get(vertex)[1];
-						VulkanicGalBridge.GuiMeshVertexRecord source = copied.get(vertex);
-						glintVertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(
-							source.position(), new float[] {u, v}, new float[] {u, v}, glintColor, source.normalPacked()
-						));
-					}
+					int[] glintColors = staging.glintColors;
+					java.util.Arrays.fill(glintColors, glintColor);
+					List<VulkanicGalBridge.GuiMeshVertexRecord> glintVertices = VulkanicGalBridge.packedGuiMeshVertices(
+						positions, glintUvs, glintUvs, glintColors, normals, vertexCount);
 					records.add(new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, records.size(), 4, 1,
 						glintAsset.assetId(), 0L, 0.1F, identity(), new float[] {
 							item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()
@@ -731,6 +750,31 @@ public final class RustGalGuiItemRenderer {
 
 		private static float[] identity() { return new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
 		private record Batch(RustGalGuiRawImageAssets.Asset asset, float[] vertices, float[] uvs, @Nullable float[] normals, int[] colors) {}
+	}
+
+	/** Reused render-thread CPU scratch; packed list factories take owned copies before the next batch reuses it. */
+	private static final class TaczGuiPackedStaging {
+		private float[] positions = new float[0];
+		private float[] atlasUvs = new float[0];
+		private float[] localUvs = new float[0];
+		private float[] glintUvs = new float[0];
+		private int[] colors = new int[0];
+		private int[] normals = new int[0];
+		private int[] glintColors = new int[0];
+		private int[] indices = new int[0];
+
+		private void ensureCapacity(int vertices, boolean foil) {
+			if (positions.length < vertices * 3) positions = new float[vertices * 3];
+			if (atlasUvs.length < vertices * 2) atlasUvs = new float[vertices * 2];
+			if (localUvs.length < vertices * 2) localUvs = new float[vertices * 2];
+			if (colors.length < vertices) colors = new int[vertices];
+			if (normals.length < vertices) normals = new int[vertices];
+			if (indices.length < vertices / 4 * 6) indices = new int[vertices / 4 * 6];
+			if (foil) {
+				if (glintUvs.length < vertices * 2) glintUvs = new float[vertices * 2];
+				if (glintColors.length < vertices) glintColors = new int[vertices];
+			}
+		}
 	}
 
 	private static final class TaczGuiSubmitCollector extends SubmitNodeCollection implements SubmitNodeCollector {

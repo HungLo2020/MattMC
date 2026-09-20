@@ -15,7 +15,7 @@ class WaterOverlayTest(unittest.TestCase):
     def test_both_pack_variants_keep_one_pose_on_both_launchers(self):
         import shlex
         import graphics_harness as harness
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         for scenario in overlay.SCENARIOS:
             with tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
@@ -44,7 +44,7 @@ class WaterOverlayTest(unittest.TestCase):
             self.assertTrue(all(name.startswith('assets/minecraft/textures/block/') for name in payloads[0]))
             for root in roots:
                 with Image.open(root/'assets/minecraft/textures/block/ice.png') as ice:
-                    self.assertEqual({(0,0,0,0)}, set(ice.getdata()))
+                    self.assertEqual({(0,0,0,0)}, set(ice.get_flattened_data()))
 
     def scene(self):
         image = Image.new('RGB', (1280,720), (40,70,130))

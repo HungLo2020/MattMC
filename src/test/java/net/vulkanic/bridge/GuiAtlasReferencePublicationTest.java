@@ -45,4 +45,17 @@ class GuiAtlasReferencePublicationTest {
         assertThrows(IllegalArgumentException.class, () -> new VulkanicGalBridge.GuiAtlasReferenceRecord(1, 17, 0,
             8, 8, 0, 0, 2, 2));
     }
+
+	@Test void rawImageMetadataAndEqualityDoNotExposeMutablePixelStorage() {
+		byte[] source = new byte[] {1, 2, 3, 4};
+		var first = new VulkanicGalBridge.GuiRawImageAssetRecord(1, 2, 1, 1, source);
+		var equal = new VulkanicGalBridge.GuiRawImageAssetRecord(2, 2, 1, 1, source);
+		source[0] = 9;
+
+		assertEquals(4, first.pixelByteLength());
+		assertTrue(first.hasSamePixels(equal));
+		byte[] exposed = first.pixels();
+		exposed[1] = 9;
+		assertArrayEquals(new byte[] {1, 2, 3, 4}, first.pixels());
+	}
 }

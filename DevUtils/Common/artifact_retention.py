@@ -17,10 +17,10 @@ from typing import Iterable
 MARKER_NAME = ".mattmc-generated-artifact-root.json"
 DEFAULT_RESERVE_MB = 8192
 PROFILE_LIMITS = {
-    "smoke": {"global_mb": 2048, "run_mb": 384, "keep_success": 1, "keep_failed": 1, "heavy_keep": 0, "estimate_mb": 256},
-    "standard": {"global_mb": 8192, "run_mb": 1536, "keep_success": 3, "keep_failed": 1, "heavy_keep": 0, "estimate_mb": 768},
-    "extended": {"global_mb": 12288, "run_mb": 2048, "keep_success": 3, "keep_failed": 1, "heavy_keep": 1, "estimate_mb": 1024},
-    "diagnostic": {"global_mb": 16384, "run_mb": 4096, "keep_success": 2, "keep_failed": 2, "heavy_keep": 1, "estimate_mb": 2048},
+    "smoke": {"global_mb": 1024, "run_mb": 256, "keep_success": 1, "keep_failed": 1, "heavy_keep": 0, "estimate_mb": 256},
+    "standard": {"global_mb": 3072, "run_mb": 768, "keep_success": 1, "keep_failed": 1, "heavy_keep": 0, "estimate_mb": 768},
+    "extended": {"global_mb": 5120, "run_mb": 1536, "keep_success": 1, "keep_failed": 1, "heavy_keep": 1, "estimate_mb": 1024},
+    "diagnostic": {"global_mb": 8192, "run_mb": 3072, "keep_success": 1, "keep_failed": 1, "heavy_keep": 1, "estimate_mb": 2048},
     "preserve": {"global_mb": 0, "run_mb": 0, "keep_success": 999999, "keep_failed": 999999, "heavy_keep": 999999, "estimate_mb": 0},
 }
 HEAVY_SUFFIXES = {".rdc", ".tracy"}
@@ -159,6 +159,22 @@ def nearest_marked_root(path: Path) -> Path | None:
     current = canonical(path)
     if current.is_file():
         current = current.parent
+
+
+def clear_auto_preserve_markers(root: Path) -> list[Path]:
+    """Release old one-run preservation markers before retaining a new run."""
+    root = assert_marked_root(root)
+    removed: list[Path] = []
+    for marker in root.rglob(".preserve"):
+        marker = assert_inside_marked_root(root, marker)
+        try:
+            automatic = marker.read_text(encoding="utf-8") == "current validation evidence\n"
+        except (OSError, UnicodeError):
+            automatic = False
+        if automatic:
+            marker.unlink()
+            removed.append(marker)
+    return removed
     while True:
         if (current / MARKER_NAME).is_file():
             return current

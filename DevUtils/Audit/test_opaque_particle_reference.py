@@ -22,7 +22,7 @@ class OpaqueParticleFootprintTest(unittest.TestCase):
 
     def test_launcher_forwards_sign_to_both_repositories(self):
         import graphics_harness as harness
-        from test_graphics_harness import fake_repo
+        from harness_test_support import fake_repo
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
             for name in ("current-rust-vulkan-shaders-off","frozen-opengl-shaders-off"):

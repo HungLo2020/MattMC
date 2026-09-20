@@ -527,6 +527,28 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	/**
+	 * Requests bounded native publication for a DH section that is about to
+	 * participate in a parent/child visibility transition. The quadtree must not
+	 * call a CPU-built column renderable before its immutable Rust asset is
+	 * acknowledged: doing so disables the covering parent and presents a hole.
+	 * An older acknowledged generation remains renderable while its replacement
+	 * is queued, preserving the existing generation-safe rebuild contract.
+	 */
+	public static boolean requestColumnPublication(long columnKey) {
+		if (!enabled()) {
+			return false;
+		}
+		synchronized (COLUMNS) {
+			LodColumnSnapshot current = COLUMNS.get(columnKey);
+			LodColumnSnapshot published = PUBLISHED_COLUMNS.get(columnKey);
+			if (current != null && (published == null || published.generation() != current.generation())) {
+				markPendingVisibleColumnLocked(columnKey);
+			}
+			return published != null;
+		}
+	}
+
+	/**
 	 * Reports a real legacy or Rust-visible opaque segment covering a point in
 	 * the current frame. This is capture evidence only; it neither publishes a
 	 * Rust frame nor changes a route decision.

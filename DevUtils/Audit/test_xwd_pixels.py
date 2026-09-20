@@ -40,12 +40,12 @@ class XwdPixelsTests(unittest.TestCase):
             pixels = bytes((17,47,48,255,128,0) if order == 0 else (48,47,17,0,128,255))
             data = struct.pack(">25I",*fields)+b"\0"+colors+pixels+b"XY"
             with decode_truecolor_rgb(data) as image:
-                self.assertEqual([(207,47,8),(255,128,127)], list(image.getdata()))
+                self.assertEqual([(207,47,8),(255,128,127)], list(image.get_flattened_data()))
             wide = fields.copy(); wide[11] = 32; wide[12] = 10
             wide_pixels = bytes((17,47,48,186,255,128,0,186) if order == 0
                                 else (186,48,47,17,186,0,128,255))
             with decode_truecolor_rgb(struct.pack(">25I",*wide)+b"\0"+colors+wide_pixels+b"XY") as image:
-                self.assertEqual([(207,47,8),(255,128,127)],list(image.getdata()))
+                self.assertEqual([(207,47,8),(255,128,127)],list(image.get_flattened_data()))
             for index, value in ((19,255), (12,5)):
                 invalid = bytearray(data); struct.pack_into(">I",invalid,index*4,value)
                 with self.assertRaises(ValueError): decode_truecolor_rgb(invalid)
@@ -56,7 +56,7 @@ class XwdPixelsTests(unittest.TestCase):
         fields = [101,7,2,24,2,1,0,0,32,0,8,24,8,4,0xff0000,0xff00,0xff,8,256,0,2,1,0,0,0]
         data = struct.pack(">25I",*fields)+b"\0"+bytes((17,47,48,255,128,0))+b"XY"
         with decode_truecolor_rgb(data) as image:
-            self.assertEqual([(48,47,17),(0,128,255)],list(image.getdata()))
+            self.assertEqual([(48,47,17),(0,128,255)],list(image.get_flattened_data()))
     def test_png_roundtrip_preserves_drawable_channels_without_colormap_quantization(self):
         data = bytearray(fixture())
         struct.pack_into(">I", data, 17 * 4, 11)  # observed X server color precision

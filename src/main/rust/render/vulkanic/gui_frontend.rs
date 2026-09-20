@@ -1752,7 +1752,9 @@ impl GuiFrontend {
         self.mesh_geometry_cache.clear();
         self.mesh_geometry_free_ranges.clear();
         let mesh_composites = std::mem::take(&mut self.mesh_composites);
-        for resources in mesh_composites.into_values() {
+        let mut mesh_composites = mesh_composites.into_values().collect::<Vec<_>>();
+        mesh_composites.sort_by_key(|resources| resources.owns_shared_resources());
+        for resources in mesh_composites {
             resources.destroy(gal);
         }
         self.discard_prepared_post_effects(gal);
@@ -6016,6 +6018,12 @@ impl GuiFrontend {
                 &mut ops,
             )?;
         }
+        let composite_uniform_buffers = self
+            .mesh_composites
+            .values()
+            .map(|resources| resources.uniform_buffer)
+            .collect::<BTreeSet<_>>();
+        pack_gui_composite_uniform_uploads(&mut ops, &composite_uniform_buffers);
         stats.command_lists = 1;
         stats.command_ops = ops.len() as u64;
         Self::require_gui_draw_receipt(&stats, &ops)?;
@@ -6383,16 +6391,30 @@ impl GuiFrontend {
                         GUI_MAX_MESH_COMPOSITE_RESOURCES
                     )));
                 }
-                let composite = GuiMeshCompositeResources::create(
-                    gal,
-                    &format!(
-                        "minecraft.gui.mesh.composite.gen{}.{}x{}",
-                        generation, target.extent.width, target.extent.height
-                    ),
-                    color_format,
-                    depth_format,
-                    target.color_view,
-                )?;
+                let label = format!(
+                    "minecraft.gui.mesh.composite.gen{}.{}x{}",
+                    generation, target.extent.width, target.extent.height
+                );
+                let shared = self.mesh_composites.iter().find_map(|(key, resources)| {
+                    (key.color_format == color_format && key.depth_format == depth_format)
+                        .then_some(*resources)
+                });
+                let composite = if let Some(shared) = shared {
+                    GuiMeshCompositeResources::create_binding(
+                        gal,
+                        &label,
+                        target.color_view,
+                        shared,
+                    )?
+                } else {
+                    GuiMeshCompositeResources::create(
+                        gal,
+                        &label,
+                        color_format,
+                        depth_format,
+                        target.color_view,
+                    )?
+                };
                 self.mesh_composites.insert(composite_key, composite);
                 stats.resource_creates = stats.resource_creates.saturating_add(1);
             }
@@ -7898,6 +7920,124 @@ fn append_gui_batches_ops(
         ops.push(CommandOp::EndPass);
     }
     Ok(())
+}
+
+fn pack_gui_composite_uniform_uploads(
+    operations: &mut Vec<CommandOp>,
+    composite_uniform_buffers: &BTreeSet<Handle>,
+) {
+    #[derive(Clone)]
+    struct Upload {
+        start: usize,
+        buffer: Handle,
+        offset: u64,
+        data: Vec<u8>,
+        before: CommandOp,
+        after: CommandOp,
+    }
+
+    let mut by_buffer: BTreeMap<Handle, Vec<Upload>> = BTreeMap::new();
+    for start in 0..operations.len().saturating_sub(2) {
+        let (
+            CommandOp::Barrier(ResourceBarrier {
+                resource: before_buffer,
+                before: TextureUsageState::ShaderRead,
+                after: TextureUsageState::TransferDst,
+                ..
+            }),
+            CommandOp::HostWriteBuffer {
+                buffer,
+                offset,
+                data,
+            },
+            CommandOp::Barrier(ResourceBarrier {
+                resource: after_buffer,
+                before: TextureUsageState::TransferDst,
+                after: TextureUsageState::ShaderRead,
+                ..
+            }),
+        ) = (
+            &operations[start],
+            &operations[start + 1],
+            &operations[start + 2],
+        )
+        else {
+            continue;
+        };
+        if before_buffer != buffer
+            || after_buffer != buffer
+            || !composite_uniform_buffers.contains(buffer)
+        {
+            continue;
+        }
+        by_buffer.entry(*buffer).or_default().push(Upload {
+            start,
+            buffer: *buffer,
+            offset: *offset,
+            data: data.clone(),
+            before: operations[start].clone(),
+            after: operations[start + 2].clone(),
+        });
+    }
+
+    let mut replacements = BTreeMap::<usize, Vec<CommandOp>>::new();
+    let mut skipped = BTreeSet::new();
+    for uploads in by_buffer.into_values().filter(|uploads| uploads.len() > 1) {
+        let mut ranges = uploads
+            .iter()
+            .map(|upload| {
+                upload
+                    .offset
+                    .checked_add(upload.data.len() as u64)
+                    .map(|end| (upload.offset, end))
+            })
+            .collect::<Option<Vec<_>>>();
+        let Some(ref mut ranges) = ranges else {
+            continue;
+        };
+        ranges.sort_unstable();
+        if ranges.windows(2).any(|pair| pair[0].1 > pair[1].0) {
+            continue;
+        }
+        let minimum = ranges[0].0;
+        let maximum = ranges.last().unwrap().1;
+        let Ok(packed_len) = usize::try_from(maximum - minimum) else {
+            continue;
+        };
+        let mut packed = vec![0; packed_len];
+        for upload in &uploads {
+            let Ok(relative) = usize::try_from(upload.offset - minimum) else {
+                continue;
+            };
+            packed[relative..relative + upload.data.len()].copy_from_slice(&upload.data);
+            skipped.extend(upload.start..upload.start + 3);
+        }
+        let first = &uploads[0];
+        replacements.insert(
+            first.start,
+            vec![
+                first.before.clone(),
+                CommandOp::HostWriteBuffer {
+                    buffer: first.buffer,
+                    offset: minimum,
+                    data: packed,
+                },
+                first.after.clone(),
+            ],
+        );
+    }
+    if replacements.is_empty() {
+        return;
+    }
+    let original = std::mem::take(operations);
+    for (index, operation) in original.into_iter().enumerate() {
+        if let Some(replacement) = replacements.remove(&index) {
+            operations.extend(replacement);
+        }
+        if !skipped.contains(&index) {
+            operations.push(operation);
+        }
+    }
 }
 
 fn mesh_atlas_contract_supported(batch: &GuiMeshBatchRequest) -> bool {
@@ -13731,7 +13871,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
     }
 
     #[test]
-    fn mesh_items_reusing_an_extent_transition_the_raster_target_back_to_attachment_usage() {
+    fn mesh_items_share_compositor_program_and_packed_uniform_stream() {
         let mut gal = mock_gal();
         let mut frontend = GuiFrontend::default();
         let target = frame_target(&mut gal);
@@ -13763,6 +13903,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let mut next_item = mesh_item_batches(10);
         for layer in &mut next_item {
             layer.asset_id = 8;
+            layer.render_extent = [36, 36];
         }
         requests.append(&mut next_item);
         let (ops, stats) = frontend
@@ -13818,28 +13959,31 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 .collect::<Vec<_>>(),
             "each GUI item composite must bind its own uniform range"
         );
-        let composite_uniform_offsets = composite_bind_indices
+        let composite_uniform_writes = ops
             .iter()
-            .map(|(bind_index, _)| {
-                ops[..*bind_index]
-                    .iter()
-                    .rev()
-                    .find_map(|operation| match operation {
-                        CommandOp::HostWriteBuffer { buffer, offset, .. }
-                            if composite_uniform_buffers.contains(buffer) =>
-                        {
-                            Some(*offset)
-                        }
-                        _ => None,
-                    })
-                    .expect("a GUI mesh composite must write its bound UBO range")
+            .filter_map(|operation| match operation {
+                CommandOp::HostWriteBuffer {
+                    buffer,
+                    offset,
+                    data,
+                } if composite_uniform_buffers.contains(buffer) => Some((*offset, data.len())),
+                _ => None,
             })
             .collect::<Vec<_>>();
         assert_eq!(
-            vec![0, GUI_MESH_COMPOSITE_UNIFORM_STRIDE],
-            composite_uniform_offsets,
-            "same-sized GUI items must not overwrite one another's composite pose before execution"
+            vec![(
+                0,
+                GUI_MESH_COMPOSITE_UNIFORM_STRIDE as usize
+                    + super::super::gui_mesh_frontend::GUI_MESH_COMPOSITE_UNIFORM_BYTES
+            )],
+            composite_uniform_writes,
+            "same-sized GUI item poses use one packed upload without overlapping dynamic ranges"
         );
+        let composites = frontend.mesh_composites.values().collect::<Vec<_>>();
+        assert_eq!(composites[0].uniform_buffer, composites[1].uniform_buffer);
+        assert_eq!(composites[0].pipeline, composites[1].pipeline);
+        assert_eq!(composites[0].pipeline_layout, composites[1].pipeline_layout);
+        assert_ne!(composites[0].resource_set, composites[1].resource_set);
         assert_eq!(
             ops.iter()
                 .filter(|operation| matches!(

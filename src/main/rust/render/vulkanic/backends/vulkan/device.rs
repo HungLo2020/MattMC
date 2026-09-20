@@ -22,6 +22,10 @@ pub(super) struct VulkanContext {
     pub(super) timestamp_valid_bits: u32,
     pub(super) command_pool: vk::CommandPool,
     pub(super) timeline: vk::Semaphore,
+    /// Whether device creation enabled Vulkan's core multiDrawIndirect feature.
+    /// Packed GAL indirect lists still work without it because lowering emits
+    /// one native draw per record on that fallback path.
+    pub(super) multi_draw_indirect: bool,
     /// Whether the device was created with Vulkan's core independent MRT
     /// blending feature. Source translucent passes rely on distinct primary
     /// and auxiliary attachment blend semantics; callers must keep that
@@ -196,10 +200,13 @@ impl VulkanContext {
             == vk::TRUE;
         let fragment_storage_writes =
             supported_features.features.fragment_stores_and_atomics == vk::TRUE;
+        let multi_draw_indirect_supported =
+            supported_features.features.multi_draw_indirect == vk::TRUE;
         let provoking_vertex_last =
             provoking_extension && provoking_features.provoking_vertex_last == vk::TRUE;
         let core_features = vk::PhysicalDeviceFeatures::default()
             .independent_blend(independent_blend_supported)
+            .multi_draw_indirect(multi_draw_indirect_supported)
             .vertex_pipeline_stores_and_atomics(vertex_storage_writes)
             .fragment_stores_and_atomics(fragment_storage_writes);
         if supported_demote.shader_demote_to_helper_invocation == vk::TRUE {
@@ -276,6 +283,7 @@ impl VulkanContext {
             timestamp_valid_bits,
             command_pool,
             timeline,
+            multi_draw_indirect: multi_draw_indirect_supported,
             independent_blend: independent_blend_supported,
             provoking_vertex_last,
             provoking_vertex_per_pipeline: provoking_properties.provoking_vertex_mode_per_pipeline

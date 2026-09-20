@@ -1724,9 +1724,11 @@ public final class RustGalTerrainRenderer {
 		if (instances == null || instances.isEmpty()) {
 			return;
 		}
+		boolean detailedDiagnostics =
+			net.sodium.client.render.StaticTerrainParityDiagnostics.isEnabled();
 		long executedStaticTerrainInstances = 0L;
 		List<net.sodium.client.render.StaticTerrainParityDiagnostics.RustExecutionIdentity> executionReceipt =
-			new ArrayList<>();
+			detailedDiagnostics ? new ArrayList<>(instances.size()) : List.of();
 		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : instances) {
 			TerrainSectionAsset asset = null;
 			LayerKey layerKey = null;
@@ -1757,7 +1759,7 @@ public final class RustGalTerrainRenderer {
 		double cameraY = layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentCameraY() : 0.0D;
 		double cameraZ = layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentCameraZ() : 0.0D;
 			int drawOrder = submittedMetadata != null ? submittedMetadata.drawOrder() : 0;
-			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainExecution(
+			if (detailedDiagnostics) net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainExecution(
 				"rust-vulkan-executed",
 				layerKey.sectionPos(),
 				layerKey.layer().name(),
@@ -1786,10 +1788,12 @@ public final class RustGalTerrainRenderer {
 				frameId,
 				0L
 			);
-			executionReceipt.add(new net.sodium.client.render.StaticTerrainParityDiagnostics.RustExecutionIdentity(
-				layerKey.sectionPos(), layerKey.layer().name(), instance.meshGeneration()
-			));
-			recordEvent(
+			if (detailedDiagnostics) executionReceipt.add(
+				new net.sodium.client.render.StaticTerrainParityDiagnostics.RustExecutionIdentity(
+					layerKey.sectionPos(), layerKey.layer().name(), instance.meshGeneration()
+				)
+			);
+			if (detailedDiagnostics) recordEvent(
 				layerKey.sectionPos(),
 				layerKey.layer(),
 				0L,
@@ -1822,9 +1826,11 @@ public final class RustGalTerrainRenderer {
 			);
 		}
 		if (executedStaticTerrainInstances > 0L) {
-			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustWholeFrameExecutionCoverage(
-				executionReceipt, frameId
-			);
+			if (detailedDiagnostics) {
+				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustWholeFrameExecutionCoverage(
+					executionReceipt, frameId
+				);
+			}
 			lastExecutedStaticTerrainFrameId.set(frameId);
 			lastExecutedStaticTerrainSubmissionId.set(submissionId);
 			lastExecutedStaticTerrainInstances.set(executedStaticTerrainInstances);
@@ -2918,18 +2924,13 @@ public final class RustGalTerrainRenderer {
 				layer == ChunkSectionLayer.TRANSLUCENT ? currentTranslucentSortSnapshot(asset) : null;
 			long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
 			long sortedIndexHash = sortedIndex == null ? 0L : sortedIndex.indexHash();
-		// A visible section can be discovered in the same frame that its copied
-		// asset is registered, before the combined Rust upload is acknowledged.
-		// Keep that ordinary admission latency out of the stale-generation
-		// counter; an explicitly requested stale-generation fault still reaches
-		// the strict rejection path below.
-		if (!"stale-generation".equals(activeFault())
-				&& !RustGalWorldPrimitiveRenderer.isStaticTerrainMeshGenerationUploaded(asset.meshKey(), asset.meshGeneration())) {
-			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainNonExecution(
-				section.getPosition().asLong(), layer.name(), "asset-upload-pending", asset.meshGeneration(), 0L
-			);
-			return false;
-		}
+		// Queue the visible semantic instance even when this generation is still
+		// awaiting its bounded Rust asset upload. The frame coordinator publishes
+		// resources before consumeFrame(), which then admits only an acknowledged
+		// generation. Refusing to queue here left the old active generation behind;
+		// the upload changed the acknowledgement to the replacement generation and
+		// consumeFrame() rejected the old instance, creating a one-frame terrain
+		// hole. Queuing first makes upload plus active-instance replacement atomic.
 		if (visibleSubmissions != null && !"duplicate-visible-section".equals(activeFault())) {
 			VisibleSubmitKey submitKey = new VisibleSubmitKey(section.getPosition().asLong(), layer, visibleGeneration);
 			if (!visibleSubmissions.add(submitKey)) {
@@ -3096,11 +3097,10 @@ public final class RustGalTerrainRenderer {
 				);
 			}
 		} else {
-			// Registration can be retired concurrently with the visible-list walk
-			// when Sodium publishes a replacement section. Re-check the explicit
-			// Rust residency state before classifying the failed enqueue as a stale
-			// generation; a missing generation here is ordinary upload/retirement
-			// latency, not evidence of a bad semantic submission.
+			// Registration can be retired concurrently with the visible-list walk.
+			// A missing generation here is ordinary retirement latency rather than a
+			// bad semantic submission. Pending uploads normally enqueue successfully
+			// above and become drawable after the coordinator's pre-consume flush.
 			if (!"stale-generation".equals(activeFault())
 					&& !RustGalWorldPrimitiveRenderer.isStaticTerrainMeshGenerationUploaded(asset.meshKey(), asset.meshGeneration())) {
 				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainNonExecution(

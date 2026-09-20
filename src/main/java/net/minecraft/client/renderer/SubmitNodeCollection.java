@@ -728,8 +728,7 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		// the Java RenderType remains only a semantic selector.
 		if (rustWholeFramePresenterActive()
 			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
-			&& renderType != null
-			&& renderType.toString().contains("armor_entity_glint")
+			&& renderType == RenderType.armorEntityGlint()
 			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneGlintModelMesh(
 				model, object, poseStack.last(), renderType,
 				net.minecraft.resources.ResourceLocation.withDefaultNamespace("armor/glint"), i, j

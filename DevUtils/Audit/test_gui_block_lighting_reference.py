@@ -27,7 +27,7 @@ class GuiBlockLightingReferenceTest(unittest.TestCase):
 
     def test_source_magma_dark_red_is_visible_even_with_equal_green_and_blue(self):
         with Image.open(Path(__file__).resolve().parents[2] / "run/assets/minecraft/textures/block/magma.png") as source:
-            red_texels = [pixel for pixel in source.convert("RGB").getdata()
+            red_texels = [pixel for pixel in source.convert("RGB").get_flattened_data()
                           if pixel[0] > pixel[1] == pixel[2]]
         self.assertTrue(red_texels, "the anti-blank control must respect real vanilla magma texels")
         image = self.magma()
