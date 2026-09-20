@@ -43,6 +43,7 @@ final class AtlasAnimationPublications {
         if (previous != null) {
             previous.invalidateResourceForReplacement();
         }
+        publication.beginPublication();
         publications.put(publication.textureId(), publication);
     }
 

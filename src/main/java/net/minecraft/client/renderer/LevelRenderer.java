@@ -562,14 +562,32 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		// cost if networking continues to enqueue work concurrently.
 		final int maxDrainPasses = 64;
 		int drainPasses = 0;
-		do {
+		boolean pendingQueueBefore = this.level.hasPendingLightUpdates();
+		while (drainPasses < maxDrainPasses && this.level.hasPendingLightUpdates()) {
 			this.level.pollLightUpdates();
 			drainPasses++;
-		} while (drainPasses < maxDrainPasses && this.level.hasPendingLightUpdates());
+		}
+		boolean pendingQueueAfter = this.level.hasPendingLightUpdates();
 		var lightEngine = this.level.getChunkSource().getLightEngine();
-		if (lightEngine.hasLightWork()) {
+		boolean lightEngineWorkBefore = lightEngine.hasLightWork();
+		if (lightEngineWorkBefore) {
 			lightEngine.runLightUpdates();
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+			"rust-gal.light-state.queue-pending-before", pendingQueueBefore ? 1L : 0L
+		);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+			"rust-gal.light-state.queue-drain-passes", drainPasses
+		);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+			"rust-gal.light-state.queue-pending-after", pendingQueueAfter ? 1L : 0L
+		);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+			"rust-gal.light-state.engine-work-before", lightEngineWorkBefore ? 1L : 0L
+		);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+			"rust-gal.light-state.engine-work-after", lightEngine.hasLightWork() ? 1L : 0L
+		);
 	}
 
 	private Frustum prepareCullFrustum(Matrix4f matrix4f, Matrix4f matrix4f2, Vec3 vec3) {
@@ -4329,6 +4347,17 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public void onSectionBecomingNonEmpty(long l) {
+		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// The independent source may have completed this section as empty
+			// before the client chunk packet populated it. Invalidate that immutable
+			// CPU snapshot through the normal replacement transaction; otherwise
+			// the all-open placeholder remains cached forever and the real terrain
+			// is never meshed. The last accepted non-empty generation, when one
+			// exists, stays published until its replacement is ready.
+			this.rustGalWholeFrameTerrainSource.onSectionBecomingNonEmpty(
+				SectionPos.x(l), SectionPos.y(l), SectionPos.z(l));
+			return;
+		}
 		// Real production replay fixtures can populate a client level before the
 		// camera/view-area renderer is initialized. The section will be observed by
 		// the normal dirty/source path once initialization completes.

@@ -118,6 +118,38 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
+	void settledTerrainInstancesReuseIdentityWhileFrameCameraLanesAdvance() throws Exception {
+		try (var bridge = VulkanicGalBridge.create("rust-vulkan")) {
+			var pack = VulkanicGalBridge.class.getDeclaredMethod(
+				"encodeWorldMeshInstances", List.class, VulkanicGalBridge.TerrainFrameCamera.class);
+			pack.setAccessible(true);
+			var placement = new VulkanicGalBridge.TerrainSectionPlacement(112, 80, 528);
+			var instance = VulkanicGalBridge.WorldMeshInstanceRecord.staticTerrain(
+				41L, 7L, 0, 1, 0, 0, 1280, 720, placement);
+			MemorySegment initial = (MemorySegment) pack.invoke(
+				bridge, List.of(instance), new VulkanicGalBridge.TerrainFrameCamera(150.5, 101.62, 530.5));
+			MemorySegment item = VulkanicGalBridge.Abi.item(
+				initial, VulkanicGalBridge.Struct.WORLD_MESH_INSTANCE_RECORD, 0);
+			assertEquals(112, item.get(java.lang.foreign.ValueLayout.JAVA_INT,
+				VulkanicGalBridge.Struct.WORLD_MESH_INSTANCE_RECORD.offset(18)));
+			assertEquals(101.62, item.get(java.lang.foreign.ValueLayout.JAVA_DOUBLE,
+				VulkanicGalBridge.Struct.WORLD_MESH_INSTANCE_RECORD.offset(19) + 8L));
+
+			MemorySegment moved = (MemorySegment) pack.invoke(
+				bridge, List.of(instance), new VulkanicGalBridge.TerrainFrameCamera(151.25, 102.125, 531.75));
+			assertEquals(initial.address(), moved.address(), "camera motion should reuse terrain staging");
+			assertEquals(112, item.get(java.lang.foreign.ValueLayout.JAVA_INT,
+				VulkanicGalBridge.Struct.WORLD_MESH_INSTANCE_RECORD.offset(18)));
+			assertEquals(151.25, item.get(java.lang.foreign.ValueLayout.JAVA_DOUBLE,
+				VulkanicGalBridge.Struct.WORLD_MESH_INSTANCE_RECORD.offset(19)));
+			assertEquals(102.125, item.get(java.lang.foreign.ValueLayout.JAVA_DOUBLE,
+				VulkanicGalBridge.Struct.WORLD_MESH_INSTANCE_RECORD.offset(19) + 8L));
+			assertEquals(531.75, item.get(java.lang.foreign.ValueLayout.JAVA_DOUBLE,
+				VulkanicGalBridge.Struct.WORLD_MESH_INSTANCE_RECORD.offset(19) + 16L));
+		}
+	}
+
+	@Test
 	void itemRasterPreservesBoundedAuthoredUvSubrectangles() {
 		var quad = new VulkanicGalBridge.GuiAffineQuadRecord(1,7L,
 			0,0,16,0,0,16,0,0.25F,0,0.75F,0.5F,-1,100,100)
@@ -786,12 +818,15 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	@Test
-	void terrainPlacementRetainsDoublePrecisionAndRejectsAmbiguousOwnership() {
+	void terrainOriginAndFrameCameraRemainSeparateAndRejectAmbiguousOwnership() {
 		net.minecraft.SharedConstants.tryDetectVersion();
 		net.minecraft.server.Bootstrap.bootStrap();
-		var placement = new VulkanicGalBridge.TerrainSectionPlacement(112, 80, 528, 150.5, 101.62, 530.5);
-		assertEquals(101.62, placement.cameraY());
-		assertNotEquals((double)(float)101.62, placement.cameraY());
+		var placement = new VulkanicGalBridge.TerrainSectionPlacement(112, 80, 528);
+		var frameCamera = new VulkanicGalBridge.TerrainFrameCamera(150.5, 101.62, 530.5);
+		assertEquals(101.62, frameCamera.y());
+		assertThrows(IllegalArgumentException.class,
+			() -> new VulkanicGalBridge.TerrainFrameCamera(Double.NaN, 0, 0));
+		assertNotEquals((double)(float)101.62, frameCamera.y());
 		var original = new VulkanicGalBridge.WorldMeshInstanceRecord(
 			60, 41L, 2L, -1, 0, 0, 0, 0xffffffff, new float[16], 640, 480, 0, 0, 0, 0, -1);
 		var semantic = original.withTerrainPlacement(placement);
@@ -808,8 +843,7 @@ class VulkanicGalBridgeAbiTest {
 		assertEquals(placement, resized.meshInstances().getFirst().terrainPlacement());
 		assertEquals(1280, resized.meshInstances().getFirst().viewportWidth());
 		assertArrayEquals(semantic.transform(), resized.meshInstances().getFirst().transform());
-		assertThrows(IllegalArgumentException.class, () -> new VulkanicGalBridge.TerrainSectionPlacement(1, 0, 0, 0, 0, 0));
-		assertThrows(IllegalArgumentException.class, () -> new VulkanicGalBridge.TerrainSectionPlacement(0, 0, 0, Double.NaN, 0, 0));
+		assertThrows(IllegalArgumentException.class, () -> new VulkanicGalBridge.TerrainSectionPlacement(1, 0, 0));
 		assertThrows(IllegalArgumentException.class, () -> new VulkanicGalBridge.WorldMeshInstanceRecord(
 			60, 41L, 2L, -1, 0, 0, 0, 0xffffffff, detached, 640, 480, 0, 0, 0, 0, -1, placement));
 		assertThrows(IllegalArgumentException.class, () -> new VulkanicGalBridge.WorldMeshInstanceRecord(

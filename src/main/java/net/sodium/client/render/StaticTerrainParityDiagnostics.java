@@ -848,6 +848,18 @@ public final class StaticTerrainParityDiagnostics {
         }
     }
 
+	/** Records Java OpenGL terrain readiness without enabling the heavier parity event stream. */
+	static void recordJavaOpenGlSubmittedWork(int loadedChunks, int renderDistance) {
+		if (loadedChunks <= 0
+			|| (!net.minecraft.client.dev.GraphicsFrameBenchmark.needsSubmittedWorkIdentity()
+				&& !net.minecraft.client.dev.DeterministicCameraCapture.isActiveForDiagnostics())) {
+			return;
+		}
+		String identity = loadedChunks + ":" + renderDistance;
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("sodium-terrain", identity);
+		net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("sodium-terrain", identity);
+	}
+
     /**
      * Records the explicit Rust whole-frame source's final CPU section domain.
      * This intentionally accepts only immutable semantic {@link RenderSection}

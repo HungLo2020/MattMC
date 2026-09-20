@@ -8,7 +8,6 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.item.FallingBlockEntity;
@@ -50,7 +49,8 @@ public final class GraphicsFrameBenchmark {
 	private static final int MAX_SETTLE_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.maxSettleFrames", 2400));
 	private static final int WARMUP_FRAMES = Math.max(0, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.warmupFrames", 600));
 	private static final int MEASURE_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.measureFrames", 900));
-	private static final float YAW_DELTA = Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.yawDelta", "70.0"));
+	private static final String WORKLOAD_PROFILE =
+		System.getProperty("mattmc.dev.graphicsFrameBenchmark.workloadProfile", "unknown").trim().toLowerCase(Locale.ROOT);
 	private static final double CAMERA_X = Double.parseDouble(System.getProperty("mattmc.dev.graphicsFrameBenchmark.cameraX", "150.5"));
 	private static final double CAMERA_Y = Double.parseDouble(System.getProperty("mattmc.dev.graphicsFrameBenchmark.cameraY", "100.0"));
 	private static final double CAMERA_Z = Double.parseDouble(System.getProperty("mattmc.dev.graphicsFrameBenchmark.cameraZ", "530.5"));
@@ -144,6 +144,8 @@ public final class GraphicsFrameBenchmark {
 	private static final String WORKLOAD_COUNTER_DEFINITION_VERSION = "phase-family-v2";
 	private static final int MAX_FRAME_TIMELINE_EVENTS =
 		Math.max(1, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.maxTimelineEvents", 128));
+	private static final boolean PHASE_ALLOCATION_SAMPLES =
+		Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.phaseAllocationSamples");
 
 	private static final ArrayDeque<OpenPhase> PHASE_STACK = new ArrayDeque<>();
 	private static final Map<String, PhaseStats> EXCLUSIVE_PHASES = new LinkedHashMap<>();
@@ -168,6 +170,13 @@ public final class GraphicsFrameBenchmark {
 	private static boolean stopIssued;
 	private static boolean frameActive;
 	private static boolean measurementFrame;
+	private static boolean renderedFrameThisTick;
+	private static long renderedMeasurementFrames;
+	private static long measurementRestartsAfterReadinessLoss;
+	private static String lastMeasurementRestartCause = "none";
+	private static long rejectedUnrenderedMeasurementFrames;
+	private static long staticTerrainMeasurementSubmissionBaseline;
+	private static long rejectedEmptyStaticTerrainMeasurementFrames;
 	private static boolean preMeasurementGcIssued;
 	private static long beginFrameCalls;
 	private static long activeBeginFrameCalls;
@@ -295,6 +304,25 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	/**
+	 * Detailed capture receipts are useful while establishing a workload, but
+	 * constructing them inside the measured frame changes the workload being
+	 * measured. Producers use this exact-frame signal to retain counters and
+	 * semantic execution while omitting capture-only object graphs and log text.
+	 */
+	public static boolean isMeasurementFrameForDiagnostics() {
+		return ENABLED && frameActive && measurementFrame && !complete && !failed;
+	}
+
+	/** Remains true through post-submit callbacks for the active sample window. */
+	public static boolean isMeasurementWindowForDiagnostics() {
+		return ENABLED && measurementStartNanos > 0L && !complete && !failed;
+	}
+
+	public static boolean needsSubmittedWorkIdentity() {
+		return isActiveForDiagnostics() && !isMeasurementFrameForDiagnostics();
+	}
+
+	/**
 	 * A deterministic visual capture may have its screenshot receipt before the
 	 * independent frame-sampling contract completes.  The capture lifecycle
 	 * uses this to defer process shutdown, never to reduce or bypass the
@@ -324,6 +352,7 @@ public final class GraphicsFrameBenchmark {
 		}
 		frameActive = ensureInitialized(minecraft) && !complete && !failed;
 		measurementFrame = false;
+		renderedFrameThisTick = false;
 		PHASE_STACK.clear();
 		if (!frameActive) {
 			lastFrameLifecycle = "begin-not-ready";
@@ -331,19 +360,27 @@ public final class GraphicsFrameBenchmark {
 		}
 		activeBeginFrameCalls++;
 		lastFrameLifecycle = "begin-active";
-		if ((beginFrameCalls % 60L) == 0L) {
+		// Status serialization is deliberately outside the measurement window.
+		// A periodic write here previously inserted a 500–700 ms gap between two
+		// otherwise adjacent samples, then made the wall-clock validator reject
+		// the renderer for benchmark-owned file I/O.
+		if ((beginFrameCalls % 60L) == 0L
+			&& (settledFrameIndex < 0L || frameIndex - settledFrameIndex < WARMUP_FRAMES)) {
 			writeStatus(minecraft, "frame-lifecycle");
 		}
 		frameAllocatedBytesAtStart = currentThreadAllocatedBytes();
 		frameGcCountAtStart = totalGcCount();
 		frameGcTimeAtStart = totalGcTimeMillis();
 		beginPhase("java.frame.render-production");
-		holdPlayerStillAndApplyCameraPath(minecraft);
+		maintainExplicitWorkloadFixtures(minecraft);
 		if (!DeterministicCameraCapture.setupGameplayProducerScenarios(minecraft)) {
 			lastProducerWorkloadBlocker = "waiting-for-gameplay-producer-fixture";
 			return;
 		}
 		if (!producerWorkloadReady(minecraft)) {
+			if (!FRAME_NANOS.isEmpty()) {
+				restartMeasurementAfterReadinessLoss();
+			}
 			return;
 		}
 		if (settledFrameIndex < 0L) {
@@ -365,7 +402,13 @@ public final class GraphicsFrameBenchmark {
 			preMeasurementGcIssued = true;
 			System.gc();
 		}
-		measurementFrame = framesAfterSettle >= WARMUP_FRAMES && FRAME_NANOS.size() < MEASURE_FRAMES;
+		// External screenshot capture deliberately holds the last presented image.
+		// A client-loop tick during that hold is not a rendered frame and must not
+		// enter a renderer benchmark. Wait for the independent capture contract to
+		// finish before opening the measurement window.
+		measurementFrame = framesAfterSettle >= WARMUP_FRAMES
+			&& FRAME_NANOS.size() < MEASURE_FRAMES
+			&& !DeterministicCameraCapture.isAwaitingCompletion();
 		if (measurementFrame && FRAME_NANOS.isEmpty()) {
 			measurementStartNanos = System.nanoTime();
 			displayedFpsAtMeasurementStart = minecraft.getFps();
@@ -378,12 +421,48 @@ public final class GraphicsFrameBenchmark {
 			}
 		}
 		if (measurementFrame) {
+			staticTerrainMeasurementSubmissionBaseline =
+				RustGalTerrainRenderer.staticTerrainExecutionSnapshot().submissionId();
 			if (lastMeasurementFrameStartNanos > 0L) {
 				recordPhaseSample("benchmark.frame-start-interval", currentFrameStartNanos - lastMeasurementFrameStartNanos);
 			}
 			lastMeasurementFrameStartNanos = currentFrameStartNanos;
 		}
 		applyPositiveControlDelay();
+	}
+
+	private static void restartMeasurementAfterReadinessLoss() {
+		// A late chunk or asset mutation can revoke steady-state readiness after
+		// sampling begins. Do not splice pre-mutation and post-mutation frames
+		// across that gap: discard the partial window, settle again, and retain
+		// only one contiguous workload generation for timing and allocation data.
+		measurementRestartsAfterReadinessLoss++;
+		lastMeasurementRestartCause = lastProducerWorkloadBlocker
+			+ "; changingCounters=" + staticTerrainLastChangingCounters
+			+ "; mutationSections=" + staticTerrainLastMutationSections
+			+ "; terrainQueue=" + RustGalWholeFrameTerrainSource.wholeFrameTerrainQueueSummary();
+		FRAME_NANOS.clear();
+		EXCLUSIVE_PHASES.clear();
+		NESTED_PHASES.clear();
+		COUNTER_SAMPLES.clear();
+		FRAME_TIMELINE_EVENTS.clear();
+		renderedMeasurementFrames = 0L;
+		measurementStartNanos = -1L;
+		measurementEndNanos = -1L;
+		firstSampleNanos = -1L;
+		lastSampleNanos = -1L;
+		lastMeasurementFrameStartNanos = -1L;
+		gcCountAtStart = -1L;
+		gcTimeAtStart = -1L;
+		gcCountAtEnd = -1L;
+		gcTimeAtEnd = -1L;
+		usedMemoryAtStart = -1L;
+		usedMemoryAtEnd = -1L;
+		threadAllocatedBytesAtStart = -1L;
+		threadAllocatedBytesAtEnd = -1L;
+		displayedFpsAtMeasurementStart = -1;
+		displayedFpsAtMeasurementEnd = -1;
+		settledFrameIndex = -1L;
 	}
 
 	public static void endFrame(Minecraft minecraft, long frameNanos) {
@@ -399,6 +478,25 @@ public final class GraphicsFrameBenchmark {
 			return;
 		}
 		if (measurementFrame) {
+			if (!renderedFrameThisTick) {
+				rejectedUnrenderedMeasurementFrames++;
+				fail(minecraft, "measurement frame completed without executing a renderer submission");
+				frameActive = false;
+				measurementFrame = false;
+				PHASE_STACK.clear();
+				return;
+			}
+			if ("steady-state-performance".equals(STATIC_TERRAIN_SCENARIO)
+				&& !RustGalTerrainRenderer.staticTerrainExecutionSnapshot()
+					.executedAfter(staticTerrainMeasurementSubmissionBaseline)) {
+				rejectedEmptyStaticTerrainMeasurementFrames++;
+				fail(minecraft, "measurement frame completed without a non-empty static terrain submission");
+				frameActive = false;
+				measurementFrame = false;
+				PHASE_STACK.clear();
+				return;
+			}
+			renderedMeasurementFrames++;
 			FRAME_NANOS.add(frameNanos);
 			recordFrameAllocationAndGcSamples();
 			long sampleNanos = System.nanoTime();
@@ -430,8 +528,8 @@ public final class GraphicsFrameBenchmark {
 				stopIssued = true;
 				minecraft.stop();
 			}
-		} else if ((frameIndex % 60L) == 0L) {
-			writeStatus(minecraft, measurementFrame ? "measuring" : "warming_or_settling");
+		} else if (!measurementFrame && (frameIndex % 60L) == 0L) {
+			writeStatus(minecraft, "warming_or_settling");
 		}
 		frameActive = false;
 		measurementFrame = false;
@@ -440,6 +538,13 @@ public final class GraphicsFrameBenchmark {
 		frameGcCountAtStart = -1L;
 		frameGcTimeAtStart = -1L;
 		PHASE_STACK.clear();
+	}
+
+	/** Called only after the selected renderer has executed its real frame path. */
+	public static void recordRenderedFrame() {
+		if (ENABLED && frameActive) {
+			renderedFrameThisTick = true;
+		}
 	}
 
 	private static void recordFrameAllocationAndGcSamples() {
@@ -461,7 +566,8 @@ public final class GraphicsFrameBenchmark {
 		if (!ENABLED || !frameActive) {
 			return;
 		}
-		PHASE_STACK.push(new OpenPhase(name, System.nanoTime(), beginTracyZone(name)));
+		long allocatedBytes = PHASE_ALLOCATION_SAMPLES ? currentThreadAllocatedBytes() : -1L;
+		PHASE_STACK.push(new OpenPhase(name, System.nanoTime(), allocatedBytes, beginTracyZone(name)));
 	}
 
 	/** Returns whether frame-local diagnostic timing is currently being sampled. */
@@ -478,14 +584,25 @@ public final class GraphicsFrameBenchmark {
 		phase.closeTracyZone();
 		long inclusive = Math.max(0L, now - phase.startNanos());
 		long exclusive = Math.max(0L, inclusive - phase.childNanos());
+		long allocatedBytes = PHASE_ALLOCATION_SAMPLES ? currentThreadAllocatedBytes() : -1L;
+		long inclusiveAllocated = phase.startAllocatedBytes() >= 0L && allocatedBytes >= phase.startAllocatedBytes()
+			? allocatedBytes - phase.startAllocatedBytes()
+			: -1L;
+		long exclusiveAllocated = inclusiveAllocated >= 0L
+			? Math.max(0L, inclusiveAllocated - phase.childAllocatedBytes())
+			: -1L;
 		if (!PHASE_STACK.isEmpty()) {
 			OpenPhase parent = PHASE_STACK.pop();
-			PHASE_STACK.push(parent.withAdditionalChild(inclusive));
+			PHASE_STACK.push(parent.withAdditionalChild(inclusive, Math.max(0L, inclusiveAllocated)));
 		}
 		if (measurementFrame) {
 			String label = phase.name().equals(name) ? name : phase.name() + "/ended-as/" + name;
 			NESTED_PHASES.computeIfAbsent(label, ignored -> new PhaseStats()).add(inclusive);
 			EXCLUSIVE_PHASES.computeIfAbsent(label, ignored -> new PhaseStats()).add(exclusive);
+			if (exclusiveAllocated >= 0L) {
+				COUNTER_SAMPLES.computeIfAbsent("java.alloc.phase." + label + "-bytes", ignored -> new PhaseStats())
+					.add(exclusiveAllocated);
+			}
 		}
 	}
 
@@ -683,20 +800,22 @@ public final class GraphicsFrameBenchmark {
 		initialPosition = new Vec3(CAMERA_X, CAMERA_Y, CAMERA_Z);
 		initialYaw = CAMERA_YAW;
 		initialPitch = CAMERA_PITCH;
-		player.setPos(initialPosition);
-			player.setYRot(initialYaw);
-			player.setXRot(initialPitch);
-				setupRealTerrainParticleGameplayBlock(minecraft, player);
-				setupBlockDisplayScenario(minecraft, player);
-				setupFallingBlockScenario(minecraft, player);
-				setupPistonScenario(minecraft, player);
-				if (INVENTORY_SCREEN) {
-					minecraft.setScreen(new InventoryScreen(player));
-				}
-				dimension = minecraft.level.dimension().location().toString();
-				writeStatus(minecraft, "initialized");
-				return true;
+		// Establish the benchmark viewpoint once and synchronize interpolation
+		// history with it. Rewriting the player transform during every rendered
+		// frame made the benchmark itself perturb first-person animation and could
+		// expose partially interpolated camera/entity state to the renderer.
+		player.snapTo(initialPosition, initialYaw, initialPitch);
+		setupRealTerrainParticleGameplayBlock(minecraft, player);
+		setupBlockDisplayScenario(minecraft, player);
+		setupFallingBlockScenario(minecraft, player);
+		setupPistonScenario(minecraft, player);
+		if (INVENTORY_SCREEN) {
+			minecraft.setScreen(new InventoryScreen(player));
 		}
+		dimension = minecraft.level.dimension().location().toString();
+		writeStatus(minecraft, "initialized");
+		return true;
+	}
 
 	private static void dismissKnownGameplayScreen(Minecraft minecraft) {
 		disableVoxelMapWelcomeScreen();
@@ -885,13 +1004,17 @@ public final class GraphicsFrameBenchmark {
 			|| "terrain-generation-never-quiesced".equals(fault)) {
 			staticTerrainQuiescenceClassification = fault;
 			staticTerrainLastChangingCounters = "fault-injection=" + fault;
-			staticTerrainLastMutationSections = latestTerrainMutationSections(snapshot.diagnostics().recentEvents());
+			staticTerrainLastMutationSections = latestTerrainMutationSections(
+				RustGalTerrainRenderer.diagnosticsSnapshot().recentEvents());
 			staticTerrainLastSnapshot = snapshot;
 			staticTerrainSteadyFrames = 0L;
 			return false;
 		}
-		boolean unchanged = staticTerrainLastSnapshot != null && snapshot.quiescenceKeyEquals(staticTerrainLastSnapshot);
-		String changed = staticTerrainLastSnapshot == null ? "initial-snapshot" : snapshot.changedCounters(staticTerrainLastSnapshot);
+		boolean unchanged = staticTerrainLastSnapshot != null
+			&& snapshot.quiescenceKeyEquals(staticTerrainLastSnapshot, false);
+		String changed = staticTerrainLastSnapshot == null
+			? "initial-snapshot"
+			: snapshot.changedCounters(staticTerrainLastSnapshot, false);
 		staticTerrainLastSnapshot = snapshot;
 		staticTerrainLastActiveLayers = snapshot.activeTerrainLayers();
 		staticTerrainLastActiveSectionAssets = snapshot.activeSectionAssets();
@@ -905,7 +1028,8 @@ public final class GraphicsFrameBenchmark {
 		if (snapshot.mutationCountersNonZero() && !unchanged) {
 			staticTerrainLastMutationNanos = System.nanoTime();
 			staticTerrainLastChangingCounters = changed;
-			staticTerrainLastMutationSections = latestTerrainMutationSections(snapshot.diagnostics().recentEvents());
+			staticTerrainLastMutationSections = latestTerrainMutationSections(
+				RustGalTerrainRenderer.diagnosticsSnapshot().recentEvents());
 			staticTerrainQuiescenceClassification = classifyTerrainChurn(changed);
 		}
 		if (unchanged && snapshot.readyForSteadyState()) {
@@ -934,7 +1058,8 @@ public final class GraphicsFrameBenchmark {
 			if (!snapshot.readyForSteadyState()) {
 				staticTerrainQuiescenceClassification = classifyTerrainNotReady(snapshot);
 				staticTerrainLastChangingCounters = changed + ";notReady=" + staticTerrainQuiescenceClassification;
-				staticTerrainLastMutationSections = latestTerrainMutationSections(snapshot.diagnostics().recentEvents());
+				staticTerrainLastMutationSections = latestTerrainMutationSections(
+					RustGalTerrainRenderer.diagnosticsSnapshot().recentEvents());
 			}
 		}
 		return staticTerrainSteadyFrames >= STATIC_TERRAIN_STEADY_FRAMES;
@@ -945,10 +1070,13 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static TerrainPerfSnapshot terrainPerfSnapshot() {
-		RustGalTerrainRenderer.TerrainDiagnostics diagnostics = RustGalTerrainRenderer.diagnosticsSnapshot();
+		RustGalTerrainRenderer.TerrainPerformanceCounters diagnostics = RustGalTerrainRenderer.performanceCountersSnapshot();
 		RustGalWorldPrimitiveRenderer.WorldMeshAssetMetrics meshMetrics = RustGalWorldPrimitiveRenderer.worldMeshAssetMetrics();
 		Minecraft minecraft = Minecraft.getInstance();
 		int loadedChunks = minecraft.level == null ? -1 : minecraft.level.getChunkSource().getLoadedChunksCount();
+		long loadedChunkPositionFingerprint = minecraft.level == null
+			? 0L
+			: minecraft.level.getChunkSource().getLoadedChunkPositionFingerprint();
 		int renderDistance = minecraft.options == null ? -1 : minecraft.options.getEffectiveRenderDistance();
 		long cameraSignature = 0L;
 		if (minecraft.player != null) {
@@ -962,6 +1090,7 @@ public final class GraphicsFrameBenchmark {
 			meshMetrics,
 			diagnostics.currentFrameVisibleFingerprint(),
 			loadedChunks,
+			loadedChunkPositionFingerprint,
 			renderDistance,
 			cameraSignature
 		);
@@ -1115,7 +1244,7 @@ public final class GraphicsFrameBenchmark {
 		return minecraft.screen == null ? "none" : minecraft.screen.getTitle().getString();
 	}
 
-	private static void holdPlayerStillAndApplyCameraPath(Minecraft minecraft) {
+	private static void maintainExplicitWorkloadFixtures(Minecraft minecraft) {
 		LocalPlayer player = minecraft.player;
 		if (player == null) {
 			return;
@@ -1123,28 +1252,9 @@ public final class GraphicsFrameBenchmark {
 		applyArmorOverride(player);
 		applyHealthOverride(player);
 		applyGameModeOverride(minecraft);
-		player.input.keyPresses = Input.EMPTY;
-		player.xxa = 0.0F;
-		player.zza = 0.0F;
-		player.setSprinting(false);
-			player.setShiftKeyDown(false);
-			player.setDeltaMovement(Vec3.ZERO);
-			player.setPos(initialPosition);
-			double period = Math.max(1.0, WARMUP_FRAMES + MEASURE_FRAMES);
-			float yaw = REAL_TERRAIN_PARTICLE_GAMEPLAY || staticTerrainScenarioEnabled()
-				? initialYaw
-				: initialYaw + (float)Math.sin((frameIndex / period) * Math.PI * 2.0) * YAW_DELTA;
-			player.setYRot(yaw);
-			player.setXRot(initialPitch);
-			player.yRotO = yaw;
-			player.xRotO = initialPitch;
-			player.yHeadRot = yaw;
-			player.yHeadRotO = yaw;
-			player.yBodyRot = yaw;
-			player.yBodyRotO = yaw;
-			driveRealTerrainParticleGameplay(minecraft, player);
-			maintainPistonScenario(minecraft);
-		}
+		driveRealTerrainParticleGameplay(minecraft, player);
+		maintainPistonScenario(minecraft);
+	}
 
 	private static void setupRealTerrainParticleGameplayBlock(Minecraft minecraft, LocalPlayer player) {
 		if (!REAL_TERRAIN_PARTICLE_GAMEPLAY || minecraft.level == null || player == null) {
@@ -1699,11 +1809,17 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"framesSeenIncludingSettleWarmup\": ").append(frameIndex).append(",\n");
 		json.append("  \"settledFrameIndex\": ").append(settledFrameIndex).append(",\n");
 		json.append("  \"measuredFrameCount\": ").append(FRAME_NANOS.size()).append(",\n");
+		json.append("  \"renderedMeasurementFrames\": ").append(renderedMeasurementFrames).append(",\n");
+		json.append("  \"measurementRestartsAfterReadinessLoss\": ").append(measurementRestartsAfterReadinessLoss).append(",\n");
+		field(json, "lastMeasurementRestartCause", lastMeasurementRestartCause, 2, true);
+		json.append("  \"rejectedUnrenderedMeasurementFrames\": ").append(rejectedUnrenderedMeasurementFrames).append(",\n");
+		json.append("  \"rejectedEmptyStaticTerrainMeasurementFrames\": ")
+			.append(rejectedEmptyStaticTerrainMeasurementFrames).append(",\n");
 		json.append("  \"window\": { \"width\": ").append(minecraft.getWindow().getWidth()).append(", \"height\": ").append(minecraft.getWindow().getHeight()).append(" },\n");
 		writeRuntimeState(json, minecraft);
 		json.append(",\n");
-			json.append("  \"cameraPath\": { \"type\": \"").append(staticTerrainScenarioEnabled() ? "fixed-static-terrain" : "settled-sine-yaw")
-				.append("\", \"yawDelta\": ").append(format(staticTerrainScenarioEnabled() ? 0.0F : YAW_DELTA))
+			json.append("  \"cameraPath\": { \"type\": \"fixed-static-terrain\"")
+				.append(", \"yawDelta\": 0.0")
 				.append(", \"initialYaw\": ").append(format(initialYaw))
 				.append(", \"initialPitch\": ").append(format(initialPitch))
 				.append(", \"initialPosition\": { \"x\": ").append(format(initialPosition.x))
@@ -2205,20 +2321,41 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static long currentThreadAllocatedBytes() {
-		java.lang.management.ThreadMXBean baseBean = ManagementFactory.getThreadMXBean();
-		if (!(baseBean instanceof com.sun.management.ThreadMXBean threadBean)) {
-			return -1L;
-		}
-		if (!threadBean.isThreadAllocatedMemorySupported()) {
+		com.sun.management.ThreadMXBean threadBean = ThreadAllocationBeanHolder.BEAN;
+		if (threadBean == null) {
 			return -1L;
 		}
 		try {
-			if (!threadBean.isThreadAllocatedMemoryEnabled()) {
-				threadBean.setThreadAllocatedMemoryEnabled(true);
-			}
 			return threadBean.getThreadAllocatedBytes(Thread.currentThread().getId());
 		} catch (SecurityException | UnsupportedOperationException exception) {
 			return -1L;
+		}
+	}
+
+	/**
+	 * The platform management lookup can allocate megabytes while initializing
+	 * JMX metadata. Doing that at every phase boundary made the opt-in allocation
+	 * profiler create the periodic stalls it was intended to locate. Resolve and
+	 * enable the bean once on first use; ordinary non-benchmark rendering never
+	 * initializes this holder.
+	 */
+	private static final class ThreadAllocationBeanHolder {
+		private static final com.sun.management.ThreadMXBean BEAN = create();
+
+		private static com.sun.management.ThreadMXBean create() {
+			java.lang.management.ThreadMXBean baseBean = ManagementFactory.getThreadMXBean();
+			if (!(baseBean instanceof com.sun.management.ThreadMXBean threadBean)
+				|| !threadBean.isThreadAllocatedMemorySupported()) {
+				return null;
+			}
+			try {
+				if (!threadBean.isThreadAllocatedMemoryEnabled()) {
+					threadBean.setThreadAllocatedMemoryEnabled(true);
+				}
+				return threadBean;
+			} catch (SecurityException | UnsupportedOperationException exception) {
+				return null;
+			}
 		}
 	}
 
@@ -2346,18 +2483,19 @@ public final class GraphicsFrameBenchmark {
 		json.append("{ ");
 		json.append("\"acceptedBuildOutputs\": ").append(snapshot.acceptedBuildOutputs()).append(", ");
 		json.append("\"registeredMeshes\": ").append(snapshot.registeredMeshes()).append(", ");
-		json.append("\"terrainExtractionFrames\": ").append(snapshot.diagnostics().terrainExtractionFrames()).append(", ");
+		json.append("\"terrainExtractionFrames\": ").append(snapshot.counters().terrainExtractionFrames()).append(", ");
 		json.append("\"cachedLayerAssets\": ").append(snapshot.cachedLayerAssets()).append(", ");
 		json.append("\"activeTerrainLayers\": ").append(snapshot.activeTerrainLayers()).append(", ");
 		json.append("\"activeSectionAssets\": ").append(snapshot.activeSectionAssets()).append(", ");
 		json.append("\"atlasGeneration\": ").append(snapshot.atlasGeneration()).append(", ");
 		json.append("\"texturePayloadUpdates\": ").append(snapshot.texturePayloadUpdates()).append(", ");
-		json.append("\"texturePayloadUpdateBytes\": ").append(snapshot.diagnostics().texturePayloadUpdateBytes()).append(", ");
-		json.append("\"removedLayers\": ").append(snapshot.diagnostics().removedLayers()).append(", ");
+		json.append("\"texturePayloadUpdateBytes\": ").append(snapshot.counters().texturePayloadUpdateBytes()).append(", ");
+		json.append("\"removedLayers\": ").append(snapshot.counters().removedLayers()).append(", ");
 		json.append("\"invalidations\": ").append(snapshot.invalidations()).append(", ");
 		json.append("\"failedLayerSubmissions\": ").append(snapshot.failedLayerSubmissions()).append(", ");
 		json.append("\"visibleFingerprint\": ").append(snapshot.visibleFingerprint()).append(", ");
 		json.append("\"loadedChunks\": ").append(snapshot.loadedChunks()).append(", ");
+		json.append("\"loadedChunkPositionFingerprint\": ").append(snapshot.loadedChunkPositionFingerprint()).append(", ");
 		json.append("\"renderDistance\": ").append(snapshot.renderDistance()).append(", ");
 		json.append("\"worldMeshGeneration\": ").append(snapshot.meshMetrics().generation()).append(", ");
 		json.append("\"worldMeshUploadedGeneration\": ").append(snapshot.meshMetrics().uploadedGeneration()).append(", ");
@@ -2727,17 +2865,31 @@ public final class GraphicsFrameBenchmark {
 		return "rust";
 	}
 
-	private record OpenPhase(String name, long startNanos, long childNanos, Zone tracyZone) {
+	private record OpenPhase(
+		String name,
+		long startNanos,
+		long startAllocatedBytes,
+		long childNanos,
+		long childAllocatedBytes,
+		Zone tracyZone
+	) {
 		OpenPhase(String name, long startNanos) {
-			this(name, startNanos, 0L, null);
+			this(name, startNanos, -1L, 0L, 0L, null);
 		}
 
-		OpenPhase(String name, long startNanos, Zone tracyZone) {
-			this(name, startNanos, 0L, tracyZone);
+		OpenPhase(String name, long startNanos, long startAllocatedBytes, Zone tracyZone) {
+			this(name, startNanos, startAllocatedBytes, 0L, 0L, tracyZone);
 		}
 
-		OpenPhase withAdditionalChild(long nanos) {
-			return new OpenPhase(this.name, this.startNanos, this.childNanos + Math.max(0L, nanos), this.tracyZone);
+		OpenPhase withAdditionalChild(long nanos, long allocatedBytes) {
+			return new OpenPhase(
+				this.name,
+				this.startNanos,
+				this.startAllocatedBytes,
+				this.childNanos + Math.max(0L, nanos),
+				this.childAllocatedBytes + Math.max(0L, allocatedBytes),
+				this.tracyZone
+			);
 		}
 
 		void closeTracyZone() {
@@ -2773,47 +2925,48 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private record TerrainPerfSnapshot(
-		RustGalTerrainRenderer.TerrainDiagnostics diagnostics,
+		RustGalTerrainRenderer.TerrainPerformanceCounters counters,
 		RustGalWorldPrimitiveRenderer.WorldMeshAssetMetrics meshMetrics,
 		long visibleFingerprint,
 		int loadedChunks,
+		long loadedChunkPositionFingerprint,
 		int renderDistance,
 		long cameraSignature
 	) {
 		long acceptedBuildOutputs() {
-			return this.diagnostics.acceptedBuildOutputs();
+			return this.counters.acceptedBuildOutputs();
 		}
 
 		long registeredMeshes() {
-			return this.diagnostics.registeredMeshes();
+			return this.counters.registeredMeshes();
 		}
 
 		long atlasGeneration() {
-			return this.diagnostics.atlasGeneration();
+			return this.counters.atlasGeneration();
 		}
 
 		long texturePayloadUpdates() {
-			return this.diagnostics.texturePayloadUpdates();
+			return this.counters.texturePayloadUpdates();
 		}
 
 		long invalidations() {
-			return this.diagnostics.invalidations();
+			return this.counters.invalidations();
 		}
 
 		long failedLayerSubmissions() {
-			return this.diagnostics.failedLayerSubmissions();
+			return this.counters.failedLayerSubmissions();
 		}
 
 		int activeTerrainLayers() {
-			return this.diagnostics.activeTerrainLayers();
+			return this.counters.activeTerrainLayers();
 		}
 
 		int activeSectionAssets() {
-			return this.diagnostics.activeSectionAssets();
+			return this.counters.activeSectionAssets();
 		}
 
 		int cachedLayerAssets() {
-			return this.diagnostics.cachedLayerAssets();
+			return this.counters.cachedLayerAssets();
 		}
 
 		boolean readyForSteadyState() {
@@ -2835,7 +2988,7 @@ public final class GraphicsFrameBenchmark {
 				|| this.visibleFingerprint != 0L;
 		}
 
-		boolean quiescenceKeyEquals(TerrainPerfSnapshot other) {
+		boolean quiescenceKeyEquals(TerrainPerfSnapshot other, boolean ignoreViewState) {
 			// This benchmark measures a quiescent static-terrain cache while the
 			// rest of the world continues normally. Global mesh generations and
 			// cache sizes include posed entities and other dynamic producers, so
@@ -2844,10 +2997,10 @@ public final class GraphicsFrameBenchmark {
 			return other != null
 				&& this.acceptedBuildOutputs() == other.acceptedBuildOutputs()
 				&& this.registeredMeshes() == other.registeredMeshes()
-				&& this.diagnostics.terrainExtractionFrames() == other.diagnostics.terrainExtractionFrames()
-				&& this.diagnostics.skippedUnsupportedAnimatedSections() == other.diagnostics.skippedUnsupportedAnimatedSections()
-				&& this.diagnostics.skippedEmptyLayers() == other.diagnostics.skippedEmptyLayers()
-				&& this.diagnostics.removedLayers() == other.diagnostics.removedLayers()
+				&& this.counters.terrainExtractionFrames() == other.counters.terrainExtractionFrames()
+				&& this.counters.skippedUnsupportedAnimatedSections() == other.counters.skippedUnsupportedAnimatedSections()
+				&& this.counters.skippedEmptyLayers() == other.counters.skippedEmptyLayers()
+				&& this.counters.removedLayers() == other.counters.removedLayers()
 				&& this.atlasGeneration() == other.atlasGeneration()
 				&& this.texturePayloadUpdates() == other.texturePayloadUpdates()
 				&& this.invalidations() == other.invalidations()
@@ -2859,23 +3012,24 @@ public final class GraphicsFrameBenchmark {
 				&& this.meshMetrics.dirtyMeshes() == other.meshMetrics.dirtyMeshes()
 				&& this.meshMetrics.dirtyTextures() == other.meshMetrics.dirtyTextures()
 				&& this.meshMetrics.pendingInstances() == other.meshMetrics.pendingInstances()
-				&& this.visibleFingerprint == other.visibleFingerprint
+				&& (ignoreViewState || this.visibleFingerprint == other.visibleFingerprint)
 				&& this.loadedChunks == other.loadedChunks
+				&& this.loadedChunkPositionFingerprint == other.loadedChunkPositionFingerprint
 				&& this.renderDistance == other.renderDistance
-				&& this.cameraSignature == other.cameraSignature;
+				&& (ignoreViewState || this.cameraSignature == other.cameraSignature);
 		}
 
-		String changedCounters(TerrainPerfSnapshot other) {
+		String changedCounters(TerrainPerfSnapshot other, boolean ignoreViewState) {
 			if (other == null) {
 				return "initial-snapshot";
 			}
 			StringBuilder builder = new StringBuilder();
 			appendChange(builder, "acceptedBuildOutputs", other.acceptedBuildOutputs(), this.acceptedBuildOutputs());
 			appendChange(builder, "registeredMeshes", other.registeredMeshes(), this.registeredMeshes());
-			appendChange(builder, "terrainExtractionFrames", other.diagnostics.terrainExtractionFrames(), this.diagnostics.terrainExtractionFrames());
-			appendChange(builder, "skippedUnsupportedAnimatedSections", other.diagnostics.skippedUnsupportedAnimatedSections(), this.diagnostics.skippedUnsupportedAnimatedSections());
-			appendChange(builder, "skippedEmptyLayers", other.diagnostics.skippedEmptyLayers(), this.diagnostics.skippedEmptyLayers());
-			appendChange(builder, "removedLayers", other.diagnostics.removedLayers(), this.diagnostics.removedLayers());
+			appendChange(builder, "terrainExtractionFrames", other.counters.terrainExtractionFrames(), this.counters.terrainExtractionFrames());
+			appendChange(builder, "skippedUnsupportedAnimatedSections", other.counters.skippedUnsupportedAnimatedSections(), this.counters.skippedUnsupportedAnimatedSections());
+			appendChange(builder, "skippedEmptyLayers", other.counters.skippedEmptyLayers(), this.counters.skippedEmptyLayers());
+			appendChange(builder, "removedLayers", other.counters.removedLayers(), this.counters.removedLayers());
 			appendChange(builder, "atlasGeneration", other.atlasGeneration(), this.atlasGeneration());
 			appendChange(builder, "texturePayloadUpdates", other.texturePayloadUpdates(), this.texturePayloadUpdates());
 			appendChange(builder, "invalidations", other.invalidations(), this.invalidations());
@@ -2887,10 +3041,16 @@ public final class GraphicsFrameBenchmark {
 			appendChange(builder, "dirtyMeshes", other.meshMetrics.dirtyMeshes(), this.meshMetrics.dirtyMeshes());
 			appendChange(builder, "dirtyTextures", other.meshMetrics.dirtyTextures(), this.meshMetrics.dirtyTextures());
 			appendChange(builder, "pendingInstances", other.meshMetrics.pendingInstances(), this.meshMetrics.pendingInstances());
-			appendChange(builder, "visibleFingerprint", other.visibleFingerprint, this.visibleFingerprint);
+			if (!ignoreViewState) {
+				appendChange(builder, "visibleFingerprint", other.visibleFingerprint, this.visibleFingerprint);
+			}
 			appendChange(builder, "loadedChunks", other.loadedChunks, this.loadedChunks);
+			appendChange(builder, "loadedChunkPositionFingerprint", other.loadedChunkPositionFingerprint,
+				this.loadedChunkPositionFingerprint);
 			appendChange(builder, "renderDistance", other.renderDistance, this.renderDistance);
-			appendChange(builder, "cameraSignature", other.cameraSignature, this.cameraSignature);
+			if (!ignoreViewState) {
+				appendChange(builder, "cameraSignature", other.cameraSignature, this.cameraSignature);
+			}
 			return builder.isEmpty() ? "none" : builder.toString();
 		}
 

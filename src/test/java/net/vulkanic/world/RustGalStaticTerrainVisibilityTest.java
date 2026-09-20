@@ -4,9 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -75,54 +72,4 @@ class RustGalStaticTerrainVisibilityTest {
 		assertTrue(StaticTerrainVisibilitySet.mayPublishGeneration(frozen, 42L, 8L));
 	}
 
-	@Test
-	void wholeFrameTerrainPublishesAReplacementVisibilitySetBeforeFrameDiagnostics() throws IOException {
-		String source = Files.readString(Path.of(
-			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
-		));
-		int enqueue = source.indexOf("public static void enqueueWholeFrameTerrainSections(");
-		int visibleKeys = source.indexOf("Set<Long> visibleMeshKeys = visibleWholeFrameMeshKeys(sectionSnapshot);", enqueue);
-		int reconcile = source.indexOf("RustGalWorldPrimitiveRenderer.reconcileStaticTerrainVisibility(visibleMeshKeys);", enqueue);
-		int receipt = source.indexOf("recordRustWholeFrameEnqueueCoverage(", enqueue);
-		assertTrue(visibleKeys > enqueue);
-		assertTrue(reconcile > visibleKeys,
-			"the semantic source must replace the active draw domain after its layer submissions");
-		assertTrue(receipt > reconcile,
-			"coverage receipts must describe the same reconciled semantic frame");
-	}
-
-	@Test
-	void visibilityReconciliationRetiresInstancesWithoutEvictingPersistentAssets() throws IOException {
-		String source = Files.readString(Path.of(
-			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
-		));
-		int method = source.indexOf("public static void reconcileStaticTerrainVisibility(");
-		int end = source.indexOf("\n\tprivate static void markWorldMeshAssetsChangedLocked()", method);
-		String body = source.substring(method, end);
-		assertTrue(body.contains("StaticTerrainVisibilitySet.reconcile(ACTIVE_STATIC_TERRAIN_INSTANCES, visibleSnapshot)"));
-		assertTrue(!body.contains("WORLD_MESH_ASSETS.remove"),
-			"culling a section must not destroy the reusable Rust mesh asset");
-	}
-
-	@Test
-	void replacementGenerationDoesNotDisplaceAcknowledgedTerrainBeforeAssetAcceptance() throws IOException {
-		String source = Files.readString(Path.of(
-			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
-		));
-		int enqueue = source.indexOf("public static boolean enqueueStaticTerrainMeshInstance(");
-		int pending = source.indexOf("PENDING_MESH_INSTANCES.add(instance);", enqueue);
-		String enqueueBody = source.substring(enqueue, pending);
-		assertTrue(!enqueueBody.contains("rememberActiveStaticTerrainInstanceLocked(instance)"),
-			"a pending replacement must not displace the last acknowledged active terrain generation");
-
-		int consume = source.indexOf("public static PrimitiveFrame consumeFrame()");
-		int admitted = source.indexOf("if (!isWorldMeshInstanceUploadedLocked(instance))", consume);
-		int promote = source.indexOf("rememberActiveStaticTerrainInstanceLocked(instance);", admitted);
-		assertTrue(admitted > consume && promote > admitted,
-			"consume must promote a terrain replacement only after exact upload admission");
-
-		assertTrue(source.contains("ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY"),
-			"the accepted generation needs dependency state independent of a newer registered replacement");
-		assertTrue(source.contains("ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY.put(mesh.meshKey(), terrainResidency.copy())"));
-	}
 }

@@ -199,6 +199,14 @@ public class RenderSection {
     }
 
     /**
+     * Returns the packed section position without allocating a temporary
+     * {@link SectionPos}. Use this for per-frame identity lookups.
+     */
+    public long getPositionAsLong() {
+        return SectionPos.asLong(this.chunkX, this.chunkY, this.chunkZ);
+    }
+
+    /**
      * @return The x-coordinate of the origin position of this chunk render
      */
     public int getOriginX() {

@@ -3890,6 +3890,8 @@ STATIC_TERRAIN_POST_SETUP_EXECUTION_SCENARIOS = frozenset(
         "memory-cache-soak",
         "steady-state-performance",
         "texture-palette",
+        "time-of-day-transition",
+        "chunk-light-transition",
     }
 )
 
@@ -4006,6 +4008,8 @@ def static_terrain_lifecycle_evidence(
         "return-visited-terrain",
         "memory-cache-soak",
         "steady-state-performance",
+        "time-of-day-transition",
+        "chunk-light-transition",
     }
     atlas_scenarios = {
         "resource-reload",
@@ -4085,6 +4089,48 @@ def static_terrain_lifecycle_evidence(
             failures.append("lifecycle_resize_cycle_incomplete")
     if base_scenario in {"resource-reload", "pack-priority-reversal"}:
         required_reason_prefixes.append("lifecycle-resource-reload-started")
+    if base_scenario == "resource-reload":
+        continuity_frames = int(parse_number(lifecycle_doc.get("continuityFrames")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        continuity_zero_frames = int(parse_number(lifecycle_doc.get("continuityZeroFrames")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        continuity_minimum = int(parse_number(lifecycle_doc.get("continuityMinimumInstances")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        if continuity_frames <= 0:
+            failures.append("lifecycle_continuity_unobserved")
+        elif continuity_zero_frames > 0 or continuity_minimum <= 0:
+            failures.append("lifecycle_terrain_disappeared")
+    if base_scenario == "time-of-day-transition":
+        continuity_frames = int(parse_number(lifecycle_doc.get("continuityFrames")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        continuity_zero_frames = int(parse_number(lifecycle_doc.get("continuityZeroFrames")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        before_lightmap_generation = int(parse_number(lifecycle_doc.get("beforeLightmapGeneration")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        after_lightmap_generation = int(parse_number(lifecycle_doc.get("afterLightmapGeneration")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        before_world_time = int(parse_number(lifecycle_doc.get("beforeWorldTime")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        after_world_time = int(parse_number(lifecycle_doc.get("afterWorldTime")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        before_sky_factor = float(parse_number(lifecycle_doc.get("beforeSkyFactor")) or 0.0) if isinstance(lifecycle_doc, dict) else 0.0
+        after_sky_factor = float(parse_number(lifecycle_doc.get("afterSkyFactor")) or 0.0) if isinstance(lifecycle_doc, dict) else 0.0
+        if continuity_frames <= 0 or continuity_zero_frames > 0:
+            failures.append("lifecycle_daylight_terrain_continuity_invalid")
+        if after_lightmap_generation <= before_lightmap_generation:
+            failures.append("lifecycle_daylight_lightmap_generation_stale")
+        if after_world_time == before_world_time:
+            failures.append("lifecycle_daylight_world_time_stale")
+        if after_sky_factor <= before_sky_factor + 0.25:
+            failures.append("lifecycle_daylight_sky_factor_stale")
+        required_reason_prefixes.append("lifecycle-time-of-day-transition-requested")
+    if base_scenario == "chunk-light-transition":
+        continuity_frames = int(parse_number(lifecycle_doc.get("continuityFrames")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        continuity_zero_frames = int(parse_number(lifecycle_doc.get("continuityZeroFrames")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        before_content_hash = int(parse_number(lifecycle_doc.get("beforeContentHash")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        after_content_hash = int(parse_number(lifecycle_doc.get("afterContentHash")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        before_block_light = int(parse_number(lifecycle_doc.get("beforeBlockLight")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        after_block_light = int(parse_number(lifecycle_doc.get("afterBlockLight")) or 0) if isinstance(lifecycle_doc, dict) else 0
+        if continuity_frames <= 0 or continuity_zero_frames > 0:
+            failures.append("lifecycle_chunk_light_terrain_continuity_invalid")
+        if after_generation == before_generation:
+            failures.append("lifecycle_chunk_light_generation_stale")
+        if after_content_hash == before_content_hash:
+            failures.append("lifecycle_chunk_light_mesh_payload_stale")
+        if after_block_light <= before_block_light:
+            failures.append("lifecycle_chunk_light_level_stale")
+        required_reason_prefixes.append("lifecycle-chunk-light-transition-requested")
     if base_scenario == "view-distance-decrease":
         required_reason_prefixes.append("lifecycle-view-distance-decreased")
     if base_scenario in {"view-distance-increase", "memory-cache-soak", "steady-state-performance"}:
@@ -36028,11 +36074,20 @@ def build_capture_command(
     # volume before a parity screenshot is admissible. Keep the same bounded
     # frame allowance on both repositories; the standard outer wall-clock
     # profile may still reject a slow machine rather than capture partial work.
-    settled_static_ready_max_wait_frames = (
-        (900 if args.profile == "extended" else 300)
-        if (tool_kind == "capture" and workload_profile == "settled-static")
-        else world_profile.deterministic_ready_max_wait_frames
-    )
+    if tool_kind == "capture" and static_terrain_requires_post_setup_execution(
+        static_terrain_scenario
+    ):
+        # Lifecycle captures need one complete settled terrain population before
+        # applying their action, then another afterward. A radius-10 cold start
+        # can legitimately receive its final chunk invalidation near the generic
+        # 180-frame migration ceiling; failing two frames into the required
+        # three-frame quiet window never exercises the requested lifecycle.
+        # Keep this bounded and preserve every readiness condition.
+        settled_static_ready_max_wait_frames = 900 if args.profile == "extended" else 600
+    elif tool_kind == "capture" and workload_profile == "settled-static":
+        settled_static_ready_max_wait_frames = 900 if args.profile == "extended" else 300
+    else:
+        settled_static_ready_max_wait_frames = world_profile.deterministic_ready_max_wait_frames
     # A cloud/weather/particle-only capture has no producer-specific terrain
     # quiescence contract. Leaving the migration-gate's sodium-terrain
     # readiness family enabled would make these fixtures wait forever while
@@ -39132,6 +39187,13 @@ def run_mode(
     repository_paths = repository_resolution(current_root, find_frozen_repo(current_root, explicit_frozen_repo), explicit_frozen_repo)
     unsupported_profile_reason = profile_not_supported_reason(args.profile, mode, tool_kind, args)
     if unsupported_profile_reason:
+        # Matrix rows use an unsupported profile as an explicit inapplicable
+        # skip. A directly requested capture/gameplay/subsystem run is
+        # different: reporting it as successful means no client is launched
+        # while callers believe they exercised the renderer. Fail that direct
+        # request loudly so lifecycle regressions cannot hide behind an empty
+        # artifact.
+        profile_skip_is_success = args.tool == "matrix"
         capture_dir.mkdir(parents=True, exist_ok=True)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         write_preflight_meta(capture_dir, mode, args, env)
@@ -39151,16 +39213,16 @@ def run_mode(
         artifact["capture"]["profile_not_supported"] = True
         artifact["capture"]["minimum_supported_profile"] = minimum_supported_profile(mode, tool_kind, args)
         artifact["capture"]["requested_profile"] = args.profile
-        artifact["capture"]["success"] = True
+        artifact["capture"]["success"] = profile_skip_is_success
         artifact["capture"]["failed_phase"] = "profile-not-supported"
-        artifact["validation"]["complete"] = True
+        artifact["validation"]["complete"] = profile_skip_is_success
         artifact["validation"]["messages"] = [unsupported_profile_reason]
         artifact["validation"]["performance_publishable"] = False
         write_artifact(output_path, artifact)
         emit_matrix_progress(args, row_label, "artifact-finalized", unsupported_profile_reason)
         return MatrixResult(
             mode.name,
-            True,
+            profile_skip_is_success,
             False,
             False,
             "profile-not-supported",
@@ -40816,6 +40878,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 "return-visited-terrain",
                 "memory-cache-soak",
                 "steady-state-performance",
+                "time-of-day-transition",
+                "chunk-light-transition",
             ),
             default=os.environ.get("MATTMC_WORLD_STATIC_TERRAIN_SCENARIO", ""),
             help="Require deterministic real Sodium static chunk-terrain evidence for Rust whole-frame Vulkan captures.",

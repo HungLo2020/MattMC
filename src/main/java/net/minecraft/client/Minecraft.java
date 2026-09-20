@@ -1403,6 +1403,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 								"Rust Vulkan whole-frame presentation was selected but its semantic shell was not admitted"
 							);
 						}
+						net.minecraft.client.dev.GraphicsFrameBenchmark.recordRenderedFrame();
 						// The Rust coordinator already advances deterministic capture
 						// at its post-present boundary. Do not count this frame twice.
 					}
@@ -1422,6 +1423,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 					if (!holdExternalFrame) {
 						net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering");
 						this.gameRenderer.render(this.deltaTracker, bl);
+						net.minecraft.client.dev.GraphicsFrameBenchmark.recordRenderedFrame();
 						net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering");
 						net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
 					}

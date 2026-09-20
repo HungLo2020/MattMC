@@ -30,6 +30,37 @@ class AtlasAnimationPublicationsTest {
     }
 
     @Test
+    void registrationRebasesStartupTicksBeforeTheBoundedLiveDeliveryFifo() {
+        var registry = new AtlasAnimationPublications();
+        var resource = AtlasAnimationResource.runtime(
+            ResourceLocation.withDefaultNamespace("atlas/startup"), 0x5a110001,
+            new SemanticAtlasAnimationSource(77, 1, 1, 1, List.of()), 0);
+        for (int tick = 1; tick <= AtlasAnimationTickDelivery.MAX_PENDING_TICKS + 32; tick++) {
+            resource.enqueueNextTick(false);
+        }
+        var publication = new AtlasAnimationPublication(texture(0x5a110001, 0), resource);
+        registry.register(publication, () -> {});
+        registry.textureAccepted(1, texture(0x5a110001, 0));
+        var stagedTicks = new ArrayList<Long>();
+        assertTrue(registry.drain((id, generation, initialTick, source) -> {
+            stagedTicks.add(initialTick);
+            return null;
+        }, (id, generation, tick, visible, onlyVisible) -> {
+            fail("pre-publication startup history must be represented by the initial clock");
+            return true;
+        }));
+        assertEquals(List.of(96L), stagedTicks);
+        resource.enqueueNextTick(false);
+        assertTrue(registry.drain((id, generation, initialTick, source) -> {
+            fail("the accepted declaration must not be staged twice");
+            return null;
+        }, (id, generation, tick, visible, onlyVisible) -> {
+            assertEquals(97, tick);
+            return true;
+        }));
+    }
+
+    @Test
     void diagnosticGenerationNamesOnlyTheStagedOwnedResource() {
         var source = new SemanticAtlasAnimationSource(77, 1, 1, 1, List.of());
         var resource = new AtlasAnimationResource(ResourceLocation.withDefaultNamespace("atlas/101"), 101, source);

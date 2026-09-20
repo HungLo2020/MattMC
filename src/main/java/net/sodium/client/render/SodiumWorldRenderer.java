@@ -326,6 +326,11 @@ public class SodiumWorldRenderer {
 	        net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("sodium.terrain.draw");
 	        try {
 	        if (group == ChunkSectionLayerGroup.OPAQUE) {
+			if (this.renderSectionManager.getBuilder().isBuildQueueEmpty() && this.client.level != null) {
+				StaticTerrainParityDiagnostics.recordJavaOpenGlSubmittedWork(
+					this.client.level.getChunkSource().getLoadedChunksCount(),
+					this.client.options.getEffectiveRenderDistance());
+			}
 	            StaticTerrainParityDiagnostics.recordVisibleLists(
 	                    "java-opengl-draw",
 	                    "solid",

@@ -21,11 +21,13 @@ import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.translucent_sorting.data.SharedIndexSorter;
 import net.sodium.client.render.chunk.translucent_sorting.data.Sorter;
+import net.sodium.client.render.chunk.translucent_sorting.SortType;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.util.iterator.ByteIterator;
 import net.sodium.client.util.NativeBuffer;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.vulkanic.bridge.VulkanicGalBridge;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import org.slf4j.Logger;
 import net.logging.LogUtils;
 
@@ -41,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -78,11 +81,23 @@ public final class RustGalTerrainRenderer {
 	private static final String STATIC_TERRAIN_SCENARIO_PROPERTY = "mattmc.dev.rustGalStaticTerrain.scenario";
 	private static final String FAULT_PROPERTY = "mattmc.dev.rustGalStaticTerrain.fault";
 	private static final Map<LayerKey, TerrainSectionAsset> SECTION_ASSETS = new ConcurrentHashMap<>();
+	/** Direct semantic identity lookup for post-submit receipts and sort metadata. */
+	private static final Map<Long, TerrainAssetIdentity> SECTION_ASSETS_BY_MESH_KEY = new ConcurrentHashMap<>();
+	/** Replacement generation built off-screen while the published atlas remains live. */
+	private static final Map<LayerKey, TerrainSectionAsset> RESOURCE_RELOAD_SECTION_ASSETS = new ConcurrentHashMap<>();
+	private static volatile boolean resourceReloadStaging;
+	private static volatile boolean resourceReloadCommitInProgress;
 	/** Bounded semantic-only probe samples retained after Rust accepts a mesh. */
 	private static final Map<BlockPos, List<VulkanicGalBridge.WorldMeshVertexRecord>> TEXTURE_PROBE_QUADS = new ConcurrentHashMap<>();
 	private static volatile List<TerrainTextureProbe> activeTextureProbes = List.of();
 	/** Must match the Rust whole-frame static-terrain residency bound. */
 	private static final int MAX_SEMANTIC_TERRAIN_SECTIONS = 4096;
+	/** Primitive-only render-thread scratch; it retains no section or world objects. */
+	private static final ThreadLocal<TerrainSetScratch> TERRAIN_SET_SCRATCH =
+		ThreadLocal.withInitial(TerrainSetScratch::new);
+	/** Read-only map probe reused by each caller; immutable LayerKey values remain the only stored keys. */
+	private static final ThreadLocal<LayerLookup> SECTION_ASSET_LOOKUP =
+		ThreadLocal.withInitial(LayerLookup::new);
 	private static final ArrayDeque<TerrainDiagnosticEvent> RECENT_EVENTS = new ArrayDeque<>(MAX_RECENT_EVENTS);
 	private static final ArrayDeque<TerrainDiagnosticEvent> LIFECYCLE_EVENTS = new ArrayDeque<>(MAX_LIFECYCLE_EVENTS);
 	private static final ArrayDeque<TerrainDiagnosticEvent> TRANSLUCENT_EVENTS = new ArrayDeque<>(MAX_TRANSLUCENT_EVENTS);
@@ -151,6 +166,26 @@ public final class RustGalTerrainRenderer {
 		double cameraZ,
 		int drawOrder
 	) {}
+
+	private static final class TerrainSetScratch {
+		final LongOpenHashSet seenPositions = new LongOpenHashSet();
+		final LongOpenHashSet visibleMeshKeys = new LongOpenHashSet();
+		final LongOpenHashSet visibleSubmissions = new LongOpenHashSet();
+		final ArrayList<RenderSection> sectionSnapshot = new ArrayList<>();
+		final ArrayList<TerrainSectionAsset> solidAssetSnapshot = new ArrayList<>();
+		final ArrayList<TerrainSectionAsset> cutoutAssetSnapshot = new ArrayList<>();
+		final ArrayList<RenderSection> translucentSectionSnapshot = new ArrayList<>();
+
+		void clearAll() {
+			seenPositions.clear();
+			visibleMeshKeys.clear();
+			visibleSubmissions.clear();
+			sectionSnapshot.clear();
+			solidAssetSnapshot.clear();
+			cutoutAssetSnapshot.clear();
+			translucentSectionSnapshot.clear();
+		}
+	}
 
 
 	private static void retainTranslucentExecutionMetadata(long meshKey, TranslucentExecutionMetadata metadata) {
@@ -335,6 +370,13 @@ public final class RustGalTerrainRenderer {
 	private RustGalTerrainRenderer() {
 	}
 
+	/** True when the published Rust terrain registry owns any layer for this section. */
+	static boolean hasSectionAsset(long sectionPos) {
+		return sectionAsset(sectionPos, ChunkSectionLayer.SOLID) != null
+			|| sectionAsset(sectionPos, ChunkSectionLayer.CUTOUT_MIPPED) != null
+			|| sectionAsset(sectionPos, ChunkSectionLayer.TRANSLUCENT) != null;
+	}
+
 	public static void acceptChunkBuildOutput(ChunkBuildOutput output) {
 		// Select the owner before constructing any layout.  The whole-frame
 		// Vulkan producer is compact and must not even query Iris's live vertex
@@ -387,7 +429,7 @@ public final class RustGalTerrainRenderer {
 		if (output == null || output.translucentData == null || !isStaticTerrainTranslucentScenario()) {
 			return;
 		}
-		TerrainSectionAsset asset = SECTION_ASSETS.get(new LayerKey(output.render.getPosition().asLong(), ChunkSectionLayer.TRANSLUCENT));
+		TerrainSectionAsset asset = sectionAsset(output.render.getPositionAsLong(), ChunkSectionLayer.TRANSLUCENT);
 		if (asset == null) {
 			return;
 		}
@@ -396,7 +438,7 @@ public final class RustGalTerrainRenderer {
 			+ ":"
 			+ output.translucentData.getClass().getSimpleName();
 		recordEvent(
-			output.render.getPosition().asLong(),
+			output.render.getPositionAsLong(),
 			ChunkSectionLayer.TRANSLUCENT,
 			output.submitTime,
 			asset.meshGeneration(),
@@ -440,7 +482,7 @@ public final class RustGalTerrainRenderer {
 		long sortedIndexSampleHash = sortedIndexSampleHash(indexBytes);
 		String sortedIndexSample = sortedIndexSample(indexBytes, asset.indexType(), 12);
 		String sorterType = initialTranslucentSorterType(output);
-		long sectionPos = output.render.getPosition().asLong();
+		long sectionPos = output.render.getPositionAsLong();
 		recordTranslucentSortPayloadEvent(
 			sectionPos,
 			output.submitTime,
@@ -531,7 +573,7 @@ public final class RustGalTerrainRenderer {
 		if (output == null || output.isReusingUploadedIndexData()) {
 			return;
 		}
-		TerrainSectionAsset asset = SECTION_ASSETS.get(new LayerKey(output.render.getPosition().asLong(), ChunkSectionLayer.TRANSLUCENT));
+		TerrainSectionAsset asset = sectionAsset(output.render.getPositionAsLong(), ChunkSectionLayer.TRANSLUCENT);
 		if (asset == null) {
 			return;
 		}
@@ -542,7 +584,7 @@ public final class RustGalTerrainRenderer {
 		);
 		if (indexBytes.length == 0) {
 			recordEvent(
-				output.render.getPosition().asLong(),
+				output.render.getPositionAsLong(),
 				ChunkSectionLayer.TRANSLUCENT,
 				output.submitTime,
 				asset.meshGeneration(),
@@ -580,7 +622,7 @@ public final class RustGalTerrainRenderer {
 		String sortedIndexSample = sortedIndexSample(indexBytes, INDEX_TYPE_U32, 12);
 		String sorterType = translucentSorterType(output.getSorter());
 		recordTranslucentSortPayloadEvent(
-			output.render.getPosition().asLong(),
+			output.render.getPositionAsLong(),
 			output.submitTime,
 			asset,
 			output.render.getOriginX(),
@@ -614,7 +656,7 @@ public final class RustGalTerrainRenderer {
 		registeredTranslucentSorts.incrementAndGet();
 		registeredTranslucentSortBytes.addAndGet(indexBytes.length);
 		recordEvent(
-			output.render.getPosition().asLong(),
+			output.render.getPositionAsLong(),
 			ChunkSectionLayer.TRANSLUCENT,
 			output.submitTime,
 			asset.meshGeneration(),
@@ -663,18 +705,12 @@ public final class RustGalTerrainRenderer {
 		if (sortedIndex == null) {
 			return;
 		}
-		LayerKey layerKey = null;
-		TerrainSectionAsset asset = null;
-		for (Map.Entry<LayerKey, TerrainSectionAsset> entry : SECTION_ASSETS.entrySet()) {
-			if (entry.getKey().layer() == ChunkSectionLayer.TRANSLUCENT && entry.getValue().meshKey() == sortedIndex.meshKey()) {
-				layerKey = entry.getKey();
-				asset = entry.getValue();
-				break;
-			}
-		}
-		if (asset == null || layerKey == null) {
+		TerrainAssetIdentity identity = SECTION_ASSETS_BY_MESH_KEY.get(sortedIndex.meshKey());
+		if (identity == null || identity.layerKey().layer() != ChunkSectionLayer.TRANSLUCENT) {
 			return;
 		}
+		LayerKey layerKey = identity.layerKey();
+		TerrainSectionAsset asset = identity.asset();
 		long hash = sortedIndexHash(sortedIndex.indexBytes());
 		long sampleHash = sortedIndexSampleHash(sortedIndex.indexBytes());
 		recordTranslucentSortPayloadEvent(
@@ -772,7 +808,14 @@ public final class RustGalTerrainRenderer {
 		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan() || renderLists == null || camera == null) {
 			return;
 		}
-		Set<VisibleSubmitKey> visibleSubmissions = new HashSet<>();
+		RustGalWorldPrimitiveRenderer.seedStaticTerrainFrameCamera(
+			camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z());
+		TerrainSetScratch scratch = TERRAIN_SET_SCRATCH.get();
+		scratch.visibleSubmissions.clear();
+		LongOpenHashSet visibleSubmissions = scratch.visibleSubmissions;
+		String fault = activeFault();
+		boolean detailedDiagnostics = detailedTerrainDiagnosticsEnabled(fault);
+		boolean trackTerrainCounters = terrainCountersEnabled(fault);
 		Iterator<ChunkRenderList> iterator = renderLists.iterator();
 		while (iterator.hasNext()) {
 			ChunkRenderList renderList = iterator.next();
@@ -785,8 +828,10 @@ public final class RustGalTerrainRenderer {
 				if (section == null) {
 					continue;
 				}
-				enqueueSectionLayer(section, ChunkSectionLayer.SOLID, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
-				enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
+				enqueueSectionLayer(section, ChunkSectionLayer.SOLID, camera, viewportWidth, viewportHeight, 0,
+					visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+				enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, camera, viewportWidth, viewportHeight, 0,
+					visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
 			}
 		}
 		int translucentDrawOrder = 0;
@@ -802,7 +847,8 @@ public final class RustGalTerrainRenderer {
 				if (section == null) {
 					continue;
 				}
-				enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight, translucentDrawOrder++, visibleSubmissions);
+				enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight,
+					translucentDrawOrder++, visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
 			}
 		}
 	}
@@ -819,8 +865,13 @@ public final class RustGalTerrainRenderer {
 			|| sections == null || camera == null) {
 			return;
 		}
+		RustGalWorldPrimitiveRenderer.seedStaticTerrainFrameCamera(
+			camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z());
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visibility-snapshot");
-		List<RenderSection> sectionSnapshot = snapshotBuiltTerrainSections(sections);
+		TerrainSetScratch scratch = TERRAIN_SET_SCRATCH.get();
+		scratch.clearAll();
+		List<RenderSection> sectionSnapshot = snapshotBuiltTerrainSections(
+			sections, scratch.seenPositions, scratch.sectionSnapshot);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visibility-snapshot");
 		// Mesh residency is intentionally longer lived than visibility. Publish
 		// the complete semantic visibility replacement below so the primitive
@@ -828,21 +879,38 @@ public final class RustGalTerrainRenderer {
 		// This is derived only from the copied section/layer assets, never from a
 		// Sodium render list or a backend handle.
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.mesh-key-set");
-		Set<Long> visibleMeshKeys = visibleWholeFrameMeshKeys(sectionSnapshot);
+		LongOpenHashSet visibleMeshKeys = visibleWholeFrameMeshKeys(
+			sectionSnapshot, scratch.visibleMeshKeys, scratch.solidAssetSnapshot,
+			scratch.cutoutAssetSnapshot, scratch.translucentSectionSnapshot);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.mesh-key-set");
-		Set<VisibleSubmitKey> visibleSubmissions = new HashSet<>();
+		if (net.minecraft.client.dev.GraphicsFrameBenchmark.isActiveForDiagnostics()) {
+			recordTerrainIndexWorkload(sectionSnapshot);
+		}
+		LongOpenHashSet visibleSubmissions = scratch.visibleSubmissions;
+		String fault = activeFault();
+		boolean detailedDiagnostics = detailedTerrainDiagnosticsEnabled(fault);
+		boolean trackTerrainCounters = terrainCountersEnabled(fault);
 		int translucentDrawOrder = 0;
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.opaque-submit");
-		for (RenderSection section : sectionSnapshot) {
-			enqueueSectionLayer(section, ChunkSectionLayer.SOLID, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
-			enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, camera, viewportWidth, viewportHeight, 0, visibleSubmissions);
+		for (int index = 0; index < sectionSnapshot.size(); index++) {
+			RenderSection section = sectionSnapshot.get(index);
+			enqueueSectionLayer(section, ChunkSectionLayer.SOLID, scratch.solidAssetSnapshot.get(index),
+				camera, viewportWidth, viewportHeight, 0,
+				visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+			enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, scratch.cutoutAssetSnapshot.get(index),
+				camera, viewportWidth, viewportHeight, 0,
+				visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.opaque-submit");
 		// Translucent sections are a single camera-sorted semantic stream. The
 		// legacy Sodium render list is unavailable on the Rust whole-frame route,
 		// so retain no list/GL state and order copied section centers explicitly.
+		// Restrict the sort to sections that actually own a published translucent
+		// asset; sorting every opaque/cutout-only section produced identical output
+		// while adding O(visible sections log visible sections) frame work.
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.translucent-sort");
-		sectionSnapshot.sort(Comparator.comparingDouble((RenderSection section) -> {
+		ArrayList<RenderSection> translucentSections = scratch.translucentSectionSnapshot;
+		translucentSections.sort(Comparator.comparingDouble((RenderSection section) -> {
 			double dx = section.getOriginX() + 8.0D - camera.getPosition().x();
 			double dy = section.getOriginY() + 8.0D - camera.getPosition().y();
 			double dz = section.getOriginZ() + 8.0D - camera.getPosition().z();
@@ -850,13 +918,15 @@ public final class RustGalTerrainRenderer {
 		}).reversed());
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.translucent-sort");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.translucent-submit");
-		for (RenderSection section : sectionSnapshot) {
+		for (RenderSection section : translucentSections) {
 			enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight,
-				translucentDrawOrder++, visibleSubmissions);
+				translucentDrawOrder++, visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.translucent-submit");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visibility-reconcile");
-		RustGalWorldPrimitiveRenderer.reconcileStaticTerrainVisibility(visibleMeshKeys);
+		if (!resourceReloadStaging) {
+			RustGalWorldPrimitiveRenderer.reconcileStaticTerrainVisibility(visibleMeshKeys);
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visibility-reconcile");
 		// Report the semantic terrain workload at the producer boundary. These
 		// names are parity-family labels only: the work above is Rust-owned CPU
@@ -874,16 +944,49 @@ public final class RustGalTerrainRenderer {
 		// The companion receipt is built from the same CPU-owned RenderSection
 		// values that this semantic callsite submitted. It deliberately contains
 		// no Sodium render list, GL object, or backend handle.
-		net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustWholeFrameEnqueueCoverage(
-			sectionSnapshot,
-			currentGameplayFrameId(),
-			RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained(),
-			camera.getPosition().x(),
-			camera.getPosition().y(),
-			camera.getPosition().z(),
-			viewportWidth,
-			viewportHeight
-		);
+		if (detailedDiagnostics) {
+			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustWholeFrameEnqueueCoverage(
+				sectionSnapshot,
+				currentGameplayFrameId(),
+				RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained(),
+				camera.getPosition().x(),
+				camera.getPosition().y(),
+				camera.getPosition().z(),
+				viewportWidth,
+				viewportHeight
+			);
+		}
+	}
+
+	/** Benchmark-only geometry volume, derived from copied semantic assets. */
+	private static void recordTerrainIndexWorkload(List<RenderSection> sections) {
+		long solidIndices = 0L;
+		long cutoutIndices = 0L;
+		long translucentIndices = 0L;
+		long staticTranslucentSections = 0L;
+		long dynamicTranslucentSections = 0L;
+		for (RenderSection section : sections) {
+			long sectionPos = section.getPositionAsLong();
+			TerrainSectionAsset solid = sectionAsset(sectionPos, ChunkSectionLayer.SOLID);
+			TerrainSectionAsset cutout = sectionAsset(sectionPos, ChunkSectionLayer.CUTOUT_MIPPED);
+			TerrainSectionAsset translucent = sectionAsset(sectionPos, ChunkSectionLayer.TRANSLUCENT);
+			if (solid != null) {
+				solidIndices += solid.indexCount();
+			}
+			if (cutout != null) {
+				cutoutIndices += cutout.indexCount();
+			}
+			if (translucent != null) {
+				translucentIndices += translucent.indexCount();
+				if (translucent.translucentSortType() == SortType.DYNAMIC) dynamicTranslucentSections++;
+				else staticTranslucentSections++;
+			}
+		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("world.static-terrain.solid-indices", solidIndices);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("world.static-terrain.cutout-indices", cutoutIndices);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("world.static-terrain.translucent-indices", translucentIndices);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("world.static-terrain.static-translucent-sections", staticTranslucentSections);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("world.static-terrain.dynamic-translucent-sections", dynamicTranslucentSections);
 	}
 
 	/**
@@ -891,18 +994,32 @@ public final class RustGalTerrainRenderer {
 	 * visibility set. Empty layers deliberately contribute nothing: they have
 	 * no mesh instance to retain or execute.
 	 */
-	private static Set<Long> visibleWholeFrameMeshKeys(Iterable<RenderSection> sections) {
-		Set<Long> visibleMeshKeys = new HashSet<>();
+	private static LongOpenHashSet visibleWholeFrameMeshKeys(Iterable<RenderSection> sections,
+			LongOpenHashSet visibleMeshKeys, List<TerrainSectionAsset> solidAssets,
+			List<TerrainSectionAsset> cutoutAssets, List<RenderSection> translucentSections) {
+		visibleMeshKeys.clear();
+		solidAssets.clear();
+		cutoutAssets.clear();
+		translucentSections.clear();
 		for (RenderSection section : sections) {
 			if (section == null) {
 				continue;
 			}
-			long sectionPos = section.getPosition().asLong();
-			for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
-				TerrainSectionAsset asset = SECTION_ASSETS.get(new LayerKey(sectionPos, layer));
-				if (asset != null) {
-					visibleMeshKeys.add(asset.meshKey());
-				}
+			long sectionPos = section.getPositionAsLong();
+			TerrainSectionAsset solid = sectionAsset(sectionPos, ChunkSectionLayer.SOLID);
+			TerrainSectionAsset cutout = sectionAsset(sectionPos, ChunkSectionLayer.CUTOUT_MIPPED);
+			TerrainSectionAsset translucent = sectionAsset(sectionPos, ChunkSectionLayer.TRANSLUCENT);
+			solidAssets.add(solid);
+			cutoutAssets.add(cutout);
+			if (solid != null) {
+				visibleMeshKeys.add(solid.meshKey());
+			}
+			if (cutout != null) {
+				visibleMeshKeys.add(cutout.meshKey());
+			}
+			if (translucent != null) {
+				visibleMeshKeys.add(translucent.meshKey());
+				translucentSections.add(section);
 			}
 		}
 		return visibleMeshKeys;
@@ -918,11 +1035,17 @@ public final class RustGalTerrainRenderer {
 		if (sections == null) {
 			return List.of();
 		}
-		List<RenderSection> snapshot = new ArrayList<>();
-		Set<Long> seenPositions = new HashSet<>();
+		TerrainSetScratch scratch = TERRAIN_SET_SCRATCH.get();
+		return snapshotBuiltTerrainSections(sections, scratch.seenPositions, new ArrayList<>());
+	}
+
+	private static List<RenderSection> snapshotBuiltTerrainSections(Iterable<RenderSection> sections,
+			LongOpenHashSet seenPositions, List<RenderSection> snapshot) {
+		seenPositions.clear();
+		snapshot.clear();
 		for (RenderSection section : sections) {
 			if (section != null && section.isBuilt()
-				&& seenPositions.add(section.getPosition().asLong())) {
+				&& seenPositions.add(section.getPositionAsLong())) {
 				if (snapshot.size() >= MAX_SEMANTIC_TERRAIN_SECTIONS) {
 					throw new IllegalStateException(
 						"Rust whole-frame semantic terrain section bound exceeded "
@@ -942,16 +1065,12 @@ public final class RustGalTerrainRenderer {
 		// Until the rebuild is acknowledged, this terrain family remains unavailable
 		// instead of presenting stale resource-pack materials.
 		RustGalWholeFrameTerrainSource.requestResourceReload();
-		// The source rebuild is consumed lazily by the next whole-frame enqueue.
-		// Retire the currently drawable identities here, not when that later enqueue
-		// happens: their atlas UVs name the pre-reload atlas layout and can otherwise
-		// sample unrelated sprites from the newly copied atlas for one or more frames.
-		// `removeLayer` also retires the matching Rust-owned mesh resource, so this
-		// remains an explicit semantic rebuild rather than retaining or borrowing a
-		// Java renderer/GPU object across the resource generation boundary.
-		for (LayerKey key : List.copyOf(SECTION_ASSETS.keySet())) {
-			removeLayer(key.sectionPos(), key.layer(), "resource-reload");
-		}
+		// Keep the last complete atlas/mesh generation drawable while the CPU source
+		// rebuilds. New meshes use generation-scoped keys and upload off-screen; the
+		// complete replacement and its atlas are published together after quiescence.
+		discardStagedResourceReloadAssets();
+		resourceReloadStaging = true;
+		resourceReloadCommitInProgress = false;
 		TRANSLUCENT_EXECUTION_METADATA.clear();
 		TEXTURE_PROBE_QUADS.clear();
 		DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
@@ -978,6 +1097,9 @@ public final class RustGalTerrainRenderer {
 	}
 
 	public static void invalidateForWorldUnload() {
+		discardStagedResourceReloadAssets();
+		resourceReloadStaging = false;
+		resourceReloadCommitInProgress = false;
 		// DH snapshots are CPU-only semantic copies, but they are world-scoped.
 		// Discard them with the existing terrain world epoch so no later Rust
 		// route can accidentally observe data from a disconnected level.
@@ -1012,14 +1134,19 @@ public final class RustGalTerrainRenderer {
 	 * stream is required for the explicit camera-relative sort producer.
 	 */
 	public static void releaseUploadedStaticTerrainPayload(long meshKey, long meshGeneration) {
-		for (Map.Entry<LayerKey, TerrainSectionAsset> entry : SECTION_ASSETS.entrySet()) {
-			TerrainSectionAsset asset = entry.getValue();
-			if (asset.meshKey() != meshKey || asset.meshGeneration() != meshGeneration
-				|| entry.getKey().layer() == ChunkSectionLayer.TRANSLUCENT || asset.asset() == null) {
-				continue;
-			}
-			SECTION_ASSETS.replace(entry.getKey(), asset, asset.releaseCpuPayload());
+		TerrainAssetIdentity identity = SECTION_ASSETS_BY_MESH_KEY.get(meshKey);
+		if (identity == null) {
 			return;
+		}
+		LayerKey layerKey = identity.layerKey();
+		TerrainSectionAsset asset = identity.asset();
+		if (asset.meshGeneration() != meshGeneration || layerKey.layer() == ChunkSectionLayer.TRANSLUCENT
+			|| asset.asset() == null) {
+			return;
+		}
+		TerrainSectionAsset released = asset.releaseCpuPayload();
+		if (SECTION_ASSETS.replace(layerKey, asset, released)) {
+			SECTION_ASSETS_BY_MESH_KEY.replace(meshKey, identity, new TerrainAssetIdentity(layerKey, released));
 		}
 	}
 
@@ -1068,6 +1195,35 @@ public final class RustGalTerrainRenderer {
 				List.copyOf(RECENT_EVENTS)
 			);
 		}
+	}
+
+	/**
+	 * Counter-only view used by the steady-state benchmark. The full diagnostics
+	 * snapshot intentionally copies bounded event histories for crash/capture
+	 * evidence; polling those histories every measured frame would make the audit
+	 * machinery part of the workload being measured.
+	 */
+	public static TerrainPerformanceCounters performanceCountersSnapshot() {
+		long currentFrameId = currentGameplayFrameId();
+		long currentVisibleSubmissions =
+			lastVisibleSubmissionFrameId.get() == currentFrameId ? currentFrameVisibleLayerSubmissions.get() : 0L;
+		return new TerrainPerformanceCounters(
+			SECTION_ASSETS.size(),
+			SECTION_ASSETS.size(),
+			SECTION_ASSETS.size(),
+			currentVisibleSubmissions > 0L ? currentFrameVisibleFingerprint.get() : 0L,
+			atlasGeneration,
+			acceptedBuildOutputs.get(),
+			skippedUnsupportedAnimatedSections.get(),
+			skippedEmptyLayers.get(),
+			registeredMeshes.get(),
+			texturePayloadUpdates.get(),
+			texturePayloadUpdateBytes.get(),
+			removedLayers.get(),
+			failedLayerSubmissions.get(),
+			invalidations.get(),
+			terrainExtractionFrames.get()
+		);
 	}
 
 	/**
@@ -1472,15 +1628,16 @@ public final class RustGalTerrainRenderer {
 			net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getY()),
 			net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getZ())
 		);
-		TerrainSectionAsset asset = SECTION_ASSETS.get(new LayerKey(sectionPos, layer));
+		TerrainSectionAsset asset = sectionAsset(sectionPos, layer);
 		if (asset == null) {
-			return new TerrainLayerSnapshot(sectionPos, layer.name(), 0L, 0L, 0, 0, 0);
+			return new TerrainLayerSnapshot(sectionPos, layer.name(), 0L, 0L, 0L, 0, 0, 0);
 		}
 		return new TerrainLayerSnapshot(
 			sectionPos,
 			layer.name(),
 			asset.meshKey(),
 			asset.meshGeneration(),
+			asset.contentHash(),
 			asset.vertexCount(),
 			asset.indexCount() * 2,
 			asset.sectionCount()
@@ -1496,7 +1653,7 @@ public final class RustGalTerrainRenderer {
 			net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getY()),
 			net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getZ())
 		);
-		TerrainSectionAsset asset = SECTION_ASSETS.get(new LayerKey(sectionPos, layer));
+		TerrainSectionAsset asset = sectionAsset(sectionPos, layer);
 		int originX = net.minecraft.core.SectionPos.sectionToBlockCoord(net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getX()));
 		int originY = net.minecraft.core.SectionPos.sectionToBlockCoord(net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getY()));
 		int originZ = net.minecraft.core.SectionPos.sectionToBlockCoord(net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getZ()));
@@ -1527,7 +1684,7 @@ public final class RustGalTerrainRenderer {
 			net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getY()),
 			net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getZ())
 		);
-		TerrainSectionAsset asset = SECTION_ASSETS.get(new LayerKey(sectionPos, ChunkSectionLayer.TRANSLUCENT));
+		TerrainSectionAsset asset = sectionAsset(sectionPos, ChunkSectionLayer.TRANSLUCENT);
 		int originX = net.minecraft.core.SectionPos.sectionToBlockCoord(net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getX()));
 		int originY = net.minecraft.core.SectionPos.sectionToBlockCoord(net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getY()));
 		int originZ = net.minecraft.core.SectionPos.sectionToBlockCoord(net.minecraft.core.SectionPos.blockToSectionCoord(blockPos.getZ()));
@@ -1629,6 +1786,9 @@ public final class RustGalTerrainRenderer {
 		if (Minecraft.getInstance() == null) {
 			return;
 		}
+		if (resourceReloadStaging && !resourceReloadCommitInProgress) {
+			return;
+		}
 		ensureAtlasPayload();
 		byte[] payload;
 		List<byte[]> mipPayloads;
@@ -1721,43 +1881,49 @@ public final class RustGalTerrainRenderer {
 		long frameId,
 		long submissionId
 	) {
-		if (instances == null || instances.isEmpty()) {
-			return;
+		// This receipt describes every completed whole-frame submission, including
+		// an empty terrain domain. Retaining the last non-empty value hid real
+		// terrain holes during reload and made eventual-recovery tests unable to
+		// distinguish continuous presentation from a blank interval.
+		if (instances == null) {
+			instances = List.of();
 		}
-		boolean detailedDiagnostics =
-			net.sodium.client.render.StaticTerrainParityDiagnostics.isEnabled();
+		boolean detailedDiagnostics = detailedTerrainDiagnosticsEnabled();
+		if (!detailedDiagnostics && !TRANSLUCENT_EXECUTION_METADATA.isEmpty()) {
+			// A capture or fault fixture can end between semantic enqueue and its
+			// execution receipt. Do not let that diagnostic-only metadata survive
+			// and attach to a later capture; ordinary frames otherwise never touch
+			// this map.
+			TRANSLUCENT_EXECUTION_METADATA.clear();
+		}
 		long executedStaticTerrainInstances = 0L;
 		List<net.sodium.client.render.StaticTerrainParityDiagnostics.RustExecutionIdentity> executionReceipt =
 			detailedDiagnostics ? new ArrayList<>(instances.size()) : List.of();
 		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : instances) {
-			TerrainSectionAsset asset = null;
-			LayerKey layerKey = null;
-			for (Map.Entry<LayerKey, TerrainSectionAsset> entry : SECTION_ASSETS.entrySet()) {
-				TerrainSectionAsset candidate = entry.getValue();
-				if (candidate.meshKey() == instance.meshKey()) {
-					asset = candidate;
-					layerKey = entry.getKey();
-					break;
-				}
-			}
-			if (asset == null || layerKey == null) {
+			TerrainAssetIdentity identity = SECTION_ASSETS_BY_MESH_KEY.get(instance.meshKey());
+			if (identity == null) {
 				continue;
 			}
+			TerrainSectionAsset asset = identity.asset();
+			LayerKey layerKey = identity.layerKey();
 			executedStaticTerrainInstances++;
-		TranslucentExecutionMetadata submittedMetadata =
-				layerKey.layer() == ChunkSectionLayer.TRANSLUCENT
-					? takeTranslucentExecutionMetadata(instance.meshKey())
-					: null;
-			TranslucentSortSnapshot sortedIndex =
-				layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentTranslucentSortSnapshot(asset) : null;
-		// Execution is recorded after command generation. Report the sorted
-		// payload currently owned by Rust at that point; an older queued receipt
-		// must not masquerade as the active draw after a camera resort.
-		long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
-		long sortedIndexHash = sortedIndex == null ? 0L : sortedIndex.indexHash();
-		double cameraX = layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentCameraX() : 0.0D;
-		double cameraY = layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentCameraY() : 0.0D;
-		double cameraZ = layerKey.layer() == ChunkSectionLayer.TRANSLUCENT ? currentCameraZ() : 0.0D;
+			TranslucentExecutionMetadata submittedMetadata = null;
+			TranslucentSortSnapshot sortedIndex = null;
+			double cameraX = 0.0D;
+			double cameraY = 0.0D;
+			double cameraZ = 0.0D;
+			if (detailedDiagnostics && layerKey.layer() == ChunkSectionLayer.TRANSLUCENT) {
+				submittedMetadata = takeTranslucentExecutionMetadata(instance.meshKey());
+				sortedIndex = currentTranslucentSortSnapshot(asset);
+				cameraX = currentCameraX();
+				cameraY = currentCameraY();
+				cameraZ = currentCameraZ();
+			}
+			// Execution is recorded after command generation. Report the sorted
+			// payload currently owned by Rust at that point; an older queued receipt
+			// must not masquerade as the active draw after a camera resort.
+			long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
+			long sortedIndexHash = sortedIndex == null ? 0L : sortedIndex.indexHash();
 			int drawOrder = submittedMetadata != null ? submittedMetadata.drawOrder() : 0;
 			if (detailedDiagnostics) net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainExecution(
 				"rust-vulkan-executed",
@@ -1825,16 +1991,14 @@ public final class RustGalTerrainRenderer {
 				drawOrder
 			);
 		}
-		if (executedStaticTerrainInstances > 0L) {
-			if (detailedDiagnostics) {
+		if (executedStaticTerrainInstances > 0L && detailedDiagnostics) {
 				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustWholeFrameExecutionCoverage(
 					executionReceipt, frameId
 				);
-			}
-			lastExecutedStaticTerrainFrameId.set(frameId);
-			lastExecutedStaticTerrainSubmissionId.set(submissionId);
-			lastExecutedStaticTerrainInstances.set(executedStaticTerrainInstances);
 		}
+		lastExecutedStaticTerrainFrameId.set(frameId);
+		lastExecutedStaticTerrainSubmissionId.set(submissionId);
+		lastExecutedStaticTerrainInstances.set(executedStaticTerrainInstances);
 	}
 
 	private static void acceptLayer(ChunkBuildOutput output, TerrainRenderPass pass, ChunkSectionLayer layer, long extractionFrameId,
@@ -1845,7 +2009,7 @@ public final class RustGalTerrainRenderer {
 			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
 				output, layer.name(), "source-layer-empty"
 			);
-			removeLayer(output.render.getPosition().asLong(), layer, "empty-layer");
+			removeOrStageEmptyLayer(output.render.getPositionAsLong(), layer, "empty-layer");
 			return;
 		}
 			try {
@@ -1855,7 +2019,7 @@ public final class RustGalTerrainRenderer {
 					net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
 						output, layer.name(), "source-layer-fully-filtered"
 					);
-					removeLayer(output.render.getPosition().asLong(), layer, "fully-filtered-layer");
+					removeOrStageEmptyLayer(output.render.getPositionAsLong(), layer, "fully-filtered-layer");
 					return;
 				}
 				cacheTextureProbeQuads(output, asset);
@@ -1875,17 +2039,26 @@ public final class RustGalTerrainRenderer {
 				// the copied mesh, SECTION_ASSETS must not advertise a drawable section
 				// that the Rust frontend cannot consume.
 				long atlasGenerationForRegistration = atlasGeneration;
+				boolean stagingReload = resourceReloadStaging;
 				RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset(
-					asset.asset(), atlasTextureUpdatePayload(waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute())), layer == ChunkSectionLayer.TRANSLUCENT
+					asset.asset(), stagingReload ? List.of()
+						: atlasTextureUpdatePayload(waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute())),
+					layer == ChunkSectionLayer.TRANSLUCENT
 				);
-				confirmAtlasPayloadRegistered(atlasGenerationForRegistration);
-				SECTION_ASSETS.put(new LayerKey(output.render.getPosition().asLong(), layer), asset);
+				if (stagingReload) {
+					RESOURCE_RELOAD_SECTION_ASSETS.put(
+						new LayerKey(output.render.getPositionAsLong(), layer), asset
+					);
+				} else {
+					confirmAtlasPayloadRegistered(atlasGenerationForRegistration);
+					publishSectionAsset(new LayerKey(output.render.getPositionAsLong(), layer), asset);
+				}
 				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
 					output, layer.name(), "asset-registered"
 				);
 				registeredMeshes.incrementAndGet();
 				recordEvent(
-					output.render.getPosition().asLong(),
+					output.render.getPositionAsLong(),
 					layer,
 					output.submitTime,
 					asset.meshGeneration(),
@@ -1923,7 +2096,7 @@ public final class RustGalTerrainRenderer {
 				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainAdmission(
 					output, layer.name(), "asset-decode-failed"
 				);
-				removeLayer(output.render.getPosition().asLong(), layer, "decode-failed");
+				removeOrStageEmptyLayer(output.render.getPositionAsLong(), layer, "decode-failed");
 		}
 	}
 
@@ -2164,7 +2337,7 @@ public final class RustGalTerrainRenderer {
 		if (sections.isEmpty()) {
 			throw new IllegalArgumentException("static terrain mesh has no drawable sections");
 		}
-		long sectionPos = output.render.getPosition().asLong();
+		long sectionPos = output.render.getPositionAsLong();
 		long meshKey = meshKey(sectionPos, layer);
 		long generation = meshGeneration(sectionPos, layer, vertices, indexBytes, sections);
 		int diagnosticVertexCount = vertexCount;
@@ -2243,6 +2416,8 @@ public final class RustGalTerrainRenderer {
 			output.render.getOriginX(),
 			output.render.getOriginY(),
 			output.render.getOriginZ(),
+			layer == ChunkSectionLayer.TRANSLUCENT && output.translucentData != null
+				? output.translucentData.getSortType() : SortType.NONE,
 			orderedTranslucentMesh == null ? "" : orderedTranslucentMesh.accountingReason(),
 			orderedTranslucentMesh == null ? 0 : orderedTranslucentMesh.unsupportedPrimitiveCount(),
 			translucentSourceSegmentQuadCounts,
@@ -2899,31 +3074,42 @@ public final class RustGalTerrainRenderer {
 			| ((bytes[offset + 3] & 0xff) << 24);
 	}
 
-	private static boolean enqueueSectionLayer(RenderSection section, ChunkSectionLayer layer, Camera camera, int viewportWidth, int viewportHeight, int drawOrder,
-			Set<VisibleSubmitKey> visibleSubmissions) {
-		visibleLayerProbes.incrementAndGet();
-		TerrainSectionAsset asset = SECTION_ASSETS.get(new LayerKey(section.getPosition().asLong(), layer));
+	private static boolean enqueueSectionLayer(RenderSection section, ChunkSectionLayer layer, Camera camera,
+			int viewportWidth, int viewportHeight, int drawOrder, LongOpenHashSet visibleSubmissions,
+			String fault, boolean detailedDiagnostics, boolean trackTerrainCounters) {
+		long sectionPos = section.getPositionAsLong();
+		TerrainSectionAsset asset = sectionAsset(sectionPos, layer);
+		return enqueueSectionLayer(section, layer, asset, camera, viewportWidth, viewportHeight,
+			drawOrder, visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+	}
+
+	/** Uses the immutable asset resolved while building the same frame's visibility key set. */
+	private static boolean enqueueSectionLayer(RenderSection section, ChunkSectionLayer layer,
+			TerrainSectionAsset asset, Camera camera, int viewportWidth, int viewportHeight, int drawOrder,
+			LongOpenHashSet visibleSubmissions, String fault, boolean detailedDiagnostics,
+			boolean trackTerrainCounters) {
+		if (trackTerrainCounters) {
+			visibleLayerProbes.incrementAndGet();
+		}
+		long sectionPos = section.getPositionAsLong();
 		if (asset == null) {
+			if (detailedDiagnostics) {
 			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainNonExecution(
-				section.getPosition().asLong(),
+				sectionPos,
 				layer.name(),
 				"asset-missing:" + net.sodium.client.render.StaticTerrainParityDiagnostics
-					.rustStaticTerrainAdmissionReason(section.getPosition().asLong(), layer.name()),
+					.rustStaticTerrainAdmissionReason(sectionPos, layer.name()),
 				0L,
 				0L
 			);
+			}
 			return false;
 		}
-		float[] transform = cameraRelativeTranslationTransform(
-			(float)(section.getOriginX() - camera.getPosition().x()),
-			(float)(section.getOriginY() - camera.getPosition().y()),
-			(float)(section.getOriginZ() - camera.getPosition().z())
-		);
-		long visibleGeneration = "stale-generation".equals(activeFault()) ? asset.meshGeneration() + 1L : asset.meshGeneration();
-			TranslucentSortSnapshot sortedIndex =
-				layer == ChunkSectionLayer.TRANSLUCENT ? currentTranslucentSortSnapshot(asset) : null;
-			long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
-			long sortedIndexHash = sortedIndex == null ? 0L : sortedIndex.indexHash();
+		long visibleGeneration = "stale-generation".equals(fault) ? asset.meshGeneration() + 1L : asset.meshGeneration();
+		TranslucentSortSnapshot sortedIndex = detailedDiagnostics && layer == ChunkSectionLayer.TRANSLUCENT
+			? currentTranslucentSortSnapshot(asset) : null;
+		long sortGeneration = sortedIndex == null ? 0L : sortedIndex.sortGeneration();
+		long sortedIndexHash = sortedIndex == null ? 0L : sortedIndex.indexHash();
 		// Queue the visible semantic instance even when this generation is still
 		// awaiting its bounded Rust asset upload. The frame coordinator publishes
 		// resources before consumeFrame(), which then admits only an acknowledged
@@ -2931,14 +3117,14 @@ public final class RustGalTerrainRenderer {
 		// the upload changed the acknowledgement to the replacement generation and
 		// consumeFrame() rejected the old instance, creating a one-frame terrain
 		// hole. Queuing first makes upload plus active-instance replacement atomic.
-		if (visibleSubmissions != null && !"duplicate-visible-section".equals(activeFault())) {
-			VisibleSubmitKey submitKey = new VisibleSubmitKey(section.getPosition().asLong(), layer, visibleGeneration);
-			if (!visibleSubmissions.add(submitKey)) {
+		if (visibleSubmissions != null && !"duplicate-visible-section".equals(fault)) {
+			if (!visibleSubmissions.add(asset.meshKey())) {
+				if (detailedDiagnostics) {
 				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainNonExecution(
-					section.getPosition().asLong(), layer.name(), "duplicate-visible-suppressed", visibleGeneration, 0L
+					sectionPos, layer.name(), "duplicate-visible-suppressed", visibleGeneration, 0L
 				);
-				recordEvent(
-					section.getPosition().asLong(),
+					recordEvent(
+					sectionPos,
 					layer,
 					0L,
 					asset.meshGeneration(),
@@ -2966,15 +3152,17 @@ public final class RustGalTerrainRenderer {
 					Math.max(0, asset.indexCount() / 6),
 					sortedIndexHash,
 					sortGeneration,
-					drawOrder
-				);
-				return false;
+						drawOrder
+					);
+				}
+					return false;
 			}
 		}
-		boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainMeshInstance(
+		boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainSectionInstance(
 			asset.meshKey(),
 			visibleGeneration,
-			transform,
+			section.getOriginX(), section.getOriginY(), section.getOriginZ(),
+			camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z(),
 			viewportWidth,
 			viewportHeight,
 			terrainDepthPolicy(layer),
@@ -2982,14 +3170,13 @@ public final class RustGalTerrainRenderer {
 			// copied mesh preserves its authored winding, so this remains an
 			// explicit semantic request rather than an OpenGL-state fallback.
 			RustGalWorldPrimitiveRenderer.CULL_BACK,
-			terrainCameraSortRequested(layer),
-			Boolean.getBoolean("mattmc.dev.rustGalTerrainPlacement")
-				? new VulkanicGalBridge.TerrainSectionPlacement(section.getOriginX(),section.getOriginY(),section.getOriginZ(),
-					camera.getPosition().x(),camera.getPosition().y(),camera.getPosition().z()) : null
+			terrainCameraSortRequested(layer, asset.translucentSortType())
 		);
-		long enqueueFrameId = rustEnqueueFrames.incrementAndGet();
+		long enqueueFrameId = trackTerrainCounters ? rustEnqueueFrames.incrementAndGet() : 0L;
 		if (submitted) {
-			visibleLayerSubmissions.incrementAndGet();
+			if (trackTerrainCounters) {
+				visibleLayerSubmissions.incrementAndGet();
+			}
 			// This section's accepted semantic draw supplies CPU resource names,
 			// never Sodium render-list storage or its mutable sprite-active flags.
 			var animatedSprites = section.getAnimatedSprites();
@@ -2999,10 +3186,12 @@ public final class RustGalTerrainRenderer {
 						sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
 				}
 			}
-			recordCurrentFrameVisibleSubmission(enqueueFrameId, section.getPosition().asLong(), layer,
-				asset.meshKey(), visibleGeneration);
-			recordVisibleSubmissionIdentity(section.getPosition().asLong(), layer, visibleGeneration);
-			if (layer == ChunkSectionLayer.TRANSLUCENT) {
+			if (trackTerrainCounters) {
+				recordCurrentFrameVisibleSubmission(enqueueFrameId, sectionPos, layer,
+					asset.meshKey(), visibleGeneration);
+				recordVisibleSubmissionIdentity(sectionPos, layer, visibleGeneration);
+			}
+			if (detailedDiagnostics && layer == ChunkSectionLayer.TRANSLUCENT) {
 				retainTranslucentExecutionMetadata(asset.meshKey(), new TranslucentExecutionMetadata(
 						sortGeneration,
 						sortedIndexHash,
@@ -3012,9 +3201,9 @@ public final class RustGalTerrainRenderer {
 						drawOrder
 				));
 			}
-			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainExecution(
+			if (detailedDiagnostics) net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainExecution(
 				"rust-vulkan-enqueued",
-				section.getPosition().asLong(),
+				sectionPos,
 				layer.name(),
 				asset.meshKey(),
 				asset.meshGeneration(),
@@ -3041,9 +3230,9 @@ public final class RustGalTerrainRenderer {
 				currentGameplayFrameId(),
 				enqueueFrameId
 			);
-			if (detailedTerrainDiagnosticsEnabled()) {
+			if (detailedDiagnostics) {
 			recordEvent(
-				section.getPosition().asLong(),
+				sectionPos,
 				layer,
 				0L,
 				asset.meshGeneration(),
@@ -3074,9 +3263,9 @@ public final class RustGalTerrainRenderer {
 				drawOrder
 			);
 			}
-			if (detailedTerrainDiagnosticsEnabled() && "duplicate-visible-section".equals(activeFault())) {
+			if (detailedDiagnostics && "duplicate-visible-section".equals(fault)) {
 				recordEvent(
-					section.getPosition().asLong(),
+					sectionPos,
 					layer,
 					0L,
 					asset.meshGeneration(),
@@ -3101,18 +3290,22 @@ public final class RustGalTerrainRenderer {
 			// A missing generation here is ordinary retirement latency rather than a
 			// bad semantic submission. Pending uploads normally enqueue successfully
 			// above and become drawable after the coordinator's pre-consume flush.
-			if (!"stale-generation".equals(activeFault())
+			if (!"stale-generation".equals(fault)
 					&& !RustGalWorldPrimitiveRenderer.isStaticTerrainMeshGenerationUploaded(asset.meshKey(), asset.meshGeneration())) {
+				if (detailedDiagnostics) {
 				net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainNonExecution(
-					section.getPosition().asLong(), layer.name(), "asset-upload-pending", asset.meshGeneration(), 0L
+					sectionPos, layer.name(), "asset-upload-pending", asset.meshGeneration(), 0L
 				);
+				}
 				return false;
 			}
 			failedLayerSubmissions.incrementAndGet();
+			if (detailedDiagnostics) {
 			net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustStaticTerrainNonExecution(
-				section.getPosition().asLong(), layer.name(), "stale-or-unregistered-submit", visibleGeneration, enqueueFrameId
+				sectionPos, layer.name(), "stale-or-unregistered-submit", visibleGeneration, enqueueFrameId
 			);
-			recordEvent(section.getPosition().asLong(), layer, 0L, asset.meshGeneration(), visibleGeneration, atlasGeneration, asset, section.getOriginX(), section.getOriginY(), section.getOriginZ(), 0.0F, 0.0F, 0.0F, "stale-or-unregistered-submit", 0L, enqueueFrameId, 0L, 0L);
+			recordEvent(sectionPos, layer, 0L, asset.meshGeneration(), visibleGeneration, atlasGeneration, asset, section.getOriginX(), section.getOriginY(), section.getOriginZ(), 0.0F, 0.0F, 0.0F, "stale-or-unregistered-submit", 0L, enqueueFrameId, 0L, 0L);
+			}
 		}
 		return submitted;
 	}
@@ -3139,6 +3332,11 @@ public final class RustGalTerrainRenderer {
 	 * visible terrain is already stable.
 	 */
 	private static void recordVisibleSubmissionIdentity(long sectionPos, ChunkSectionLayer layer, long generation) {
+		boolean benchmarkNeedsIdentity = net.minecraft.client.dev.GraphicsFrameBenchmark.needsSubmittedWorkIdentity();
+		boolean captureNeedsIdentity = net.minecraft.client.dev.DeterministicCameraCapture.needsSubmittedWorkIdentity();
+		if (!benchmarkNeedsIdentity && !captureNeedsIdentity) {
+			return;
+		}
 		String identity = "rust-vulkan-whole-frame:section=" + sectionPos
 			+ ":layer=" + layer.name()
 			+ ":generation=" + generation;
@@ -3146,10 +3344,14 @@ public final class RustGalTerrainRenderer {
 		// route, but it is still the semantic sodium-terrain family. Recording
 		// that identity lets the shared parity capture wait for real submitted
 		// terrain instead of accepting an empty first Rust frame.
-		net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("sodium-terrain", identity);
-		net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("sodium-terrain", identity);
-		net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("static-terrain", identity);
-		net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("static-terrain", identity);
+		if (benchmarkNeedsIdentity) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("sodium-terrain", identity);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("static-terrain", identity);
+		}
+		if (captureNeedsIdentity) {
+			net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("sodium-terrain", identity);
+			net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("static-terrain", identity);
+		}
 	}
 
 	public static boolean injectCrossWorldStaleSubmissionForDiagnostics(int viewportWidth, int viewportHeight) {
@@ -3341,9 +3543,22 @@ public final class RustGalTerrainRenderer {
 	 * event stream needed by their validation contracts.
 	 */
 	private static boolean detailedTerrainDiagnosticsEnabled() {
-		return Boolean.getBoolean("mattmc.dev.deterministicCameraCapture")
+		return detailedTerrainDiagnosticsEnabled(activeFault());
+	}
+
+	private static boolean detailedTerrainDiagnosticsEnabled(String fault) {
+		return !net.minecraft.client.dev.GraphicsFrameBenchmark.isMeasurementWindowForDiagnostics()
+			&& (Boolean.getBoolean("mattmc.dev.deterministicCameraCapture")
 			|| Boolean.getBoolean("mattmc.dev.staticTerrainParityDiagnostics")
-			|| !activeFault().isEmpty();
+			|| !fault.isEmpty());
+	}
+
+	/** Cumulative and current-frame receipts have no ordinary gameplay consumer. */
+	private static boolean terrainCountersEnabled(String fault) {
+		return net.minecraft.client.dev.GraphicsFrameBenchmark.isActiveForDiagnostics()
+			|| net.minecraft.client.dev.DeterministicCameraCapture.isActiveForDiagnostics()
+			|| net.sodium.client.render.StaticTerrainParityDiagnostics.isEnabled()
+			|| !fault.isEmpty();
 	}
 
 	private static boolean isStaticTerrainTranslucentScenario() {
@@ -3630,9 +3845,13 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private static long meshKey(long sectionPos, ChunkSectionLayer layer) {
-		long hash = fnv64("static-terrain-section-v1");
+		long hash = fnv64("static-terrain-section-v2");
 		hash = fnv64Long(hash, sectionPos);
 		hash = fnv64Int(hash, layer.ordinal());
+		// Resource generations must coexist while a replacement atlas and all of
+		// its meshes upload off-screen. Ordinary block edits within one atlas keep
+		// the stable key and continue using per-mesh generation replacement.
+		hash = fnv64Long(hash, atlasGeneration);
 		return hash == 0L ? 1L : hash;
 	}
 
@@ -3762,9 +3981,98 @@ public final class RustGalTerrainRenderer {
 			&& (animationDeclarationStable || copiedFrameKey == semanticFrameKey);
 	}
 
+	private static void removeOrStageEmptyLayer(long sectionPos, ChunkSectionLayer layer, String reason) {
+		if (resourceReloadStaging) {
+			RESOURCE_RELOAD_SECTION_ASSETS.remove(new LayerKey(sectionPos, layer));
+			return;
+		}
+		removeLayer(sectionPos, layer, reason);
+	}
+
+	/**
+	 * Atomically replaces the published terrain generation after every rebuilt
+	 * mesh has crossed the native asset boundary. The atlas remains old until
+	 * this point, so no presented frame can combine old UVs with new pixels.
+	 */
+	static boolean finishResourceReloadIfReady() {
+		if (!resourceReloadStaging) {
+			return true;
+		}
+		for (TerrainSectionAsset asset : RESOURCE_RELOAD_SECTION_ASSETS.values()) {
+			if (!RustGalWorldPrimitiveRenderer.isStaticTerrainMeshGenerationUploaded(
+				asset.meshKey(), asset.meshGeneration()
+			)) {
+				return false;
+			}
+		}
+		Map<LayerKey, TerrainSectionAsset> replacement = Map.copyOf(RESOURCE_RELOAD_SECTION_ASSETS);
+		resourceReloadCommitInProgress = true;
+		try {
+			ensureTerrainAtlasAssetForWorldMesh();
+			confirmAtlasPayloadRegistered(atlasGeneration);
+			List<TerrainSectionAsset> previous = List.copyOf(SECTION_ASSETS.values());
+			rebuildMeshKeyIdentityIndex(replacement);
+			SECTION_ASSETS.clear();
+			SECTION_ASSETS.putAll(replacement);
+			RESOURCE_RELOAD_SECTION_ASSETS.clear();
+			resourceReloadStaging = false;
+			for (TerrainSectionAsset asset : previous) {
+				RustGalWorldPrimitiveRenderer.removeStaticTerrainMeshAsset(asset.meshKey());
+			}
+			recordEvent(0L, ChunkSectionLayer.SOLID, 0L, 0L, 0L, atlasGeneration,
+				null, 0, 0, 0, 0.0F, 0.0F, 0.0F, "resource-reload-committed");
+			return true;
+		} finally {
+			resourceReloadCommitInProgress = false;
+		}
+	}
+
+	private static void discardStagedResourceReloadAssets() {
+		for (TerrainSectionAsset asset : RESOURCE_RELOAD_SECTION_ASSETS.values()) {
+			RustGalWorldPrimitiveRenderer.removeStaticTerrainMeshAsset(asset.meshKey());
+		}
+		RESOURCE_RELOAD_SECTION_ASSETS.clear();
+	}
+
+	private static void publishSectionAsset(LayerKey layerKey, TerrainSectionAsset asset) {
+		TerrainAssetIdentity identity = new TerrainAssetIdentity(layerKey, asset);
+		TerrainAssetIdentity collision = SECTION_ASSETS_BY_MESH_KEY.get(asset.meshKey());
+		if (collision != null && !collision.layerKey().equals(layerKey)) {
+			throw new IllegalStateException("Rust terrain mesh key maps to multiple section layers: meshKey="
+				+ asset.meshKey() + " existing=" + collision.layerKey() + " replacement=" + layerKey);
+		}
+		TerrainSectionAsset replaced = SECTION_ASSETS.put(layerKey, asset);
+		if (replaced != null && replaced.meshKey() != asset.meshKey()) {
+			SECTION_ASSETS_BY_MESH_KEY.computeIfPresent(replaced.meshKey(), (meshKey, previous) ->
+				previous.layerKey().equals(layerKey) ? null : previous
+			);
+		}
+		SECTION_ASSETS_BY_MESH_KEY.put(asset.meshKey(), identity);
+	}
+
+	private static void rebuildMeshKeyIdentityIndex(Map<LayerKey, TerrainSectionAsset> assets) {
+		Map<Long, TerrainAssetIdentity> rebuilt = new HashMap<>(assets.size());
+		for (Map.Entry<LayerKey, TerrainSectionAsset> entry : assets.entrySet()) {
+			TerrainAssetIdentity identity = new TerrainAssetIdentity(entry.getKey(), entry.getValue());
+			TerrainAssetIdentity collision = rebuilt.putIfAbsent(entry.getValue().meshKey(), identity);
+			if (collision != null && !collision.layerKey().equals(entry.getKey())) {
+				throw new IllegalStateException("Rust terrain reload contains a duplicate mesh key: meshKey="
+					+ entry.getValue().meshKey() + " first=" + collision.layerKey() + " second=" + entry.getKey());
+			}
+		}
+		SECTION_ASSETS_BY_MESH_KEY.clear();
+		SECTION_ASSETS_BY_MESH_KEY.putAll(rebuilt);
+	}
+
 	private static void removeLayer(long sectionPos, ChunkSectionLayer layer, String reason) {
-		TerrainSectionAsset removed = SECTION_ASSETS.remove(new LayerKey(sectionPos, layer));
+		LayerKey layerKey = new LayerKey(sectionPos, layer);
+		TerrainSectionAsset removed = SECTION_ASSETS.remove(layerKey);
 		if (removed != null) {
+			SECTION_ASSETS_BY_MESH_KEY.computeIfPresent(removed.meshKey(), (meshKey, identity) ->
+				identity.layerKey().equals(layerKey) && identity.asset().meshGeneration() == removed.meshGeneration()
+					? null
+					: identity
+			);
 			if ("world-unload".equals(reason)) {
 				lastWorldUnloadAsset = removed;
 				lastWorldUnloadSectionPos = sectionPos;
@@ -4116,9 +4424,11 @@ public final class RustGalTerrainRenderer {
 			: RustGalWorldPrimitiveRenderer.DEPTH_POLICY_TEST_NO_WRITE;
 	}
 
-	static boolean terrainCameraSortRequested(ChunkSectionLayer layer) {
-		// Blend ordering is independent of whether the layer writes depth.
-		return layer == ChunkSectionLayer.TRANSLUCENT;
+	static boolean terrainCameraSortRequested(ChunkSectionLayer layer, SortType sortType) {
+		// Sodium's static sort modes already authored their one valid index order
+		// into the copied asset. Re-sorting those quads every frame both changes
+		// that order and explodes one section into many tiny draw batches.
+		return layer == ChunkSectionLayer.TRANSLUCENT && sortType == SortType.DYNAMIC;
 	}
 
 	static String appendPbrSuffix(String path, String suffix) {
@@ -4488,10 +4798,64 @@ public final class RustGalTerrainRenderer {
 		}
 	}
 
-	private record LayerKey(long sectionPos, ChunkSectionLayer layer) {
+	private static TerrainSectionAsset sectionAsset(long sectionPos, ChunkSectionLayer layer) {
+		LayerLookup lookup = SECTION_ASSET_LOOKUP.get();
+		lookup.set(sectionPos, layer);
+		return SECTION_ASSETS.get(lookup);
 	}
 
-	private record VisibleSubmitKey(long sectionPos, ChunkSectionLayer layer, long generation) {
+	private interface LayerAddress {
+		long sectionPos();
+
+		ChunkSectionLayer layer();
+	}
+
+	private record LayerKey(long sectionPos, ChunkSectionLayer layer) implements LayerAddress {
+		@Override
+		public boolean equals(Object other) {
+			return this == other || other instanceof LayerAddress address
+				&& sectionPos == address.sectionPos() && layer == address.layer();
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * Long.hashCode(sectionPos) + layer.hashCode();
+		}
+	}
+
+	/** Never inserted into a map; get(Object) consumes its value synchronously before the next set. */
+	private static final class LayerLookup implements LayerAddress {
+		private long sectionPos;
+		private ChunkSectionLayer layer;
+
+		void set(long sectionPos, ChunkSectionLayer layer) {
+			this.sectionPos = sectionPos;
+			this.layer = layer;
+		}
+
+		@Override
+		public long sectionPos() {
+			return sectionPos;
+		}
+
+		@Override
+		public ChunkSectionLayer layer() {
+			return layer;
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			return this == other || other instanceof LayerAddress address
+				&& sectionPos == address.sectionPos() && layer == address.layer();
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * Long.hashCode(sectionPos) + layer.hashCode();
+		}
+	}
+
+	private record TerrainAssetIdentity(LayerKey layerKey, TerrainSectionAsset asset) {
 	}
 
 	private record TerrainSectionAsset(
@@ -4537,6 +4901,7 @@ public final class RustGalTerrainRenderer {
 		int sectionOriginX,
 		int sectionOriginY,
 		int sectionOriginZ,
+		SortType translucentSortType,
 		String translucentPrimitiveAccountingReason,
 		int unsupportedPrimitiveCount,
 		int[] translucentSourceSegmentQuadCounts,
@@ -4553,7 +4918,7 @@ public final class RustGalTerrainRenderer {
 				blockSkyLightContractValid, topFaceShadeContractValid, separateAoActive,
 				separateAoVertexCount, minAo, maxAo, positiveYNormalSections,
 				negativeYNormalSections, horizontalNormalSections, sectionOriginX,
-				sectionOriginY, sectionOriginZ, translucentPrimitiveAccountingReason,
+				sectionOriginY, sectionOriginZ, translucentSortType, translucentPrimitiveAccountingReason,
 				unsupportedPrimitiveCount, translucentSourceSegmentQuadCounts, null
 			);
 		}
@@ -4690,11 +5055,31 @@ public final class RustGalTerrainRenderer {
 			}
 		}
 
+	public record TerrainPerformanceCounters(
+		int cachedLayerAssets,
+		int activeTerrainLayers,
+		int activeSectionAssets,
+		long currentFrameVisibleFingerprint,
+		long atlasGeneration,
+		long acceptedBuildOutputs,
+		long skippedUnsupportedAnimatedSections,
+		long skippedEmptyLayers,
+		long registeredMeshes,
+		long texturePayloadUpdates,
+		long texturePayloadUpdateBytes,
+		long removedLayers,
+		long failedLayerSubmissions,
+		long invalidations,
+		long terrainExtractionFrames
+	) {
+	}
+
 	public record TerrainLayerSnapshot(
 		long sectionPos,
 		String layer,
 		long meshKey,
 		long meshGeneration,
+		long contentHash,
 		int vertexCount,
 		int indexBytes,
 		int sectionCount

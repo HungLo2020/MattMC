@@ -2146,6 +2146,7 @@ mod tests {
                 MeshGeometryResourceKey {
                     mesh_key: 9890,
                     mesh_generation: 1,
+                    vertex_abi: MeshVertexAbi::Rich80,
                 },
                 vertex_bytes,
                 index_bytes,

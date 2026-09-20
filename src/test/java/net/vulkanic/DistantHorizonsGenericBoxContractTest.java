@@ -41,6 +41,9 @@ class DistantHorizonsGenericBoxContractTest {
         assertEquals(0, count(renderer, "appendDistantHorizonsGenericBoxFaceLocked(box,"),
             "Java must not rebuild six face records for each copied box");
         assertTrue(renderer.contains("PENDING_DH_GENERIC_BOXES.addAll(boxes)"));
+        assertTrue(renderer.contains("consumedDistantHorizonsRouteSelected"));
+        assertTrue(renderer.contains("admittedDistantHorizonsGenericBoxes"),
+            "generic boxes must be paired with the consumed private-DH route decision");
         assertTrue(rustFfi.contains("const DH_GENERIC_BOX_FACE_COUNT: usize = 6"));
         assertTrue(rustFfi.contains("decode_dh_generic_boxes"));
         assertTrue(rustFfi.contains("WORLD_MATERIAL_TEXTURE_GENERATED_WHITE"));
@@ -73,7 +76,7 @@ class DistantHorizonsGenericBoxContractTest {
             "src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
         assertTrue(capture.contains("rustGalSubmittedWorkIdentities"));
         assertTrue(capture.contains("boundedIdentity"));
-        int collect = lod.indexOf("collectRustSemantic(renderParams)");
+        int collect = lod.indexOf("collectRustGenericSemantics(renderParams)");
         int select = lod.indexOf("markRustNonWaterRouteSelected()", collect);
         assertTrue(collect >= 0 && select > collect,
             "generic DH semantics must be copied before route admission");

@@ -370,6 +370,18 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
             gui_mesh_prepare_nanos: profile.gui_mesh_prepare_nanos,
             gui_mesh_lower_nanos: profile.gui_mesh_lower_nanos,
             gpu_distant_horizons_opaque_nanos: profile.gpu_distant_horizons_opaque_nanos,
+            world_mesh_page_indirect_batch_count: profile.world_mesh_page_indirect_batch_count,
+            world_mesh_page_indirect_run_count: profile.world_mesh_page_indirect_run_count,
+            world_mesh_dynamic_terrain_batch_count: profile.world_mesh_dynamic_terrain_batch_count,
+            world_mesh_dynamic_non_terrain_batch_count: profile
+                .world_mesh_dynamic_non_terrain_batch_count,
+            world_mesh_terrain_translucent_batch_count: profile
+                .world_mesh_terrain_translucent_batch_count,
+            whole_frame_native_total_nanos: profile.whole_frame_native_total_nanos,
+            world_post_submit_confirm_nanos: profile.world_post_submit_confirm_nanos,
+            gal_command_recording_finish_nanos: profile.gal_command_recording_finish_nanos,
+            gal_command_recording_deferred_destroys: profile
+                .gal_command_recording_deferred_destroys,
         }
     }
 }

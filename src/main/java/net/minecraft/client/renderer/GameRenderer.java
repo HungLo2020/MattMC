@@ -1013,7 +1013,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		// Match the baseline world's CPU light-update ordering before copying any
 		// terrain semantics. The selected Rust route owns rendering, while this
 		// only publishes authoritative client world state for its source snapshot.
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.light-state-advance");
 		this.minecraft.levelRenderer.advanceRustWholeFrameLightState();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.light-state-advance");
 		boolean captureTerrainParticleScenario = !System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank();
 		if (!rustHandPredicateLogged && Boolean.getBoolean("mattmc.dev.deterministicCameraCapture")
 			&& this.minecraft.level != null && this.minecraft.player != null) {
@@ -1492,7 +1494,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		if (this.minecraft.getCameraEntity() == null) {
 			this.minecraft.setCameraEntity(localPlayer);
 		}
-
 		this.pick(f);
 		DeterministicCameraCapture.forceBlockOutlineTargetForDiagnostics(this.minecraft);
 		ProfilerFiller profilerFiller = Profiler.get();

@@ -22,6 +22,7 @@ public final class AtlasAnimationResource implements AutoCloseable {
     private final long initialTick;
     private final boolean retainRuntimeEpoch;
     private boolean closed;
+    private boolean publicationBound;
     private long lastProducedTick;
     /** Native publication may be retired while this semantic resource lives. */
     private long publicationInitialTick;
@@ -88,6 +89,11 @@ public final class AtlasAnimationResource implements AutoCloseable {
         this.source = java.util.Objects.requireNonNull(source);
         this.initialTick = initialTick;
         this.retainRuntimeEpoch = retainRuntimeEpoch;
+        // Unit-scoped resources may exercise the transport directly. Runtime
+        // atlases first need an explicit native publication before events have
+        // a destination; their pre-publication clock is represented by the
+        // declaration's initial tick.
+        publicationBound = !retainRuntimeEpoch;
         visibility = new AtlasAnimationVisibility(atlas, source);
         ticks = new AtlasAnimationTickDelivery(semanticTextureId, source.generation(), initialTick);
         lastProducedTick = initialTick;
@@ -118,7 +124,17 @@ public final class AtlasAnimationResource implements AutoCloseable {
     /** Tick production is semantic only; frame selection remains entirely in Rust. */
     public synchronized void enqueueTick(long tick, boolean onlyVisible) {
         requireOpen();
-        ticks.enqueue(tick, onlyVisible, visibility);
+        if (lastProducedTick == Long.MAX_VALUE || tick != lastProducedTick + 1) {
+            throw new IllegalArgumentException("Animation tick events must be consecutive");
+        }
+        if (publicationBound) {
+            ticks.enqueue(tick, onlyVisible, visibility);
+        } else {
+            // No native incarnation exists yet. Its eventual declaration starts
+            // at this clock, so retaining an undeliverable event would only fill
+            // the bounded live-delivery queue during bootstrap/menu rendering.
+            visibility.clearUses();
+        }
         lastProducedTick = tick;
         if (retainRuntimeEpoch) {
             RUNTIME_TICK_EPOCHS.merge(semanticTextureId, tick, Long::max);
@@ -129,11 +145,25 @@ public final class AtlasAnimationResource implements AutoCloseable {
         enqueueTick(Math.addExact(lastProducedTick, 1), onlyVisible);
     }
 
+    /**
+     * Binds future events to a newly registered native incarnation. Ticks made
+     * before registration have no native resource to update; the declaration
+     * starts at their current semantic clock instead of replaying startup
+     * history through the bounded live-delivery FIFO.
+     */
+    synchronized void beginPublication() {
+        requireOpen();
+        publicationInitialTick = lastProducedTick;
+        ticks.rebase(lastProducedTick);
+        publicationBound = true;
+    }
+
     /** Retire native publication state while retaining this semantic resource. */
     synchronized void invalidatePublication() {
         if (closed) return;
         ticks.discard();
         publicationInitialTick = Math.max(publicationInitialTick, lastProducedTick);
+        publicationBound = false;
     }
 
     synchronized int pendingTickCount() { return ticks.pendingCount(); }

@@ -1064,7 +1064,8 @@ public final class RustGalFrameCoordinator {
 					engineGlobals,
 					primitiveFrame.particleQuads(),
 					primitiveFrame.orbInstances(),
-					primitiveFrame.distantHorizonsGenericBoxes()
+					primitiveFrame.distantHorizonsGenericBoxes(),
+					primitiveFrame.terrainFrameCamera()
 				);
 				if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 					auditMessage("Rust GUI whole-frame result mesh items=" + wholeFrameResult.guiMeshItemCount()
@@ -1104,6 +1105,7 @@ public final class RustGalFrameCoordinator {
 				submitEnded = System.nanoTime();
 			METRICS.abiPackingNanos += Math.max(0L, submitEnded - packingStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.frame.submit-call");
+			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.post-submit-receipts");
 			if (wholeFrameVulkan && primitiveFrame != null && wholeFrameResult != null
 				&& primitiveFrame.shaderEnvironmentFrame().enabled()
 				&& net.vulkanic.shaderpack.RustShaderPackSourceCollector.activeConfiguredPackName().isPresent()
@@ -1133,8 +1135,6 @@ public final class RustGalFrameCoordinator {
 				// Rust LOD frame remains visible to the comparator even when its
 				// immutable instances are retired immediately after submission.
 				if (lastDhParityPhaseFrame != frameId) {
-					LOGGER.info("Rust Vulkan semantic DistantHorizons route selected frame={} instances={}",
-						frameId, primitiveFrame.lodInstances().size());
 					GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.lod-render", 1L);
 					GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.translucent-fade", 1L);
 					GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.opaque-fade", 1L);
@@ -1149,15 +1149,17 @@ public final class RustGalFrameCoordinator {
 				METRICS.worldLodInstancesSubmitted += primitiveFrame.lodInstances().size();
 				METRICS.worldLodFramesExecuted++;
 				if (!primitiveFrame.lodInstances().isEmpty()) {
-					int opaqueInstances = (int)primitiveFrame.lodInstances().stream()
-						.filter(instance -> instance.layer() == 1)
-						.count();
-					int transparentInstances = (int)primitiveFrame.lodInstances().stream()
-						.filter(instance -> instance.layer() == 2 || instance.layer() == 3)
-						.count();
-					int waterInstances = (int)primitiveFrame.lodInstances().stream()
-						.filter(instance -> instance.layer() == 4)
-						.count();
+					int opaqueInstances = 0;
+					int transparentInstances = 0;
+					int waterInstances = 0;
+					for (var instance : primitiveFrame.lodInstances()) {
+						switch (instance.layer()) {
+							case 1 -> opaqueInstances++;
+							case 2, 3 -> transparentInstances++;
+							case 4 -> waterInstances++;
+							default -> { }
+						}
+					}
 					DistantHorizonsSemanticCollector.recordRustMaterialRouteExecution(
 						frameId,
 						submissionId,
@@ -1179,6 +1181,7 @@ public final class RustGalFrameCoordinator {
 				}
 			}
 			if (wholeFrameVulkan) {
+				GraphicsFrameBenchmark.beginPhase("rust-gal.frame.execution-receipts");
 				recordWholeFrameTerrainReadiness(primitiveFrame);
 				if (wholeFrameResult.guiMeshItemCount() > 0L) {
 					net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity(
@@ -1285,10 +1288,12 @@ public final class RustGalFrameCoordinator {
 					primitiveFrame.materialQuads()
 				);
 				auditWholeFrameTarget(frame, primitiveFrame);
+				GraphicsFrameBenchmark.endPhase("rust-gal.frame.execution-receipts");
 			}
 			lastSubmitted = Math.max(lastSubmitted, submissionId);
 			TracyCompat.message("gal.frame.deferred producer=gui.frame stratum=gui.frame"
 				+ " frame=" + frameId + " submission=" + submissionId + " batches=" + requests.size());
+			GraphicsFrameBenchmark.endPhase("rust-gal.frame.post-submit-receipts");
 
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.present");
 			presentStarted = System.nanoTime();
@@ -1299,6 +1304,9 @@ public final class RustGalFrameCoordinator {
 			if (wholeFrameResult != null) {
 				RustGalTerrainRenderer.recordExecutedStaticTerrainInstances(
 					primitiveFrame.meshInstances(), frameId, submissionId
+				);
+				RustGalWorldPrimitiveRenderer.recordWholeFrameShaderEnvironmentExecution(
+					frameId, submissionId, primitiveFrame.shaderEnvironmentFrame()
 				);
 			}
 				if (wholeFrameVulkan) {
@@ -1328,6 +1336,7 @@ public final class RustGalFrameCoordinator {
 			presentEnded = System.nanoTime();
 			METRICS.framePresentNanos += Math.max(0L, presentEnded - presentStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.gui-frame.ffi.present");
+			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.post-present-handoff");
 			if (renderdocFrameCaptureStarted) {
 				RenderDocCaptureHook.endFrameCaptureOnce(window, "rust-vulkan-whole-frame-world#" + frameId + "-submission=" + submissionId);
 				renderdocFrameCaptureStarted = false;
@@ -1343,10 +1352,13 @@ public final class RustGalFrameCoordinator {
 				// DH extraction can build a replacement while this frame still refers
 				// to the last acknowledged column generation. Publish the replacement
 				// only after presentation so one frame never mixes those generations.
+				GraphicsFrameBenchmark.beginPhase("rust-gal.frame.world-lod-asset-flush");
 				synchronized (LOCK) {
 					flushPendingWorldLodAssetsLocked();
 				}
+				GraphicsFrameBenchmark.endPhase("rust-gal.frame.world-lod-asset-flush");
 			}
+			GraphicsFrameBenchmark.endPhase("rust-gal.frame.post-present-handoff");
 
 			METRICS.frames++;
 			METRICS.submissions++;
@@ -1392,7 +1404,12 @@ public final class RustGalFrameCoordinator {
 			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.retire-outstanding");
 			retireOutstanding(forceDeterministicCaptureRetirement());
 			GraphicsFrameBenchmark.endPhase("rust-gal.frame.retire-outstanding");
-			auditMessage(metricsAuditLine(requests.size(), frameId, submissionId, wholeFrameResult != null));
+			// The benchmark records these metrics directly. Building the full audit
+			// line during its measured window allocates a large transient string and
+			// makes the diagnostic path part of the workload under test.
+			if (!GraphicsFrameBenchmark.isMeasurementFrameForDiagnostics()) {
+				auditMessage(metricsAuditLine(requests.size(), frameId, submissionId, wholeFrameResult != null));
+			}
 			METRICS.executeNanos += elapsedSince(executeStarted);
 			executeCounted = true;
 			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
@@ -1844,6 +1861,10 @@ public final class RustGalFrameCoordinator {
 		METRICS.profileFfiDecodeNanos += profile.ffiDecodeNanos();
 		METRICS.profileGuiFrontendNanos += profile.guiFrontendNanos();
 		METRICS.profileWorldFrontendNanos += profile.worldFrontendTotalNanos();
+		METRICS.profileWholeFrameNativeNanos += profile.wholeFrameNativeTotalNanos();
+		METRICS.profileWorldPostSubmitConfirmNanos += profile.worldPostSubmitConfirmNanos();
+		METRICS.profileGalCommandRecordingFinishNanos += profile.galCommandRecordingFinishNanos();
+		METRICS.profileGalCommandRecordingDeferredDestroys += profile.galCommandRecordingDeferredDestroys();
 		METRICS.profileWorldValidateFrameNanos += profile.worldValidateFrameNanos();
 		METRICS.profileWorldBatchingNanos += profile.worldBatchingNanos();
 		METRICS.profileWorldResourcePrepareNanos += profile.worldResourcePrepareNanos();
@@ -1920,6 +1941,10 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gui-mesh-prepare", profile.guiMeshPrepareNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gui-mesh-lower", profile.guiMeshLowerNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-frontend", profile.worldFrontendTotalNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.whole-frame-native-total", profile.wholeFrameNativeTotalNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-post-submit-confirm", profile.worldPostSubmitConfirmNanos());
+		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-command-recording-finish", profile.galCommandRecordingFinishNanos());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.gal-command-recording-deferred-destroys", profile.galCommandRecordingDeferredDestroys());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-validate-frame", profile.worldValidateFrameNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-batching", profile.worldBatchingNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-resource-prepare", profile.worldResourcePrepareNanos());
@@ -1968,6 +1993,11 @@ public final class RustGalFrameCoordinator {
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.world-mesh-draw-record", profile.worldMeshDrawRecordNanos());
 		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.world-mesh-stream-payload-bytes", profile.worldMeshStreamPayloadBytes());
 		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.world-mesh-dynamic-offset-count", profile.worldMeshDynamicOffsetCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.world-mesh-page-indirect-batch-count", profile.worldMeshPageIndirectBatchCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.world-mesh-page-indirect-run-count", profile.worldMeshPageIndirectRunCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.world-mesh-dynamic-terrain-batch-count", profile.worldMeshDynamicTerrainBatchCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.world-mesh-dynamic-non-terrain-batch-count", profile.worldMeshDynamicNonTerrainBatchCount());
+		GraphicsFrameBenchmark.recordCounterSample("rust-gal.native-profile.world-mesh-terrain-translucent-batch-count", profile.worldMeshTerrainTranslucentBatchCount());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.shader-plan-lookup", profile.shaderPlanLookupNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-command-generation", profile.galCommandGenerationNanos());
 		GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gal-submit-total", profile.galSubmitTotalNanos());
@@ -2112,7 +2142,13 @@ public final class RustGalFrameCoordinator {
 	 * enabled only for capture diagnostics or the terrain-particle fixture.
 	 */
 	private static boolean forceDeterministicCaptureRetirement() {
-		return net.minecraft.client.dev.DeterministicCameraCapture.isEnabledForDiagnostics()
+		// Performance captures deliberately exercise the same bounded in-flight
+		// timeline policy as RunDev. Forcing the just-submitted token complete here
+		// serializes CPU and GPU work and turns the benchmark into a diagnostic
+		// readback workload. The normal path still polls completion every frame and
+		// retires every token the Vulkan timeline has actually completed.
+		return !net.minecraft.client.dev.GraphicsFrameBenchmark.isActiveForDiagnostics()
+			&& net.minecraft.client.dev.DeterministicCameraCapture.isEnabledForDiagnostics()
 			|| !System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank();
 	}
 
@@ -2752,6 +2788,10 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_profile_ffi_decode_nanos=" + METRICS.profileFfiDecodeNanos
 			+ " rust_gal_profile_gui_frontend_nanos=" + METRICS.profileGuiFrontendNanos
 			+ " rust_gal_profile_world_frontend_nanos=" + METRICS.profileWorldFrontendNanos
+			+ " rust_gal_profile_whole_frame_native_nanos=" + METRICS.profileWholeFrameNativeNanos
+			+ " rust_gal_profile_world_post_submit_confirm_nanos=" + METRICS.profileWorldPostSubmitConfirmNanos
+			+ " rust_gal_profile_gal_command_recording_finish_nanos=" + METRICS.profileGalCommandRecordingFinishNanos
+			+ " rust_gal_profile_gal_command_recording_deferred_destroys=" + METRICS.profileGalCommandRecordingDeferredDestroys
 			+ " rust_gal_profile_world_validate_frame_nanos=" + METRICS.profileWorldValidateFrameNanos
 			+ " rust_gal_profile_world_batching_nanos=" + METRICS.profileWorldBatchingNanos
 			+ " rust_gal_profile_world_resource_prepare_nanos=" + METRICS.profileWorldResourcePrepareNanos
@@ -3014,6 +3054,10 @@ public final class RustGalFrameCoordinator {
 		long profileFfiDecodeNanos;
 		long profileGuiFrontendNanos;
 		long profileWorldFrontendNanos;
+		long profileWholeFrameNativeNanos;
+		long profileWorldPostSubmitConfirmNanos;
+		long profileGalCommandRecordingFinishNanos;
+		long profileGalCommandRecordingDeferredDestroys;
 		long profileWorldValidateFrameNanos;
 		long profileWorldBatchingNanos;
 		long profileWorldResourcePrepareNanos;

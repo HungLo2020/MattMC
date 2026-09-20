@@ -77,6 +77,15 @@ final class AtlasAnimationTickDelivery {
         lastQueuedEvent = null;
         lastNonemptyQueuedEvent = null;
     }
+
+    /** Starts a newly published native incarnation at an already-produced clock. */
+    void rebase(long tick) {
+        if (tick < lastQueuedTick) {
+            throw new IllegalArgumentException("Animation tick delivery cannot move backwards");
+        }
+        discard();
+        lastQueuedTick = tick;
+    }
     long lastNonemptyTickNamingSpriteForDiagnostics(int spriteId) {
         return lastNonemptyQueuedEvent != null
             && java.util.Arrays.binarySearch(lastNonemptyQueuedEvent.visible, spriteId) >= 0

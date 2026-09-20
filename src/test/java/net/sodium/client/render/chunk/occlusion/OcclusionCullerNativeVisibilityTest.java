@@ -2,7 +2,12 @@ package net.sodium.client.render.chunk.occlusion;
 
 import net.minecraft.client.renderer.chunk.VisibilitySet;
 import net.minecraft.core.Direction;
+import net.sodium.client.render.chunk.RenderSection;
+import net.sodium.client.render.chunk.data.BuiltSectionInfo;
+import net.sodium.client.render.viewport.Viewport;
+import net.sodium.client.render.viewport.frustum.Frustum;
 import org.junit.jupiter.api.Test;
+import org.joml.Vector3d;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,5 +54,42 @@ class OcclusionCullerNativeVisibilityTest {
         assertEquals(GraphDirectionSet.ALL,
                 OcclusionCuller.getVisibilityConnections(visibility, GraphDirectionSet.of(GraphDirection.DOWN), true));
     }
+
+	@Test
+	void batchedCameraConnectionsMatchScalarPortalSemantics() {
+		RenderSection first = new RenderSection(null, 2, 4, -3);
+		RenderSection second = new RenderSection(null, -5, 1, 7);
+		first.setInfo(BuiltSectionInfo.EMPTY);
+		second.setInfo(BuiltSectionInfo.EMPTY);
+		Viewport viewport = new Viewport(new Frustum() {
+			@Override
+			public boolean testAab(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+				return true;
+			}
+
+			@Override
+			public int intersectAab(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+				return 0;
+			}
+		}, new Vector3d(41.25, 70.5, -17.75));
+		RenderSection[] sections = {first, second};
+		int[] incoming = {
+			GraphDirectionSet.of(GraphDirection.WEST),
+			GraphDirectionSet.of(GraphDirection.UP)
+		};
+		int[] actual = new int[2];
+
+		OcclusionCuller.getVisibilityConnectionsForCameraBatch(
+			sections, incoming, viewport, sections.length, actual);
+
+		for (int index = 0; index < sections.length; index++) {
+			RenderSection section = sections[index];
+			assertEquals(OcclusionCuller.getVisibilityConnectionsForCamera(
+				section.getVisibilityData(), incoming[index],
+				viewport.getTransform().x - section.getCenterX(),
+				viewport.getTransform().y - section.getCenterY(),
+				viewport.getTransform().z - section.getCenterZ()), actual[index]);
+		}
+	}
 
 }

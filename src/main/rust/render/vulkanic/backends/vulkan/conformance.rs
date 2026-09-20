@@ -1183,6 +1183,31 @@ fn standard_item_foil_compiles_without_vertex_lighting_or_terrain_lod_bias() {
 }
 
 #[test]
+fn compact_direct_terrain_vertex_program_compiles_for_vulkan() {
+    use crate::render::vulkanic::shader_pack::programs::{
+        minimal_compact_direct_terrain_program, TerrainMaterialProgramKind,
+    };
+    for kind in [
+        TerrainMaterialProgramKind::Opaque,
+        TerrainMaterialProgramKind::Cutout,
+    ] {
+        let program = minimal_compact_direct_terrain_program(kind);
+        let source = String::from_utf8(shader_stage_code_for_backend(
+            BackendApi::Vulkan,
+            &program.vertex.source,
+        ))
+        .unwrap();
+        let spirv = compile_glsl_for_backend_test(
+            shaderc::ShaderKind::Vertex,
+            &source,
+            program.vertex.label.as_str(),
+        )
+        .unwrap();
+        assert!(!spirv.is_empty());
+    }
+}
+
+#[test]
 fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
     let backend =
         match VulkanBackend::new("MattMC VulkanicGAL selected terrain pipeline conformance") {

@@ -2,6 +2,7 @@ package net.vulkanic.world;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import java.util.ArrayDeque;
@@ -42,6 +43,14 @@ import org.joml.Vector3d;
  */
 public final class RustGalWholeFrameTerrainSource {
 	private static final int MAX_SEMANTIC_MESH_WORKERS = 8;
+	/**
+	 * Publishing a completed section copies its immutable layers into the Rust
+	 * asset registry. Draining every worker at once turns an eight-worker burst
+	 * into a long render-thread stall, so admit a small, deterministic number per
+	 * frame while the previous complete meshes remain drawable.
+	 */
+	private static final int MAX_COMPLETED_BUILDS_PER_FRAME = Math.max(1,
+		Integer.getInteger("mattmc.dev.rustGalWorldMaterial.terrainCompletedBuildsPerFrame", 2));
 	private static volatile boolean wholeFrameSurfaceQueueDrained;
 	private static volatile boolean wholeFrameTerrainQueueDrained;
 	/** Capture-only state explaining the current explicit CPU-source queue state. */
@@ -68,14 +77,16 @@ public final class RustGalWholeFrameTerrainSource {
 	 * only on the following wave, matching Sodium's occlusion traversal without
 	 * importing its renderer-owned queue or render lists.
 	 */
-	private final ArrayDeque<SectionPos> propagationRead = new ArrayDeque<>();
-	private final ArrayDeque<SectionPos> propagationPending = new ArrayDeque<>();
+	private final LongArrayFIFOQueue propagationRead = new LongArrayFIFOQueue();
+	private final LongArrayFIFOQueue propagationPending = new LongArrayFIFOQueue();
 	private final LongOpenHashSet propagationQueued = new LongOpenHashSet();
 	private final Long2IntOpenHashMap incomingDirections = new Long2IntOpenHashMap();
 	private final Long2IntOpenHashMap propagatedIncomingDirections = new Long2IntOpenHashMap();
 	private final LongOpenHashSet inFlight = new LongOpenHashSet();
 	private final LongOpenHashSet invalidatedInFlight = new LongOpenHashSet();
 	private final LongOpenHashSet invalidatedPending = new LongOpenHashSet();
+	/** Dirty resident sections waiting for their packet-backed chunk to return. */
+	private final LongOpenHashSet deferredInvalidations = new LongOpenHashSet();
 	private final LongOpenHashSet unavailableSections = new LongOpenHashSet();
 	private final ConcurrentLinkedQueue<CompletedBuild> completedBuilds = new ConcurrentLinkedQueue<>();
 	private long lastCameraSection = Long.MIN_VALUE;
@@ -83,10 +94,14 @@ public final class RustGalWholeFrameTerrainSource {
 	private int lastHorizontalRadius = -1;
 	/** Complete CPU visibility input used by the resident portal traversal. */
 	private long lastVisibilitySignature = Long.MIN_VALUE;
+	/** Visibility input represented by the current, possibly incomplete portal graph. */
+	private long traversalVisibilitySignature = Long.MIN_VALUE;
 	/** Final visible section snapshot for an unchanged, fully drained frame. */
 	private ArrayList<RenderSection> cachedVisibleSections = new ArrayList<>();
 	private LongOpenHashSet cachedVisibleKeys = new LongOpenHashSet();
 	private LongOpenHashSet cachedPortalVisibleKeys = new LongOpenHashSet();
+	/** Whether the cached portal-only subset was populated for capture diagnostics. */
+	private boolean cachedPortalVisibilityDiagnosticValid;
 	/**
 	 * Last visibility domain actually published to Rust. A replacement portal
 	 * search is assembled incrementally while section builds complete; retaining
@@ -94,6 +109,8 @@ public final class RustGalWholeFrameTerrainSource {
 	 * resident meshes merely because the replacement search is incomplete.
 	 */
 	private LongOpenHashSet publishedVisibleKeys = new LongOpenHashSet();
+	/** One-frame debounce for a complete empty replacement of a non-empty domain. */
+	private int consecutiveDrainedEmptySelections;
 	private long cachedVisibleSignature = Long.MIN_VALUE;
 	/** Current-frame CPU culling semantics; never a renderer or GPU resource. */
 	private Viewport viewport;
@@ -109,6 +126,11 @@ public final class RustGalWholeFrameTerrainSource {
 	 * only its CPU portal frontier when that semantic input changes.
 	 */
 	private boolean visibilityGraphDirty;
+	/** Reused CPU buffers for one portal BFS wave; native visibility is batched once per wave. */
+	private RenderSection[] visibilityBatchSections = new RenderSection[256];
+	private int[] visibilityBatchIncoming = new int[256];
+	private int[] visibilityBatchOutgoing = new int[256];
+	private int completedBuildsConsumedThisFrame;
     private int buildFrame;
 	private long emptySnapshotBuilds;
 	private long meshlessOutputBuilds;
@@ -171,6 +193,7 @@ public final class RustGalWholeFrameTerrainSource {
 			throw new IllegalStateException("Rust whole-frame terrain requires Sodium viewport semantics");
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.source-select");
+		this.completedBuildsConsumedThisFrame = 0;
 		this.viewport = viewportProvider.sodium$createViewport();
 		this.terrainSelectionDistance = terrainSelectionDistance;
 		long visibilitySignature = frustum instanceof net.minecraft.client.renderer.culling.Frustum vanillaFrustum
@@ -183,7 +206,6 @@ public final class RustGalWholeFrameTerrainSource {
 		SectionPos cameraSection = SectionPos.of(camera.getPosition());
 		long cameraKey = cameraSection.asLong();
 		int horizontalRadius = this.configuredHorizontalRadius();
-		boolean refreshResidentVisibility = false;
 		if (cameraKey != this.lastCameraSection || horizontalRadius != this.lastHorizontalRadius) {
 			this.cachedVisibleSignature = Long.MIN_VALUE;
 			wholeFrameSurfaceQueueDrained = false;
@@ -199,25 +221,27 @@ public final class RustGalWholeFrameTerrainSource {
 			this.propagatedIncomingDirections.clear();
 			this.unavailableSections.clear();
 				this.evictOutsideWindow(cameraSection, horizontalRadius);
-				this.admitSection(cameraSection, GraphDirectionSet.NONE, true, frustum);
+				this.seedVisibilityFrontier(cameraSection, frustum);
+				this.traversalVisibilitySignature = visibilitySignature;
 				// All resident waves can be traversed immediately. Publishing only one
 				// wave here made section-boundary movement erase most terrain for several
 				// frames even though its immutable meshes were still resident.
-				refreshResidentVisibility = true;
-		} else if (this.canRefreshResidentVisibility()) {
-			if (visibilitySignature != this.lastVisibilitySignature) {
-				this.resetVisibilityFrontier();
-				this.admitSection(cameraSection, GraphDirectionSet.NONE, true, frustum);
-				refreshResidentVisibility = true;
-			}
-		} else {
-			// Revisit the origin's completed CPU section so a transiently unavailable
-			// camera section can never be mistaken for a settled terrain source.
-			this.admitSection(cameraSection, GraphDirectionSet.NONE, true, frustum);
+		} else if (visibilitySignature != this.traversalVisibilitySignature) {
+			// Camera visibility is independent of worker readiness. Rebuild the graph
+			// from resident immutable sections immediately; queued and in-flight nodes
+			// are rediscovered as frontier leaves without cancelling their CPU work.
+			this.resetVisibilityFrontier();
+			this.seedVisibilityFrontier(cameraSection, frustum);
+			this.traversalVisibilitySignature = visibilitySignature;
+		} else if (!wholeFrameTerrainQueueDrained) {
+			// Revisit the current bootstrap domain so transiently unavailable seed
+			// sections can never be mistaken for a settled terrain source.
+			this.seedVisibilityFrontier(cameraSection, frustum);
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.source-frontier");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.frontier-invalidation");
-		this.admitInvalidatedSections(frustum);
+		this.reactivateDeferredInvalidations();
+		this.admitInvalidatedSections();
 		this.retryUnavailableSections(frustum);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.frontier-invalidation");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.frontier-completions");
@@ -231,16 +255,11 @@ public final class RustGalWholeFrameTerrainSource {
 			// under continuous chunk/light updates. This is semantic CPU selection
 			// only and deliberately does not touch Sodium render lists or backend state.
 			this.resetVisibilityFrontier();
-			this.admitSection(cameraSection, GraphDirectionSet.NONE, true, frustum);
+			this.seedVisibilityFrontier(cameraSection, frustum);
 			this.visibilityGraphDirty = false;
-			refreshResidentVisibility = true;
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.frontier-traversal");
-		if (refreshResidentVisibility) {
-			this.drainVisibilityFrontierFully(frustum);
-		} else {
-			this.drainVisibilityFrontier(frustum);
-		}
+		this.drainVisibilityFrontierFully(frustum);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.frontier-traversal");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.frontier-scheduling");
 		this.scheduleBuilds(camera);
@@ -251,13 +270,11 @@ public final class RustGalWholeFrameTerrainSource {
 		// producer work remains explicitly bounded and the settled gate still
 		// requires the queues to be empty after the pass.
 		this.drainCompletedBuilds(frustum);
-		if (refreshResidentVisibility) {
-			this.drainVisibilityFrontierFully(frustum);
-		} else {
-			this.drainVisibilityFrontier(frustum);
-		}
+		this.drainVisibilityFrontierFully(frustum);
 		this.scheduleBuilds(camera);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.frontier-scheduling");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+			"world.static-terrain.completed-builds-consumed", this.completedBuildsConsumedThisFrame);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.source-frontier");
 		this.sectionCache.cleanup();
 		wholeFrameSurfaceQueueDrained = this.pending.isEmpty()
@@ -269,6 +286,12 @@ public final class RustGalWholeFrameTerrainSource {
 			&& this.propagationPending.isEmpty()
 			&& this.completedBuilds.isEmpty()
 			&& this.unavailableSections.isEmpty();
+		if (wholeFrameTerrainQueueDrained
+			&& !RustGalTerrainRenderer.finishResourceReloadIfReady()) {
+			// CPU work is complete, but the bounded native uploader has not accepted
+			// every replacement mesh yet. Continue presenting the old complete domain.
+			wholeFrameTerrainQueueDrained = false;
+		}
 		boolean terrainDiagnosticsActive = StaticTerrainParityDiagnostics.isEnabled()
 			|| net.minecraft.client.dev.DeterministicCameraCapture.isActiveForDiagnostics();
 		if (terrainDiagnosticsActive) {
@@ -281,6 +304,7 @@ public final class RustGalWholeFrameTerrainSource {
 				+ ",frontier=" + (this.propagationRead.size() + this.propagationPending.size())
 				+ ",inFlight=" + this.inFlight.size()
 				+ ",invalidatedPending=" + this.invalidatedPending.size()
+				+ ",deferredInvalidations=" + this.deferredInvalidations.size()
 				+ ",invalidatedSample=" + this.invalidatedPendingSample()
 				+ ",invalidatedInFlight=" + this.invalidatedInFlight.size()
 				+ ",completed=" + this.completedBuilds.size()
@@ -310,7 +334,8 @@ public final class RustGalWholeFrameTerrainSource {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visible-list");
 		boolean reuseVisibleSnapshot = wholeFrameTerrainQueueDrained
 			&& visibilitySignature == this.lastVisibilitySignature
-			&& visibilitySignature == this.cachedVisibleSignature;
+			&& visibilitySignature == this.cachedVisibleSignature
+			&& (!terrainDiagnosticsActive || this.cachedPortalVisibilityDiagnosticValid);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
 			"world.static-terrain.visible-cache-hit", reuseVisibleSnapshot ? 1L : 0L);
 		ArrayList<RenderSection> visibleSections;
@@ -321,9 +346,12 @@ public final class RustGalWholeFrameTerrainSource {
 			visibleKeys = this.cachedVisibleKeys;
 			portalVisibleKeys = this.cachedPortalVisibleKeys;
 		} else {
-			visibleSections = new ArrayList<>(this.propagatedIncomingDirections.size() + 26);
-			visibleKeys = new LongOpenHashSet(this.propagatedIncomingDirections.size() + 26);
-			portalVisibleKeys = new LongOpenHashSet();
+			visibleSections = this.cachedVisibleSections;
+			visibleKeys = this.cachedVisibleKeys;
+			portalVisibleKeys = this.cachedPortalVisibleKeys;
+			visibleSections.clear();
+			visibleKeys.clear();
+			portalVisibleKeys.clear();
 			for (var entry : this.sections.long2ObjectEntrySet()) {
 			// `sections` is a bounded CPU mesh cache, not the render domain. A
 			// cached section may remain frustum-visible after the camera moves but
@@ -342,29 +370,50 @@ public final class RustGalWholeFrameTerrainSource {
 			// admission and the explicit VulkanicGAL draw domain.
 			boolean bootstrapRoot = entry.getLongKey() == this.lastCameraSection;
 			if (section != null && section.getFlags() != 0
-				&& (bootstrapRoot || this.isVisible(section.getPosition(), frustum))) {
+				&& (bootstrapRoot || this.isVisible(
+					section.getChunkX(), section.getChunkY(), section.getChunkZ(), frustum))) {
 				visibleSections.add(section);
 				visibleKeys.add(entry.getLongKey());
 			}
 			}
-			portalVisibleKeys.addAll(visibleKeys);
+			if (terrainDiagnosticsActive) {
+				portalVisibleKeys.addAll(visibleKeys);
+				this.cachedPortalVisibilityDiagnosticValid = true;
+			} else {
+				this.cachedPortalVisibilityDiagnosticValid = false;
+			}
 			this.addNearbyVisibleSections(visibleSections, visibleKeys);
-			if (!wholeFrameTerrainQueueDrained) {
+			int selectedBeforeRetention = visibleSections.size();
+			boolean drainedEmptyReplacement = wholeFrameTerrainQueueDrained
+				&& selectedBeforeRetention == 0 && !this.publishedVisibleKeys.isEmpty();
+			this.consecutiveDrainedEmptySelections = drainedEmptyReplacement
+				? this.consecutiveDrainedEmptySelections + 1
+				: 0;
+			boolean deferEmptyReplacement = this.consecutiveDrainedEmptySelections == 1;
+			if (!wholeFrameTerrainQueueDrained || deferEmptyReplacement) {
 				this.retainPublishedVisibleSections(visibleSections, visibleKeys, frustum);
 			}
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+				"world.static-terrain.empty-domain-retained-sections",
+				deferEmptyReplacement ? visibleSections.size() - selectedBeforeRetention : 0L);
 			this.publishedVisibleKeys.clear();
 			this.publishedVisibleKeys.addAll(visibleKeys);
-			this.cachedVisibleSections = visibleSections;
-			this.cachedVisibleKeys = visibleKeys;
-			this.cachedPortalVisibleKeys = portalVisibleKeys;
-			this.cachedVisibleSignature = visibilitySignature;
+			// A deferred empty replacement is deliberately provisional. Caching the
+			// retained list here prevents the next identical frame from rebuilding
+			// the raw portal selection, turning the intended one-frame debounce into
+			// permanent stale terrain for a stationary camera. Force one more CPU
+			// selection so either recovered portals replace it or the repeated empty
+			// result authoritatively withdraws it.
+			this.cachedVisibleSignature = deferEmptyReplacement
+				? Long.MIN_VALUE
+				: visibilitySignature;
 		}
 
 			// Capture-only receipt of the final Rust-owned CPU visibility domain.
 		// Wait for the source's existing settled state so startup-empty samples
 		// cannot displace the comparable capture-phase observation.  This does
 		// not provide the renderer with a list or influence admission.
-		if (wholeFrameTerrainQueueDrained) {
+		if (wholeFrameTerrainQueueDrained && terrainDiagnosticsActive) {
 			StaticTerrainParityDiagnostics.recordWholeFrameVisibleSections(
 				visibleSections, camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z(),
 				viewportWidth, viewportHeight, portalVisibleKeys::contains
@@ -384,8 +433,8 @@ public final class RustGalWholeFrameTerrainSource {
 	 * graph is still being built. Keys are resolved back through the current
 	 * section cache so updated immutable mesh semantics replace old values, and
 	 * window/frustum filtering prevents stale camera domains from leaking across
-	 * movement. Once the source drains, the exact new portal result replaces this
-	 * set and normal occlusion removal is immediate.
+	 * movement. A complete empty result is deferred for one frame so a transient
+	 * false drain cannot erase the world; a repeated empty result is authoritative.
 	 */
 	private void retainPublishedVisibleSections(ArrayList<RenderSection> visibleSections,
 			LongOpenHashSet visibleKeys, Frustum frustum) {
@@ -396,8 +445,9 @@ public final class RustGalWholeFrameTerrainSource {
 			RenderSection section = this.sections.get(key);
 			boolean bootstrapRoot = key == this.lastCameraSection;
 			if (section != null && section.getFlags() != 0
-					&& this.isInsideCurrentWindow(section.getPosition())
-					&& (bootstrapRoot || this.isVisible(section.getPosition(), frustum))) {
+					&& this.isInsideCurrentWindow(section.getChunkX(), section.getChunkZ())
+					&& (bootstrapRoot || this.isVisible(
+						section.getChunkX(), section.getChunkY(), section.getChunkZ(), frustum))) {
 				visibleSections.add(section);
 				visibleKeys.add(key);
 			}
@@ -409,7 +459,7 @@ public final class RustGalWholeFrameTerrainSource {
 		return wholeFrameSurfaceQueueDrained;
 	}
 
-	private void replaceRetainedSection(long key, RenderSection section) {
+	private RenderSection replaceRetainedSection(long key, RenderSection section) {
 		RenderSection previous = this.sections.put(key, section);
 		if (previous != null && previous.getFlags() != 0) {
 			this.retainedGeometryCount--;
@@ -417,6 +467,7 @@ public final class RustGalWholeFrameTerrainSource {
 		if (section != null && section.getFlags() != 0) {
 			this.retainedGeometryCount++;
 		}
+		return previous;
 	}
 
 	/** Capture diagnostic only: identifies a bounded sample of the semantic
@@ -483,13 +534,36 @@ public final class RustGalWholeFrameTerrainSource {
 			&& !this.pending.contains(SectionPos.of(key))
 			&& !this.invalidatedInFlight.contains(key)
 			&& !this.invalidatedPending.contains(key)
+			&& !this.deferredInvalidations.contains(key)
 			&& !this.unavailableSections.contains(key);
 	}
 
     public void invalidate(int sectionX, int sectionY, int sectionZ) {
+		this.invalidate(sectionX, sectionY, sectionZ, false);
+	}
+
+	/** A newly populated section may make a previously absent chunk edge traversable. */
+	public void onSectionBecomingNonEmpty(int sectionX, int sectionY, int sectionZ) {
+		this.invalidate(sectionX, sectionY, sectionZ, true);
+	}
+
+	private void invalidate(int sectionX, int sectionY, int sectionZ, boolean discoverUnowned) {
         if (this.level == null || this.sectionCache == null) {
             return;
         }
+		long key = SectionPos.asLong(sectionX, sectionY, sectionZ);
+		this.sectionCache.invalidate(sectionX, sectionY, sectionZ);
+		SectionPos section = SectionPos.of(sectionX, sectionY, sectionZ);
+		if (!this.isInsideCurrentWindow(section)) {
+			return;
+		}
+		boolean owned = this.ownsSectionLifecycle(key);
+		if (!owned && !discoverUnowned) {
+			// Light/chunk padding notifications cover many coordinates the portal
+			// graph never selected. Their clone data must be fresh if later admitted,
+			// but they do not change the currently published visibility domain.
+			return;
+		}
 		// Deterministic readiness is observed before the next render enqueue. Do
 		// not leave a previous-frame "drained" receipt visible across a newly
 		// dirty semantic section, or capture can photograph the route while its
@@ -497,12 +571,22 @@ public final class RustGalWholeFrameTerrainSource {
 		wholeFrameSurfaceQueueDrained = false;
 		wholeFrameTerrainQueueDrained = false;
 		net.minecraft.client.dev.DeterministicCameraCapture.invalidateRustWholeFrameTerrainReadiness();
-        long key = SectionPos.asLong(sectionX, sectionY, sectionZ);
-        this.sectionCache.invalidate(sectionX, sectionY, sectionZ);
+		if (!owned) {
+			// A newly non-empty section is the explicit discovery signal for a
+			// previously unowned chunk edge. Reconsider resident portals without
+			// bypassing their admission policy by building this coordinate directly.
+			this.cachedVisibleSignature = Long.MIN_VALUE;
+			this.visibilityGraphDirty = true;
+			return;
+		}
+		if (discoverUnowned) {
+			this.cachedVisibleSignature = Long.MIN_VALUE;
+			this.visibilityGraphDirty = true;
+		}
 		// Keep the last accepted immutable section and Rust mesh visible until its
 		// replacement has completed and can be published as one transaction.
 		this.unavailableSections.remove(key);
-		SectionPos section = SectionPos.of(sectionX, sectionY, sectionZ);
+		this.deferredInvalidations.remove(key);
 		if (this.inFlight.contains(key)) {
 			// The immutable snapshot may still be meshing on a worker. Suppress its
 			// stale result and schedule a replacement once that worker completes.
@@ -513,6 +597,20 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 		this.recordPortalBuildLifecycle(key, "invalidated");
     }
+
+	/** True when this source has admitted the section into its CPU lifecycle. */
+	private boolean ownsSectionLifecycle(long key) {
+		return this.sections.containsKey(key)
+			|| RustGalTerrainRenderer.hasSectionAsset(key)
+			|| this.queued.contains(key)
+			|| this.inFlight.contains(key)
+			|| this.invalidatedPending.contains(key)
+			|| this.invalidatedInFlight.contains(key)
+			|| this.deferredInvalidations.contains(key)
+			|| this.unavailableSections.contains(key)
+			|| this.incomingDirections.containsKey(key)
+			|| this.propagatedIncomingDirections.containsKey(key);
+	}
 
 	public void destroy() {
 		wholeFrameSurfaceQueueDrained = false;
@@ -535,16 +633,20 @@ public final class RustGalWholeFrameTerrainSource {
 		this.inFlight.clear();
 		this.invalidatedInFlight.clear();
 		this.invalidatedPending.clear();
+		this.deferredInvalidations.clear();
 		this.unavailableSections.clear();
 		this.destroyCompletedBuilds();
 		this.lastCameraSection = Long.MIN_VALUE;
 		this.lastHorizontalRadius = -1;
 		this.lastVisibilitySignature = Long.MIN_VALUE;
+		this.traversalVisibilitySignature = Long.MIN_VALUE;
 		this.cachedVisibleSignature = Long.MIN_VALUE;
 		this.cachedVisibleSections.clear();
 			this.cachedVisibleKeys.clear();
 			this.cachedPortalVisibleKeys.clear();
+			this.cachedPortalVisibilityDiagnosticValid = false;
 			this.publishedVisibleKeys.clear();
+		this.consecutiveDrainedEmptySelections = 0;
 		this.viewport = null;
 		this.visibilityGraphDirty = false;
         this.buildFrame = 0;
@@ -556,13 +658,9 @@ public final class RustGalWholeFrameTerrainSource {
     }
 
 	private void resetForResourceReload() {
-		for (RenderSection section : this.sections.values()) {
-			if (section == null) continue;
-			SectionPos position = section.getPosition();
-			RustGalTerrainRenderer.removeSection(
-				position.getX(), position.getY(), position.getZ(), "cpu-source-resource-reload"
-			);
-		}
+		// Renderer publication is a separate two-phase transaction. Clear only this
+		// CPU source generation here; the last completed Rust-owned mesh/atlas set
+		// remains drawable until finishResourceReloadIfReady() commits its successor.
 		this.sections.clear();
 		this.retainedGeometryCount = 0;
 		this.queued.clear();
@@ -574,23 +672,91 @@ public final class RustGalWholeFrameTerrainSource {
 		this.propagatedIncomingDirections.clear();
 		this.invalidatedInFlight.addAll(this.inFlight);
 		this.invalidatedPending.clear();
+		this.deferredInvalidations.clear();
 		this.unavailableSections.clear();
 		this.lastCameraSection = Long.MIN_VALUE;
 		this.lastHorizontalRadius = -1;
 		this.lastVisibilitySignature = Long.MIN_VALUE;
+		this.traversalVisibilitySignature = Long.MIN_VALUE;
 		this.cachedVisibleSignature = Long.MIN_VALUE;
 		this.cachedVisibleSections.clear();
 			this.cachedVisibleKeys.clear();
 			this.cachedPortalVisibleKeys.clear();
+			this.cachedPortalVisibilityDiagnosticValid = false;
 			this.publishedVisibleKeys.clear();
+		this.consecutiveDrainedEmptySelections = 0;
 		this.visibilityGraphDirty = false;
 		wholeFrameSurfaceQueueDrained = false;
 		wholeFrameTerrainQueueDrained = false;
 	}
 
-	/** Targets the configured client view distance without a fixed bootstrap cap. */
+	/**
+	 * Keeps one bounded transition ring outside the nominal section radius.
+	 * Sodium's distance predicate includes a one-block model-overhang envelope,
+	 * so immediately evicting at the nominal radius can retire a still-visible
+	 * edge section when the camera crosses a section boundary. The exact block
+	 * distance and frustum tests remain the admission gate; this ring changes
+	 * residency lifetime, not the configured visible distance.
+	 */
 	private int configuredHorizontalRadius() {
-		return Math.max(1, Minecraft.getInstance().options.getEffectiveRenderDistance());
+		return Math.max(1, Minecraft.getInstance().options.getEffectiveRenderDistance()) + 1;
+	}
+
+	/**
+	 * Seeds the same CPU visibility domain as Sodium. A camera inside the build
+	 * height starts from its containing section. Above or below the build height,
+	 * Sodium starts from every frustum-visible section on the nearest boundary
+	 * plane in diamond-spiral order; rejecting the out-of-height camera section
+	 * without those seeds makes an otherwise loaded world publish an empty set.
+	 */
+	private void seedVisibilityFrontier(SectionPos cameraSection, Frustum frustum) {
+		int cameraY = cameraSection.getY();
+		if (cameraY < this.level.getMinSectionY()) {
+			this.seedOutsideWorldHeight(cameraSection, this.level.getMinSectionY(), GraphDirection.DOWN, frustum);
+		} else if (cameraY > this.level.getMaxSectionY()) {
+			this.seedOutsideWorldHeight(cameraSection, this.level.getMaxSectionY(), GraphDirection.UP, frustum);
+		} else {
+			this.admitSection(cameraSection, GraphDirectionSet.NONE, true, frustum);
+		}
+	}
+
+	private void seedOutsideWorldHeight(SectionPos cameraSection, int boundaryY, int incomingDirection,
+			Frustum frustum) {
+		int originX = cameraSection.getX();
+		int originZ = cameraSection.getZ();
+		int radius = Math.max(0, Mth.floor(this.terrainSelectionDistance / 16.0F));
+		this.admitOutsideWorldSeed(originX, boundaryY, originZ, incomingDirection, frustum);
+		for (int layer = 1; layer <= radius; layer++) {
+			for (int z = -layer; z < layer; z++) {
+				int x = Math.abs(z) - layer;
+				this.admitOutsideWorldSeed(originX + x, boundaryY, originZ + z, incomingDirection, frustum);
+			}
+			for (int z = layer; z > -layer; z--) {
+				int x = layer - Math.abs(z);
+				this.admitOutsideWorldSeed(originX + x, boundaryY, originZ + z, incomingDirection, frustum);
+			}
+		}
+		for (int layer = radius + 1; layer <= 2 * radius; layer++) {
+			int inner = layer - radius;
+			for (int z = -radius; z <= -inner; z++) {
+				this.admitOutsideWorldSeed(originX - z - layer, boundaryY, originZ + z, incomingDirection, frustum);
+			}
+			for (int z = inner; z <= radius; z++) {
+				this.admitOutsideWorldSeed(originX + z - layer, boundaryY, originZ + z, incomingDirection, frustum);
+			}
+			for (int z = radius; z >= inner; z--) {
+				this.admitOutsideWorldSeed(originX + layer - z, boundaryY, originZ + z, incomingDirection, frustum);
+			}
+			for (int z = -inner; z >= -radius; z--) {
+				this.admitOutsideWorldSeed(originX + layer + z, boundaryY, originZ + z, incomingDirection, frustum);
+			}
+		}
+	}
+
+	private void admitOutsideWorldSeed(int sectionX, int sectionY, int sectionZ, int incomingDirection,
+			Frustum frustum) {
+		this.admitSection(sectionX, sectionY, sectionZ,
+			GraphDirectionSet.of(incomingDirection), false, frustum);
 	}
 
 	/**
@@ -600,19 +766,29 @@ public final class RustGalWholeFrameTerrainSource {
 	 * lists while avoiding the raw-frustum vertical-volume over-admission.
 	 */
 	private void admitSection(SectionPos section, int incoming, boolean origin, Frustum frustum) {
+		if (section == null) {
+			StaticTerrainParityDiagnostics.recordPortalAdmission("rust-whole-frame", Long.MIN_VALUE, incoming,
+				origin, false, false, false, false, false, false, false, false);
+			return;
+		}
+		this.admitSection(section.getX(), section.getY(), section.getZ(), incoming, origin, frustum);
+	}
+
+	private void admitSection(int sectionX, int sectionY, int sectionZ, int incoming, boolean origin,
+			Frustum frustum) {
 		// The camera's containing section is necessarily part of the visible
 		// semantic frame.  Keep it as the bootstrap root even when a captured or
 		// numerically marginal frustum rejects its boundary AABB; propagation and
 		// all non-root sections still use the exact frustum test below.
-		boolean withinBuildHeight = section != null && !this.level.isOutsideBuildHeight(section.minBlockY());
-		boolean loaded = section != null && this.level.hasChunk(section.getX(), section.getZ());
-		boolean insideWindow = section != null && this.isInsideCurrentWindow(section);
-		boolean visible = section != null && (origin || this.isVisible(section, frustum));
-		long key = section == null ? Long.MIN_VALUE : section.asLong();
+		boolean withinBuildHeight = !this.level.isOutsideBuildHeight(SectionPos.sectionToBlockCoord(sectionY));
+		boolean loaded = this.isChunkLoaded(sectionX, sectionZ);
+		boolean insideWindow = this.isInsideCurrentWindow(sectionX, sectionZ);
+		boolean visible = origin || this.isVisible(sectionX, sectionY, sectionZ, frustum);
+		long key = SectionPos.asLong(sectionX, sectionY, sectionZ);
 		StaticTerrainParityDiagnostics.recordPortalAdmission("rust-whole-frame", key, incoming,
 			origin, withinBuildHeight, loaded, insideWindow, visible, this.sections.containsKey(key),
 			this.queued.contains(key), this.inFlight.contains(key), this.unavailableSections.contains(key));
-		if (!withinBuildHeight || !loaded || !insideWindow || !visible) {
+		if (!withinBuildHeight || !insideWindow || !visible) {
 			return;
 		}
 		int previousIncoming = this.incomingDirections.get(key);
@@ -622,6 +798,15 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 		if (nextIncoming != previousIncoming) {
 			this.incomingDirections.put(key, nextIncoming);
+		}
+		if (!loaded) {
+			// ClientLevel#hasChunk intentionally reports true for generic client
+			// block access, while ClientChunkCache can still hold no packet-backed
+			// chunk at this coordinate. Keep the portal input pending until the real
+			// chunk arrives; treating the fallback EmptyLevelChunk as authoritative
+			// air permanently erases terrain loaded later in the same startup.
+			this.unavailableSections.add(key);
+			return;
 		}
 		if (this.sections.containsKey(key)) {
 			this.sections.get(key).setIncomingDirections(nextIncoming & GraphDirectionSet.ALL);
@@ -638,7 +823,7 @@ public final class RustGalWholeFrameTerrainSource {
 			return;
 		}
 		if (!this.inFlight.contains(key) && this.queued.add(key)) {
-			this.pending.addLast(section);
+			this.pending.addLast(SectionPos.of(sectionX, sectionY, sectionZ));
 			this.recordPortalBuildLifecycle(key, "enqueued");
 		}
 	}
@@ -650,32 +835,19 @@ public final class RustGalWholeFrameTerrainSource {
 	private boolean isCandidate(SectionPos section, Frustum frustum, boolean bootstrapOrigin) {
 		return section != null
 			&& !this.level.isOutsideBuildHeight(section.minBlockY())
-			&& this.level.hasChunk(section.getX(), section.getZ())
+			&& this.isChunkLoaded(section.getX(), section.getZ())
 			&& this.isInsideCurrentWindow(section)
 			&& (bootstrapOrigin || this.isVisible(section, frustum));
 	}
 
-	private void requestPropagation(long key) {
-		if (this.propagationQueued.add(key)) {
-			this.propagationPending.addLast(SectionPos.of(key));
-		}
+	private boolean isChunkLoaded(int chunkX, int chunkZ) {
+		return this.level != null && this.level.getChunkSource().hasChunk(chunkX, chunkZ);
 	}
 
-	/**
-	 * A visibility refresh is safe only after the source has consumed every
-	 * pending CPU result. In-flight work keeps its original portal inputs until
-	 * it becomes resident, so no build request can be dropped by the refresh.
-	 */
-	private boolean canRefreshResidentVisibility() {
-		return this.pending.isEmpty()
-			&& this.queued.isEmpty()
-			&& this.inFlight.isEmpty()
-			&& this.completedBuilds.isEmpty()
-			&& this.propagationRead.isEmpty()
-			&& this.propagationPending.isEmpty()
-			&& this.invalidatedPending.isEmpty()
-			&& this.invalidatedInFlight.isEmpty()
-			&& this.unavailableSections.isEmpty();
+	private void requestPropagation(long key) {
+		if (this.propagationQueued.add(key)) {
+			this.propagationPending.enqueue(key);
+		}
 	}
 
 	/** Clears only frame-local traversal state; resident CPU meshes remain owned by this source. */
@@ -687,29 +859,29 @@ public final class RustGalWholeFrameTerrainSource {
 		this.propagatedIncomingDirections.clear();
 	}
 
-	private void admitInvalidatedSections(Frustum frustum) {
+	private void admitInvalidatedSections() {
 		var iterator = this.invalidatedPending.iterator();
 		while (iterator.hasNext()) {
 			long key = iterator.nextLong();
 			SectionPos section = SectionPos.of(key);
-			// A dirty section that has left the current camera window or frustum is
-			// no longer part of this frame's readiness domain. Drop the stale
-			// invalidation here; ordinary visibility traversal will re-admit it if
-			// the camera later makes it relevant again. Retaining it forever would
-			// keep the whole-frame queue non-drained despite no pending or in-flight
-			// work.
-			if (!this.isInsideCurrentWindow(section) || !this.isVisible(section, frustum)) {
+			if (!this.isInsideCurrentWindow(section)) {
+				this.queued.remove(key);
+				this.deferredInvalidations.remove(key);
+				iterator.remove();
+				continue;
+			}
+			if (this.level.isOutsideBuildHeight(section.minBlockY())) {
 				this.queued.remove(key);
 				iterator.remove();
 				continue;
 			}
-			if (!this.isCandidate(section, frustum)) {
-				// Candidates outside the build height have a loaded horizontal chunk
-				// but can never produce a semantic terrain section.  They must leave
-				// the readiness domain just like unloaded or out-of-view sections;
-				// otherwise light updates for padding sections keep capture and normal
-				// source convergence permanently unsettled.
+			if (!this.isChunkLoaded(section.getX(), section.getZ())) {
+				// Keep the accepted mesh drawable while its packet-backed chunk is
+				// unavailable. A resident section inside the current window must not be
+				// filtered by the instantaneous raw frustum: the published portal domain
+				// can still draw it, and doing so would retain stale blocks or lighting.
 				this.queued.remove(key);
+				this.deferredInvalidations.add(key);
 				iterator.remove();
 				continue;
 			}
@@ -718,11 +890,28 @@ public final class RustGalWholeFrameTerrainSource {
 			// admitSection after claiming that gate drops the work: its own enqueue
 			// guard quite correctly refuses the already-queued key. Invalidated,
 			// visible sections must therefore enter the same pending deque directly.
-			// Their accumulated portal inputs remain in incomingDirections and are
+			// Loaded resident sections enter the same pending deque regardless of a
+			// transient raw-frustum result. Their accumulated portal inputs are
 			// applied when the immutable build result becomes resident.
 			this.pending.addLast(section);
 			this.recordPortalBuildLifecycle(key, "invalidated-enqueued");
 			iterator.remove();
+		}
+	}
+
+	private void reactivateDeferredInvalidations() {
+		var iterator = this.deferredInvalidations.iterator();
+		while (iterator.hasNext()) {
+			long key = iterator.nextLong();
+			SectionPos section = SectionPos.of(key);
+			if (!this.isInsideCurrentWindow(section)) {
+				iterator.remove();
+				continue;
+			}
+			if (this.isChunkLoaded(section.getX(), section.getZ())) {
+				this.invalidatedPending.add(key);
+				iterator.remove();
+			}
 		}
 	}
 
@@ -741,7 +930,7 @@ public final class RustGalWholeFrameTerrainSource {
 				iterator.remove();
 				continue;
 			}
-			if (!this.level.hasChunk(section.getX(), section.getZ())
+			if (!this.isChunkLoaded(section.getX(), section.getZ())
 				|| this.sections.containsKey(key)
 				|| this.inFlight.contains(key)
 				|| !this.queued.add(key)) {
@@ -757,15 +946,19 @@ public final class RustGalWholeFrameTerrainSource {
 		// wave evaluates visibility. The old immediate drain accidentally made
 		// traversal order part of the visible terrain domain.
 		if (this.propagationRead.isEmpty()) {
-			SectionPos queuedSection;
-			while ((queuedSection = this.propagationPending.pollFirst()) != null) {
-				this.propagationQueued.remove(queuedSection.asLong());
-				this.propagationRead.addLast(queuedSection);
+			while (!this.propagationPending.isEmpty()) {
+				long queuedSection = this.propagationPending.dequeueLong();
+				this.propagationQueued.remove(queuedSection);
+				this.propagationRead.enqueue(queuedSection);
 			}
 		}
-		SectionPos sectionPos;
-		while ((sectionPos = this.propagationRead.pollFirst()) != null) {
-			long key = sectionPos.asLong();
+		Viewport currentViewport = this.viewport;
+		if (currentViewport == null) {
+			return;
+		}
+		int batchCount = 0;
+		while (!this.propagationRead.isEmpty()) {
+			long key = this.propagationRead.dequeueLong();
 			RenderSection section = this.sections.get(key);
 			if (section == null || !section.isBuilt()) {
 				continue;
@@ -779,57 +972,90 @@ public final class RustGalWholeFrameTerrainSource {
 			int directionMask = GraphDirectionSet.ALL;
 			int originBit = 1 << GraphDirection.COUNT;
 			int incomingDirections = incoming & directionMask;
-			Viewport currentViewport = this.viewport;
-			if (currentViewport == null) continue;
-			var transform = currentViewport.getTransform();
-			int outgoing = (incoming & originBit) != 0
-				? OcclusionCuller.getVisibilityConnections(section.getVisibilityData(), GraphDirectionSet.NONE, false)
-				: OcclusionCuller.getVisibilityConnectionsForCamera(section.getVisibilityData(), incomingDirections,
-					transform.x - (sectionPos.minBlockX() + 8), transform.y - (sectionPos.minBlockY() + 8), transform.z - (sectionPos.minBlockZ() + 8));
-			int outgoingBeforeOutwardMask = outgoing;
-			// Mirror Sodium's CPU occlusion traversal: once a portal path has
-			// moved away from the camera section, never walk it back toward the
-			// camera. Besides preventing redundant graph walks, this is essential
-			// to preserve Sodium's visible-section domain without touching its GL
-			// render lists or render device.
-			outgoing &= this.outwardDirections(sectionPos);
-			int outgoingAfterOutwardMask = outgoing;
-			// Sodium applies the region graph's adjacent-mask before admitting a
-			// neighbor. This source owns no Java render region, so derive the same
-			// structural constraint from its own CPU-resident/window domain instead
-			// of treating every coordinate as a linked graph node.
-			int adjacentMask = this.residentAdjacentMask(sectionPos);
-			outgoing &= adjacentMask;
-			StaticTerrainParityDiagnostics.recordPortalTraversal("rust-whole-frame", key, this.lastCameraSection,
-				incomingDirections, outgoingBeforeOutwardMask, outgoingAfterOutwardMask, adjacentMask, outgoing,
-				section.getVisibilityData(),
-				transform.x - section.getCenterX(), transform.y - section.getCenterY(), transform.z - section.getCenterZ());
-			for (int direction = 0; direction < GraphDirection.COUNT; direction++) {
-				if (!GraphDirectionSet.contains(outgoing, direction)) {
-					continue;
-				}
-				SectionPos neighbor = SectionPos.of(
-					sectionPos.getX() + GraphDirection.x(direction),
-					sectionPos.getY() + GraphDirection.y(direction),
-					sectionPos.getZ() + GraphDirection.z(direction)
-				);
-				this.admitSection(neighbor, GraphDirectionSet.of(GraphDirection.opposite(direction)), false, frustum);
+			if ((incoming & originBit) != 0) {
+				int outgoing = OcclusionCuller.getVisibilityConnections(
+					section.getVisibilityData(), GraphDirectionSet.NONE, false);
+				this.propagateVisibility(section, incomingDirections, outgoing, currentViewport, frustum);
+				continue;
 			}
+			this.ensureVisibilityBatchCapacity(batchCount + 1);
+			this.visibilityBatchSections[batchCount] = section;
+			this.visibilityBatchIncoming[batchCount] = incomingDirections;
+			batchCount++;
+		}
+		OcclusionCuller.getVisibilityConnectionsForCameraBatch(
+			this.visibilityBatchSections,
+			this.visibilityBatchIncoming,
+			currentViewport,
+			batchCount,
+			this.visibilityBatchOutgoing
+		);
+		for (int index = 0; index < batchCount; index++) {
+			RenderSection section = this.visibilityBatchSections[index];
+			this.propagateVisibility(section, this.visibilityBatchIncoming[index],
+				this.visibilityBatchOutgoing[index], currentViewport, frustum);
+			this.visibilityBatchSections[index] = null;
 		}
 	}
 
-	/** CPU-only equivalent of Sodium RenderSection#getAdjacentMask(). */
-	private int residentAdjacentMask(SectionPos section) {
+	private void propagateVisibility(RenderSection section, int incomingDirections, int outgoing,
+			Viewport currentViewport, Frustum frustum) {
+		int sectionX = section.getChunkX();
+		int sectionY = section.getChunkY();
+		int sectionZ = section.getChunkZ();
+		long key = section.getPositionAsLong();
+		var transform = currentViewport.getTransform();
+		int outgoingBeforeOutwardMask = outgoing;
+		// Mirror Sodium's CPU occlusion traversal: once a portal path has
+		// moved away from the camera section, never walk it back toward the
+		// camera. Besides preventing redundant graph walks, this is essential
+		// to preserve Sodium's visible-section domain without touching its GL
+		// render lists or render device.
+		outgoing &= this.outwardDirections(sectionX, sectionY, sectionZ);
+		int outgoingAfterOutwardMask = outgoing;
+		// Sodium applies the region graph's adjacent-mask before admitting a
+		// neighbor. This source owns no Java render region, so derive only the
+		// structural build-height/window constraint here. Packet availability is
+		// handled by admitSection, which retains a missing portal neighbor in the
+		// unavailable set until its chunk arrives. Masking unloaded chunks here
+		// lets readiness report a false drain while the client view is streaming.
+		int adjacentMask = this.structuralAdjacentMask(sectionX, sectionY, sectionZ);
+		outgoing &= adjacentMask;
+		StaticTerrainParityDiagnostics.recordPortalTraversal("rust-whole-frame", key, this.lastCameraSection,
+			incomingDirections, outgoingBeforeOutwardMask, outgoingAfterOutwardMask, adjacentMask, outgoing,
+			section.getVisibilityData(),
+			transform.x - section.getCenterX(), transform.y - section.getCenterY(), transform.z - section.getCenterZ());
+		for (int direction = 0; direction < GraphDirection.COUNT; direction++) {
+			if (!GraphDirectionSet.contains(outgoing, direction)) {
+				continue;
+			}
+			this.admitSection(
+				sectionX + GraphDirection.x(direction),
+				sectionY + GraphDirection.y(direction),
+				sectionZ + GraphDirection.z(direction),
+				GraphDirectionSet.of(GraphDirection.opposite(direction)), false, frustum);
+		}
+	}
+
+	private void ensureVisibilityBatchCapacity(int capacity) {
+		if (capacity <= this.visibilityBatchSections.length) {
+			return;
+		}
+		int next = Math.max(capacity, this.visibilityBatchSections.length << 1);
+		this.visibilityBatchSections = java.util.Arrays.copyOf(this.visibilityBatchSections, next);
+		this.visibilityBatchIncoming = java.util.Arrays.copyOf(this.visibilityBatchIncoming, next);
+		this.visibilityBatchOutgoing = java.util.Arrays.copyOf(this.visibilityBatchOutgoing, next);
+	}
+
+	/** CPU-only structural equivalent of Sodium RenderSection#getAdjacentMask(). */
+	private int structuralAdjacentMask(int sectionX, int sectionY, int sectionZ) {
 		int mask = GraphDirectionSet.NONE;
 		for (int direction = 0; direction < GraphDirection.COUNT; direction++) {
-			SectionPos neighbor = SectionPos.of(
-				section.getX() + GraphDirection.x(direction),
-				section.getY() + GraphDirection.y(direction),
-				section.getZ() + GraphDirection.z(direction)
-			);
-			if (!this.level.isOutsideBuildHeight(neighbor.minBlockY())
-				&& this.level.hasChunk(neighbor.getX(), neighbor.getZ())
-				&& this.isInsideCurrentWindow(neighbor)) {
+			int neighborX = sectionX + GraphDirection.x(direction);
+			int neighborY = sectionY + GraphDirection.y(direction);
+			int neighborZ = sectionZ + GraphDirection.z(direction);
+			if (!this.level.isOutsideBuildHeight(SectionPos.sectionToBlockCoord(neighborY))
+				&& this.isInsideCurrentWindow(neighborX, neighborZ)) {
 				mask |= GraphDirectionSet.of(direction);
 			}
 		}
@@ -843,7 +1069,7 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 	}
 
-	private int outwardDirections(SectionPos section) {
+	private int outwardDirections(int sectionX, int sectionY, int sectionZ) {
 		if (this.lastCameraSection == Long.MIN_VALUE) {
 			return GraphDirectionSet.NONE;
 		}
@@ -851,12 +1077,12 @@ public final class RustGalWholeFrameTerrainSource {
 		int originY = SectionPos.y(this.lastCameraSection);
 		int originZ = SectionPos.z(this.lastCameraSection);
 		int directions = GraphDirectionSet.NONE;
-		directions |= section.getX() <= originX ? 1 << GraphDirection.WEST : 0;
-		directions |= section.getX() >= originX ? 1 << GraphDirection.EAST : 0;
-		directions |= section.getY() <= originY ? 1 << GraphDirection.DOWN : 0;
-		directions |= section.getY() >= originY ? 1 << GraphDirection.UP : 0;
-		directions |= section.getZ() <= originZ ? 1 << GraphDirection.NORTH : 0;
-		directions |= section.getZ() >= originZ ? 1 << GraphDirection.SOUTH : 0;
+		directions |= sectionX <= originX ? 1 << GraphDirection.WEST : 0;
+		directions |= sectionX >= originX ? 1 << GraphDirection.EAST : 0;
+		directions |= sectionY <= originY ? 1 << GraphDirection.DOWN : 0;
+		directions |= sectionY >= originY ? 1 << GraphDirection.UP : 0;
+		directions |= sectionZ <= originZ ? 1 << GraphDirection.NORTH : 0;
+		directions |= sectionZ >= originZ ? 1 << GraphDirection.SOUTH : 0;
 		return directions;
 	}
 
@@ -869,9 +1095,10 @@ public final class RustGalWholeFrameTerrainSource {
 				iterator.remove();
 				continue;
 			}
-			SectionPos position = section.getPosition();
-			if (Math.abs(position.getX() - center.getX()) <= horizontalRadius
-					&& Math.abs(position.getZ() - center.getZ()) <= horizontalRadius) {
+			int sectionX = section.getChunkX();
+			int sectionZ = section.getChunkZ();
+			if (Math.abs(sectionX - center.getX()) <= horizontalRadius
+					&& Math.abs(sectionZ - center.getZ()) <= horizontalRadius) {
 				continue;
 			}
 			long key = entry.getLongKey();
@@ -882,9 +1109,11 @@ public final class RustGalWholeFrameTerrainSource {
 			if (this.inFlight.contains(key)) {
 				this.invalidatedInFlight.add(key);
 			}
-			RustGalTerrainRenderer.removeSection(position.getX(), position.getY(), position.getZ(), "cpu-source-window-evicted");
+			RustGalTerrainRenderer.removeSection(
+				sectionX, section.getChunkY(), sectionZ, "cpu-source-window-evicted");
 			this.incomingDirections.remove(key);
 			this.propagatedIncomingDirections.remove(key);
+			this.deferredInvalidations.remove(key);
 			this.unavailableSections.remove(key);
 			if (section.getFlags() != 0) {
 				this.retainedGeometryCount--;
@@ -902,9 +1131,21 @@ public final class RustGalWholeFrameTerrainSource {
 			}
 			return outside;
 		});
+		var deferredIterator = this.deferredInvalidations.iterator();
+		while (deferredIterator.hasNext()) {
+			SectionPos position = SectionPos.of(deferredIterator.nextLong());
+			if (Math.abs(position.getX() - center.getX()) > horizontalRadius
+					|| Math.abs(position.getZ() - center.getZ()) > horizontalRadius) {
+				deferredIterator.remove();
+			}
+		}
 	}
 
 	private boolean isVisible(SectionPos section, Frustum frustum) {
+		return section != null && this.isVisible(section.getX(), section.getY(), section.getZ(), frustum);
+	}
+
+	private boolean isVisible(int sectionX, int sectionY, int sectionZ, Frustum frustum) {
 		// Reuse Sodium's CPU viewport predicate verbatim. It includes the model
 		// overhang/precision extent, camera split coordinates, its cylindrical
 		// render-distance test, and its exact frustum convention; no GL render
@@ -916,9 +1157,11 @@ public final class RustGalWholeFrameTerrainSource {
 			}
 			currentViewport = viewportProvider.sodium$createViewport();
 		}
-		return this.isWithinRenderDistance(currentViewport, section)
+		return this.isWithinRenderDistance(currentViewport, sectionX, sectionY, sectionZ)
 			&& currentViewport.isBoxVisible(
-			section.minBlockX() + 8, section.minBlockY() + 8, section.minBlockZ() + 8,
+			SectionPos.sectionToBlockCoord(sectionX) + 8,
+			SectionPos.sectionToBlockCoord(sectionY) + 8,
+			SectionPos.sectionToBlockCoord(sectionZ) + 8,
 			OcclusionCuller.CHUNK_SECTION_SIZE,
 			OcclusionCuller.CHUNK_SECTION_SIZE,
 			OcclusionCuller.CHUNK_SECTION_SIZE
@@ -931,11 +1174,11 @@ public final class RustGalWholeFrameTerrainSource {
 	 * extend past its owning section. This is selection policy over immutable
 	 * camera/section data, not a Java renderer or OpenGL-state dependency.
 	 */
-	private boolean isWithinRenderDistance(Viewport viewport, SectionPos section) {
+	private boolean isWithinRenderDistance(Viewport viewport, int sectionX, int sectionY, int sectionZ) {
 		var camera = viewport.getTransform();
-		int originX = section.minBlockX() - camera.intX;
-		int originY = section.minBlockY() - camera.intY;
-		int originZ = section.minBlockZ() - camera.intZ;
+		int originX = SectionPos.sectionToBlockCoord(sectionX) - camera.intX;
+		int originY = SectionPos.sectionToBlockCoord(sectionY) - camera.intY;
+		int originZ = SectionPos.sectionToBlockCoord(sectionZ) - camera.intZ;
 		float deltaX = this.nearestToZero(originX - 1, originX + 17) - camera.fracX;
 		float deltaY = this.nearestToZero(originY - 1, originY + 17) - camera.fracY;
 		float deltaZ = this.nearestToZero(originZ - 1, originZ + 17) - camera.fracZ;
@@ -1056,6 +1299,11 @@ public final class RustGalWholeFrameTerrainSource {
 			return;
 		}
 		this.recordPortalBuildLifecycle(key, "dispatched");
+		if (!this.isChunkLoaded(sectionPos.getX(), sectionPos.getZ())) {
+			this.completeUnavailableBuild(sectionPos);
+			this.recordPortalBuildLifecycle(key, "chunk-unavailable");
+			return;
+		}
         ChunkRenderContext renderContext;
 		try {
 			renderContext = LevelSlice.prepare(this.level, sectionPos, this.sectionCache);
@@ -1076,13 +1324,16 @@ public final class RustGalWholeFrameTerrainSource {
         RenderSection section = new RenderSection(null, sectionPos.getX(), sectionPos.getY(), sectionPos.getZ());
         Vec3 cameraPos = camera.getPosition();
 		ChunkBuilderMeshingTask task = new ChunkBuilderMeshingTask(section, ++this.buildFrame,
-				new Vector3d(cameraPos.x(), cameraPos.y(), cameraPos.z()), renderContext, SortBehavior.STATIC, true);
+				new Vector3d(cameraPos.x(), cameraPos.y(), cameraPos.z()), renderContext,
+				SortBehavior.DYNAMIC_DEFER_NEARBY_ZERO_FRAMES, true);
 		this.workerBuilder.scheduleTask(task, true, result -> this.completedBuilds.add(new CompletedBuild(sectionPos, section, result)), false);
     }
 
 	private void drainCompletedBuilds(Frustum frustum) {
 		CompletedBuild completed;
-		while ((completed = this.completedBuilds.poll()) != null) {
+		while (this.completedBuildsConsumedThisFrame < MAX_COMPLETED_BUILDS_PER_FRAME
+				&& (completed = this.completedBuilds.poll()) != null) {
+			this.completedBuildsConsumedThisFrame++;
 			long key = completed.sectionPos().asLong();
 			this.inFlight.remove(key);
 			this.recordPortalBuildLifecycle(key, "worker-completed");
@@ -1114,8 +1365,8 @@ public final class RustGalWholeFrameTerrainSource {
 					}
 				}
 				completed.section().setIncomingDirections(this.incomingDirections.get(key) & GraphDirectionSet.ALL);
-				this.replaceRetainedSection(key, completed.section());
-				this.visibilityGraphDirty = true;
+				RenderSection previous = this.replaceRetainedSection(key, completed.section());
+				this.acceptSectionVisibilityChange(previous, completed.section());
 				// This is capture-only provenance for the immutable CPU output. The
 				// normal Sodium manager records it on its own path; the independent
 				// whole-frame source must do the same before ownership transfers to
@@ -1129,18 +1380,25 @@ public final class RustGalWholeFrameTerrainSource {
 				this.requestPropagation(key);
 				this.recordPortalBuildLifecycle(key, "accepted");
 			} finally {
+				if (output.translucentData != null) {
+					output.translucentData.close();
+				}
 				output.destroy();
 			}
 		}
 	}
 
 	private boolean isInsideCurrentWindow(SectionPos section) {
+		return section != null && this.isInsideCurrentWindow(section.getX(), section.getZ());
+	}
+
+	private boolean isInsideCurrentWindow(int sectionX, int sectionZ) {
 		if (this.lastCameraSection == Long.MIN_VALUE) {
 			return false;
 		}
 		int horizontalRadius = this.configuredHorizontalRadius();
-		return Math.abs(section.getX() - SectionPos.x(this.lastCameraSection)) <= horizontalRadius
-			&& Math.abs(section.getZ() - SectionPos.z(this.lastCameraSection)) <= horizontalRadius;
+		return Math.abs(sectionX - SectionPos.x(this.lastCameraSection)) <= horizontalRadius
+			&& Math.abs(sectionZ - SectionPos.z(this.lastCameraSection)) <= horizontalRadius;
 	}
 
 	private void completeUnavailableBuild(SectionPos sectionPos) {
@@ -1169,11 +1427,26 @@ public final class RustGalWholeFrameTerrainSource {
 		RenderSection section = new RenderSection(null, sectionPos.getX(), sectionPos.getY(), sectionPos.getZ());
 		section.setInfo(BuiltSectionInfo.EMPTY);
 		section.setIncomingDirections(this.incomingDirections.get(key) & GraphDirectionSet.ALL);
-		this.replaceRetainedSection(key, section);
-		this.visibilityGraphDirty = true;
+		RenderSection previous = this.replaceRetainedSection(key, section);
+		this.acceptSectionVisibilityChange(previous, section);
 		this.unavailableSections.remove(key);
 		this.requestPropagation(key);
 		this.recordPortalBuildLifecycle(key, "accepted-empty");
+	}
+
+	/**
+	 * A first build continues the existing frontier through its accumulated
+	 * incoming portals and does not invalidate already traversed nodes. Only an
+	 * accepted replacement whose occlusion connectivity changed can alter paths
+	 * through the resident graph and therefore requires a full traversal reset.
+	 * Every replacement invalidates the visible-object cache so a settled frame
+	 * cannot retain the superseded RenderSection instance.
+	 */
+	private void acceptSectionVisibilityChange(RenderSection previous, RenderSection replacement) {
+		this.cachedVisibleSignature = Long.MIN_VALUE;
+		if (previous != null && previous.getVisibilityData() != replacement.getVisibilityData()) {
+			this.visibilityGraphDirty = true;
+		}
 	}
 
 	private static String sectionPosString(SectionPos section) {

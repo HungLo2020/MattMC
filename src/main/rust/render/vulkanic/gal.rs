@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use super::backends::{
     Backend, BackendCreateDesc, BackendRuntimeMetrics, BackendToken, CompletedHostRead,
@@ -110,7 +110,9 @@ impl<T> Arena<T> {
         Ok(handle)
     }
 
+    #[track_caller]
     fn get(&self, handle: Handle) -> GalResult<&T> {
+        let caller = std::panic::Location::caller();
         let (index, generation) = handle.require_kind(self.kind)?;
         let Some(slot) = self.slots.get(index) else {
             return Err(GalError::handle(
@@ -122,8 +124,8 @@ impl<T> Arena<T> {
             return Err(GalError::handle(
                 StatusCode::StaleHandle,
                 format!(
-                    "stale handle generation kind={:?} index={} requested_generation={} live_generation={}",
-                    self.kind, index, generation, slot.generation
+                    "stale handle generation kind={:?} index={} requested_generation={} live_generation={} lookup={}:{}",
+                    self.kind, index, generation, slot.generation, caller.file(), caller.line()
                 ),
             ));
         }
@@ -380,6 +382,13 @@ pub struct VulkanicGal {
     dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
     reverse_dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
     pending_destroys: BTreeMap<Handle, PendingDestroy>,
+    /// Whole-frame frontends assemble command lists incrementally. Resources
+    /// retired while that transaction is open must remain logically live until
+    /// the completed list has either been submitted or abandoned; otherwise an
+    /// arena slot can be reused and turn an already-recorded handle stale.
+    command_recording_depth: usize,
+    command_recording_destroys: Vec<Handle>,
+    command_recording_destroy_set: HashSet<Handle>,
     retirement: RetirementQueue,
     next_submission: u64,
     latest_accepted_submission: SubmissionId,
@@ -422,6 +431,9 @@ impl VulkanicGal {
             dependencies: BTreeMap::new(),
             reverse_dependencies: BTreeMap::new(),
             pending_destroys: BTreeMap::new(),
+            command_recording_depth: 0,
+            command_recording_destroys: Vec::new(),
+            command_recording_destroy_set: HashSet::new(),
             retirement: RetirementQueue::new(),
             next_submission: 1,
             latest_accepted_submission: SubmissionId(0),
@@ -1733,7 +1745,79 @@ impl VulkanicGal {
         )
     }
 
+    /// Opens a nestable command-recording lifetime. Destruction remains
+    /// dependency checked, but the handle slot is not released until the
+    /// outermost scope closes after submission or command abandonment.
+    pub(in crate::render::vulkanic) fn begin_command_recording(&mut self) -> GalResult<()> {
+        self.command_recording_depth =
+            self.command_recording_depth.checked_add(1).ok_or_else(|| {
+                GalError::invalid_argument("GAL command-recording scope depth exhausted")
+            })?;
+        Ok(())
+    }
+
+    pub(in crate::render::vulkanic) fn command_recording_deferred_destroy_count(&self) -> usize {
+        self.command_recording_destroys.len()
+    }
+
+    /// Closes one command-recording lifetime and applies deferred destroys in
+    /// their original dependency order at the outermost boundary.
+    pub(in crate::render::vulkanic) fn finish_command_recording(&mut self) -> GalResult<()> {
+        if self.command_recording_depth == 0 {
+            return Err(GalError::invalid_argument(
+                "GAL command-recording scope is not active",
+            ));
+        }
+        self.command_recording_depth -= 1;
+        if self.command_recording_depth != 0 {
+            return Ok(());
+        }
+        let mut destroys = std::mem::take(&mut self.command_recording_destroys);
+        self.command_recording_destroy_set.clear();
+        let mut first_error = None;
+        for handle in destroys.iter().copied() {
+            if let Err(error) = self.destroy_now(handle) {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
+        }
+        // Keep the steady-state allocation owned by the GAL. These handles
+        // are ephemeral frame resources, so discarding the Vec capacity here
+        // forced the same backing allocation to be rebuilt every frame.
+        destroys.clear();
+        self.command_recording_destroys = destroys;
+        match first_error {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
+    }
+
     pub fn destroy(&mut self, handle: Handle) -> GalResult<()> {
+        if self.command_recording_depth != 0 {
+            if self.command_recording_destroy_set.contains(&handle) {
+                return Err(GalError::handle(
+                    StatusCode::DoubleDestroy,
+                    "resource is already queued for destruction after command recording",
+                ));
+            }
+            self.validate_any_resource(handle)?;
+            if let Some(dependents) = self.dependencies.get(&handle) {
+                if dependents
+                    .iter()
+                    .any(|dependent| !self.command_recording_destroy_set.contains(dependent))
+                {
+                    return self.ensure_no_dependents(handle);
+                }
+            }
+            self.command_recording_destroys.push(handle);
+            self.command_recording_destroy_set.insert(handle);
+            return Ok(());
+        }
+        self.destroy_now(handle)
+    }
+
+    fn destroy_now(&mut self, handle: Handle) -> GalResult<()> {
         self.ensure_no_dependents(handle)?;
         self.buffer_upload_capture.forget(handle);
         let owned_frame_depth = if handle.kind() == Some(HandleKind::FrameTarget) {
@@ -2476,7 +2560,30 @@ impl VulkanicGal {
                         ));
                     }
                     let layout = self.pipeline_layouts.get(*pipeline_layout)?;
-                    let set_record = self.resource_sets.get(*set)?;
+                    let set_record = match self.resource_sets.get(*set) {
+                        Ok(record) => record,
+                        Err(mut error) => {
+                            let replacement = self
+                                .resource_sets
+                                .slots
+                                .get(set.index() as usize)
+                                .and_then(|slot| {
+                                    slot.value.as_ref().map(|record| (slot.generation, record))
+                                })
+                                .map(|(generation, record)| {
+                                    format!(
+                                        "generation={} label='{}'",
+                                        generation, record.desc.label
+                                    )
+                                })
+                                .unwrap_or_else(|| "none".to_owned());
+                            error.message = format!(
+                                "command list '{label}' op {op_index} BindResourceSet set={set:?} live_slot={replacement}: {}",
+                                error.message
+                            );
+                            return Err(error);
+                        }
+                    };
                     let Some(expected_layout) =
                         layout.desc.resource_layouts.get(*set_index as usize)
                     else {

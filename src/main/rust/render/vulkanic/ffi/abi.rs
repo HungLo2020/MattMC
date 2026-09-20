@@ -1982,6 +1982,15 @@ pub struct FfiWholeFrameProfileSnapshot {
     pub gui_mesh_prepare_nanos: u64,
     pub gui_mesh_lower_nanos: u64,
     pub gpu_distant_horizons_opaque_nanos: u64,
+    pub world_mesh_page_indirect_batch_count: u64,
+    pub world_mesh_page_indirect_run_count: u64,
+    pub world_mesh_dynamic_terrain_batch_count: u64,
+    pub world_mesh_dynamic_non_terrain_batch_count: u64,
+    pub world_mesh_terrain_translucent_batch_count: u64,
+    pub whole_frame_native_total_nanos: u64,
+    pub world_post_submit_confirm_nanos: u64,
+    pub gal_command_recording_finish_nanos: u64,
+    pub gal_command_recording_deferred_destroys: u64,
 }
 
 impl Default for FfiGuiFrameSubmitResult {

@@ -3287,13 +3287,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                             gui_blur_radius,
                             gui_tiled_quads,
                         );
-                    // `world_frontend_total_nanos` is the diagnostic boundary
-                    // for the complete Rust frontend call.  The frontend also
-                    // keeps a narrower internal graph timer for its direct
-                    // world path, but that timer starts after route admission
-                    // and omits post-submit ownership confirmation.  Recording
-                    // the outer boundary here makes the native-submit wall
-                    // time auditable without changing the rendering contract.
+                    // Preserve the frontend's direct world-graph timer and
+                    // report this outer boundary separately. The outer call
+                    // also contains GUI lowering, GAL submission, and
+                    // post-submit ownership confirmation.
                     let frontend_elapsed_nanos =
                         crate::render::vulkanic::metrics::elapsed_nanos_u64(frontend_started);
                     whole_frame_trace(&format!(
@@ -3308,7 +3305,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                             world_frame_id, parents, children);
                     }
                     world_stats.profile.ffi_decode_nanos = ffi_decode_nanos;
-                    world_stats.profile.world_frontend_total_nanos = frontend_elapsed_nanos;
+                    world_stats.profile.whole_frame_native_total_nanos = frontend_elapsed_nanos;
                     world_stats.profile.gui_frontend_nanos = gui_stats.frontend_nanos;
                     world_stats.profile.gui_mesh_prepare_nanos = gui_stats.mesh_prepare_nanos;
                     world_stats.profile.gui_mesh_lower_nanos = gui_stats.mesh_lower_nanos;

@@ -3,11 +3,13 @@ package net.vulkanic.world;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.data.BuiltSectionInfo;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.nio.file.Files;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -236,7 +238,7 @@ public class RustGalTerrainRendererLightingContractTest {
 			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
 		));
 		int enqueue = source.indexOf("private static boolean enqueueSectionLayer");
-		int submission = source.indexOf("boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainMeshInstance", enqueue);
+		int submission = source.indexOf("boolean submitted = RustGalWorldPrimitiveRenderer.enqueueStaticTerrainSectionInstance", enqueue);
 		assertTrue(enqueue >= 0 && submission > enqueue);
 		String beforeSubmission = source.substring(enqueue, submission);
 		assertFalse(beforeSubmission.contains("isStaticTerrainMeshGenerationUploaded"),
@@ -623,16 +625,6 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
-	void terrainSectionIndexPublishesOnlyAfterRustMeshRegistryAdmission() throws Exception {
-		String source = Files.readString(Path.of(
-			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"));
-		int register = source.indexOf("RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset");
-		int publish = source.indexOf("SECTION_ASSETS.put(new LayerKey", register);
-		assertTrue(register >= 0 && publish > register,
-			"terrain section index must publish only after Rust mesh admission");
-	}
-
-	@Test
 	void atlasGenerationCommitsOnlyAfterRustMeshAdmission() throws Exception {
 		String source = Files.readString(Path.of(
 			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"));
@@ -667,14 +659,36 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
-	void staleInvalidatedTerrainSectionsLeaveTheReadinessDomain() throws Exception {
+	void steadyTerrainVisibilityLookupsReuseAReadOnlyProbe() throws Exception {
 		String source = Files.readString(Path.of(
-			"src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"));
-		int method = source.indexOf("private void admitInvalidatedSections");
-		int visibility = source.indexOf("!this.isInsideCurrentWindow(section) || !this.isVisible(section, frustum)", method);
-		int remove = source.indexOf("iterator.remove()", visibility);
-		assertTrue(method >= 0 && visibility > method && remove > visibility,
-			"stale terrain invalidations must not keep Rust whole-frame readiness blocked forever");
+			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"));
+		int workload = source.indexOf("private static void recordTerrainIndexWorkload(");
+		int visibility = source.indexOf("private static LongOpenHashSet visibleWholeFrameMeshKeys(", workload);
+		int snapshot = source.indexOf("static List<RenderSection> snapshotBuiltTerrainSections(", visibility);
+		assertTrue(workload >= 0 && visibility > workload && snapshot > visibility);
+		assertFalse(source.substring(workload, snapshot).contains("new LayerKey("),
+			"steady whole-frame accounting and visibility must not allocate map keys per section/layer");
+		assertTrue(source.contains("ThreadLocal<LayerLookup> SECTION_ASSET_LOOKUP"));
+		assertTrue(source.contains("return SECTION_ASSETS.get(lookup);"));
+		assertTrue(source.contains("private record LayerKey(long sectionPos, ChunkSectionLayer layer) implements LayerAddress"),
+			"only immutable layer keys may be published into the concurrent asset map");
+
+		Class<?> keyType = Class.forName("net.vulkanic.world.RustGalTerrainRenderer$LayerKey");
+		var keyConstructor = keyType.getDeclaredConstructor(long.class, ChunkSectionLayer.class);
+		keyConstructor.setAccessible(true);
+		Object immutableKey = keyConstructor.newInstance(0x1234_5678_9abcL, ChunkSectionLayer.CUTOUT_MIPPED);
+		Class<?> lookupType = Class.forName("net.vulkanic.world.RustGalTerrainRenderer$LayerLookup");
+		var lookupConstructor = lookupType.getDeclaredConstructor();
+		lookupConstructor.setAccessible(true);
+		Object lookup = lookupConstructor.newInstance();
+		var set = lookupType.getDeclaredMethod("set", long.class, ChunkSectionLayer.class);
+		set.setAccessible(true);
+		set.invoke(lookup, 0x1234_5678_9abcL, ChunkSectionLayer.CUTOUT_MIPPED);
+		HashMap<Object, String> map = new HashMap<>();
+		map.put(immutableKey, "asset");
+		assertEquals("asset", map.get(lookup), "the reusable probe must retrieve an immutable stored key");
+		assertEquals(immutableKey, lookup);
+		assertEquals(lookup, immutableKey);
 	}
 
 	private static int[] primitiveMetadata(int... kinds) {

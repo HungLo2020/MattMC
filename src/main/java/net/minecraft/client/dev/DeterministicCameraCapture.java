@@ -107,6 +107,7 @@ import net.minecraft.world.BossEvent.BossBarOverlay;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.WeatheringCopper;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -149,6 +150,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Development-only deterministic camera capture hook.
@@ -163,6 +165,8 @@ public final class DeterministicCameraCapture {
 	private static final boolean ENABLED = Boolean.getBoolean("mattmc.dev.deterministicCameraCapture");
 	private static final int FRAMES_PER_POSE = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.framesPerPose", 8));
 	private static final int ACK_TIMEOUT_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.deterministicCameraCapture.ackTimeoutFrames", 600));
+	private static final long SCREENSHOT_ACK_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L,
+		Long.getLong("mattmc.dev.deterministicCameraCapture.ackTimeoutSeconds", 30L)));
 	private static final int POSE_COUNT = Math.max(1, Math.min(8, Integer.getInteger("mattmc.dev.deterministicCameraCapture.poseCount", 4)));
 	private static final float YAW_DELTA = Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.yawDelta", "35.0"));
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.stopAfterComplete", "true"));
@@ -539,6 +543,7 @@ public final class DeterministicCameraCapture {
 	private static boolean wholeFrameFinalOutputCapture;
 	private static boolean awaitingScreenshotAck;
 	private static int framesAwaitingAck;
+	private static long screenshotAckWaitStartNanos = -1L;
 	private static Path currentScreenshotPath;
 	private static Path currentAckPath;
 	/**
@@ -618,6 +623,20 @@ public final class DeterministicCameraCapture {
 	private static long staticTerrainLifecycleExecutionFrame = -1L;
 	private static long staticTerrainLifecycleExecutionSubmission = -1L;
 	private static long staticTerrainLifecycleExecutionInstances;
+	private static long staticTerrainLifecycleContinuityLastSubmission = -1L;
+	private static long staticTerrainLifecycleContinuityMinimumInstances = Long.MAX_VALUE;
+	private static int staticTerrainLifecycleContinuityFrames;
+	private static int staticTerrainLifecycleContinuityZeroFrames;
+	private static long staticTerrainLifecycleBeforeLightmapGeneration;
+	private static long staticTerrainLifecycleAfterLightmapGeneration;
+	private static long staticTerrainLifecycleBeforeWorldTime;
+	private static long staticTerrainLifecycleAfterWorldTime;
+	private static float staticTerrainLifecycleBeforeSkyFactor;
+	private static float staticTerrainLifecycleAfterSkyFactor;
+	private static long staticTerrainLifecycleBeforeContentHash;
+	private static long staticTerrainLifecycleAfterContentHash;
+	private static int staticTerrainLifecycleBeforeBlockLight;
+	private static int staticTerrainLifecycleAfterBlockLight;
 	// A selected-source frame intentionally runs as a separate transaction from
 	// normal terrain submission. Once the post-setup pair is correlated, keep
 	// that proof for the pose instead of requiring an impossible fresh source
@@ -1423,23 +1442,35 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static java.lang.ref.WeakReference<MinecraftServer> fixedCaptureClockServer = new java.lang.ref.WeakReference<>(null);
+	private static long fixedCaptureClockTime = Long.MIN_VALUE;
+
+	/** Applies the capture-only live clock transition to deterministic shader semantics. */
+	public static long temporalWorldTimeForCapture(long configuredTime) {
+		return ENABLED
+			&& "time-of-day-transition".equals(staticTerrainBaseScenario())
+			&& staticTerrainLifecycleSetup
+			? 6000L
+			: configuredTime;
+	}
 
 	private static void applyFixedCaptureTime(Minecraft minecraft) {
 		if (FIXED_CAPTURE_TIME != Long.MIN_VALUE && minecraft.level != null) {
+			long effectiveCaptureTime = temporalWorldTimeForCapture(FIXED_CAPTURE_TIME);
 			var server = minecraft.getSingleplayerServer();
-			if (server != null && fixedCaptureClockServer.get() != server) {
+			if (server != null && (fixedCaptureClockServer.get() != server || fixedCaptureClockTime != effectiveCaptureTime)) {
 				fixedCaptureClockServer = new java.lang.ref.WeakReference<>(server);
+				fixedCaptureClockTime = effectiveCaptureTime;
 				// Seed the copied fixture's authoritative clock too. Otherwise real
 				// time packets periodically undo the client override between ticks,
 				// and tick-driven vignette/light state never settles at the target.
 				server.execute(() -> {
 					long previousDayTime = server.overworld().getDayTime();
 					server.overworld().getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false, server);
-					server.overworld().setDayTime(FIXED_CAPTURE_TIME);
-					LOGGER.info("Capture fixture server clock: previousDayTime={} fixedDayTime={}", previousDayTime, FIXED_CAPTURE_TIME);
+					server.overworld().setDayTime(effectiveCaptureTime);
+					LOGGER.info("Capture fixture server clock: previousDayTime={} fixedDayTime={}", previousDayTime, effectiveCaptureTime);
 				});
 			}
-			minecraft.level.setTimeFromServer(FIXED_CAPTURE_TIME, FIXED_CAPTURE_TIME, false);
+			minecraft.level.setTimeFromServer(effectiveCaptureTime, effectiveCaptureTime, false);
 		}
 	}
 
@@ -1477,7 +1508,8 @@ public final class DeterministicCameraCapture {
 			return true;
 		}
 		framesAwaitingAck++;
-		if (framesAwaitingAck > ACK_TIMEOUT_FRAMES) {
+		if (screenshotAckWaitStartNanos > 0L
+				&& System.nanoTime() - screenshotAckWaitStartNanos > SCREENSHOT_ACK_TIMEOUT_NANOS) {
 			fail("timed out waiting for deterministic screenshot ack: " + currentAckPath);
 		}
 		return true;
@@ -1934,6 +1966,10 @@ public final class DeterministicCameraCapture {
 
 	public static boolean isEnabledForDiagnostics() {
 		return ENABLED && initialized && !failed;
+	}
+
+	public static boolean needsSubmittedWorkIdentity() {
+		return ENABLED && initialized && !complete && !failed;
 	}
 
 	/**
@@ -2795,7 +2831,7 @@ public final class DeterministicCameraCapture {
 			// The radius is reduced to two after the source column is proven below.
 			// Four chunks still stream the panel's source area while avoiding the
 			// broad near-terrain rebuild that can consume the bounded capture window.
-			minecraft.options.renderDistance().set(4);
+			setRenderDistance(minecraft, 4);
 			BlockPos panelOrigin = new BlockPos(64, 81, 512);
 			// Keep the target center aligned with the datapack-authored panel.  The
 			// invalidation helpers derive their 32x32 footprint from this point; using
@@ -3055,7 +3091,7 @@ public final class DeterministicCameraCapture {
 			// This is a far-LOD-only fixture. Keep ordinary client terrain out of
 			// the source-update queue after the server-side panel exists; the real
 			// DH source column remains responsible for every visible palette pixel.
-			minecraft.options.renderDistance().set(DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 8 : 2);
+			setRenderDistance(minecraft, DISTANT_HORIZONS_EXTERNAL_FIXTURE ? 8 : 2);
 			Vec3 panelCenter = Vec3.atCenterOf(center);
 			Vec3 delta = panelCenter.subtract(minecraft.player.getEyePosition());
 			double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
@@ -3158,7 +3194,7 @@ public final class DeterministicCameraCapture {
 			// with a different fade boundary and photographs sky where Frozen has
 			// terrain.  Water remains a real DH stream witness; it does not require
 			// suppressing the equivalent vanilla near-world window.
-			minecraft.options.renderDistance().set(DISTANT_HORIZONS_REQUIRE_WATER ? 10 : 3);
+			setRenderDistance(minecraft, DISTANT_HORIZONS_REQUIRE_WATER ? 10 : 3);
 		}
 		// Texture identity is valid only when every displayed palette target has
 		// both spatially matching semantic provenance and the expected exact atlas
@@ -3257,7 +3293,7 @@ public final class DeterministicCameraCapture {
 			// proven, reduce the copied server's normal radius and wait for the
 			// ordinary client terrain route to release it. The subsequent frame
 			// must therefore be rendered from the same retained DH column alone.
-			minecraft.options.renderDistance().set(DISTANT_HORIZONS_FAR_ONLY_RENDER_DISTANCE);
+			setRenderDistance(minecraft, DISTANT_HORIZONS_FAR_ONLY_RENDER_DISTANCE);
 			distantHorizonsTexturePaletteSourceReady = true;
 			distantHorizonsTexturePaletteStage = "dh-palette-source-ready";
 			writeMetadata(minecraft, "distant_horizons_texture_palette_source_ready");
@@ -3670,6 +3706,8 @@ public final class DeterministicCameraCapture {
 			staticTerrainLifecycleBeforeGeneration = staticTerrainUsesAtlasGeneration()
 				? beforeDiagnostics.atlasGeneration()
 				: before == null ? 0L : before.meshGeneration();
+			staticTerrainLifecycleBeforeContentHash = before == null ? 0L : before.contentHash();
+			staticTerrainLifecycleBeforeBlockLight = minecraft.level.getBrightness(LightLayer.BLOCK, target);
 			staticTerrainLifecycleBeforeCachedLayers = beforeDiagnostics.cachedLayerAssets();
 			DistantHorizonsSemanticCollector.RouteDiagnostics dhBefore =
 				DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
@@ -3681,7 +3719,21 @@ public final class DeterministicCameraCapture {
 			staticTerrainLifecycleBeforeDhExecutionSubmission = dhBefore.lastExecutedSubmission();
 			staticTerrainLifecycleBeforeRssBytes = currentUsedMemoryBytes();
 			staticTerrainLifecycleExecutionSubmissionBaseline = executionBefore.submissionId();
+			RustGalWorldPrimitiveRenderer.ShaderEnvironmentExecutionSnapshot shaderBefore =
+				RustGalWorldPrimitiveRenderer.shaderEnvironmentExecutionSnapshot();
+			staticTerrainLifecycleBeforeLightmapGeneration = shaderBefore.lightmapGeneration();
+			staticTerrainLifecycleBeforeWorldTime = shaderBefore.worldTime();
+			staticTerrainLifecycleBeforeSkyFactor = shaderBefore.lightmapSkyFactor();
 			BlockState replacement = staticTerrainReplacementState();
+			// Bounds identify a rendered section, not necessarily an occupied block
+			// at their midpoint. Guarantee that an edit scenario actually changes
+			// the client source state; setting air to air emits no dirty notification
+			// and cannot prove replacement lifecycle behavior.
+			if (staticTerrainEditScenario() && minecraft.level.getBlockState(target).equals(replacement)) {
+				replacement = replacement.isAir()
+					? Blocks.STONE.defaultBlockState()
+					: Blocks.AIR.defaultBlockState();
+			}
 			staticTerrainLifecycleBlockType = replacement.getBlock().builtInRegistryHolder().key().location().toString();
 			RustGalTerrainRenderer.recordLifecycleMarker(
 				"lifecycle-edit-before",
@@ -3726,6 +3778,7 @@ public final class DeterministicCameraCapture {
 			return false;
 		}
 		framesWaitingForStaticTerrainLifecycle++;
+		recordStaticTerrainLifecycleContinuity();
 		if (continueStaticTerrainLifecycleAction(minecraft)) {
 			return false;
 		}
@@ -3776,6 +3829,15 @@ public final class DeterministicCameraCapture {
 		long observedGeneration = observedStaticTerrainGeneration();
 		boolean replacementReady = staticTerrainReplacementReady(observedGeneration);
 		if (replacementReady) {
+			if (("resource-reload".equals(staticTerrainBaseScenario())
+				|| "time-of-day-transition".equals(staticTerrainBaseScenario())
+				|| "chunk-light-transition".equals(staticTerrainBaseScenario()))
+				&& staticTerrainLifecycleContinuityZeroFrames > 0) {
+				fail("static terrain disappeared during " + staticTerrainBaseScenario() + ": zeroFrames="
+					+ staticTerrainLifecycleContinuityZeroFrames
+					+ " observedFrames=" + staticTerrainLifecycleContinuityFrames);
+				return false;
+			}
 			if (!staticTerrainPostSetupExecutionReady(minecraft)) {
 				return false;
 			}
@@ -3841,15 +3903,102 @@ public final class DeterministicCameraCapture {
 		return false;
 	}
 
+	private static void recordStaticTerrainLifecycleContinuity() {
+		RustGalTerrainRenderer.StaticTerrainExecutionSnapshot execution =
+			RustGalTerrainRenderer.staticTerrainExecutionSnapshot();
+		if (execution.submissionId() <= staticTerrainLifecycleExecutionSubmissionBaseline
+			|| execution.submissionId() <= staticTerrainLifecycleContinuityLastSubmission) {
+			return;
+		}
+		staticTerrainLifecycleContinuityLastSubmission = execution.submissionId();
+		staticTerrainLifecycleContinuityMinimumInstances = Math.min(
+			staticTerrainLifecycleContinuityMinimumInstances, execution.instances()
+		);
+		staticTerrainLifecycleContinuityFrames++;
+		if (execution.instances() == 0L) {
+			staticTerrainLifecycleContinuityZeroFrames++;
+		}
+	}
+
 	private static BlockPos chooseStaticTerrainLifecycleTarget(Minecraft minecraft, ServerLevel serverLevel) {
 		if ("texture-palette".equals(staticTerrainBaseScenario())) {
 			return chooseStaticTerrainTexturePaletteTarget(minecraft, serverLevel);
+		}
+		if ("chunk-light-transition".equals(staticTerrainBaseScenario())) {
+			return chooseStaticTerrainLightTarget(minecraft, serverLevel);
 		}
 		if (!staticTerrainTranslucentScenario()) {
 			return RustGalTerrainRenderer.chooseLifecycleEditTarget(STATIC_TERRAIN_SCENARIO);
 		}
 		BlockPos target = chooseStaticTerrainTranslucentPlacementTarget(minecraft, serverLevel);
 		return target == null ? RustGalTerrainRenderer.chooseLifecycleEditTarget(STATIC_TERRAIN_SCENARIO) : target;
+	}
+
+	private static BlockPos chooseStaticTerrainLightTarget(Minecraft minecraft, ServerLevel serverLevel) {
+		BlockPos seed = RustGalTerrainRenderer.chooseLifecycleEditTarget(STATIC_TERRAIN_SCENARIO);
+		if (minecraft.level == null || minecraft.player == null) {
+			return null;
+		}
+		if (seed != null) {
+			BlockPos target = findStaticTerrainLightTargetInSection(minecraft, serverLevel, SectionPos.of(seed));
+			if (target != null) {
+				return target;
+			}
+		}
+		SectionPos cameraSection = SectionPos.of(minecraft.player.blockPosition());
+		for (int radius = 0; radius <= 5; radius++) {
+			for (int sectionX = cameraSection.getX() - radius; sectionX <= cameraSection.getX() + radius; sectionX++) {
+				for (int sectionZ = cameraSection.getZ() - radius; sectionZ <= cameraSection.getZ() + radius; sectionZ++) {
+					if (Math.max(Math.abs(sectionX - cameraSection.getX()), Math.abs(sectionZ - cameraSection.getZ())) != radius) {
+						continue;
+					}
+					for (int sectionY = cameraSection.getY() + 2; sectionY >= cameraSection.getY() - 5; sectionY--) {
+						SectionPos section = SectionPos.of(sectionX, sectionY, sectionZ);
+						RustGalTerrainRenderer.TerrainLayerSnapshot snapshot =
+							RustGalTerrainRenderer.snapshotLayer(section.origin(), ChunkSectionLayer.SOLID);
+						if (snapshot == null || snapshot.meshGeneration() == 0L) {
+							continue;
+						}
+						BlockPos target = findStaticTerrainLightTargetInSection(minecraft, serverLevel, section);
+						if (target != null) {
+							return target;
+						}
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	private static BlockPos findStaticTerrainLightTargetInSection(
+		Minecraft minecraft,
+		ServerLevel serverLevel,
+		SectionPos section
+	) {
+		int minX = section.minBlockX();
+		int minY = section.minBlockY();
+		int minZ = section.minBlockZ();
+		for (int y = minY + 1; y < minY + 15; y++) {
+			for (int x = minX + 1; x < minX + 15; x++) {
+				for (int z = minZ + 1; z < minZ + 15; z++) {
+					BlockPos candidate = new BlockPos(x, y, z);
+					if (!serverLevel.isLoaded(candidate) || !minecraft.level.isLoaded(candidate)
+						|| !serverLevel.getBlockState(candidate).isAir()
+						|| !minecraft.level.getBlockState(candidate).isAir()
+						|| minecraft.level.getBrightness(LightLayer.BLOCK, candidate) > 1) {
+						continue;
+					}
+					for (Direction direction : Direction.values()) {
+						BlockState state = minecraft.level.getBlockState(candidate.relative(direction));
+						if (!state.isAir()
+							&& state.getRenderShape() != net.minecraft.world.level.block.RenderShape.INVISIBLE) {
+							return candidate;
+						}
+					}
+				}
+			}
+		}
+		return null;
 	}
 
 	private static BlockPos chooseStaticTerrainTranslucentPlacementTarget(Minecraft minecraft, ServerLevel serverLevel) {
@@ -3980,7 +4129,8 @@ public final class DeterministicCameraCapture {
 				"partial-texture-update", "model-resource-generation-change", "resize-cycle",
 				"swapchain-recreate", "world-unload-reload", "world-different-reload",
 				"view-distance-decrease", "view-distance-increase", "camera-relocation",
-				"return-visited-terrain", "memory-cache-soak", "steady-state-performance", "texture-palette" -> true;
+				"return-visited-terrain", "memory-cache-soak", "steady-state-performance", "texture-palette",
+				"time-of-day-transition", "chunk-light-transition" -> true;
 			default -> false;
 		};
 	}
@@ -4088,6 +4238,23 @@ public final class DeterministicCameraCapture {
 		return Blocks.BLUE_STAINED_GLASS.defaultBlockState();
 	}
 
+	private static void setRenderDistance(Minecraft minecraft, int renderDistance) {
+		if (minecraft.options.renderDistance().get() == renderDistance) {
+			return;
+		}
+		minecraft.options.renderDistance().set(renderDistance);
+		minecraft.options.broadcastOptions();
+	}
+
+	private static void setViewDistances(Minecraft minecraft, int renderDistance, int simulationDistance) {
+		boolean renderDistanceChanged = minecraft.options.renderDistance().get() != renderDistance;
+		minecraft.options.renderDistance().set(renderDistance);
+		minecraft.options.simulationDistance().set(simulationDistance);
+		if (renderDistanceChanged) {
+			minecraft.options.broadcastOptions();
+		}
+	}
+
 	private static void applyStaticTerrainLifecycleAction(
 		Minecraft minecraft,
 		ServerLevel serverLevel,
@@ -4183,6 +4350,27 @@ public final class DeterministicCameraCapture {
 						+ ";oak_leaves=" + target.relative(right, 3).toShortString()
 				);
 			}
+			case "time-of-day-transition" -> {
+				staticTerrainLifecycleStage = "daylight-transition-requested";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-time-of-day-transition-requested",
+					target,
+					staticTerrainLifecycleLayer(),
+					"from=" + FIXED_CAPTURE_TIME + ":to=6000"
+				);
+			}
+			case "chunk-light-transition" -> {
+				BlockState light = Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, 15);
+				applyStaticTerrainLifecycleEdit(serverLevel, minecraft.level, target, light);
+				staticTerrainLifecycleBlockType = "minecraft:light[level=15]";
+				staticTerrainLifecycleStage = "chunk-light-transition-requested";
+				RustGalTerrainRenderer.recordLifecycleMarker(
+					"lifecycle-chunk-light-transition-requested",
+					target,
+					staticTerrainLifecycleLayer(),
+					"beforeBlockLight=" + staticTerrainLifecycleBeforeBlockLight
+				);
+			}
 			case "resource-reload", "pack-priority-reversal" -> {
 				RustGalTerrainRenderer.invalidateForResourceReload();
 				minecraft.levelRenderer.allChanged();
@@ -4216,8 +4404,9 @@ public final class DeterministicCameraCapture {
 			case "view-distance-decrease" -> {
 				staticTerrainOriginalRenderDistance = minecraft.options.renderDistance().get();
 				staticTerrainOriginalSimulationDistance = minecraft.options.simulationDistance().get();
-				minecraft.options.renderDistance().set(Math.max(2, Math.min(staticTerrainOriginalRenderDistance, 4)));
-				minecraft.options.simulationDistance().set(Math.max(2, Math.min(staticTerrainOriginalSimulationDistance, 4)));
+				setViewDistances(minecraft,
+					Math.max(2, Math.min(staticTerrainOriginalRenderDistance, 4)),
+					Math.max(2, Math.min(staticTerrainOriginalSimulationDistance, 4)));
 				// The action runs after the pre-change settled gate. Changing the
 				// semantic visibility radius starts a new Rust producer domain, so the
 				// old drained receipt cannot admit the next frame.
@@ -4239,8 +4428,9 @@ public final class DeterministicCameraCapture {
 					staticTerrainOriginalPosition = initialPosition;
 					staticTerrainLifecycleActionStep = 0;
 				}
-				minecraft.options.renderDistance().set(Math.max(staticTerrainOriginalRenderDistance, 12));
-				minecraft.options.simulationDistance().set(Math.max(staticTerrainOriginalSimulationDistance, 12));
+				setViewDistances(minecraft,
+					Math.max(staticTerrainOriginalRenderDistance, 12),
+					Math.max(staticTerrainOriginalSimulationDistance, 12));
 				// The action runs after the pre-change settled gate. Changing the
 				// semantic visibility radius starts a new Rust producer domain, so the
 				// old drained receipt cannot admit the next frame.
@@ -4274,8 +4464,9 @@ public final class DeterministicCameraCapture {
 			case "camera-relocation", "return-visited-terrain" -> {
 				staticTerrainOriginalRenderDistance = minecraft.options.renderDistance().get();
 				staticTerrainOriginalSimulationDistance = minecraft.options.simulationDistance().get();
-				minecraft.options.renderDistance().set(Math.max(staticTerrainOriginalRenderDistance, 12));
-				minecraft.options.simulationDistance().set(Math.max(staticTerrainOriginalSimulationDistance, 12));
+				setViewDistances(minecraft,
+					Math.max(staticTerrainOriginalRenderDistance, 12),
+					Math.max(staticTerrainOriginalSimulationDistance, 12));
 				staticTerrainOriginalPosition = initialPosition;
 				Vec3 relocated = initialPosition.add(64.0, 0.0, 64.0);
 				initialPosition = relocated;
@@ -4627,8 +4818,7 @@ public final class DeterministicCameraCapture {
 			// original capture inputs before returning so the final Current frame is
 			// directly comparable to Frozen while the caches still carry the revisit
 			// pressure produced by the relocated view.
-			minecraft.options.renderDistance().set(staticTerrainOriginalRenderDistance);
-			minecraft.options.simulationDistance().set(staticTerrainOriginalSimulationDistance);
+			setViewDistances(minecraft, staticTerrainOriginalRenderDistance, staticTerrainOriginalSimulationDistance);
 			invalidateRustWholeFrameTerrainReadiness();
 			settledDistantHorizonsGenerationFrames = 0;
 			initialPosition = staticTerrainOriginalPosition;
@@ -4667,8 +4857,7 @@ public final class DeterministicCameraCapture {
 			}
 			staticTerrainLifecycleActionStep = nextStep;
 			if (nextStep == 4) {
-				minecraft.options.renderDistance().set(staticTerrainOriginalRenderDistance);
-				minecraft.options.simulationDistance().set(staticTerrainOriginalSimulationDistance);
+				setViewDistances(minecraft, staticTerrainOriginalRenderDistance, staticTerrainOriginalSimulationDistance);
 				staticTerrainLifecycleStage = "memory-cache-soak-returned";
 			} else {
 				staticTerrainLifecycleStage = "memory-cache-soak-step-" + nextStep;
@@ -4688,6 +4877,11 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static long observedStaticTerrainGeneration() {
+		if ("chunk-light-transition".equals(staticTerrainBaseScenario())) {
+			RustGalTerrainRenderer.TerrainLayerSnapshot after =
+				RustGalTerrainRenderer.snapshotLayer(staticTerrainLifecycleEditBlock, ChunkSectionLayer.SOLID);
+			return after == null ? 0L : after.meshGeneration();
+		}
 		if (staticTerrainUsesAtlasGeneration()) {
 			return RustGalTerrainRenderer.diagnosticsSnapshot().atlasGeneration();
 		}
@@ -4710,6 +4904,21 @@ public final class DeterministicCameraCapture {
 		}
 		if (observedGeneration == 0L) {
 			return false;
+		}
+		if ("chunk-light-transition".equals(staticTerrainBaseScenario())) {
+			RustGalTerrainRenderer.TerrainLayerSnapshot after =
+				RustGalTerrainRenderer.snapshotLayer(staticTerrainLifecycleEditBlock, ChunkSectionLayer.SOLID);
+			int blockLight = Minecraft.getInstance().level == null ? 0
+				: Minecraft.getInstance().level.getBrightness(LightLayer.BLOCK, staticTerrainLifecycleEditBlock);
+			boolean ready = after != null
+				&& after.meshGeneration() != staticTerrainLifecycleBeforeGeneration
+				&& after.contentHash() != staticTerrainLifecycleBeforeContentHash
+				&& blockLight > staticTerrainLifecycleBeforeBlockLight;
+			if (ready) {
+				staticTerrainLifecycleAfterContentHash = after.contentHash();
+				staticTerrainLifecycleAfterBlockLight = blockLight;
+			}
+			return ready;
 		}
 		if (staticTerrainAllowsAirSource()) {
 			return RustGalTerrainRenderer.diagnosticsSnapshot().visibleLayerSubmissions() > 0
@@ -4756,6 +4965,33 @@ public final class DeterministicCameraCapture {
 		staticTerrainLifecycleExecutionFrame = execution.frameId();
 		staticTerrainLifecycleExecutionSubmission = execution.submissionId();
 		staticTerrainLifecycleExecutionInstances = execution.instances();
+		if ("time-of-day-transition".equals(staticTerrainBaseScenario())) {
+			RustGalWorldPrimitiveRenderer.ShaderEnvironmentExecutionSnapshot shaderAfter =
+				RustGalWorldPrimitiveRenderer.shaderEnvironmentExecutionSnapshot();
+			boolean daylightReady = shaderAfter.submissionId() > staticTerrainLifecycleExecutionSubmissionBaseline
+				&& shaderAfter.lightmapEnabled()
+				&& shaderAfter.lightmapGeneration() > staticTerrainLifecycleBeforeLightmapGeneration
+				&& shaderAfter.worldTime() != staticTerrainLifecycleBeforeWorldTime
+				&& shaderAfter.lightmapSkyFactor() > staticTerrainLifecycleBeforeSkyFactor + 0.25F;
+			if (!daylightReady) {
+				staticTerrainLifecycleStage = "waiting-for-presented-daylight-state";
+				if (framesWaitingForStaticTerrainLifecycle > SETTLED_READY_MAX_WAIT_FRAMES) {
+					fail("timed out waiting for presented daylight state: beforeGeneration="
+						+ staticTerrainLifecycleBeforeLightmapGeneration
+						+ " afterGeneration=" + shaderAfter.lightmapGeneration()
+						+ " beforeWorldTime=" + staticTerrainLifecycleBeforeWorldTime
+						+ " afterWorldTime=" + shaderAfter.worldTime()
+						+ " beforeSkyFactor=" + staticTerrainLifecycleBeforeSkyFactor
+						+ " afterSkyFactor=" + shaderAfter.lightmapSkyFactor());
+				} else if ((framesWaitingForStaticTerrainLifecycle % 30) == 0) {
+					writeMetadata(minecraft, "waiting_for_presented_daylight_state");
+				}
+				return false;
+			}
+			staticTerrainLifecycleAfterLightmapGeneration = shaderAfter.lightmapGeneration();
+			staticTerrainLifecycleAfterWorldTime = shaderAfter.worldTime();
+			staticTerrainLifecycleAfterSkyFactor = shaderAfter.lightmapSkyFactor();
+		}
 		if (!staticTerrainPostSetupDistantHorizonsExecutionReady(minecraft)) {
 			return false;
 		}
@@ -5641,6 +5877,20 @@ public final class DeterministicCameraCapture {
 					player.setPos(initialPosition);
 					player.setDeltaMovement(Vec3.ZERO);
 					player.setOldPosAndRot(initialPosition, FIXED_CAMERA_YAW, FIXED_CAMERA_PITCH);
+					MinecraftServer integratedServer = minecraft.getSingleplayerServer();
+					if (integratedServer != null) {
+						ServerPlayer serverPlayer = integratedServer.getPlayerList().getPlayer(player.getUUID());
+						if (serverPlayer == null) {
+							// Initialization can run before the integrated server publishes its
+							// player. Wait instead of beginning a fixed-camera capture whose
+							// packet-backed chunk window still follows the saved player position.
+							return false;
+						}
+						runOnServerThreadAndWait(integratedServer, () -> {
+							serverPlayer.setPos(initialPosition);
+							serverPlayer.setDeltaMovement(Vec3.ZERO);
+						});
+					}
 				}
 		applyRuntimeOverrides(minecraft, player);
 					setupDeterministicSupportPlatform(minecraft, player);
@@ -6596,6 +6846,7 @@ public final class DeterministicCameraCapture {
 
 		awaitingScreenshotAck = true;
 		framesAwaitingAck = 0;
+		screenshotAckWaitStartNanos = System.nanoTime();
 		writeMetadata(minecraft, "waiting_for_screenshot");
 		LOGGER.info(
 			"Deterministic camera capture requested screenshot index={} pose={} path={} ack={} yaw={} pitch={}",
@@ -6761,6 +7012,7 @@ public final class DeterministicCameraCapture {
 			renderedFramesAtPose = 0;
 		}
 		framesAwaitingAck = 0;
+		screenshotAckWaitStartNanos = -1L;
 		currentScreenshotPath = null;
 		currentAckPath = null;
 		poseIndex++;
@@ -18336,6 +18588,21 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 		json.append("\"executionFrame\": ").append(staticTerrainLifecycleExecutionFrame).append(", ");
 		json.append("\"executionSubmission\": ").append(staticTerrainLifecycleExecutionSubmission).append(", ");
 		json.append("\"executionInstances\": ").append(staticTerrainLifecycleExecutionInstances).append(", ");
+		json.append("\"continuityFrames\": ").append(staticTerrainLifecycleContinuityFrames).append(", ");
+		json.append("\"continuityZeroFrames\": ").append(staticTerrainLifecycleContinuityZeroFrames).append(", ");
+		json.append("\"continuityMinimumInstances\": ").append(
+			staticTerrainLifecycleContinuityFrames == 0 ? 0L : staticTerrainLifecycleContinuityMinimumInstances
+		).append(", ");
+		json.append("\"beforeLightmapGeneration\": ").append(staticTerrainLifecycleBeforeLightmapGeneration).append(", ");
+		json.append("\"afterLightmapGeneration\": ").append(staticTerrainLifecycleAfterLightmapGeneration).append(", ");
+		json.append("\"beforeWorldTime\": ").append(staticTerrainLifecycleBeforeWorldTime).append(", ");
+		json.append("\"afterWorldTime\": ").append(staticTerrainLifecycleAfterWorldTime).append(", ");
+		json.append("\"beforeSkyFactor\": ").append(format(staticTerrainLifecycleBeforeSkyFactor)).append(", ");
+		json.append("\"afterSkyFactor\": ").append(format(staticTerrainLifecycleAfterSkyFactor)).append(", ");
+		json.append("\"beforeContentHash\": ").append(staticTerrainLifecycleBeforeContentHash).append(", ");
+		json.append("\"afterContentHash\": ").append(staticTerrainLifecycleAfterContentHash).append(", ");
+		json.append("\"beforeBlockLight\": ").append(staticTerrainLifecycleBeforeBlockLight).append(", ");
+		json.append("\"afterBlockLight\": ").append(staticTerrainLifecycleAfterBlockLight).append(", ");
 		json.append("\"selectedSourceExecutionFrame\": ").append(staticTerrainLifecycleSourceExecutionFrame).append(", ");
 		json.append("\"selectedSourceExecutionSubmission\": ").append(staticTerrainLifecycleSourceExecutionSubmission).append(", ");
 		json.append("\"actionStep\": ").append(staticTerrainLifecycleActionStep).append(", ");

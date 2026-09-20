@@ -65,18 +65,20 @@ use super::shader_pack::material_contract::{
     TexturedMaterialTextureCoordinates, TexturedMaterialWinding,
 };
 use super::shader_pack::programs::{
-    minimal_direct_model_translucent_cutout_program, minimal_direct_standard_item_foil_program,
-    minimal_direct_terrain_cutout_program, minimal_direct_terrain_solid_program,
-    minimal_direct_terrain_translucent_program, minimal_direct_world_decal_foil_program,
-    minimal_entity_outline_program, minimal_optical_stencil_write_program,
-    minimal_shadow_depth_program, minimal_terrain_cutout_program, minimal_terrain_solid_program,
+    minimal_compact_direct_terrain_program, minimal_direct_model_translucent_cutout_program,
+    minimal_direct_standard_item_foil_program, minimal_direct_terrain_cutout_program,
+    minimal_direct_terrain_solid_program, minimal_direct_terrain_translucent_program,
+    minimal_direct_world_decal_foil_program, minimal_entity_outline_program,
+    minimal_optical_stencil_write_program, minimal_shadow_depth_program,
+    minimal_terrain_cutout_program, minimal_terrain_solid_program,
     prepare_lowered_distant_horizons_exact_atlas_source_program, shader_stage_code_for_backend,
     CompositeProgram, DistantHorizonsMaterialIdentityContract, LocalTexturedSourceProgram,
     LoweredCloudSourceProgram, LoweredDistantHorizonsSourceProgram, LoweredEntitySourceProgram,
     LoweredFullscreenSourceProgram, LoweredHandSourceProgram, LoweredTerrainSourceProgram,
     LoweredTexturedMaterialSourceProgram, LoweredWeatherSourceProgram, ProgramIdentity,
     TerrainMaterialProgram, TerrainMaterialProgramKind, TerrainSourceExecutionLayouts,
-    TerrainSourceTextureTransforms, MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT,
+    TerrainSourceTextureTransforms, COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
+    COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID, MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT,
     MINIMAL_ENTITY_OUTLINE_BLUR_FRAGMENT, MINIMAL_ENTITY_OUTLINE_FULLSCREEN_VERTEX,
     MINIMAL_ENTITY_OUTLINE_SOBEL_FRAGMENT, STANDARD_ITEM_FOIL_PROGRAM_ID,
     TERRAIN_SOURCE_INSTANCE_BYTES, TERRAIN_SOURCE_VERTEX_BYTES, WORLD_DECAL_FOIL_PROGRAM_ID,
@@ -492,6 +494,7 @@ const WORLD_MATERIAL_UNIFORM_BYTES: u64 = (WORLD_MATERIAL_HEADER_BYTES
     as u64;
 const WORLD_MATERIAL_INDEX_BYTES: u64 = 6 * 4;
 const WORLD_MESH_GPU_VERTEX_BYTES: usize = 5 * 4 * 4;
+const WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES: usize = 3 * 4 * 4;
 const WORLD_MESH_BATCH_HEADER_BYTES: usize = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4 + 4 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BYTES: usize = 16 * 4 + 6 * 4 * 4;
 const WORLD_MESH_INSTANCE_BUFFER_BYTES: u64 =
@@ -503,10 +506,10 @@ const WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES: u64 = WORLD_MESH_INSTANCE_
 /// to infer ownership or reconstruct a hidden mesh heap.
 const WORLD_MESH_GEOMETRY_PAGE_BYTES: u64 = 16 * 1024 * 1024;
 // Page-relative indexed draws address vertices in whole records while storage
-// descriptors retain Vulkan's 256-byte dynamic-offset compatibility. 1280 is
-// the least common multiple of those two requirements (80-byte vertices and
-// 256-byte descriptor alignment).
-const WORLD_MESH_GEOMETRY_ALIGNMENT: u64 = 1_280;
+// descriptors retain Vulkan's 256-byte dynamic-offset compatibility. 3840 is
+// the least common multiple of 48-byte direct-terrain vertices, 80-byte rich
+// vertices, and the descriptor alignment.
+const WORLD_MESH_GEOMETRY_ALIGNMENT: u64 = 3_840;
 const WORLD_MESH_INDEXED_INDIRECT_COMMAND_BYTES: u64 = 20;
 const SOURCE_TERRAIN_FRAME_STREAM_SLOT_COUNT: usize = 3;
 const SOURCE_TERRAIN_FRAME_STREAM_MIN_BYTES: u64 = 64 * 1024;
@@ -3032,6 +3035,21 @@ struct MeshResourceKey {
     color_format: ColorFormat,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+enum MeshVertexAbi {
+    Rich80,
+    DirectTerrain48,
+}
+
+impl MeshVertexAbi {
+    const fn stride(self) -> usize {
+        match self {
+            Self::Rich80 => WORLD_MESH_GPU_VERTEX_BYTES,
+            Self::DirectTerrain48 => WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES,
+        }
+    }
+}
+
 /// Immutable geometry is shared by every material section of one copied mesh
 /// generation. Section bindings still own their pipeline/resource-set state,
 /// but duplicating the full vertex/index payload per section multiplies static
@@ -3040,19 +3058,26 @@ struct MeshResourceKey {
 struct MeshGeometryResourceKey {
     mesh_key: u64,
     mesh_generation: u64,
+    vertex_abi: MeshVertexAbi,
 }
 
 impl MeshResourceKey {
-    const fn geometry_key(self) -> MeshGeometryResourceKey {
+    fn geometry_key(self) -> MeshGeometryResourceKey {
+        self.geometry_key_for_abi(mesh_vertex_abi_for_builtin(self))
+    }
+
+    const fn geometry_key_for_abi(self, vertex_abi: MeshVertexAbi) -> MeshGeometryResourceKey {
         MeshGeometryResourceKey {
             mesh_key: self.mesh_key,
             mesh_generation: self.mesh_generation,
+            vertex_abi,
         }
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct MeshPipelineResourceKey {
+    vertex_abi: MeshVertexAbi,
     raster_y_direction: RasterYDirection,
     g_buffer: bool,
     material_mode: u32,
@@ -3378,6 +3403,7 @@ struct MeshResources {
     vertex_buffer: Handle,
     vertex_offset: u64,
     vertex_range: u64,
+    vertex_stride: usize,
     index_buffer: Handle,
     index_offset: u64,
     pipeline_layout: Handle,
@@ -3400,6 +3426,7 @@ struct MeshGeometryResources {
     vertex_buffer: Handle,
     vertex_offset: u64,
     vertex_range: u64,
+    vertex_stride: usize,
     index_buffer: Handle,
     index_offset: u64,
     index_range: u64,
@@ -3419,6 +3446,11 @@ struct MeshGeometryArena {
 }
 
 struct SourceMeshResources {
+    geometry_key: MeshGeometryResourceKey,
+    vertex_offset: u64,
+    vertex_stride: usize,
+    index_buffer: Handle,
+    index_offset: u64,
     pipeline_layout: Handle,
     pipeline: Handle,
     shadow_pipeline: Option<Handle>,
@@ -5259,6 +5291,12 @@ pub struct WorldPrimitiveFrontend {
     /// colours animate. Entries contain semantic ranges and frame indices
     /// only; they own no GAL handles and are cleared at mesh replacement.
     mesh_batch_plan_cache: Vec<MeshBatchPlanCacheEntry>,
+    /// Reusable semantic identity staging for mesh-plan lookup. A settled
+    /// terrain frame can contain hundreds of instances, so allocating this
+    /// complete identity sequence merely to hit the topology cache defeats a
+    /// substantial part of that cache. Entries still own an exact clone on a
+    /// miss; steady frames reuse this capacity without retaining GPU state.
+    mesh_batch_identity_scratch: Vec<MeshBatchInstanceKey>,
     /// Reuses the material batch topology while per-quad geometry, lighting,
     /// and colors change. The key contains the complete ordered material
     /// identity sequence, so cloud adjacency and every raster/source policy
@@ -5328,6 +5366,11 @@ pub struct WorldPrimitiveFrontend {
     /// Reusable frame-local DH classification storage. It retains only bounded
     /// vector capacity; draw uniforms and ordering are rebuilt every frame.
     lod_frame_plan_scratch: lod::WorldLodFramePlan,
+    /// Reusable resolved DH geometry metadata for the ordinary frame planner.
+    /// Residency retains its own validated identity cache; this vector only
+    /// avoids allocating a second owned copy every frame while other frontend
+    /// state is mutably staged.
+    lod_visible_draw_scratch: Vec<lod::WorldLodGpuDraw>,
     /// Generation-keyed private resources for the first Rust-owned DH opaque
     /// pass. The route remains unselected until all required material and
     /// shadow semantics are available, but its cache follows the same asset
@@ -10595,6 +10638,7 @@ impl WorldPrimitiveFrontend {
                 let geometry_key = MeshGeometryResourceKey {
                     mesh_key: draw.mesh_key,
                     mesh_generation: draw.mesh_generation,
+                    vertex_abi: MeshVertexAbi::Rich80,
                 };
                 self.ensure_mesh_geometry_resources(
                     gal,
@@ -21733,6 +21777,21 @@ impl WorldPrimitiveFrontend {
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
+        gal.begin_command_recording()?;
+        let result =
+            self.submit_whole_frame_recorded(gal, generation, frame_target, frame, gui_ops);
+        let finish = gal.finish_command_recording();
+        result.and_then(|stats| finish.map(|()| stats))
+    }
+
+    fn submit_whole_frame_recorded(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: WorldPrimitiveFrame,
+        gui_ops: Vec<CommandOp>,
+    ) -> GalResult<WorldPrimitiveSubmitStats> {
         let direction = match std::env::var("MATTMC_RUST_OWNED_WORLD_TARGET").as_deref() {
             Ok("1") => Some(RasterYDirection::Up),
             Ok("down") => Some(RasterYDirection::Down),
@@ -21857,6 +21916,7 @@ impl WorldPrimitiveFrontend {
         let owned_world_target = owned_world_direction.is_some();
         let graph_direction = owned_world_direction.unwrap_or(RasterYDirection::Up);
         let total_started = std::time::Instant::now();
+        let pre_graph_started = std::time::Instant::now();
         let world_frame_id = frame.frame_id;
         whole_frame_phase_trace("pre-graph.begin", world_frame_id, None);
         // The selected-source admission path needs an exact semantic snapshot
@@ -22070,6 +22130,8 @@ impl WorldPrimitiveFrontend {
         } else {
             (frame, None)
         };
+        whole_frame_phase_trace("pre-graph-total", world_frame_id, Some(pre_graph_started));
+        let graph_target_started = std::time::Instant::now();
         let graph_target = if owned_world_target {
             let desc = oriented_target::WorldTargetDesc {
                 extent: gal.pass_target_extent(frame_target)?,
@@ -22123,6 +22185,11 @@ impl WorldPrimitiveFrontend {
         } else {
             frame_target
         };
+        whole_frame_phase_trace(
+            "graph-target-prepare",
+            world_frame_id,
+            Some(graph_target_started),
+        );
         let graph_started = std::time::Instant::now();
         let (graph_ops, mut stats) = match self.append_frame_ops_inner(
             gal,
@@ -22145,6 +22212,7 @@ impl WorldPrimitiveFrontend {
             }
         };
         whole_frame_phase_trace("graph-append", world_frame_id, Some(graph_started));
+        let post_graph_compose_started = std::time::Instant::now();
         let (
             terrain_external_material_ops,
             mut terrain_external_roles_written,
@@ -22707,6 +22775,12 @@ impl WorldPrimitiveFrontend {
             capture.equipment_inputs = equipment_capture::observe(gal, self, frame, &ops);
             capture.wolf_inputs = equipment_capture::observe_wolf(gal, self, frame, &ops);
         }
+        whole_frame_phase_trace(
+            "post-graph-compose",
+            world_frame_id,
+            Some(post_graph_compose_started),
+        );
+        let partition_started = std::time::Instant::now();
         let command_lists = match Self::partition_command_lists_at_pass_boundaries(
             "minecraft.world-and-gui.frame.commands",
             ops,
@@ -22732,6 +22806,11 @@ impl WorldPrimitiveFrontend {
                 return Err(error);
             }
         };
+        whole_frame_phase_trace(
+            "command-list-partition",
+            world_frame_id,
+            Some(partition_started),
+        );
         stats.command_lists = command_lists.len() as u64;
         let frontend_done_nanos = elapsed_nanos_u64(total_started);
         stats.profile.world_frontend_total_nanos = stats
@@ -22765,6 +22844,7 @@ impl WorldPrimitiveFrontend {
                 return Err(error);
             }
         };
+        let post_submit_confirm_started = std::time::Instant::now();
         if terrain_presentation_pass != Handle::NULL {
             gal.destroy(terrain_presentation_pass)?;
         }
@@ -22998,6 +23078,8 @@ impl WorldPrimitiveFrontend {
             self.source_execution_admission_reason =
                 Some("runtime-selected-source-opt-in-disabled".to_string());
         }
+        stats.profile.world_post_submit_confirm_nanos =
+            elapsed_nanos_u64(post_submit_confirm_started);
         Ok(stats)
     }
 
@@ -23037,6 +23119,49 @@ impl WorldPrimitiveFrontend {
     }
 
     pub(crate) fn submit_whole_frame_with_tiled_gui_frontend(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: WorldPrimitiveFrame,
+        gui_frontend: &mut GuiFrontend,
+        gui_sprites: Vec<GuiSpriteRequest>,
+        gui_affine_quads: Vec<GuiAffineQuadRequest>,
+        gui_mesh_batches: Vec<GuiMeshBatchRequest>,
+        post_effect_id: Vec<u8>,
+        gui_blur_before_stratum: i32,
+        gui_blur_radius: i32,
+        gui_tiled_quads: Vec<GuiTiledQuadRequest>,
+    ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)> {
+        gal.begin_command_recording()?;
+        let result = self.submit_whole_frame_with_tiled_gui_frontend_recorded(
+            gal,
+            generation,
+            frame_target,
+            frame,
+            gui_frontend,
+            gui_sprites,
+            gui_affine_quads,
+            gui_mesh_batches,
+            post_effect_id,
+            gui_blur_before_stratum,
+            gui_blur_radius,
+            gui_tiled_quads,
+        );
+        let deferred_destroy_count = gal.command_recording_deferred_destroy_count() as u64;
+        let finish_started = std::time::Instant::now();
+        let finish = gal.finish_command_recording();
+        let finish_nanos = elapsed_nanos_u64(finish_started);
+        result.and_then(|(mut stats, gui_stats)| {
+            finish.map(|()| {
+                stats.profile.gal_command_recording_finish_nanos = finish_nanos;
+                stats.profile.gal_command_recording_deferred_destroys = deferred_destroy_count;
+                (stats, gui_stats)
+            })
+        })
+    }
+
+    fn submit_whole_frame_with_tiled_gui_frontend_recorded(
         &mut self,
         gal: &mut VulkanicGal,
         generation: u64,
@@ -27705,11 +27830,14 @@ impl WorldPrimitiveFrontend {
         target_color_format: TextureFormat,
         ops: &mut Vec<CommandOp>,
     ) -> GalResult<Vec<TerrainMeshDraw>> {
-        let visible = self
-            .lod_gpu_residency
-            .resolve_visible_draws_cached(&self.lod_gpu_column_assets, &frame.lod_instances)?;
+        let mut visible = std::mem::take(&mut self.lod_visible_draw_scratch);
         let mut plan = std::mem::take(&mut self.lod_frame_plan_scratch);
         let result = (|| {
+            self.lod_gpu_residency.resolve_visible_draws_cached_into(
+                &self.lod_gpu_column_assets,
+                &frame.lod_instances,
+                &mut visible,
+            )?;
             lod::plan_world_lod_frame_with_camera_into(
                 &frame.lod_render_frame,
                 &visible,
@@ -27729,10 +27857,11 @@ impl WorldPrimitiveFrontend {
                 deferred,
                 target_color_format,
                 ops,
-                visible,
+                &visible,
                 &mut plan,
             )
         })();
+        self.lod_visible_draw_scratch = visible;
         self.lod_frame_plan_scratch = plan;
         return result;
     }
@@ -27748,7 +27877,7 @@ impl WorldPrimitiveFrontend {
         deferred: bool,
         target_color_format: TextureFormat,
         ops: &mut Vec<CommandOp>,
-        visible: Vec<lod::WorldLodGpuDraw>,
+        visible: &[lod::WorldLodGpuDraw],
         plan: &mut lod::WorldLodFramePlan,
     ) -> GalResult<Vec<TerrainMeshDraw>> {
         if !frame.lod_render_frame.rust_route_selected() {
@@ -27920,7 +28049,7 @@ impl WorldPrimitiveFrontend {
                 .chain(plan.transparent_draws.iter().map(|draw| draw.draw))
                 .chain(plan.water_draws.iter().map(|draw| draw.draw))
                 .collect::<Vec<_>>();
-            self.write_distant_horizons_channel_receipt(frame, &visible);
+            self.write_distant_horizons_channel_receipt(frame, visible);
             self.write_distant_horizons_transform_receipt(
                 frame,
                 "ordinary",
@@ -29479,53 +29608,91 @@ impl WorldPrimitiveFrontend {
             ));
         }
         let mesh_group_started = std::time::Instant::now();
-        let mesh_batch_key = mesh_batch_plan_key(
-            &frame,
-            color_format,
-            raster_y_direction,
-            use_g_buffer_mesh_path,
-            false,
-        );
+        let mut mesh_identity_scratch = std::mem::take(&mut self.mesh_batch_identity_scratch);
+        mesh_identity_scratch.clear();
+        mesh_identity_scratch.reserve(frame.mesh_instances.len());
+        mesh_identity_scratch.extend(frame.mesh_instances.iter().map(mesh_batch_instance_key));
         // Camera-sorted translucent sections derive their order from the
-        // frame transform and therefore cannot reuse a topology plan keyed
-        // only by instance identity. Keep that path fully frame-local.
-        let mesh_batch_plan_cacheable = !frame
+        // frame transform. Keep only those batches frame-local; their presence
+        // must not force every stable opaque/cutout/entity instance through
+        // section expansion and hash grouping again. The cache key still owns
+        // the complete ordered instance identity, including the dynamic
+        // records, so cached static indices remain exact frame indices.
+        let has_camera_sorted_meshes = frame
             .mesh_instances
             .iter()
             .any(|instance| instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0);
-        let mesh_batch_plan = if !mesh_batch_plan_cacheable {
-            Arc::new(mesh_batches(
-                &frame,
-                self,
-                color_format,
-                raster_y_direction,
-                use_g_buffer_mesh_path,
-                false,
-            )?)
-        } else if let Some(entry) = self
+        let cached_mesh_batch_plan = self
             .mesh_batch_plan_cache
             .iter()
-            .find(|entry| entry.key == mesh_batch_key)
-        {
-            Arc::clone(&entry.batches)
+            .find(|entry| {
+                entry.key.color_format == color_format
+                    && entry.key.raster_y_direction == raster_y_direction
+                    && entry.key.g_buffer == use_g_buffer_mesh_path
+                    && !entry.key.allow_optical
+                    && entry.key.instances == mesh_identity_scratch
+            })
+            .map(|entry| Arc::clone(&entry.batches));
+        let static_mesh_batch_plan = if let Some(batches) = cached_mesh_batch_plan {
+            self.mesh_batch_identity_scratch = mesh_identity_scratch;
+            batches
         } else {
-            let batches = Arc::new(mesh_batches(
+            let selection = if has_camera_sorted_meshes {
+                MeshBatchSelection::Static
+            } else {
+                MeshBatchSelection::All
+            };
+            let batches = Arc::new(mesh_batches_selected(
                 &frame,
                 self,
                 color_format,
                 raster_y_direction,
                 use_g_buffer_mesh_path,
                 false,
+                selection,
             )?);
             const MAX_MESH_BATCH_PLAN_CACHE: usize = 4;
             if self.mesh_batch_plan_cache.len() >= MAX_MESH_BATCH_PLAN_CACHE {
                 self.mesh_batch_plan_cache.remove(0);
             }
             self.mesh_batch_plan_cache.push(MeshBatchPlanCacheEntry {
-                key: mesh_batch_key,
+                key: MeshBatchPlanKey {
+                    color_format,
+                    raster_y_direction,
+                    g_buffer: use_g_buffer_mesh_path,
+                    allow_optical: false,
+                    instances: mesh_identity_scratch.clone(),
+                },
                 batches: Arc::clone(&batches),
             });
+            self.mesh_batch_identity_scratch = mesh_identity_scratch;
             batches
+        };
+        let mesh_batch_plan = if has_camera_sorted_meshes {
+            let mut combined = Vec::with_capacity(
+                static_mesh_batch_plan.len()
+                    + frame
+                        .mesh_instances
+                        .iter()
+                        .filter(|instance| {
+                            instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
+                        })
+                        .count(),
+            );
+            combined.extend(static_mesh_batch_plan.iter().cloned());
+            combined.extend(mesh_batches_selected(
+                &frame,
+                self,
+                color_format,
+                raster_y_direction,
+                use_g_buffer_mesh_path,
+                false,
+                MeshBatchSelection::CameraSorted,
+            )?);
+            sort_mesh_batches(&mut combined, &frame);
+            Arc::new(combined)
+        } else {
+            static_mesh_batch_plan
         };
         // The cached plan contains only semantic batch ranges and stable
         // frame indices. Borrow it for the normal path; `to_mut` below makes
@@ -30527,19 +30694,6 @@ impl WorldPrimitiveFrontend {
                 let mut pending_draws = Vec::with_capacity(mesh_batches.len());
                 let mesh_draw_record_started = std::time::Instant::now();
                 for (batch_index, batch) in mesh_batches.iter().enumerate() {
-                    let (index_buffer, geometry_index_offset, vertex_offset) = self
-                        .mesh_resources
-                        .get(&batch.key)
-                        .map(|resources| {
-                            (
-                                resources.index_buffer,
-                                resources.index_offset,
-                                resources.vertex_offset,
-                            )
-                        })
-                        .ok_or_else(|| {
-                            GalError::backend("world mesh index buffer vanished before submit")
-                        })?;
                     let index_type = self
                         .mesh_assets
                         .get(&batch.key.mesh_key)
@@ -30550,6 +30704,10 @@ impl WorldPrimitiveFrontend {
                     let use_indirect = source_terrain_programs.is_none()
                         && packed_stream.first_instances[batch_index].is_some();
                     let (
+                        index_buffer,
+                        geometry_index_offset,
+                        vertex_offset,
+                        vertex_stride,
                         shadow_pipeline,
                         pipeline,
                         pipeline_layout,
@@ -30563,6 +30721,10 @@ impl WorldPrimitiveFrontend {
                                 GalError::backend("source mesh resources vanished before submit")
                             })?;
                         (
+                            resources.index_buffer,
+                            resources.index_offset,
+                            resources.vertex_offset,
+                            resources.vertex_stride,
                             resources.shadow_pipeline,
                             resources.pipeline,
                             resources.pipeline_layout,
@@ -30574,6 +30736,10 @@ impl WorldPrimitiveFrontend {
                             GalError::backend("world mesh resources vanished before submit")
                         })?;
                         (
+                            resources.index_buffer,
+                            resources.index_offset,
+                            resources.vertex_offset,
+                            resources.vertex_stride,
                             resources.shadow_pipeline,
                             resources.pipeline,
                             resources.pipeline_layout,
@@ -30603,7 +30769,7 @@ impl WorldPrimitiveFrontend {
                                     GalError::invalid_argument("world mesh index offset overflow")
                                 })?;
                             if absolute_index_offset % index_size != 0
-                                || vertex_offset % WORLD_MESH_GPU_VERTEX_BYTES as u64 != 0
+                                || vertex_offset % vertex_stride as u64 != 0
                             {
                                 return Err(GalError::invalid_argument(
                                     "page-addressed mesh geometry is not record aligned",
@@ -30613,13 +30779,12 @@ impl WorldPrimitiveFrontend {
                                 .map_err(|_| {
                                     GalError::invalid_argument("world mesh first index exceeds u32")
                                 })?;
-                            let vertex_offset_records =
-                                i32::try_from(vertex_offset / WORLD_MESH_GPU_VERTEX_BYTES as u64)
-                                    .map_err(|_| {
-                                    GalError::invalid_argument(
-                                        "world mesh vertex offset exceeds i32",
-                                    )
-                                })?;
+                            let vertex_offset_records = i32::try_from(
+                                vertex_offset / vertex_stride as u64,
+                            )
+                            .map_err(|_| {
+                                GalError::invalid_argument("world mesh vertex offset exceeds i32")
+                            })?;
                             (
                                 page_set,
                                 vec![0, 0],
@@ -30651,6 +30816,26 @@ impl WorldPrimitiveFrontend {
                                 None,
                             )
                         };
+                    let front_to_back_distance_squared = if page_command.is_some() {
+                        batch
+                            .indices
+                            .iter()
+                            .filter_map(|index| frame.mesh_instances.get(*index))
+                            .map(|instance| {
+                                // Static terrain vertices are section-local and
+                                // their transforms are camera-relative. Use the
+                                // section centre so compatible opaque/cutout
+                                // draws populate depth from near to far without
+                                // changing any semantic or resource grouping.
+                                let x = instance.transform[12] + 8.0;
+                                let y = instance.transform[13] + 8.0;
+                                let z = instance.transform[14] + 8.0;
+                                x.mul_add(x, y.mul_add(y, z * z))
+                            })
+                            .fold(f32::INFINITY, f32::min)
+                    } else {
+                        f32::INFINITY
+                    };
                     pending_draws.push(PendingMeshDraw {
                         draw: TerrainMeshDraw {
                             shadow: shadow_pipeline.map(|pipeline| TerrainShadowDraw {
@@ -30677,9 +30862,51 @@ impl WorldPrimitiveFrontend {
                             shadow_participation: TerrainShadowParticipation::Required,
                         },
                         page_command,
+                        front_to_back_distance_squared,
                     });
                 }
                 order_compatible_page_indirect_draws(&mut pending_draws);
+                stats.profile.world_mesh_page_indirect_batch_count = pending_draws
+                    .iter()
+                    .filter(|pending| pending.page_command.is_some())
+                    .count()
+                    as u64;
+                stats.profile.world_mesh_page_indirect_run_count = pending_draws
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, pending)| {
+                        pending.page_command.is_some()
+                            && (*index == 0
+                                || pending_draws[*index - 1].page_command.is_none()
+                                || page_indirect_draw_order(&pending_draws[*index - 1], pending)
+                                    != std::cmp::Ordering::Equal)
+                    })
+                    .count()
+                    as u64;
+                stats.profile.world_mesh_dynamic_terrain_batch_count = pending_draws
+                    .iter()
+                    .filter(|pending| {
+                        pending.page_command.is_none()
+                            && pending.draw.stratum == WORLD_STRATUM_TERRAIN
+                    })
+                    .count()
+                    as u64;
+                stats.profile.world_mesh_dynamic_non_terrain_batch_count = pending_draws
+                    .iter()
+                    .filter(|pending| {
+                        pending.page_command.is_none()
+                            && pending.draw.stratum != WORLD_STRATUM_TERRAIN
+                    })
+                    .count()
+                    as u64;
+                stats.profile.world_mesh_terrain_translucent_batch_count = pending_draws
+                    .iter()
+                    .filter(|pending| {
+                        pending.draw.stratum == WORLD_STRATUM_TERRAIN
+                            && pending.draw.material_mode == TerrainMaterialPassMode::Translucent
+                    })
+                    .count()
+                    as u64;
                 for pending in &mut pending_draws {
                     let Some(command) = pending.page_command else {
                         continue;
@@ -33350,14 +33577,23 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         key: MeshPipelineResourceKey,
     ) -> GalResult<()> {
-        let terrain_program =
-            if key.shader_program_identity.as_str() == STANDARD_ITEM_FOIL_PROGRAM_ID {
-                minimal_direct_standard_item_foil_program()
-            } else if key.shader_program_identity.as_str() == WORLD_DECAL_FOIL_PROGRAM_ID {
-                minimal_direct_world_decal_foil_program()
-            } else {
-                terrain_program_for_mode(key.material_mode, key.g_buffer)?
-            };
+        let terrain_program = if key.vertex_abi == MeshVertexAbi::DirectTerrain48 {
+            minimal_compact_direct_terrain_program(match key.material_mode {
+                WORLD_MATERIAL_MODE_OPAQUE => TerrainMaterialProgramKind::Opaque,
+                WORLD_MATERIAL_MODE_CUTOUT => TerrainMaterialProgramKind::Cutout,
+                _ => {
+                    return Err(GalError::invalid_argument(
+                        "compact direct terrain pipeline requires opaque/cutout material",
+                    ));
+                }
+            })
+        } else if key.shader_program_identity.as_str() == STANDARD_ITEM_FOIL_PROGRAM_ID {
+            minimal_direct_standard_item_foil_program()
+        } else if key.shader_program_identity.as_str() == WORLD_DECAL_FOIL_PROGRAM_ID {
+            minimal_direct_world_decal_foil_program()
+        } else {
+            terrain_program_for_mode(key.material_mode, key.g_buffer)?
+        };
         if key.shader_program_identity != terrain_program.identity {
             return Err(GalError::invalid_argument(
                 "builtin mesh pipeline key does not match its terrain program identity",
@@ -33417,6 +33653,7 @@ impl WorldPrimitiveFrontend {
     ) -> GalResult<MeshPipelineResourceKey> {
         let program = minimal_entity_outline_program();
         let key = MeshPipelineResourceKey {
+            vertex_abi: MeshVertexAbi::Rich80,
             raster_y_direction,
             g_buffer: false,
             material_mode: WORLD_MATERIAL_MODE_OPAQUE,
@@ -33790,7 +34027,11 @@ impl WorldPrimitiveFrontend {
             key.depth_policy,
             key.cull_policy
         );
-        let vertex_bytes = asset.vertex_bytes.clone();
+        let vertex_abi = mesh_vertex_abi_for_builtin(key);
+        let vertex_bytes = match vertex_abi {
+            MeshVertexAbi::Rich80 => asset.vertex_bytes.clone(),
+            MeshVertexAbi::DirectTerrain48 => compact_direct_terrain_vertices(&asset.vertex_bytes)?,
+        };
         let index_bytes = asset.index_bytes.clone();
         let index_type = asset.index_type;
         let geometry_key = key.geometry_key();
@@ -33810,6 +34051,7 @@ impl WorldPrimitiveFrontend {
         let vertex_buffer = geometry.vertex_buffer;
         let vertex_offset = geometry.vertex_offset;
         let vertex_range = geometry.vertex_range;
+        let vertex_stride = geometry.vertex_stride;
         let index_buffer = geometry.index_buffer;
         let geometry_index_offset = geometry.index_offset;
         self.ensure_mesh_texture_resources(gal, key.texture_id, &label)?;
@@ -33856,6 +34098,7 @@ impl WorldPrimitiveFrontend {
                 vertex_buffer,
                 vertex_offset,
                 vertex_range,
+                vertex_stride,
                 index_buffer,
                 index_offset: geometry_index_offset,
                 pipeline_layout,
@@ -33895,10 +34138,11 @@ impl WorldPrimitiveFrontend {
             "world-mesh-geometry-{}-gen{}",
             key.mesh_key, key.mesh_generation
         );
-        // Reclamation may retire an empty page. Page-wide descriptor sets
-        // must be retired first; GAL keeps any in-flight use alive.
-        self.destroy_mesh_page_resource_sets(gal);
-        self.mesh_geometry_arena.reclaim_completed(gal);
+        // Page reclamation belongs to the explicit post-submission retirement
+        // boundary. Destroying page-wide descriptor sets here invalidates sets
+        // already recorded for an earlier batch while this same frame is still
+        // being assembled, allowing their handle slots to be reused before
+        // GAL validates the completed command list.
         let result = (|| -> GalResult<MeshGeometryResources> {
             let vertex_range = vertex_bytes.len() as u64;
             let index_range = index_bytes.len() as u64;
@@ -33924,6 +34168,7 @@ impl WorldPrimitiveFrontend {
                 vertex_buffer,
                 vertex_offset,
                 vertex_range,
+                vertex_stride: key.vertex_abi.stride(),
                 index_buffer,
                 index_offset,
                 index_range,
@@ -34002,26 +34247,43 @@ impl WorldPrimitiveFrontend {
                 "world source mesh resource residency exceeds bounded limit {WORLD_SOURCE_MESH_RESOURCE_RESIDENCY}"
             )));
         }
-        self.ensure_mesh_resources(gal, mesh_key)?;
-        let (vertex_buffer, vertex_range, texture_id) = self
-            .mesh_resources
-            .get(&mesh_key)
-            .map(|resources| {
+        // Source-derived programs retain the complete 80-byte semantic ABI
+        // even when the shader-off builtin route has a compact GPU lowering.
+        let rich_geometry_key = mesh_key.geometry_key_for_abi(MeshVertexAbi::Rich80);
+        let (rich_vertices, index_bytes) = self
+            .mesh_assets
+            .get(&mesh_key.mesh_key)
+            .map(|asset| (asset.vertex_bytes.clone(), asset.index_bytes.clone()))
+            .ok_or_else(|| GalError::backend("source mesh asset vanished before lowering"))?;
+        self.ensure_mesh_geometry_resources(
+            gal,
+            rich_geometry_key,
+            rich_vertices,
+            index_bytes,
+            mesh_key.view_layering.is_some(),
+        )?;
+        let (vertex_buffer, vertex_offset, vertex_range, index_buffer, index_offset) = self
+            .mesh_geometry_resources
+            .get(&rich_geometry_key)
+            .map(|geometry| {
                 (
-                    resources.vertex_buffer,
-                    resources.vertex_range,
-                    mesh_key.texture_id,
+                    geometry.vertex_buffer,
+                    geometry.vertex_offset,
+                    geometry.vertex_range,
+                    geometry.index_buffer,
+                    geometry.index_offset,
                 )
             })
-            .ok_or_else(|| {
-                GalError::backend("base mesh resources vanished before source variant")
-            })?;
+            .ok_or_else(|| GalError::backend("rich source mesh geometry vanished"))?;
+        let texture_id = mesh_key.texture_id;
+        self.ensure_mesh_texture_resources(gal, texture_id, "world-mesh-source")?;
         let (texture_view, sampler) = self
             .mesh_texture_resources
             .get(&texture_id)
             .map(|resources| (resources.view, resources.sampler))
             .ok_or_else(|| GalError::backend("source mesh texture resources vanished"))?;
         let pipeline_key = MeshPipelineResourceKey {
+            vertex_abi: MeshVertexAbi::Rich80,
             raster_y_direction: mesh_key.raster_y_direction,
             g_buffer: mesh_key.g_buffer,
             material_mode: mesh_key.material_mode,
@@ -34071,6 +34333,11 @@ impl WorldPrimitiveFrontend {
         self.source_mesh_resources.insert(
             source_key.clone(),
             SourceMeshResources {
+                geometry_key: rich_geometry_key,
+                vertex_offset,
+                vertex_stride: WORLD_MESH_GPU_VERTEX_BYTES,
+                index_buffer,
+                index_offset,
                 pipeline_layout,
                 pipeline,
                 shadow_pipeline,
@@ -35061,6 +35328,12 @@ impl WorldPrimitiveFrontend {
                 geometry_keys.insert(resources.geometry_key);
             }
         }
+        geometry_keys.extend(
+            self.source_mesh_resources
+                .iter()
+                .filter(|(key, _)| key.mesh.mesh_key == update.mesh_key)
+                .map(|(_, resources)| resources.geometry_key),
+        );
         for geometry_key in geometry_keys {
             if let Some(resources) = self.mesh_geometry_resources.get(&geometry_key) {
                 gal.submit(SubmissionBatch {
@@ -36765,10 +37038,27 @@ impl WorldPrimitiveFrontend {
             .filter(|source_key| ids.contains(&source_key.mesh.texture_id))
             .cloned()
             .collect::<Vec<_>>();
+        let mut source_geometry_keys = BTreeSet::new();
         for source_key in source_keys {
             if let Some(resources) = self.source_mesh_resources.remove(&source_key) {
+                source_geometry_keys.insert(resources.geometry_key);
                 for handle in resources.handles_in_destroy_order() {
                     let _ = gal.destroy(handle);
+                }
+            }
+        }
+        for geometry_key in source_geometry_keys {
+            let still_referenced = self
+                .mesh_resources
+                .values()
+                .any(|resources| resources.geometry_key == geometry_key)
+                || self
+                    .source_mesh_resources
+                    .values()
+                    .any(|resources| resources.geometry_key == geometry_key);
+            if !still_referenced {
+                if let Some(resources) = self.mesh_geometry_resources.remove(&geometry_key) {
+                    self.deferred_mesh_geometry_range_releases.push(resources);
                 }
             }
         }
@@ -36796,6 +37086,7 @@ impl WorldPrimitiveFrontend {
                 .collect::<Vec<_>>();
             for source_key in source_keys {
                 if let Some(resources) = self.source_mesh_resources.remove(&source_key) {
+                    geometry_keys.insert(resources.geometry_key);
                     for handle in resources.handles_in_destroy_order() {
                         self.deferred_mesh_resource_destroys.push(handle);
                     }
@@ -36815,8 +37106,8 @@ impl WorldPrimitiveFrontend {
                 .any(|resources| resources.geometry_key == geometry_key)
                 || self
                     .source_mesh_resources
-                    .keys()
-                    .any(|source_key| source_key.mesh.geometry_key() == geometry_key);
+                    .values()
+                    .any(|resources| resources.geometry_key == geometry_key);
             if !still_referenced {
                 if let Some(resources) = self.mesh_geometry_resources.remove(&geometry_key) {
                     self.deferred_mesh_geometry_range_releases.push(resources);
@@ -38878,6 +39169,32 @@ fn packed_mesh_vertices(vertices: &[WorldMeshVertex]) -> Vec<u8> {
     out
 }
 
+fn compact_direct_terrain_vertices(rich_vertices: &[u8]) -> GalResult<Vec<u8>> {
+    if rich_vertices.len() % WORLD_MESH_GPU_VERTEX_BYTES != 0 {
+        return Err(GalError::invalid_argument(
+            "rich world mesh vertex payload is not record aligned",
+        ));
+    }
+    let vertex_count = rich_vertices.len() / WORLD_MESH_GPU_VERTEX_BYTES;
+    let mut out = Vec::with_capacity(vertex_count * WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES);
+    for vertex in rich_vertices.chunks_exact(WORLD_MESH_GPU_VERTEX_BYTES) {
+        // position.xyz + terrain material byte
+        out.extend_from_slice(&vertex[0..12]);
+        out.extend_from_slice(&vertex[60..64]);
+        // lossless RGBA copied from the rich float lanes
+        out.extend_from_slice(&vertex[16..28]);
+        out.extend_from_slice(&vertex[44..48]);
+        // resolved atlas UV + copied lightmap coordinates
+        out.extend_from_slice(&vertex[64..72]);
+        out.extend_from_slice(&vertex[48..56]);
+    }
+    debug_assert_eq!(
+        out.len(),
+        vertex_count * WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES
+    );
+    Ok(out)
+}
+
 /// Complete mip chain for an owned 2D atlas.  This is a resource description,
 /// not a backend choice: GAL records the generation and each backend performs
 /// its own explicit mip operation.
@@ -39878,6 +40195,7 @@ impl PageIndexedDrawCommand {
 struct PendingMeshDraw {
     draw: TerrainMeshDraw,
     page_command: Option<PageIndexedDrawCommand>,
+    front_to_back_distance_squared: f32,
 }
 
 /// Groups only adjacent page-addressed draws inside one opaque/cutout phase.
@@ -39900,7 +40218,12 @@ fn order_compatible_page_indirect_draws(draws: &mut [PendingMeshDraw]) {
         {
             end += 1;
         }
-        draws[start..end].sort_by(page_indirect_draw_order);
+        draws[start..end].sort_by(|left, right| {
+            page_indirect_draw_order(left, right).then_with(|| {
+                left.front_to_back_distance_squared
+                    .total_cmp(&right.front_to_back_distance_squared)
+            })
+        });
         start = end;
     }
 }
@@ -41407,6 +41730,44 @@ fn mesh_batches(
     g_buffer: bool,
     allow_optical: bool,
 ) -> GalResult<Vec<MeshBatch>> {
+    mesh_batches_selected(
+        frame,
+        frontend,
+        color_format,
+        raster_y_direction,
+        g_buffer,
+        allow_optical,
+        MeshBatchSelection::All,
+    )
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MeshBatchSelection {
+    All,
+    Static,
+    CameraSorted,
+}
+
+impl MeshBatchSelection {
+    fn includes(self, instance: &WorldMeshInstanceRequest) -> bool {
+        let camera_sorted = instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0;
+        match self {
+            Self::All => true,
+            Self::Static => !camera_sorted,
+            Self::CameraSorted => camera_sorted,
+        }
+    }
+}
+
+fn mesh_batches_selected(
+    frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+    g_buffer: bool,
+    allow_optical: bool,
+    selection: MeshBatchSelection,
+) -> GalResult<Vec<MeshBatch>> {
     // Preserve first-seen batch order for deterministic submission, but use a
     // hash index for membership.  The previous ordered tree made terrain
     // streaming cost scale as O(instances * log batches); a settled world can
@@ -41416,6 +41777,9 @@ fn mesh_batches(
     let mut batches: Vec<MeshBatch> = Vec::new();
     let mut key_to_batch = HashMap::<(MeshResourceKey, Option<i32>), usize>::new();
     for (index, instance) in frame.mesh_instances.iter().enumerate() {
+        if !selection.includes(instance) {
+            continue;
+        }
         if instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY != 0 {
             // Outline-only instances remain in the frame for the dedicated
             // mask/post-effect planner, but never enter the regular material
@@ -41511,6 +41875,11 @@ fn mesh_batches(
     // Ordinary model layers retain authored order. Armor glint is accumulated
     // by vanilla's fixed buffer and flushed after the model collections, so its
     // semantic material has a separate deferred phase within the model group.
+    sort_mesh_batches(&mut batches, frame);
+    Ok(batches)
+}
+
+fn sort_mesh_batches(batches: &mut [MeshBatch], frame: &WorldPrimitiveFrame) {
     batches.sort_by_key(|batch| {
         let phase = if batch.key.standard_item_foil {
             4
@@ -41540,7 +41909,6 @@ fn mesh_batches(
             )
         }
     });
-    Ok(batches)
 }
 
 fn mesh_batch_plan_key(
@@ -41558,20 +41926,24 @@ fn mesh_batch_plan_key(
         instances: frame
             .mesh_instances
             .iter()
-            .map(|instance| MeshBatchInstanceKey {
-                stratum: instance.stratum,
-                mesh_key: instance.mesh_key,
-                mesh_generation: instance.mesh_generation,
-                mesh_section_index: instance.mesh_section_index,
-                depth_policy: instance.depth_policy,
-                cull_policy: instance.cull_policy,
-                winding: instance.winding,
-                flags: instance.flags,
-                model_submission_order: instance.model_submission_order,
-                standard_foil_kind: instance.item_foil.map(|foil| foil.kind),
-                has_decal_foil: instance.decal_foil.is_some(),
-            })
+            .map(mesh_batch_instance_key)
             .collect(),
+    }
+}
+
+fn mesh_batch_instance_key(instance: &WorldMeshInstanceRequest) -> MeshBatchInstanceKey {
+    MeshBatchInstanceKey {
+        stratum: instance.stratum,
+        mesh_key: instance.mesh_key,
+        mesh_generation: instance.mesh_generation,
+        mesh_section_index: instance.mesh_section_index,
+        depth_policy: instance.depth_policy,
+        cull_policy: instance.cull_policy,
+        winding: instance.winding,
+        flags: instance.flags,
+        model_submission_order: instance.model_submission_order,
+        standard_foil_kind: instance.item_foil.map(|foil| foil.kind),
+        has_decal_foil: instance.decal_foil.is_some(),
     }
 }
 
@@ -42141,22 +42513,49 @@ fn mesh_key_for_section(
     }
 }
 
+fn mesh_vertex_abi_for_builtin(key: MeshResourceKey) -> MeshVertexAbi {
+    if !key.g_buffer
+        && key.stratum == WORLD_STRATUM_TERRAIN
+        && matches!(
+            key.material_mode,
+            WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT
+        )
+        && key.texture_id == WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS
+        && !key.standard_item_foil
+        && key.view_layering.is_none()
+        && key.decal_vertex_count == 0
+    {
+        MeshVertexAbi::DirectTerrain48
+    } else {
+        MeshVertexAbi::Rich80
+    }
+}
+
 fn mesh_pipeline_key(key: MeshResourceKey) -> GalResult<MeshPipelineResourceKey> {
-    let terrain_program = if key.standard_item_foil {
+    let vertex_abi = mesh_vertex_abi_for_builtin(key);
+    let shader_program_identity = if vertex_abi == MeshVertexAbi::DirectTerrain48 {
+        ProgramIdentity::new(match key.material_mode {
+            WORLD_MATERIAL_MODE_OPAQUE => COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
+            WORLD_MATERIAL_MODE_CUTOUT => COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
+            _ => unreachable!("compact terrain predicate admits only opaque/cutout"),
+        })
+    } else if key.standard_item_foil {
         if key.material_mode != WORLD_MATERIAL_MODE_GLINT {
             return Err(GalError::invalid_argument(
                 "standard foil binding requires glint material",
             ));
         }
-        if key.decal_vertex_count > 0 {
+        let program = if key.decal_vertex_count > 0 {
             minimal_direct_world_decal_foil_program()
         } else {
             minimal_direct_standard_item_foil_program()
-        }
+        };
+        program.identity
     } else {
-        terrain_program_for_mode(key.material_mode, key.g_buffer)?
+        terrain_program_for_mode(key.material_mode, key.g_buffer)?.identity
     };
     Ok(MeshPipelineResourceKey {
+        vertex_abi,
         raster_y_direction: key.raster_y_direction,
         g_buffer: key.g_buffer,
         material_mode: key.material_mode,
@@ -42164,7 +42563,7 @@ fn mesh_pipeline_key(key: MeshResourceKey) -> GalResult<MeshPipelineResourceKey>
         depth_policy: key.depth_policy,
         cull_policy: key.cull_policy,
         color_format: key.color_format,
-        shader_program_identity: terrain_program.identity,
+        shader_program_identity,
         shader_resource_layout: None,
     })
 }
@@ -46687,6 +47086,7 @@ mod tests {
         pipeline_index: u32,
         mode: TerrainMaterialPassMode,
         page_addressed: bool,
+        distance_squared: f32,
     ) -> PendingMeshDraw {
         let handle = |kind, index| Handle::new(kind, index, 1).unwrap();
         let pipeline = handle(HandleKind::GraphicsPipeline, pipeline_index);
@@ -46724,17 +47124,18 @@ mod tests {
                 vertex_offset: 0,
                 first_instance: identity,
             }),
+            front_to_back_distance_squared: distance_squared,
         }
     }
 
     #[test]
     fn page_indirect_order_groups_compatible_draws_without_crossing_boundaries() {
         let mut draws = vec![
-            pending_page_draw(30, 3, TerrainMaterialPassMode::Opaque, true),
-            pending_page_draw(10, 1, TerrainMaterialPassMode::Opaque, true),
-            pending_page_draw(99, 9, TerrainMaterialPassMode::Opaque, false),
-            pending_page_draw(40, 4, TerrainMaterialPassMode::Cutout, true),
-            pending_page_draw(20, 2, TerrainMaterialPassMode::Cutout, true),
+            pending_page_draw(30, 3, TerrainMaterialPassMode::Opaque, true, 30.0),
+            pending_page_draw(10, 1, TerrainMaterialPassMode::Opaque, true, 10.0),
+            pending_page_draw(99, 9, TerrainMaterialPassMode::Opaque, false, 0.0),
+            pending_page_draw(40, 4, TerrainMaterialPassMode::Cutout, true, 40.0),
+            pending_page_draw(20, 2, TerrainMaterialPassMode::Cutout, true, 20.0),
         ];
 
         order_compatible_page_indirect_draws(&mut draws);
@@ -46749,6 +47150,28 @@ mod tests {
         assert!(draws[2].page_command.is_none());
         assert_eq!(TerrainMaterialPassMode::Opaque, draws[1].draw.material_mode);
         assert_eq!(TerrainMaterialPassMode::Cutout, draws[3].draw.material_mode);
+    }
+
+    #[test]
+    fn page_indirect_order_sorts_compatible_draws_front_to_back() {
+        let mut draws = vec![
+            pending_page_draw(30, 1, TerrainMaterialPassMode::Cutout, true, 900.0),
+            pending_page_draw(10, 1, TerrainMaterialPassMode::Cutout, true, 100.0),
+            pending_page_draw(20, 1, TerrainMaterialPassMode::Cutout, true, 400.0),
+        ];
+
+        order_compatible_page_indirect_draws(&mut draws);
+
+        assert_eq!(
+            vec![10, 20, 30],
+            draws
+                .iter()
+                .map(|pending| pending.draw.index_count)
+                .collect::<Vec<_>>()
+        );
+        assert!(draws
+            .windows(2)
+            .all(|pair| page_indirect_draw_order(&pair[0], &pair[1]) == std::cmp::Ordering::Equal));
     }
 
     #[test]
@@ -49959,6 +50382,7 @@ mod tests {
         let mut source_derived = builtin.clone();
         source_derived.identity = ProgramIdentity::new("shader-pack:test/terrain_opaque");
         let builtin_key = MeshPipelineResourceKey {
+            vertex_abi: MeshVertexAbi::Rich80,
             raster_y_direction: RasterYDirection::Up,
             g_buffer: true,
             material_mode: WORLD_MATERIAL_MODE_OPAQUE,
@@ -52038,6 +52462,7 @@ mod tests {
                 minimal_direct_terrain_translucent_program().identity
             );
             let key = MeshPipelineResourceKey {
+                vertex_abi: MeshVertexAbi::Rich80,
                 raster_y_direction: RasterYDirection::Up,
                 g_buffer,
                 material_mode: WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
@@ -58570,6 +58995,69 @@ mod tests {
     }
 
     #[test]
+    fn direct_opaque_atlas_terrain_uses_compact_geometry_and_stride() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        let mut asset = mesh_asset(0xc048, 1, IndexType::U16);
+        asset.sections[0].texture_id = WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS;
+        let rich_bytes = asset.vertices.len() * WORLD_MESH_GPU_VERTEX_BYTES;
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![asset],
+                vec![WorldMeshTextureAssetPayload {
+                    texture_id: WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
+                    png_bytes: material_scene_png(0),
+                    mip_png_bytes: Vec::new(),
+                    frame_width: 0,
+                    frame_height: 0,
+                    frame_count: 1,
+                    frame_ticks: 1,
+                    animation_flags: 0,
+                    frame_row_size: 0,
+                    interpolation_policy: 0,
+                    animation_frames: Vec::new(),
+                    coordinate_origin: 0,
+                    sampling: None,
+                    requested_mip_levels: 0,
+                }],
+            )
+            .unwrap();
+        let mut render_frame = frame(Vec::new());
+        let mut instance = mesh_instance(0xc048, 1);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        render_frame.mesh_instances.push(instance);
+
+        frontend
+            .append_frame_ops(&mut gal, 1, target, render_frame)
+            .unwrap();
+        let resources = frontend.mesh_resources.values().next().unwrap();
+        assert_eq!(
+            MeshVertexAbi::DirectTerrain48,
+            resources.geometry_key.vertex_abi
+        );
+        assert_eq!(
+            WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES,
+            resources.vertex_stride
+        );
+        assert_eq!(
+            rich_bytes / WORLD_MESH_GPU_VERTEX_BYTES * WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES,
+            resources.vertex_range as usize
+        );
+        let pipeline_key = frontend
+            .mesh_pipeline_resources
+            .keys()
+            .find(|key| key.vertex_abi == MeshVertexAbi::DirectTerrain48)
+            .expect("compact direct terrain pipeline");
+        assert!(pipeline_key
+            .shader_program_identity
+            .as_str()
+            .ends_with("compact48_v1"));
+    }
+
+    #[test]
     fn copied_terrain_atlas_selects_resolved_atlas_uvs_while_water_stays_local() {
         assert!(mesh_texture_uses_atlas_coordinates(
             WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS
@@ -59181,6 +59669,82 @@ mod tests {
         assert_eq!(
             64.0 / 255.0,
             f32::from_le_bytes(bytes[44..48].try_into().unwrap())
+        );
+    }
+
+    #[test]
+    fn direct_static_terrain_compaction_is_lossless_for_consumed_lanes() {
+        let vertex = WorldMeshVertex {
+            position: [1.25, -2.5, 3.75],
+            uv: [0.125, 0.875],
+            shader_atlas_uv: [0.3125, 0.6875],
+            shader_block_id: 10232,
+            shader_material_type: 1,
+            terrain_material_bits: 5,
+            mid_block_packed: 0,
+            color_argb: 0x8040_80c0,
+            normal_packed: 0x0012_3456,
+            light: 0x00b0_0070,
+        };
+        let rich = packed_mesh_vertices(&[vertex]);
+        let compact = compact_direct_terrain_vertices(&rich).unwrap();
+        assert_eq!(WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES, compact.len());
+        let lane = |index| read_f32(&compact, index);
+        assert_eq!(
+            [1.25, -2.5, 3.75, 5.0],
+            [lane(0), lane(1), lane(2), lane(3)]
+        );
+        assert_eq!(
+            [64.0 / 255.0, 128.0 / 255.0, 192.0 / 255.0, 128.0 / 255.0],
+            [lane(4), lane(5), lane(6), lane(7)]
+        );
+        assert_eq!(
+            [0.3125, 0.6875, 112.0 / 240.0, 176.0 / 240.0],
+            [lane(8), lane(9), lane(10), lane(11)]
+        );
+    }
+
+    #[test]
+    fn compact_vertex_abi_is_admitted_only_for_direct_atlas_terrain() {
+        let mut instance = mesh_instance(77, 1);
+        instance.stratum = WORLD_STRATUM_TERRAIN;
+        let mut section = mesh_asset(77, 1, IndexType::U16).sections.remove(0);
+        section.texture_id = WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS;
+        let compact = mesh_key_for_section(
+            &instance,
+            &section,
+            0,
+            section.cull_policy,
+            1,
+            4,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+        );
+        assert_eq!(
+            MeshVertexAbi::DirectTerrain48,
+            mesh_vertex_abi_for_builtin(compact)
+        );
+        assert_eq!(
+            MeshVertexAbi::Rich80,
+            mesh_vertex_abi_for_builtin(MeshResourceKey {
+                g_buffer: true,
+                ..compact
+            })
+        );
+        assert_eq!(
+            MeshVertexAbi::Rich80,
+            mesh_vertex_abi_for_builtin(MeshResourceKey {
+                material_mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
+                ..compact
+            })
+        );
+        assert_eq!(
+            MeshVertexAbi::Rich80,
+            mesh_vertex_abi_for_builtin(MeshResourceKey {
+                stratum: WORLD_STRATUM_ENTITY_MESH,
+                ..compact
+            })
         );
     }
 
@@ -62720,7 +63284,8 @@ mod tests {
         let mut first_instance = mesh_instance(188, 1);
         first_instance.mesh_section_index = WORLD_MESH_SECTION_ALL;
         first.mesh_instances.push(first_instance);
-        frontend
+        gal.begin_command_recording().unwrap();
+        let (first_ops, _) = frontend
             .append_frame_ops(&mut gal, 1, target, first)
             .unwrap();
         let first_sets = frontend
@@ -62740,6 +63305,20 @@ mod tests {
         frontend
             .append_frame_ops(&mut gal, 1, target, second)
             .unwrap();
+        // Startup can grow the shared instance stream after terrain commands
+        // have already captured the old descriptor set. Exercise that actual
+        // cache path through deferred destruction and a late submit; a small
+        // standalone GAL handle test does not cover this frontend ownership.
+        frontend.flush_deferred_mesh_resource_destroys(&mut gal);
+        gal.submit(SubmissionBatch {
+            label: "world-mesh-stream-growth-late-submit".to_owned(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "world-mesh-stream-growth-recorded-terrain".to_owned(),
+                operations: first_ops,
+            })],
+        })
+        .unwrap();
+        gal.finish_command_recording().unwrap();
         let rebound_sets = frontend
             .mesh_resources
             .values()
@@ -63372,6 +63951,34 @@ mod tests {
                 && geometry.vertex_offset % WORLD_MESH_GEOMETRY_ALIGNMENT == 0
                 && geometry.index_offset % WORLD_MESH_GEOMETRY_ALIGNMENT == 0
         }));
+    }
+
+    #[test]
+    fn whole_frame_keeps_page_sets_live_while_streaming_multiple_geometry_assets() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![
+                    mesh_asset(1_871, 1, IndexType::U16),
+                    mesh_asset(1_872, 1, IndexType::U16),
+                ],
+                Vec::new(),
+            )
+            .unwrap();
+        let mut semantic_frame = frame(Vec::new());
+        semantic_frame
+            .mesh_instances
+            .extend([mesh_instance(1_871, 1), mesh_instance(1_872, 1)]);
+
+        frontend
+            .submit_whole_frame(&mut gal, 1, target, semantic_frame, Vec::new())
+            .expect(
+                "later geometry allocation must not stale page sets recorded by an earlier batch",
+            );
     }
 
     #[test]
@@ -70797,6 +71404,56 @@ mod tests {
     }
 
     #[test]
+    fn settled_mesh_batch_cache_hit_reuses_identity_staging_capacity() {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh_asset(9182, 1, IndexType::U32)],
+                Vec::new(),
+            )
+            .unwrap();
+        let mut first = frame(Vec::new());
+        first.mesh_instances = (0..64)
+            .map(|section| {
+                let mut instance = mesh_instance(9182, 1);
+                instance.transform[12] = section as f32 * 16.0;
+                instance
+            })
+            .collect();
+        frontend
+            .append_frame_ops(&mut gal, 1, target, first.clone())
+            .unwrap();
+        assert_eq!(1, frontend.mesh_batch_plan_cache.len());
+        assert_eq!(64, frontend.mesh_batch_identity_scratch.len());
+        let scratch_allocation = frontend.mesh_batch_identity_scratch.as_ptr();
+        let scratch_capacity = frontend.mesh_batch_identity_scratch.capacity();
+
+        let mut moved = first;
+        moved.frame_id = 2;
+        for instance in &mut moved.mesh_instances {
+            instance.transform[14] -= 0.25;
+        }
+        frontend
+            .append_frame_ops(&mut gal, 2, target, moved)
+            .unwrap();
+
+        assert_eq!(1, frontend.mesh_batch_plan_cache.len());
+        assert_eq!(64, frontend.mesh_batch_identity_scratch.len());
+        assert_eq!(
+            scratch_capacity,
+            frontend.mesh_batch_identity_scratch.capacity()
+        );
+        assert_eq!(
+            scratch_allocation,
+            frontend.mesh_batch_identity_scratch.as_ptr()
+        );
+    }
+
+    #[test]
     fn camera_sorted_terrain_interleaves_materials_and_invalidates_replaced_geometry() {
         let mut gal = gal();
         let mut frontend = WorldPrimitiveFrontend::default();
@@ -70831,7 +71488,12 @@ mod tests {
         }
         let mut replacement = mesh.clone();
         frontend
-            .apply_world_mesh_asset_update(&mut gal, 1, vec![mesh], Vec::new())
+            .apply_world_mesh_asset_update(
+                &mut gal,
+                1,
+                vec![mesh, mesh_asset(9183, 1, IndexType::U16)],
+                Vec::new(),
+            )
             .unwrap();
         let mut instance = mesh_instance(9182, 1);
         instance.stratum = WORLD_STRATUM_TERRAIN;
@@ -70895,6 +71557,64 @@ mod tests {
             let mut normalized = down.key;
             normalized.raster_y_direction = RasterYDirection::Up;
             assert_eq!(normalized, up.key);
+        }
+
+        // One dynamic translucent section must not make the stable opaque
+        // topology uncacheable. Recombining a cached static plan with only
+        // the freshly sorted subset must be byte-for-byte equivalent at the
+        // semantic batch boundary to a complete rebuild.
+        let mut mixed = frame.clone();
+        mixed.mesh_instances.clear();
+        mixed.mesh_instances.push(mesh_instance(9183, 1));
+        mixed.mesh_instances.push(frame.mesh_instances[0].clone());
+        let full = mesh_batches(
+            &mixed,
+            &frontend,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+        )
+        .unwrap();
+        let static_batches = mesh_batches_selected(
+            &mixed,
+            &frontend,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+            MeshBatchSelection::Static,
+        )
+        .unwrap();
+        let dynamic_batches = mesh_batches_selected(
+            &mixed,
+            &frontend,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+            MeshBatchSelection::CameraSorted,
+        )
+        .unwrap();
+        assert!(static_batches
+            .iter()
+            .all(|batch| batch.indices.iter().all(|index| *index == 0)));
+        assert!(dynamic_batches
+            .iter()
+            .all(|batch| batch.indices.iter().all(|index| *index == 1)));
+        let mut recombined = static_batches;
+        recombined.extend(dynamic_batches);
+        sort_mesh_batches(&mut recombined, &mixed);
+        assert_eq!(full.len(), recombined.len());
+        for (expected, actual) in full.iter().zip(&recombined) {
+            assert_eq!(
+                expected.model_submission_order,
+                actual.model_submission_order
+            );
+            assert_eq!(expected.key, actual.key);
+            assert_eq!(expected.index_offset, actual.index_offset);
+            assert_eq!(expected.index_count, actual.index_count);
+            assert_eq!(expected.indices, actual.indices);
         }
         // Camera movement re-evaluates order without mutating the source bytes.
         frame.mesh_instances[0].transform[14] = 0.;

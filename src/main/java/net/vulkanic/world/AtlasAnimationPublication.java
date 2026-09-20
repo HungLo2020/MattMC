@@ -39,6 +39,7 @@ final class AtlasAnimationPublication {
     boolean pending() { return pendingGeneration != 0; }
     int textureId() { return texture.textureId(); }
     boolean owns(AtlasAnimationResource candidate) { return resource == candidate; }
+    void beginPublication() { resource.beginPublication(); }
     void invalidateResourceForReplacement() { resource.invalidatePublication(); }
     SemanticAtlasAnimationSource source() { return source; }
     long stagedGeneration() { return stagedGeneration; }

@@ -169,6 +169,27 @@ public class ClientChunkCache extends ChunkSource {
 		return this.storage.chunkCount;
 	}
 
+	/**
+	 * Diagnostic identity for the packet-backed client chunk window. Counts alone
+	 * cannot distinguish two equally sized windows while a benchmark camera is
+	 * relocated and the server replaces their chunks in place.
+	 */
+	public long getLoadedChunkPositionFingerprint() {
+		Storage storage = this.storage;
+		long fingerprint = storage.loadedChunkPositionFingerprint;
+		fingerprint = mixChunkIdentity(fingerprint ^ Integer.toUnsignedLong(storage.chunkCount));
+		fingerprint ^= mixChunkIdentity(ChunkPos.asLong(storage.viewCenterX, storage.viewCenterZ));
+		return fingerprint;
+	}
+
+	private static long mixChunkIdentity(long value) {
+		value ^= value >>> 30;
+		value *= 0xbf58476d1ce4e5b9L;
+		value ^= value >>> 27;
+		value *= 0x94d049bb133111ebL;
+		return value ^ value >>> 31;
+	}
+
 	public void onLightUpdate(LightLayer lightLayer, SectionPos sectionPos) {
 		Minecraft.getInstance().levelRenderer.setSectionDirty(sectionPos.x(), sectionPos.y(), sectionPos.z());
 	}
@@ -190,6 +211,7 @@ public class ClientChunkCache extends ChunkSource {
 		volatile int viewCenterX;
 		volatile int viewCenterZ;
 		int chunkCount;
+		long loadedChunkPositionFingerprint;
 
 		Storage(final int i) {
 			this.chunkRadius = i;
@@ -205,12 +227,16 @@ public class ClientChunkCache extends ChunkSource {
 			LevelChunk levelChunk2 = (LevelChunk)this.chunks.getAndSet(i, levelChunk);
 			if (levelChunk2 != null) {
 				this.chunkCount--;
+				ChunkPos oldPos = levelChunk2.getPos();
+				this.loadedChunkPositionFingerprint ^= mixChunkIdentity(ChunkPos.asLong(oldPos.x, oldPos.z));
 				this.dropEmptySections(levelChunk2);
 				ClientChunkCache.this.level.unload(levelChunk2);
 			}
 
 			if (levelChunk != null) {
 				this.chunkCount++;
+				ChunkPos newPos = levelChunk.getPos();
+				this.loadedChunkPositionFingerprint ^= mixChunkIdentity(ChunkPos.asLong(newPos.x, newPos.z));
 				this.addEmptySections(levelChunk);
 			}
 		}
@@ -218,6 +244,8 @@ public class ClientChunkCache extends ChunkSource {
 		void drop(int i, LevelChunk levelChunk) {
 			if (this.chunks.compareAndSet(i, levelChunk, null)) {
 				this.chunkCount--;
+				ChunkPos chunkPos = levelChunk.getPos();
+				this.loadedChunkPositionFingerprint ^= mixChunkIdentity(ChunkPos.asLong(chunkPos.x, chunkPos.z));
 				this.dropEmptySections(levelChunk);
 			}
 

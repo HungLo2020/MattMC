@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::ffi::{CStr, CString};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 
 use ash::vk;
 
@@ -56,6 +56,7 @@ const MAX_NATIVE_GRAPHICS_PIPELINE_CACHE_KEYS: usize = 512;
 /// a GAL lifetime or synchronization decision.
 const NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL: u32 = 32;
 const NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES: usize = 128 * 1024 * 1024;
+static RUNTIME_NATIVE_ALLOCATOR_TRIM_ENABLED: OnceLock<bool> = OnceLock::new();
 static GLIBC_ALLOCATION_TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static NATIVE_GRAPHICS_PIPELINE_CACHE_TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static VULKAN_RESIDENCY_TRACE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -102,8 +103,18 @@ fn trace_native_graphics_pipeline_cache(hit: bool, resource_label: &str, key_cou
     );
 }
 
-fn should_trim_native_allocator(retired_since_trim: u32, free_bytes: usize) -> bool {
-    retired_since_trim >= NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL
+fn runtime_native_allocator_trim_enabled() -> bool {
+    *RUNTIME_NATIVE_ALLOCATOR_TRIM_ENABLED
+        .get_or_init(|| std::env::var_os("MATTMC_VULKAN_RUNTIME_ALLOCATOR_TRIM").is_some())
+}
+
+fn should_trim_native_allocator(
+    runtime_enabled: bool,
+    retired_since_trim: u32,
+    free_bytes: usize,
+) -> bool {
+    runtime_enabled
+        && retired_since_trim >= NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL
         && free_bytes >= NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES
 }
 
@@ -305,8 +316,9 @@ struct DeviceMemoryAllocator {
 /// Backend-private page allocator for explicit GAL resource sets.  The GAL
 /// API still creates and destroys independently addressable resource sets;
 /// only Vulkan's pool bookkeeping is shared.  Pages are keyed by their exact
-/// per-set descriptor signature, which keeps capacity accounting explicit and
-/// makes an empty page immediately reclaimable.
+/// per-set descriptor signature, which keeps capacity accounting explicit.
+/// Empty pages remain reusable so frame-local resource sets do not recreate
+/// Vulkan descriptor pools every frame.
 struct DescriptorPoolAllocator {
     context: Arc<VulkanContext>,
     blocks: Vec<DescriptorPoolBlock>,
@@ -398,14 +410,6 @@ impl DescriptorPoolAllocator {
             let _ = self.context.device.free_descriptor_sets(pool, &[set]);
         }
         block.allocated_sets = block.allocated_sets.saturating_sub(1);
-        if block.allocated_sets == 0 {
-            let block = self.blocks.remove(index);
-            unsafe {
-                self.context
-                    .device
-                    .destroy_descriptor_pool(block.pool, None)
-            };
-        }
     }
 
     fn destroy_all(&mut self) {
@@ -767,8 +771,19 @@ impl VulkanObjects {
             self.objects.insert(handle, object);
             return Err(GalError::backend("Vulkan destroy kind or token mismatch"));
         }
+        let releases_native_allocation = !matches!(
+            kind,
+            HandleKind::CombinedTextureSampler
+                | HandleKind::ResourceSet
+                | HandleKind::GraphicsPipeline
+                | HandleKind::RenderTarget
+                | HandleKind::FrameTarget
+                | HandleKind::RenderPass
+        );
         self.destroy_object(object);
-        self.trim_native_allocator_after_retirement();
+        if releases_native_allocation {
+            self.trim_native_allocator_after_retirement();
+        }
         Ok(())
     }
 
@@ -777,6 +792,12 @@ impl VulkanObjects {
     /// other backends: object lifetime remains controlled solely by the GAL
     /// completion-aware destroy path above.
     fn trim_native_allocator_after_retirement(&mut self) {
+        // `malloc_trim` walks the process-wide glibc arena and routinely costs
+        // multiple milliseconds. Keep that diagnostic residency policy opt-in
+        // instead of injecting it into steady render-frame retirement.
+        if !runtime_native_allocator_trim_enabled() {
+            return;
+        }
         self.native_objects_retired_since_allocator_trim = self
             .native_objects_retired_since_allocator_trim
             .saturating_add(1);
@@ -784,6 +805,7 @@ impl VulkanObjects {
         {
             let info = unsafe { libc::mallinfo2() };
             if should_trim_native_allocator(
+                true,
                 self.native_objects_retired_since_allocator_trim,
                 info.fordblks,
             ) {
@@ -900,15 +922,24 @@ impl VulkanObjects {
     }
 
     pub(super) fn destroy_all(&mut self) {
+        let had_objects = !self.objects.is_empty();
         let objects = std::mem::take(&mut self.objects);
         for (_, object) in objects.into_iter().rev() {
             self.destroy_object(object);
         }
         self.graphics_pipeline_cache.clear();
-        // Normally every resource-set destruction releases its page.  Keep a
-        // final backend teardown sweep for partial native initialization paths
-        // where no logical resource object was installed.
+        // Retained empty descriptor pages are backend-private reuse storage.
+        // Backend teardown remains the single unconditional release point.
         self.descriptor_pools.destroy_all();
+        #[cfg(target_os = "linux")]
+        if had_objects {
+            // Teardown runs after the backend has waited idle, outside normal
+            // frame retirement, so returning a large free arena here cannot
+            // create gameplay frame-time spikes.
+            unsafe {
+                libc::malloc_trim(0);
+            }
+        }
     }
 
     /// Diagnostic-only accounting for backend-private Vulkan memory pages.
@@ -2703,14 +2734,22 @@ mod tests {
     #[test]
     fn native_allocator_trim_requires_both_retirement_batch_and_large_free_arena() {
         assert!(!should_trim_native_allocator(
+            true,
             NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL - 1,
             NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES,
         ));
         assert!(!should_trim_native_allocator(
+            true,
             NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL,
             NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES - 1,
         ));
         assert!(should_trim_native_allocator(
+            true,
+            NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL,
+            NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES,
+        ));
+        assert!(!should_trim_native_allocator(
+            false,
             NATIVE_ALLOCATOR_TRIM_RETIRE_INTERVAL,
             NATIVE_ALLOCATOR_TRIM_MIN_FREE_BYTES,
         ));

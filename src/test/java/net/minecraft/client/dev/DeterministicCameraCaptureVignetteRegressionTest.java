@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DeterministicCameraCaptureVignetteRegressionTest {
@@ -34,6 +35,25 @@ class DeterministicCameraCaptureVignetteRegressionTest {
 			"the benchmark completion gate must remain independent of screenshot readiness");
 		assertTrue(benchmark.contains("!DeterministicCameraCapture.isAwaitingCompletion()"),
 			"a fast benchmark must not stop the client before its deterministic screenshot receipt arrives");
+	}
+
+	@Test
+	void frameBenchmarkDoesNotFightDeterministicCameraOrLivePlayerState() throws Exception {
+		String benchmark = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/GraphicsFrameBenchmark.java"));
+		int method = benchmark.indexOf("private static void maintainExplicitWorkloadFixtures(Minecraft minecraft)");
+		int nextMethod = benchmark.indexOf("private static void setupRealTerrainParticleGameplayBlock", method);
+		assertTrue(method >= 0 && nextMethod > method,
+			"the frame benchmark must retain a small explicit-fixture maintenance boundary");
+
+		String maintenance = benchmark.substring(method, nextMethod);
+		assertFalse(maintenance.contains("player.setPos("),
+			"steady-state measurement must not teleport the live player every frame");
+		assertFalse(maintenance.contains("player.setYRot(") || maintenance.contains("player.setXRot("),
+			"steady-state measurement must not compete with deterministic camera rotation");
+		assertFalse(maintenance.contains("player.setDeltaMovement(") || maintenance.contains("player.input."),
+			"steady-state measurement must not rewrite gameplay motion or input");
+		assertTrue(benchmark.contains("player.snapTo(initialPosition, initialYaw, initialPitch);"),
+			"the benchmark may establish its requested viewpoint once with synchronized interpolation history");
 	}
 
 	@Test

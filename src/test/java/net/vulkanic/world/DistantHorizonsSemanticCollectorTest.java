@@ -6,6 +6,9 @@ import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.LodQuadBuilder;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiRendererMode;
+import com.seibel.distanthorizons.core.config.Config;
+import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -89,6 +92,32 @@ class DistantHorizonsSemanticCollectorTest {
 		assertEquals(newGeneration, DistantHorizonsSemanticCollector.snapshotForTest(columnKey).generation());
 		DistantHorizonsSemanticCollector.removeColumn(columnKey, newGeneration);
 		assertFalse(DistantHorizonsSemanticCollector.hasColumn(columnKey));
+	}
+
+	@Test
+	void closingVisibleColumnBeforePreflightCannotSubmitItsRetiredNativeAsset() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		long columnKey = 45L;
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			columnKey, new DhBlockPos(0, 64, 0),
+			List.of(quadBuffer(0, 0, 0, 0xB7, 1, 2, 3, 255, 1, 2)), List.of(), List.of(), List.of()
+		);
+		publishPendingForTest();
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleOpaqueColumn(columnKey).opaqueSegments());
+		DistantHorizonsSemanticCollector.markRustOpaqueRouteSelected();
+
+		DistantHorizonsSemanticCollector.removeColumn(columnKey);
+		var retirement = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		assertNotNull(retirement);
+		assertEquals(columnKey, retirement.retirements().getFirst().columnKey());
+		DistantHorizonsSemanticCollector.acknowledgeForTest(retirement);
+
+		var consumed = DistantHorizonsSemanticCollector.consumeVisibleFrame();
+		assertTrue(consumed.visibleSegments().isEmpty());
+		assertEquals(0, consumed.renderFrame().flags()
+			& DistantHorizonsSemanticCollector.RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED);
+		assertFalse(DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot().selected());
 	}
 
 	@Test
@@ -251,6 +280,28 @@ class DistantHorizonsSemanticCollectorTest {
 			List.of()
 		);
 		assertNull(DistantHorizonsSemanticCollector.snapshotForTest(9L));
+	}
+
+	@Test
+	void disabledDhRendererDoesNotDivertBackgroundBuildsIntoRustSemantics() {
+		String wholeFrameProperty = RustGalVulkanWholeFrameMode.propertyName();
+		String previousWholeFrame = System.getProperty(wholeFrameProperty);
+		EDhApiRendererMode previousMode = Config.Client.Advanced.Debugging.rendererMode.get();
+		try {
+			System.setProperty(wholeFrameProperty, "true");
+			Config.Client.Advanced.Debugging.rendererMode.setWithoutFiringEvents(EDhApiRendererMode.DISABLED);
+			assertFalse(DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild());
+
+			Config.Client.Advanced.Debugging.rendererMode.setWithoutFiringEvents(EDhApiRendererMode.DEFAULT);
+			assertTrue(DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild());
+		} finally {
+			Config.Client.Advanced.Debugging.rendererMode.setWithoutFiringEvents(previousMode);
+			if (previousWholeFrame == null) {
+				System.clearProperty(wholeFrameProperty);
+			} else {
+				System.setProperty(wholeFrameProperty, previousWholeFrame);
+			}
+		}
 	}
 
 	@Test

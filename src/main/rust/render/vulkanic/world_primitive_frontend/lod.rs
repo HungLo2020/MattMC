@@ -6248,6 +6248,68 @@ impl WorldLodGpuResidency {
         instances: &[WorldLodColumnInstanceRequest],
     ) -> GalResult<Vec<WorldLodGpuDraw>> {
         let mut draws = Vec::with_capacity(instances.len());
+        self.resolve_visible_draws_into(assets, instances, &mut draws)?;
+        Ok(draws)
+    }
+
+    /// Resolve a visible list once per immutable asset/instance identity.
+    /// Callers receive an owned vector because the surrounding frontend may
+    /// need to mutably borrow other Rust-owned pass state while it plans and
+    /// stages materials. The expensive generation, payload, and resource
+    /// validation still happens only when the semantic instance list changes.
+    pub(crate) fn resolve_visible_draws_cached(
+        &mut self,
+        assets: &BTreeMap<u64, WorldLodGpuColumnAsset>,
+        instances: &[WorldLodColumnInstanceRequest],
+    ) -> GalResult<Vec<WorldLodGpuDraw>> {
+        if let Some((cached_instances, cached_draws)) = &self.visible_draw_cache {
+            if cached_instances.as_slice() == instances {
+                return Ok(cached_draws.clone());
+            }
+        }
+        let draws = self.resolve_visible_draws(assets, instances)?;
+        self.visible_draw_cache = Some((instances.to_vec(), draws.clone()));
+        Ok(draws)
+    }
+
+    /// Resolves into caller-owned bounded scratch so the ordinary frame path
+    /// does not allocate a second visible-draw vector on every cache hit. A
+    /// cache miss is built transactionally into `draws`; only a complete
+    /// result replaces the retained identity and metadata, and both retained
+    /// vectors reuse their previous capacities during active DH generation.
+    pub(crate) fn resolve_visible_draws_cached_into(
+        &mut self,
+        assets: &BTreeMap<u64, WorldLodGpuColumnAsset>,
+        instances: &[WorldLodColumnInstanceRequest],
+        draws: &mut Vec<WorldLodGpuDraw>,
+    ) -> GalResult<()> {
+        draws.clear();
+        if let Some((cached_instances, cached_draws)) = &self.visible_draw_cache {
+            if cached_instances.as_slice() == instances {
+                draws.extend_from_slice(cached_draws);
+                return Ok(());
+            }
+        }
+        self.resolve_visible_draws_into(assets, instances, draws)?;
+        let (mut cached_instances, mut cached_draws) = self
+            .visible_draw_cache
+            .take()
+            .unwrap_or_else(|| (Vec::new(), Vec::new()));
+        cached_instances.clear();
+        cached_instances.extend_from_slice(instances);
+        cached_draws.clear();
+        cached_draws.extend_from_slice(draws);
+        self.visible_draw_cache = Some((cached_instances, cached_draws));
+        Ok(())
+    }
+
+    fn resolve_visible_draws_into(
+        &self,
+        assets: &BTreeMap<u64, WorldLodGpuColumnAsset>,
+        instances: &[WorldLodColumnInstanceRequest],
+        draws: &mut Vec<WorldLodGpuDraw>,
+    ) -> GalResult<()> {
+        draws.reserve(instances.len());
         for instance in instances {
             let asset = assets.get(&instance.column_key).ok_or_else(|| {
                 GalError::invalid_argument(format!(
@@ -6321,27 +6383,7 @@ impl WorldLodGpuResidency {
                 index_count,
             });
         }
-        Ok(draws)
-    }
-
-    /// Resolve a visible list once per immutable asset/instance identity.
-    /// Callers receive an owned vector because the surrounding frontend may
-    /// need to mutably borrow other Rust-owned pass state while it plans and
-    /// stages materials. The expensive generation, payload, and resource
-    /// validation still happens only when the semantic instance list changes.
-    pub(crate) fn resolve_visible_draws_cached(
-        &mut self,
-        assets: &BTreeMap<u64, WorldLodGpuColumnAsset>,
-        instances: &[WorldLodColumnInstanceRequest],
-    ) -> GalResult<Vec<WorldLodGpuDraw>> {
-        if let Some((cached_instances, cached_draws)) = &self.visible_draw_cache {
-            if cached_instances.as_slice() == instances {
-                return Ok(cached_draws.clone());
-            }
-        }
-        let draws = self.resolve_visible_draws(assets, instances)?;
-        self.visible_draw_cache = Some((instances.to_vec(), draws.clone()));
-        Ok(draws)
+        Ok(())
     }
 
     pub(crate) fn confirm_submission(&mut self, gal: &mut VulkanicGal) -> GalResult<()> {
@@ -8936,25 +8978,32 @@ mod tests {
         assert!(!draws[0].vertex_buffer.is_null());
         assert!(!draws[0].index_buffer.is_null());
 
-        // The second lookup reuses the validated generation-bound record;
-        // callers still receive an owned list so later planning can borrow
-        // other frontend state mutably.
-        let cached = residency
-            .resolve_visible_draws_cached(&assets, &[instance])
+        // The ordinary frame path resolves through reusable caller storage.
+        // A failed generation change must not poison the last complete cache.
+        let mut cached = Vec::new();
+        residency
+            .resolve_visible_draws_cached_into(&assets, &[instance], &mut cached)
             .unwrap();
-        let cached_again = residency
-            .resolve_visible_draws_cached(&assets, &[instance])
+        let cached_first = cached.clone();
+        residency
+            .resolve_visible_draws_cached_into(&assets, &[instance], &mut cached)
             .unwrap();
-        assert_eq!(cached, cached_again);
+        assert_eq!(cached_first, cached);
 
         let stale = WorldLodColumnInstanceRequest {
             column_generation: 4,
             ..instance
         };
-        assert!(residency.resolve_visible_draws(&assets, &[stale]).is_err());
+        assert!(residency
+            .resolve_visible_draws_cached_into(&assets, &[stale], &mut cached)
+            .is_err());
+        residency
+            .resolve_visible_draws_cached_into(&assets, &[instance], &mut cached)
+            .unwrap();
+        assert_eq!(cached_first, cached);
         residency.discard_submission(&mut gal);
         assert!(residency
-            .resolve_visible_draws_cached(&assets, &[instance])
+            .resolve_visible_draws_cached_into(&assets, &[instance], &mut cached)
             .is_err());
     }
 

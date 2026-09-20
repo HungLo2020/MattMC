@@ -448,6 +448,37 @@ public class OcclusionCuller {
 		return connections;
 	}
 
+	/**
+	 * Batches the CPU-only portal calculation used by independent semantic
+	 * terrain producers. The section objects contribute immutable visibility and
+	 * position data only; no render list, region storage, or backend state crosses
+	 * this boundary.
+	 */
+	public static void getVisibilityConnectionsForCameraBatch(RenderSection[] sections, int[] incoming,
+			Viewport viewport, int count, int[] output) {
+		if (sections == null || incoming == null || viewport == null || output == null
+				|| count < 0 || count > sections.length || count > incoming.length || count > output.length) {
+			throw new IllegalArgumentException("invalid batched portal visibility inputs");
+		}
+		NativeScratch scratch = NATIVE_SCRATCH.get();
+		scratch.clear();
+		for (int index = 0; index < count; index++) {
+			RenderSection section = sections[index];
+			if (section == null) {
+				throw new IllegalArgumentException("batched portal visibility section is null");
+			}
+			scratch.add(section, incoming[index], viewport);
+		}
+		if (count == 0) {
+			return;
+		}
+		computeOcclusionConnectionsBatch(scratch);
+		for (int index = 0; index < count; index++) {
+			output[index] = scratch.connections.getInt(index * Integer.BYTES);
+			scratch.sections[index] = null;
+		}
+	}
+
     private static void computeOcclusionConnectionsBatch(NativeScratch scratch) {
         check(VERIFY_STATUS, "native occlusion verification");
         check(invokeConnectionsBatch(
@@ -527,12 +558,16 @@ public class OcclusionCuller {
         }
 
         void add(RenderSection section, Viewport viewport) {
+			this.add(section, section.getIncomingDirections(), viewport);
+		}
+
+		void add(RenderSection section, int incoming, Viewport viewport) {
             this.ensureCapacity(this.count + 1);
 
             int index = this.count++;
             this.sections[index] = section;
             this.visibilityData.putLong(index * Long.BYTES, section.getVisibilityData());
-            this.incomingDirections.putInt(index * Integer.BYTES, section.getIncomingDirections());
+			this.incomingDirections.putInt(index * Integer.BYTES, incoming);
 
             CameraTransform transform = viewport.getTransform();
             int deltaOffset = index * 3 * Double.BYTES;

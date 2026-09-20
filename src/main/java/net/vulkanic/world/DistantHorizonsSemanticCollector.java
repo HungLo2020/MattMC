@@ -1,6 +1,7 @@
 package net.vulkanic.world;
 
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiRendererMode;
 import com.seibel.distanthorizons.api.enums.config.EDhApiMcRenderingFadeMode;
 import com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.LodBufferContainer;
 import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
@@ -440,8 +441,7 @@ public final class DistantHorizonsSemanticCollector {
 	public static boolean enabled() {
 		return Boolean.getBoolean(CAPTURE_PROPERTY)
 			|| Boolean.getBoolean(LEGACY_OBSERVATION_PROPERTY)
-			|| WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan()
-			|| selectedSourceExecutionRequested();
+			|| usesRustWholeFrameSemanticBuild();
 	}
 
 	private static boolean exactAtlasCoverageRequested() {
@@ -493,7 +493,14 @@ public final class DistantHorizonsSemanticCollector {
 	/** True only for the backend-owned whole-frame route. Diagnostic capture by
 	 * itself must continue through DH's ordinary Java upload lifecycle. */
 	public static boolean usesRustWholeFrameSemanticBuild() {
-		return WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan();
+		// The backend route remains selected while DH's quick toggle is off, but
+		// its background loader can still finish database work already in flight.
+		// Do not divert that work into Rust semantic buffers unless a renderer can
+		// consume them. Selected-source execution is an explicit independent
+		// consumer and therefore keeps semantic construction enabled.
+		return selectedSourceExecutionRequested()
+			|| (Config.Client.Advanced.Debugging.rendererMode.get() == EDhApiRendererMode.DEFAULT
+				&& WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan());
 	}
 
 	/**
@@ -2725,10 +2732,7 @@ public final class DistantHorizonsSemanticCollector {
 			routeReason = hasCompleteVisibleExactAtlasCoverage()
 			? "all-visible-material-segments-supported"
 			: "reduced-color-with-partial-exact-atlas";
-			routeOpaqueSegments = (int) PENDING_VISIBLE_SEGMENTS.stream().filter(instance -> instance.layer() == 1).count();
-			routeTransparentSegments = (int) PENDING_VISIBLE_SEGMENTS.stream()
-				.filter(instance -> instance.layer() == 2 || instance.layer() == 3).count();
-			routeWaterSegments = (int) PENDING_VISIBLE_SEGMENTS.stream().filter(instance -> instance.layer() == 4).count();
+			recomputePendingVisibleRouteLocked();
 			routeSelected = true;
 			// Capture-only semantic receipt: this proves that the real DH visible
 			// list reached Rust route admission, without retaining a Java renderer
@@ -3551,11 +3555,7 @@ public final class DistantHorizonsSemanticCollector {
 		if (PENDING_VISIBLE_SEGMENTS.size() == before) {
 			return;
 		}
-		routeOpaqueSegments = (int) PENDING_VISIBLE_SEGMENTS.stream().filter(instance -> instance.layer() == 1).count();
-		routeTransparentSegments = (int) PENDING_VISIBLE_SEGMENTS.stream()
-			.filter(instance -> instance.layer() == 2 || instance.layer() == 3)
-			.count();
-		routeWaterSegments = (int) PENDING_VISIBLE_SEGMENTS.stream().filter(instance -> instance.layer() == 4).count();
+		recomputePendingVisibleRouteLocked();
 		if (PENDING_VISIBLE_SEGMENTS.isEmpty()) {
 			PENDING_RENDER_FRAME = withFlags(
 				PENDING_RENDER_FRAME,
@@ -3662,11 +3662,43 @@ public final class DistantHorizonsSemanticCollector {
 		PUBLISHED_COLUMNS.remove(columnKey);
 		PUBLISHED_MATERIAL_PROVENANCE.remove(columnKey);
 		PENDING_VISIBLE_COLUMN_KEYS.remove(columnKey);
+		// A DH buffer can close after its column was selected by the render-list
+		// traversal but before the bounded preflight asset update. That update will
+		// retire the native column immediately, so the still-pending instance must
+		// leave the same Java transaction. LAST_CONSUMED_VISIBLE_SEGMENTS is left
+		// intact: once consumeFrame() freezes a frame, the coordinator deliberately
+		// defers this retirement until after that frame has presented.
+		if (PENDING_VISIBLE_SEGMENTS.removeIf(instance -> instance.columnKey() == columnKey)) {
+			recomputePendingVisibleRouteLocked();
+			if (PENDING_VISIBLE_SEGMENTS.isEmpty()) {
+				routeSelected = false;
+				routeDecision = "rejected";
+				routeReason = "visible-columns-retired-before-submit";
+				PENDING_RENDER_FRAME = withFlags(
+					PENDING_RENDER_FRAME,
+					PENDING_RENDER_FRAME.flags() & ~RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED
+				);
+			}
+		}
 		IN_FLIGHT_ASSET_GENERATIONS.remove(columnKey);
 		LAST_COLUMN_PAYLOAD_DIFFERENCES.remove(columnKey);
 		Long publishedGeneration = PUBLISHED_GENERATIONS.get(columnKey);
 		if (publishedGeneration != null) {
 			PENDING_RETIREMENTS.put(columnKey, publishedGeneration);
+		}
+	}
+
+	private static void recomputePendingVisibleRouteLocked() {
+		routeOpaqueSegments = 0;
+		routeTransparentSegments = 0;
+		routeWaterSegments = 0;
+		for (VulkanicGalBridge.WorldLodColumnInstanceRecord instance : PENDING_VISIBLE_SEGMENTS) {
+			switch (instance.layer()) {
+				case 1 -> routeOpaqueSegments++;
+				case 2, 3 -> routeTransparentSegments++;
+				case 4 -> routeWaterSegments++;
+				default -> { }
+			}
 		}
 	}
 

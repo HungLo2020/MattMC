@@ -62,6 +62,7 @@ import net.minecraft.client.renderer.feature.NameTagFeatureRenderer;
 import net.minecraft.client.renderer.state.BlockOutlineRenderState;
 import net.minecraft.client.renderer.state.SkyRenderState;
 import net.minecraft.client.renderer.state.WorldBorderRenderState;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.renderer.state.BlockBreakingRenderState;
 import net.minecraft.client.renderer.state.WeatherRenderState;
 import net.minecraft.client.renderer.WeatherEffectRenderer;
@@ -436,6 +437,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		MATERIAL_TEXTURE_BLOCK_MARKER_LIGHT_15
 	};
 	private static final Object LOCK = new Object();
+	private static volatile ShaderEnvironmentExecutionSnapshot shaderEnvironmentExecutionSnapshot =
+		new ShaderEnvironmentExecutionSnapshot(-1L, -1L, false, 0L, 0L, 0.0F, 0.0F, 0.0F);
 	private static final List<VulkanicGalBridge.WorldLineSegmentRecord> PENDING_SEGMENTS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldCrackQuadRecord> PENDING_CRACK_QUADS = new ArrayList<>();
 	private static final List<VulkanicGalBridge.WorldBorderQuadRecord> PENDING_BORDER_QUADS = new ArrayList<>();
@@ -477,7 +480,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * frame-local and are never retained here.
 	 */
 	private static final Map<Long, VulkanicGalBridge.WorldMeshInstanceRecord> ACTIVE_STATIC_TERRAIN_INSTANCES = new LinkedHashMap<>();
+	private static final LongOpenHashSet NEWLY_ADMITTED_STATIC_TERRAIN_KEYS = new LongOpenHashSet();
 	private static final int MAX_ACTIVE_STATIC_TERRAIN_INSTANCES = 4096;
+	private static VulkanicGalBridge.TerrainFrameCamera pendingStaticTerrainCamera;
 	// First-person items have an explicit camera-space projection/depth domain.
 	// They never join ordinary entity meshes, even though both reuse the same
 	// copied indexed asset family.
@@ -1451,6 +1456,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				PENDING_MESH_INSTANCES.clear();
 				ACTIVE_STATIC_TERRAIN_INSTANCES.clear();
 				PENDING_MESH_PRODUCERS.clear();
+				pendingStaticTerrainCamera = null;
 				PENDING_BLOCK_MODEL_MESH_KEYS.clear();
 				PENDING_MODEL_MESH_KEYS.clear();
 				PENDING_MODEL_PART_MESH_KEYS.clear();
@@ -2157,6 +2163,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			worldTextDiagnostic = WorldTextDiagnostic.empty(semanticFrameSequence);
 			PENDING_MESH_INSTANCES.clear();
 			PENDING_MESH_PRODUCERS.clear();
+			pendingStaticTerrainCamera = null;
 			PENDING_BLOCK_MODEL_MESH_KEYS.clear();
 			PENDING_MODEL_MESH_KEYS.clear();
 			PENDING_MODEL_PART_MESH_KEYS.clear();
@@ -2605,6 +2612,47 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	/**
+	 * Publishes the shader-environment values consumed by a successfully
+	 * presented whole-frame submission. This is a copied semantic receipt: it
+	 * carries no Java texture or uniform ownership across the GAL boundary.
+	 */
+	public static void recordWholeFrameShaderEnvironmentExecution(
+		long frameId,
+		long submissionId,
+		VulkanicGalBridge.WorldShaderEnvironmentFrameRecord environment
+	) {
+		if (environment == null) {
+			return;
+		}
+		shaderEnvironmentExecutionSnapshot = new ShaderEnvironmentExecutionSnapshot(
+			frameId,
+			submissionId,
+			environment.lightmapEnabled(),
+			environment.lightmapGeneration(),
+			environment.worldTime(),
+			environment.timeOfDay(),
+			environment.skyDarken(),
+			environment.lightmapSkyFactor()
+		);
+	}
+
+	public static ShaderEnvironmentExecutionSnapshot shaderEnvironmentExecutionSnapshot() {
+		return shaderEnvironmentExecutionSnapshot;
+	}
+
+	public record ShaderEnvironmentExecutionSnapshot(
+		long frameId,
+		long submissionId,
+		boolean lightmapEnabled,
+		long lightmapGeneration,
+		long worldTime,
+		float timeOfDay,
+		float skyDarken,
+		float lightmapSkyFactor
+	) {
+	}
+
 	private static void seedVoxelVolumeFrameLocked(ClientLevel level, Camera camera) {
 		if (level == null || camera == null) {
 			auditSemanticInputGap("voxel-volume level=" + (level != null) + " camera=" + (camera != null));
@@ -3050,7 +3098,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	 */
 	private static long shaderPackWorldTime(ClientLevel level) {
 		long sourceTime = DETERMINISTIC_TEMPORAL_PARITY
-			? DETERMINISTIC_TEMPORAL_WORLD_TIME
+			? DeterministicCameraCapture.temporalWorldTimeForCapture(DETERMINISTIC_TEMPORAL_WORLD_TIME)
 			: level.getDayTime();
 		return level.dimensionType().fixedTime().orElse(Math.floorMod(sourceTime, 24000L));
 	}
@@ -3067,14 +3115,14 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	private static int shaderPackWorldDay(ClientLevel level) {
 		long sourceTime = DETERMINISTIC_TEMPORAL_PARITY
-			? DETERMINISTIC_TEMPORAL_WORLD_TIME
+			? DeterministicCameraCapture.temporalWorldTimeForCapture(DETERMINISTIC_TEMPORAL_WORLD_TIME)
 			: level.getDayTime();
 		return (int)Math.floorDiv(sourceTime, 24000L);
 	}
 
 	private static int shaderPackMoonPhase(ClientLevel level) {
 		long sourceTime = DETERMINISTIC_TEMPORAL_PARITY
-			? DETERMINISTIC_TEMPORAL_WORLD_TIME
+			? DeterministicCameraCapture.temporalWorldTimeForCapture(DETERMINISTIC_TEMPORAL_WORLD_TIME)
 			: level.getDayTime();
 		return level.dimensionType().moonPhase(sourceTime);
 	}
@@ -10691,6 +10739,74 @@ public final class RustGalWorldPrimitiveRenderer {
 			depthPolicy,cullPolicy,cameraSortedQuads,null);
 	}
 
+	/**
+	 * Freezes the full-precision camera once for this semantic terrain frame.
+	 * Section instances retain only stable asset/origin identity; the bridge
+	 * copies this frame-local value into their ABI camera lanes at submission.
+	 */
+	public static void seedStaticTerrainFrameCamera(double cameraX, double cameraY, double cameraZ) {
+		VulkanicGalBridge.TerrainFrameCamera camera =
+			new VulkanicGalBridge.TerrainFrameCamera(cameraX, cameraY, cameraZ);
+		synchronized (LOCK) {
+			if (pendingStaticTerrainCamera != null && !pendingStaticTerrainCamera.equals(camera)) {
+				throw new IllegalStateException("static terrain frame received conflicting camera semantics");
+			}
+			pendingStaticTerrainCamera = camera;
+		}
+	}
+
+	public static boolean enqueueStaticTerrainSectionInstance(
+		long meshKey, long meshGeneration, int sectionX, int sectionY, int sectionZ,
+		double cameraX, double cameraY, double cameraZ,
+		int viewportWidth, int viewportHeight, int depthPolicy, int cullPolicy, boolean cameraSortedQuads
+	) {
+		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+			return false;
+		}
+		int flags = cameraSortedQuads ? WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS : 0;
+		synchronized (LOCK) {
+			VulkanicGalBridge.TerrainFrameCamera frameCamera = pendingStaticTerrainCamera;
+			if (frameCamera == null
+				|| Double.compare(frameCamera.x(), cameraX) != 0
+				|| Double.compare(frameCamera.y(), cameraY) != 0
+				|| Double.compare(frameCamera.z(), cameraZ) != 0) {
+				throw new IllegalStateException("static terrain instance camera was not seeded for this frame");
+			}
+			VulkanicGalBridge.WorldMeshInstanceRecord active = ACTIVE_STATIC_TERRAIN_INSTANCES.get(meshKey);
+			VulkanicGalBridge.TerrainSectionPlacement placement =
+				active == null ? null : active.terrainPlacement();
+			if (active != null
+				&& active.meshGeneration() == meshGeneration
+				&& active.depthPolicy() == depthPolicy
+				&& active.cullPolicy() == cullPolicy
+				&& active.flags() == flags
+				&& active.viewportWidth() == viewportWidth
+				&& active.viewportHeight() == viewportHeight
+				&& placement != null
+				&& placement.x() == sectionX && placement.y() == sectionY && placement.z() == sectionZ) {
+				ensureWorldQueueCapacityLocked(
+					PENDING_MESH_INSTANCES.size(), 1, MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
+				);
+				PENDING_MESH_INSTANCES.add(active);
+				PENDING_MESH_PRODUCERS.add(PendingMeshProducer.STATIC_TERRAIN);
+				return true;
+			}
+		}
+		return enqueueStaticTerrainSectionInstance(
+			meshKey, meshGeneration,
+			new VulkanicGalBridge.TerrainSectionPlacement(sectionX, sectionY, sectionZ),
+			viewportWidth, viewportHeight, depthPolicy, cullPolicy, cameraSortedQuads
+		);
+	}
+
+	public static boolean enqueueStaticTerrainSectionInstance(
+		long meshKey, long meshGeneration, VulkanicGalBridge.TerrainSectionPlacement terrainPlacement,
+		int viewportWidth, int viewportHeight, int depthPolicy, int cullPolicy, boolean cameraSortedQuads
+	) {
+		return enqueueStaticTerrainMeshInstance(meshKey, meshGeneration, null, viewportWidth, viewportHeight,
+			depthPolicy, cullPolicy, cameraSortedQuads, Objects.requireNonNull(terrainPlacement, "terrainPlacement"));
+	}
+
 	public static boolean enqueueStaticTerrainMeshInstance(
 		long meshKey, long meshGeneration, float[] transform, int viewportWidth, int viewportHeight,
 		int depthPolicy, int cullPolicy, boolean cameraSortedQuads, VulkanicGalBridge.TerrainSectionPlacement terrainPlacement
@@ -10715,37 +10831,33 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (!generationMatches) {
 				return false;
 			}
-			if (transform == null || transform.length != 16
-				|| viewportWidth <= 0 || viewportHeight <= 0
+			if (viewportWidth <= 0 || viewportHeight <= 0
 				|| viewportWidth > MAX_SEMANTIC_VIEWPORT_AXIS
 				|| viewportHeight > MAX_SEMANTIC_VIEWPORT_AXIS) {
 				throw new IllegalArgumentException("Rust static terrain instance requires finite bounded frame semantics");
 			}
-			for (float value : transform) {
-				if (!Float.isFinite(value)) {
-					throw new IllegalArgumentException("Rust static terrain instance transform must be finite");
+			if (terrainPlacement == null) {
+				if (transform == null || transform.length != 16) {
+					throw new IllegalArgumentException("Rust static terrain instance transform must contain 16 floats");
+				}
+				for (float value : transform) {
+					if (!Float.isFinite(value)) {
+						throw new IllegalArgumentException("Rust static terrain instance transform must be finite");
+					}
 				}
 			}
 				ensureWorldQueueCapacityLocked(
 					PENDING_MESH_INSTANCES.size(), 1, MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
 				);
-			VulkanicGalBridge.WorldMeshInstanceRecord instance = new VulkanicGalBridge.WorldMeshInstanceRecord(
-				STRATUM_WORLD_TERRAIN,
-				meshKey,
-				meshGeneration,
-				MESH_SECTION_ALL,
-				depthPolicy,
-				cullPolicy,
-				WORLD_WINDING_CCW,
-				0xFFFFFFFF,
-				transform,
-				viewportWidth,
-				viewportHeight,
-				0, 0, 0,
-				cameraSortedQuads ? WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS : 0,
-				-1
-			);
-			if (terrainPlacement != null) instance = instance.withTerrainPlacement(terrainPlacement);
+			int flags = cameraSortedQuads ? WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS : 0;
+			VulkanicGalBridge.WorldMeshInstanceRecord instance = terrainPlacement == null
+				? new VulkanicGalBridge.WorldMeshInstanceRecord(
+					STRATUM_WORLD_TERRAIN, meshKey, meshGeneration, MESH_SECTION_ALL, depthPolicy,
+					cullPolicy, WORLD_WINDING_CCW, 0xFFFFFFFF, transform, viewportWidth,
+					viewportHeight, 0, 0, 0, flags, -1)
+				: VulkanicGalBridge.WorldMeshInstanceRecord.staticTerrain(
+					meshKey, meshGeneration, depthPolicy, cullPolicy, WORLD_WINDING_CCW, flags,
+					viewportWidth, viewportHeight, terrainPlacement);
 			// Do not replace the acknowledged active instance yet. consumeFrame()
 			// promotes this exact record only after the pre-consume asset flush has
 			// accepted its generation. Until then, the prior generation remains the
@@ -10769,12 +10881,11 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (visibleMeshKeys == null) {
 			throw new IllegalArgumentException("Rust static terrain visibility set is null");
 		}
-		Set<Long> visibleSnapshot = Set.copyOf(visibleMeshKeys);
 		synchronized (LOCK) {
-			StaticTerrainVisibilitySet.reconcile(ACTIVE_STATIC_TERRAIN_INSTANCES, visibleSnapshot);
+			StaticTerrainVisibilitySet.reconcile(ACTIVE_STATIC_TERRAIN_INSTANCES, visibleMeshKeys);
 			for (int index = PENDING_MESH_INSTANCES.size() - 1; index >= 0; index--) {
 				VulkanicGalBridge.WorldMeshInstanceRecord instance = PENDING_MESH_INSTANCES.get(index);
-				if (instance.stratum() == STRATUM_WORLD_TERRAIN && !visibleSnapshot.contains(instance.meshKey())) {
+				if (instance.stratum() == STRATUM_WORLD_TERRAIN && !visibleMeshKeys.contains(instance.meshKey())) {
 					PENDING_MESH_INSTANCES.remove(index);
 					if (index < PENDING_MESH_PRODUCERS.size()) {
 						PENDING_MESH_PRODUCERS.remove(index);
@@ -17874,7 +17985,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static void rememberActiveStaticTerrainInstanceLocked(
 		VulkanicGalBridge.WorldMeshInstanceRecord instance
 	) {
-		ACTIVE_STATIC_TERRAIN_INSTANCES.remove(instance.meshKey());
 		ACTIVE_STATIC_TERRAIN_INSTANCES.put(instance.meshKey(), instance);
 		while (ACTIVE_STATIC_TERRAIN_INSTANCES.size() > MAX_ACTIVE_STATIC_TERRAIN_INSTANCES) {
 			Long eldest = ACTIVE_STATIC_TERRAIN_INSTANCES.keySet().iterator().next();
@@ -17888,7 +17998,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				ACTIVE_STATIC_TERRAIN_INSTANCES.size() + PENDING_MESH_INSTANCES.size());
 			List<String> meshProducerLabels = new ArrayList<>(
 				ACTIVE_STATIC_TERRAIN_INSTANCES.size() + PENDING_MESH_INSTANCES.size());
-			Set<Long> newlyAdmittedStaticTerrainKeys = new LinkedHashSet<>();
+			NEWLY_ADMITTED_STATIC_TERRAIN_KEYS.clear();
 			int[] admittedPrefix = new int[PENDING_MESH_INSTANCES.size() + 1];
 			for (int index = 0; index < PENDING_MESH_INSTANCES.size(); index++) {
 				admittedPrefix[index] = admittedMeshInstances.size();
@@ -17900,7 +18010,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					rememberActiveStaticTerrainInstanceLocked(instance);
 					admittedMeshInstances.add(instance);
 					meshProducerLabels.add(PendingMeshProducer.STATIC_TERRAIN.diagnosticLabel());
-					newlyAdmittedStaticTerrainKeys.add(instance.meshKey());
+					NEWLY_ADMITTED_STATIC_TERRAIN_KEYS.add(instance.meshKey());
 				} else {
 					admittedMeshInstances.add(instance);
 					meshProducerLabels.add(index < PENDING_MESH_PRODUCERS.size()
@@ -17916,7 +18026,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					throw new IllegalStateException("native orb cannot render ahead of its resource transaction");
 			}
 			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : ACTIVE_STATIC_TERRAIN_INSTANCES.values()) {
-				if (newlyAdmittedStaticTerrainKeys.contains(instance.meshKey())) {
+				if (NEWLY_ADMITTED_STATIC_TERRAIN_KEYS.contains(instance.meshKey())) {
 					continue;
 				}
 				if (!isWorldMeshInstanceUploadedLocked(instance)) {
@@ -17948,8 +18058,31 @@ public final class RustGalWorldPrimitiveRenderer {
 				)
 				: VulkanicGalBridge.WorldFirstPersonFrameRecord.disabled();
 			List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonInstances = List.copyOf(admittedFirstPersonInstances);
+			if (pendingStaticTerrainCamera == null) {
+				for (VulkanicGalBridge.WorldMeshInstanceRecord instance : admittedMeshInstances) {
+					if (instance.terrainPlacement() != null) {
+						throw new IllegalStateException(
+							"frozen static terrain frame is missing full-precision camera semantics");
+					}
+				}
+			}
 			DistantHorizonsSemanticCollector.ConsumedVisibleFrame consumedDistantHorizons =
 				DistantHorizonsSemanticCollector.consumeVisibleFrame();
+			// Generic boxes are copied before DH decides whether the complete private
+			// route is admissible. Pair them with that exact consumed decision: a
+			// rejected/transitional frame has no private DH target or lightmap in
+			// which these faces can execute, and DH will offer the frame-local boxes
+			// again on its next traversal. Sending them alone would turn ordinary
+			// startup convergence into an UnsupportedFeature client crash.
+			VulkanicGalBridge.WorldLodRenderFrameRecord consumedLodFrame =
+				consumedDistantHorizons.renderFrame();
+			boolean consumedDistantHorizonsRouteSelected = consumedLodFrame.enabled()
+				&& (consumedLodFrame.flags()
+					& DistantHorizonsSemanticCollector.RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED) != 0;
+			List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> admittedDistantHorizonsGenericBoxes =
+				consumedDistantHorizonsRouteSelected
+					? List.copyOf(PENDING_DH_GENERIC_BOXES)
+					: List.of();
 			PrimitiveFrame frame = new PrimitiveFrame(
 				pendingViewportWidth,
 				pendingViewportHeight,
@@ -17967,13 +18100,14 @@ public final class RustGalWorldPrimitiveRenderer {
 				pendingShaderEnvironmentFrame,
 			pendingFeatureCoverage,
 			consumedDistantHorizons.visibleSegments(),
-			consumedDistantHorizons.renderFrame(),
+			consumedLodFrame,
 			pendingEntityFlameQuadCount,
 			firstPersonFrame,
 				firstPersonInstances,
 				List.copyOf(PENDING_PARTICLE_QUADS),
 				orbInstances,
-				List.copyOf(PENDING_DH_GENERIC_BOXES)
+				admittedDistantHorizonsGenericBoxes,
+				pendingStaticTerrainCamera
 			);
 			worldTextDiagnostic = worldTextDiagnostic.withConsumed(semanticFrameSequence, frame.textQuads().size());
 			ORB_SEMANTICS.clearFrame();
@@ -17987,6 +18121,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					PENDING_TEXT_QUADS.clear();
 					PENDING_MESH_INSTANCES.clear();
 					PENDING_MESH_PRODUCERS.clear();
+					pendingStaticTerrainCamera = null;
 					PENDING_FIRST_PERSON_MESH_INSTANCES.clear();
 					pendingFirstPersonFrame = false;
 			pendingFirstPersonMainHandInstanceCount = 0;
@@ -18207,7 +18342,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			List.copyOf(firstPersonMeshInstances),
 			frame.particleQuads(),
 			frame.orbInstances(),
-			frame.distantHorizonsGenericBoxes()
+			frame.distantHorizonsGenericBoxes(),
+			frame.terrainFrameCamera()
 		);
 	}
 
@@ -18247,12 +18383,45 @@ public final class RustGalWorldPrimitiveRenderer {
 		List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances,
 		List<VulkanicGalBridge.WorldParticleQuadRecord> particleQuads,
 		List<VulkanicGalBridge.WorldExperienceOrbInstanceRecord> orbInstances,
-		List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> distantHorizonsGenericBoxes
+		List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> distantHorizonsGenericBoxes,
+		VulkanicGalBridge.TerrainFrameCamera terrainFrameCamera
 	) {
 		public PrimitiveFrame {
 			particleQuads = List.copyOf(particleQuads);
 			orbInstances = List.copyOf(orbInstances);
-			distantHorizonsGenericBoxes = List.copyOf(distantHorizonsGenericBoxes);
+		distantHorizonsGenericBoxes = List.copyOf(distantHorizonsGenericBoxes);
+		}
+
+		public PrimitiveFrame(
+			int viewportWidth,
+			int viewportHeight,
+			float[] viewMatrix,
+			float[] projectionMatrix,
+			VulkanicGalBridge.WorldBackgroundRecord background,
+			List<VulkanicGalBridge.WorldLineSegmentRecord> segments,
+			List<VulkanicGalBridge.WorldCrackQuadRecord> crackQuads,
+			List<VulkanicGalBridge.WorldBorderQuadRecord> borderQuads,
+			List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
+			List<WorldTextSemanticCollector.WorldTextQuad> textQuads,
+			List<VulkanicGalBridge.WorldMeshInstanceRecord> meshInstances,
+			List<String> meshProducerLabels,
+			VulkanicGalBridge.WorldVoxelVolumeFrameRecord voxelVolumeFrame,
+			VulkanicGalBridge.WorldShaderEnvironmentFrameRecord shaderEnvironmentFrame,
+			VulkanicGalBridge.WorldFeatureCoverageRecord featureCoverage,
+			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> lodInstances,
+			VulkanicGalBridge.WorldLodRenderFrameRecord lodRenderFrame,
+			int entityFlameQuadCount,
+			VulkanicGalBridge.WorldFirstPersonFrameRecord firstPersonFrame,
+			List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonMeshInstances,
+			List<VulkanicGalBridge.WorldParticleQuadRecord> particleQuads,
+			List<VulkanicGalBridge.WorldExperienceOrbInstanceRecord> orbInstances,
+			List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> distantHorizonsGenericBoxes
+		) {
+			this(viewportWidth, viewportHeight, viewMatrix, projectionMatrix, background, segments, crackQuads,
+				borderQuads, materialQuads, textQuads, meshInstances, meshProducerLabels, voxelVolumeFrame,
+				shaderEnvironmentFrame, featureCoverage, lodInstances, lodRenderFrame, entityFlameQuadCount,
+				firstPersonFrame, firstPersonMeshInstances, particleQuads, orbInstances,
+				distantHorizonsGenericBoxes, null);
 		}
 	public PrimitiveFrame(
 		int viewportWidth,

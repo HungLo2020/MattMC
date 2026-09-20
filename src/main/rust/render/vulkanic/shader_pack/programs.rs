@@ -4228,6 +4228,34 @@ pub fn minimal_direct_terrain_cutout_program() -> TerrainMaterialProgram {
     minimal_direct_terrain_material_program(TerrainMaterialProgramKind::Cutout)
 }
 
+pub const COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID: &str =
+    "vulkanic:builtin/direct_terrain_opaque_compact48_v1";
+pub const COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID: &str =
+    "vulkanic:builtin/direct_terrain_cutout_compact48_v1";
+
+/// Shader-off static terrain has a deliberately smaller GPU-only vertex ABI.
+/// The authoritative copied mesh remains the rich semantic form used by
+/// source-derived programs; this program may only be selected alongside the
+/// matching `DirectTerrain48` lowering in the world frontend.
+pub fn minimal_compact_direct_terrain_program(
+    kind: TerrainMaterialProgramKind,
+) -> TerrainMaterialProgram {
+    let mut program = minimal_direct_terrain_material_program(kind);
+    program.identity = ProgramIdentity::new(match kind {
+        TerrainMaterialProgramKind::Opaque => COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
+        TerrainMaterialProgramKind::Cutout => COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
+        TerrainMaterialProgramKind::Translucent => {
+            "vulkanic:builtin/direct_terrain_translucent_compact48_v1"
+        }
+    });
+    program.vertex.label = format!(
+        "minimal-direct-terrain-{}-compact48.vertex",
+        kind.label_suffix()
+    );
+    program.vertex.source = compact_direct_terrain_vertex_source();
+    program
+}
+
 /// Direct forward counterpart of the deferred translucent terrain program.
 /// Vanilla's non-source route has one color attachment, so it must never bind
 /// the multi-output G-buffer fragment merely because the material is water or
@@ -4526,6 +4554,48 @@ fn terrain_fragment_discard_define(kind: TerrainMaterialProgramKind) -> &'static
 fn minimal_direct_terrain_vertex_source() -> String {
     terrain_vertex_coordinate_probe(
         MINIMAL_TERRAIN_MATERIAL_VERTEX.to_string(),
+        std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
+            .ok()
+            .as_deref(),
+    )
+}
+
+fn compact_direct_terrain_vertex_source() -> String {
+    let source = MINIMAL_TERRAIN_MATERIAL_VERTEX
+        .replace(
+            "struct MeshVertex {\n    vec4 position_uv;\n    vec4 color_uv;\n    vec4 normal_light;\n    vec4 extra_data;\n    vec4 shader_data;\n};",
+            "struct MeshVertex {\n    vec4 position_material;\n    vec4 color;\n    vec4 atlas_light;\n};",
+        )
+        .replace(
+            "vec4 world = instance.model * vec4(vertex.position_uv.xyz, 1.0);",
+            "vec4 world = instance.model * vec4(vertex.position_material.xyz, 1.0);",
+        )
+        .replace(
+            "v_uv = (material_semantics & 1u) != 0u\n        ? vertex.shader_data.xy\n        : vec2(vertex.position_uv.w, vertex.color_uv.w);",
+            "v_uv = vertex.atlas_light.xy;",
+        )
+        .replace(
+            "vec2 light_coordinates = vertex.extra_data.xy;",
+            "vec2 light_coordinates = vertex.atlas_light.zw;",
+        )
+        .replace(
+            "vec3 normal = normalize(transpose(inverse(mat3(instance.model)))\n            * vec3(vertex.normal_light.yz, vertex.extra_data.z));",
+            "vec3 normal = vec3(0.0, 1.0, 0.0);",
+        )
+        .replace(
+            "v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color\n        * light_color;",
+            "v_color = vertex.color * instance.color * light_color;",
+        )
+        .replace(
+            "v_normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));",
+            "v_normal = vec3(0.0, 1.0, 0.0);",
+        )
+        .replace(
+            "v_terrain_material_bits = uint(clamp(vertex.extra_data.w, 0.0, 255.0));",
+            "v_terrain_material_bits = uint(clamp(vertex.position_material.w, 0.0, 255.0));",
+        );
+    terrain_vertex_coordinate_probe(
+        source,
         std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
             .ok()
             .as_deref(),
@@ -8052,6 +8122,31 @@ mod tests {
             .fragment
             .source
             .contains("#define VULKANIC_TERRAIN_FRAGMENT_DISCARD"));
+    }
+
+    #[test]
+    fn compact_direct_terrain_program_reads_only_its_three_vec4_vertex_lanes() {
+        let program = minimal_compact_direct_terrain_program(TerrainMaterialProgramKind::Opaque);
+        assert_eq!(
+            ProgramIdentity::new("vulkanic:builtin/direct_terrain_opaque_compact48_v1"),
+            program.identity
+        );
+        assert!(program.vertex.source.contains("vec4 position_material;"));
+        assert!(program.vertex.source.contains("vec4 color;"));
+        assert!(program.vertex.source.contains("vec4 atlas_light;"));
+        assert!(!program.vertex.source.contains("vec4 shader_data;"));
+        assert!(program
+            .vertex
+            .source
+            .contains("v_uv = vertex.atlas_light.xy;"));
+        assert!(program
+            .vertex
+            .source
+            .contains("vec2 light_coordinates = vertex.atlas_light.zw;"));
+        assert!(program
+            .vertex
+            .source
+            .contains("v_color = vertex.color * instance.color"));
     }
 
     #[test]

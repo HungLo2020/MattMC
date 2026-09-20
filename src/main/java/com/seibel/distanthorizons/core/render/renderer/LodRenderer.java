@@ -219,7 +219,9 @@ public class LodRenderer
 			// requesting the same work. Visibility is established by the traversal
 			// below before any upload is selected; publishing here would spend the
 			// bounded Rust upload budget on arbitrary background columns.
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.render-list");
 			buffers.buildRenderList(renderParams);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.render-list");
 			List<Long> semanticColumns = buffers.getSemanticColumnRenderPositions();
 			if (semanticColumns.isEmpty())
 			{
@@ -230,6 +232,7 @@ public class LodRenderer
 			int opaqueSegments = 0;
 			int transparentSegments = 0;
 			int waterSegments = 0;
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.visible-segments");
 			for (long columnKey : semanticColumns)
 			{
 				DistantHorizonsSemanticCollector.VisibleColumnSegments segments =
@@ -238,10 +241,13 @@ public class LodRenderer
 				transparentSegments += segments.transparentSegments();
 				waterSegments += segments.waterSegments();
 			}
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.visible-segments");
 			// The traversal above is the first point at which pending asset demand is
 			// known to be visible. Publish that bounded demand before freezing route
 			// semantics; the draw itself still waits for the next coherent frame.
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.asset-preflight");
 			net.vulkanic.gui.RustGalFrameCoordinator.flushPendingWorldLodAssetsForSemanticPreflight();
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.asset-preflight");
 			DistantHorizonsSemanticCollector.recordRenderListObservation(semanticColumns.size());
 			if (opaqueSegments + transparentSegments + waterSegments == 0)
 			{
@@ -259,7 +265,7 @@ public class LodRenderer
 			// admission so custom objects, beacons, and DH generic cloud groups
 			// remain part of the selected frame.
 			if (renderParams.genericRenderer != null
-				&& !renderParams.genericRenderer.collectRustSemantic(renderParams))
+				&& !collectRustGenericSemantics(renderParams))
 			{
 				DistantHorizonsSemanticCollector.recordRustNonWaterRouteRejected(
 					"unsupported-dh-generic-object-semantics", opaqueSegments, transparentSegments, waterSegments);
@@ -280,6 +286,19 @@ public class LodRenderer
 		finally
 		{
 			profiler.pop();
+		}
+	}
+
+	private static boolean collectRustGenericSemantics(RenderParams renderParams)
+	{
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.generic-semantics");
+		try
+		{
+			return renderParams.genericRenderer.collectRustSemantic(renderParams);
+		}
+		finally
+		{
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.distant-horizons.generic-semantics");
 		}
 	}
 
