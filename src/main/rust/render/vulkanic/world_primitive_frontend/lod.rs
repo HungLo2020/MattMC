@@ -12,8 +12,9 @@ use super::{
     selected_source_raster_probe_front_face, validate_world_lod_column_asset, GalError, GalResult,
     WorldLodColumnAsset, WorldLodColumnInstanceRequest, WorldLodColumnMaterialProvenance,
     WorldLodFaceMaterial, WorldLodRenderFrame, WorldLodSegment, WorldLodVertex,
-    WORLD_LOD_LAYER_OPAQUE, WORLD_LOD_LAYER_TRANSPARENT_SIDE, WORLD_LOD_LAYER_TRANSPARENT_UP,
-    WORLD_LOD_LAYER_TRANSPARENT_WATER_UP, WORLD_LOD_MAX_NORMAL_INDEX,
+    SHADER_G_BUFFER_COLOR_FORMAT, WORLD_LOD_LAYER_OPAQUE, WORLD_LOD_LAYER_TRANSPARENT_SIDE,
+    WORLD_LOD_LAYER_TRANSPARENT_UP, WORLD_LOD_LAYER_TRANSPARENT_WATER_UP,
+    WORLD_LOD_MAX_NORMAL_INDEX,
 };
 use crate::render::vulkanic::commands::{
     AttachmentLoadOp, AttachmentStoreOp, ClearColor, CommandOp, PassAttachment, ResourceBarrier,
@@ -2328,7 +2329,7 @@ impl WorldLodPassResources {
         Self {
             pass,
             deferred,
-            color_format: deferred.then_some(TextureFormat::Rgba8Unorm),
+            color_format: deferred.then_some(SHADER_G_BUFFER_COLOR_FORMAT),
             pipeline: None,
             draws: BTreeMap::new(),
             lightmaps: BTreeMap::new(),
@@ -3357,7 +3358,7 @@ impl Default for WorldLodExactAtlasPassResources {
             draws: BTreeMap::new(),
             material_sets: BTreeMap::new(),
             deferred: true,
-            color_format: Some(TextureFormat::Rgba8Unorm),
+            color_format: Some(SHADER_G_BUFFER_COLOR_FORMAT),
             pass: WorldLodExactAtlasPassKind::Opaque,
         }
     }
@@ -3398,7 +3399,7 @@ impl WorldLodExactAtlasPassResources {
             draws: BTreeMap::new(),
             material_sets: BTreeMap::new(),
             deferred: true,
-            color_format: Some(TextureFormat::Rgba8Unorm),
+            color_format: Some(SHADER_G_BUFFER_COLOR_FORMAT),
             pass,
         }
     }
@@ -3684,7 +3685,7 @@ impl WorldLodExactAtlasPassResources {
                 depth_write,
                 depth_bias: None,
                 color_formats: if self.deferred {
-                    vec![TextureFormat::Rgba8Unorm; 4]
+                    vec![SHADER_G_BUFFER_COLOR_FORMAT; 4]
                 } else {
                     vec![self.color_format.unwrap_or(TextureFormat::Rgba8Unorm)]
                 },

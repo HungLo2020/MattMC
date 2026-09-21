@@ -1742,6 +1742,7 @@ impl SourceEntityMeshAsset {
                 WORLD_MATERIAL_MODE_OPAQUE
                     | WORLD_MATERIAL_MODE_CUTOUT
                     | WORLD_MATERIAL_MODE_TRANSLUCENT
+                    | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
                     | WORLD_MATERIAL_MODE_GLINT
                     | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
                     | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST
@@ -11920,6 +11921,7 @@ impl WorldPrimitiveFrontend {
         &mut self,
         mesh_key: u64,
         mesh_generation: u64,
+        packed_light: u32,
     ) -> GalResult<Arc<SourceEntityMeshAsset>> {
         self.ensure_source_mesh_generation("entity", mesh_key, mesh_generation)?;
         let asset = self
@@ -11933,7 +11935,19 @@ impl WorldPrimitiveFrontend {
             ))
         })?;
         prepare_source_entity_mesh_asset_view(&input)
-            .map(Arc::new)
+            .and_then(|mut prepared| {
+                if packed_light != 0 {
+                    // Java's entity producer supplies UV2 as an instance
+                    // semantic for models whose copied vertices do not carry
+                    // a resolved light value.  The selected-source ABI keeps
+                    // light in the vertex record, so materialize a bounded
+                    // per-light geometry variant instead of dropping the
+                    // semantic or widening the shared instance ABI.
+                    override_source_entity_vertex_light(&mut prepared, packed_light)?;
+                    prepared.mesh_key = source_entity_light_variant_key(mesh_key, packed_light);
+                }
+                Ok(Arc::new(prepared))
+            })
             .map_err(|error| {
                 GalError::unsupported_feature(format!(
                     "source entity mesh {} generation {} is unavailable: {}",
@@ -11969,7 +11983,7 @@ impl WorldPrimitiveFrontend {
             }
         }
         let mut grouped = BTreeMap::<
-            (u64, u64, u32, u32, u32, u32, u32, u32, i32),
+            (u64, u64, u32, u32, u32, u32, u32, u32, i32, u32),
             (Arc<SourceEntityMeshAsset>, Vec<SourceTerrainInstance>),
         >::new();
 
@@ -11979,11 +11993,6 @@ impl WorldPrimitiveFrontend {
             .filter(|instance| instance.stratum == WORLD_STRATUM_ENTITY_MESH)
         {
             validate_mesh_instance(instance, frame)?;
-            if instance.packed_light != 0 {
-                return Err(GalError::unsupported_feature(
-                    "source entity preparation requires vertex-owned light; instance packed light is not implemented",
-                ));
-            }
             if mesh_view_layering(instance).is_some() {
                 return Err(GalError::unsupported_feature(
                     "source entity view layering is not implemented",
@@ -11999,8 +12008,11 @@ impl WorldPrimitiveFrontend {
                     "source entity preparation rejects invalid block-entity IDs",
                 ));
             }
-            let mesh =
-                self.source_entity_mesh_asset(instance.mesh_key, instance.mesh_generation)?;
+            let mesh = self.source_entity_mesh_asset(
+                instance.mesh_key,
+                instance.mesh_generation,
+                instance.packed_light,
+            )?;
             mesh.validate()?;
             let section_indices = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
                 (0..mesh.sections.len())
@@ -12044,6 +12056,7 @@ impl WorldPrimitiveFrontend {
                     cull_policy,
                     instance.entity_color_argb,
                     instance.block_entity_id,
+                    instance.packed_light,
                 );
                 grouped
                     .entry(key)
@@ -12065,6 +12078,7 @@ impl WorldPrimitiveFrontend {
                 cull_policy,
                 entity_color_argb,
                 block_entity_id,
+                _packed_light,
             ),
             (mesh, instances),
         ) in grouped
@@ -12277,8 +12291,11 @@ impl WorldPrimitiveFrontend {
             let hand = frame
                 .first_person
                 .hand_for_instance(instance_index, instance_count)?;
-            let mesh =
-                self.source_entity_mesh_asset(instance.mesh_key, instance.mesh_generation)?;
+            let mesh = self.source_entity_mesh_asset(
+                instance.mesh_key,
+                instance.mesh_generation,
+                instance.packed_light,
+            )?;
             mesh.validate()?;
             let section_indices = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
                 (0..mesh.sections.len())
@@ -12996,6 +13013,7 @@ impl WorldPrimitiveFrontend {
             WORLD_MATERIAL_MODE_OPAQUE
                 | WORLD_MATERIAL_MODE_CUTOUT
                 | WORLD_MATERIAL_MODE_TRANSLUCENT
+                | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
                 | WORLD_MATERIAL_MODE_GLINT
                 | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
                 | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST
@@ -14287,7 +14305,11 @@ impl WorldPrimitiveFrontend {
         base_resources: &TerrainSourceOwnedResourceSet,
         color_formats: Vec<TextureFormat>,
     ) -> GalResult<EntitySourceDraw> {
-        self.ensure_source_mesh_generation("entity", mesh.mesh_key, mesh.mesh_generation)?;
+        // Entity source assets are already generation-validated when copied
+        // from the world asset cache.  A non-zero instance light may produce
+        // a transient geometry variant with a derived mesh key, so looking
+        // that key up in the ordinary asset cache here would reject a valid
+        // Rust-owned payload.
         if instance_transforms.len() % TERRAIN_SOURCE_INSTANCE_BYTES != 0 {
             return Err(GalError::invalid_argument(
                 "source entity instance payload does not contain whole records",
@@ -14929,7 +14951,7 @@ impl WorldPrimitiveFrontend {
             material_mode,
             cull_policy,
             winding,
-            vec![TextureFormat::Rgba8Unorm; 4],
+            vec![SHADER_G_BUFFER_COLOR_FORMAT; 4],
         )
     }
 
@@ -14947,7 +14969,7 @@ impl WorldPrimitiveFrontend {
             material_mode,
             cull_policy,
             winding,
-            vec![TextureFormat::Rgba8Unorm; 2],
+            vec![SHADER_G_BUFFER_COLOR_FORMAT; 2],
         )
     }
 
@@ -15106,7 +15128,7 @@ impl WorldPrimitiveFrontend {
             material_mode,
             cull_policy,
             winding,
-            vec![TextureFormat::Rgba8Unorm; 4],
+            vec![SHADER_G_BUFFER_COLOR_FORMAT; 4],
         )
     }
 
@@ -20331,8 +20353,11 @@ impl WorldPrimitiveFrontend {
                 ));
             }
             frame.first_person.hand_for_instance(index, count)?;
-            let mesh =
-                self.source_entity_mesh_asset(instance.mesh_key, instance.mesh_generation)?;
+            let mesh = self.source_entity_mesh_asset(
+                instance.mesh_key,
+                instance.mesh_generation,
+                instance.packed_light,
+            )?;
             mesh.validate()?;
             let section_indices = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
                 0..mesh.sections.len()
@@ -20467,8 +20492,11 @@ impl WorldPrimitiveFrontend {
                             "selected source frame has entity meshes but no lowered gbuffers_entities writer",
                         )
                     })?;
-                let mesh =
-                    self.source_entity_mesh_asset(instance.mesh_key, instance.mesh_generation)?;
+                let mesh = self.source_entity_mesh_asset(
+                    instance.mesh_key,
+                    instance.mesh_generation,
+                    instance.packed_light,
+                )?;
                 if mesh.sections.iter().any(|section| {
                     matches!(
                         section.material_mode,
@@ -21866,6 +21894,15 @@ impl WorldPrimitiveFrontend {
                     move |_, _, _, _| Ok((gui_ops.clone(), GuiSubmitStats::default())),
                 )
                 .map(|(stats, _)| stats);
+        }
+        #[cfg(not(test))]
+        if self.runtime_source_execution_is_armed() {
+            self.write_runtime_source_admission_status(
+                gal,
+                &frame,
+                "target-policy-source-armed",
+                false,
+            );
         }
         #[cfg(not(test))]
         if self.runtime_source_execution_is_armed() {
@@ -23515,6 +23552,32 @@ impl WorldPrimitiveFrontend {
             // needs the same semantic GUI replay after the world transfer.
             // Keep request data copy-owned: no Java or backend state is
             // consulted by the diagnostic path.
+            // Prepare the normal presentation GUI while the frontend still
+            // has exclusive access to the Rust atlas owner. The complete
+            // source planner later borrows its own frame resources while it
+            // records the world graph, so trying to reacquire `self` from the
+            // planner callback would violate the ownership boundary. These
+            // operations target the acquired Rust frame target, exactly where
+            // the source final-output plan presents its result.
+            let (prepared_gui_ops, prepared_gui_stats) = if gui_blur_before_stratum < 0 {
+                gui_frontend.append_frame_ops_with_owned_atlases_to_target(
+                    gal,
+                    Some(self),
+                    generation,
+                    frame_target,
+                    frame_target,
+                    None,
+                    None,
+                    None,
+                    false,
+                    gui_sprites.clone(),
+                    gui_affine_quads.clone(),
+                    gui_mesh_batches.clone(),
+                    gui_tiled_quads.clone(),
+                )?
+            } else {
+                (Vec::new(), GuiSubmitStats::default())
+            };
             return self.submit_armed_runtime_source_frame_with_gui(
                 gal,
                 generation,
@@ -23553,39 +23616,27 @@ impl WorldPrimitiveFrontend {
                         post_ops.extend(gui_ops);
                         return Ok((post_ops, stats));
                     }
-                    if diagnostic_capture {
-                        let (gui_ops, stats) = gui_frontend
-                            .append_frame_ops_to_transient_tiled_diagnostic_target(
-                                gal,
-                                generation,
-                                target,
-                                color_attachment,
-                                gui_sprites.clone(),
-                                gui_affine_quads.clone(),
-                                gui_mesh_batches.clone(),
-                                gui_tiled_quads.clone(),
-                            )?;
-                        post_ops.extend(gui_ops);
-                        Ok((post_ops, stats))
-                    } else {
-                        let (gui_ops, stats) = gui_frontend
-                            .append_frame_ops_with_tiled_quads_to_target(
-                                gal,
-                                generation,
-                                target,
-                                color_attachment,
-                                None,
-                                None,
-                                None,
-                                false,
-                                gui_sprites.clone(),
-                                gui_affine_quads.clone(),
-                                gui_mesh_batches.clone(),
-                                gui_tiled_quads.clone(),
-                            )?;
-                        post_ops.extend(gui_ops);
-                        Ok((post_ops, stats))
+                    if !diagnostic_capture {
+                        post_ops.extend(prepared_gui_ops.clone());
+                        return Ok((post_ops, prepared_gui_stats.clone()));
                     }
+                    let (gui_ops, stats) = gui_frontend
+                        .append_frame_ops_with_tiled_quads_to_target(
+                            gal,
+                            generation,
+                            target,
+                            color_attachment,
+                            None,
+                            None,
+                            None,
+                            false,
+                            gui_sprites.clone(),
+                            gui_affine_quads.clone(),
+                            Vec::new(),
+                            gui_tiled_quads.clone(),
+                        )?;
+                    post_ops.extend(gui_ops);
+                    Ok((post_ops, stats))
                 },
             );
         }
@@ -24547,7 +24598,15 @@ impl WorldPrimitiveFrontend {
         // owners remain cached; this only restores the strict same-frame
         // correlation required by the selected transaction.
         let validates_runtime_source_roles = self.runtime_source_preparation_requested();
-        if validates_runtime_source_roles {
+        // The provisional frame deliberately has no terrain, entity, or DH
+        // instances. Its only job is to materialize target metadata. Reusing
+        // ensure_candidate_source_assets_for_frame here would rebuild the
+        // exact-frame semantic snapshot against that empty frame while the
+        // G-buffer-dependent shadow/depth roles are still being staged, which
+        // can erase otherwise complete roles. The real frame assembled its
+        // snapshot immediately before this pass; preserve it and let the
+        // final selected transaction perform the authoritative revalidation.
+        if validates_runtime_source_roles && self.candidate_source_resource_snapshot.is_none() {
             let _ = self.ensure_candidate_source_assets_for_frame(
                 gal,
                 frame.voxel_volume.world_generation,
@@ -26014,6 +26073,38 @@ impl WorldPrimitiveFrontend {
                 blocker,
             );
             let _ = std::fs::write(dir.join("selected-source-admission-status.json"), &status);
+            // Keep a bounded phase trace while bringing the first real
+            // selected-source frame online. Four fixed phase files make it
+            // possible to identify where a semantic role disappears without
+            // retaining per-frame diagnostics or changing rendering.
+            let phase_name = phase
+                .chars()
+                .map(|character| {
+                    if character.is_ascii_alphanumeric() {
+                        character
+                    } else {
+                        '-'
+                    }
+                })
+                .collect::<String>();
+            let _ = std::fs::write(
+                dir.join(format!("selected-source-admission-phase-{phase_name}.json")),
+                &status,
+            );
+            // A small rolling history makes frame-to-frame admission churn
+            // diagnosable without retaining unbounded per-frame artifacts.
+            let history_path = dir.join("selected-source-admission-history.ndjson");
+            let mut history = std::fs::read_to_string(&history_path).unwrap_or_default();
+            history.push_str(&status);
+            if history.len() > 64 * 1024 {
+                let keep_from = history.len() - 64 * 1024;
+                let boundary = history[keep_from..]
+                    .find('\n')
+                    .map(|offset| keep_from + offset + 1)
+                    .unwrap_or(keep_from);
+                history.drain(..boundary);
+            }
+            let _ = std::fs::write(history_path, history);
             // Preserve one bounded in-world observation because normal menu
             // teardown intentionally clears the candidate runtime.
             if retain_as_last_world
@@ -27285,6 +27376,29 @@ impl WorldPrimitiveFrontend {
                 )
             })
             .count() as u64;
+        // A texture upload can be assembled by both the ordinary world
+        // resource path and the selected-source preparation path in the same
+        // frame. Keep the first complete upload transaction and discard only
+        // a later mip-generation command that has no preceding transfer
+        // transition; such a command would write a texture already sampled
+        // by an earlier source pass and is an invalid overlapping access.
+        let mut texture_transfer_pending = BTreeSet::new();
+        operations.retain(|operation| match operation {
+            CommandOp::Barrier(barrier)
+                if barrier.resource.kind() == Some(super::handles::HandleKind::Texture) =>
+            {
+                if barrier.after == TextureUsageState::TransferDst {
+                    texture_transfer_pending.insert(barrier.resource);
+                }
+                true
+            }
+            CommandOp::CopyBufferToTexture(region) => {
+                texture_transfer_pending.insert(region.texture);
+                true
+            }
+            CommandOp::GenerateMipmaps { texture, .. } => texture_transfer_pending.remove(texture),
+            _ => true,
+        });
         profile.gal_command_generation_nanos = elapsed_nanos_u64(command_generation_started);
         // One source-derived shader-pack frame can legitimately contain far
         // more operations than a backend's *single command-list* budget.
@@ -27670,11 +27784,12 @@ impl WorldPrimitiveFrontend {
         };
         if deferred {
             // Deferred DH color attachments are Rust-owned and fixed to the
-            // semantic RGBA format; retain the explicit argument check so a
-            // future caller cannot silently bind a different attachment.
-            if color_format != TextureFormat::Rgba8Unorm {
+            // shader graph's HDR intermediate format; retain the explicit
+            // argument check so a future caller cannot silently bind a
+            // different attachment.
+            if color_format != SHADER_G_BUFFER_COLOR_FORMAT {
                 return Err(GalError::invalid_argument(
-                    "deferred exact-atlas pass requires the RGBA8 semantic color format",
+                    "deferred exact-atlas pass requires the shader G-buffer color format",
                 ));
             }
             Ok(())
@@ -27891,7 +28006,11 @@ impl WorldPrimitiveFrontend {
         // the acquired target format is only valid for the direct forward
         // route.
         let lod_color_format = if deferred {
-            TextureFormat::Rgba8Unorm
+            // Deferred DH material draws land in the Rust-owned G-buffer
+            // translucent attachment, which uses the same HDR FP16 domain as
+            // the terrain graph.  The acquired target format is only valid
+            // for the direct forward route.
+            SHADER_G_BUFFER_COLOR_FORMAT
         } else {
             target_color_format
         };
@@ -29506,10 +29625,25 @@ impl WorldPrimitiveFrontend {
         let had_border_resources = self
             .border_resources
             .contains_key(&(color_format, raster_y_direction));
+        let source_preparation_warmup = {
+            #[cfg(not(test))]
+            {
+                self.runtime_source_preparation_requested()
+            }
+            #[cfg(test)]
+            {
+                false
+            }
+        };
         let use_g_buffer_mesh_path = uses_shader_g_buffer_mesh_path(
             &frame,
             clear_background,
-            self.runtime_source_execution_is_armed(),
+            // An explicitly requested source route needs one Rust-owned
+            // G-buffer warmup frame to establish depth history before exact
+            // source admission can arm. The warmup still uses the complete
+            // vanilla semantic draw path; source execution remains gated by
+            // the armed flag below.
+            self.runtime_source_execution_is_armed() || source_preparation_warmup,
             self.pending_terrain_fabulous_handoff,
         );
         // The direct Rust DH compositor overlays its private sparse target
@@ -29531,13 +29665,13 @@ impl WorldPrimitiveFrontend {
             }
         }
         let batching_started = std::time::Instant::now();
-        // Direct material batches join the owned graph's forward color phase
-        // when indexed terrain is present. That phase is RGBA8 regardless of
-        // the acquired swapchain's format, so select the compatible pipeline
-        // key before resource construction rather than asking a BGRA pipeline
-        // to render into the graph attachment.
+        // Material batches join the owned graph's forward color phase when
+        // indexed terrain is present. That phase targets the same HDR
+        // intermediate domain as the G-buffer, so select the compatible
+        // pipeline key before resource construction rather than asking an
+        // acquired-target pipeline to render into the graph attachment.
         let material_color_format = if use_g_buffer_mesh_path {
-            ColorFormat::Rgba8Unorm
+            SHADER_G_BUFFER_COLOR_FORMAT
         } else {
             color_format
         };
@@ -29955,7 +30089,14 @@ impl WorldPrimitiveFrontend {
             )?;
         profile.world_prepare_depth_attachment_nanos = elapsed_nanos_u64(depth_started);
         let mut g_buffer_final_binding_key = None;
-        if use_g_buffer_mesh_path {
+        // Selected-source admission needs Rust-owned G-buffer views for
+        // shadow and main-depth semantic roles before the route can arm.
+        // Prepare those resources under the explicit opt-in as well, without
+        // submitting a source graph or changing the presenter.
+        let prepare_source_g_buffer = source_preparation_warmup
+            && frame.background.enabled
+            && frame.voxel_volume.world_generation != 0;
+        if use_g_buffer_mesh_path || prepare_source_g_buffer {
             let g_buffer_started = std::time::Instant::now();
             let final_target_query_started = std::time::Instant::now();
             let final_depth_view =
@@ -32221,7 +32362,7 @@ impl WorldPrimitiveFrontend {
                 depth_compare: Some(CompareOp::LessOrEqual),
                 depth_write: false,
                 depth_bias: None,
-                color_formats: vec![ColorFormat::Rgba8Unorm; 4],
+                color_formats: vec![SHADER_G_BUFFER_COLOR_FORMAT; 4],
                 depth_format: Some(TextureFormat::Depth32Float),
                 stencil: None,
             })?;
@@ -33886,10 +34027,10 @@ impl WorldPrimitiveFrontend {
                 },
                 depth_bias: None,
                 color_formats: if key.g_buffer && !is_translucent && !standard_foil {
-                    vec![TextureFormat::Rgba8Unorm; 4]
+                    vec![SHADER_G_BUFFER_COLOR_FORMAT; 4]
                 } else {
                     vec![if key.g_buffer {
-                        TextureFormat::Rgba8Unorm
+                        SHADER_G_BUFFER_COLOR_FORMAT
                     } else {
                         key.color_format
                     }]
@@ -33931,7 +34072,7 @@ impl WorldPrimitiveFrontend {
                     depth_compare: Some(CompareOp::LessOrEqual),
                     depth_write: true,
                     depth_bias: None,
-                    color_formats: vec![TextureFormat::Rgba8Unorm; 2],
+                    color_formats: vec![SHADER_G_BUFFER_COLOR_FORMAT; 2],
                     depth_format: Some(TextureFormat::Depth32Float),
                     stencil: None,
                 })?;
@@ -35900,56 +36041,56 @@ impl WorldPrimitiveFrontend {
                 gal,
                 &format!("{label}.shadow-color.view"),
                 shadow_color_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(shadow_color_view);
             let shadow_light_shaft_view = create_texture_view(
                 gal,
                 &format!("{label}.shadow-light-shaft.view"),
                 shadow_light_shaft_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(shadow_light_shaft_view);
             let albedo_view = create_texture_view(
                 gal,
                 &format!("{label}.albedo.view"),
                 albedo_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(albedo_view);
             let normal_view = create_texture_view(
                 gal,
                 &format!("{label}.normal.view"),
                 normal_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(normal_view);
             let material_light_view = create_texture_view(
                 gal,
                 &format!("{label}.material-light.view"),
                 material_light_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(material_light_view);
             let world_position_view = create_texture_view(
                 gal,
                 &format!("{label}.world-position.view"),
                 world_position_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(world_position_view);
             let deferred_lit_view = create_texture_view(
                 gal,
                 &format!("{label}.deferred-lit.view"),
                 deferred_lit_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(deferred_lit_view);
             let translucent_capture_view = create_texture_view(
                 gal,
                 &format!("{label}.translucent-capture.view"),
                 translucent_capture_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(translucent_capture_view);
             let translucent_capture_depth_view = create_texture_view(
@@ -35963,14 +36104,14 @@ impl WorldPrimitiveFrontend {
                 gal,
                 &format!("{label}.composite-0.view"),
                 composite0_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(composite0_view);
             let composite1_view = create_texture_view(
                 gal,
                 &format!("{label}.composite-1.view"),
                 composite1_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )?;
             created.push(composite1_view);
             let depth_view = create_texture_view(
@@ -36062,49 +36203,49 @@ impl WorldPrimitiveFrontend {
             let shadow_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.shadow-pass"),
                 target: shadow_target,
-                color_formats: vec![TextureFormat::Rgba8Unorm; 2],
+                color_formats: vec![SHADER_G_BUFFER_COLOR_FORMAT; 2],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
             created.push(shadow_pass);
             let g_buffer_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.terrain-pass"),
                 target,
-                color_formats: vec![TextureFormat::Rgba8Unorm; 4],
+                color_formats: vec![SHADER_G_BUFFER_COLOR_FORMAT; 4],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
             created.push(g_buffer_pass);
             let deferred_lighting_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.deferred-lighting-pass"),
                 target: deferred_lit_target,
-                color_formats: vec![TextureFormat::Rgba8Unorm],
+                color_formats: vec![SHADER_G_BUFFER_COLOR_FORMAT],
                 depth_format: None,
             })?;
             created.push(deferred_lighting_pass);
             let translucent_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.translucent-pass"),
                 target: translucent_target,
-                color_formats: vec![TextureFormat::Rgba8Unorm],
+                color_formats: vec![SHADER_G_BUFFER_COLOR_FORMAT],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
             created.push(translucent_pass);
             let translucent_capture_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.translucent-capture-pass"),
                 target: translucent_capture_target,
-                color_formats: vec![TextureFormat::Rgba8Unorm],
+                color_formats: vec![SHADER_G_BUFFER_COLOR_FORMAT],
                 depth_format: Some(TextureFormat::Depth32Float),
             })?;
             created.push(translucent_capture_pass);
             let composite0_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.composite-0-pass"),
                 target: composite0_target,
-                color_formats: vec![TextureFormat::Rgba8Unorm],
+                color_formats: vec![SHADER_G_BUFFER_COLOR_FORMAT],
                 depth_format: None,
             })?;
             created.push(composite0_pass);
             let composite1_pass = gal.create_render_pass(RenderPassDesc {
                 label: format!("{label}.composite-1-pass"),
                 target: composite1_target,
-                color_formats: vec![TextureFormat::Rgba8Unorm],
+                color_formats: vec![SHADER_G_BUFFER_COLOR_FORMAT],
                 depth_format: None,
             })?;
             created.push(composite1_pass);
@@ -36228,7 +36369,7 @@ impl WorldPrimitiveFrontend {
                 screen_pipeline_layout,
                 screen_vertex_shader,
                 deferred_lighting_fragment_shader,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
                 None,
             )?;
             created.push(deferred_lighting_pipeline);
@@ -36238,7 +36379,7 @@ impl WorldPrimitiveFrontend {
                 screen_pipeline_layout,
                 screen_vertex_shader,
                 composite0_fragment_shader,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
                 None,
             )?;
             created.push(composite0_pipeline);
@@ -36248,7 +36389,7 @@ impl WorldPrimitiveFrontend {
                 screen_pipeline_layout,
                 screen_vertex_shader,
                 composite1_fragment_shader,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
                 None,
             )?;
             created.push(composite1_pipeline);
@@ -38522,6 +38663,7 @@ fn prepare_source_entity_mesh_asset_view<V: EntitySourceVertex>(
             WORLD_MATERIAL_MODE_OPAQUE
                 | WORLD_MATERIAL_MODE_CUTOUT
                 | WORLD_MATERIAL_MODE_TRANSLUCENT
+                | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
                 | WORLD_MATERIAL_MODE_GLINT
                 | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
                 | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST
@@ -38661,6 +38803,36 @@ fn pack_source_entity_vertices(vertices: &[SourceEntityVertex]) -> GalResult<Vec
     }
     debug_assert_eq!(out.len(), byte_count);
     Ok(out)
+}
+
+fn source_entity_light_variant_key(mesh_key: u64, packed_light: u32) -> u64 {
+    let mut hash = mesh_key ^ 0x9e37_79b9_7f4a_7c15;
+    hash = hash.wrapping_mul(0x1000_0000_01b3);
+    hash ^= u64::from(packed_light);
+    hash | 1
+}
+
+fn override_source_entity_vertex_light(
+    mesh: &mut SourceEntityMeshAsset,
+    packed_light: u32,
+) -> GalResult<()> {
+    const LIGHT_OFFSET_IN_VERTEX: usize = 56;
+    const LIGHT_LANE_BYTES: usize = 8;
+    if mesh.vertex_bytes.len() % TERRAIN_SOURCE_VERTEX_BYTES != 0 {
+        return Err(GalError::invalid_argument(
+            "source entity vertex payload is not aligned to the fixed source ABI",
+        ));
+    }
+    let [block_light, sky_light] = source_lightmap_coordinates(packed_light);
+    for vertex in mesh
+        .vertex_bytes
+        .chunks_exact_mut(TERRAIN_SOURCE_VERTEX_BYTES)
+    {
+        let light = &mut vertex[LIGHT_OFFSET_IN_VERTEX..LIGHT_OFFSET_IN_VERTEX + LIGHT_LANE_BYTES];
+        light[..4].copy_from_slice(&block_light.to_ne_bytes());
+        light[4..].copy_from_slice(&sky_light.to_ne_bytes());
+    }
+    Ok(())
 }
 
 /// Packs the fixed source-lowering vertex record declared in
@@ -38838,12 +39010,12 @@ fn source_section_accepts_shader_material_type(
         WORLD_MATERIAL_MODE_TRANSLUCENT
             if section.material_id == WORLD_MATERIAL_ID_WATER_TRANSLUCENT =>
         {
-            matches!(
-                (section.texture_id, shader_material_type),
-                (WORLD_MATERIAL_TEXTURE_WATER_STILL, 1)
-                    | (WORLD_MATERIAL_TEXTURE_WATER_FLOW, 2)
-                    | (WORLD_MATERIAL_TEXTURE_WATER_OVERLAY, 3)
-            )
+            // Resource-pack water textures retain the water material identity
+            // while their copied texture IDs are not limited to the three
+            // built-in sentinel IDs. The source lane still carries the same
+            // still/flow/overlay values and must be admitted by material
+            // identity, not by a hard-coded texture registry.
+            matches!(shader_material_type, 1 | 2 | 3)
         }
         // Sodium's ordinary translucent terrain primitives retain the normal
         // terrain render-type lane. They still select the distinct
@@ -40828,6 +41000,7 @@ fn source_textured_material_blend(material_mode: u32) -> GalResult<BlendMode> {
         WORLD_MATERIAL_MODE_OPAQUE
         | WORLD_MATERIAL_MODE_CUTOUT
         | WORLD_MATERIAL_MODE_GLINT
+        | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
         | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
         | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST => Ok(BlendMode::Disabled),
         WORLD_MATERIAL_MODE_TRANSLUCENT => Ok(BlendMode::Alpha),
@@ -40847,6 +41020,7 @@ fn source_entity_alpha_cutoff(material_mode: u32) -> GalResult<Option<f32>> {
         | WORLD_MATERIAL_MODE_TRANSLUCENT
         | WORLD_MATERIAL_MODE_GLINT => Ok(None),
         WORLD_MATERIAL_MODE_CUTOUT
+        | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
         | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
         | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST => Ok(Some(0.1)),
         value => Err(GalError::unsupported_feature(format!(
@@ -43024,10 +43198,17 @@ fn create_g_buffer_color_texture(
     label: &str,
     extent: Extent3d,
 ) -> GalResult<Handle> {
+    // Shader-pack terrain lighting is HDR.  Complementary's terrain pass can
+    // legitimately produce values above one before its deferred/composite
+    // tone mapping; an 8-bit UNORM attachment clamps those values and turns
+    // the entire daylight terrain into a pale white sheet.  Keep the graph's
+    // intermediate color domain float so the Rust/Vulkan route has the same
+    // precision contract as the Frozen OpenGL shader targets.  The acquired
+    // presentation target remains its normal swapchain format.
     gal.create_texture(TextureDesc {
         label: format!("{label}.texture"),
         dimension: TextureDimension::D2,
-        format: TextureFormat::Rgba8Unorm,
+        format: SHADER_G_BUFFER_COLOR_FORMAT,
         extent,
         mip_levels: 1,
         array_layers: 1,
@@ -43038,6 +43219,8 @@ fn create_g_buffer_color_texture(
         ],
     })
 }
+
+const SHADER_G_BUFFER_COLOR_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
 
 fn create_shader_screen_resource_layout(gal: &mut VulkanicGal, label: &str) -> GalResult<Handle> {
     gal.create_resource_layout(ResourceLayoutDesc {
@@ -45317,7 +45500,7 @@ impl GameplayAttachmentCapture {
             (
                 "final_output",
                 g_buffer.composite1_texture,
-                TextureFormat::Rgba8Unorm,
+                SHADER_G_BUFFER_COLOR_FORMAT,
             )
         };
         // The ordinary whole-frame route appends GUI after this graph method.
@@ -45340,17 +45523,25 @@ impl GameplayAttachmentCapture {
                     g_buffer.shadow_depth_texture,
                     TextureFormat::Depth32Float,
                 ),
-                ("albedo", g_buffer.albedo_texture, TextureFormat::Rgba8Unorm),
-                ("normal", g_buffer.normal_texture, TextureFormat::Rgba8Unorm),
+                (
+                    "albedo",
+                    g_buffer.albedo_texture,
+                    SHADER_G_BUFFER_COLOR_FORMAT,
+                ),
+                (
+                    "normal",
+                    g_buffer.normal_texture,
+                    SHADER_G_BUFFER_COLOR_FORMAT,
+                ),
                 (
                     "material_light",
                     g_buffer.material_light_texture,
-                    TextureFormat::Rgba8Unorm,
+                    SHADER_G_BUFFER_COLOR_FORMAT,
                 ),
                 (
                     "world_position",
                     g_buffer.world_position_texture,
-                    TextureFormat::Rgba8Unorm,
+                    SHADER_G_BUFFER_COLOR_FORMAT,
                 ),
                 (
                     "main_depth",
@@ -45360,7 +45551,7 @@ impl GameplayAttachmentCapture {
                 (
                     "deferred_lit",
                     g_buffer.deferred_lit_texture,
-                    TextureFormat::Rgba8Unorm,
+                    SHADER_G_BUFFER_COLOR_FORMAT,
                 ),
                 // This is the exact Rust-owned source consumed by the
                 // Fabulous `minecraft:translucent` handoff.  Capturing it
@@ -45371,7 +45562,7 @@ impl GameplayAttachmentCapture {
                 (
                     "translucent_capture",
                     g_buffer.translucent_capture_texture,
-                    TextureFormat::Rgba8Unorm,
+                    SHADER_G_BUFFER_COLOR_FORMAT,
                 ),
                 (
                     "translucent_capture_depth",
@@ -45381,12 +45572,12 @@ impl GameplayAttachmentCapture {
                 (
                     "composite_0",
                     g_buffer.composite0_texture,
-                    TextureFormat::Rgba8Unorm,
+                    SHADER_G_BUFFER_COLOR_FORMAT,
                 ),
                 (
                     "composite_1",
                     g_buffer.composite1_texture,
-                    TextureFormat::Rgba8Unorm,
+                    SHADER_G_BUFFER_COLOR_FORMAT,
                 ),
             ];
             if !defer_normal_final_output {
@@ -54673,8 +54864,12 @@ mod tests {
             .apply_world_mesh_asset_update(&mut gal, 1, vec![asset], Vec::new())
             .unwrap();
 
-        let first = frontend.source_entity_mesh_asset(0xe771_ca5e, 3).unwrap();
-        let second = frontend.source_entity_mesh_asset(0xe771_ca5e, 3).unwrap();
+        let first = frontend
+            .source_entity_mesh_asset(0xe771_ca5e, 3, 0)
+            .unwrap();
+        let second = frontend
+            .source_entity_mesh_asset(0xe771_ca5e, 3, 0)
+            .unwrap();
         assert!(
             !Arc::ptr_eq(&first, &second),
             "expanded source entities must be owned by their selected frames, not retained by the world asset cache"
@@ -54687,7 +54882,7 @@ mod tests {
             Some(SourceMeshSemanticInput::Entity(_))
         ));
         assert!(frontend
-            .source_entity_mesh_asset(0xe771_ca5e, 4)
+            .source_entity_mesh_asset(0xe771_ca5e, 4, 0)
             .unwrap_err()
             .to_string()
             .contains("does not match cached generation"));
@@ -55059,11 +55254,13 @@ mod tests {
 
         source_frame.mesh_instances[0].block_entity_id = -1;
         source_frame.mesh_instances[0].packed_light = 0x00f0_00f0;
-        assert!(frontend
+        source_frame.mesh_instances[1].block_entity_id = -1;
+        source_frame.mesh_instances[1].packed_light = 0x00f0_00f0;
+        let lit_prepared = frontend
             .prepare_source_entity_frames(&prepared_entity_source_program_for_test(), &source_frame)
-            .unwrap_err()
-            .to_string()
-            .contains("vertex-owned light"));
+            .expect("instance packed light must become a Rust-owned vertex-light variant");
+        assert_eq!(1, lit_prepared.len());
+        assert_ne!(0xe771_1701, lit_prepared[0].mesh.mesh_key);
     }
 
     #[test]
@@ -60144,10 +60341,10 @@ mod tests {
         );
 
         for vertex in &mut mesh.vertices {
-            vertex.shader_material_type = 1;
+            vertex.shader_material_type = 0;
         }
         let error = prepare_source_terrain_mesh_asset(&mesh).unwrap_err();
-        assert!(error.to_string().contains("rejects shader material type 1"));
+        assert!(error.to_string().contains("rejects shader material type 0"));
 
         mesh.sections[0].material_mode = WORLD_MATERIAL_MODE_CUTOUT;
         for vertex in &mut mesh.vertices {
@@ -69452,9 +69649,18 @@ mod tests {
                 ),
             ];
             for (name, texture, previous_usage) in attachment_specs {
+                let bytes_per_texel = if matches!(name, "shadow_depth" | "depth") {
+                    TextureFormat::Depth32Float
+                        .copy_bytes_per_texel()
+                        .expect("depth attachment copy format has a byte size")
+                } else {
+                    SHADER_G_BUFFER_COLOR_FORMAT
+                        .copy_bytes_per_texel()
+                        .expect("shader G-buffer color format has a byte size")
+                };
                 let attachment_readback = gal.create_buffer(BufferDesc {
                     label: format!("{label}.{name}.readback"),
-                    size: u64::from(width) * u64::from(height) * 4,
+                    size: u64::from(width) * u64::from(height) * u64::from(bytes_per_texel),
                     memory: MemoryDomain::Readback,
                     usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
                 })?;
@@ -69467,7 +69673,7 @@ mod tests {
                 ops.push(CommandOp::CopyTextureToBuffer(BufferImageCopyRegion {
                     buffer: attachment_readback,
                     buffer_offset: 0,
-                    bytes_per_row: width * 4,
+                    bytes_per_row: width * bytes_per_texel,
                     rows_per_image: height,
                     texture,
                     texture_mip: 0,
@@ -69483,7 +69689,7 @@ mod tests {
                 ops.push(CommandOp::HostReadBuffer {
                     buffer: attachment_readback,
                     offset: 0,
-                    size: u64::from(width) * u64::from(height) * 4,
+                    size: u64::from(width) * u64::from(height) * u64::from(bytes_per_texel),
                 });
             }
         }
@@ -70777,7 +70983,7 @@ mod tests {
             .map(|frame| frame.stats.mesh_draw_count)
             .sum::<u64>();
         let json = format!(
-            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"shader_pack_generation\":1,\n  \"shader_config_schema\":1,\n  \"pass_graph_generation\":3,\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_multipass_v1\",\n  \"passes\":[\"vulkanic:pass/shadow_depth\",\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/deferred_lighting\",\"vulkanic:pass/terrain_translucent\",\"vulkanic:pass/composite_0\",\"vulkanic:pass/composite_1\",\"vulkanic:pass/final_output\"],\n  \"executed_pass_order\":[\"shadow_depth\",\"terrain_opaque\",\"terrain_cutout\",\"deferred_lighting\",\"terrain_translucent\",\"composite_0_color_grade\",\"composite_1_depth_fog\",\"final_output\"],\n  \"g_buffer_attachments\":[\"shadow_depth\",\"albedo\",\"normal\",\"material_light\",\"world_position\",\"depth\",\"deferred_lit\",\"composite_0\",\"composite_1\"],\n  \"attachment_formats\":{{\"shadow_depth\":\"Depth32Float\",\"albedo\":\"Rgba8Unorm\",\"normal\":\"Rgba8Unorm\",\"material_light\":\"Rgba8Unorm\",\"world_position\":\"Rgba8Unorm\",\"depth\":\"Depth32Float\",\"deferred_lit\":\"Rgba8Unorm\",\"composite_0\":\"Rgba8Unorm\",\"composite_1\":\"Rgba8Unorm\",\"final_composite\":\"Rgba8Unorm\"}},\n  \"attachment_extents\":{{\"width\":{},\"height\":{}}},\n  \"attachment_hashes\":{{{}}},\n  \"attachment_semantic_evidence\":{},\n  \"shadow_dependency_evidence\":{},\n  \"composite_dependency_perturbations\":{},\n  \"composite_chain_evidence\":{},\n  \"final_presentation_owner\":\"rust-backend-owned-target\",\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"rust_owned_shadow_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"],\n  \"attachment_dumps\":[\"attachment-shadow_depth.png\",\"attachment-shadow_depth.raw\",\"attachment-albedo.png\",\"attachment-normal.png\",\"attachment-material_light.png\",\"attachment-world_position.png\",\"attachment-depth.png\",\"attachment-depth.raw\",\"attachment-deferred_lit.png\",\"attachment-composite_0.png\",\"attachment-composite_1.png\",\"attachment-final_composite.png\"]\n}}\n",
+            "{{\n  \"artifact_class\":\"rust_owned_shader_pack_mesh_conformance\",\n  \"backend\":\"{}\",\n  \"shader_pack_generation\":1,\n  \"shader_config_schema\":1,\n  \"pass_graph_generation\":3,\n  \"semantic_request_hash\":\"{:08x}\",\n  \"pass_graph\":\"vulkanic:builtin/terrain_material_multipass_v1\",\n  \"passes\":[\"vulkanic:pass/shadow_depth\",\"vulkanic:pass/terrain_opaque\",\"vulkanic:pass/terrain_cutout\",\"vulkanic:pass/deferred_lighting\",\"vulkanic:pass/terrain_translucent\",\"vulkanic:pass/composite_0\",\"vulkanic:pass/composite_1\",\"vulkanic:pass/final_output\"],\n  \"executed_pass_order\":[\"shadow_depth\",\"terrain_opaque\",\"terrain_cutout\",\"deferred_lighting\",\"terrain_translucent\",\"composite_0_color_grade\",\"composite_1_depth_fog\",\"final_output\"],\n  \"g_buffer_attachments\":[\"shadow_depth\",\"albedo\",\"normal\",\"material_light\",\"world_position\",\"depth\",\"deferred_lit\",\"composite_0\",\"composite_1\"],\n  \"attachment_formats\":{{\"shadow_depth\":\"Depth32Float\",\"albedo\":\"Rgba16Float\",\"normal\":\"Rgba16Float\",\"material_light\":\"Rgba16Float\",\"world_position\":\"Rgba16Float\",\"depth\":\"Depth32Float\",\"deferred_lit\":\"Rgba16Float\",\"composite_0\":\"Rgba16Float\",\"composite_1\":\"Rgba16Float\",\"final_composite\":\"Rgba8Unorm\"}},\n  \"attachment_extents\":{{\"width\":{},\"height\":{}}},\n  \"attachment_hashes\":{{{}}},\n  \"attachment_semantic_evidence\":{},\n  \"shadow_dependency_evidence\":{},\n  \"composite_dependency_perturbations\":{},\n  \"composite_chain_evidence\":{},\n  \"final_presentation_owner\":\"rust-backend-owned-target\",\n  \"rust_owned_color_attachment\":true,\n  \"rust_owned_depth_attachment\":true,\n  \"rust_owned_shadow_attachment\":true,\n  \"java_iris_participation\":false,\n  \"width\":{},\n  \"height\":{},\n  \"airborne_frame_hashes\":[{}],\n  \"rollback_hash\":\"{:08x}\",\n  \"reloaded_hash\":\"{:08x}\",\n  \"rollback_preserved_last_valid_generation\":{},\n  \"crop_names\":[{}],\n  \"frame0_feature_non_clear\":{{{}}},\n  \"mesh_instance_count\":{},\n  \"mesh_batch_count\":{},\n  \"mesh_draw_count\":{},\n  \"mesh_cache_hits\":{},\n  \"mesh_cache_misses\":{},\n  \"mesh_asset_payload_bytes\":{},\n  \"screenshots\":[\"full-airborne-frame-0.png\",\"full-airborne-frame-1.png\",\"full-airborne-frame-2.png\",\"full-airborne-frame-3.png\",\"full-airborne-frame-4.png\",\"full-rollback.png\",\"full-reloaded.png\"],\n  \"attachment_dumps\":[\"attachment-shadow_depth.png\",\"attachment-shadow_depth.raw\",\"attachment-albedo.png\",\"attachment-normal.png\",\"attachment-material_light.png\",\"attachment-world_position.png\",\"attachment-depth.png\",\"attachment-depth.raw\",\"attachment-deferred_lit.png\",\"attachment-composite_0.png\",\"attachment-composite_1.png\",\"attachment-final_composite.png\"]\n}}\n",
             backend.name(),
             semantic_hash,
             width,

@@ -36826,12 +36826,21 @@ def build_capture_command(
     if selected_source_fixture_capture:
         # Selected-source admission is a real whole-frame route check, not a
         # view-distance throughput run. Keep both sides of a paired fixture at
-        # the same near-world window; otherwise Current's source queue and
-        # Frozen's baseline would run with different settings and could never
-        # produce a valid parity pair. The Rust route controls above remain
-        # Current-only; this is only equivalent capture configuration.
-        env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", "4")
-        env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", "4")
+        # the same world window; otherwise Current's source queue and Frozen's
+        # baseline would run with different settings and could never produce a
+        # valid parity pair. The real-world shader pair uses the ordinary
+        # ten-chunk baseline so its fog range matches Frozen OpenGL. Smaller
+        # source-only fixtures retain their bounded four-chunk window. The
+        # Rust route controls above remain Current-only; this is equivalent
+        # capture configuration only.
+        selected_source_render_distance = (
+            "10" if static_terrain_scenario.lower() == "real-world" else "4"
+        )
+        selected_source_simulation_distance = (
+            "12" if selected_source_render_distance == "10" else "4"
+        )
+        env.setdefault("MATTMC_CAPTURE_RENDER_DISTANCE", selected_source_render_distance)
+        env.setdefault("MATTMC_CAPTURE_SIMULATION_DISTANCE", selected_source_simulation_distance)
     if ordinary_terrain_particle_capture:
         env["MATTMC_CAPTURE_KILL_AFTER_DETERMINISTIC"] = "true"
         # The particle is admitted immediately, while the ordinary client

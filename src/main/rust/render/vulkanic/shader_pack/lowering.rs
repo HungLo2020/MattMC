@@ -4083,10 +4083,9 @@ fn lower_fullscreen_source_fragment_with_contracts(
     }
     // Fullscreen source stages need two explicit coordinate domains. Source
     // math (fog, reconstruction, dithering) is authored around OpenGL's
-    // lower-left gl_FragCoord, while source target texelFetch calls keep
-    // naming Rust-owned image storage in its native address space. Depth
-    // textures are the one exception: their readback row order is top-left,
-    // so the depth fetches below are explicitly row-normalized.
+    // lower-left gl_FragCoord, while source target color images retain their
+    // native presentation row order. Depth attachments use that same target
+    // coordinate here so color and depth remain aligned during composites.
     lowered = lower_fullscreen_fragment_coordinates(lowered, uniform_contract)?;
     // Fullscreen shader-pack stages commonly reconstruct view space from a
     // sampled depth value using the legacy OpenGL clip-depth mapping.  The
@@ -4139,20 +4138,13 @@ fn lower_fullscreen_fragment_coordinates(
     );
     source = source.replace(
         "ivec2 texelCoord = ivec2(vulkanic_source_fullscreen_fragment_coord().xy);",
-        "// Source texelCoord addresses the Rust-owned target storage, not the source-space screen direction.\n        ivec2 texelCoord = ivec2(gl_FragCoord.xy);",
+        "// Source texelCoord addresses the Rust-owned target color storage.\n        ivec2 texelCoord = ivec2(gl_FragCoord.xy);",
     );
-    for depth_texture in ["depthtex0", "depthtex1", "dhDepthTex"] {
-        let native_fetch = format!("texelFetch({depth_texture}, texelCoord, 0)");
-        let normalized_fetch = format!(
-            "texelFetch({depth_texture}, ivec2(texelCoord.x, int(viewHeight) - 1 - texelCoord.y), 0)"
-        );
-        source = source.replace(&native_fetch, &normalized_fetch);
-    }
-    // `texCoord` intentionally retains the source sampler convention: V=0 is
-    // the lower edge in the legacy OpenGL shader.  Position reconstruction is
-    // a different semantic domain, however.  Convert only the screen-space
-    // inputs used to rebuild view rays; otherwise deferred sky/cloud code sees
-    // a vertically mirrored camera while texture sampling remains correct.
+    // `texCoord` is the target-sampler domain established by the owned
+    // fullscreen vertex stream. Source reconstruction still uses the legacy
+    // lower-left screen domain, so convert only position vectors that feed
+    // projection inversion. This keeps texture sampling and source math from
+    // silently sharing a backend row convention.
     for anchor in [
         "vec4 screenPos = vec4(texCoord,",
         "vec4 screenPosDH = vec4(texCoord,",
@@ -4165,12 +4157,6 @@ fn lower_fullscreen_fragment_coordinates(
             ),
         );
     }
-    // The fullscreen vertex semantic preamble has already converted the
-    // interpolated UV into the source pack's screen domain. Re-flipping it
-    // here would invert deferred reconstruction a second time while integer
-    // texelFetch still addressed the correct target pixel. Preserve texCoord
-    // for vec[34] reconstruction and leave sampler-specific lowering to the
-    // explicit source-target sampling helpers.
     insert_after_version(
         &source,
         r#"vec4 vulkanic_source_fullscreen_fragment_coord() {
@@ -4264,11 +4250,40 @@ fn apply_selected_source_fullscreen_probe(
         && mode != "depth-input-flipped"
         && mode != "depth-input-amplified"
         && mode != "deferred-fog-inputs"
+        && mode != "composite5-fog-inputs"
         && mode != "composite7-without-fxaa"
     {
         return Err(GalError::invalid_argument(format!(
-            "unknown selected-source fullscreen probe '{mode}'; expected distant-horizons-depth, distant-horizons-depth-routing, distant-horizons-depth-coordinate, distant-horizons-fog-inputs, distant-horizons-fog-effect, gbuffer-inputs, gbuffer-primary, depth-input, depth-input-flipped, depth-input-amplified, deferred-fog-inputs, or composite7-without-fxaa"
+            "unknown selected-source fullscreen probe '{mode}'; expected distant-horizons-depth, distant-horizons-depth-routing, distant-horizons-depth-coordinate, distant-horizons-fog-inputs, distant-horizons-fog-effect, gbuffer-inputs, gbuffer-primary, depth-input, depth-input-flipped, depth-input-amplified, deferred-fog-inputs, composite5-fog-inputs, or composite7-without-fxaa"
         )));
+    }
+    if mode == "composite5-fog-inputs" {
+        if !entry_path
+            .replace('\\', "/")
+            .ends_with("world0/composite5.fsh")
+        {
+            return Ok(());
+        }
+        let output = outputs.first().ok_or_else(|| {
+            GalError::invalid_argument("composite5 fog probe requires a color output")
+        })?;
+        let assignment = format!("{} = vec4(color, 1.0);", output.semantic_name);
+        if !source.contains(&assignment)
+            || !source.contains("float z0 = texture(depthtex0, texCoord).r;")
+        {
+            return Err(GalError::invalid_argument(
+                "composite5 fog probe could not locate its depth declaration or output",
+            ));
+        }
+        *source = source.replacen(
+            &assignment,
+            &format!(
+                "{} = vec4(vec3(z0, clamp(lViewPos / max(far, 1.0), 0.0, 1.0), texCoord.y), 1.0); // selected-source fullscreen diagnostic probe: composite5-fog-inputs",
+                output.semantic_name
+            ),
+            1,
+        );
+        return Ok(());
     }
     if mode == "composite7-without-fxaa" {
         if !entry_path
@@ -4398,12 +4413,24 @@ fn apply_selected_source_fullscreen_probe(
         );
         // Capture the values after the ordinary-world fog path has established
         // skyFade and color; the probe does not alter the normal route.
-        let fog_call = "DoFog(color.rgb, skyFade, lViewPos, playerPos, VdotU, VdotS, dither);";
-        if !source.contains(fog_call) {
+        // Complementary's deferred stage passes its local `vec3 color`
+        // directly, while small synthetic fixtures and some pack variants
+        // spell the same call as `color.rgb`. Accept either exact source form
+        // so this diagnostic observes the real fog boundary instead of
+        // rejecting source preparation before the capture can run.
+        let fog_call = if source
+            .contains("DoFog(color, skyFade, lViewPos, playerPos, VdotU, VdotS, dither);")
+        {
+            "DoFog(color, skyFade, lViewPos, playerPos, VdotU, VdotS, dither);"
+        } else if source
+            .contains("DoFog(color.rgb, skyFade, lViewPos, playerPos, VdotU, VdotS, dither);")
+        {
+            "DoFog(color.rgb, skyFade, lViewPos, playerPos, VdotU, VdotS, dither);"
+        } else {
             return Err(GalError::invalid_argument(
                 "deferred fog probe could not locate fog call",
             ));
-        }
+        };
         *source = source.replacen(
             fog_call,
             "DoFog(color.rgb, skyFade, lViewPos, playerPos, VdotU, VdotS, dither); vulkanicDeferredFogInputs = vec3(z0, clamp(lViewPos / max(far, 1.0), 0.0, 1.0), clamp(skyFade, 0.0, 1.0));",
@@ -7117,9 +7144,6 @@ mod tests {
         assert!(fragment.contains("coordinate.y = viewHeight - coordinate.y;"));
         assert!(fragment.contains("vec2 vulkanic_source_fullscreen_screen_uv(vec2 image_uv)"));
         assert!(fragment.contains("ivec2 texelCoord = ivec2(gl_FragCoord.xy);"));
-        assert!(fragment.contains(
-            "texelFetch(depthtex0, ivec2(texelCoord.x, int(viewHeight) - 1 - texelCoord.y), 0)"
-        ));
         assert!(fragment.contains("texelFetch(colortex0, texelCoord, 0)"));
         assert!(fragment.contains(
             "vec2 sourceScreen = vulkanic_source_fullscreen_fragment_coord().xy / vec2(1.0, viewHeight);"
@@ -7159,6 +7183,40 @@ mod tests {
         apply_selected_source_fullscreen_probe(&mut unrelated, &[], "world0/composite6.fsh")
             .unwrap();
         assert!(unrelated.contains("FXAA311(color);"));
+
+        match prior {
+            Some(value) => std::env::set_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE", value),
+            None => std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE"),
+        }
+    }
+
+    #[test]
+    fn fullscreen_source_composite5_fog_probe_exposes_depth_and_distance_only_for_target_stage() {
+        let _guard = fullscreen_probe_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let prior = std::env::var_os("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+        std::env::set_var(
+            "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
+            "composite5-fog-inputs",
+        );
+        let outputs = [FullscreenSourceFragmentOutput {
+            source_location: 0,
+            source_slot: 3,
+            role: TerrainSourceResourceRole::ShaderPackColor("translucent_final".to_string()),
+            semantic_name: "out_vulkanic_source_color_translucent_final".to_string(),
+        }];
+        let mut composite5 = "void main() { float z0 = texture(depthtex0, texCoord).r; float lViewPos = 4.0; vec3 color = vec3(1.0); out_vulkanic_source_color_translucent_final = vec4(color, 1.0); }".to_string();
+        apply_selected_source_fullscreen_probe(&mut composite5, &outputs, "world0/composite5.fsh")
+            .unwrap();
+        assert!(
+            composite5.contains("vec3(z0, clamp(lViewPos / max(far, 1.0), 0.0, 1.0), texCoord.y)")
+        );
+
+        let mut unrelated = composite5.clone();
+        apply_selected_source_fullscreen_probe(&mut unrelated, &outputs, "world0/composite6.fsh")
+            .unwrap();
+        assert_eq!(composite5, unrelated);
 
         match prior {
             Some(value) => std::env::set_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE", value),
