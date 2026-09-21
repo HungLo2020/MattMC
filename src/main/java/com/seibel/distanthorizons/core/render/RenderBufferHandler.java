@@ -62,7 +62,6 @@ public class RenderBufferHandler implements AutoCloseable
 	private int shadowCulledBufferCount;
 	
 	
-	
 	//=============//
 	// constructor //
 	//=============//
@@ -256,6 +255,28 @@ public class RenderBufferHandler implements AutoCloseable
 				}
 				LodBufferContainer bufferContainer = renderSection.bufferContainer;
 				if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()) {
+					// A stale enabled bit can survive while DH replaces or closes a
+					// section. Without an installed lifecycle container there is no
+					// current CPU result to publish, just as there is no legacy VBO to
+					// draw. The quadtree will re-admit the section after its build swap.
+					if (bufferContainer == null) {
+						nullBufferCount++;
+						continue;
+					}
+					// A closed/replaced container may remain attached to a stale
+					// render-enabled node until the next quadtree update. It owns no
+					// publishable generation and must not enter this frame's demand set.
+					if (!bufferContainer.rustSemanticBuildLifecycleCurrent()) {
+						nullBufferCount++;
+						continue;
+					}
+					// A completed empty section participates in DH's parent/child
+					// quadtree transition but owns no draw or native asset. Do not count
+					// it as an unpublished visible candidate forever.
+					if (bufferContainer != null
+						&& bufferContainer.rustSemanticBuildHasNoDrawableGeometry()) {
+						continue;
+					}
 					semanticCandidateCount++;
 					this.semanticColumnPositionsNearToFar.add(renderSection.pos);
 					// A semantic DH build may retain the Java container as a CPU-side
@@ -264,7 +285,13 @@ public class RenderBufferHandler implements AutoCloseable
 					// unpublished columns, so preflight can mark that demand pending and
 					// reject the frame coherently. Never re-admit an unpublished section to
 					// the legacy VBO list: the whole-frame route owns this boundary.
-					if (!net.vulkanic.world.DistantHorizonsSemanticCollector.hasPublishedColumn(renderSection.pos)) {
+					// An already-enabled DH node can survive a generation retirement
+					// without re-entering LodRenderSection#canRender. Reassert visible
+					// publication demand here, immediately before the coordinator's
+					// bounded visible-only asset flush, so that stale enabled state
+					// cannot leave a real non-empty candidate unpublished forever.
+					if (!net.vulkanic.world.DistantHorizonsSemanticCollector.hasPublishedColumn(renderSection.pos)
+						&& !net.vulkanic.world.DistantHorizonsSemanticCollector.requestColumnPublication(renderSection.pos)) {
 						semanticUnpublishedCount++;
 					}
 					continue;

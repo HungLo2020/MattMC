@@ -72,8 +72,8 @@ public final class DistantHorizonsSemanticCollector {
 	// for each material identity.  Admit a small batch so visible DH rebuilds do
 	// not spend hundreds of frames publishing one column at a time, while the
 	// byte cap keeps temporary Java/Rust staging bounded for dense modded worlds.
-	private static final int MAX_PENDING_ASSET_COLUMNS_PER_UPDATE = 4;
-	private static final long MAX_PENDING_ASSET_BYTES_PER_UPDATE = 4L * 1024L * 1024L;
+	private static final int MAX_PENDING_ASSET_COLUMNS_PER_UPDATE = 16;
+	private static final long MAX_PENDING_ASSET_BYTES_PER_UPDATE = 16L * 1024L * 1024L;
 	private static final int MAX_VISIBLE_SEGMENTS = 16_384;
 	private static final int MAX_LOD_SEGMENTS_PER_COLUMN = 512;
 	private static final int MAX_LOD_VERTICES_PER_SEGMENT = 2_097_152;
@@ -521,6 +521,15 @@ public final class DistantHorizonsSemanticCollector {
 	public static boolean hasColumn(long columnKey) {
 		synchronized (COLUMNS) {
 			return COLUMN_KEYS.contains(columnKey);
+		}
+	}
+
+	/** Generation-qualified CPU lifecycle check for DH container owners. */
+	public static boolean hasColumn(long columnKey, long columnGeneration) {
+		if (columnGeneration == 0L) return false;
+		synchronized (COLUMNS) {
+			LodColumnSnapshot column = COLUMNS.get(columnKey);
+			return column != null && column.generation() == columnGeneration;
 		}
 	}
 
@@ -1652,7 +1661,10 @@ public final class DistantHorizonsSemanticCollector {
 		LodMaterialProvenanceSnapshot provenance
 	) {
 		if (!snapshot.hasSegments()) {
-			removeColumnLocked(columnKey);
+			// A completed empty build owns no native asset, but it is not active
+			// until LodRenderSection installs its container. Keep the previous
+			// acknowledged generation drawable until that swap closes its owning
+			// container; removing it on this worker thread creates a one-frame hole.
 			return 0L;
 			}
 			LodColumnSnapshot replaced = COLUMNS.get(columnKey);
@@ -1662,6 +1674,10 @@ public final class DistantHorizonsSemanticCollector {
 				// asset remains eligible until its copied payload actually changes.
 				LodMaterialProvenanceSnapshot previousProvenance = MATERIAL_PROVENANCE.get(columnKey);
 				if (Objects.equals(previousProvenance, provenance)) {
+					if (usesRustWholeFrameSemanticBuild()
+						&& !Objects.equals(PUBLISHED_GENERATIONS.get(columnKey), replaced.generation())) {
+						markPendingVisibleColumnLocked(columnKey);
+					}
 					semanticColumnsBuilt++;
 					semanticColumnsReused++;
 					return replaced.generation();
@@ -1688,6 +1704,13 @@ public final class DistantHorizonsSemanticCollector {
 					PENDING_COLUMNS.remove(columnKey);
 				} else {
 					PENDING_COLUMNS.put(columnKey, snapshot);
+					// Every Rust semantic build was requested by the live DH quadtree.
+					// Demand publication immediately: waiting for the next traversal left
+					// transition children unprotected long enough for the byte-bounded
+					// staging cache to evict them, so their parent could never hand off.
+					if (usesRustWholeFrameSemanticBuild()) {
+						markPendingVisibleColumnLocked(columnKey);
+					}
 				}
 				semanticColumnsBuilt++;
 				return snapshot.generation();
@@ -1727,6 +1750,9 @@ public final class DistantHorizonsSemanticCollector {
 				PENDING_COLUMNS.remove(columnKey);
 			} else {
 				PENDING_COLUMNS.put(columnKey, snapshot);
+				if (usesRustWholeFrameSemanticBuild()) {
+					markPendingVisibleColumnLocked(columnKey);
+				}
 			}
 			trimRetainedColumnsLocked(MAX_RETAINED_COLUMNS, MAX_RETAINED_BYTES);
 			semanticColumnsBuilt++;
@@ -3659,8 +3685,6 @@ public final class DistantHorizonsSemanticCollector {
 			retainedBytes -= removed.byteSize();
 		}
 		PENDING_COLUMNS.remove(columnKey);
-		PUBLISHED_COLUMNS.remove(columnKey);
-		PUBLISHED_MATERIAL_PROVENANCE.remove(columnKey);
 		PENDING_VISIBLE_COLUMN_KEYS.remove(columnKey);
 		// A DH buffer can close after its column was selected by the render-list
 		// traversal but before the bounded preflight asset update. That update will
@@ -3684,6 +3708,11 @@ public final class DistantHorizonsSemanticCollector {
 		LAST_COLUMN_PAYLOAD_DIFFERENCES.remove(columnKey);
 		Long publishedGeneration = PUBLISHED_GENERATIONS.get(columnKey);
 		if (publishedGeneration != null) {
+			// The native asset remains valid until Rust acknowledges this explicit
+			// retirement. Keep its immutable descriptor and material sidecar for
+			// the same interval. If DH rebuilds this key before the update flushes,
+			// recordBuiltSnapshotLocked cancels the retirement and the acknowledged
+			// generation can cover the replacement without a one-frame hole.
 			PENDING_RETIREMENTS.put(columnKey, publishedGeneration);
 		}
 	}
@@ -3756,13 +3785,13 @@ public final class DistantHorizonsSemanticCollector {
 			(COLUMNS.size() > maximumColumns || retainedBytes + retainedMaterialProvenanceBytes > maximumBytes)
 			&& COLUMNS.size() > 1
 		) {
-			Long evictionKey = COLUMNS.size() > maximumColumns
-				? COLUMNS.keySet().iterator().next()
-				: eldestUnprotectedColumnKeyLocked();
+			Long evictionKey = eldestUnprotectedColumnKeyLocked();
 			// Never turn a real visible column back into an apparent cache miss.
 			// The owning LodBufferContainer will retire it when DH removes or
 			// reloads that render section. A temporarily oversized visible working
-			// set is bounded by DH's own visible-section set and the hard column cap.
+			// set is bounded by DH's own quadtree lifecycle. The collector's byte
+			// and count targets may not evict a live transition child: doing so
+			// prevents all four siblings from ever becoming ready together.
 			if (evictionKey == null) {
 				break;
 			}

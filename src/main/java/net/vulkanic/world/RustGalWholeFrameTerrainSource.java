@@ -810,14 +810,13 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 		if (this.sections.containsKey(key)) {
 			this.sections.get(key).setIncomingDirections(nextIncoming & GraphDirectionSet.ALL);
-			// Sodium's graph visit is single-shot for a visibility frame. Incoming
-			// portals are merged while the node waits in its wave, but a route that
-			// arrives after that wave has been consumed must not reopen the node.
-			// Reopening it here discovers portal paths that Frozen never visits and
-			// expands the semantic terrain domain. The independent source keeps the
-			// merged value for diagnostics and future frontier resets, while only an
-			// unvisited completed section is eligible to enter its first wave.
-			if (!this.propagatedIncomingDirections.containsKey(key)) {
+			// Frozen traverses an already-resident graph, so every same-wave route is
+			// merged before a section is consumed. This source constructs that graph
+			// asynchronously: a second valid route can arrive after the first route
+			// propagated only because its neighboring mesh completed later. Requeue
+			// when the accumulated input grows so worker completion order cannot close
+			// a legitimate portal path. The finite direction mask makes this converge.
+			if (nextIncoming != previousIncoming) {
 				this.requestPropagation(key);
 			}
 			return;
@@ -1435,16 +1434,19 @@ public final class RustGalWholeFrameTerrainSource {
 	}
 
 	/**
-	 * A first build continues the existing frontier through its accumulated
-	 * incoming portals and does not invalidate already traversed nodes. Only an
-	 * accepted replacement whose occlusion connectivity changed can alter paths
-	 * through the resident graph and therefore requires a full traversal reset.
-	 * Every replacement invalidates the visible-object cache so a settled frame
+	 * Sodium starts visibility from the camera against a complete resident graph
+	 * every frame. This source constructs that graph asynchronously, so a first
+	 * completed node changes which neighbors exist for paths whose earlier waves
+	 * have already been consumed. Restart from the camera after each bounded batch
+	 * of first completions; otherwise worker completion order becomes part of the
+	 * final domain and leaves visible terrain unbuilt. An accepted replacement only
+	 * requires the same restart when its occlusion connectivity changed. Every
+	 * replacement still invalidates the visible-object cache so a settled frame
 	 * cannot retain the superseded RenderSection instance.
 	 */
 	private void acceptSectionVisibilityChange(RenderSection previous, RenderSection replacement) {
 		this.cachedVisibleSignature = Long.MIN_VALUE;
-		if (previous != null && previous.getVisibilityData() != replacement.getVisibilityData()) {
+		if (previous == null || previous.getVisibilityData() != replacement.getVisibilityData()) {
 			this.visibilityGraphDirty = true;
 		}
 	}

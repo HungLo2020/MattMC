@@ -494,7 +494,7 @@ const WORLD_MATERIAL_UNIFORM_BYTES: u64 = (WORLD_MATERIAL_HEADER_BYTES
     as u64;
 const WORLD_MATERIAL_INDEX_BYTES: u64 = 6 * 4;
 const WORLD_MESH_GPU_VERTEX_BYTES: usize = 5 * 4 * 4;
-const WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES: usize = 3 * 4 * 4;
+const WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES: usize = 2 * 4 * 4;
 const WORLD_MESH_BATCH_HEADER_BYTES: usize = 16 * 4 + 16 * 4 + 16 * 4 + 4 * 4 + 4 * 4 + 4 * 4;
 const WORLD_MESH_INSTANCE_BYTES: usize = 16 * 4 + 6 * 4 * 4;
 const WORLD_MESH_INSTANCE_BUFFER_BYTES: u64 =
@@ -506,9 +506,9 @@ const WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES: u64 = WORLD_MESH_INSTANCE_
 /// to infer ownership or reconstruct a hidden mesh heap.
 const WORLD_MESH_GEOMETRY_PAGE_BYTES: u64 = 16 * 1024 * 1024;
 // Page-relative indexed draws address vertices in whole records while storage
-// descriptors retain Vulkan's 256-byte dynamic-offset compatibility. 3840 is
-// the least common multiple of 48-byte direct-terrain vertices, 80-byte rich
-// vertices, and the descriptor alignment.
+// descriptors retain Vulkan's 256-byte dynamic-offset compatibility. Keep the
+// existing conservative page alignment; it is divisible by both the 32-byte
+// direct-terrain and 80-byte rich vertex records.
 const WORLD_MESH_GEOMETRY_ALIGNMENT: u64 = 3_840;
 const WORLD_MESH_INDEXED_INDIRECT_COMMAND_BYTES: u64 = 20;
 const SOURCE_TERRAIN_FRAME_STREAM_SLOT_COUNT: usize = 3;
@@ -3038,14 +3038,14 @@ struct MeshResourceKey {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum MeshVertexAbi {
     Rich80,
-    DirectTerrain48,
+    DirectTerrain32,
 }
 
 impl MeshVertexAbi {
     const fn stride(self) -> usize {
         match self {
             Self::Rich80 => WORLD_MESH_GPU_VERTEX_BYTES,
-            Self::DirectTerrain48 => WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES,
+            Self::DirectTerrain32 => WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES,
         }
     }
 }
@@ -33577,7 +33577,7 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         key: MeshPipelineResourceKey,
     ) -> GalResult<()> {
-        let terrain_program = if key.vertex_abi == MeshVertexAbi::DirectTerrain48 {
+        let terrain_program = if key.vertex_abi == MeshVertexAbi::DirectTerrain32 {
             minimal_compact_direct_terrain_program(match key.material_mode {
                 WORLD_MATERIAL_MODE_OPAQUE => TerrainMaterialProgramKind::Opaque,
                 WORLD_MATERIAL_MODE_CUTOUT => TerrainMaterialProgramKind::Cutout,
@@ -34030,7 +34030,7 @@ impl WorldPrimitiveFrontend {
         let vertex_abi = mesh_vertex_abi_for_builtin(key);
         let vertex_bytes = match vertex_abi {
             MeshVertexAbi::Rich80 => asset.vertex_bytes.clone(),
-            MeshVertexAbi::DirectTerrain48 => compact_direct_terrain_vertices(&asset.vertex_bytes)?,
+            MeshVertexAbi::DirectTerrain32 => compact_direct_terrain_vertices(&asset.vertex_bytes)?,
         };
         let index_bytes = asset.index_bytes.clone();
         let index_type = asset.index_type;
@@ -39178,15 +39178,45 @@ fn compact_direct_terrain_vertices(rich_vertices: &[u8]) -> GalResult<Vec<u8>> {
     let vertex_count = rich_vertices.len() / WORLD_MESH_GPU_VERTEX_BYTES;
     let mut out = Vec::with_capacity(vertex_count * WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES);
     for vertex in rich_vertices.chunks_exact(WORLD_MESH_GPU_VERTEX_BYTES) {
-        // position.xyz + terrain material byte
+        // The direct-only ABI retains exact float position and atlas UV lanes.
+        // Future source/Iris routes continue to use the complete 80-byte
+        // semantic vertex. Byte-originated values return to canonical packed
+        // integers instead of occupying separate float lanes here.
         out.extend_from_slice(&vertex[0..12]);
-        out.extend_from_slice(&vertex[60..64]);
-        // lossless RGBA copied from the rich float lanes
-        out.extend_from_slice(&vertex[16..28]);
-        out.extend_from_slice(&vertex[44..48]);
-        // resolved atlas UV + copied lightmap coordinates
+        let material = f32::from_ne_bytes(vertex[60..64].try_into().unwrap());
+        if !material.is_finite() || material.fract() != 0.0 || !(0.0..=255.0).contains(&material) {
+            return Err(GalError::invalid_argument(
+                "direct terrain material byte is not canonical",
+            ));
+        }
+        push_u32(&mut out, material as u32);
         out.extend_from_slice(&vertex[64..72]);
-        out.extend_from_slice(&vertex[48..56]);
+        let mut color_rgba = 0u32;
+        for (channel, offset) in [16usize, 20, 24, 44].into_iter().enumerate() {
+            let value = f32::from_ne_bytes(vertex[offset..offset + 4].try_into().unwrap());
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(GalError::invalid_argument(
+                    "direct terrain color channel is not normalized",
+                ));
+            }
+            color_rgba |= ((value * 255.0).round() as u32) << (channel * 8);
+        }
+        push_u32(&mut out, color_rgba);
+        let mut packed_light = 0u32;
+        for (channel, offset) in [48usize, 52].into_iter().enumerate() {
+            let value = f32::from_ne_bytes(vertex[offset..offset + 4].try_into().unwrap());
+            let byte = (value * 240.0).round();
+            if !value.is_finite()
+                || !(0.0..=255.0).contains(&byte)
+                || (value - byte / 240.0).abs() > 1.0e-6
+            {
+                return Err(GalError::invalid_argument(
+                    "direct terrain light coordinate is not byte-exact",
+                ));
+            }
+            packed_light |= (byte as u32) << (channel * 8);
+        }
+        push_u32(&mut out, packed_light);
     }
     debug_assert_eq!(
         out.len(),
@@ -42525,7 +42555,7 @@ fn mesh_vertex_abi_for_builtin(key: MeshResourceKey) -> MeshVertexAbi {
         && key.view_layering.is_none()
         && key.decal_vertex_count == 0
     {
-        MeshVertexAbi::DirectTerrain48
+        MeshVertexAbi::DirectTerrain32
     } else {
         MeshVertexAbi::Rich80
     }
@@ -42533,7 +42563,7 @@ fn mesh_vertex_abi_for_builtin(key: MeshResourceKey) -> MeshVertexAbi {
 
 fn mesh_pipeline_key(key: MeshResourceKey) -> GalResult<MeshPipelineResourceKey> {
     let vertex_abi = mesh_vertex_abi_for_builtin(key);
-    let shader_program_identity = if vertex_abi == MeshVertexAbi::DirectTerrain48 {
+    let shader_program_identity = if vertex_abi == MeshVertexAbi::DirectTerrain32 {
         ProgramIdentity::new(match key.material_mode {
             WORLD_MATERIAL_MODE_OPAQUE => COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
             WORLD_MATERIAL_MODE_CUTOUT => COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
@@ -59035,7 +59065,7 @@ mod tests {
             .unwrap();
         let resources = frontend.mesh_resources.values().next().unwrap();
         assert_eq!(
-            MeshVertexAbi::DirectTerrain48,
+            MeshVertexAbi::DirectTerrain32,
             resources.geometry_key.vertex_abi
         );
         assert_eq!(
@@ -59049,12 +59079,12 @@ mod tests {
         let pipeline_key = frontend
             .mesh_pipeline_resources
             .keys()
-            .find(|key| key.vertex_abi == MeshVertexAbi::DirectTerrain48)
+            .find(|key| key.vertex_abi == MeshVertexAbi::DirectTerrain32)
             .expect("compact direct terrain pipeline");
         assert!(pipeline_key
             .shader_program_identity
             .as_str()
-            .ends_with("compact48_v1"));
+            .ends_with("compact32_v1"));
     }
 
     #[test]
@@ -59689,18 +59719,26 @@ mod tests {
         let rich = packed_mesh_vertices(&[vertex]);
         let compact = compact_direct_terrain_vertices(&rich).unwrap();
         assert_eq!(WORLD_MESH_DIRECT_TERRAIN_VERTEX_BYTES, compact.len());
-        let lane = |index| read_f32(&compact, index);
         assert_eq!(
-            [1.25, -2.5, 3.75, 5.0],
-            [lane(0), lane(1), lane(2), lane(3)]
+            [1.25, -2.5, 3.75],
+            [
+                read_f32(&compact, 0),
+                read_f32(&compact, 1),
+                read_f32(&compact, 2)
+            ]
+        );
+        assert_eq!(5, u32::from_ne_bytes(compact[12..16].try_into().unwrap()));
+        assert_eq!(
+            [0.3125, 0.6875],
+            [read_f32(&compact, 4), read_f32(&compact, 5)]
         );
         assert_eq!(
-            [64.0 / 255.0, 128.0 / 255.0, 192.0 / 255.0, 128.0 / 255.0],
-            [lane(4), lane(5), lane(6), lane(7)]
+            0x80c0_8040,
+            u32::from_ne_bytes(compact[24..28].try_into().unwrap())
         );
         assert_eq!(
-            [0.3125, 0.6875, 112.0 / 240.0, 176.0 / 240.0],
-            [lane(8), lane(9), lane(10), lane(11)]
+            0x0000_b070,
+            u32::from_ne_bytes(compact[28..32].try_into().unwrap())
         );
     }
 
@@ -59722,7 +59760,7 @@ mod tests {
             false,
         );
         assert_eq!(
-            MeshVertexAbi::DirectTerrain48,
+            MeshVertexAbi::DirectTerrain32,
             mesh_vertex_abi_for_builtin(compact)
         );
         assert_eq!(

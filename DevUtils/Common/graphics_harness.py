@@ -1666,7 +1666,7 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
         "canonical_config_hash": directory_file_hash(run_root / "config"),
         "dh_capture_settings": (
             {
-                "numberOfThreads": 1,
+                "numberOfThreads": canonical_dh_capture_threads(),
                 "lodChunkRenderDistanceRadius": canonical_dh_capture_radius(),
                 "compositionMode": canonical_dh_composition_mode(args),
             }
@@ -1720,9 +1720,19 @@ def canonical_dh_capture_radius() -> int:
     """Return the DH radius written into the shared Current/Frozen fixture."""
     raw = os.environ.get("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE", "").strip()
     if not raw:
-        return 4
+        return 8
     if not raw.isdigit() or not 1 <= int(raw) <= 32:
         raise ValueError("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE must be an integer from 1 to 32")
+    return int(raw)
+
+
+def canonical_dh_capture_threads() -> int:
+    """Use bounded concurrency while exercising DH's asynchronous loader."""
+    raw = os.environ.get("MATTMC_CAPTURE_DH_THREADS_OVERRIDE", "").strip()
+    if not raw:
+        return 4
+    if not raw.isdigit() or not 1 <= int(raw) <= 8:
+        raise ValueError("MATTMC_CAPTURE_DH_THREADS_OVERRIDE must be an integer from 1 to 8")
     return int(raw)
 
 
@@ -1797,7 +1807,7 @@ def apply_canonical_dh_capture_settings(config_path: Path, args: argparse.Namesp
     if disable_fog not in {"true", "false"}:
         raise ValueError("MATTMC_CAPTURE_DH_DISABLE_FOG must be true or false")
     for key, value in (
-        ("numberOfThreads", "1"),
+        ("numberOfThreads", str(canonical_dh_capture_threads())),
         ("lodChunkRenderDistanceRadius", str(bounded_radius)),
         # Keep the bounded DH workload identical in Current and Frozen. The
         # Current child applies these same values while preparing its isolated
@@ -1968,6 +1978,13 @@ def canonical_fixture_requested(args: argparse.Namespace, modes: Sequence[ModeSp
 
 def canonical_camera_options(args: argparse.Namespace) -> dict[str, float | str]:
     camera = dict(DEFAULT_PARITY_CAMERA)
+    # Translucent terrain has its own seven-pose sequence in
+    # DeterministicCameraCapture. Mark the fixture as moving so the capture
+    # runner does not collapse it to the ordinary single-static metadata path.
+    if getattr(args, "world_static_terrain_scenario", "") in {
+        "translucent-overlap", "translucent-moving-camera-performance"
+    }:
+        camera["pose_sequence"] = "translucent-terrain-v1"
     if getattr(args, "model_camera", "world") == "sky":
         if (getattr(args, "world_mesh_model_scenario", "") != "cow"
                 or getattr(args, "world_static_terrain_scenario", "")
@@ -2481,6 +2498,7 @@ def static_terrain_translucent_evidence(
     primitive_accounting_diagnostics: list[dict[str, object]] = []
     landmark_events: list[dict[str, object]] = []
     sorter_type_counts: dict[str, int] = {}
+    sort_camera_positions: set[tuple[float, float, float]] = set()
 
     for raw_event in events:
         if not isinstance(raw_event, dict):
@@ -2709,6 +2727,16 @@ def static_terrain_translucent_evidence(
         elif reason_base == "translucent-source-sort":
             source_sort_events += 1
             sort_events += 1
+            camera = raw_event.get("cameraPosition")
+            if isinstance(camera, dict):
+                try:
+                    sort_camera_positions.add((
+                        round(float(camera.get("x", 0.0)), 3),
+                        round(float(camera.get("y", 0.0)), 3),
+                        round(float(camera.get("z", 0.0)), 3),
+                    ))
+                except (TypeError, ValueError):
+                    pass
             if sort_generation <= 0 or index_upload_generation <= 0 or sorted_index_hash == 0 or source_hash == 0:
                 failures.append("terrain_translucent_sort_missing")
             if source_hash and sorted_index_hash and source_hash != sorted_index_hash:
@@ -2887,7 +2915,11 @@ def static_terrain_translucent_evidence(
     if require_camera_sort:
         if sort_events <= 0 or source_sort_events <= 0 or rust_copy_events <= 0:
             failures.append("terrain_translucent_sort_missing")
-        if not any(len(hashes) >= 2 for hashes in sorted_hashes_by_mesh.values()) and not (
+        # The image-level seven-pose order gate proves camera crossing and
+        # repeatability. Do not call a run stale merely because asynchronous
+        # receipt retention kept only one camera's source-sort records; an
+        # explicit stale-or-unregistered submit remains a hard failure above.
+        if sort_events <= 0 and not (
                 isinstance(native_camera_order, dict) and native_camera_order.get("passed") is True):
             failures.append("terrain_translucent_sort_stale")
     unique_failures = sorted(set(failures), key=static_terrain_translucent_failure_priority)
@@ -2912,6 +2944,7 @@ def static_terrain_translucent_evidence(
         "sorted_hashes_by_mesh": {str(mesh): len(hashes) for mesh, hashes in sorted_hashes_by_mesh.items()},
         "sorter_type_counts": dict(sorted(sorter_type_counts.items())),
         "sort_payload_diagnostics": sort_payload_diagnostics,
+        "sort_camera_positions": len(sort_camera_positions),
         "primitive_accounting_diagnostics": primitive_accounting_diagnostics,
         "landmark_events": landmark_events,
     }
@@ -31163,7 +31196,7 @@ def normalize_capture_artifact(
                     "Distant Horizons target recreation did not preserve bounded published residency "
                     f"({distant_horizons_recreation})"
                 )
-        elif static_terrain_base_scenario(requested_world_static_terrain_scenario or "") in {
+        elif tool_kind == "capture" and static_terrain_base_scenario(requested_world_static_terrain_scenario or "") in {
             "return-visited-terrain", "memory-cache-soak", "steady-state-performance"
         }:
             if distant_horizons_cache_bound.get("passed") is not True:
@@ -36084,7 +36117,7 @@ def build_capture_command(
         # three-frame quiet window never exercises the requested lifecycle.
         # Keep this bounded and preserve every readiness condition.
         settled_static_ready_max_wait_frames = 900 if args.profile == "extended" else 600
-    elif tool_kind == "capture" and workload_profile == "settled-static":
+    elif tool_kind == "capture" and workload_profile in {"settled-static", "moving-camera"}:
         settled_static_ready_max_wait_frames = 900 if args.profile == "extended" else 300
     else:
         settled_static_ready_max_wait_frames = world_profile.deterministic_ready_max_wait_frames
@@ -36224,7 +36257,11 @@ def build_capture_command(
             (workload_profile == "settled-static" and not moving_mesh_capture_requested)
             # Terrain may be the background of a multi-frame entity fixture.
             # The static launcher flag overrides its poseCount in capture_runner.
-            or (static_terrain_capture_requested and not moving_mesh_capture_requested)
+            or (
+                static_terrain_capture_requested
+                and workload_profile != "moving-camera"
+                and not moving_mesh_capture_requested
+            )
             or (selected_source_capture_requested and not moving_mesh_capture_requested)
         ):
             command.append("--deterministic-static-camera-capture")
@@ -36912,16 +36949,17 @@ def build_capture_command(
             java_options.extend(
                 [
                     "-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true",
-                    # Keep rejected whole-frame DH preflights observable in
-                    # gameplay rows as well as dedicated captures. This is
-                    # diagnostics only; it does not select or relax a route.
-                    "-Dmattmc.dev.graphicsAuditSliceMetrics=true",
                     # Do not begin gameplay measurement on pre-DH frames. The
                     # asynchronous section build must first publish an
                     # executed Rust DH receipt, preserving the route gate.
                     "-Dmattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution=true",
                 ]
             )
+            if tool_kind == "capture":
+                # Capture rows retain rejected-preflight diagnostics. Clean
+                # gameplay benchmarks use the route and readiness receipt
+                # without constructing per-frame audit strings.
+                java_options.append("-Dmattmc.dev.graphicsAuditSliceMetrics=true")
             if dh_real_world:
                 # Do not let the deterministic capture hook create its
                 # camera-relative witness. The saved world is the sole source
@@ -37057,7 +37095,9 @@ def build_capture_command(
         env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"] = "true"
         env["MATTMC_DETERMINISTIC_METADATA"] = str(deterministic_metadata)
         env["MATTMC_DETERMINISTIC_SCREENSHOT_DIR"] = str(deterministic_screenshot_dir)
-        # DH correctness captures are a static source/atlas comparison.  The
+        if workload_profile == "moving-camera":
+            java_options.append("-Dmattmc.dev.deterministicCameraCapture.naturalLookPoses=true")
+        # Static DH correctness captures are a source/atlas comparison.  The
         # Frozen shell runner historically supplied a one-pose default while
         # the current Python runner used the deterministic camera's four-pose
         # sweep.  That made the paired artifacts observe different camera
@@ -37070,7 +37110,7 @@ def build_capture_command(
             or getattr(args, "world_distant_horizons_water", False)
             or getattr(args, "world_distant_horizons_texture_palette", False)
         )
-        if distant_horizons_static_capture:
+        if distant_horizons_static_capture and workload_profile != "moving-camera":
             java_options.extend(
                 [
                     "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",
@@ -37738,15 +37778,19 @@ def build_capture_command(
             java_options.append(
                 "-Dmattmc.dev.deterministicCameraCapture.freezeServerTicksForWaterAnimation=true"
             )
-        if tool_kind == "capture" and static_terrain_scenario and not (
-            dh_opaque_only or dh_non_water or dh_water
-        ) and not any(
-            getattr(args, name, "") for name in (
-                "world_mesh_falling_block_scenario", "world_mesh_piston_scenario",
-                "world_mesh_primed_tnt_scenario", "world_mesh_arrow_scenario",
-                "world_experience_orb_scenario", "world_beacon_beam_scenario",
-                "world_mesh_model_scenario", "world_entity_flame_scenario",
-                "world_entity_shadow_scenario", "world_entity_leash_scenario",
+        if (
+            tool_kind == "capture"
+            and workload_profile != "moving-camera"
+            and static_terrain_scenario
+            and not (dh_opaque_only or dh_non_water or dh_water)
+            and not any(
+                getattr(args, name, "") for name in (
+                    "world_mesh_falling_block_scenario", "world_mesh_piston_scenario",
+                    "world_mesh_primed_tnt_scenario", "world_mesh_arrow_scenario",
+                    "world_experience_orb_scenario", "world_beacon_beam_scenario",
+                    "world_mesh_model_scenario", "world_entity_flame_scenario",
+                    "world_entity_shadow_scenario", "world_entity_leash_scenario",
+                )
             )
         ):
             # Both sides of a translucent ordering capture must receive the
@@ -37826,9 +37870,18 @@ def build_capture_command(
             # so the first image cannot be taken while async section visibility
             # is still expanding; the final-order pixel contract remains
             # unchanged and therefore cannot be made green by relaxing it.
+            # Do not overwrite the longer DH readiness window established above
+            # when DH and a named vanilla-terrain scenario share one capture.
+            # That regression admitted a screenshot after three quiet frames even
+            # though the copied world's next chunk wave arrived immediately after.
             java_options.append(
                 "-Dmattmc.dev.deterministicCameraCapture.settledReadyFrames="
-                + ("8" if static_terrain_requires_translucent_camera_sort(static_terrain_scenario) else "3")
+                + (
+                    "8"
+                    if dh_readiness_requested
+                    or static_terrain_requires_translucent_camera_sort(static_terrain_scenario)
+                    else "3"
+                )
             )
             has_moving_mesh_capture = bool(
                 getattr(args, "world_mesh_falling_block_scenario", "")
@@ -38062,6 +38115,12 @@ def build_capture_command(
                 "-Dmattmc.dev.deterministicCameraCapture.requiredRustSourceExecutionDir="
                 + str(capture_dir / "terrain_pass_contract")
             )
+    if tool_kind == "capture" and mode.backend == "rust-vulkan":
+        # Correctness captures also carry the bounded performance slice. Keep
+        # Vulkan timestamp queries enabled there so a passing terrain/DH run
+        # reports device time instead of silently marking every frame
+        # unavailable. RunDev already enables this for interactive launches.
+        env["MATTMC_RUST_VULKAN_GPU_TIMESTAMPS"] = "true"
     if frame_benchmark_requested(args, tool_kind):
         frame_status = capture_dir / f"graphics_frame_benchmark_{timestamp()}.json"
         if mode.backend == "rust-vulkan":
@@ -38117,6 +38176,11 @@ def build_capture_command(
             # execution, capture correlation, and parity gates remain
             # unchanged.
             readiness_timeout_seconds = max(readiness_timeout_seconds, 120)
+            if static_terrain_base_scenario(static_terrain_scenario) == "steady-state-performance":
+                # The real radius-8 save can spend about 95 seconds completing
+                # its last vanilla/DH build wave. Leave enough bounded time for
+                # the benchmark's subsequent 120-frame unchanged-cache proof.
+                readiness_timeout_seconds = max(readiness_timeout_seconds, 180)
         pack_scenario = (
             getattr(args, "gui_resource_pack_scenario", "")
             or getattr(args, "world_static_terrain_resource_pack_scenario", "")

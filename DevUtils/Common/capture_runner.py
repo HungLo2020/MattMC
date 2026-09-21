@@ -1298,7 +1298,14 @@ class CaptureRunner:
 
         if not self.config.deterministic_camera_capture:
             return
-        if self.config.deterministic_static_camera_capture:
+        # Translucent terrain sorting is a moving-camera feature fixture even
+        # though it uses the static-terrain diagnostics. Keep its explicit
+        # seven-pose schedule active when the canonical launcher correctly
+        # classifies it as a feature (rather than a one-pose static probe).
+        translucent_camera_sequence = static_terrain_requires_translucent_camera_sort(
+            self.config.world_static_terrain_scenario
+        )
+        if self.config.deterministic_static_camera_capture or translucent_camera_sequence:
             parity_diagnostics_path = self.artifact_dir / f"static_terrain_parity_diagnostics_{self.run_id}.jsonl"
             self.append_java_tool_options([
                 "-Dmattmc.dev.staticTerrainParityDiagnostics=true",
@@ -1327,12 +1334,10 @@ class CaptureRunner:
                 ])
                 self.append_meta("static_terrain_water_animation_dense_capture=true")
             moving_mesh_sequence = self.has_active_moving_mesh_capture_sequence()
-            if static_terrain_requires_translucent_camera_sort(
-                self.config.world_static_terrain_scenario
-            ) and not moving_mesh_sequence:
+            if translucent_camera_sequence and not moving_mesh_sequence:
                 self.append_java_tool_options([
                     "-Dmattmc.dev.deterministicCameraCapture.poseCount=7",
-                    "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=1",
+                    "-Dmattmc.dev.deterministicCameraCapture.framesPerPose=2",
                     "-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0",
                 ])
                 self.append_meta("deterministic_static_camera_capture=translucent_camera_sequence")

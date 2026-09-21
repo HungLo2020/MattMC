@@ -952,7 +952,7 @@ public final class RustGalGuiItemRenderer {
 			for (GuiItemMeshSemanticCollector.GuiItemMeshQuad quad : layer.quads()) {
 				List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = layer.sourceFoilType() == 0
 					? quad.bridgeVertices() : quad.bridgeFoilVertices();
-				batches.add(new VulkanicGalBridge.GuiMeshBatchRecord(
+				batches.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(
 					requestLayerOrder, batchLayerIndex++,
 					guiMaterialMode(layer.materialMode()),
 					// Ordinary inventory light space; Rust owns the light vectors.

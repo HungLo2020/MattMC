@@ -160,8 +160,6 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 			// don't accidentally queue multiple uploads at the same time
 			return false;
 		}
-		net.vulkanic.world.DistantHorizonsSemanticCollector.recordSemanticBuildAttempt(this.pos);
-		
 		PriorityTaskPicker.Executor executor = ThreadPoolUtil.getRenderLoadingExecutor();
 		if (executor == null || executor.isTerminated())
 		{
@@ -177,6 +175,7 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 			this.uploadTaskCountRef.decrementAndGet();
 			return false;
 		}
+		net.vulkanic.world.DistantHorizonsSemanticCollector.recordSemanticBuildAttempt(this.pos);
 		
 		try
 		{
@@ -406,6 +405,13 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	{
 		if (net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild())
 		{
+			// Legacy DH treats a completed empty buffer as render-ready. Preserve
+			// that quadtree contract without fabricating a zero-byte Vulkan asset.
+			if (this.bufferContainer != null
+				&& this.bufferContainer.rustSemanticBuildHasNoDrawableGeometry())
+			{
+				return true;
+			}
 			// The retained container owns lifecycle only. A CPU-built column is not
 			// renderable until Rust acknowledges its immutable asset. Requesting the
 			// bounded publication here keeps a covering parent enabled while child
@@ -413,6 +419,17 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 			return net.vulkanic.world.DistantHorizonsSemanticCollector.requestColumnPublication(this.pos);
 		}
 		return this.bufferContainer != null;
+	}
+
+	/** A completed CPU semantic result is waiting for the bounded Rust asset
+	 * transaction. It must keep its covering parent visible, but it must not be
+	 * mistaken for missing source data and rebuilt every quadtree update. */
+	public boolean hasRustSemanticBuildResult()
+	{
+		return net.vulkanic.world.DistantHorizonsSemanticCollector.usesRustWholeFrameSemanticBuild()
+			&& this.bufferContainer != null
+			&& this.bufferContainer.renderDataReady()
+			&& this.bufferContainer.rustSemanticBuildLifecycleCurrent();
 	}
 	
 	public boolean getRenderingEnabled() { return this.renderingEnabled; }

@@ -2783,7 +2783,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				MemorySegment item = Abi.item(assetArray, Struct.GUI_ASSET_PAYLOAD, i);
 				item.set(ValueLayout.JAVA_INT, Struct.GUI_ASSET_PAYLOAD.offset(0), Struct.GUI_ASSET_PAYLOAD.byteSize());
 				Struct.GUI_ASSET_PAYLOAD.setInt(item, 1, asset.spriteId());
-				Abi.writeBytes(updateArena, item, Struct.GUI_ASSET_PAYLOAD, 2, asset.pngBytes());
+				// The record defensively copied this payload at construction and its
+				// public accessor keeps returning a copy. As the enclosing bridge we
+				// can copy the private immutable bytes straight into confined FFI
+				// memory instead of cloning the complete atlas once more first.
+				Abi.writeBytes(updateArena, item, Struct.GUI_ASSET_PAYLOAD, 2, asset.pngBytes);
 			}
 			MemorySegment request = Struct.GUI_ASSET_UPDATE.allocate(updateArena);
 			Abi.writeHeader(request, Struct.GUI_ASSET_UPDATE);
@@ -2812,7 +2816,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.setLong(item, 2, asset.assetId());
 				Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.setInt(item, 3, asset.width());
 				Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.setInt(item, 4, asset.height());
-				Abi.writeBytes(updateArena, item, Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD, 5, asset.pixels());
+				// `pixels` is an immutable defensive copy owned by the record. The
+				// native request receives its own confined-memory copy below, so the
+				// public cloning accessor is unnecessary on this trusted bridge path.
+				Abi.writeBytes(updateArena, item, Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD, 5, asset.pixels);
 				Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.setInt(item, 6, asset.samplingFilter());
 				Struct.GUI_RAW_IMAGE_ASSET_PAYLOAD.setInt(item, 7, asset.samplingAddress());
 			}
@@ -3368,6 +3375,11 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		@Override
 		public byte[] pngBytes() {
 			return this.pngBytes.clone();
+		}
+
+		/** Allocation-free payload size for staging metrics. */
+		public int pngByteLength() {
+			return this.pngBytes.length;
 		}
 	}
 
@@ -5236,6 +5248,33 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		GuiDecalFoilRecord decalFoil, GuiBlockItemRasterRecord blockItemRaster, GuiItemCacheRecord itemCache
 	) {
 		private static final ThreadLocal<Boolean> TRUSTED_COPY = ThreadLocal.withInitial(() -> false);
+
+		/**
+		 * Builds a frame-local batch from already-owned immutable semantic views.
+		 * The canonical constructor still validates every field; only redundant
+		 * defensive list/array copies are skipped for this confined handoff.
+		 */
+		public static GuiMeshBatchRecord trustedOwned(
+			int stratum, int layerIndex, int materialMode, int lightingMode, long assetId, long sequence,
+			float alphaCutoff, float[] modelTransform, float[] guiPose,
+			int left, int top, int right, int bottom, int guiWidth, int guiHeight,
+			int renderWidth, int renderHeight, int guardPixels,
+			int clipMode, int clipLeft, int clipTop, int clipWidth, int clipHeight,
+			List<GuiMeshVertexRecord> vertices, List<Integer> indices, StandardItemFoilRecord itemFoil,
+			int itemRasterScale, GuiDecalFoilRecord decalFoil, GuiBlockItemRasterRecord blockItemRaster,
+			GuiItemCacheRecord itemCache
+		) {
+			TRUSTED_COPY.set(true);
+			try {
+				return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, sequence,
+					alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
+					renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight,
+					vertices, indices, itemFoil, itemRasterScale, decalFoil, blockItemRaster, itemCache);
+			} finally {
+				TRUSTED_COPY.set(false);
+			}
+		}
+
 		public GuiMeshBatchRecord(
 			int stratum, int layerIndex, int materialMode, int lightingMode, long assetId, long sequence,
 			float alphaCutoff, float[] modelTransform, float[] guiPose,

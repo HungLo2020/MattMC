@@ -169,6 +169,9 @@ public final class DeterministicCameraCapture {
 		Long.getLong("mattmc.dev.deterministicCameraCapture.ackTimeoutSeconds", 30L)));
 	private static final int POSE_COUNT = Math.max(1, Math.min(8, Integer.getInteger("mattmc.dev.deterministicCameraCapture.poseCount", 4)));
 	private static final float YAW_DELTA = Float.parseFloat(System.getProperty("mattmc.dev.deterministicCameraCapture.yawDelta", "35.0"));
+	/** Use ordinary first-person look state without forcing body/head animation. */
+	private static final boolean NATURAL_LOOK_POSES =
+		Boolean.getBoolean("mattmc.dev.deterministicCameraCapture.naturalLookPoses");
 	private static final boolean STOP_AFTER_COMPLETE = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.stopAfterComplete", "true"));
 	private static final boolean INTERNAL_SCREENSHOTS = Boolean.parseBoolean(System.getProperty("mattmc.dev.deterministicCameraCapture.internalScreenshots", "false"));
 	/**
@@ -4248,9 +4251,10 @@ public final class DeterministicCameraCapture {
 
 	private static void setViewDistances(Minecraft minecraft, int renderDistance, int simulationDistance) {
 		boolean renderDistanceChanged = minecraft.options.renderDistance().get() != renderDistance;
+		boolean simulationDistanceChanged = minecraft.options.simulationDistance().get() != simulationDistance;
 		minecraft.options.renderDistance().set(renderDistance);
 		minecraft.options.simulationDistance().set(simulationDistance);
-		if (renderDistanceChanged) {
+		if (renderDistanceChanged || simulationDistanceChanged) {
 			minecraft.options.broadcastOptions();
 		}
 	}
@@ -4406,7 +4410,7 @@ public final class DeterministicCameraCapture {
 				staticTerrainOriginalSimulationDistance = minecraft.options.simulationDistance().get();
 				setViewDistances(minecraft,
 					Math.max(2, Math.min(staticTerrainOriginalRenderDistance, 4)),
-					Math.max(2, Math.min(staticTerrainOriginalSimulationDistance, 4)));
+					Math.max(5, Math.min(staticTerrainOriginalSimulationDistance, 5)));
 				// The action runs after the pre-change settled gate. Changing the
 				// semantic visibility radius starts a new Rust producer domain, so the
 				// old drained receipt cannot admit the next frame.
@@ -7073,10 +7077,12 @@ public final class DeterministicCameraCapture {
 		player.setXRot(pose.pitch());
 		player.yRotO = pose.yaw();
 		player.xRotO = pose.pitch();
-		player.yHeadRot = pose.yaw();
-		player.yHeadRotO = pose.yaw();
-		player.yBodyRot = pose.yaw();
-		player.yBodyRotO = pose.yaw();
+		if (!NATURAL_LOOK_POSES) {
+			player.yHeadRot = pose.yaw();
+			player.yHeadRotO = pose.yaw();
+			player.yBodyRot = pose.yaw();
+			player.yBodyRotO = pose.yaw();
+		}
 		if ("translucent-overlap".equals(STATIC_TERRAIN_SCENARIO)) GraphicsAuditCameraHistory.settle(player);
 		net.minecraft.client.particle.GraphicsAuditTerrainParticleFixture.install(Minecraft.getInstance());
 		net.minecraft.client.particle.GraphicsAuditBlockMarkerFixture.install(Minecraft.getInstance());

@@ -75,7 +75,11 @@ public final class RustGalTerrainRenderer {
 	// the initial mesh/accounting records while later frames append visibility
 	// and sort receipts.  This is diagnostics-only state; it does not increase
 	// semantic mesh residency or GPU resource bounds.
-	private static final int MAX_TRANSLUCENT_EVENTS = 16384;
+	// A seven-pose capture can legitimately produce tens of thousands of
+	// visibility receipts before the final audit snapshot. Keep the ring bounded
+	// but large enough to retain the initial source/copy sort receipts alongside
+	// those frame-local submissions. This is diagnostics-only state.
+	private static final int MAX_TRANSLUCENT_EVENTS = 32768;
 	/** Bounds each copied atlas before base/normal/specular expansion. */
 	private static final long MAX_RUST_ATLAS_PIXELS = 16_777_216L;
 	private static final String STATIC_TERRAIN_SCENARIO_PROPERTY = "mattmc.dev.rustGalStaticTerrain.scenario";

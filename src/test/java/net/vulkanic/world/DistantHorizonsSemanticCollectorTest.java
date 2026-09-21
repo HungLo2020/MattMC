@@ -66,10 +66,18 @@ class DistantHorizonsSemanticCollectorTest {
 		assertFalse(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
 		DistantHorizonsSemanticCollector.PendingAssetUpdate update = DistantHorizonsSemanticCollector.pendingUpdateForTest();
 		assertEquals(1, update.assets().size());
+		long columnGeneration = update.assets().getFirst().columnGeneration();
+		assertTrue(DistantHorizonsSemanticCollector.hasColumn(columnKey, columnGeneration));
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(columnKey, columnGeneration + 1));
 		DistantHorizonsSemanticCollector.acknowledgeForTest(update);
 		assertTrue(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
 		DistantHorizonsSemanticCollector.removeColumn(columnKey);
 		assertFalse(DistantHorizonsSemanticCollector.hasColumn(columnKey));
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(columnKey, columnGeneration));
+		assertTrue(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey),
+			"the acknowledged descriptor must live until Rust accepts its retirement");
+		DistantHorizonsSemanticCollector.acknowledgeForTest(
+			DistantHorizonsSemanticCollector.pendingUpdateForTest());
 		assertFalse(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
 	}
 
@@ -92,6 +100,39 @@ class DistantHorizonsSemanticCollectorTest {
 		assertEquals(newGeneration, DistantHorizonsSemanticCollector.snapshotForTest(columnKey).generation());
 		DistantHorizonsSemanticCollector.removeColumn(columnKey, newGeneration);
 		assertFalse(DistantHorizonsSemanticCollector.hasColumn(columnKey));
+	}
+
+	@Test
+	void completedEmptyBuildKeepsPreviousAssetUntilContainerSwapClosesItsOwner() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		long columnKey = 46L;
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			columnKey, new DhBlockPos(0, 64, 0),
+			List.of(quadBuffer(0, 0, 0, 0xB7, 1, 2, 3, 255, 1, 2)), List.of(), List.of(), List.of()
+		);
+		long previousGeneration = DistantHorizonsSemanticCollector.snapshotForTest(columnKey).generation();
+		publishPendingForTest();
+
+		LodQuadBuilder.SemanticVertexBufferBuild empty =
+			new LodQuadBuilder.SemanticVertexBufferBuild(List.of(), List.of(), List.of(), List.of());
+		long emptyGeneration = DistantHorizonsSemanticCollector.recordRustSemanticBuiltColumn(
+			columnKey, new DhBlockPos(0, 64, 0), List.of(),
+			new LodQuadBuilder.SemanticQuadCoverage(0, 0, 0),
+			new LodQuadBuilder.SemanticQuadCoverage(0, 0, 0),
+			empty, empty, empty, empty
+		);
+
+		assertEquals(0L, emptyGeneration);
+		assertTrue(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey),
+			"worker-side empty completion must not erase the active asset before the container swap");
+		assertEquals(previousGeneration,
+			DistantHorizonsSemanticCollector.snapshotForTest(columnKey).generation());
+
+		DistantHorizonsSemanticCollector.removeColumn(columnKey, previousGeneration);
+		assertTrue(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
+		DistantHorizonsSemanticCollector.acknowledgeForTest(
+			DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		assertFalse(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
 	}
 
 	@Test
@@ -705,7 +746,9 @@ class DistantHorizonsSemanticCollectorTest {
 			List.of(quadBuffer(2, 2, 2, 0xB7, 1, 1, 1, 255, 1, 1)), List.of(), List.of(), List.of()
 		);
 
-		DistantHorizonsSemanticCollector.trimRetainedColumnsForTest(8, 64L);
+		// Exercise the count target as well as the byte target. A live candidate
+		// must survive either form of trimming until its quadtree owner closes it.
+		DistantHorizonsSemanticCollector.trimRetainedColumnsForTest(1, Long.MAX_VALUE);
 
 		assertTrue(DistantHorizonsSemanticCollector.hasColumn(100L));
 		assertFalse(DistantHorizonsSemanticCollector.hasColumn(101L));
@@ -793,13 +836,13 @@ class DistantHorizonsSemanticCollectorTest {
 		}
 
 		DistantHorizonsSemanticCollector.PendingAssetUpdate first = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertEquals(4, first.assets().size(), "one provenance extraction transaction must stay heap-bounded");
+		assertEquals(16, first.assets().size(), "one provenance extraction transaction must stay heap-bounded");
 		assertEquals(0L, first.assets().getFirst().columnKey());
 		DistantHorizonsSemanticCollector.acknowledgeForTest(first);
 
 		DistantHorizonsSemanticCollector.PendingAssetUpdate second = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertEquals(4, second.assets().size());
-		assertEquals(4L, second.assets().getFirst().columnKey());
+		assertEquals(1, second.assets().size());
+		assertEquals(16L, second.assets().getFirst().columnKey());
 	}
 
 	@Test

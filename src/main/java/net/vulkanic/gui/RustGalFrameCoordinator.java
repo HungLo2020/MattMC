@@ -2058,6 +2058,16 @@ public final class RustGalFrameCoordinator {
 		long gpuTimestampSubmission = profile.gpuTimestampStatus();
 		if (gpuTimestampSubmission != 0L && gpuTimestampSubmission != METRICS.profileLastGpuTimestampSubmission) {
 			METRICS.profileLastGpuTimestampSubmission = gpuTimestampSubmission;
+			METRICS.profileGpuTimestampSubmission = gpuTimestampSubmission;
+			METRICS.profileGpuShadowDepthNanos += profile.gpuShadowDepthNanos();
+			METRICS.profileGpuTerrainOpaqueNanos += profile.gpuTerrainOpaqueNanos();
+			METRICS.profileGpuTerrainCutoutNanos += profile.gpuTerrainCutoutNanos();
+			METRICS.profileGpuDeferredLightingNanos += profile.gpuDeferredLightingNanos();
+			METRICS.profileGpuComposite0Nanos += profile.gpuComposite0Nanos();
+			METRICS.profileGpuComposite1Nanos += profile.gpuComposite1Nanos();
+			METRICS.profileGpuFinalOutputNanos += profile.gpuFinalOutputNanos();
+			METRICS.profileGpuDistantHorizonsOpaqueNanos += profile.gpuDistantHorizonsOpaqueNanos();
+			METRICS.profileGpuFrameTotalNanos += profile.gpuFrameTotalNanos();
 			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-shadow-depth", profile.gpuShadowDepthNanos());
 			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-terrain-opaque", profile.gpuTerrainOpaqueNanos());
 			GraphicsFrameBenchmark.recordPhaseSample("rust-gal.native-profile.gpu-terrain-cutout", profile.gpuTerrainCutoutNanos());
@@ -2246,7 +2256,7 @@ public final class RustGalFrameCoordinator {
 			try {
 				recordStatus(Operation.GUI_ASSET_UPDATE, bridge.updateGuiAssets(assetGeneration, pendingAssets));
 				lastAssetPayloadCount = pendingAssets.size();
-				lastAssetPayloadBytes = pendingAssets.stream().mapToLong(asset -> asset.pngBytes().length).sum();
+				lastAssetPayloadBytes = pendingAssets.stream().mapToLong(VulkanicGalBridge.GuiAssetRecord::pngByteLength).sum();
 				uploadedAssetGeneration = assetGeneration;
 				auditMessage(
 					"Rust VulkanicGAL GUI asset update accepted"
@@ -2846,9 +2856,19 @@ public final class RustGalFrameCoordinator {
 			+ " rust_gal_profile_pass_count=" + METRICS.profilePassCount
 			+ " rust_gal_profile_draw_ops=" + METRICS.profileDrawOps
 			+ " rust_gal_profile_draw_indexed_ops=" + METRICS.profileDrawIndexedOps
-			+ " rust_gal_profile_pipeline_binds=" + METRICS.profilePipelineBinds
+				+ " rust_gal_profile_pipeline_binds=" + METRICS.profilePipelineBinds
 				+ " rust_gal_profile_resource_set_binds=" + METRICS.profileResourceSetBinds
 				+ " rust_gal_profile_gpu_timestamp_unavailable_frames=" + METRICS.profileGpuTimestampUnavailableFrames
+				+ " rust_gal_profile_gpu_timestamp_submission=" + METRICS.profileGpuTimestampSubmission
+				+ " rust_gal_profile_gpu_shadow_depth_nanos=" + METRICS.profileGpuShadowDepthNanos
+				+ " rust_gal_profile_gpu_terrain_opaque_nanos=" + METRICS.profileGpuTerrainOpaqueNanos
+				+ " rust_gal_profile_gpu_terrain_cutout_nanos=" + METRICS.profileGpuTerrainCutoutNanos
+				+ " rust_gal_profile_gpu_deferred_lighting_nanos=" + METRICS.profileGpuDeferredLightingNanos
+				+ " rust_gal_profile_gpu_composite_0_nanos=" + METRICS.profileGpuComposite0Nanos
+				+ " rust_gal_profile_gpu_composite_1_nanos=" + METRICS.profileGpuComposite1Nanos
+				+ " rust_gal_profile_gpu_final_output_nanos=" + METRICS.profileGpuFinalOutputNanos
+				+ " rust_gal_profile_gpu_distant_horizons_opaque_nanos=" + METRICS.profileGpuDistantHorizonsOpaqueNanos
+				+ " rust_gal_profile_gpu_frame_total_nanos=" + METRICS.profileGpuFrameTotalNanos
 				+ " rust_gal_profile_g_buffer_persistent_cache_hits=" + METRICS.profileGBufferPersistentCacheHits
 				+ " rust_gal_profile_g_buffer_persistent_cache_misses=" + METRICS.profileGBufferPersistentCacheMisses
 				+ " rust_gal_profile_g_buffer_final_binding_cache_hits=" + METRICS.profileGBufferFinalBindingCacheHits
@@ -3116,6 +3136,16 @@ public final class RustGalFrameCoordinator {
 		long profileResourceSetBinds;
 		long profileGpuTimestampUnavailableFrames;
 		long profileLastGpuTimestampSubmission;
+		long profileGpuTimestampSubmission;
+		long profileGpuShadowDepthNanos;
+		long profileGpuTerrainOpaqueNanos;
+		long profileGpuTerrainCutoutNanos;
+		long profileGpuDeferredLightingNanos;
+		long profileGpuComposite0Nanos;
+		long profileGpuComposite1Nanos;
+		long profileGpuFinalOutputNanos;
+		long profileGpuDistantHorizonsOpaqueNanos;
+		long profileGpuFrameTotalNanos;
 		long profileGBufferPersistentCacheHits;
 		long profileGBufferPersistentCacheMisses;
 		long profileGBufferFinalBindingCacheHits;

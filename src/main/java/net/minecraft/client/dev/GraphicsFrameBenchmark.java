@@ -933,6 +933,14 @@ public final class GraphicsFrameBenchmark {
 		if (REQUIRE_DH_EXECUTION && !submittedWorkObserved("distant-horizons")) {
 			missing.add("distant-horizons");
 		}
+		if (REQUIRE_DH_EXECUTION) {
+			DistantHorizonsSemanticCollector.RouteDiagnostics route =
+				DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+			if (route.semanticUnpublishedCandidates() != 0
+				|| route.unpublishedVisibleColumns() != 0) {
+				missing.add("distant-horizons-publication");
+			}
+		}
 		if (scenarioRequiresProducerTraversal(BLOCK_DISPLAY_SCENARIO)
 			&& !submittedWorkObserved("block-display")) {
 			missing.add("block-display");

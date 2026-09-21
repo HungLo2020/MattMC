@@ -4229,14 +4229,14 @@ pub fn minimal_direct_terrain_cutout_program() -> TerrainMaterialProgram {
 }
 
 pub const COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID: &str =
-    "vulkanic:builtin/direct_terrain_opaque_compact48_v1";
+    "vulkanic:builtin/direct_terrain_opaque_compact32_v1";
 pub const COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID: &str =
-    "vulkanic:builtin/direct_terrain_cutout_compact48_v1";
+    "vulkanic:builtin/direct_terrain_cutout_compact32_v1";
 
 /// Shader-off static terrain has a deliberately smaller GPU-only vertex ABI.
 /// The authoritative copied mesh remains the rich semantic form used by
 /// source-derived programs; this program may only be selected alongside the
-/// matching `DirectTerrain48` lowering in the world frontend.
+/// matching `DirectTerrain32` lowering in the world frontend.
 pub fn minimal_compact_direct_terrain_program(
     kind: TerrainMaterialProgramKind,
 ) -> TerrainMaterialProgram {
@@ -4245,11 +4245,11 @@ pub fn minimal_compact_direct_terrain_program(
         TerrainMaterialProgramKind::Opaque => COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
         TerrainMaterialProgramKind::Cutout => COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
         TerrainMaterialProgramKind::Translucent => {
-            "vulkanic:builtin/direct_terrain_translucent_compact48_v1"
+            "vulkanic:builtin/direct_terrain_translucent_compact32_v1"
         }
     });
     program.vertex.label = format!(
-        "minimal-direct-terrain-{}-compact48.vertex",
+        "minimal-direct-terrain-{}-compact32.vertex",
         kind.label_suffix()
     );
     program.vertex.source = compact_direct_terrain_vertex_source();
@@ -4564,19 +4564,19 @@ fn compact_direct_terrain_vertex_source() -> String {
     let source = MINIMAL_TERRAIN_MATERIAL_VERTEX
         .replace(
             "struct MeshVertex {\n    vec4 position_uv;\n    vec4 color_uv;\n    vec4 normal_light;\n    vec4 extra_data;\n    vec4 shader_data;\n};",
-            "struct MeshVertex {\n    vec4 position_material;\n    vec4 color;\n    vec4 atlas_light;\n};",
+            "struct MeshVertex {\n    vec3 position;\n    uint material;\n    vec2 atlas_uv;\n    uint color_rgba;\n    uint light_block_sky;\n};",
         )
         .replace(
             "vec4 world = instance.model * vec4(vertex.position_uv.xyz, 1.0);",
-            "vec4 world = instance.model * vec4(vertex.position_material.xyz, 1.0);",
+            "vec4 world = instance.model * vec4(vertex.position, 1.0);",
         )
         .replace(
             "v_uv = (material_semantics & 1u) != 0u\n        ? vertex.shader_data.xy\n        : vec2(vertex.position_uv.w, vertex.color_uv.w);",
-            "v_uv = vertex.atlas_light.xy;",
+            "v_uv = vertex.atlas_uv;",
         )
         .replace(
             "vec2 light_coordinates = vertex.extra_data.xy;",
-            "vec2 light_coordinates = vertex.atlas_light.zw;",
+            "vec2 light_coordinates = vec2(float(vertex.light_block_sky & 0xffu), float((vertex.light_block_sky >> 8u) & 0xffu));",
         )
         .replace(
             "vec3 normal = normalize(transpose(inverse(mat3(instance.model)))\n            * vec3(vertex.normal_light.yz, vertex.extra_data.z));",
@@ -4584,7 +4584,7 @@ fn compact_direct_terrain_vertex_source() -> String {
         )
         .replace(
             "v_color = vec4(vertex.color_uv.rgb, vertex.normal_light.w) * instance.color\n        * light_color;",
-            "v_color = vertex.color * instance.color * light_color;",
+            "v_color = unpackUnorm4x8(vertex.color_rgba) * instance.color * light_color;",
         )
         .replace(
             "v_normal = normalize(vec3(vertex.normal_light.yz, vertex.extra_data.z));",
@@ -4592,7 +4592,7 @@ fn compact_direct_terrain_vertex_source() -> String {
         )
         .replace(
             "v_terrain_material_bits = uint(clamp(vertex.extra_data.w, 0.0, 255.0));",
-            "v_terrain_material_bits = uint(clamp(vertex.position_material.w, 0.0, 255.0));",
+            "v_terrain_material_bits = vertex.material;",
         );
     terrain_vertex_coordinate_probe(
         source,
@@ -5484,7 +5484,11 @@ void main() {
     vec4 combined_color = texture(sampler2D(VanillaColorTexture, VanillaColorSampler), v_uv);
     vec4 dh_color = texture(sampler2D(DhResolvedColorTexture, DhResolvedColorSampler), v_uv);
     float dh_depth = texture(sampler2D(DhDepthTexture, DhDepthSampler), v_uv).r;
-    bool dh_has_coverage = dh_depth < 1.0 || dh_color.a > 0.0;
+    // The resolved attachment carries the semantic coverage marker in alpha.
+    // A private depth write alone is not visible DH color: treating it as
+    // coverage lets the fog-colored clear value replace valid vanilla terrain
+    // at the fade boundary.
+    bool dh_has_coverage = dh_color.a > 0.0;
 
     // Audit-only source snapshot. Production fog never supplies this negative
     // vertical-scale sentinel.
@@ -5696,10 +5700,18 @@ void main() {
     // Keep the light result smooth instead of sampling one flat provoking
     // vertex in the fragment stage.
     float light_sky = float(vertex.data.w & 0x0fu);
-    vec2 light_uv = (vec2(
-        float((vertex.data.w >> 4u) & 0x0fu),
-        light_sky
-    ) + vec2(0.5)) / 16.0;
+    float light_sky_uv = (light_sky + 0.5) / 16.0;
+    // Match standard.vert's VULKANIC_BACKEND contract. DH folds low sky
+    // coordinates into the lit half of the copied vanilla lightmap; omitting
+    // this made valid low-sky side and underside geometry render black.
+    light_sky_uv = max(light_sky_uv, 1.0 - light_sky_uv);
+    vec2 light_uv = vec2(
+        // The compact Rust-owned stream stores one byte per channel:
+        // sky, block, material, normal. Do not decode the block channel as
+        // the unused high nibble of the sky byte.
+        (float((vertex.data.w >> 8u) & 0x0fu) + 0.5) / 16.0,
+        light_sky_uv
+    );
     v_unlit_color = v_color.rgb;
     v_light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
     v_color.rgb *= v_light_color;
@@ -5808,10 +5820,16 @@ void main() {
     // the resolved sprite. The lightmap is still sampled per vertex, as in
     // Frozen's standard.vert.
     float light_sky = float(vertex.light_normal_pad & 0x0fu);
-    vec2 light_uv = (vec2(
-        float((vertex.light_normal_pad >> 4u) & 0x0fu),
-        light_sky
-    ) + vec2(0.5)) / 16.0;
+    float light_sky_uv = (light_sky + 0.5) / 16.0;
+    // Keep exact-atlas replacements on the same source DH Vulkan lightmap
+    // convention as the reduced-color fallback they replace.
+    light_sky_uv = max(light_sky_uv, 1.0 - light_sky_uv);
+    vec2 light_uv = vec2(
+        // Exact-atlas vertices use the same byte-separated sky/block ABI as
+        // the reduced stream.
+        (float((vertex.light_normal_pad >> 8u) & 0x0fu) + 0.5) / 16.0,
+        light_sky_uv
+    );
     v_light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv).rgb;
     v_light = uvec2(
         vertex.light_normal_pad & 0xffu,
@@ -7526,6 +7544,10 @@ mod tests {
         );
         assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT.contains("vanilla_depth >= 1.0"));
         assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT.contains("DhResolvedColorTexture"));
+        assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT
+            .contains("bool dh_has_coverage = dh_color.a > 0.0;"));
+        assert!(!MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT
+            .contains("dh_depth < 1.0 || dh_color.a > 0.0"));
         assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_APPLY_FRAGMENT
             .contains("if (dh_depth >= 1.0 && dh_color.a <= 0.0) discard;"));
         assert!(MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT
@@ -7644,7 +7666,6 @@ mod tests {
             // result is interpolated exactly as Frozen's standard.vert does.
             assert!(source.contains("v_light_color"));
             assert!(!source.contains("vec2 light_uv = (vec2(v_light.y, v_light.x)"));
-            assert!(!source.contains("light_uv.y = max(light_uv.y, 1.0 - light_uv.y);"));
         }
         for source in [
             MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX,
@@ -7660,7 +7681,16 @@ mod tests {
                 source.contains("float(vertex.data.w & 0x0fu)")
                     || source.contains("float(vertex.light_normal_pad & 0x0fu)")
             );
+            assert!(source.contains("light_sky_uv = max(light_sky_uv, 1.0 - light_sky_uv);"));
         }
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX
+            .contains("float((vertex.data.w >> 8u) & 0x0fu)"));
+        assert!(!MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX
+            .contains("float((vertex.data.w >> 4u) & 0x0fu)"));
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX
+            .contains("float((vertex.light_normal_pad >> 8u) & 0x0fu)"));
+        assert!(!MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX
+            .contains("float((vertex.light_normal_pad >> 4u) & 0x0fu)"));
         assert!(MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT
             .contains("out_color = vec4(shaded, v_color.a);"));
         assert!(!MINIMAL_DISTANT_HORIZONS_LOD_TRANSPARENT_FRAGMENT
@@ -8125,28 +8155,31 @@ mod tests {
     }
 
     #[test]
-    fn compact_direct_terrain_program_reads_only_its_three_vec4_vertex_lanes() {
+    fn compact_direct_terrain_program_reads_only_its_32_byte_vertex_record() {
         let program = minimal_compact_direct_terrain_program(TerrainMaterialProgramKind::Opaque);
         assert_eq!(
-            ProgramIdentity::new("vulkanic:builtin/direct_terrain_opaque_compact48_v1"),
+            ProgramIdentity::new("vulkanic:builtin/direct_terrain_opaque_compact32_v1"),
             program.identity
         );
-        assert!(program.vertex.source.contains("vec4 position_material;"));
-        assert!(program.vertex.source.contains("vec4 color;"));
-        assert!(program.vertex.source.contains("vec4 atlas_light;"));
+        assert!(program.vertex.source.contains("vec3 position;"));
+        assert!(program.vertex.source.contains("uint material;"));
+        assert!(program.vertex.source.contains("vec2 atlas_uv;"));
+        assert!(program.vertex.source.contains("uint color_rgba;"));
+        assert!(program.vertex.source.contains("uint light_block_sky;"));
         assert!(!program.vertex.source.contains("vec4 shader_data;"));
+        assert!(program.vertex.source.contains("v_uv = vertex.atlas_uv;"));
         assert!(program
             .vertex
             .source
-            .contains("v_uv = vertex.atlas_light.xy;"));
+            .contains("v_uv = v_uv * instance.texture_transform.xy"));
         assert!(program
             .vertex
             .source
-            .contains("vec2 light_coordinates = vertex.atlas_light.zw;"));
+            .contains("float(vertex.light_block_sky & 0xffu)"));
         assert!(program
             .vertex
             .source
-            .contains("v_color = vertex.color * instance.color"));
+            .contains("v_color = unpackUnorm4x8(vertex.color_rgba) * instance.color"));
     }
 
     #[test]
