@@ -107,6 +107,14 @@ unsafe fn compile_inner(
     );
     options.set_auto_bind_uniforms(true);
     options.set_auto_map_locations(true);
+    // Keep debug builds and the conformance test compiler easy to inspect while
+    // allowing the release RunDev profile to receive Shaderc's semantics-
+    // preserving SPIR-V cleanup and dead-code elimination. Test conformance
+    // intentionally keeps inactive std140 members so it can inspect their
+    // declared offsets; production modules remain performance-optimized.
+    if !cfg!(debug_assertions) && !cfg!(test) {
+        options.set_optimization_level(shaderc::OptimizationLevel::Performance);
+    }
 
     let artifact = compiler
         .compile_into_spirv(

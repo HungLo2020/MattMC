@@ -152,6 +152,7 @@ pub(super) fn append_batches(
             color_format,
             raster_y_direction,
             g_buffer,
+            false,
         );
         // Only contiguous indices with identical resources and the same
         // instance can form one draw. Never move a pane across another material.

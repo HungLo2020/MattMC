@@ -183,6 +183,7 @@ fn observe_inner(
                                 key.color_format,
                                 key.raster_y_direction,
                                 key.g_buffer,
+                                key.texture_animated,
                             )?
                         } else {
                             let section = asset
@@ -200,6 +201,7 @@ fn observe_inner(
                                     key.color_format,
                                     key.raster_y_direction,
                                     key.g_buffer,
+                                    key.texture_animated,
                                 ),
                                 index_offset: u64::from(section.index_offset),
                                 index_count: section.index_count,

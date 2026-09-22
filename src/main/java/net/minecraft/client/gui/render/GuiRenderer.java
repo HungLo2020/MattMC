@@ -221,6 +221,14 @@ public class GuiRenderer implements AutoCloseable {
 	 * renderer is excluded from that frame rather than drawn a second time.
 	 */
 	public void collectRustGalItemSemantics() {
+		// During a resource reload the render state can still contain item models
+		// baked against the previous block atlas. The reload overlay owns that
+		// transient frame; defer all item semantic admission until the new atlas
+		// generation has been published instead of counting stale items as an
+		// unsupported whole-frame family.
+		if (net.vulkanic.world.RustGalTerrainRenderer.isResourceReloadStaging()) {
+			return;
+		}
 		net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.beginFrame();
 		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
 		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();

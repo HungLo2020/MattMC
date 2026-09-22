@@ -6,7 +6,6 @@ from __future__ import annotations
 from shield_animation_scenarios import SHIELD_ANIMATION_SCENARIOS, SHIELD_ANIMATION_SPRITES, shield_animation_materials, shield_animation_phase, shield_animation_frames
 
 import argparse
-import ctypes
 import csv
 import gzip
 from collections import Counter
@@ -22716,6 +22715,16 @@ def deterministic_inventory_frame_path(artifact_path: Path) -> Path | None:
         candidate = Path(str(cycle.get("inventoryScreenshot", "")))
         if candidate.is_file():
             return candidate
+    # Frozen's ordinary deterministic path has no Rust GUI cycle receipt. When
+    # the shared inventory fixture opened the vanilla InventoryScreen before
+    # the pose request, its acknowledged initial pose is the paired image.
+    for manifest in sorted(capture_dir.glob("deterministic_camera_capture_*.json")):
+        document = read_json(manifest)
+        fixture = document.get("inventoryEquipmentFixture") if isinstance(document, dict) else None
+        if isinstance(fixture, dict) and fixture.get("inventoryOpen") is True:
+            candidate = deterministic_initial_frame_path(artifact_path)
+            if candidate is not None:
+                return candidate
     interaction = read_json(capture_dir / "inventory_screen_interaction.json")
     presented = Path(str(interaction.get("screenshot", ""))) if isinstance(interaction, dict) else None
     if presented is not None and presented.is_file():
@@ -36334,6 +36343,13 @@ def build_capture_command(
                 static_terrain_second_world,
             ])
     env = os.environ.copy()
+    if tool_kind == "gameplay":
+        # Keep ordinary performance rows uncapped by the capture runner's
+        # interactive 120-FPS default. Explicit caller settings still win,
+        # while DH workloads retain their own renderer and producer controls.
+        env.setdefault("MATTMC_CAPTURE_MAX_FPS", "260")
+        if not dh_readiness_requested:
+            env.setdefault("MATTMC_CAPTURE_DISABLE_DH_FOR_PERF", "true")
     run_type = run_type_for_effective_options(
         validation,
         renderdoc=getattr(args, "renderdoc_capture", False),
@@ -36553,19 +36569,16 @@ def build_capture_command(
         java_options.append("-Dmattmc.dev.deterministicCameraCapture.resourceReload=true")
         if getattr(args, "world_reload_remove_pack", ""):
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.reloadRemovePack=" + args.world_reload_remove_pack)
-    if getattr(args, "inventory_screen_capture", False) and mode.target == "current" and mode.backend == "rust-vulkan":
+    if (
+        getattr(args, "inventory_screen_capture", False)
+        and mode.target == "current"
+        and mode.backend == "rust-vulkan"
+    ):
         # Selected Vulkan owns its final image outside Java's main target, so
-        # its capture hook holds a presented frame while the external runner
-        # acknowledges it. Use the same normal InventoryScreen semantic
-        # callsite through a bounded deterministic cycle; this is not a Java
-        # render path and it never borrows a GPU resource.
-        java_options.extend(
-            [
-                "-Dmattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycle=true",
-                "-Dmattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleRepeats=1",
-                "-Dmattmc.dev.deterministicCameraCapture.rustGalGuiScreenCycleHoldFrames=1",
-            ]
-        )
+        # its capture hook holds a presented frame while the runner
+        # acknowledges it. The shared inventory fixture above opens the
+        # ordinary InventoryScreen before the pose request, so both routes
+        # now capture the same semantic screen state.
         if tool_kind == "gameplay":
             # Keep the ordinary InventoryScreen open through the benchmark's
             # warmup and sample window. The Java sampler explicitly records
@@ -37104,6 +37117,12 @@ def build_capture_command(
         env["MATTMC_GRAPHICS_CORRECTNESS_CAPTURE"] = "true"
         env["MATTMC_DETERMINISTIC_METADATA"] = str(deterministic_metadata)
         env["MATTMC_DETERMINISTIC_SCREENSHOT_DIR"] = str(deterministic_screenshot_dir)
+        if getattr(args, "inventory_screen_capture", False):
+            # Use the existing ordinary inventory fixture in both runners.
+            # This opens the same screen from the render thread and lets the
+            # deterministic pose receipt prove that the captured frame really
+            # contained InventoryScreen; an XTest key race cannot do that.
+            java_options.append("-Dmattmc.dev.graphicsAuditInventoryEquipment=base")
         if workload_profile == "moving-camera":
             java_options.append("-Dmattmc.dev.deterministicCameraCapture.naturalLookPoses=true")
         # Static DH correctness captures are a source/atlas comparison.  The
@@ -38202,19 +38221,61 @@ def build_capture_command(
             readiness_timeout_seconds = max(readiness_timeout_seconds, 30)
         measure_frames = mode_frame_count(args.measure_frames, mode, args, "--measure-frames")
         if (
-            frame_benchmark_requested(args, tool_kind)
-            and mode.backend == "rust-vulkan"
+            tool_kind == "gameplay"
+            and frame_benchmark_requested(args, tool_kind)
             and "--measure-frames" not in getattr(args, "_provided_options", set())
         ):
-            # The standard gameplay probe has a fixed wall-clock budget. The
-            # explicit Rust Vulkan route currently spends substantially more
-            # time per frame while its real command stream is being lowered;
-            # retaining the generic 120-frame warmup plus 300-frame sample
-            # window makes the probe time out before measurement starts. Keep
-            # a complete, validated sample window, but bound the default
-            # probe to the same order of magnitude as the smoke workload.
-            warmup_frames = min(warmup_frames, 30)
+            # The ordinary gameplay performance probe has a fixed wall-clock
+            # budget. Keep the bounded window identical for Current and
+            # Frozen so a paired comparison cannot silently use different
+            # sample counts. Explicit --warmup-frames/--measure-frames still
+            # win, and correctness captures retain their longer profile
+            # windows.
+            # A moving path changes the visible terrain domain while the
+            # benchmark warms up.  Thirty frames can measure Frozen before
+            # Sodium has populated that path, so give both implementations a
+            # bounded 120-frame path warmup.  Settled-static retains the
+            # shorter startup window because its visibility domain is fixed.
+            warmup_frames = min(warmup_frames, 120 if workload_profile == "moving-camera" else 30)
             measure_frames = min(measure_frames, 60)
+        if (
+            mode.backend == "rust-vulkan"
+            and workload_profile in {"settled-static", "moving-camera"}
+            and not any(
+                value.startswith("-Dmattmc.dev.graphicsFrameBenchmark.requireTerrainQueueDrain=")
+                for value in (getattr(args, "jvm_arg", []) or [])
+            )
+        ):
+            # Large copied worlds can need more than the ordinary startup
+            # readiness window to finish the bounded semantic terrain build.
+            # The benchmark is explicitly measuring the settled source, so
+            # give its existing queue gate enough time to reach that state.
+            readiness_timeout_seconds = max(readiness_timeout_seconds, 180)
+        if workload_profile == "moving-camera":
+            # The Java benchmark owns the measured camera path.  Keep this
+            # explicit so a moving workload cannot silently fall back to the
+            # fixed pose used by settled-static rows.
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.cameraPathType=moving-camera")
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.35")
+        elif workload_profile == "settled-static":
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.cameraPathType=fixed-static-terrain")
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
+        if (
+            mode.backend == "rust-vulkan"
+            and workload_profile in {"settled-static", "moving-camera"}
+            and not any(
+                value.startswith("-Dmattmc.dev.graphicsFrameBenchmark.requireTerrainQueueDrain=")
+                for value in (getattr(args, "jvm_arg", []) or [])
+            )
+        ):
+            # A performance sample must represent the settled renderer, not
+            # the asynchronous near-field builder.  The source owns the
+            # queue-drain readiness witness; wait for it before both static
+            # and moving samples so Current and Frozen compare the same
+            # fully populated vanilla terrain domain.  This gate changes no
+            # rendering or ownership behavior and remains overrideable for
+            # intentional streaming probes.
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.requireTerrainQueueDrain=true")
         java_options.extend(
             [
                 "-Dmattmc.dev.graphicsFrameBenchmark=true",
@@ -39177,7 +39238,16 @@ def run_mode(
     repetition: int = 1,
 ) -> MatrixResult:
     kind, _ = run_dev_capture_entrypoint(target.root)
-    effective_workload_profile = "gameplay" if tool_kind == "gameplay" else args.workload_profile
+    # The gameplay entry point defaults to the broad real-game workload, but
+    # an explicit settled-static or moving-camera selector must be honored.
+    # Silently replacing that request made the performance rows incomparable
+    # with the workload named by the caller.
+    effective_workload_profile = (
+        "gameplay"
+        if tool_kind == "gameplay"
+        and "--workload-profile" not in getattr(args, "_provided_options", set())
+        else args.workload_profile
+    )
     run_dir = f"run-{repetition:02d}"
     row_label = matrix_row_label(mode, tool_kind, repetition)
     capture_dir = artifact_root / mode.name / tool_kind / run_dir / "capture"
@@ -39547,8 +39617,6 @@ def run_mode(
             subsystem_terminal_started: float | None = None
             artifact_finalization_started: float | None = None
             selected_source_admission_grace_applied = False
-            inventory_interaction_injected = False
-            inventory_interaction_sidecar = capture_dir / "inventory_screen_interaction.json"
             while True:
                 exit_code = process.poll()
                 if exit_code is not None:
@@ -39699,53 +39767,6 @@ def run_mode(
                         exit_code = process.wait(timeout=cleanup_timeout)
                         emit_matrix_progress(args, row_label, "shutdown-started", "artifact quota exceeded")
                         break
-                if (
-                    getattr(args, "inventory_screen_capture", False)
-                    and target.name == "frozen"
-                    and not inventory_interaction_injected
-                ):
-                    request = deterministic_screenshot_request(capture_dir)
-                    if request is not None:
-                        injected = send_linux_inventory_key()
-                        screenshot = capture_dir / "inventory_screen_presented.png"
-                        # Both routes receive the ordinary inventory key after
-                        # the same deterministic pose request.  The initial
-                        # request can already be acknowledged by either runner;
-                        # this independent desktop image is deliberately taken
-                        # only after the next rendered input turn.
-                        target_window = None
-                        if injected:
-                            time.sleep(0.75)
-                            target_window = capture_linux_focused_client(screenshot)
-                            injected = target_window is not None
-                        inventory_interaction_sidecar.write_text(
-                            json.dumps(
-                                {
-                                    "schema": "mattmc-inventory-screen-interaction-v1",
-                                    "request": str(request),
-                                    "method": "x11-xtest-key-e",
-                                    "injected": injected,
-                                    "screenshot": str(screenshot) if injected else "",
-                                    "target_window": target_window or "",
-                                    "timestamp_utc": utc_now(),
-                                },
-                                indent=2,
-                                sort_keys=True,
-                            ) + "\n",
-                            encoding="utf-8",
-                        )
-                        if not injected:
-                            timed_out = True
-                            timed_out_phase = "inventory-screen-input"
-                            error = "could not inject the inventory key before the deterministic screenshot acknowledgement"
-                            terminate_process_tree(process)
-                            cleanup_killed_processes = cleanup_repo_processes(target.root)
-                            cleanup_timeout = max(1, phase_timeout_seconds(args, "cleanup"))
-                            exit_code = process.wait(timeout=cleanup_timeout)
-                            emit_matrix_progress(args, row_label, "shutdown-started", "inventory input injection failed")
-                            break
-                        inventory_interaction_injected = True
-                        emit_matrix_progress(args, row_label, "active", "inventory key injected before deterministic screenshot acknowledgement")
                 time.sleep(0.25)
         except subprocess.TimeoutExpired:
             timed_out = True
@@ -40145,118 +40166,6 @@ def selected_modes(args: argparse.Namespace) -> list[ModeSpec]:
     if args.mode:
         return [by_name[name] for name in args.mode]
     return list(MATRIX_MODES)
-
-
-def deterministic_screenshot_request(capture_dir: Path) -> Path | None:
-    """Return the first ordinary deterministic pose request, acknowledged or not.
-
-    The inventory fixture deliberately captures after the runner's ordinary
-    deterministic image. Requiring an unacknowledged request made that input
-    depend on a race between the parent harness and each target's runner.
-    """
-    for request in sorted(capture_dir.glob("deterministic_camera_capture_*/capture_request_*.json")):
-        if request.name.endswith(".ack.json"):
-            continue
-        try:
-            document = json.loads(request.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(document, dict) and isinstance(document.get("poseName"), str):
-            return request
-    return None
-
-
-def linux_minecraft_window_id() -> str | None:
-    """Return the top-most Minecraft client window visible to the X server."""
-    if platform_name() != "linux" or not shutil.which("xprop"):
-        return None
-    stacking = subprocess.run(
-        ["xprop", "-root", "_NET_CLIENT_LIST_STACKING"],
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    ).stdout
-    for candidate in reversed(re.findall(r"0x[0-9a-fA-F]+", stacking)):
-        properties = subprocess.run(
-            ["xprop", "-id", candidate, "WM_NAME", "_NET_WM_NAME", "WM_CLASS"],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        ).stdout
-        if re.search(r"Minecraft|LWJGL|GLFW|KnotClient|devlaunchinjector", properties, re.IGNORECASE):
-            return candidate
-    return None
-
-
-def send_linux_inventory_key() -> bool:
-    """Focus the Minecraft client then send its ordinary inventory key via XTest."""
-    if platform_name() != "linux" or not os.environ.get("DISPLAY"):
-        return False
-    target = linux_minecraft_window_id()
-    if target is None:
-        return False
-    try:
-        x11 = ctypes.CDLL("libX11.so.6")
-        xtst = ctypes.CDLL("libXtst.so.6")
-        x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
-        x11.XOpenDisplay.restype = ctypes.c_void_p
-        x11.XStringToKeysym.argtypes = [ctypes.c_char_p]
-        x11.XStringToKeysym.restype = ctypes.c_ulong
-        x11.XKeysymToKeycode.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
-        x11.XKeysymToKeycode.restype = ctypes.c_ubyte
-        x11.XRaiseWindow.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
-        x11.XSetInputFocus.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
-        x11.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
-        x11.XFlush.argtypes = [ctypes.c_void_p]
-        x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
-        xtst.XTestFakeKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
-        display = x11.XOpenDisplay(None)
-        if not display:
-            return False
-        try:
-            keycode = x11.XKeysymToKeycode(display, x11.XStringToKeysym(b"e"))
-            if not keycode:
-                return False
-            window = int(target, 16)
-            x11.XRaiseWindow(display, window)
-            # RevertToPointerRoot (1) matches a normal transient focus change
-            # if the target window exits while the deterministic run stops.
-            x11.XSetInputFocus(display, window, 1, 0)
-            x11.XSync(display, 0)
-            if not xtst.XTestFakeKeyEvent(display, keycode, 1, 0) or x11.XFlush(display) < 0:
-                return False
-            # A zero-duration synthetic press can be entirely contained
-            # between two GLFW polls on a busy Rust-owned frame. Hold it long
-            # enough for both the Frozen and Current event loops to consume
-            # the same ordinary key transition.
-            time.sleep(0.15)
-            return bool(
-                xtst.XTestFakeKeyEvent(display, keycode, 0, 0)
-                # XFlush returns the request serial (positive on a healthy
-                # connection), not a C-style boolean success code.
-                and x11.XFlush(display) >= 0
-            )
-        finally:
-            x11.XCloseDisplay(display)
-    except OSError:
-        return False
-
-
-def capture_linux_focused_client(screenshot: Path) -> str | None:
-    """Capture the focused Minecraft window after the deterministic input tick."""
-    if platform_name() != "linux" or not shutil.which("import"):
-        return None
-    screenshot.parent.mkdir(parents=True, exist_ok=True)
-    target = linux_minecraft_window_id() or "root"
-    result = subprocess.run(
-        ["import", "-window", target, str(screenshot)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
-    return target if result.returncode == 0 and screenshot.is_file() else None
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -41280,7 +41189,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     for option, (field, default_value) in profile_defaults.items():
         if option not in provided_options or getattr(args, field) is None:
             setattr(args, field, default_value)
-    if args.tool == "gameplay" and args.world_profile == "migration-gate":
+    if (
+        args.tool == "gameplay"
+        and args.world_profile == "migration-gate"
+        and "--workload-profile" not in provided_options
+    ):
         if "--settle-frames" not in provided_options:
             args.settle_frames = 0
         if "--max-settle-frames" not in provided_options:

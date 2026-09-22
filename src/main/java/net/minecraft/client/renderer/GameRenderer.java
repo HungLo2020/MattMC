@@ -960,7 +960,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		ProfilerFiller profilerFiller = Profiler.get();
 		boolean gameLoadFinished = this.minecraft.isGameLoadFinished();
 		float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);
-		if (!System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank()
+		boolean captureTerrainParticleScenario = !System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank();
+		if (captureTerrainParticleScenario
 			&& this.minecraft.level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel
 			&& this.minecraft.player != null) {
 			// Seed before the shell's world predicate so the particle is available
@@ -970,19 +971,36 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.minecraft.particleEngine.flushPendingParticlesForCapture();
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset.gui-state");
 		this.guiRenderState.reset();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset.gui-state");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset.world-clear");
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.clearFrame();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset.world-clear");
 		// Consume the lightmap-dirty flag set by GameRenderer.tick before the
 		// first semantic-world seed. The sky reads live world time directly, but
 		// terrain samples this copied 16x16 lightmap; leaving the cached snapshot
 		// untouched made a /time change brighten the sky while terrain stayed dark.
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset.lightmap");
 		this.lightTexture.updateLightTexture(f);
-		net.vulkanic.world.RustGalWorldPrimitiveRenderer.primeWorldSemanticState(
-			this.minecraft.level,
-			this.mainCamera,
-			this.minecraft.getWindow().getWidth(),
-			this.minecraft.getWindow().getHeight()
-		);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset.lightmap");
+		// A normal loaded gameplay frame immediately enters the full semantic-world
+		// path below, whose beginFrame seeds the same copied background, voxel, and
+		// shader-environment values. Avoid doing that work twice. Keep the prime for
+		// loading, GUI handoff, and any frame that will not reach beginFrame.
+		boolean fullWorldSemanticFrameExpected = (gameLoadFinished || captureTerrainParticleScenario)
+			&& bl && this.minecraft.level != null && this.minecraft.player != null;
+		if (!fullWorldSemanticFrameExpected) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset.world-prime");
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.primeWorldSemanticState(
+				this.minecraft.level,
+				this.mainCamera,
+				this.minecraft.getWindow().getWidth(),
+				this.minecraft.getWindow().getHeight()
+			);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset.world-prime");
+		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.frame-reset.route-ensure");
 		net.vulkanic.gui.RustGalGuiRenderer.beginWholeFrameVulkanFrame();
 		// Activate any newly configured filesystem-backed shader-pack snapshot
 		// before deriving camera matrices. Rust owns this copied semantic source;
@@ -1009,6 +1027,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		this.getFeatureRenderDispatcher().particleFeatureRenderer.ensureRustSemanticRoute();
 		this.minecraft.getMainRenderTarget().ensureRustSemanticRoute();
 		this.minecraft.getShaderManager().ensureRustSemanticRoute();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset.route-ensure");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.frame-reset");
 		// Match the baseline world's CPU light-update ordering before copying any
 		// terrain semantics. The selected Rust route owns rendering, while this
@@ -1016,7 +1035,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rust-vulkan.light-state-advance");
 		this.minecraft.levelRenderer.advanceRustWholeFrameLightState();
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rust-vulkan.light-state-advance");
-		boolean captureTerrainParticleScenario = !System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank();
 		if (!rustHandPredicateLogged && Boolean.getBoolean("mattmc.dev.deterministicCameraCapture")
 			&& this.minecraft.level != null && this.minecraft.player != null) {
 			rustHandPredicateLogged = true;
@@ -1028,15 +1046,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		}
 		if ((gameLoadFinished || captureTerrainParticleScenario) && bl && this.minecraft.level != null && this.minecraft.player != null) {
 			net.voxelmap.VoxelConstants.assertRustWholeFrameWaypointsSupported();
-			if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)
-				&& this.minecraft.options.getCameraType().isFirstPerson()
-				&& !this.minecraft.options.hideGui) {
-				if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueThreeDimensionalDebugCrosshair(
-					this.mainCamera, this.minecraft.getWindow().getGuiScale()
-				)) {
-					throw new IllegalStateException("Rust whole-frame Vulkan 3D debug crosshair route rejected semantic line work");
-				}
-			}
 			// Collision debugging is a world-render callsite too. The legacy
 			// DebugRenderer is bypassed by the whole-frame shell, so copy its
 			// bounded shape stream into Rust's explicit line primitive here.
@@ -1159,6 +1168,18 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 					this.minecraft.level,
 					this.mainCamera
 				);
+				// The debug crosshair is part of this frame's Rust line stream. Enqueue
+				// it only after beginFrame has seeded the bounded viewport and matrices;
+				// real gameplay can reach the shell before any later world callback.
+				if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)
+					&& this.minecraft.options.getCameraType().isFirstPerson()
+					&& !this.minecraft.options.hideGui) {
+					if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueThreeDimensionalDebugCrosshair(
+						this.mainCamera, this.minecraft.getWindow().getGuiScale()
+					)) {
+						throw new IllegalStateException("Rust whole-frame Vulkan 3D debug crosshair route rejected semantic line work");
+					}
+				}
 				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin");
 				if (net.vulkanic.world.DistantHorizonsSemanticCollector.requiresWholeFrameSemanticCollection()) {
 					net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.distant-horizons.enqueue");

@@ -1626,6 +1626,7 @@ class CaptureRunner:
                 name.startswith("MATTMC_RUST_SELECTED_SOURCE_")
                 or name.startswith("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_")
                 or name.startswith("MATTMC_RUST_DH_")
+                or name.startswith("MATTMC_RUST_VULKAN_PIPELINE_")
                 or name.startswith("MATTMC_CAPTURE_DH_")
                 or name.startswith("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_")
                 or name.startswith("MATTMC_STATIC_TERRAIN_BATCH_TRACE_")

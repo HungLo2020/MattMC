@@ -21,6 +21,7 @@ import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer;
 import net.minecraft.client.renderer.state.MapRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.vulkanic.world.RustGalWorldPrimitiveRenderer;
 import net.vulkanic.world.WorldRenderRoutePolicy;
 import net.minecraft.core.component.DataComponents;
@@ -487,13 +488,17 @@ public class ItemInHandRenderer {
 				RustGalWorldPrimitiveRenderer.setFirstPersonMainHandCapture(true);
 				float handSwing = swingingHand == InteractionHand.MAIN_HAND ? swing : 0.0F;
 				float equip = 1.0F - Mth.lerp(f, this.oMainHandHeight, this.mainHandHeight);
-				this.renderArmWithItem(localPlayer, f, viewPitch, InteractionHand.MAIN_HAND, handSwing, this.mainHandItem, equip, poseStack, semanticCollector, packedLight);
+				if (!isRustGlassPane(this.mainHandItem)) {
+					this.renderArmWithItem(localPlayer, f, viewPitch, InteractionHand.MAIN_HAND, handSwing, this.mainHandItem, equip, poseStack, semanticCollector, packedLight);
+				}
 			}
 			if (selection.renderOffHand) {
 				RustGalWorldPrimitiveRenderer.setFirstPersonMainHandCapture(false);
 				float handSwing = swingingHand == InteractionHand.OFF_HAND ? swing : 0.0F;
 				float equip = 1.0F - Mth.lerp(f, this.oOffHandHeight, this.offHandHeight);
-				this.renderArmWithItem(localPlayer, f, viewPitch, InteractionHand.OFF_HAND, handSwing, this.offHandItem, equip, poseStack, semanticCollector, packedLight);
+				if (!isRustGlassPane(this.offHandItem)) {
+					this.renderArmWithItem(localPlayer, f, viewPitch, InteractionHand.OFF_HAND, handSwing, this.offHandItem, equip, poseStack, semanticCollector, packedLight);
+				}
 			}
 			List<SubmitNodeStorage.TextSubmit> textSubmits = new ArrayList<>();
 			semanticCollector.getSubmitsPerOrder().values().forEach(collection -> textSubmits.addAll(collection.getTextSubmits()));
@@ -504,6 +509,20 @@ public class ItemInHandRenderer {
 			RustGalWorldPrimitiveRenderer.setFirstPersonMainHandCapture(false);
 			RustGalWorldPrimitiveRenderer.endFirstPersonGuiCapture();
 		}
+	}
+
+	/**
+	 * Glass-pane first-person models currently arrive as a full gray overlay on
+	 * the Rust whole-frame path. Keep the item in the hotbar and inventory, but
+	 * omit this known-bad hand submission until transparent pane semantics are
+	 * admitted there. The Java/OpenGL hand path is unchanged.
+	 */
+	private static boolean isRustGlassPane(ItemStack itemStack) {
+		if (itemStack == null || itemStack.isEmpty()) {
+			return false;
+		}
+		ResourceLocation key = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
+		return key != null && key.getPath().endsWith("glass_pane");
 	}
 
 	@VisibleForTesting

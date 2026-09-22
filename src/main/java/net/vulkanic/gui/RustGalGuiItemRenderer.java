@@ -2,6 +2,7 @@ package net.vulkanic.gui;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
@@ -81,6 +82,13 @@ public final class RustGalGuiItemRenderer {
 	private static final boolean DEBUG_STANDARD_3D_ITEM_ENABLED = Boolean.getBoolean("mattmc.rustGal.gui.standard3d.debugItem");
 	private static final int MAX_DIAGNOSTIC_ENTRIES = 256;
 	private static final Map<String, Boolean> DIAGNOSTICS = new HashMap<>();
+	private static final int MAX_TACZ_GUI_CAPTURE_CACHE = 64;
+	private static final Map<String, TaczGuiCachedCapture> TACZ_GUI_CAPTURE_CACHE = new LinkedHashMap<>(16, 0.75F, true) {
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<String, TaczGuiCachedCapture> eldest) {
+			return this.size() > MAX_TACZ_GUI_CAPTURE_CACHE;
+		}
+	};
 	private static final ThreadLocal<TaczGuiPackedStaging> TACZ_GUI_STAGING =
 		ThreadLocal.withInitial(TaczGuiPackedStaging::new);
 
@@ -565,22 +573,88 @@ public final class RustGalGuiItemRenderer {
 		int bottom,
 		@Nullable Integer dynamicLayerOrder
 	) {
-		TaczGuiQuadCapture capture = new TaczGuiQuadCapture();
-		TaczGuiSubmitCollector collector = new TaczGuiSubmitCollector(capture);
-		PoseStack poseStack = new PoseStack();
-		poseStack.last().pose().set(selected.transform().pose());
-		try {
-			renderer.submit(ItemDisplayContext.GUI, poseStack, collector, 15728880, 0, false, 0);
-		} catch (RuntimeException error) {
-			recordDiagnostic("special-renderer-tacz-rejected=" + error.getClass().getSimpleName());
-			return List.of();
+		boolean cacheEligible = !item.itemStackRenderState().isAnimated() && !foil;
+		int guiScale = Math.max(1, Minecraft.getInstance().getWindow().getGuiScale());
+		TaczGuiCachedCapture cached = cacheEligible
+			? findTaczGuiCapture(renderer.gunId(), guiScale, right - left, bottom - top, selected.transform().pose()) : null;
+		TaczGuiQuadCapture capture = cached == null ? new TaczGuiQuadCapture() : TaczGuiQuadCapture.from(cached.batches());
+		if (cached == null) {
+			TaczGuiSubmitCollector collector = new TaczGuiSubmitCollector(capture);
+			PoseStack poseStack = new PoseStack();
+			poseStack.last().pose().set(selected.transform().pose());
+			try {
+				renderer.submit(ItemDisplayContext.GUI, poseStack, collector, 15728880, 0, false, 0);
+			} catch (RuntimeException error) {
+				recordDiagnostic("special-renderer-tacz-rejected=" + error.getClass().getSimpleName());
+				return List.of();
+			}
 		}
-		return capture.enqueue(item, foil, left, top, right, bottom, dynamicLayerOrder);
+		List<TaczGuiQuadCapture.PreparedBatch> prepared = cached == null ? null : cached.prepared();
+		if (cached == null && cacheEligible && !capture.batches.isEmpty()) {
+			prepared = capture.prepareStatic(guiScale, right - left, bottom - top);
+			if (!prepared.isEmpty()) {
+				cacheTaczGuiCapture(renderer.gunId(), guiScale, selected.transform().pose(), right - left, bottom - top, capture, prepared);
+			}
+		}
+		return capture.enqueue(item, foil, left, top, right, bottom, dynamicLayerOrder, prepared);
+	}
+
+	private static TaczGuiCachedCapture findTaczGuiCapture(
+		String gunId, int guiScale, int pixelWidth, int pixelHeight, Matrix4f transform
+	) {
+		synchronized (TACZ_GUI_CAPTURE_CACHE) {
+			TaczGuiCachedCapture cached = TACZ_GUI_CAPTURE_CACHE.get(gunId);
+			return cached != null && cached.guiScale() == guiScale && cached.pixelWidth() == pixelWidth
+				&& cached.pixelHeight() == pixelHeight && cached.matchesTransform(transform) ? cached : null;
+		}
+	}
+
+	private static void cacheTaczGuiCapture(
+		String gunId, int guiScale, Matrix4f transform, int pixelWidth, int pixelHeight,
+		TaczGuiQuadCapture capture, List<TaczGuiQuadCapture.PreparedBatch> prepared
+	) {
+		float[] copiedTransform = new float[16];
+		transform.get(copiedTransform);
+		TaczGuiCachedCapture cached = new TaczGuiCachedCapture(
+			guiScale, pixelWidth, pixelHeight, copiedTransform, List.copyOf(capture.batches), List.copyOf(prepared));
+		synchronized (TACZ_GUI_CAPTURE_CACHE) {
+			TACZ_GUI_CAPTURE_CACHE.put(gunId, cached);
+		}
+	}
+
+	private record TaczGuiCachedCapture(
+		int guiScale, int pixelWidth, int pixelHeight, float[] transform,
+		List<TaczGuiQuadCapture.Batch> batches, List<TaczGuiQuadCapture.PreparedBatch> prepared
+	) {
+		private TaczGuiCachedCapture {
+			transform = transform.clone();
+			batches = List.copyOf(batches);
+			prepared = List.copyOf(prepared);
+		}
+
+		private boolean matchesTransform(Matrix4f value) {
+			return transform[0] == value.m00() && transform[1] == value.m01() && transform[2] == value.m02() && transform[3] == value.m03()
+				&& transform[4] == value.m10() && transform[5] == value.m11() && transform[6] == value.m12() && transform[7] == value.m13()
+				&& transform[8] == value.m20() && transform[9] == value.m21() && transform[10] == value.m22() && transform[11] == value.m23()
+				&& transform[12] == value.m30() && transform[13] == value.m31() && transform[14] == value.m32() && transform[15] == value.m33();
+		}
 	}
 
 	private static final class TaczGuiQuadCapture {
 		private static final int MAX_QUADS = 4096;
-		private final List<Batch> batches = new ArrayList<>();
+		private final List<Batch> batches;
+
+		private TaczGuiQuadCapture() {
+			this(new ArrayList<>());
+		}
+
+		private TaczGuiQuadCapture(List<Batch> batches) {
+			this.batches = batches;
+		}
+
+		private static TaczGuiQuadCapture from(List<Batch> batches) {
+			return new TaczGuiQuadCapture(batches);
+		}
 
 		private boolean add(ResourceLocation texture, float[] vertices, float[] uvs, @Nullable float[] normals, int[] colors) {
 			if (texture == null || vertices == null || uvs == null || colors == null) {
@@ -620,27 +694,21 @@ public final class RustGalGuiItemRenderer {
 
 		private int totalQuads() { return batches.stream().mapToInt(batch -> batch.vertices.length / 12).sum(); }
 
-		private List<RustGalGuiElementRenderState> enqueue(
-			GuiItemRenderState item, boolean foil, int left, int top, int right, int bottom, @Nullable Integer dynamicLayerOrder
+		private List<PreparedBatch> prepareStatic(int guiScale, int pixelWidth, int pixelHeight) {
+			return prepareBatches(guiScale, pixelWidth, pixelHeight, null, 0xffffffff);
+		}
+
+		private List<PreparedBatch> prepareBatches(
+			int guiScale, int pixelWidth, int pixelHeight,
+			@Nullable RustGalGuiRawImageAssets.Asset glintAsset, int glintColor
 		) {
 			if (batches.isEmpty()) return List.of();
-			int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
-			int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
-			int guiScale = Math.max(1, Minecraft.getInstance().getWindow().getGuiScale());
-			int width = Math.max(2, (right - left) * guiScale + 2);
-			int height = Math.max(2, (bottom - top) * guiScale + 2);
+			int width = Math.max(2, pixelWidth * guiScale + 2);
+			int height = Math.max(2, pixelHeight * guiScale + 2);
 			Matrix4f transform = new Matrix4f().translate(width / 2.0F, height / 2.0F, 0.0F)
 				.scale(guiScale * 16.0F, guiScale * 16.0F, -guiScale * 16.0F);
 			org.joml.Matrix3f normalTransform = new org.joml.Matrix3f(transform).invert().transpose();
-			RustGalGuiRawImageAssets.Asset glintAsset = null;
-			int glintColor = 0xffffffff;
-			if (foil) {
-				glintAsset = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
-				if (glintAsset == null) return List.of();
-				int strength = Mth.clamp((int)Math.round(Minecraft.getInstance().options.glintStrength().get() * 255.0F), 0, 255);
-				glintColor = ARGB.color(strength, 255, 255, 255);
-			}
-			List<VulkanicGalBridge.GuiMeshBatchRecord> records = new ArrayList<>(batches.size());
+			List<PreparedBatch> prepared = new ArrayList<>(batches.size() * (glintAsset == null ? 1 : 2));
 			TaczGuiPackedStaging staging = TACZ_GUI_STAGING.get();
 			for (Batch batch : batches) {
 				int maximumVertices = batch.vertices.length / 3;
@@ -661,9 +729,6 @@ public final class RustGalGuiItemRenderer {
 					Vector3f second = transformedPosition(batch.vertices, floatOffset + 3, transform);
 					Vector3f third = transformedPosition(batch.vertices, floatOffset + 6, transform);
 					float alignment = new Vector3f(second).sub(first).cross(new Vector3f(third).sub(first)).dot(normal);
-					// Bedrock permits zero-thickness cubes whose collapsed faces cannot
-					// rasterize. Frozen submits those no-op triangles; omit them before
-					// Rust's stricter copied-normal/winding validation.
 					if (!Float.isFinite(alignment)) return List.of();
 					if (Math.abs(alignment) <= 1.0e-6F) continue;
 					for (int corner = 0; corner < 4; corner++) {
@@ -698,36 +763,73 @@ public final class RustGalGuiItemRenderer {
 				List<VulkanicGalBridge.GuiMeshVertexRecord> copied = VulkanicGalBridge.packedGuiMeshVertices(
 					positions, atlasUvs, localUvs, colors, normals, vertexCount);
 				List<Integer> indices = VulkanicGalBridge.packedGuiMeshIndices(indexValues, indexCount);
-				int layerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder;
-				records.add(new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, records.size(),
-					VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL,
-					VulkanicGalBridge.GUI_MESH_LIGHTING_ENTITY_PREVIEW,
-					batch.asset.assetId(), 0L, 0.1F, identity(), new float[] {
-						item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()
-					},
-					left, top, right, bottom, guiWidth, guiHeight, width, height, 1, 0, 0, 0, 0, 0,
-					copied, indices));
+				prepared.add(new PreparedBatch(batch.asset, copied, indices, false));
 				if (glintAsset != null) {
 					int[] glintColors = staging.glintColors;
 					java.util.Arrays.fill(glintColors, glintColor);
 					List<VulkanicGalBridge.GuiMeshVertexRecord> glintVertices = VulkanicGalBridge.packedGuiMeshVertices(
 						positions, glintUvs, glintUvs, glintColors, normals, vertexCount);
-					records.add(new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, records.size(), 4, 1,
-						glintAsset.assetId(), 0L, 0.1F, identity(), new float[] {
-							item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()
-						}, left, top, right, bottom, guiWidth, guiHeight, width, height, 1, 0, 0, 0, 0, 0,
-						glintVertices, indices));
+					prepared.add(new PreparedBatch(glintAsset, glintVertices, indices, true));
 				}
 			}
-			RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(records,
-				GuiRenderStratum.GUI_ITEM.id(), dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder, System.nanoTime());
-			// Commit copied item/glint images only after the complete special-item
-			// mesh has entered the scheduler. Rejected requests must not retain
-			// texture assets without corresponding Rust GUI work.
-			for (Batch batch : batches) RustGalGuiRawImageAssets.stage(batch.asset());
-			if (glintAsset != null) RustGalGuiRawImageAssets.stage(glintAsset);
+			return List.copyOf(prepared);
+		}
+
+		private List<RustGalGuiElementRenderState> enqueue(
+			GuiItemRenderState item, boolean foil, int left, int top, int right, int bottom,
+			@Nullable Integer dynamicLayerOrder, @Nullable List<PreparedBatch> preparedOverride
+		) {
+			if (batches.isEmpty()) return List.of();
+			int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+			int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+			int guiScale = Math.max(1, Minecraft.getInstance().getWindow().getGuiScale());
+			RustGalGuiRawImageAssets.Asset glintAsset = null;
+			int glintColor = 0xffffffff;
+			if (foil) {
+				glintAsset = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
+				if (glintAsset == null) return List.of();
+				int strength = Mth.clamp((int)Math.round(Minecraft.getInstance().options.glintStrength().get() * 255.0F), 0, 255);
+				glintColor = ARGB.color(strength, 255, 255, 255);
+			}
+			List<PreparedBatch> prepared = preparedOverride == null
+				? prepareBatches(guiScale, right - left, bottom - top, glintAsset, glintColor) : preparedOverride;
+			if (prepared.isEmpty()) return List.of();
+			int width = Math.max(2, (right - left) * guiScale + 2);
+			int height = Math.max(2, (bottom - top) * guiScale + 2);
+			int layerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder;
+			float[] guiPose = new float[] {
+				item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()
+			};
+			float[] identity = identity();
+			RustGalFrameScheduler.Token token = RustGalFrameCoordinator.reserveGuiMeshItemRequest(
+				GuiRenderStratum.GUI_ITEM.id(), layerOrder);
+			List<VulkanicGalBridge.GuiMeshBatchRecord> records = new ArrayList<>(prepared.size());
+			for (PreparedBatch batch : prepared) {
+				if (!batch.glint()) {
+					records.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(layerOrder, records.size(),
+						VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL,
+						VulkanicGalBridge.GUI_MESH_LIGHTING_ENTITY_PREVIEW, batch.asset().assetId(), token.sequence(), 0.1F,
+						identity, guiPose, left, top, right, bottom, guiWidth, guiHeight, width, height, 1,
+						0, 0, 0, 0, 0, batch.vertices(), batch.indices(), null, 0, null, null, null));
+				} else {
+					records.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(layerOrder, records.size(), 4, 1,
+						batch.asset().assetId(), token.sequence(), 0.1F, identity, guiPose,
+						left, top, right, bottom, guiWidth, guiHeight, width, height, 1,
+						0, 0, 0, 0, 0, batch.vertices(), batch.indices(), null, 0, null, null, null));
+				}
+				RustGalGuiRawImageAssets.stage(batch.asset());
+			}
+			RustGalFrameCoordinator.publishReservedGuiMeshItemRequest(token, records);
 			return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.tacz-bedrock",
 				-1, -1.0F, GuiFillDirection.NONE, left, top, right - left, bottom - top, guiWidth, guiHeight));
+		}
+
+		private record PreparedBatch(
+			RustGalGuiRawImageAssets.Asset asset,
+			List<VulkanicGalBridge.GuiMeshVertexRecord> vertices,
+			List<Integer> indices,
+			boolean glint
+		) {
 		}
 
 		private static int packGuiNormal(float x, float y, float z) {
@@ -933,54 +1035,57 @@ public final class RustGalGuiItemRenderer {
 			return List.of();
 		}
 		GuiItemMeshSemanticCollector.GuiItemMesh mesh = collected.mesh();
-		boolean cacheableRaster = !item.itemStackRenderState().isAnimated()
-			&& mesh.layers().stream().noneMatch(layer -> layer.itemFoil() != null);
+		boolean cacheableRaster = !item.itemStackRenderState().isAnimated();
+		if (cacheableRaster) {
+			for (GuiItemMeshSemanticCollector.GuiItemMeshLayer layer : mesh.layers()) {
+				if (layer.itemFoil() != null) {
+					cacheableRaster = false;
+					break;
+				}
+			}
+		}
 		long cacheIdentity = cacheableRaster
 			? GuiItemSemanticIdentities.identityOrZero(item.itemStackRenderState().getModelIdentity()) : 0;
 		VulkanicGalBridge.GuiItemCacheRecord itemCache = cacheIdentity != 0
 			? new VulkanicGalBridge.GuiItemCacheRecord(cacheIdentity, false) : null;
-		long batchStarted = benchmarkTiming ? System.nanoTime() : 0L;
 		var clip = item.scissorArea();
-		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>();
-		float[] guiPose = mesh.guiPose();
+		float[] guiPose = mesh.guiPoseOwned();
 		int requestLayerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order()
 			: RustGalGuiRenderer.dynamicLayerOrder(dynamicLayerOrder);
+		// Reserve the scheduler sequence before constructing immutable batch
+		// records.  The records can then carry their final ordering directly and
+		// do not need to be cloned again when the frame is flushed.
+		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.reserveGuiMeshItemRequest(
+			dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.id() : RustGalGuiRenderer.dynamicLayerId(dynamicLayerOrder),
+			requestLayerOrder);
+		int estimatedBatchCount = 0;
+		for (GuiItemMeshSemanticCollector.GuiItemMeshLayer layer : mesh.layers()) estimatedBatchCount += layer.quads().size();
+		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>(Math.max(estimatedBatchCount, 1));
 		int batchLayerIndex = 0;
 		for (int layerIndex = 0; layerIndex < mesh.layers().size(); layerIndex++) {
-			GuiItemMeshSemanticCollector.GuiItemMeshLayer layer = mesh.layers().get(layerIndex);
-			float[] modelTransform = layer.modelTransform();
-			for (GuiItemMeshSemanticCollector.GuiItemMeshQuad quad : layer.quads()) {
-				List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = layer.sourceFoilType() == 0
-					? quad.bridgeVertices() : quad.bridgeFoilVertices();
-				batches.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(
-					requestLayerOrder, batchLayerIndex++,
-					guiMaterialMode(layer.materialMode()),
-					// Ordinary inventory light space; Rust owns the light vectors.
-					layer.blockLight() ? VulkanicGalBridge.GUI_MESH_LIGHTING_INVENTORY_BLOCK : 1, quad.assetId(), 0L,
-					(layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.CUTOUT
-						|| layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.GLINT) ? 0.1F : 0.0F,
-					modelTransform, guiPose, mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
-					guiWidth, guiHeight, 0, 0, 0,
-					clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
-					clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(),
-					vertices, QUAD_INDICES,
-					layer.itemFoil(), 0, null, mesh.blockItemRaster(), itemCache
-				));
-			}
+				GuiItemMeshSemanticCollector.GuiItemMeshLayer layer = mesh.layers().get(layerIndex);
+				float[] modelTransform = layer.modelTransformOwned();
+				for (GuiItemMeshSemanticCollector.GuiItemMeshQuad quad : layer.quads()) {
+					List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = layer.sourceFoilType() == 0
+						? quad.bridgeVertices() : quad.bridgeFoilVertices();
+					batches.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(
+						requestLayerOrder, batchLayerIndex++,
+						guiMaterialMode(layer.materialMode()),
+						// Ordinary inventory light space; Rust owns the light vectors.
+						layer.blockLight() ? VulkanicGalBridge.GUI_MESH_LIGHTING_INVENTORY_BLOCK : 1, quad.assetId(), token.sequence(),
+						(layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.CUTOUT
+							|| layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.GLINT) ? 0.1F : 0.0F,
+						modelTransform, guiPose, mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
+						guiWidth, guiHeight, 0, 0, 0,
+						clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
+						clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(),
+						vertices, QUAD_INDICES,
+						layer.itemFoil(), 0, null, mesh.blockItemRaster(), itemCache
+					));
+				}
 		}
 		if (batches.isEmpty()) return List.of();
-		if (benchmarkTiming) {
-			GraphicsFrameBenchmark.recordPhaseSample(
-				"gui.item.standard3d.batch-build",
-				Math.max(0L, System.nanoTime() - batchStarted)
-			);
-		}
-		long startedNanos = System.nanoTime();
-		var token = dynamicLayerOrder == null
-			? RustGalFrameCoordinator.enqueueGuiMeshItemRequest(batches, GuiRenderStratum.GUI_ITEM, startedNanos)
-			: RustGalFrameCoordinator.enqueueGuiMeshItemRequest(
-				batches, RustGalGuiRenderer.dynamicLayerId(dynamicLayerOrder),
-				requestLayerOrder, startedNanos);
+		RustGalFrameCoordinator.publishReservedGuiMeshItemRequest(token, batches);
 		mesh.sources().forEach(GuiItemTextureSource::stage);
 		for (var batch : batches) {
 			var foil = batch.itemFoil();
@@ -1085,6 +1190,9 @@ public final class RustGalGuiItemRenderer {
 
 	public static void invalidateAssets() {
 		RustGalGuiRawImageAssets.invalidate();
+		synchronized (TACZ_GUI_CAPTURE_CACHE) {
+			TACZ_GUI_CAPTURE_CACHE.clear();
+		}
 	}
 
 	static boolean supportedGuiRenderType(RenderType renderType) {

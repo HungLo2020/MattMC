@@ -3366,9 +3366,23 @@ public final class DistantHorizonsSemanticCollector {
 			return null;
 		}
 		try {
+			long updateStarted = System.nanoTime();
+			if (System.getenv("MATTMC_TRACE_WHOLE_FRAME") != null) {
+				long snapshotBytes = update.snapshots().stream()
+					.mapToLong(LodColumnSnapshot::byteSize)
+					.sum();
+				System.err.println("whole-frame.dh-assets.begin generation=" + update.generation()
+					+ " columns=" + update.assets().size()
+					+ " snapshots_bytes=" + snapshotBytes
+					+ " retirements=" + update.retirements().size());
+			}
 			VulkanicGalBridge.Status status = bridge.updateWorldLodAssets(
 				update.generation(), update.assets(), update.retirements(), update.materialProvenance()
 			);
+			if (System.getenv("MATTMC_TRACE_WHOLE_FRAME") != null) {
+				System.err.println("whole-frame.dh-assets.end generation=" + update.generation()
+					+ " elapsed_nanos=" + (System.nanoTime() - updateStarted));
+			}
 			acknowledge(update);
 			return status;
 		} catch (RuntimeException error) {

@@ -168,6 +168,11 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		this.animations = BedrockAnimationSet.load(ResourceLocation.withDefaultNamespace("animations/" + gunId + ".animation.json"));
 	}
 
+	/** Stable semantic identity for render-thread GUI topology caches. */
+	public String gunId() {
+		return this.gunId;
+	}
+
 	public static void triggerMuzzleFlash() {
 		muzzleFlashShootTimeMillis = System.currentTimeMillis();
 		muzzleFlashRandomRotate = (float)(Math.random() * 360.0);

@@ -26,6 +26,10 @@ pub(super) struct VulkanContext {
     /// Packed GAL indirect lists still work without it because lowering emits
     /// one native draw per record on that fallback path.
     pub(super) multi_draw_indirect: bool,
+    /// Whether the optional pipeline-statistics query feature was enabled.
+    /// The lowerer creates and reads these queries only when explicitly
+    /// requested by the diagnostics environment variable.
+    pub(super) pipeline_statistics_query: bool,
     /// Whether the device was created with Vulkan's core independent MRT
     /// blending feature. Source translucent passes rely on distinct primary
     /// and auxiliary attachment blend semantics; callers must keep that
@@ -202,11 +206,14 @@ impl VulkanContext {
             supported_features.features.fragment_stores_and_atomics == vk::TRUE;
         let multi_draw_indirect_supported =
             supported_features.features.multi_draw_indirect == vk::TRUE;
+        let pipeline_statistics_supported =
+            supported_features.features.pipeline_statistics_query == vk::TRUE;
         let provoking_vertex_last =
             provoking_extension && provoking_features.provoking_vertex_last == vk::TRUE;
         let core_features = vk::PhysicalDeviceFeatures::default()
             .independent_blend(independent_blend_supported)
             .multi_draw_indirect(multi_draw_indirect_supported)
+            .pipeline_statistics_query(pipeline_statistics_supported)
             .vertex_pipeline_stores_and_atomics(vertex_storage_writes)
             .fragment_stores_and_atomics(fragment_storage_writes);
         if supported_demote.shader_demote_to_helper_invocation == vk::TRUE {
@@ -284,6 +291,7 @@ impl VulkanContext {
             command_pool,
             timeline,
             multi_draw_indirect: multi_draw_indirect_supported,
+            pipeline_statistics_query: pipeline_statistics_supported,
             independent_blend: independent_blend_supported,
             provoking_vertex_last,
             provoking_vertex_per_pipeline: provoking_properties.provoking_vertex_mode_per_pipeline

@@ -103,9 +103,34 @@ public final class RustGalFrameCoordinator {
 	private static List<VulkanicGalBridge.GuiAssetRecord> pendingAssets = List.of();
 	private static final RustGalFrameScheduler<QueuedGuiRequest> SCHEDULER =
 		new RustGalFrameScheduler<>("Rust VulkanicGAL deferred GUI");
+	/**
+	 * Render-thread-only staging lists for the synchronous Java-to-FFI handoff.
+	 * The bridge copies each list into its native arena before returning, so the
+	 * next frame can clear and reuse these backing arrays without retaining
+	 * Java GUI state or native memory.
+	 */
+	private static final FramePackingScratch FRAME_PACKING_SCRATCH = new FramePackingScratch();
 	private static final Metrics METRICS = new Metrics();
 
 	private RustGalFrameCoordinator() {
+	}
+
+	private static final class FramePackingScratch {
+		private final ArrayList<VulkanicGalBridge.GuiSpriteRecord> spriteRequests = new ArrayList<>();
+		private final ArrayList<VulkanicGalBridge.GuiAffineQuadRecord> affineQuadRequests = new ArrayList<>();
+		private final ArrayList<VulkanicGalBridge.GuiMeshBatchRecord> meshBatchRequests = new ArrayList<>();
+		private final ArrayList<VulkanicGalBridge.GuiTiledQuadRecord> tiledQuadRequests = new ArrayList<>();
+
+		private void begin(int requestCapacity, int tiledCapacity) {
+			spriteRequests.clear();
+			affineQuadRequests.clear();
+			meshBatchRequests.clear();
+			tiledQuadRequests.clear();
+			spriteRequests.ensureCapacity(requestCapacity);
+			affineQuadRequests.ensureCapacity(requestCapacity);
+			meshBatchRequests.ensureCapacity(requestCapacity);
+			tiledQuadRequests.ensureCapacity(tiledCapacity);
+		}
 	}
 
 	/** One ordered, generation-bound semantic GUI work item. */
@@ -113,11 +138,12 @@ public final class RustGalFrameCoordinator {
 		VulkanicGalBridge.GuiSpriteRecord sprite,
 		List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuads,
 		List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches,
-		VulkanicGalBridge.GuiTiledQuadRecord tiledQuad
+		VulkanicGalBridge.GuiTiledQuadRecord tiledQuad,
+		boolean meshSequencesStamped
 	) {
 		private static final int MAX_AFFINE_QUADS_PER_ITEM = (int) RustGalFrameScheduler.SEQUENCE_STRIDE - 1;
 		static QueuedGuiRequest sprite(VulkanicGalBridge.GuiSpriteRecord sprite) {
-			return new QueuedGuiRequest(java.util.Objects.requireNonNull(sprite, "sprite"), List.of(), List.of(), null);
+			return new QueuedGuiRequest(java.util.Objects.requireNonNull(sprite, "sprite"), List.of(), List.of(), null, false);
 		}
 
 		static QueuedGuiRequest affineQuad(VulkanicGalBridge.GuiAffineQuadRecord affineQuad) {
@@ -129,16 +155,27 @@ public final class RustGalFrameCoordinator {
 				|| affineQuads.stream().anyMatch(java.util.Objects::isNull)) {
 				throw new IllegalArgumentException("GUI affine-quad item requires quads");
 			}
-			return new QueuedGuiRequest(null, List.copyOf(affineQuads), List.of(), null);
+			return new QueuedGuiRequest(null, List.copyOf(affineQuads), List.of(), null, false);
 		}
 
 		static QueuedGuiRequest meshBatches(List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches) {
 			if (meshBatches == null || meshBatches.isEmpty()) throw new IllegalArgumentException("GUI mesh item requires layers");
-			return new QueuedGuiRequest(null, List.of(), List.copyOf(meshBatches), null);
+			return new QueuedGuiRequest(null, List.of(), List.copyOf(meshBatches), null, false);
+		}
+
+		/**
+		 * Takes ownership of an already-built immutable batch list.  The caller
+		 * must not mutate it after publication; this is confined to the synchronous
+		 * render-thread scheduler handoff and avoids a redundant list copy for the
+		 * sequence-reserved mesh route.
+		 */
+		static QueuedGuiRequest meshBatchesOwned(List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatches) {
+			if (meshBatches == null || meshBatches.isEmpty()) throw new IllegalArgumentException("GUI mesh item requires layers");
+			return new QueuedGuiRequest(null, List.of(), meshBatches, null, true);
 		}
 
 		static QueuedGuiRequest tiledQuad(VulkanicGalBridge.GuiTiledQuadRecord tile) {
-			return new QueuedGuiRequest(null, List.of(), List.of(), java.util.Objects.requireNonNull(tile));
+			return new QueuedGuiRequest(null, List.of(), List.of(), java.util.Objects.requireNonNull(tile), false);
 		}
 
 		int guiWidth() {
@@ -167,7 +204,15 @@ public final class RustGalFrameCoordinator {
 					affineQuads.add(this.affineQuads.get(index).withSequence(sequence + index));
 				}
 			} else {
-				for (VulkanicGalBridge.GuiMeshBatchRecord batch : this.meshBatches) meshBatches.add(batch.withSequence(sequence));
+				// Mesh batches on the whole-frame route are built after their scheduler
+				// sequence is reserved, so they already carry the final sequence.  Keep
+				// the immutable records intact instead of allocating a second record per
+				// layer during frame flush.
+				if (this.meshSequencesStamped) {
+					meshBatches.addAll(this.meshBatches);
+				} else {
+					for (VulkanicGalBridge.GuiMeshBatchRecord batch : this.meshBatches) meshBatches.add(batch.withSequence(sequence));
+				}
 			}
 		}
 	}
@@ -280,6 +325,34 @@ public final class RustGalFrameCoordinator {
 				generation, semanticLayerId, semanticLayerOrder, QueuedGuiRequest.meshBatches(batches));
 			METRICS.enqueueNanos += elapsedSince(lockStartedNanos);
 			return token;
+		}
+	}
+
+	/** Reserves mesh ordering before the caller builds records carrying that sequence. */
+	static RustGalFrameScheduler.Token reserveGuiMeshItemRequest(
+		String semanticLayerId, int semanticLayerOrder
+	) {
+		requireRustGuiRoute();
+		if (semanticLayerId == null || semanticLayerId.isBlank() || semanticLayerOrder < 0) {
+			throw new IllegalArgumentException("invalid semantic GUI layer");
+		}
+		synchronized (LOCK) {
+			return SCHEDULER.reserve(generation, semanticLayerId, semanticLayerOrder);
+		}
+	}
+
+	/** Publishes the immutable mesh payload for a previously reserved token. */
+	static void publishReservedGuiMeshItemRequest(
+		RustGalFrameScheduler.Token token, List<VulkanicGalBridge.GuiMeshBatchRecord> batches
+	) {
+		requireRustGuiRoute();
+		long lockStartedNanos = System.nanoTime();
+		synchronized (LOCK) {
+			if (token.generation() != generation) {
+				throw new IllegalStateException("reserved GUI mesh token generation is stale");
+			}
+			SCHEDULER.publish(token, QueuedGuiRequest.meshBatchesOwned(batches));
+			METRICS.enqueueNanos += elapsedSince(lockStartedNanos);
 		}
 	}
 
@@ -947,10 +1020,11 @@ public final class RustGalFrameCoordinator {
 			// the FFI arena is packed; this changes no ordering or admission policy.
 			int requestCapacity = Math.min(requests.size(), RustGalFrameScheduler.SEQUENCE_STRIDE > Integer.MAX_VALUE
 				? Integer.MAX_VALUE : (int) RustGalFrameScheduler.SEQUENCE_STRIDE);
-			List<VulkanicGalBridge.GuiSpriteRecord> spriteRequests = new ArrayList<>(requestCapacity);
-			List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuadRequests = new ArrayList<>(requestCapacity);
-			List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatchRequests = new ArrayList<>(requestCapacity);
-			List<VulkanicGalBridge.GuiTiledQuadRecord> tiledQuadRequests = new ArrayList<>(requests.size());
+			FRAME_PACKING_SCRATCH.begin(requestCapacity, requests.size());
+			List<VulkanicGalBridge.GuiSpriteRecord> spriteRequests = FRAME_PACKING_SCRATCH.spriteRequests;
+			List<VulkanicGalBridge.GuiAffineQuadRecord> affineQuadRequests = FRAME_PACKING_SCRATCH.affineQuadRequests;
+			List<VulkanicGalBridge.GuiMeshBatchRecord> meshBatchRequests = FRAME_PACKING_SCRATCH.meshBatchRequests;
+			List<VulkanicGalBridge.GuiTiledQuadRecord> tiledQuadRequests = FRAME_PACKING_SCRATCH.tiledQuadRequests;
 			int guiTextAffineQuadCount = 0;
 			int guiItemAffineQuadCount = 0;
 			int meshVertexCount = 0;
@@ -1182,111 +1256,43 @@ public final class RustGalFrameCoordinator {
 			}
 			if (wholeFrameVulkan) {
 				GraphicsFrameBenchmark.beginPhase("rust-gal.frame.execution-receipts");
-				recordWholeFrameTerrainReadiness(primitiveFrame);
-				if (wholeFrameResult.guiMeshItemCount() > 0L) {
-					net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity(
-						"gui-standard-3d",
-						"rust-vulkan-whole-frame:items=" + wholeFrameResult.guiMeshItemCount()
-							+ ":batches=" + wholeFrameResult.guiMeshBatchCount()
-							+ ":draws=" + wholeFrameResult.guiMeshDrawCount()
-					);
+				// These records are capture-only receipts.  During the measured benchmark
+				// window the benchmark deliberately does not request submitted-work
+				// identities, so constructing the receipt graphs here would measure the
+				// audit machinery instead of the renderer.  Warm-up and explicit
+				// deterministic captures still collect them through the same gate.
+				boolean collectExecutionReceipts = GraphicsFrameBenchmark.needsSubmittedWorkIdentity()
+					|| net.minecraft.client.dev.DeterministicCameraCapture.needsSubmittedWorkIdentity();
+				if (collectExecutionReceipts) {
+					recordWholeFrameTerrainReadiness(primitiveFrame);
+					if (wholeFrameResult.guiMeshItemCount() > 0L) {
+						net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity(
+							"gui-standard-3d",
+							"rust-vulkan-whole-frame:items=" + wholeFrameResult.guiMeshItemCount()
+								+ ":batches=" + wholeFrameResult.guiMeshBatchCount()
+								+ ":draws=" + wholeFrameResult.guiMeshDrawCount()
+						);
+					}
+					RustGalWorldPrimitiveRenderer.recordWholeFrameMovingMeshExecution(frameId, submissionId, primitiveFrame);
+					RustGalWorldPrimitiveRenderer.recordWholeFrameStructureBlockBoxExecution(frameId, submissionId, primitiveFrame);
+					RustGalWorldPrimitiveRenderer.recordWholeFrameStructureInvisibleCellsExecution(frameId, submissionId, primitiveFrame);
+					RustGalWorldPrimitiveRenderer.recordWholeFrameTestInstanceCompositionExecution(frameId, submissionId, primitiveFrame);
+					RustGalWorldPrimitiveRenderer.recordWholeFrameModelCompositionExecution(frameId, submissionId, primitiveFrame);
+					RustGalWorldPrimitiveRenderer.recordWholeFrameWeatherExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameExperienceOrbExecution(frameId, submissionId, primitiveFrame.materialQuads(), primitiveFrame.orbInstances());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameBeaconBeamExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameEndPortalExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameEndGatewayBeamExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameCrystalBeamExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameEnergySwirlExecution(frameId, submissionId, primitiveFrame.materialQuads(), primitiveFrame.meshInstances());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameEntityFlameExecution(frameId, submissionId, primitiveFrame.entityFlameQuadCount());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameEntityShadowExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameItemFrameMapExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameEntityLeashExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameCloudExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameEntityModelExecution(frameId, submissionId, primitiveFrame.materialQuads());
+					RustGalWorldPrimitiveRenderer.recordWholeFrameProceduralQuadExecution(frameId, submissionId, primitiveFrame.materialQuads());
 				}
-				RustGalWorldPrimitiveRenderer.recordWholeFrameMovingMeshExecution(
-					frameId,
-					submissionId,
-					primitiveFrame
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameStructureBlockBoxExecution(
-					frameId,
-					submissionId,
-					primitiveFrame
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameStructureInvisibleCellsExecution(
-					frameId,
-					submissionId,
-					primitiveFrame
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameTestInstanceCompositionExecution(
-					frameId,
-					submissionId,
-					primitiveFrame
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameModelCompositionExecution(
-					frameId,
-					submissionId,
-					primitiveFrame
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameWeatherExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameExperienceOrbExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads(), primitiveFrame.orbInstances()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameBeaconBeamExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameEndPortalExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameEndGatewayBeamExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameCrystalBeamExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameEnergySwirlExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads(),
-					primitiveFrame.meshInstances()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityFlameExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.entityFlameQuadCount()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityShadowExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameItemFrameMapExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityLeashExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameCloudExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameEntityModelExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
-				RustGalWorldPrimitiveRenderer.recordWholeFrameProceduralQuadExecution(
-					frameId,
-					submissionId,
-					primitiveFrame.materialQuads()
-				);
 				auditWholeFrameTarget(frame, primitiveFrame);
 				GraphicsFrameBenchmark.endPhase("rust-gal.frame.execution-receipts");
 			}

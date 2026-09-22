@@ -4749,7 +4749,11 @@ fn compact_world_material_ffi_rejects_malformed_indexes_and_preserves_mixed_full
 
     let legacy = vec![material_quad_request()];
     let compact_record = compact_material_quad_request();
-    let mut request = whole_frame_request_with_compact_materials(&table, &[compact_record]);
+    // Keep the compact slice alive while the FFI request is decoded. Passing
+    // an inline one-element temporary leaves the raw pointer dangling before
+    // this mixed legacy/compact decode reaches the native boundary.
+    let compact_records = vec![compact_record];
+    let mut request = whole_frame_request_with_compact_materials(&table, &compact_records);
     request.world_material_quads = FfiSlice {
         ptr: legacy.as_ptr(),
         count: legacy.len() as u64,

@@ -210,7 +210,19 @@ public final class GuiItemMeshSemanticCollector {
 		}
 		long assetId;
 		if (net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS.equals(sprite.atlasLocation())) {
-			var region = net.vulkanic.world.RustGalTerrainRenderer.requireGuiAtlasSpritePayload(sprite);
+			net.vulkanic.world.AtlasSpritePayload region;
+			try {
+				region = net.vulkanic.world.RustGalTerrainRenderer.requireGuiAtlasSpritePayload(sprite);
+			} catch (IllegalStateException staleAtlas) {
+				if (net.vulkanic.world.RustGalTerrainRenderer.isResourceReloadStaging()) {
+					// A render-state item can straddle the resource reload boundary
+					// while the reload overlay is active. Its old TextureAtlasSprite
+					// cannot be paired with the new Rust-owned atlas payload; reject
+					// this item for the frame and let the next state rebuild it.
+					return null;
+				}
+				throw staleAtlas;
+			}
 			assetId = RustGalGuiRawImageAssets.assetId("gui-atlas-region:"+sprite.atlasLocation()+":"+spriteIdentity);
 			if (sources.stream().noneMatch(source -> source.assetId() == assetId)) {
 				sources.add(new GuiItemTextureSource.Atlas(new GuiAtlasRegion(assetId,region.texture(),
@@ -338,6 +350,16 @@ public final class GuiItemMeshSemanticCollector {
 			return this.guiPose.clone();
 		}
 
+		/**
+		 * Internal frame handoff view. The record still exposes a defensive
+		 * public accessor; this package-private view is safe because the Rust
+		 * bridge's trusted constructor retains immutable semantic arrays without
+		 * publishing them to callers.
+		 */
+		float[] guiPoseOwned() {
+			return this.guiPose;
+		}
+
 	}
 
 	public record GuiItemAtlasUse(
@@ -369,6 +391,11 @@ public final class GuiItemMeshSemanticCollector {
 		@Override
 		public float[] modelTransform() {
 			return this.modelTransform.clone();
+		}
+
+		/** See {@link GuiItemMesh#guiPoseOwned()} for the ownership contract. */
+		float[] modelTransformOwned() {
+			return this.modelTransform;
 		}
 	}
 

@@ -264,18 +264,21 @@ public class GuiRenderState {
 		if (selected == null) {
 			throw new IllegalStateException("semantic GUI layer requested outside traversal");
 		}
-		int[] nodeOrdinal = new int[] {0};
-		int[] selectedOrdinal = new int[] {-1};
-		this.traverse(node -> {
-			if (node == selected) {
-				selectedOrdinal[0] = nodeOrdinal[0];
+		// This method is called once per admitted semantic item. Keep the exact
+		// pre-order used by traverse(), but avoid allocating lambda captures and
+		// one-element arrays on every call during a large inventory screen.
+		int nodeOrdinal = 0;
+		for (GuiRenderState.Node root : this.strata) {
+			GuiRenderState.Node node = root;
+			while (node != null) {
+				if (node == selected) {
+					return Math.addExact(Math.multiplyExact(nodeOrdinal, GuiRenderState.SemanticPhase.values().length), phase.offset());
+				}
+				nodeOrdinal++;
+				node = node.up;
 			}
-			nodeOrdinal[0]++;
-		}, GuiRenderState.TraverseRange.ALL);
-		if (selectedOrdinal[0] < 0) {
-			throw new IllegalStateException("current semantic GUI node is not part of this frame");
 		}
-		return Math.addExact(Math.multiplyExact(selectedOrdinal[0], GuiRenderState.SemanticPhase.values().length), phase.offset());
+		throw new IllegalStateException("current semantic GUI node is not part of this frame");
 	}
 
 	private void traverse(Consumer<GuiRenderState.Node> consumer, GuiRenderState.TraverseRange traverseRange) {

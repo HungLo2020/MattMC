@@ -2148,6 +2148,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		Camera camera
 	) {
 		synchronized (LOCK) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.frame-begin.reset-state");
 			semanticFrameSequence++;
 			retireIdleDynamicWorldMeshesLocked();
 			ORB_SEMANTICS.clearFrame();
@@ -2181,6 +2182,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			pendingVoxelVolumeFrame = VulkanicGalBridge.WorldVoxelVolumeFrameRecord.disabled();
 			pendingShaderEnvironmentFrame = VulkanicGalBridge.WorldShaderEnvironmentFrameRecord.disabled();
 			pendingFeatureCoverage = VulkanicGalBridge.WorldFeatureCoverageRecord.empty();
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin.reset-state");
 			// A shader-enabled render can enter the shell through a timing window
 			// where the caller's copied level/camera arguments are still null even
 			// though Minecraft has already installed its live client world and
@@ -2190,19 +2192,27 @@ public final class RustGalWorldPrimitiveRenderer {
 			Camera semanticCamera = camera != null
 				? camera
 				: Minecraft.getInstance().gameRenderer.getMainCamera();
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.frame-begin.matrix-seed");
 			seedFrameMatricesLocked(viewMatrix, projectionMatrix, viewportWidth, viewportHeight);
 			net.minecraft.client.dev.DeterministicCameraCapture.recordRustSkyMatrices(
 				PENDING_VIEW.clone(), PENDING_PROJECTION.clone()
 			);
 			seedDiagnosticCameraOriginLocked(semanticCamera);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin.matrix-seed");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.frame-begin.voxel-seed");
 			seedVoxelVolumeFrameLocked(semanticLevel, semanticCamera);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin.voxel-seed");
 			// Shader-enabled Vulkan frames can bypass vanilla's background
 			// renderer entirely. Seed the copied semantic world target here from
 			// the level/camera pair so Rust source admission never depends on that
 			// later renderer callback being reached. The dedicated background and
 			// sky callsites still refine fog, load/store, and celestial fields.
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.frame-begin.background-seed");
 			seedBackgroundFrameLocked(semanticLevel, semanticCamera, viewportWidth, viewportHeight);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin.background-seed");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.frame-begin.shader-environment-seed");
 			seedShaderEnvironmentFrameLocked(semanticLevel, semanticCamera);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.frame-begin.shader-environment-seed");
 		}
 	}
 
@@ -10807,6 +10817,55 @@ public final class RustGalWorldPrimitiveRenderer {
 			depthPolicy, cullPolicy, cameraSortedQuads, Objects.requireNonNull(terrainPlacement, "terrainPlacement"));
 	}
 
+	/**
+	 * Replays already acknowledged opaque/cutout terrain instances in one
+	 * producer-lock transaction. The records are immutable and still pass
+	 * through the normal frame snapshot and FFI validation; this only removes
+	 * one monitor acquisition and capacity check per visible section.
+	 */
+	public static boolean enqueueCachedStaticTerrainInstances(long[] meshKeys, long[] meshGenerations,
+		int count, int viewportWidth, int viewportHeight) {
+		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
+			return false;
+		}
+		if (meshKeys == null || meshGenerations == null || count < 0
+			|| count > meshKeys.length || count > meshGenerations.length) {
+			throw new IllegalArgumentException("cached static terrain key batch is not bounded");
+		}
+		if (viewportWidth <= 0 || viewportHeight <= 0
+			|| viewportWidth > MAX_SEMANTIC_VIEWPORT_AXIS
+			|| viewportHeight > MAX_SEMANTIC_VIEWPORT_AXIS) {
+			throw new IllegalArgumentException("cached static terrain viewport is not bounded");
+		}
+		synchronized (LOCK) {
+			for (VulkanicGalBridge.WorldMeshInstanceRecord pending : PENDING_MESH_INSTANCES) {
+				if (pending.stratum() == STRATUM_WORLD_TERRAIN) {
+					// A replacement or another producer already queued terrain this
+					// frame. Fall back to the per-record path so admission ordering
+					// remains explicit and deterministic.
+					return false;
+				}
+			}
+			if (count > MAX_RUST_WORLD_MESH_INSTANCES - PENDING_MESH_INSTANCES.size()) {
+				throw new IllegalStateException("cached static terrain instance capacity exceeded");
+			}
+			for (int index = 0; index < count; index++) {
+				VulkanicGalBridge.WorldMeshInstanceRecord active = ACTIVE_STATIC_TERRAIN_INSTANCES.get(meshKeys[index]);
+				if (active == null || active.meshGeneration() != meshGenerations[index]
+					|| active.viewportWidth() != viewportWidth
+					|| active.viewportHeight() != viewportHeight
+					|| !isWorldMeshInstanceUploadedLocked(active)) {
+					return false;
+				}
+			}
+			for (int index = 0; index < count; index++) {
+				PENDING_MESH_INSTANCES.add(ACTIVE_STATIC_TERRAIN_INSTANCES.get(meshKeys[index]));
+				PENDING_MESH_PRODUCERS.add(PendingMeshProducer.STATIC_TERRAIN);
+			}
+			return true;
+		}
+	}
+
 	public static boolean enqueueStaticTerrainMeshInstance(
 		long meshKey, long meshGeneration, float[] transform, int viewportWidth, int viewportHeight,
 		int depthPolicy, int cullPolicy, boolean cameraSortedQuads, VulkanicGalBridge.TerrainSectionPlacement terrainPlacement
@@ -11842,13 +11901,10 @@ public final class RustGalWorldPrimitiveRenderer {
 					throw new IllegalStateException("ModelPart contains unsupported non-quad polygon at " + partPath + "/" + cubeIndex);
 				}
 				Vector3f localNormal = new Vector3f(polygon.normal());
-				Vector3f transformedNormal = partPose.transformNormal(localNormal, new Vector3f());
 				ensureFiniteModelVector(localNormal, "stable model polygon normal", partPath, cubeIndex);
-				ensureFiniteModelVector(transformedNormal, "stable transformed polygon normal", partPath, cubeIndex);
 				int normalPacked = packWorldMeshNormal(localNormal.x, localNormal.y, localNormal.z);
 				int base = builder.vertices.size();
 				int firstIndex = builder.indices.size();
-				Vector3f[] transformedPositions = new Vector3f[4];
 				for (int vertexIndex = 0; vertexIndex < polygon.vertices().length; vertexIndex++) {
 					ModelPart.Vertex vertex = polygon.vertices()[vertexIndex];
 					float textureU = sprite == null ? vertex.u() : sprite.getU(vertex.u());
@@ -11859,15 +11915,23 @@ public final class RustGalWorldPrimitiveRenderer {
 						|| !Float.isFinite(textureU) || !Float.isFinite(textureV)) {
 						throw new IllegalStateException("ModelPart contains non-finite vertex UV at " + partPath + "/" + cubeIndex);
 					}
-					transformedPositions[vertexIndex] = partPose.pose().transformPosition(position, new Vector3f());
 					builder.vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
 						position.x, position.y, position.z,
 						textureU, textureV, textureU, textureV,
 						0, 1, 0, 0xffffffff, normalPacked, 0, 0
 					));
 				}
+				// The cached asset stores model-local vertices and applies the
+				// current part pose through the per-instance transform. Winding is
+				// therefore a topology property and must be derived from the same
+				// local-space normal used by the copied vertex ABI. Comparing a
+				// pose-transformed normal with local vertices made the content hash
+				// change as animated parts moved, defeating the immutable mesh cache.
 				int winding = worldMeshWinding(
-					transformedPositions[0], transformedPositions[1], transformedPositions[2], transformedNormal
+					builder.vertices.get(base),
+					builder.vertices.get(base + 1),
+					builder.vertices.get(base + 2),
+					localNormal
 				);
 				builder.indices.add(base);
 				builder.indices.add(base + 1);
@@ -18057,7 +18121,12 @@ public final class RustGalWorldPrimitiveRenderer {
 					PENDING_FIRST_PERSON_MODEL_VIEW
 				)
 				: VulkanicGalBridge.WorldFirstPersonFrameRecord.disabled();
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonInstances = List.copyOf(admittedFirstPersonInstances);
+			// These admitted lists are frame-local and are never mutated after this
+			// method returns. Keep their backing arrays for the synchronous native
+			// handoff instead of copying them a second time with List.copyOf(). The
+			// pending producer list is cleared below, but these are independent
+			// admission lists and therefore remain valid for the PrimitiveFrame.
+			List<VulkanicGalBridge.WorldMeshInstanceRecord> firstPersonInstances = admittedFirstPersonInstances;
 			if (pendingStaticTerrainCamera == null) {
 				for (VulkanicGalBridge.WorldMeshInstanceRecord instance : admittedMeshInstances) {
 					if (instance.terrainPlacement() != null) {
@@ -18094,7 +18163,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				List.copyOf(PENDING_BORDER_QUADS),
 				List.copyOf(PENDING_MATERIAL_QUADS),
 				List.copyOf(PENDING_TEXT_QUADS),
-				List.copyOf(admittedMeshInstances),
+				admittedMeshInstances,
 				meshProducerLabels,
 				pendingVoxelVolumeFrame,
 				pendingShaderEnvironmentFrame,

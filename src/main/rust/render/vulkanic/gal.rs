@@ -4859,8 +4859,11 @@ pub(super) fn normalize_submission_batch_with_pipeline_layouts(
 }
 
 fn fuse_adjacent_identical_passes(original: Vec<CommandOp>) -> Vec<CommandOp> {
+    let original_capacity = original.len();
     let mut source = original.into_iter().peekable();
-    let mut fused = Vec::new();
+    // Pass fusion only removes operations; retain the input capacity so a
+    // steady-state frame does not grow the temporary command vector.
+    let mut fused = Vec::with_capacity(original_capacity);
     let mut active_begin: Option<CommandOp> = None;
     while let Some(operation) = source.next() {
         match &operation {

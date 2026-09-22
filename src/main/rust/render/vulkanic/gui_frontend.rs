@@ -10,7 +10,9 @@ use super::gal::VulkanicGal;
 use super::gui_atlas_reference::{AcceptedAtlasIncarnation, GuiAtlasReference, GuiAtlasReferences};
 use super::gui_mesh_frontend::{
     geometry_fingerprint as gui_mesh_geometry_fingerprint, prepare_draws as prepare_gui_mesh_draws,
-    GuiMeshBatchRequest, GuiMeshCompositeResources, GuiMeshLightingMode, GuiMeshMaterialMode,
+    prepare_draws_with_reuse as prepare_gui_mesh_draws_with_reuse,
+    resolved_item_raster as resolve_gui_mesh_item_raster, GuiMeshBatchRequest,
+    GuiMeshCompositeResources, GuiMeshLightingMode, GuiMeshMaterialMode,
     GuiMeshOffscreenTargetCache, GuiMeshPassResources, GuiMeshPreparedDraw, GuiMeshSharedProgram,
     GuiMeshStreamRange, GUI_MESH_COMPOSITE_UNIFORM_STRIDE,
 };
@@ -736,6 +738,14 @@ struct GuiMeshCompositeKey {
     height: u32,
     color_format: ColorFormat,
     depth_format: Option<TextureFormat>,
+}
+
+struct PendingGuiMeshComposite<'a> {
+    key: GuiMeshCompositeKey,
+    source: super::gui_mesh_frontend::GuiMeshOffscreenTarget,
+    source_usage: TextureUsageState,
+    draw: &'a GuiMeshPreparedDraw,
+    uniform_offset: u64,
 }
 
 /// One private GUI-mesh stream allocation. It remains unavailable until the
@@ -2839,51 +2849,17 @@ impl GuiFrontend {
             });
             ops.push(CommandOp::EndPass);
         }
-        for batch in &batches {
-            let resources = self
-                .resources
-                .get(&ResourceKey::new(batch.group, color_format, depth_format))
-                .ok_or_else(|| GalError::backend("GUI resources vanished before submit"))?;
-            let uniforms = packed_uniform_bytes(batch)?;
-            ops.push(CommandOp::Barrier(buffer_barrier(
-                resources.uniform_buffer,
-                TextureUsageState::ShaderRead,
-                TextureUsageState::TransferDst,
-            )));
-            ops.push(CommandOp::HostWriteBuffer {
-                buffer: resources.uniform_buffer,
-                offset: 0,
-                data: uniforms,
-            });
-            ops.push(CommandOp::Barrier(buffer_barrier(
-                resources.uniform_buffer,
-                TextureUsageState::TransferDst,
-                TextureUsageState::ShaderRead,
-            )));
-            ops.push(CommandOp::BeginPass {
-                pass: frame_pass,
-                target: render_target,
-                colors: vec![loaded_frame_color_attachment(color_attachment)],
-                depth_stencil: depth_attachment.map(loaded_frame_depth_attachment),
-            });
-            ops.push(CommandOp::BindGraphicsPipeline(resources.pipeline));
-            ops.push(CommandOp::BindResourceSet {
-                pipeline_layout: resources.pipeline_layout,
-                set_index: 0,
-                set: resources.resource_set,
-                dynamic_offsets: Vec::new(),
-            });
-            ops.push(CommandOp::SetIndexBuffer {
-                buffer: resources.index_buffer,
-                offset: 0,
-                index_type: super::resources::IndexType::U32,
-            });
-            ops.push(CommandOp::DrawIndexed {
-                indices: 6,
-                instances: batch.quads.len() as u32,
-            });
-            ops.push(CommandOp::EndPass);
-        }
+        append_gui_batches_ops(
+            self,
+            frame_pass,
+            render_target,
+            color_attachment,
+            depth_attachment,
+            color_format,
+            depth_format,
+            &batches,
+            &mut ops,
+        )?;
         stats.command_lists = 1;
         stats.command_ops = ops.len() as u64;
         Ok((ops, stats))
@@ -6059,6 +6035,83 @@ impl GuiFrontend {
         Ok(())
     }
 
+    fn append_mesh_composite_batch(
+        &self,
+        frame_pass: Handle,
+        render_target: Handle,
+        color_attachment: Handle,
+        depth_attachment: Option<Handle>,
+        pending: &[PendingGuiMeshComposite<'_>],
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<()> {
+        let Some(first) = pending.first() else {
+            return Ok(());
+        };
+        // All composite keys in one ordered mesh item family share the final
+        // target format and therefore one immutable compositor pipeline. Each
+        // resource set still keeps its own source view and dynamic uniform
+        // buffer range, so source/material ownership stays explicit.
+        let first_resources = self
+            .mesh_composites
+            .get(&first.key)
+            .ok_or_else(|| GalError::backend("GUI mesh compositor vanished before batch draw"))?;
+        for composite in pending {
+            let resources = self.mesh_composites.get(&composite.key).ok_or_else(|| {
+                GalError::backend("GUI mesh compositor vanished before batch draw")
+            })?;
+            if resources.pipeline != first_resources.pipeline
+                || resources.pipeline_layout != first_resources.pipeline_layout
+            {
+                return Err(GalError::backend(
+                    "GUI mesh composite batch contains incompatible compositor pipelines",
+                ));
+            }
+            if composite.draw.render_extent
+                != [
+                    composite.source.extent.width,
+                    composite.source.extent.height,
+                ]
+            {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    "GUI mesh composite source extent does not match its prepared draw",
+                ));
+            }
+            resources.append_composite_upload(
+                composite.source.color,
+                composite.source_usage,
+                super::gui_mesh_frontend::composite_uniform_bytes(composite.draw),
+                composite.uniform_offset,
+                operations,
+            )?;
+        }
+        operations.push(CommandOp::BeginPass {
+            pass: frame_pass,
+            target: render_target,
+            colors: vec![PassAttachment {
+                view: color_attachment,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }],
+            depth_stencil: depth_attachment.map(|view| PassAttachment {
+                view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+        operations.push(CommandOp::BindGraphicsPipeline(first_resources.pipeline));
+        for composite in pending {
+            let resources = self.mesh_composites.get(&composite.key).ok_or_else(|| {
+                GalError::backend("GUI mesh compositor vanished before batch draw")
+            })?;
+            resources.append_composite_draw(composite.uniform_offset, operations);
+        }
+        operations.push(CommandOp::EndPass);
+        Ok(())
+    }
+
     /// Appends one complete Rust-owned standard-3D GUI-item family. The caller
     /// supplies copied semantic mesh batches only; source images are resolved
     /// from the existing Rust GUI asset generation, each item is rasterized
@@ -6083,7 +6136,45 @@ impl GuiFrontend {
             self.destroy_render_resources(gal);
             self.generation = generation;
         }
-        let mut prepared = prepare_gui_mesh_draws(&mesh_batches)?;
+        // Static item rasters are already retained by the Rust-owned target
+        // cache. Once a prior submission has accepted that raster, composing
+        // it does not require transforming every source vertex again. Keep
+        // validation and composition metadata, but skip the frame-local mesh
+        // reconstruction for those item groups.
+        let mut reusable_items = BTreeSet::new();
+        let mut inspected_items = BTreeSet::new();
+        for batch in &mesh_batches {
+            let item_key = (batch.stratum, batch.sequence);
+            if !inspected_items.insert(item_key) {
+                continue;
+            }
+            let Some(cache) = batch.item_cache else {
+                continue;
+            };
+            if cache.animated {
+                continue;
+            }
+            let (extent, _, _) = resolve_gui_mesh_item_raster(batch)?;
+            let target_extent = Extent3d {
+                width: extent[0],
+                height: extent[1],
+                depth: 1,
+            };
+            let Some(target) =
+                self.mesh_targets
+                    .peek_item(generation, target_extent, cache.identity)
+            else {
+                continue;
+            };
+            if gal.render_pass_last_submission(target.pass)?.is_some() {
+                reusable_items.insert(item_key);
+            }
+        }
+        let mut prepared = if reusable_items.is_empty() {
+            prepare_gui_mesh_draws(&mesh_batches)?
+        } else {
+            prepare_gui_mesh_draws_with_reuse(&mesh_batches, &reusable_items)?
+        };
         // Resolve exact owner incarnations before allocating any mesh resources.
         // The geometry keeps original sprite-local UVs until this native boundary.
         for (batch, draw) in mesh_batches.iter().zip(&mut prepared) {
@@ -6118,7 +6209,9 @@ impl GuiFrontend {
             None => self.frame_pass(gal, render_target, depth_format)?,
         };
         let color_format = gal.pass_target_color_format(render_target)?;
-        let mut operations = Vec::new();
+        let mut operations =
+            Vec::with_capacity(prepared.len().saturating_mul(24).saturating_add(32));
+        let mut pending_composites = Vec::with_capacity(prepared.len());
         let mut cursor = 0;
         while cursor < prepared.len() {
             let first = &prepared[cursor];
@@ -6250,6 +6343,26 @@ impl GuiFrontend {
                 },
                 item_identity,
             )?;
+            // A cached offscreen target cannot be rasterized again while its
+            // previous pixels are still in COLOR_ATTACHMENT state. Flush all
+            // pending composites before reusing that target; unique targets
+            // remain batched into one final-target pass.
+            if pending_composites
+                .iter()
+                .any(|composite: &PendingGuiMeshComposite<'_>| {
+                    composite.source.target == target.target
+                })
+            {
+                self.append_mesh_composite_batch(
+                    frame_pass,
+                    render_target,
+                    color_attachment,
+                    depth_attachment,
+                    &pending_composites,
+                    &mut operations,
+                )?;
+                pending_composites.clear();
+            }
             let accepted_raster = gal.render_pass_last_submission(target.pass)?;
             // Preparation may be discarded. Persisted layout state is proven
             // by this pass's accepted submission, or by an earlier item in
@@ -6418,25 +6531,20 @@ impl GuiFrontend {
                 self.mesh_composites.insert(composite_key, composite);
                 stats.resource_creates = stats.resource_creates.saturating_add(1);
             }
-            let composite = self
-                .mesh_composites
+            self.mesh_composites
                 .get(&composite_key)
                 .ok_or_else(|| GalError::backend("GUI mesh compositor vanished before draw"))?;
-            composite.append_composite(
-                target,
-                if reuse_pixels {
+            pending_composites.push(PendingGuiMeshComposite {
+                key: composite_key,
+                source: target,
+                source_usage: if reuse_pixels {
                     TextureUsageState::ShaderRead
                 } else {
                     TextureUsageState::ColorAttachment
                 },
-                frame_pass,
-                render_target,
-                color_attachment,
-                depth_attachment,
-                first,
-                self.mesh_composite_uniform_cursor,
-                &mut operations,
-            )?;
+                draw: first,
+                uniform_offset: self.mesh_composite_uniform_cursor,
+            });
             self.mesh_composite_uniform_cursor = self
                 .mesh_composite_uniform_cursor
                 .checked_add(GUI_MESH_COMPOSITE_UNIFORM_STRIDE)
@@ -6452,6 +6560,14 @@ impl GuiFrontend {
             }
             cursor = group_end;
         }
+        self.append_mesh_composite_batch(
+            frame_pass,
+            render_target,
+            color_attachment,
+            depth_attachment,
+            &pending_composites,
+            &mut operations,
+        )?;
         stats.command_ops = stats.command_ops.saturating_add(operations.len() as u64);
         stats.mesh_lower_nanos = stats
             .mesh_lower_nanos
@@ -7874,49 +7990,76 @@ fn append_gui_batches_ops(
     batches: &[GuiBatch],
     ops: &mut Vec<CommandOp>,
 ) -> GalResult<()> {
-    for batch in batches {
-        let resources = frontend
-            .resources
-            .get(&ResourceKey::new(batch.group, color_format, depth_format))
-            .ok_or_else(|| GalError::backend("GUI resources vanished before ordered submit"))?;
-        let uniforms = packed_uniform_bytes(batch)?;
-        ops.push(CommandOp::Barrier(buffer_barrier(
-            resources.uniform_buffer,
-            TextureUsageState::ShaderRead,
-            TextureUsageState::TransferDst,
-        )));
-        ops.push(CommandOp::HostWriteBuffer {
-            buffer: resources.uniform_buffer,
-            offset: 0,
-            data: uniforms,
-        });
-        ops.push(CommandOp::Barrier(buffer_barrier(
-            resources.uniform_buffer,
-            TextureUsageState::TransferDst,
-            TextureUsageState::ShaderRead,
-        )));
+    let mut cursor = 0;
+    while cursor < batches.len() {
+        // Each GUI texture binding owns one offset-zero uniform buffer. Keep a
+        // buffer to at most one draw in a pass: otherwise a later host write
+        // would replace the data consumed by an earlier draw. Distinct
+        // bindings can safely share a pass because all uploads happen before
+        // rendering starts and their pipelines use the same target formats.
+        let group_start = cursor;
+        let mut uniform_buffers = BTreeSet::new();
+        while cursor < batches.len() {
+            let batch = &batches[cursor];
+            let resources = frontend
+                .resources
+                .get(&ResourceKey::new(batch.group, color_format, depth_format))
+                .ok_or_else(|| GalError::backend("GUI resources vanished before ordered submit"))?;
+            if !uniform_buffers.insert(resources.uniform_buffer) {
+                break;
+            }
+            cursor += 1;
+        }
+        let grouped = &batches[group_start..cursor];
+        for batch in grouped {
+            let resources = frontend
+                .resources
+                .get(&ResourceKey::new(batch.group, color_format, depth_format))
+                .ok_or_else(|| GalError::backend("GUI resources vanished before ordered submit"))?;
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                resources.uniform_buffer,
+                TextureUsageState::ShaderRead,
+                TextureUsageState::TransferDst,
+            )));
+            ops.push(CommandOp::HostWriteBuffer {
+                buffer: resources.uniform_buffer,
+                offset: 0,
+                data: packed_uniform_bytes(batch)?,
+            });
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                resources.uniform_buffer,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            )));
+        }
         ops.push(CommandOp::BeginPass {
             pass: frame_pass,
             target: render_target,
             colors: vec![loaded_frame_color_attachment(color_attachment)],
             depth_stencil: depth_attachment.map(loaded_frame_depth_attachment),
         });
-        ops.push(CommandOp::BindGraphicsPipeline(resources.pipeline));
-        ops.push(CommandOp::BindResourceSet {
-            pipeline_layout: resources.pipeline_layout,
-            set_index: 0,
-            set: resources.resource_set,
-            dynamic_offsets: Vec::new(),
-        });
-        ops.push(CommandOp::SetIndexBuffer {
-            buffer: resources.index_buffer,
-            offset: 0,
-            index_type: super::resources::IndexType::U32,
-        });
-        ops.push(CommandOp::DrawIndexed {
-            indices: 6,
-            instances: batch.quads.len() as u32,
-        });
+        for batch in grouped {
+            let resources = frontend
+                .resources
+                .get(&ResourceKey::new(batch.group, color_format, depth_format))
+                .ok_or_else(|| GalError::backend("GUI resources vanished before ordered submit"))?;
+            ops.push(CommandOp::BindGraphicsPipeline(resources.pipeline));
+            ops.push(CommandOp::BindResourceSet {
+                pipeline_layout: resources.pipeline_layout,
+                set_index: 0,
+                set: resources.resource_set,
+                dynamic_offsets: Vec::new(),
+            });
+            ops.push(CommandOp::SetIndexBuffer {
+                buffer: resources.index_buffer,
+                offset: 0,
+                index_type: super::resources::IndexType::U32,
+            });
+            ops.push(CommandOp::DrawIndexed {
+                indices: 6,
+                instances: batch.quads.len() as u32,
+            });
+        }
         ops.push(CommandOp::EndPass);
     }
     Ok(())
@@ -14477,6 +14620,25 @@ void main() { fragColor = texture(InSampler, texCoord); }
         assert_eq!(2, stats.sprite_batch_count);
         assert_eq!(1, stats.command_lists);
         assert_eq!(20, stats.command_ops);
+    }
+
+    #[test]
+    fn gui_batches_with_distinct_uniform_bindings_share_one_render_pass() {
+        let mut gal = mock_gal();
+        let mut frontend = GuiFrontend::default();
+        let target = frame_target(&mut gal);
+        let (ops, stats) = frontend
+            .append_frame_ops(&mut gal, 10, target, vec![request(1), request(2)])
+            .unwrap();
+
+        assert_eq!(2, stats.sprite_batch_count);
+        assert_eq!(
+            2,
+            ops.iter()
+                .filter(|op| matches!(op, CommandOp::BeginPass { .. }))
+                .count()
+        );
+        assert_eq!(18, stats.command_ops);
     }
 
     #[test]

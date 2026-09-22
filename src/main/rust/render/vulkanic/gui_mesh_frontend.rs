@@ -1738,17 +1738,33 @@ impl GuiMeshCompositeResources {
                 "GUI mesh composite source extent does not match its prepared draw",
             ));
         }
-        self.append_composite_uniforms(
+        self.append_composite_upload(
             source.color,
             source_usage,
-            destination_pass,
-            destination_target,
-            destination_color_view,
-            destination_depth_view,
             composite_uniform_bytes(draw),
             uniform_offset,
             operations,
-        )
+        )?;
+        operations.push(CommandOp::BeginPass {
+            pass: destination_pass,
+            target: destination_target,
+            colors: vec![PassAttachment {
+                view: destination_color_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }],
+            depth_stencil: destination_depth_view.map(|view| PassAttachment {
+                view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+        operations.push(CommandOp::BindGraphicsPipeline(self.pipeline));
+        self.append_composite_draw(uniform_offset, operations);
+        operations.push(CommandOp::EndPass);
+        Ok(())
     }
 
     /// Compose a Rust-owned item raster cell. Screen-space geometry remains
@@ -1856,6 +1872,46 @@ impl GuiMeshCompositeResources {
         uniform_offset: u64,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<()> {
+        self.append_composite_upload(
+            source_color,
+            source_usage,
+            uniforms,
+            uniform_offset,
+            operations,
+        )?;
+        operations.push(CommandOp::BeginPass {
+            pass: destination_pass,
+            target: destination_target,
+            colors: vec![PassAttachment {
+                view: destination_color_view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }],
+            depth_stencil: destination_depth_view.map(|view| PassAttachment {
+                view,
+                load_op: AttachmentLoadOp::Load,
+                store_op: AttachmentStoreOp::Store,
+                clear_color: None,
+            }),
+        });
+        operations.push(CommandOp::BindGraphicsPipeline(self.pipeline));
+        self.append_composite_draw(uniform_offset, operations);
+        operations.push(CommandOp::EndPass);
+        Ok(())
+    }
+
+    /// Uploads one composite's uniform data and transitions its source image.
+    /// The destination pass is deliberately separate so compatible composites
+    /// can share one load/store pass without moving source barriers inside it.
+    pub(crate) fn append_composite_upload(
+        &self,
+        source_color: Handle,
+        source_usage: TextureUsageState,
+        uniforms: Vec<u8>,
+        uniform_offset: u64,
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<()> {
         if uniform_offset % GUI_MESH_COMPOSITE_UNIFORM_STRIDE != 0
             || uniform_offset
                 .checked_add(GUI_MESH_COMPOSITE_UNIFORM_BYTES as u64)
@@ -1891,23 +1947,16 @@ impl GuiMeshCompositeResources {
                 dst_queue: QueueClass::Graphics,
             }));
         }
-        operations.push(CommandOp::BeginPass {
-            pass: destination_pass,
-            target: destination_target,
-            colors: vec![PassAttachment {
-                view: destination_color_view,
-                load_op: AttachmentLoadOp::Load,
-                store_op: AttachmentStoreOp::Store,
-                clear_color: None,
-            }],
-            depth_stencil: destination_depth_view.map(|view| PassAttachment {
-                view,
-                load_op: AttachmentLoadOp::Load,
-                store_op: AttachmentStoreOp::Store,
-                clear_color: None,
-            }),
-        });
-        operations.push(CommandOp::BindGraphicsPipeline(self.pipeline));
+        Ok(())
+    }
+
+    /// Appends the draw portion of a composite to an already-open destination
+    /// pass. The caller has already emitted its upload/source barriers.
+    pub(crate) fn append_composite_draw(
+        &self,
+        uniform_offset: u64,
+        operations: &mut Vec<CommandOp>,
+    ) {
         operations.push(CommandOp::BindResourceSet {
             pipeline_layout: self.pipeline_layout,
             set_index: 0,
@@ -1918,8 +1967,6 @@ impl GuiMeshCompositeResources {
             vertices: 6,
             instances: 1,
         });
-        operations.push(CommandOp::EndPass);
-        Ok(())
     }
 
     pub fn destroy(self, gal: &mut VulkanicGal) {
@@ -2113,7 +2160,7 @@ fn frame_uniform_bytes(
     bytes
 }
 
-fn composite_uniform_bytes(draw: &GuiMeshPreparedDraw) -> Vec<u8> {
+pub(crate) fn composite_uniform_bytes(draw: &GuiMeshPreparedDraw) -> Vec<u8> {
     let [m00, m01, m10, m11, m20, m21] = draw.gui_pose;
     let [left, top, right, bottom] = draw.bounds;
     let [width, height] = draw.render_extent;
@@ -2347,6 +2394,28 @@ impl GuiMeshOffscreenTargetCache {
         }
     }
 
+    /// Returns an existing named target without creating or mutating native
+    /// resources.  The GUI frontend uses this only to decide whether a static
+    /// item can reuse its already accepted raster before preparing vertices.
+    pub(crate) fn peek_item(
+        &self,
+        generation: u64,
+        extent: Extent3d,
+        item_identity: u64,
+    ) -> Option<GuiMeshOffscreenTarget> {
+        if generation == 0 || item_identity == 0 || extent.depth != 1 {
+            return None;
+        }
+        self.targets
+            .get(&OffscreenTargetKey {
+                generation,
+                item_identity,
+                width: extent.width,
+                height: extent.height,
+            })
+            .copied()
+    }
+
     pub fn clear(&mut self, gal: &mut VulkanicGal) {
         let targets = std::mem::take(&mut self.targets);
         for (_, target) in targets {
@@ -2474,7 +2543,9 @@ impl GuiMeshBatchRequest {
 
 /// Frozen's flat atlas cell uses translate(k/2,k/2,0), scale(k,-k,k).
 /// Resolve that layout here, without a caller-provided PIP target or guard band.
-fn resolved_item_raster(batch: &GuiMeshBatchRequest) -> GalResult<([u32; 2], [f32; 16], u32)> {
+pub(crate) fn resolved_item_raster(
+    batch: &GuiMeshBatchRequest,
+) -> GalResult<([u32; 2], [f32; 16], u32)> {
     if let Some(block) = batch.block_item_raster {
         if block
             .model_min
@@ -2560,6 +2631,20 @@ fn resolved_item_raster(batch: &GuiMeshBatchRequest) -> GalResult<([u32; 2], [f3
         layout.compose(batch.model_transform)?,
         layout.guard_pixels,
     ))
+}
+
+pub(crate) fn resolved_item_bounds(batch: &GuiMeshBatchRequest) -> GalResult<[i32; 4]> {
+    Ok(
+        match batch
+            .block_item_raster
+            .map(|block| block.oversized_layout(batch.bounds))
+            .transpose()?
+            .flatten()
+        {
+            Some((_, bounds)) => bounds,
+            None => batch.bounds,
+        },
+    )
 }
 
 pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
@@ -2807,6 +2892,57 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
 pub fn prepare_draws(batches: &[GuiMeshBatchRequest]) -> GalResult<Vec<GuiMeshPreparedDraw>> {
     validate_batches(batches)?;
     batches.iter().map(prepare_draw).collect()
+}
+
+/// Prepares a semantic mesh family while allowing the caller to skip vertex
+/// reconstruction for static items whose Rust-owned offscreen raster is known
+/// to be valid.  The returned metadata is sufficient for composition; the
+/// raster path never consumes its intentionally empty geometry vectors.
+pub(crate) fn prepare_draws_with_reuse(
+    batches: &[GuiMeshBatchRequest],
+    reusable_items: &BTreeSet<(u32, u64)>,
+) -> GalResult<Vec<GuiMeshPreparedDraw>> {
+    validate_batches(batches)?;
+    batches
+        .iter()
+        .map(|batch| {
+            if reusable_items.contains(&(batch.stratum, batch.sequence)) {
+                prepare_reused_draw(batch)
+            } else {
+                prepare_draw(batch)
+            }
+        })
+        .collect()
+}
+
+fn prepare_reused_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
+    let (render_extent, _model_transform, guard_pixels) = resolved_item_raster(batch)?;
+    Ok(GuiMeshPreparedDraw {
+        item_cache: batch.item_cache,
+        stratum: batch.stratum,
+        layer_index: batch.layer_index,
+        sequence: batch.sequence,
+        asset_id: batch.asset_id,
+        material_mode: batch.material_mode,
+        // Cached pixels do not enter the raster path, so winding is not
+        // consulted. Keep a canonical value in the backend-neutral record.
+        front_face: super::resources::FrontFace::CounterClockwise,
+        lighting_mode: batch.lighting_mode,
+        alpha_cutoff: batch.alpha_cutoff,
+        gui_pose: batch.gui_pose,
+        bounds: resolved_item_bounds(batch)?,
+        gui_extent: batch.gui_extent,
+        projection_extent: batch.projection_extent,
+        render_extent,
+        guard_pixels,
+        clip_mode: batch.clip_mode,
+        clip_left: batch.clip_left,
+        clip_top: batch.clip_top,
+        clip_width: batch.clip_width,
+        clip_height: batch.clip_height,
+        vertices: Vec::new(),
+        indices: Vec::new(),
+    })
 }
 
 fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
@@ -3375,6 +3511,45 @@ mod tests {
         let mut flat = batch();
         flat.lighting_mode = GuiMeshLightingMode::Flat;
         validate_batch(&flat).expect("flat item lighting remains an explicit mesh semantic");
+    }
+
+    #[test]
+    fn reused_item_keeps_composite_metadata_without_rebuilding_geometry() {
+        let mut source = batch();
+        source.item_cache = Some(GuiItemCache {
+            identity: 9,
+            animated: false,
+        });
+        source.block_item_raster = Some(GuiBlockItemRaster {
+            model_min: [-0.5; 3],
+            model_max: [0.5; 3],
+            gui_scale: 2,
+            oversized_gui: false,
+        });
+        source.render_extent = [0, 0];
+        source.guard_pixels = 0;
+        source.lighting_mode = GuiMeshLightingMode::InventoryBlock;
+        source.resolve_item_lighting(Some(flat_lightmap())).unwrap();
+
+        let full = prepare_draws(&[source.clone()]).unwrap().remove(0);
+        let reusable = BTreeSet::from([(source.stratum, source.sequence)]);
+        let cached = prepare_draws_with_reuse(&[source], &reusable)
+            .unwrap()
+            .remove(0);
+        assert!(cached.vertices.is_empty());
+        assert!(cached.indices.is_empty());
+        assert_eq!(cached.item_cache, full.item_cache);
+        assert_eq!(cached.gui_pose, full.gui_pose);
+        assert_eq!(cached.bounds, full.bounds);
+        assert_eq!(cached.gui_extent, full.gui_extent);
+        assert_eq!(cached.projection_extent, full.projection_extent);
+        assert_eq!(cached.render_extent, full.render_extent);
+        assert_eq!(cached.guard_pixels, full.guard_pixels);
+        assert_eq!(cached.clip_mode, full.clip_mode);
+        assert_eq!(
+            composite_uniform_bytes(&cached),
+            composite_uniform_bytes(&full)
+        );
     }
 
     #[test]

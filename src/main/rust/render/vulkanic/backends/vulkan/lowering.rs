@@ -1,9 +1,9 @@
-use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use ash::vk;
 use ash::vk::Handle as _;
+use smallvec::SmallVec;
 
 use super::device::VulkanContext;
 use super::resources::VulkanObjects;
@@ -55,6 +55,8 @@ pub(super) struct SubmissionLowerer {
     metrics: VulkanLoweringMetrics,
     timestamp_pool: Option<vk::QueryPool>,
     next_timestamp_set: u32,
+    pipeline_statistics_pool: Option<vk::QueryPool>,
+    next_pipeline_statistics_set: u32,
     live_command_buffers: HashSet<vk::CommandBuffer>,
     recycled_command_buffers: Vec<vk::CommandBuffer>,
     // Swapchain acquisition signals bounded binary semaphores. A semaphore is
@@ -73,6 +75,14 @@ pub(super) struct SubmissionLowerer {
 
 const GPU_TIMESTAMP_SET_COUNT: u32 = 8;
 const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 18;
+const PIPELINE_STATISTICS_SET_COUNT: u32 = 8;
+const PIPELINE_STATISTICS_PASS_QUERY_COUNT: u32 = 8;
+const PIPELINE_STATISTICS_QUERIES_PER_SET: u32 = PIPELINE_STATISTICS_PASS_QUERY_COUNT;
+// Keep only core stages enabled by this renderer. Geometry and tessellation
+// statistics require their respective optional shader features on some
+// drivers, while these seven counters are valid for the Vulkan 1.3 device
+// contract used here.
+const PIPELINE_STATISTICS_VALUE_COUNT: usize = 7;
 // Whole-frame submissions are independent of swapchain acquire/present
 // slots, so bound their native command-buffer window explicitly.
 const MAX_IN_FLIGHT_SUBMISSIONS: usize = 8;
@@ -106,6 +116,28 @@ enum GpuTimestampQuery {
 struct GpuTimestampSet {
     base_query: u32,
     active: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct PipelineStatisticsSet {
+    base_query: u32,
+    active: bool,
+    pass_query_count: u8,
+    pass_kinds: [u8; PIPELINE_STATISTICS_PASS_QUERY_COUNT as usize],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct PipelineStatisticsValues {
+    values: [u64; PIPELINE_STATISTICS_VALUE_COUNT],
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum PipelineStatisticsMode {
+    #[default]
+    Disabled,
+    WholeFrame,
+    PerPass,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -162,10 +194,45 @@ impl TimestampPassKind {
     }
 }
 
+fn pipeline_statistics_kind_code(kind: TimestampPassKind) -> u8 {
+    match kind {
+        TimestampPassKind::ShadowDepth => 0,
+        TimestampPassKind::TerrainOpaque => 1,
+        TimestampPassKind::TerrainCutout => 2,
+        TimestampPassKind::DeferredLighting => 3,
+        TimestampPassKind::Composite0 => 4,
+        TimestampPassKind::Composite1 => 5,
+        TimestampPassKind::FinalOutput => 6,
+        TimestampPassKind::DistantHorizonsOpaque => 7,
+    }
+}
+
+fn pipeline_statistics_kind_name(code: u8) -> &'static str {
+    match code {
+        0 => "shadow-depth",
+        1 => "terrain-opaque",
+        2 => "terrain-cutout",
+        3 => "deferred-lighting",
+        4 => "composite-0",
+        5 => "composite-1",
+        6 => "final-output",
+        7 => "distant-horizons-opaque",
+        _ => "unknown",
+    }
+}
+
 impl SubmissionLowerer {
     pub(super) fn new(context: Arc<VulkanContext>) -> Self {
         let timestamp_pool = if gpu_timestamps_enabled() {
             create_timestamp_pool(&context).ok()
+        } else {
+            None
+        };
+        let pipeline_statistics_pool = if pipeline_statistics_mode()
+            != PipelineStatisticsMode::Disabled
+            && context.pipeline_statistics_query
+        {
+            create_pipeline_statistics_pool(&context).ok()
         } else {
             None
         };
@@ -178,6 +245,8 @@ impl SubmissionLowerer {
             metrics: VulkanLoweringMetrics::default(),
             timestamp_pool,
             next_timestamp_set: 0,
+            pipeline_statistics_pool,
+            next_pipeline_statistics_set: 0,
             live_command_buffers: HashSet::new(),
             recycled_command_buffers: Vec::new(),
             acquire_semaphores: Vec::new(),
@@ -212,6 +281,14 @@ impl SubmissionLowerer {
         let mut present_image_index = None;
         let result: GalResult<()> = (|| {
             let count = batch.command_lists.len().max(1);
+            // Pipeline-statistics queries are scoped to one dynamic-rendering
+            // pass. Allocate the bounded set for either diagnostic mode; the
+            // whole-frame mode is accumulated from those pass-local queries
+            // after retirement instead of leaving a query active across
+            // vkCmdBeginRendering/vkCmdEndRendering.
+            if pipeline_statistics_mode() != PipelineStatisticsMode::Disabled {
+                state.pipeline_statistics_set = self.allocate_pipeline_statistics_set();
+            }
             for index in 0..count {
                 // Primary command buffers do not inherit recording state from
                 // one another.  Source partitioning promises complete pass
@@ -273,6 +350,19 @@ impl SubmissionLowerer {
                             );
                         }
                     }
+                    if let (Some(pool), true) = (
+                        self.pipeline_statistics_pool,
+                        state.pipeline_statistics_set.active,
+                    ) {
+                        unsafe {
+                            self.context.device.cmd_reset_query_pool(
+                                command_buffer,
+                                pool,
+                                state.pipeline_statistics_set.base_query,
+                                PIPELINE_STATISTICS_QUERIES_PER_SET,
+                            );
+                        }
+                    }
                 }
                 if let Some(list) = batch.command_lists.get(index) {
                     stdout_trace(&format!(
@@ -286,7 +376,48 @@ impl SubmissionLowerer {
                             &format!("gal.command-list.{}", sanitize_label(&list.label)),
                         )
                     };
-                    for op in &list.operations {
+                    let mut op_index = 0usize;
+                    while op_index < list.operations.len() {
+                        // Consecutive barriers have no intervening command that
+                        // can observe their intermediate state. Keep each
+                        // GAL barrier in the semantic stream, but lower a run
+                        // of independent resources through one Vulkan
+                        // dependency call. Runs stop before a repeated handle
+                        // so a same-resource transition retains the exact
+                        // ordering and layout semantics of the old path.
+                        if matches!(list.operations[op_index], CommandOp::Barrier(_)) {
+                            let start = op_index;
+                            let mut end = op_index;
+                            let mut resources = HashSet::new();
+                            while end < list.operations.len() {
+                                let CommandOp::Barrier(barrier) = &list.operations[end] else {
+                                    break;
+                                };
+                                // A view may alias an image already present in
+                                // the run even though its GAL handle differs.
+                                // Keep view barriers on the original path so
+                                // the backend never combines potentially
+                                // overlapping subresource transitions.
+                                if barrier.resource.kind() == Some(HandleKind::TextureView) {
+                                    break;
+                                }
+                                if !resources.insert(barrier.resource) {
+                                    break;
+                                }
+                                end += 1;
+                            }
+                            if end.saturating_sub(start) > 1 {
+                                self.encode_barrier_group(
+                                    objects,
+                                    command_buffer,
+                                    &mut state,
+                                    &list.operations[start..end],
+                                )?;
+                                op_index = end;
+                                continue;
+                            }
+                        }
+                        let op = &list.operations[op_index];
                         stdout_trace(&format!(
                             "vulkan.encode.begin cb=0x{:016x} op={}",
                             command_buffer.as_raw(),
@@ -298,6 +429,7 @@ impl SubmissionLowerer {
                             command_buffer.as_raw(),
                             command_op_kind(op)
                         ));
+                        op_index += 1;
                     }
                     unsafe { self.context.end_label(command_buffer) };
                 }
@@ -360,6 +492,7 @@ impl SubmissionLowerer {
             command_buffers,
             host_reads: state.host_reads,
             timestamp_set,
+            pipeline_statistics_set: state.pipeline_statistics_set,
             present_image_index,
         });
         Ok(())
@@ -457,6 +590,7 @@ impl SubmissionLowerer {
             command_buffers: encoded.command_buffers,
             host_reads: encoded.host_reads,
             timestamp_set: encoded.timestamp_set,
+            pipeline_statistics_set: encoded.pipeline_statistics_set,
             publishes_frame_timestamps: encoded.present_image_index.is_some(),
             acquire_wait_semaphore,
         });
@@ -504,6 +638,7 @@ impl SubmissionLowerer {
             let complete = self.in_flight.pop_front().expect("front existed");
             self.complete_host_reads(&complete);
             self.complete_gpu_timestamps(&complete);
+            self.complete_pipeline_statistics(&complete);
             self.free_command_buffers(&complete.command_buffers)
                 .expect("retiring a Vulkan submission must own its command buffers");
             self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
@@ -533,6 +668,7 @@ impl SubmissionLowerer {
             self.metrics.command_buffers_freed += complete.command_buffers.len() as u64;
             self.complete_host_reads(&complete);
             self.complete_gpu_timestamps(&complete);
+            self.complete_pipeline_statistics(&complete);
             self.recycle_acquire_semaphore(complete.acquire_wait_semaphore);
             self.completed = complete.id;
         }
@@ -725,6 +861,35 @@ impl SubmissionLowerer {
         GpuTimestampSet::default()
     }
 
+    fn allocate_pipeline_statistics_set(&mut self) -> PipelineStatisticsSet {
+        if self.pipeline_statistics_pool.is_none() || !self.context.pipeline_statistics_query {
+            return PipelineStatisticsSet::default();
+        }
+        for _ in 0..PIPELINE_STATISTICS_SET_COUNT {
+            let set_index = self.next_pipeline_statistics_set % PIPELINE_STATISTICS_SET_COUNT;
+            self.next_pipeline_statistics_set = self.next_pipeline_statistics_set.wrapping_add(1);
+            let base_query = set_index * PIPELINE_STATISTICS_QUERIES_PER_SET;
+            if !self.pipeline_statistics_set_in_use(base_query) {
+                return PipelineStatisticsSet {
+                    base_query,
+                    active: true,
+                    ..PipelineStatisticsSet::default()
+                };
+            }
+        }
+        PipelineStatisticsSet::default()
+    }
+
+    fn pipeline_statistics_set_in_use(&self, base_query: u32) -> bool {
+        self.pending.iter().any(|pending| {
+            pending.pipeline_statistics_set.active
+                && pending.pipeline_statistics_set.base_query == base_query
+        }) || self.in_flight.iter().any(|in_flight| {
+            in_flight.pipeline_statistics_set.active
+                && in_flight.pipeline_statistics_set.base_query == base_query
+        })
+    }
+
     fn timestamp_set_in_use(&self, base_query: u32) -> bool {
         self.pending.iter().any(|pending| {
             pending.timestamp_set.active && pending.timestamp_set.base_query == base_query
@@ -788,6 +953,56 @@ impl SubmissionLowerer {
         }
     }
 
+    unsafe fn switch_pipeline_statistics_pass(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        state: &mut EncodingState,
+        next: Option<TimestampPassKind>,
+    ) {
+        if pipeline_statistics_mode() == PipelineStatisticsMode::Disabled
+            || state.current_pipeline_statistics_kind == next
+        {
+            return;
+        }
+        if let (Some(pool), Some(slot)) = (
+            self.pipeline_statistics_pool,
+            state.current_pipeline_statistics_pass.take(),
+        ) {
+            self.context.device.cmd_end_query(
+                command_buffer,
+                pool,
+                state.pipeline_statistics_set.base_query + slot,
+            );
+        }
+        state.current_pipeline_statistics_kind = None;
+        let Some(pass_kind) = next else {
+            return;
+        };
+        let (Some(pool), true) = (
+            self.pipeline_statistics_pool,
+            state.pipeline_statistics_set.active,
+        ) else {
+            return;
+        };
+        if state.pipeline_statistics_set.pass_query_count
+            >= PIPELINE_STATISTICS_PASS_QUERY_COUNT as u8
+        {
+            return;
+        }
+        let slot = state.pipeline_statistics_set.pass_query_count as u32;
+        state.pipeline_statistics_set.pass_query_count += 1;
+        state.pipeline_statistics_set.pass_kinds[slot as usize] =
+            pipeline_statistics_kind_code(pass_kind);
+        self.context.device.cmd_begin_query(
+            command_buffer,
+            pool,
+            state.pipeline_statistics_set.base_query + slot,
+            vk::QueryControlFlags::empty(),
+        );
+        state.current_pipeline_statistics_pass = Some(slot);
+        state.current_pipeline_statistics_kind = Some(pass_kind);
+    }
+
     fn allocate_command_buffer(&mut self) -> GalResult<vk::CommandBuffer> {
         if let Some(command_buffer) = self.recycled_command_buffers.pop() {
             unsafe {
@@ -847,6 +1062,134 @@ impl SubmissionLowerer {
                 ))
             })?;
             self.recycled_command_buffers.push(*command_buffer);
+        }
+        Ok(())
+    }
+
+    /// Lower a run of independent GAL barriers in one Vulkan dependency call.
+    ///
+    /// The GAL stream remains the source of truth: callers still retain every
+    /// barrier for validation and profiling, and repeated handles are kept on
+    /// the single-barrier path so a layout transition cannot be reordered.
+    fn encode_barrier_group(
+        &self,
+        objects: &VulkanObjects,
+        command_buffer: vk::CommandBuffer,
+        state: &mut EncodingState,
+        operations: &[CommandOp],
+    ) -> GalResult<()> {
+        let _zone = trace::Zone::new("vulkan.lowering.barrier-group");
+        // Most dependency calls contain one or two records. Keep those
+        // records inline so the common path does not allocate just to pass a
+        // borrowed slice into Vulkan; larger validated groups spill without
+        // changing the barrier order or grouping semantics.
+        let mut image_barriers = SmallVec::<[vk::ImageMemoryBarrier2<'static>; 4]>::new();
+        let mut buffer_barriers = SmallVec::<[vk::BufferMemoryBarrier2<'static>; 4]>::new();
+        let mut transfer_dst_updates = SmallVec::<[(Handle, bool); 4]>::new();
+
+        for operation in operations {
+            let CommandOp::Barrier(barrier) = operation else {
+                return Err(GalError::backend(
+                    "non-barrier operation reached Vulkan barrier group",
+                ));
+            };
+            if barrier.resource.kind() == Some(HandleKind::Texture)
+                || barrier.resource.kind() == Some(HandleKind::TextureView)
+            {
+                let (texture_handle, view_range) =
+                    if barrier.resource.kind() == Some(HandleKind::TextureView) {
+                        let view = objects.texture_view(barrier.resource)?;
+                        (
+                            view.texture,
+                            crate::render::vulkanic::resources::TextureSubresourceRange {
+                                base_mip: view.base_mip,
+                                mip_count: view.mip_levels,
+                                base_layer: view.base_layer,
+                                layer_count: view.array_layers,
+                            },
+                        )
+                    } else {
+                        let texture = objects.texture(barrier.resource)?;
+                        (
+                            barrier.resource,
+                            crate::render::vulkanic::resources::TextureSubresourceRange {
+                                base_mip: 0,
+                                mip_count: texture.mip_levels,
+                                base_layer: 0,
+                                layer_count: texture.array_layers,
+                            },
+                        )
+                    };
+                let texture = objects.texture(texture_handle)?;
+                let range = barrier.subresources.unwrap_or(view_range);
+                if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some()
+                    && texture.label.contains("source-final-output")
+                {
+                    stdout_trace(&format!(
+                        "vulkan.barrier source-final-output resource=0x{:016x} texture=0x{:016x} label={} before={:?} after={:?} mip={}..{} layer={}..{}",
+                        barrier.resource.raw(),
+                        texture_handle.raw(),
+                        sanitize_label(&texture.label),
+                        barrier.before,
+                        barrier.after,
+                        range.base_mip,
+                        range.mip_count,
+                        range.base_layer,
+                        range.layer_count,
+                    ));
+                }
+                image_barriers.push(
+                    vk::ImageMemoryBarrier2::default()
+                        .src_stage_mask(stage_mask(barrier.before))
+                        .src_access_mask(image_access_mask(barrier.before))
+                        .dst_stage_mask(stage_mask(barrier.after))
+                        .dst_access_mask(image_access_mask(barrier.after))
+                        .old_layout(image_layout_for_aspect(barrier.before, texture.aspect))
+                        .new_layout(image_layout_for_aspect(barrier.after, texture.aspect))
+                        .image(texture.image)
+                        .subresource_range(vk::ImageSubresourceRange {
+                            aspect_mask: texture.aspect,
+                            base_mip_level: range.base_mip,
+                            level_count: range.mip_count,
+                            base_array_layer: range.base_layer,
+                            layer_count: range.layer_count,
+                        }),
+                );
+                transfer_dst_updates.push((
+                    barrier.resource,
+                    barrier.after == TextureUsageState::TransferDst,
+                ));
+            } else if barrier.resource.kind() == Some(HandleKind::Buffer) {
+                let buffer = objects.buffer(barrier.resource)?;
+                buffer_barriers.push(
+                    vk::BufferMemoryBarrier2::default()
+                        .src_stage_mask(stage_mask(barrier.before))
+                        .src_access_mask(access_mask(barrier.before))
+                        .dst_stage_mask(stage_mask(barrier.after))
+                        .dst_access_mask(access_mask(barrier.after))
+                        .buffer(buffer.buffer)
+                        .offset(0)
+                        .size(buffer.size),
+                );
+            }
+        }
+
+        if !image_barriers.is_empty() || !buffer_barriers.is_empty() {
+            let dependency = vk::DependencyInfo::default()
+                .image_memory_barriers(&image_barriers)
+                .buffer_memory_barriers(&buffer_barriers);
+            unsafe {
+                self.context
+                    .device
+                    .cmd_pipeline_barrier2(command_buffer, &dependency);
+            }
+        }
+        for (resource, is_transfer_dst) in transfer_dst_updates {
+            if is_transfer_dst {
+                state.transfer_dst_textures.insert(resource);
+            } else {
+                state.transfer_dst_textures.remove(&resource);
+            }
         }
         Ok(())
     }
@@ -1086,11 +1429,17 @@ impl SubmissionLowerer {
                     self.context
                         .device
                         .cmd_set_scissor(command_buffer, 0, &[scissor]);
+                    // Dynamic-rendering validation requires a pipeline query
+                    // to begin after vkCmdBeginRendering and end before
+                    // vkCmdEndRendering. Timestamp writes remain outside the
+                    // render pass and are intentionally handled separately.
+                    self.switch_pipeline_statistics_pass(command_buffer, state, timestamp_pass);
                     state.in_pass = true;
                     state.provoking_vertex = None;
                     state.frame_present = frame_present;
                 }
                 CommandOp::EndPass => {
+                    self.switch_pipeline_statistics_pass(command_buffer, state, None);
                     self.context.device.cmd_end_rendering(command_buffer);
                     if let Some(pass_kind) = state.current_timestamp_pass {
                         self.write_timestamp(
@@ -1151,6 +1500,11 @@ impl SubmissionLowerer {
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline.pipeline.pipeline,
                     );
+                    self.switch_pipeline_statistics_pass(
+                        command_buffer,
+                        state,
+                        timestamp_pipeline_kind(&pipeline.label),
+                    );
                     if let Some(pipeline_timestamp_pass) = timestamp_pipeline_kind(&pipeline.label)
                     {
                         self.switch_timestamp_pass(
@@ -1199,20 +1553,23 @@ impl SubmissionLowerer {
                     }
                     let layout = objects.pipeline_layout(*pipeline_layout)?;
                     let set = objects.resource_set(*set)?;
-                    let bind_dynamic_offsets = if dynamic_offsets.is_empty() {
-                        Cow::Borrowed(set.dynamic_offsets.as_slice())
+                    // The common descriptor bind carries one to four frame
+                    // offsets. Keep that conversion on the stack; the GAL
+                    // command still owns the original u64 values and Vulkan
+                    // receives the same validated u32 sequence. Larger binds
+                    // spill through SmallVec without changing the limit or
+                    // ordering contract.
+                    let mut converted_dynamic_offsets = SmallVec::<[u32; 4]>::new();
+                    let bind_dynamic_offsets: &[u32] = if dynamic_offsets.is_empty() {
+                        set.dynamic_offsets.as_slice()
                     } else {
-                        Cow::Owned(
-                            dynamic_offsets
-                                .iter()
-                                .copied()
-                                .map(|offset| {
-                                    u32::try_from(offset).map_err(|_| {
-                                        GalError::backend("dynamic descriptor offset exceeds u32")
-                                    })
-                                })
-                                .collect::<GalResult<Vec<_>>>()?,
-                        )
+                        converted_dynamic_offsets.reserve(dynamic_offsets.len());
+                        for offset in dynamic_offsets {
+                            converted_dynamic_offsets.push(u32::try_from(*offset).map_err(
+                                |_| GalError::backend("dynamic descriptor offset exceeds u32"),
+                            )?);
+                        }
+                        converted_dynamic_offsets.as_slice()
                     };
                     let bind_point = if state.graphics_pipeline.is_some() {
                         vk::PipelineBindPoint::GRAPHICS
@@ -1225,7 +1582,7 @@ impl SubmissionLowerer {
                         layout.layout,
                         *set_index,
                         &[set.set],
-                        bind_dynamic_offsets.as_ref(),
+                        bind_dynamic_offsets,
                     );
                 }
                 CommandOp::SetVertexBuffer {
@@ -1680,99 +2037,13 @@ impl SubmissionLowerer {
                             .cmd_pipeline_barrier2(command_buffer, &dependency);
                     }
                 }
-                CommandOp::Barrier(barrier) => {
-                    let _zone = trace::Zone::new("vulkan.lowering.barrier");
-                    if barrier.resource.kind()
-                        == Some(crate::render::vulkanic::handles::HandleKind::Texture)
-                        || barrier.resource.kind()
-                            == Some(crate::render::vulkanic::handles::HandleKind::TextureView)
-                    {
-                        let (texture_handle, view_range) = if barrier.resource.kind()
-                            == Some(crate::render::vulkanic::handles::HandleKind::TextureView)
-                        {
-                            let view = objects.texture_view(barrier.resource)?;
-                            (
-                                view.texture,
-                                crate::render::vulkanic::resources::TextureSubresourceRange {
-                                    base_mip: view.base_mip,
-                                    mip_count: view.mip_levels,
-                                    base_layer: view.base_layer,
-                                    layer_count: view.array_layers,
-                                },
-                            )
-                        } else {
-                            let texture = objects.texture(barrier.resource)?;
-                            (
-                                barrier.resource,
-                                crate::render::vulkanic::resources::TextureSubresourceRange {
-                                    base_mip: 0,
-                                    mip_count: texture.mip_levels,
-                                    base_layer: 0,
-                                    layer_count: texture.array_layers,
-                                },
-                            )
-                        };
-                        let texture = objects.texture(texture_handle)?;
-                        let range = barrier.subresources.unwrap_or(view_range);
-                        if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some()
-                            && texture.label.contains("source-final-output")
-                        {
-                            stdout_trace(&format!(
-                                "vulkan.barrier source-final-output resource=0x{:016x} texture=0x{:016x} label={} before={:?} after={:?} mip={}..{} layer={}..{}",
-                                barrier.resource.raw(),
-                                texture_handle.raw(),
-                                sanitize_label(&texture.label),
-                                barrier.before,
-                                barrier.after,
-                                range.base_mip,
-                                range.mip_count,
-                                range.base_layer,
-                                range.layer_count,
-                            ));
-                        }
-                        let image_barrier = vk::ImageMemoryBarrier2::default()
-                            .src_stage_mask(stage_mask(barrier.before))
-                            .src_access_mask(image_access_mask(barrier.before))
-                            .dst_stage_mask(stage_mask(barrier.after))
-                            .dst_access_mask(image_access_mask(barrier.after))
-                            .old_layout(image_layout_for_aspect(barrier.before, texture.aspect))
-                            .new_layout(image_layout_for_aspect(barrier.after, texture.aspect))
-                            .image(texture.image)
-                            .subresource_range(vk::ImageSubresourceRange {
-                                aspect_mask: texture.aspect,
-                                base_mip_level: range.base_mip,
-                                level_count: range.mip_count,
-                                base_array_layer: range.base_layer,
-                                layer_count: range.layer_count,
-                            });
-                        let dependency = vk::DependencyInfo::default()
-                            .image_memory_barriers(std::slice::from_ref(&image_barrier));
-                        self.context
-                            .device
-                            .cmd_pipeline_barrier2(command_buffer, &dependency);
-                        if barrier.after == TextureUsageState::TransferDst {
-                            state.transfer_dst_textures.insert(barrier.resource);
-                        } else {
-                            state.transfer_dst_textures.remove(&barrier.resource);
-                        }
-                    } else if barrier.resource.kind()
-                        == Some(crate::render::vulkanic::handles::HandleKind::Buffer)
-                    {
-                        let buffer = objects.buffer(barrier.resource)?;
-                        let buffer_barrier = vk::BufferMemoryBarrier2::default()
-                            .src_stage_mask(stage_mask(barrier.before))
-                            .src_access_mask(access_mask(barrier.before))
-                            .dst_stage_mask(stage_mask(barrier.after))
-                            .dst_access_mask(access_mask(barrier.after))
-                            .buffer(buffer.buffer)
-                            .offset(0)
-                            .size(buffer.size);
-                        let dependency = vk::DependencyInfo::default()
-                            .buffer_memory_barriers(std::slice::from_ref(&buffer_barrier));
-                        self.context
-                            .device
-                            .cmd_pipeline_barrier2(command_buffer, &dependency);
-                    }
+                CommandOp::Barrier(_) => {
+                    self.encode_barrier_group(
+                        objects,
+                        command_buffer,
+                        state,
+                        std::slice::from_ref(op),
+                    )?;
                 }
                 CommandOp::HostWriteBuffer {
                     buffer,
@@ -1995,6 +2266,86 @@ impl SubmissionLowerer {
         self.apply_gpu_timestamp_result(result);
     }
 
+    fn complete_pipeline_statistics(&mut self, complete: &InFlightSubmission) {
+        if !complete.publishes_frame_timestamps || !complete.pipeline_statistics_set.active {
+            return;
+        }
+        let Some(pool) = self.pipeline_statistics_pool else {
+            return;
+        };
+        let mode = pipeline_statistics_mode();
+        if mode == PipelineStatisticsMode::Disabled {
+            return;
+        }
+        // Vulkan forbids a pipeline-statistics query from remaining active
+        // across dynamic-rendering begin/end. The legacy whole-frame switch
+        // therefore reads and sums the same bounded pass-local queries used by
+        // per-pass diagnostics.
+        let aggregate = mode == PipelineStatisticsMode::WholeFrame;
+        let mut totals = PipelineStatisticsValues::default();
+        let mut totals_ready = true;
+        for slot in 0..complete.pipeline_statistics_set.pass_query_count as usize {
+            let query = complete.pipeline_statistics_set.base_query + slot as u32;
+            let kind =
+                pipeline_statistics_kind_name(complete.pipeline_statistics_set.pass_kinds[slot]);
+            match self.read_pipeline_statistics_values(pool, query) {
+                Ok(values) if aggregate => {
+                    for (total, value) in totals.values.iter_mut().zip(values.values) {
+                        *total = total.saturating_add(value);
+                    }
+                }
+                Ok(values) => println!(
+                    "vulkan.pipeline-pass-stats submission={} pass={} input_vertices={} input_primitives={} vertex_invocations={} clipping_invocations={} clipping_primitives={} fragment_invocations={} compute_invocations={}",
+                    complete.id.0,
+                    kind,
+                    values.values[0],
+                    values.values[1],
+                    values.values[2],
+                    values.values[3],
+                    values.values[4],
+                    values.values[5],
+                    values.values[6],
+                ),
+                Err(vk::Result::NOT_READY) => totals_ready = false,
+                Err(error) => eprintln!(
+                    "vulkan.pipeline-pass-stats read failed submission={} pass={} error={error:?}",
+                    complete.id.0,
+                    kind,
+                ),
+            }
+        }
+        if aggregate && totals_ready {
+            println!(
+                "vulkan.pipeline-stats submission={} input_vertices={} input_primitives={} vertex_invocations={} clipping_invocations={} clipping_primitives={} fragment_invocations={} compute_invocations={}",
+                complete.id.0,
+                totals.values[0],
+                totals.values[1],
+                totals.values[2],
+                totals.values[3],
+                totals.values[4],
+                totals.values[5],
+                totals.values[6],
+            );
+        }
+    }
+
+    fn read_pipeline_statistics_values(
+        &self,
+        pool: vk::QueryPool,
+        query: u32,
+    ) -> Result<PipelineStatisticsValues, vk::Result> {
+        let mut results = [PipelineStatisticsValues::default()];
+        unsafe {
+            self.context.device.get_query_pool_results(
+                pool,
+                query,
+                &mut results,
+                vk::QueryResultFlags::TYPE_64,
+            )
+        }?;
+        Ok(results[0])
+    }
+
     fn apply_gpu_timestamp_result(&mut self, result: GpuTimestampResult) {
         self.metrics.gpu_timestamp_status = result.status;
         self.metrics.gpu_shadow_depth_nanos = result.shadow_depth_nanos;
@@ -2036,6 +2387,9 @@ impl Drop for SubmissionLowerer {
         if let Some(pool) = self.timestamp_pool.take() {
             unsafe { self.context.device.destroy_query_pool(pool, None) };
         }
+        if let Some(pool) = self.pipeline_statistics_pool.take() {
+            unsafe { self.context.device.destroy_query_pool(pool, None) };
+        }
     }
 }
 
@@ -2055,6 +2409,33 @@ fn create_timestamp_pool(context: &Arc<VulkanContext>) -> GalResult<vk::QueryPoo
     })
 }
 
+fn create_pipeline_statistics_pool(context: &Arc<VulkanContext>) -> GalResult<vk::QueryPool> {
+    if !context.pipeline_statistics_query {
+        return Err(GalError::backend(
+            "Vulkan device does not expose pipeline statistics queries",
+        ));
+    }
+    let info = vk::QueryPoolCreateInfo::default()
+        .query_type(vk::QueryType::PIPELINE_STATISTICS)
+        .query_count(PIPELINE_STATISTICS_SET_COUNT * PIPELINE_STATISTICS_QUERIES_PER_SET)
+        .pipeline_statistics(pipeline_statistics_flags());
+    unsafe { context.device.create_query_pool(&info, None) }.map_err(|error| {
+        GalError::backend(format!(
+            "failed to create Vulkan pipeline statistics query pool: {error:?}"
+        ))
+    })
+}
+
+fn pipeline_statistics_flags() -> vk::QueryPipelineStatisticFlags {
+    vk::QueryPipelineStatisticFlags::INPUT_ASSEMBLY_VERTICES
+        | vk::QueryPipelineStatisticFlags::INPUT_ASSEMBLY_PRIMITIVES
+        | vk::QueryPipelineStatisticFlags::VERTEX_SHADER_INVOCATIONS
+        | vk::QueryPipelineStatisticFlags::CLIPPING_INVOCATIONS
+        | vk::QueryPipelineStatisticFlags::CLIPPING_PRIMITIVES
+        | vk::QueryPipelineStatisticFlags::FRAGMENT_SHADER_INVOCATIONS
+        | vk::QueryPipelineStatisticFlags::COMPUTE_SHADER_INVOCATIONS
+}
+
 fn gpu_timestamps_enabled() -> bool {
     matches!(
         std::env::var("MATTMC_RUST_VULKAN_GPU_TIMESTAMPS")
@@ -2062,6 +2443,22 @@ fn gpu_timestamps_enabled() -> bool {
             .as_deref(),
         Some("1" | "true" | "TRUE" | "yes" | "on")
     )
+}
+
+fn pipeline_statistics_mode() -> PipelineStatisticsMode {
+    let enabled = |name: &str| {
+        matches!(
+            std::env::var(name).ok().as_deref(),
+            Some("1" | "true" | "TRUE" | "yes" | "on")
+        )
+    };
+    if enabled("MATTMC_RUST_VULKAN_PIPELINE_PASS_STATS") {
+        PipelineStatisticsMode::PerPass
+    } else if enabled("MATTMC_RUST_VULKAN_PIPELINE_STATS") {
+        PipelineStatisticsMode::WholeFrame
+    } else {
+        PipelineStatisticsMode::Disabled
+    }
 }
 
 fn timestamp_pass_kind(label: &str) -> Option<TimestampPassKind> {
@@ -2647,7 +3044,10 @@ struct EncodingState {
     pending_frame_presents: BTreeMap<Handle, FramePresentTransition>,
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
+    pipeline_statistics_set: PipelineStatisticsSet,
     current_timestamp_pass: Option<TimestampPassKind>,
+    current_pipeline_statistics_pass: Option<u32>,
+    current_pipeline_statistics_kind: Option<TimestampPassKind>,
 }
 
 struct FramePresentTransition {
@@ -2662,6 +3062,7 @@ struct EncodedSubmission {
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
+    pipeline_statistics_set: PipelineStatisticsSet,
     present_image_index: Option<u32>,
 }
 
@@ -2670,6 +3071,7 @@ struct InFlightSubmission {
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
+    pipeline_statistics_set: PipelineStatisticsSet,
     publishes_frame_timestamps: bool,
     acquire_wait_semaphore: Option<vk::Semaphore>,
 }

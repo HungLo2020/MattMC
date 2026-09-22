@@ -175,6 +175,10 @@ public final class RustGalTerrainRenderer {
 		final LongOpenHashSet seenPositions = new LongOpenHashSet();
 		final LongOpenHashSet visibleMeshKeys = new LongOpenHashSet();
 		final LongOpenHashSet visibleSubmissions = new LongOpenHashSet();
+		final LongOpenHashSet cachedOpaqueMeshKeys = new LongOpenHashSet();
+		long[] cachedOpaqueMeshKeyArray = new long[256];
+		long[] cachedOpaqueMeshGenerationArray = new long[256];
+		int cachedOpaqueMeshKeyCount;
 		final ArrayList<RenderSection> sectionSnapshot = new ArrayList<>();
 		final ArrayList<TerrainSectionAsset> solidAssetSnapshot = new ArrayList<>();
 		final ArrayList<TerrainSectionAsset> cutoutAssetSnapshot = new ArrayList<>();
@@ -184,6 +188,8 @@ public final class RustGalTerrainRenderer {
 			seenPositions.clear();
 			visibleMeshKeys.clear();
 			visibleSubmissions.clear();
+			cachedOpaqueMeshKeys.clear();
+			cachedOpaqueMeshKeyCount = 0;
 			sectionSnapshot.clear();
 			solidAssetSnapshot.clear();
 			cutoutAssetSnapshot.clear();
@@ -894,16 +900,55 @@ public final class RustGalTerrainRenderer {
 		String fault = activeFault();
 		boolean detailedDiagnostics = detailedTerrainDiagnosticsEnabled(fault);
 		boolean trackTerrainCounters = terrainCountersEnabled(fault);
+		boolean cachedOpaqueReplay = false;
+		if (!resourceReloadStaging && fault.isEmpty() && !detailedDiagnostics
+			&& !Boolean.getBoolean("mattmc.dev.disableCachedStaticTerrainReplay")) {
+			scratch.cachedOpaqueMeshKeys.clear();
+			scratch.cachedOpaqueMeshKeyCount = 0;
+			for (int index = 0; index < sectionSnapshot.size(); index++) {
+				TerrainSectionAsset solid = scratch.solidAssetSnapshot.get(index);
+				TerrainSectionAsset cutout = scratch.cutoutAssetSnapshot.get(index);
+				if (solid != null && scratch.cachedOpaqueMeshKeys.add(solid.meshKey())) {
+					appendCachedOpaqueMeshKey(scratch, solid.meshKey(), solid.meshGeneration());
+				}
+				if (cutout != null && scratch.cachedOpaqueMeshKeys.add(cutout.meshKey())) {
+					appendCachedOpaqueMeshKey(scratch, cutout.meshKey(), cutout.meshGeneration());
+				}
+			}
+			cachedOpaqueReplay = scratch.cachedOpaqueMeshKeyCount > 0
+				&& RustGalWorldPrimitiveRenderer.enqueueCachedStaticTerrainInstances(
+					scratch.cachedOpaqueMeshKeyArray, scratch.cachedOpaqueMeshGenerationArray,
+					scratch.cachedOpaqueMeshKeyCount,
+					viewportWidth, viewportHeight);
+		}
+		if (trackTerrainCounters) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+			"world.static-terrain.cached-opaque-replay",
+			cachedOpaqueReplay ? scratch.cachedOpaqueMeshKeyCount : 0L);
+		}
 		int translucentDrawOrder = 0;
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.opaque-submit");
-		for (int index = 0; index < sectionSnapshot.size(); index++) {
-			RenderSection section = sectionSnapshot.get(index);
-			enqueueSectionLayer(section, ChunkSectionLayer.SOLID, scratch.solidAssetSnapshot.get(index),
-				camera, viewportWidth, viewportHeight, 0,
-				visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
-			enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, scratch.cutoutAssetSnapshot.get(index),
-				camera, viewportWidth, viewportHeight, 0,
-				visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+		if (cachedOpaqueReplay) {
+			if (trackTerrainCounters) {
+				visibleLayerProbes.addAndGet((long)sectionSnapshot.size() * 2L);
+			}
+			for (int index = 0; index < sectionSnapshot.size(); index++) {
+				RenderSection section = sectionSnapshot.get(index);
+				recordCachedOpaqueLayerSubmission(section, ChunkSectionLayer.SOLID,
+					scratch.solidAssetSnapshot.get(index), visibleSubmissions, trackTerrainCounters);
+				recordCachedOpaqueLayerSubmission(section, ChunkSectionLayer.CUTOUT_MIPPED,
+					scratch.cutoutAssetSnapshot.get(index), visibleSubmissions, trackTerrainCounters);
+			}
+		} else {
+			for (int index = 0; index < sectionSnapshot.size(); index++) {
+				RenderSection section = sectionSnapshot.get(index);
+				enqueueSectionLayer(section, ChunkSectionLayer.SOLID, scratch.solidAssetSnapshot.get(index),
+					camera, viewportWidth, viewportHeight, 0,
+					visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+				enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, scratch.cutoutAssetSnapshot.get(index),
+					camera, viewportWidth, viewportHeight, 0,
+					visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+			}
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.opaque-submit");
 		// Translucent sections are a single camera-sorted semantic stream. The
@@ -1846,6 +1891,17 @@ public final class RustGalTerrainRenderer {
 			return new AtlasSpritePayload(publishedWorldMeshAtlasPayload, atlas.width, atlas.height,
 				sprite.getX(), sprite.getY(), sprite.contents().width(), sprite.contents().height());
 		}
+	}
+
+	/**
+	 * Resource reloads temporarily leave already-built GUI render state pointed
+	 * at the previous atlas incarnation. That state is not valid semantic input
+	 * for the new Rust frame, but it is expected while the reload overlay is
+	 * still active. GUI collectors use this bit to reject that one stale item
+	 * rather than turning an ordinary reload transition into a client crash.
+	 */
+	public static boolean isResourceReloadStaging() {
+		return resourceReloadStaging && !resourceReloadCommitInProgress;
 	}
 
 	/**
@@ -3076,6 +3132,50 @@ public final class RustGalTerrainRenderer {
 			| ((bytes[offset + 1] & 0xff) << 8)
 			| ((bytes[offset + 2] & 0xff) << 16)
 			| ((bytes[offset + 3] & 0xff) << 24);
+	}
+
+	private static void appendCachedOpaqueMeshKey(TerrainSetScratch scratch, long meshKey, long meshGeneration) {
+		if (scratch.cachedOpaqueMeshKeyCount == scratch.cachedOpaqueMeshKeyArray.length) {
+			scratch.cachedOpaqueMeshKeyArray = Arrays.copyOf(
+				scratch.cachedOpaqueMeshKeyArray,
+				scratch.cachedOpaqueMeshKeyArray.length * 2
+			);
+			scratch.cachedOpaqueMeshGenerationArray = Arrays.copyOf(
+				scratch.cachedOpaqueMeshGenerationArray,
+				scratch.cachedOpaqueMeshGenerationArray.length * 2
+			);
+		}
+		int index = scratch.cachedOpaqueMeshKeyCount++;
+		scratch.cachedOpaqueMeshKeyArray[index] = meshKey;
+		scratch.cachedOpaqueMeshGenerationArray[index] = meshGeneration;
+	}
+
+	/**
+	 * Records the semantic receipt for a cached immutable terrain instance after
+	 * the batch producer has admitted it. No resource or backend state is
+	 * recreated here; the active record is the same one consumed by the normal
+	 * frame path.
+	 */
+	private static void recordCachedOpaqueLayerSubmission(RenderSection section,
+		ChunkSectionLayer layer, TerrainSectionAsset asset, LongOpenHashSet visibleSubmissions,
+		boolean trackTerrainCounters) {
+		if (asset == null || !visibleSubmissions.add(asset.meshKey())) {
+			return;
+		}
+		if (trackTerrainCounters) {
+			long enqueueFrameId = rustEnqueueFrames.incrementAndGet();
+			visibleLayerSubmissions.incrementAndGet();
+			recordCurrentFrameVisibleSubmission(enqueueFrameId, section.getPositionAsLong(), layer,
+				asset.meshKey(), asset.meshGeneration());
+			recordVisibleSubmissionIdentity(section.getPositionAsLong(), layer, asset.meshGeneration());
+		}
+		var animatedSprites = section.getAnimatedSprites();
+		if (animatedSprites != null) {
+			for (var sprite : animatedSprites) {
+				RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+					sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+			}
+		}
 	}
 
 	private static boolean enqueueSectionLayer(RenderSection section, ChunkSectionLayer layer, Camera camera,

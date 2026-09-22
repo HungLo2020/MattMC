@@ -9,6 +9,7 @@ use crate::render::vulkanic::resources::{
     CombinedTextureSamplerDesc, CompareOp, Extent3d, IndexType, QueueClass, SamplerAddressMode,
     SamplerDesc, SamplerFilter,
 };
+use smallvec::SmallVec;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -351,7 +352,7 @@ pub(crate) struct TerrainMeshDraw {
     /// Dynamic offsets required by the semantic mesh resource set. Fixture
     /// meshes use one streamed-instance offset; source-derived terrain sets
     /// may own static bindings and therefore require none.
-    pub resource_set_dynamic_offsets: Vec<u64>,
+    pub resource_set_dynamic_offsets: SmallVec<[u64; 3]>,
     /// Optional shader-pack-owned semantic resources. This is distinct from
     /// the mesh/material set and intentionally carries only GAL handles; the
     /// frontend never sees backend state or shader-pack internals.
@@ -415,7 +416,7 @@ pub(crate) struct TerrainShadowDraw {
     pub pipeline: Handle,
     pub pipeline_layout: Handle,
     pub resource_set: Handle,
-    pub resource_set_dynamic_offsets: Vec<u64>,
+    pub resource_set_dynamic_offsets: SmallVec<[u64; 3]>,
     pub shader_resource_set: Option<TerrainShaderResourceSet>,
 }
 
@@ -8098,7 +8099,7 @@ mod tests {
             offscreen_pipeline: None,
             pipeline_layout: Handle::NULL,
             resource_set: Handle::NULL,
-            resource_set_dynamic_offsets: Vec::new(),
+            resource_set_dynamic_offsets: Vec::new().into(),
             shader_resource_set: None,
             index_buffer: Handle::NULL,
             index_offset: 0,

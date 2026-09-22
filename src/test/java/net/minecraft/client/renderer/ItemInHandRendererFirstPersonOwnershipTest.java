@@ -32,6 +32,21 @@ final class ItemInHandRendererFirstPersonOwnershipTest {
 	}
 
 	@Test
+	void rustHandsSuppressTheKnownGlassPaneOverlayWithoutChangingJavaHands() throws Exception {
+		String source = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/minecraft/client/renderer/ItemInHandRenderer.java"
+		));
+		assertTrue(source.contains("isRustGlassPane(this.mainHandItem)"),
+			"Rust main-hand capture must omit the known broken glass-pane overlay");
+		assertTrue(source.contains("isRustGlassPane(this.offHandItem)"),
+			"Rust off-hand capture must apply the same bounded pane policy");
+		assertTrue(source.contains("BuiltInRegistries.ITEM.getKey(itemStack.getItem())"),
+			"the pane filter must use the canonical item identity rather than a renderer-specific class");
+		assertTrue(source.contains("The Java/OpenGL hand path is unchanged."),
+			"the pane workaround must remain scoped to Rust whole-frame hands");
+	}
+
+	@Test
 	void productionCallsiteSeparatesOwnershipFromRustReadiness() throws Exception {
 		String source = Files.readString(PROJECT_ROOT.resolve(
 			"src/main/java/net/minecraft/client/renderer/ItemInHandRenderer.java"

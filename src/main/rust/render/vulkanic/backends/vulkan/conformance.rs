@@ -16,7 +16,7 @@ use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
 use crate::render::vulkanic::shader_pack::programs::{
-    distant_horizons_lod_opaque_resource_layouts,
+    distant_horizons_lod_opaque_resource_layouts, minimal_compact_direct_terrain_program,
     minimal_distant_horizons_lod_exact_atlas_forward_opaque_program,
     minimal_distant_horizons_lod_exact_atlas_opaque_program,
     minimal_distant_horizons_lod_opaque_program, minimal_distant_horizons_lod_transparent_program,
@@ -1183,10 +1183,7 @@ fn standard_item_foil_compiles_without_vertex_lighting_or_terrain_lod_bias() {
 }
 
 #[test]
-fn compact_direct_terrain_vertex_program_compiles_for_vulkan() {
-    use crate::render::vulkanic::shader_pack::programs::{
-        minimal_compact_direct_terrain_program, TerrainMaterialProgramKind,
-    };
+fn compact_direct_terrain_program_compiles_for_vulkan() {
     for kind in [
         TerrainMaterialProgramKind::Opaque,
         TerrainMaterialProgramKind::Cutout,
@@ -1201,6 +1198,19 @@ fn compact_direct_terrain_vertex_program_compiles_for_vulkan() {
             shaderc::ShaderKind::Vertex,
             &source,
             program.vertex.label.as_str(),
+        )
+        .unwrap();
+        assert!(!spirv.is_empty());
+
+        let source = String::from_utf8(shader_stage_code_for_backend(
+            BackendApi::Vulkan,
+            &program.fragment.source,
+        ))
+        .unwrap();
+        let spirv = compile_glsl_for_backend_test(
+            shaderc::ShaderKind::Fragment,
+            &source,
+            program.fragment.label.as_str(),
         )
         .unwrap();
         assert!(!spirv.is_empty());

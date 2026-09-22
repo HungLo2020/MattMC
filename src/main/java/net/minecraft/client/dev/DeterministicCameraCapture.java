@@ -5707,9 +5707,12 @@ public final class DeterministicCameraCapture {
 	 * Java GPU object. */
 	public static void recordRustSkyMatrices(float[] view, float[] projection) {
 		if (!ENABLED || complete || failed || view == null || projection == null
-			|| view.length != 16 || projection.length != 16) {
+			|| view.length != 16 || projection.length != 16
+			|| GraphicsFrameBenchmark.isMeasurementFrameForDiagnostics()) {
 			return;
 		}
+		// This is a capture receipt, not renderer input. Keep it out of the measured
+		// frame so file formatting and filesystem churn cannot inflate world setup.
 		try {
 			Files.createDirectories(SCREENSHOT_DIR);
 			Files.writeString(
@@ -5727,9 +5730,11 @@ public final class DeterministicCameraCapture {
 	/** Capture-only receipt of the display-encoded sky color copied into the
 	 * immutable Rust background semantic record. */
 	public static void recordRustSkyColor(int skyColorArgb) {
-		if (!ENABLED || complete || failed) {
+		if (!ENABLED || complete || failed || GraphicsFrameBenchmark.isMeasurementFrameForDiagnostics()) {
 			return;
 		}
+		// The color is already copied into the immutable world-background record;
+		// this file is only a diagnostic receipt and is skipped during measurement.
 		try {
 			Files.createDirectories(SCREENSHOT_DIR);
 			Files.writeString(

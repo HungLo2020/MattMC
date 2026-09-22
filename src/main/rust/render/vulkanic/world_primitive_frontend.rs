@@ -70,18 +70,20 @@ use super::shader_pack::programs::{
     minimal_direct_terrain_solid_program, minimal_direct_terrain_translucent_program,
     minimal_direct_world_decal_foil_program, minimal_entity_outline_program,
     minimal_optical_stencil_write_program, minimal_shadow_depth_program,
-    minimal_terrain_cutout_program, minimal_terrain_solid_program,
-    prepare_lowered_distant_horizons_exact_atlas_source_program, shader_stage_code_for_backend,
-    CompositeProgram, DistantHorizonsMaterialIdentityContract, LocalTexturedSourceProgram,
-    LoweredCloudSourceProgram, LoweredDistantHorizonsSourceProgram, LoweredEntitySourceProgram,
-    LoweredFullscreenSourceProgram, LoweredHandSourceProgram, LoweredTerrainSourceProgram,
-    LoweredTexturedMaterialSourceProgram, LoweredWeatherSourceProgram, ProgramIdentity,
-    TerrainMaterialProgram, TerrainMaterialProgramKind, TerrainSourceExecutionLayouts,
-    TerrainSourceTextureTransforms, COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
-    COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID, MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT,
-    MINIMAL_ENTITY_OUTLINE_BLUR_FRAGMENT, MINIMAL_ENTITY_OUTLINE_FULLSCREEN_VERTEX,
-    MINIMAL_ENTITY_OUTLINE_SOBEL_FRAGMENT, STANDARD_ITEM_FOIL_PROGRAM_ID,
-    TERRAIN_SOURCE_INSTANCE_BYTES, TERRAIN_SOURCE_VERTEX_BYTES, WORLD_DECAL_FOIL_PROGRAM_ID,
+    minimal_static_compact_direct_terrain_program, minimal_terrain_cutout_program,
+    minimal_terrain_solid_program, prepare_lowered_distant_horizons_exact_atlas_source_program,
+    shader_stage_code_for_backend, CompositeProgram, DistantHorizonsMaterialIdentityContract,
+    LocalTexturedSourceProgram, LoweredCloudSourceProgram, LoweredDistantHorizonsSourceProgram,
+    LoweredEntitySourceProgram, LoweredFullscreenSourceProgram, LoweredHandSourceProgram,
+    LoweredTerrainSourceProgram, LoweredTexturedMaterialSourceProgram, LoweredWeatherSourceProgram,
+    ProgramIdentity, TerrainMaterialProgram, TerrainMaterialProgramKind,
+    TerrainSourceExecutionLayouts, TerrainSourceTextureTransforms,
+    COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID, COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
+    MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT, MINIMAL_ENTITY_OUTLINE_BLUR_FRAGMENT,
+    MINIMAL_ENTITY_OUTLINE_FULLSCREEN_VERTEX, MINIMAL_ENTITY_OUTLINE_SOBEL_FRAGMENT,
+    STANDARD_ITEM_FOIL_PROGRAM_ID, STATIC_COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
+    STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID, TERRAIN_SOURCE_INSTANCE_BYTES,
+    TERRAIN_SOURCE_VERTEX_BYTES, WORLD_DECAL_FOIL_PROGRAM_ID,
 };
 use super::shader_pack::runtime::{
     append_indexed_draw, DistantHorizonsTranslucentSourceCandidate, EntitySourceDraw,
@@ -2037,7 +2039,8 @@ pub struct WorldMeshInstanceRequest {
     /// Shared ARGB entity-color override. Alpha zero preserves source color.
     pub entity_color_argb: u32,
     /// Copied packed vanilla UV2 light used by stable model assets when the
-    /// explicit instance-light flag is present.
+    /// explicit instance-light flag is present. Terrain leaves this zero and
+    /// carries its baked light per vertex.
     pub packed_light: u32,
     /// Semantic entity-outline color. Alpha zero means no outline request.
     pub outline_color_argb: u32,
@@ -3029,6 +3032,11 @@ struct MeshResourceKey {
     section_index: u32,
     material_id: u32,
     texture_id: u32,
+    /// The compact direct terrain fragment has a separate immutable shader
+    /// identity for textures whose validated animation table has one frame.
+    /// Keep this in the resource key so a later atlas generation or animated
+    /// asset can never alias the static pipeline.
+    texture_animated: bool,
     material_mode: u32,
     winding: u32,
     depth_policy: u32,
@@ -3308,6 +3316,30 @@ impl MeshAssetStore {
         color_format: ColorFormat,
         raster_y_direction: RasterYDirection,
         g_buffer: bool,
+        texture_animated: bool,
+    ) -> GalResult<Arc<Vec<MeshSectionRange>>> {
+        self.compatible_section_ranges_per_texture(
+            instance,
+            color_format,
+            raster_y_direction,
+            g_buffer,
+            |_| texture_animated,
+        )
+    }
+
+    /// Expands a whole mesh while preserving the immutable animation class of
+    /// each section. A mesh can contain a static stone range next to an
+    /// animated water range; classifying the complete mesh from one `any()`
+    /// result needlessly routes both through the animated fragment program.
+    /// The cache key includes the complete section texture/class signature so
+    /// a texture-only animation update cannot reuse stale classification.
+    fn compatible_section_ranges_per_texture(
+        &self,
+        instance: &WorldMeshInstanceRequest,
+        color_format: ColorFormat,
+        raster_y_direction: RasterYDirection,
+        g_buffer: bool,
+        texture_is_animated: impl Fn(u32) -> bool,
     ) -> GalResult<Arc<Vec<MeshSectionRange>>> {
         let key = MeshSectionRangeCacheKey {
             stratum: instance.stratum,
@@ -3322,6 +3354,7 @@ impl MeshAssetStore {
             } else {
                 0
             },
+            texture_animation_signature: texture_animation_signature(self, &texture_is_animated),
         };
         if let Some((_, ranges)) = self
             .section_ranges_cache
@@ -3331,12 +3364,13 @@ impl MeshAssetStore {
         {
             return Ok(Arc::clone(ranges));
         }
-        let ranges = Arc::new(compatible_mesh_section_ranges(
+        let ranges = Arc::new(compatible_mesh_section_ranges_per_texture(
             instance,
             self,
             color_format,
             raster_y_direction,
             g_buffer,
+            texture_is_animated,
         )?);
         let mut cache = self.section_ranges_cache.borrow_mut();
         // A mesh normally uses one direct and one G-buffer policy. Keep the
@@ -10317,9 +10351,7 @@ struct WorldMaterialTextureAsset {
     frame_width: u32,
     frame_height: u32,
     frame_count: u32,
-    frame_ticks: u32,
     animation_flags: u32,
-    frame_row_size: u32,
     interpolation_policy: u32,
     animation_frames: Vec<MeshTextureAnimationFrame>,
     animation_total_ticks: u32,
@@ -10359,13 +10391,6 @@ struct MeshTextureAnimationFrame {
     region: [f32; 4],
 }
 
-#[derive(Clone, Debug)]
-struct MeshTextureAnimation {
-    frames: Vec<MeshTextureAnimationFrame>,
-    total_ticks: u32,
-    interpolation_policy: u32,
-}
-
 #[derive(Clone, Copy, Debug)]
 struct MeshTextureAnimationSample {
     animated: bool,
@@ -10385,76 +10410,41 @@ impl Default for MeshTextureAnimationSample {
     }
 }
 
-impl Default for MeshTextureAnimation {
-    fn default() -> Self {
-        Self {
-            frames: vec![MeshTextureAnimationFrame {
-                duration_ticks: 1,
-                region: [0.0, 0.0, 1.0, 1.0],
-            }],
-            total_ticks: 1,
-            interpolation_policy: 0,
-        }
-    }
-}
-
-impl MeshTextureAnimation {
-    fn from_asset(asset: &WorldMaterialTextureAsset) -> Self {
-        // Keep the copied asset metadata tied to the decoded animation table.
-        // These checks make malformed semantic texture records fail at the
-        // ownership boundary in debug/test builds instead of silently
-        // discarding metadata before the Rust sampler selects a frame.
-        debug_assert!(asset.width > 0 && asset.height > 0);
-        debug_assert!(asset.frame_width > 0 && asset.frame_height > 0);
-        debug_assert!(asset.frame_width <= asset.width && asset.frame_height <= asset.height);
-        debug_assert!(asset.frame_count == asset.animation_frames.len() as u32);
-        debug_assert!(asset.frame_ticks > 0 && asset.frame_row_size > 0);
-        debug_assert!(asset.animation_total_ticks > 0);
-        debug_assert_eq!(asset.animation_flags, 0);
-        debug_assert!(matches!(
-            asset.coordinate_origin,
-            WorldMeshTextureCoordinateOrigin::Vulkanic
-                | WorldMeshTextureCoordinateOrigin::MinecraftTopLeft
-        ));
-        Self {
-            frames: asset.animation_frames.clone(),
-            total_ticks: asset.animation_total_ticks.max(1),
-            interpolation_policy: asset.interpolation_policy,
-        }
-    }
-
-    fn sample(&self, frame_id: u64) -> MeshTextureAnimationSample {
-        if self.frames.len() <= 1 {
-            return MeshTextureAnimationSample {
-                ..MeshTextureAnimationSample::default()
-            };
-        }
-        let tick = (frame_id % u64::from(self.total_ticks.max(1))) as u32;
-        let mut cursor = 0u32;
-        let mut selected = 0usize;
-        for (index, frame) in self.frames.iter().enumerate() {
-            let end = cursor.saturating_add(frame.duration_ticks.max(1));
-            if tick < end {
-                selected = index;
-                break;
-            }
-            cursor = end;
-        }
-        let current = self.frames[selected];
-        let next = self.frames[(selected + 1) % self.frames.len()];
-        let elapsed = tick.saturating_sub(cursor);
-        let interpolation = if self.interpolation_policy == WORLD_MESH_ANIMATION_INTERPOLATE_LINEAR
-        {
-            elapsed as f32 / current.duration_ticks.max(1) as f32
-        } else {
-            0.0
+fn sample_mesh_texture_animation(
+    frames: &[MeshTextureAnimationFrame],
+    total_ticks: u32,
+    interpolation_policy: u32,
+    frame_id: u64,
+) -> MeshTextureAnimationSample {
+    if frames.len() <= 1 {
+        return MeshTextureAnimationSample {
+            ..MeshTextureAnimationSample::default()
         };
-        MeshTextureAnimationSample {
-            animated: true,
-            current_region: current.region,
-            next_region: next.region,
-            interpolation,
+    }
+    let tick = (frame_id % u64::from(total_ticks.max(1))) as u32;
+    let mut cursor = 0u32;
+    let mut selected = 0usize;
+    for (index, frame) in frames.iter().enumerate() {
+        let end = cursor.saturating_add(frame.duration_ticks.max(1));
+        if tick < end {
+            selected = index;
+            break;
         }
+        cursor = end;
+    }
+    let current = frames[selected];
+    let next = frames[(selected + 1) % frames.len()];
+    let elapsed = tick.saturating_sub(cursor);
+    let interpolation = if interpolation_policy == WORLD_MESH_ANIMATION_INTERPOLATE_LINEAR {
+        elapsed as f32 / current.duration_ticks.max(1) as f32
+    } else {
+        0.0
+    };
+    MeshTextureAnimationSample {
+        animated: true,
+        current_region: current.region,
+        next_region: next.region,
+        interpolation,
     }
 }
 
@@ -10998,9 +10988,7 @@ impl WorldPrimitiveFrontend {
                     frame_width: width,
                     frame_height: height,
                     frame_count: 1,
-                    frame_ticks: 1,
                     animation_flags: 0,
-                    frame_row_size: 1,
                     interpolation_policy: WORLD_MESH_ANIMATION_INTERPOLATE_NONE,
                     animation_frames: vec![MeshTextureAnimationFrame {
                         duration_ticks: 1,
@@ -11555,9 +11543,7 @@ impl WorldPrimitiveFrontend {
                     frame_width,
                     frame_height,
                     frame_count,
-                    frame_ticks,
                     animation_flags: payload.animation_flags,
-                    frame_row_size,
                     interpolation_policy: payload.interpolation_policy,
                     animation_frames,
                     animation_total_ticks,
@@ -14398,7 +14384,7 @@ impl WorldPrimitiveFrontend {
             pipeline,
             pipeline_layout,
             resource_set,
-            resource_set_dynamic_offsets: dynamic_offsets,
+            resource_set_dynamic_offsets: dynamic_offsets.into(),
             shader_resource_set: TerrainShaderResourceSet {
                 set_index: 1,
                 set: pack_resource_set,
@@ -15226,7 +15212,7 @@ impl WorldPrimitiveFrontend {
                             offsets.push(offset);
                         }
                         offsets.push(stream.instance_offset);
-                        offsets
+                        offsets.into()
                     },
                     shader_resource_set: Some(TerrainShaderResourceSet {
                         set_index: 1,
@@ -15317,7 +15303,7 @@ impl WorldPrimitiveFrontend {
                 pipeline,
                 pipeline_layout,
                 resource_set,
-                resource_set_dynamic_offsets: dynamic_offsets.clone(),
+                resource_set_dynamic_offsets: dynamic_offsets.clone().into(),
                 shader_resource_set: Some(TerrainShaderResourceSet {
                     set_index: 1,
                     set: pack_resource_set,
@@ -24194,7 +24180,7 @@ impl WorldPrimitiveFrontend {
                 pipeline_layout: draw.pipeline_layout,
                 set_index: 0,
                 set: draw.resource_set,
-                dynamic_offsets: draw.resource_set_dynamic_offsets.clone(),
+                dynamic_offsets: draw.resource_set_dynamic_offsets.to_vec(),
             });
             if let Some(shader_resource_set) = draw.shader_resource_set {
                 ops.push(CommandOp::BindResourceSet {
@@ -27849,7 +27835,7 @@ impl WorldPrimitiveFrontend {
             },
             pipeline_layout: prepared.pipeline_layout,
             resource_set: prepared.geometry_resource_set,
-            resource_set_dynamic_offsets: Vec::new(),
+            resource_set_dynamic_offsets: Vec::new().into(),
             shader_resource_set: Some(TerrainShaderResourceSet {
                 set_index: 1,
                 set: prepared.atlas_and_lightmap_resource_set,
@@ -27920,7 +27906,7 @@ impl WorldPrimitiveFrontend {
             offscreen_pipeline: prepared.offscreen_pipeline,
             pipeline_layout: prepared.pipeline_layout,
             resource_set: prepared.geometry_resource_set,
-            resource_set_dynamic_offsets: Vec::new(),
+            resource_set_dynamic_offsets: Vec::new().into(),
             shader_resource_set: Some(TerrainShaderResourceSet {
                 set_index: 1,
                 set: prepared.atlas_and_lightmap_resource_set,
@@ -28464,7 +28450,7 @@ impl WorldPrimitiveFrontend {
                 offscreen_pipeline: prepared.offscreen_pipeline,
                 pipeline_layout: prepared.pipeline_layout,
                 resource_set: prepared.geometry_resource_set,
-                resource_set_dynamic_offsets: Vec::new(),
+                resource_set_dynamic_offsets: Vec::new().into(),
                 shader_resource_set: Some(TerrainShaderResourceSet {
                     set_index: 1,
                     set: prepared.lightmap_resource_set,
@@ -28544,7 +28530,7 @@ impl WorldPrimitiveFrontend {
                             offscreen_pipeline: prepared.offscreen_pipeline,
                             pipeline_layout: prepared.pipeline_layout,
                             resource_set: prepared.geometry_resource_set,
-                            resource_set_dynamic_offsets: Vec::new(),
+                            resource_set_dynamic_offsets: Vec::new().into(),
                             shader_resource_set: Some(TerrainShaderResourceSet {
                                 set_index: 1,
                                 set: prepared.atlas_and_lightmap_resource_set,
@@ -28661,7 +28647,7 @@ impl WorldPrimitiveFrontend {
                     offscreen_pipeline: prepared.offscreen_pipeline,
                     pipeline_layout: prepared.pipeline_layout,
                     resource_set: prepared.geometry_resource_set,
-                    resource_set_dynamic_offsets: Vec::new(),
+                    resource_set_dynamic_offsets: Vec::new().into(),
                     shader_resource_set: Some(TerrainShaderResourceSet {
                         set_index: 1,
                         set: prepared.lightmap_resource_set,
@@ -28768,7 +28754,7 @@ impl WorldPrimitiveFrontend {
                 offscreen_pipeline: prepared.offscreen_pipeline,
                 pipeline_layout: prepared.pipeline_layout,
                 resource_set: prepared.geometry_resource_set,
-                resource_set_dynamic_offsets: Vec::new(),
+                resource_set_dynamic_offsets: Vec::new().into(),
                 shader_resource_set: Some(TerrainShaderResourceSet {
                     set_index: 1,
                     set: prepared.lightmap_resource_set,
@@ -28857,7 +28843,7 @@ impl WorldPrimitiveFrontend {
                 offscreen_pipeline: prepared.offscreen_pipeline,
                 pipeline_layout: prepared.pipeline_layout,
                 resource_set: prepared.geometry_resource_set,
-                resource_set_dynamic_offsets: Vec::new(),
+                resource_set_dynamic_offsets: Vec::new().into(),
                 shader_resource_set: Some(TerrainShaderResourceSet {
                     set_index: 1,
                     set: prepared.lightmap_resource_set,
@@ -30704,7 +30690,7 @@ impl WorldPrimitiveFrontend {
                     offscreen_pipeline: Some(resources.pipeline),
                     pipeline_layout: resources.pipeline_layout,
                     resource_set: slot.resource_set,
-                    resource_set_dynamic_offsets: Vec::new(),
+                    resource_set_dynamic_offsets: Vec::new().into(),
                     shader_resource_set: Some(lightmap),
                     index_buffer: resources.index_buffer,
                     index_offset: 0,
@@ -30983,14 +30969,14 @@ impl WorldPrimitiveFrontend {
                                 pipeline,
                                 pipeline_layout,
                                 resource_set,
-                                resource_set_dynamic_offsets: dynamic_offsets.clone(),
+                                resource_set_dynamic_offsets: dynamic_offsets.clone().into(),
                                 shader_resource_set,
                             }),
                             pipeline,
                             offscreen_pipeline: None,
                             pipeline_layout,
                             resource_set,
-                            resource_set_dynamic_offsets: dynamic_offsets,
+                            resource_set_dynamic_offsets: dynamic_offsets.into(),
                             shader_resource_set,
                             index_buffer,
                             index_offset: draw_index_offset,
@@ -33719,7 +33705,7 @@ impl WorldPrimitiveFrontend {
         key: MeshPipelineResourceKey,
     ) -> GalResult<()> {
         let terrain_program = if key.vertex_abi == MeshVertexAbi::DirectTerrain32 {
-            minimal_compact_direct_terrain_program(match key.material_mode {
+            let kind = match key.material_mode {
                 WORLD_MATERIAL_MODE_OPAQUE => TerrainMaterialProgramKind::Opaque,
                 WORLD_MATERIAL_MODE_CUTOUT => TerrainMaterialProgramKind::Cutout,
                 _ => {
@@ -33727,7 +33713,16 @@ impl WorldPrimitiveFrontend {
                         "compact direct terrain pipeline requires opaque/cutout material",
                     ));
                 }
-            })
+            };
+            if key.shader_program_identity.as_str()
+                == STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID
+                || key.shader_program_identity.as_str()
+                    == STATIC_COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID
+            {
+                minimal_static_compact_direct_terrain_program(kind)
+            } else {
+                minimal_compact_direct_terrain_program(kind)
+            }
         } else if key.shader_program_identity.as_str() == STANDARD_ITEM_FOIL_PROGRAM_ID {
             minimal_direct_standard_item_foil_program()
         } else if key.shader_program_identity.as_str() == WORLD_DECAL_FOIL_PROGRAM_ID {
@@ -35017,11 +35012,32 @@ impl WorldPrimitiveFrontend {
         self.world_material_texture_bytes(texture_id)
     }
 
-    fn world_mesh_texture_animation(&self, texture_id: u32) -> MeshTextureAnimation {
+    fn world_mesh_texture_animation_sample(
+        &self,
+        texture_id: u32,
+        frame_id: u64,
+    ) -> MeshTextureAnimationSample {
         self.mesh_texture_assets
             .get(&texture_id)
-            .map(MeshTextureAnimation::from_asset)
+            .map(|asset| {
+                sample_mesh_texture_animation(
+                    &asset.animation_frames,
+                    asset.animation_total_ticks,
+                    asset.interpolation_policy,
+                    frame_id,
+                )
+            })
             .unwrap_or_default()
+    }
+
+    /// Returns the validated immutable animation class for a copied texture.
+    /// A one-frame table is the same full-image sampling contract as the
+    /// legacy/default path, so it may use the compact static fragment variant;
+    /// every multi-frame asset remains on the animated shader identity.
+    fn world_mesh_texture_is_animated(&self, texture_id: u32) -> bool {
+        self.mesh_texture_assets
+            .get(&texture_id)
+            .is_some_and(|asset| asset.animation_frames.len() > 1)
     }
 
     /// Allocates the standalone base-color resource required by a local-UV
@@ -37689,6 +37705,11 @@ fn validate_mesh_instance(
     if instance.block_entity_id < -1 {
         return Err(GalError::invalid_argument(
             "world mesh instance block entity id must be >= -1",
+        ));
+    }
+    if instance.stratum == WORLD_STRATUM_TERRAIN && instance.packed_light != 0 {
+        return Err(GalError::invalid_argument(
+            "terrain mesh instances must use per-vertex light, not an instance light override",
         ));
     }
     if instance.packed_light > 0x00ff_00ff {
@@ -40709,7 +40730,7 @@ fn append_private_dh_draws(draws: &[TerrainMeshDraw], ops: &mut Vec<CommandOp>) 
             pipeline_layout: draw.pipeline_layout,
             set_index: 0,
             set: draw.resource_set,
-            dynamic_offsets: draw.resource_set_dynamic_offsets.clone(),
+            dynamic_offsets: draw.resource_set_dynamic_offsets.to_vec(),
         });
         if let Some(shader_resource_set) = draw.shader_resource_set {
             ops.push(CommandOp::BindResourceSet {
@@ -42030,12 +42051,30 @@ fn mesh_batches_selected(
             continue;
         }
         if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
-            let ranges = asset.compatible_section_ranges(
-                instance,
-                color_format,
-                raster_y_direction,
-                g_buffer,
-            )?;
+            let ranges = if matches!(
+                std::env::var("MATTMC_RUST_DISABLE_PER_SECTION_TERRAIN_ANIMATION").as_deref(),
+                Ok("1") | Ok("true") | Ok("yes")
+            ) {
+                let texture_animated = asset
+                    .sections
+                    .iter()
+                    .any(|section| frontend.world_mesh_texture_is_animated(section.texture_id));
+                asset.compatible_section_ranges(
+                    instance,
+                    color_format,
+                    raster_y_direction,
+                    g_buffer,
+                    texture_animated,
+                )?
+            } else {
+                asset.compatible_section_ranges_per_texture(
+                    instance,
+                    color_format,
+                    raster_y_direction,
+                    g_buffer,
+                    |texture_id| frontend.world_mesh_texture_is_animated(texture_id),
+                )?
+            };
             for range in ranges.iter().copied() {
                 push_mesh_batch(
                     &mut batches,
@@ -42064,6 +42103,7 @@ fn mesh_batches_selected(
                 color_format,
                 raster_y_direction,
                 g_buffer,
+                frontend.world_mesh_texture_is_animated(section.texture_id),
             );
             push_mesh_batch(
                 &mut batches,
@@ -42504,6 +42544,7 @@ struct MeshSectionRangeCacheKey {
     g_buffer: bool,
     view_layering: Option<super::view_layering::Projection>,
     decal_vertex_count: usize,
+    texture_animation_signature: u64,
 }
 
 #[derive(Clone, Copy)]
@@ -42513,12 +42554,48 @@ struct MeshSectionRange {
     index_count: u32,
 }
 
+fn texture_animation_signature(
+    asset: &MeshAssetStore,
+    texture_is_animated: impl Fn(u32) -> bool,
+) -> u64 {
+    // A small deterministic rolling signature keeps section-range reuse safe
+    // across texture-only animation updates without retaining a second vector
+    // of booleans in every mesh asset.
+    let mut signature = 0xcbf2_9ce4_8422_2325_u64 ^ asset.sections.len() as u64;
+    for section in &asset.sections {
+        signature ^= u64::from(section.texture_id);
+        signature = signature.wrapping_mul(0x1000_0000_01b3);
+        signature ^= u64::from(texture_is_animated(section.texture_id));
+        signature = signature.wrapping_mul(0x1000_0000_01b3);
+    }
+    signature
+}
+
 fn compatible_mesh_section_ranges(
     instance: &WorldMeshInstanceRequest,
     asset: &MeshAssetStore,
     color_format: ColorFormat,
     raster_y_direction: RasterYDirection,
     g_buffer: bool,
+    texture_animated: bool,
+) -> GalResult<Vec<MeshSectionRange>> {
+    compatible_mesh_section_ranges_per_texture(
+        instance,
+        asset,
+        color_format,
+        raster_y_direction,
+        g_buffer,
+        |_| texture_animated,
+    )
+}
+
+fn compatible_mesh_section_ranges_per_texture(
+    instance: &WorldMeshInstanceRequest,
+    asset: &MeshAssetStore,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+    g_buffer: bool,
+    texture_is_animated: impl Fn(u32) -> bool,
 ) -> GalResult<Vec<MeshSectionRange>> {
     let mut ranges = Vec::new();
     let Some(first) = asset.sections.first() else {
@@ -42534,6 +42611,7 @@ fn compatible_mesh_section_ranges(
         color_format,
         raster_y_direction,
         g_buffer,
+        texture_is_animated(first.texture_id),
     );
     let mut current_offset = first.index_offset as u64;
     let mut current_count = first.index_count;
@@ -42549,6 +42627,7 @@ fn compatible_mesh_section_ranges(
             color_format,
             raster_y_direction,
             g_buffer,
+            texture_is_animated(section.texture_id),
         );
         if mesh_sections_can_coalesce(&current_key, &key, previous, section, asset.index_type)
             && current_count
@@ -42692,6 +42771,7 @@ fn mesh_key_for_section(
     color_format: ColorFormat,
     raster_y_direction: RasterYDirection,
     g_buffer: bool,
+    texture_animated: bool,
 ) -> MeshResourceKey {
     MeshResourceKey {
         raster_y_direction,
@@ -42709,6 +42789,7 @@ fn mesh_key_for_section(
         section_index,
         material_id: section.material_id,
         texture_id: section.texture_id,
+        texture_animated,
         material_mode: section.material_mode,
         winding: section.winding,
         depth_policy: instance.depth_policy,
@@ -42737,10 +42818,17 @@ fn mesh_vertex_abi_for_builtin(key: MeshResourceKey) -> MeshVertexAbi {
 
 fn mesh_pipeline_key(key: MeshResourceKey) -> GalResult<MeshPipelineResourceKey> {
     let vertex_abi = mesh_vertex_abi_for_builtin(key);
+    let static_terrain_specialization = !key.texture_animated
+        && !matches!(
+            std::env::var("MATTMC_RUST_DISABLE_STATIC_TERRAIN_SPECIALIZATION").as_deref(),
+            Ok("1") | Ok("true") | Ok("yes")
+        );
     let shader_program_identity = if vertex_abi == MeshVertexAbi::DirectTerrain32 {
-        ProgramIdentity::new(match key.material_mode {
-            WORLD_MATERIAL_MODE_OPAQUE => COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
-            WORLD_MATERIAL_MODE_CUTOUT => COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
+        ProgramIdentity::new(match (key.material_mode, static_terrain_specialization) {
+            (WORLD_MATERIAL_MODE_OPAQUE, true) => STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
+            (WORLD_MATERIAL_MODE_CUTOUT, true) => STATIC_COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
+            (WORLD_MATERIAL_MODE_OPAQUE, false) => COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
+            (WORLD_MATERIAL_MODE_CUTOUT, false) => COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
             _ => unreachable!("compact terrain predicate admits only opaque/cutout"),
         })
     } else if key.standard_item_foil {
@@ -43932,11 +44020,13 @@ struct PackedMeshDrawStream {
 }
 
 fn mesh_batch_supports_page_indirect(batch: &MeshBatch) -> bool {
-    batch.key.stratum == WORLD_STRATUM_TERRAIN
+    !batch.key.g_buffer
+        && batch.key.stratum == WORLD_STRATUM_TERRAIN
         && matches!(
             batch.key.material_mode,
             WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT
         )
+        && batch.key.texture_id == WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS
         && !batch.key.standard_item_foil
         && batch.key.view_layering.is_none()
         && batch.key.decal_vertex_count == 0
@@ -43962,6 +44052,13 @@ fn packed_mesh_draw_stream(
         payload.extend_from_slice(&header);
         for (index, batch) in mesh_batches.iter().enumerate() {
             if enable_page_indirect && mesh_batch_supports_page_indirect(batch) {
+                if batch.indices.iter().any(|instance_index| {
+                    !is_translation_only_transform(&frame.mesh_instances[*instance_index].transform)
+                }) {
+                    return Err(GalError::invalid_argument(
+                        "compact vanilla terrain placement must be translation-only",
+                    ));
+                }
                 first_instances[index] = Some(next_instance);
                 next_instance =
                     next_instance
@@ -44076,7 +44173,6 @@ fn append_mesh_instances(
     batch: &MeshBatch,
     out: &mut Vec<u8>,
 ) -> GalResult<()> {
-    let animation = frontend.world_mesh_texture_animation(batch.key.texture_id);
     // Animated atlas phases follow the semantic game frame counter when the
     // caller provides shader timing. Render-frame IDs are only a diagnostic
     // fallback for legacy/minimal frames that intentionally omit it; using
@@ -44090,7 +44186,12 @@ fn append_mesh_instances(
     } else {
         frame.frame_id
     };
-    let animation_sample = animation.sample(animation_phase);
+    // The immutable texture asset owns this table. Sampling it by reference
+    // avoids cloning the animation frame vector once per mesh batch; the
+    // resulting phase/regions are identical to the owned helper used by
+    // animation-focused callers.
+    let animation_sample =
+        frontend.world_mesh_texture_animation_sample(batch.key.texture_id, animation_phase);
     for instance_index in &batch.indices {
         let instance = &frame.mesh_instances[*instance_index];
         for value in instance.transform {
@@ -44128,7 +44229,7 @@ fn append_mesh_instances(
 					&& material_registry::fullbright_without_cardinal_lighting(batch.key.material_id) { 128 } else { 0 }
                 | if batch.key.stratum == WORLD_STRATUM_ENTITY_MESH
                     && material_registry::lightmapped_without_cardinal_lighting(batch.key.material_id) { 256 } else { 0 }
-				| if batch.key.stratum == WORLD_STRATUM_ENTITY_MESH
+                | if batch.key.stratum == WORLD_STRATUM_ENTITY_MESH
 					&& material_registry::fullbright_with_cardinal_lighting(batch.key.material_id) { 512 } else { 0 }
 				| if instance.packed_light != 0 { 1024 } else { 0 }) as f32,
         );
@@ -44158,6 +44259,15 @@ fn append_mesh_instances(
         }
     }
     Ok(())
+}
+
+fn is_translation_only_transform(transform: &[f32; 16]) -> bool {
+    [0usize, 5, 10, 15]
+        .into_iter()
+        .all(|index| transform[index] == 1.0)
+        && [1usize, 2, 3, 4, 6, 7, 8, 9, 11]
+            .into_iter()
+            .all(|index| transform[index] == 0.0)
 }
 
 /// Chooses the UV semantic owned by a copied mesh texture. This is a frontend
@@ -47319,14 +47429,14 @@ mod tests {
                     pipeline,
                     pipeline_layout: layout,
                     resource_set: set,
-                    resource_set_dynamic_offsets: vec![0, 0],
+                    resource_set_dynamic_offsets: vec![0, 0].into(),
                     shader_resource_set: None,
                 }),
                 pipeline,
                 offscreen_pipeline: None,
                 pipeline_layout: layout,
                 resource_set: set,
-                resource_set_dynamic_offsets: vec![0, 0],
+                resource_set_dynamic_offsets: vec![0, 0].into(),
                 shader_resource_set: None,
                 index_buffer: handle(HandleKind::Buffer, 1),
                 index_offset: 0,
@@ -51643,6 +51753,17 @@ mod tests {
             error.contains("world mesh instance key and generation must be non-zero"),
             "zero mesh generations must fail at the semantic frame boundary: {error}"
         );
+
+        let mut terrain_light = mesh_instance(1, 1);
+        terrain_light.stratum = WORLD_STRATUM_TERRAIN;
+        terrain_light.packed_light = 0x00f0_00f0;
+        let error = validate_mesh_instance(&terrain_light, &source_frame)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("terrain mesh instances must use per-vertex light"),
+            "terrain must reject model-only instance light overrides: {error}"
+        );
     }
 
     #[test]
@@ -51661,6 +51782,7 @@ mod tests {
                 section_index: 0,
                 material_id: 1,
                 texture_id: 1,
+                texture_animated: false,
                 material_mode: WORLD_MATERIAL_MODE_OPAQUE,
                 winding: WORLD_WINDING_CCW,
                 depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
@@ -59278,10 +59400,10 @@ mod tests {
             .keys()
             .find(|key| key.vertex_abi == MeshVertexAbi::DirectTerrain32)
             .expect("compact direct terrain pipeline");
-        assert!(pipeline_key
-            .shader_program_identity
-            .as_str()
-            .ends_with("compact32_v1"));
+        assert_eq!(
+            STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
+            pipeline_key.shader_program_identity.as_str()
+        );
     }
 
     #[test]
@@ -59955,10 +60077,29 @@ mod tests {
             ColorFormat::Bgra8Unorm,
             RasterYDirection::Up,
             false,
+            false,
         );
         assert_eq!(
             MeshVertexAbi::DirectTerrain32,
             mesh_vertex_abi_for_builtin(compact)
+        );
+        assert_eq!(
+            STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
+            mesh_pipeline_key(compact)
+                .unwrap()
+                .shader_program_identity
+                .as_str()
+        );
+        let animated = MeshResourceKey {
+            texture_animated: true,
+            ..compact
+        };
+        assert_eq!(
+            COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
+            mesh_pipeline_key(animated)
+                .unwrap()
+                .shader_program_identity
+                .as_str()
         );
         assert_eq!(
             MeshVertexAbi::Rich80,
@@ -63440,6 +63581,7 @@ mod tests {
                 ColorFormat::Bgra8Unorm,
                 RasterYDirection::Up,
                 false,
+                false,
             )
             .unwrap();
         let second_ranges = asset
@@ -63447,6 +63589,7 @@ mod tests {
                 &instance,
                 ColorFormat::Bgra8Unorm,
                 RasterYDirection::Up,
+                false,
                 false,
             )
             .unwrap();
@@ -63458,6 +63601,7 @@ mod tests {
                 &layered_instance,
                 ColorFormat::Bgra8Unorm,
                 RasterYDirection::Up,
+                false,
                 false,
             )
             .unwrap();
@@ -64755,6 +64899,7 @@ mod tests {
             vertices,
             ColorFormat::Rgba8Unorm,
             RasterYDirection::Up,
+            false,
             false,
         );
         let limit = WORLD_MESH_INSTANCE_STREAM_BINDING_RANGE_BYTES as usize / (48 + vertices * 8);
@@ -67977,6 +68122,41 @@ mod tests {
             None
         );
         gal.destroy(target).unwrap();
+    }
+
+    #[test]
+    fn whole_mesh_animation_class_is_selected_per_section() {
+        let mut asset = mesh_asset(184, 1, IndexType::U16);
+        asset.index_bytes.extend_from_slice(&[0, 0, 2, 0, 3, 0]);
+        asset.sections.push(WorldMeshSection {
+            material_id: WORLD_MATERIAL_ID_OPAQUE_TEXTURED,
+            texture_id: WORLD_MATERIAL_TEXTURE_WATER_STILL,
+            material_mode: WORLD_MATERIAL_MODE_OPAQUE,
+            cull_policy: WORLD_CULL_BACK,
+            winding: WORLD_WINDING_CCW,
+            index_offset: 12,
+            index_count: 3,
+        });
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![asset], Vec::new())
+            .unwrap();
+        let asset = frontend.mesh_assets.get(&184).unwrap();
+        let instance = mesh_instance(184, 1);
+        let ranges = compatible_mesh_section_ranges_per_texture(
+            &instance,
+            &asset,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            |texture_id| texture_id == WORLD_MATERIAL_TEXTURE_WATER_STILL,
+        )
+        .unwrap();
+        assert_eq!(2, ranges.len());
+        assert!(!ranges[0].key.texture_animated);
+        assert!(ranges[1].key.texture_animated);
+        frontend.reset(&mut gal);
     }
 
     #[test]
@@ -72541,9 +72721,7 @@ mod tests {
             frame_width: 2,
             frame_height: 2,
             frame_count: 1,
-            frame_ticks: 1,
             animation_flags: 0,
-            frame_row_size: 1,
             interpolation_policy: WORLD_MESH_ANIMATION_INTERPOLATE_NONE,
             animation_frames: Vec::new(),
             animation_total_ticks: 1,
@@ -72581,9 +72759,7 @@ mod tests {
                 frame_width: 2,
                 frame_height: 2,
                 frame_count: 1,
-                frame_ticks: 1,
                 animation_flags: 0,
-                frame_row_size: 1,
                 interpolation_policy: WORLD_MESH_ANIMATION_INTERPOLATE_NONE,
                 animation_frames: Vec::new(),
                 animation_total_ticks: 1,
@@ -72614,9 +72790,7 @@ mod tests {
             frame_width: 2,
             frame_height: 2,
             frame_count: 1,
-            frame_ticks: 1,
             animation_flags: 0,
-            frame_row_size: 1,
             interpolation_policy: WORLD_MESH_ANIMATION_INTERPOLATE_NONE,
             animation_frames: Vec::new(),
             animation_total_ticks: 1,

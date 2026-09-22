@@ -56,6 +56,11 @@ public final class GraphicsFrameBenchmark {
 	private static final double CAMERA_Z = Double.parseDouble(System.getProperty("mattmc.dev.graphicsFrameBenchmark.cameraZ", "530.5"));
 	private static final float CAMERA_YAW = Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.cameraYaw", "0.0"));
 	private static final float CAMERA_PITCH = Float.parseFloat(System.getProperty("mattmc.dev.graphicsFrameBenchmark.cameraPitch", "9.7"));
+	private static final String CAMERA_PATH_TYPE =
+		System.getProperty("mattmc.dev.graphicsFrameBenchmark.cameraPathType", "fixed-static-terrain")
+			.trim().toLowerCase(Locale.ROOT);
+	private static final float CAMERA_YAW_DELTA = Float.parseFloat(
+		System.getProperty("mattmc.dev.graphicsFrameBenchmark.yawDelta", "0.0"));
 	private static final double WALL_CLOCK_TOLERANCE = Double.parseDouble(System.getProperty("mattmc.dev.graphicsFrameBenchmark.wallClockTolerance", "0.35"));
 	private static final double DISPLAY_FPS_TOLERANCE = Double.parseDouble(System.getProperty("mattmc.dev.graphicsFrameBenchmark.displayFpsTolerance", "0.40"));
 	private static final int DISPLAY_FPS_MIN_FRAMES = Math.max(1, Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.displayFpsMinFrames", 240));
@@ -377,6 +382,11 @@ public final class GraphicsFrameBenchmark {
 			lastProducerWorkloadBlocker = "waiting-for-gameplay-producer-fixture";
 			return;
 		}
+		// Apply the selected path before readiness is evaluated.  A moving
+		// workload can expose a different semantic terrain frontier at each yaw;
+		// checking the queue at the previous pose admitted the measurement window
+		// while the current pose was still building sections.
+		applyBenchmarkCameraPath(minecraft);
 		if (!producerWorkloadReady(minecraft)) {
 			if (!FRAME_NANOS.isEmpty()) {
 				restartMeasurementAfterReadinessLoss();
@@ -486,6 +496,18 @@ public final class GraphicsFrameBenchmark {
 				PHASE_STACK.clear();
 				return;
 			}
+			if (REQUIRE_TERRAIN_QUEUE_DRAIN
+				&& !RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
+				// The camera path is applied before the pre-render readiness check,
+				// but the source can admit a newly visible section during this render.
+				// Do not count that frame as settled; discard the partial window and
+				// let the next readiness cycle observe the completed frontier.
+				lastProducerWorkloadBlocker = "rust-terrain-queue-drain-post-frame";
+				restartMeasurementAfterReadinessLoss();
+				measurementFrame = false;
+			}
+		}
+		if (measurementFrame) {
 			if ("steady-state-performance".equals(STATIC_TERRAIN_SCENARIO)
 				&& !RustGalTerrainRenderer.staticTerrainExecutionSnapshot()
 					.executedAfter(staticTerrainMeasurementSubmissionBaseline)) {
@@ -815,6 +837,26 @@ public final class GraphicsFrameBenchmark {
 		dimension = minecraft.level.dimension().location().toString();
 		writeStatus(minecraft, "initialized");
 		return true;
+	}
+
+	/**
+	 * Applies the benchmark's optional moving-camera path before the selected
+	 * renderer builds its frame. Updating interpolation history together with
+	 * the current rotation keeps the path deterministic without exposing a
+	 * half-interpolated player pose to either renderer.
+	 */
+	private static void applyBenchmarkCameraPath(Minecraft minecraft) {
+		if (!"moving-camera".equals(CAMERA_PATH_TYPE) || CAMERA_YAW_DELTA == 0.0F
+			|| minecraft.player == null || initialPosition == null) {
+			return;
+		}
+		float yaw = initialYaw + frameIndex * CAMERA_YAW_DELTA;
+		minecraft.player.setYRot(yaw);
+		minecraft.player.yRotO = yaw;
+		minecraft.player.yHeadRot = yaw;
+		minecraft.player.yHeadRotO = yaw;
+		minecraft.player.yBodyRot = yaw;
+		minecraft.player.yBodyRotO = yaw;
 	}
 
 	private static void dismissKnownGameplayScreen(Minecraft minecraft) {
@@ -1826,8 +1868,8 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"window\": { \"width\": ").append(minecraft.getWindow().getWidth()).append(", \"height\": ").append(minecraft.getWindow().getHeight()).append(" },\n");
 		writeRuntimeState(json, minecraft);
 		json.append(",\n");
-			json.append("  \"cameraPath\": { \"type\": \"fixed-static-terrain\"")
-				.append(", \"yawDelta\": 0.0")
+			json.append("  \"cameraPath\": { \"type\": \"").append(escape(CAMERA_PATH_TYPE)).append("\"")
+				.append(", \"yawDelta\": ").append(format(CAMERA_YAW_DELTA))
 				.append(", \"initialYaw\": ").append(format(initialYaw))
 				.append(", \"initialPitch\": ").append(format(initialPitch))
 				.append(", \"initialPosition\": { \"x\": ").append(format(initialPosition.x))

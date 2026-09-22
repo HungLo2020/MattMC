@@ -30,15 +30,35 @@ public final class RustGalFrameScheduler<T> {
 	}
 
 	public Token enqueue(long generation, String stratumId, int stratumOrder, T payload) {
+		Token token = reserve(generation, stratumId, stratumOrder);
+		publish(token, payload);
+		return token;
+	}
+
+	/**
+	 * Reserves an ordering token before the immutable payload is built.  The
+	 * render thread uses this for mesh records whose sequence is part of each
+	 * record; it avoids rebuilding those records during frame flush.
+	 */
+	public Token reserve(long generation, String stratumId, int stratumOrder) {
 		if (this.pending.size() >= MAX_PENDING_BATCHES) {
 			throw new IllegalStateException(this.label + " pending semantic batch bound exceeded " + MAX_PENDING_BATCHES);
 		}
 		long batchId = this.nextBatchId++;
 		long sequence = this.nextSequence++;
 		this.nextSequence = Math.addExact(this.nextSequence - 1L, SEQUENCE_STRIDE);
-		Token token = new Token(batchId, sequence, generation, stratumId, stratumOrder);
-		this.pending.put(batchId, new Scheduled<>(token, payload));
-		return token;
+		return new Token(batchId, sequence, generation, stratumId, stratumOrder);
+	}
+
+	/** Publishes a payload for a token returned by {@link #reserve}. */
+	public void publish(Token token, T payload) {
+		if (token == null || payload == null) throw new IllegalArgumentException("scheduler publication requires token and payload");
+		if (this.pending.size() >= MAX_PENDING_BATCHES) {
+			throw new IllegalStateException(this.label + " pending semantic batch bound exceeded " + MAX_PENDING_BATCHES);
+		}
+		if (this.pending.putIfAbsent(token.batchId(), new Scheduled<>(token, payload)) != null) {
+			throw new IllegalStateException(this.label + " batch token was already published: batch=" + token.batchId());
+		}
 	}
 
 	public List<T> takeAll(List<Token> tokens, long generation) {
