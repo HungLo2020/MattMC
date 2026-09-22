@@ -205,13 +205,13 @@ pub(super) struct TextureViewInfo {
     pub(super) usages: Vec<TextureUsage>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum AccessMode {
     Read,
     Write,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum AccessFamily {
     Vertex,
     Index,
@@ -225,7 +225,7 @@ enum AccessFamily {
     Indirect,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum AccessTarget {
     Buffer {
         handle: Handle,
@@ -248,7 +248,7 @@ enum AccessResourceKey {
     FrameTarget(Handle),
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct AccessEvent {
     target: AccessTarget,
     mode: AccessMode,
@@ -265,6 +265,7 @@ struct AccessTracker {
 #[derive(Default)]
 struct AccessBucket {
     reads: Vec<AccessEvent>,
+    read_membership: HashSet<AccessEvent>,
     writes: Vec<AccessEvent>,
 }
 
@@ -274,7 +275,7 @@ impl AccessTracker {
             .resources
             .entry(event.target.resource_key())
             .or_default();
-        if !bucket.reads.contains(&event) {
+        if bucket.read_membership.insert(event) {
             bucket.reads.push(event);
         }
     }
@@ -296,6 +297,9 @@ impl AccessTracker {
         if let Some(bucket) = self.resources.get_mut(&key) {
             bucket
                 .reads
+                .retain(|access| !targets_overlap(access.target, target));
+            bucket
+                .read_membership
                 .retain(|access| !targets_overlap(access.target, target));
             bucket
                 .writes
@@ -2040,12 +2044,18 @@ impl VulkanicGal {
         let id = SubmissionId(self.next_submission);
         self.next_submission += 1;
         submission_trace(&format!(
-            "gal.submit.encode.begin id={} label={}",
-            id.0, validated.label
+            "gal.submit.encode.begin id={} label={} pre_encode_nanos={}",
+            id.0,
+            validated.label,
+            elapsed_nanos_u64(submit_started)
         ));
         let backend_encode_started = std::time::Instant::now();
         self.backend.encode_passes(&validated)?;
-        submission_trace(&format!("gal.submit.encode.end id={}", id.0));
+        submission_trace(&format!(
+            "gal.submit.encode.end id={} elapsed_nanos={}",
+            id.0,
+            elapsed_nanos_u64(backend_encode_started)
+        ));
         if let Some(profile) = profile.as_deref_mut() {
             profile.backend_encode_nanos = profile
                 .backend_encode_nanos
@@ -2059,7 +2069,11 @@ impl VulkanicGal {
         for usage in &submission_usages {
             usage.accept(id);
         }
-        submission_trace(&format!("gal.submit.queue.end id={}", id.0));
+        submission_trace(&format!(
+            "gal.submit.queue.end id={} elapsed_nanos={}",
+            id.0,
+            elapsed_nanos_u64(backend_submit_started)
+        ));
         if let Some(profile) = profile.as_deref_mut() {
             profile.backend_submit_nanos = profile
                 .backend_submit_nanos

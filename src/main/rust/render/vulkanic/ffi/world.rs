@@ -3300,6 +3300,62 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         frontend_elapsed_nanos
                     ));
                     let (mut world_stats, gui_stats) = frontend_result?;
+                    whole_frame_trace(&format!(
+                        "whole-frame.gal-profile frame={} validate_ops_nanos={} validate_handles_nanos={} hazard_nanos={} encode_nanos={} queue_nanos={} submit_total_nanos={} ops_before={} ops_after={} hazard_candidates={}",
+                        world_frame_id,
+                        world_stats.profile.gal_validate_ops_nanos,
+                        world_stats.profile.gal_validate_handles_nanos,
+                        world_stats.profile.gal_hazard_analysis_nanos,
+                        world_stats.profile.backend_encode_nanos,
+                        world_stats.profile.backend_submit_nanos,
+                        world_stats.profile.gal_submit_total_nanos,
+                        world_stats.profile.gal_command_ops_before_normalize,
+                        world_stats.profile.gal_command_ops_after_normalize,
+                        world_stats.profile.gal_hazard_candidates_examined,
+                    ));
+                    whole_frame_trace(&format!(
+                        "whole-frame.graph-profile frame={} validate_nanos={} batching_nanos={} mesh_group_nanos={} resources_nanos={} mesh_assets_nanos={} mesh_resources_nanos={} command_nanos={} stream_pack_nanos={} draw_record_nanos={} mesh_batches={} mesh_instances={}",
+                        world_frame_id,
+                        world_stats.profile.world_validate_frame_nanos,
+                        world_stats.profile.world_batching_nanos,
+                        world_stats.profile.world_mesh_section_expand_group_nanos,
+                        world_stats.profile.world_resource_prepare_nanos,
+                        world_stats.profile.world_prepare_mesh_material_asset_nanos,
+                        world_stats.profile.world_prepare_mesh_resource_nanos,
+                        world_stats.profile.gal_command_generation_nanos,
+                        world_stats.profile.world_mesh_stream_payload_pack_nanos,
+                        world_stats.profile.world_mesh_draw_record_nanos,
+                        world_stats.profile.world_prepare_mesh_batch_count,
+                        world_stats.mesh_instance_count,
+                    ));
+                    whole_frame_trace(&format!(
+                        "whole-frame.draw-profile frame={} draw_indexed={} draw_direct={} page_batches={} page_runs={} dynamic_terrain={} dynamic_other={} translucent_terrain={} stream_bytes={} resource_creates={} gpu_nanos={} gpu_status={}",
+                        world_frame_id,
+                        world_stats.profile.draw_indexed_ops,
+                        world_stats.profile.draw_ops,
+                        world_stats.profile.world_mesh_page_indirect_batch_count,
+                        world_stats.profile.world_mesh_page_indirect_run_count,
+                        world_stats.profile.world_mesh_dynamic_terrain_batch_count,
+                        world_stats.profile.world_mesh_dynamic_non_terrain_batch_count,
+                        world_stats.profile.world_mesh_terrain_translucent_batch_count,
+                        world_stats.profile.world_mesh_stream_payload_bytes,
+                        world_stats.profile.resource_creates_delta,
+                        world_stats.profile.gpu_frame_total_nanos,
+                        world_stats.profile.gpu_timestamp_status,
+                    ));
+                    whole_frame_trace(&format!(
+                        "whole-frame.gpu-profile frame={} total_nanos={} dh_opaque_nanos={} terrain_opaque_nanos={} terrain_cutout_nanos={} shadow_nanos={} deferred_nanos={} composite0_nanos={} composite1_nanos={} final_nanos={}",
+                        world_frame_id,
+                        world_stats.profile.gpu_frame_total_nanos,
+                        world_stats.profile.gpu_distant_horizons_opaque_nanos,
+                        world_stats.profile.gpu_terrain_opaque_nanos,
+                        world_stats.profile.gpu_terrain_cutout_nanos,
+                        world_stats.profile.gpu_shadow_depth_nanos,
+                        world_stats.profile.gpu_deferred_lighting_nanos,
+                        world_stats.profile.gpu_composite0_nanos,
+                        world_stats.profile.gpu_composite1_nanos,
+                        world_stats.profile.gpu_final_output_nanos,
+                    ));
                     if let Some((parents, children)) = tiled_receipt {
                         eprintln!("whole-frame.gui-tiles.submitted frame={} parents={} children={}",
                             world_frame_id, parents, children);
@@ -3586,9 +3642,15 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_lod_update_assets(
         context.ffi_output_bytes = context
             .ffi_output_bytes
             .saturating_add(size_of::<FfiStatusResult>() as u64);
+        let decode_started = std::time::Instant::now();
         let result = decode_world_lod_asset_update(request, context.gal.capabilities()).and_then(
             |(generation, assets, retirements, material_provenance)| {
-                context
+                let decode_nanos = crate::render::vulkanic::metrics::elapsed_nanos_u64(decode_started);
+                let asset_count = assets.len();
+                let retirement_count = retirements.len();
+                let provenance_count = material_provenance.len();
+                let apply_started = std::time::Instant::now();
+                let result = context
                     .world_primitive_frontend
                     .apply_world_lod_column_asset_update_with_provenance(
                         &mut context.gal,
@@ -3596,7 +3658,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_lod_update_assets(
                         assets,
                         retirements,
                         material_provenance,
-                    )
+                    );
+                whole_frame_trace(&format!(
+                    "whole-frame.dh-assets.native generation={generation} columns={asset_count} retirements={retirement_count} provenance={provenance_count} decode_nanos={decode_nanos} apply_nanos={}",
+                    crate::render::vulkanic::metrics::elapsed_nanos_u64(apply_started),
+                ));
+                result
             },
         );
         match result {

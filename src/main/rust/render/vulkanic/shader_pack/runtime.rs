@@ -7851,12 +7851,32 @@ impl TerrainCompositeUniforms {
     }
 }
 
-#[derive(Default)]
 pub(crate) struct IndexedDrawState {
     pipeline: Option<Handle>,
     resource_set: Option<(Handle, u32, Handle, Vec<u64>)>,
     shader_resource_set: Option<(Handle, u32, Handle)>,
     index_buffer: Option<(Handle, u64, IndexType)>,
+    max_indirect_draw_count: u32,
+}
+
+impl IndexedDrawState {
+    pub(crate) fn with_indirect_limit(max_indirect_draw_count: u32) -> Self {
+        Self {
+            pipeline: None,
+            resource_set: None,
+            shader_resource_set: None,
+            index_buffer: None,
+            max_indirect_draw_count: max_indirect_draw_count.max(1),
+        }
+    }
+}
+
+impl Default for IndexedDrawState {
+    fn default() -> Self {
+        // Source-graph callers currently emit direct indexed draws. Keep the
+        // conservative VulkanicGAL ceiling for any indirect run they add.
+        Self::with_indirect_limit(4_096)
+    }
 }
 
 /// Shared explicit binding cache for direct source-material draws. It stays
@@ -7993,7 +8013,10 @@ pub(crate) fn append_indexed_draw(
         }) = ops.last_mut()
         {
             let expected = offset.saturating_add(u64::from(*draw_count) * 20);
-            if *buffer == indirect.buffer && expected == indirect.offset {
+            if *buffer == indirect.buffer
+                && expected == indirect.offset
+                && *draw_count < state.max_indirect_draw_count
+            {
                 *draw_count = draw_count.saturating_add(1);
                 return;
             }
@@ -11328,6 +11351,50 @@ mod tests {
             ops.iter()
                 .filter(|op| matches!(op, CommandOp::DrawIndexedIndirect { .. }))
                 .count()
+        );
+    }
+
+    #[test]
+    fn indexed_indirect_emission_splits_runs_at_backend_limit() {
+        let pipeline = test_handle(HandleKind::GraphicsPipeline, 1);
+        let layout = test_handle(HandleKind::PipelineLayout, 2);
+        let set = test_handle(HandleKind::ResourceSet, 3);
+        let index = test_handle(HandleKind::Buffer, 4);
+        let indirect = test_handle(HandleKind::Buffer, 5);
+        let mut ops = Vec::new();
+        let mut state = IndexedDrawState::with_indirect_limit(2);
+        for offset in [0, 20, 40, 60, 80] {
+            append_indexed_draw(
+                &mut ops,
+                &mut state,
+                pipeline,
+                layout,
+                set,
+                &[0, 0],
+                None,
+                index,
+                0,
+                IndexType::U32,
+                6,
+                1,
+                Some(TerrainIndexedIndirect {
+                    buffer: indirect,
+                    offset,
+                }),
+            );
+        }
+        assert_eq!(
+            vec![(0, 2), (40, 2), (80, 1)],
+            ops.iter()
+                .filter_map(|op| match op {
+                    CommandOp::DrawIndexedIndirect {
+                        buffer,
+                        offset,
+                        draw_count,
+                    } if *buffer == indirect => Some((*offset, *draw_count)),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
         );
     }
 

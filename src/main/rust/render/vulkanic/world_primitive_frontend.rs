@@ -206,7 +206,7 @@ pub const WORLD_MAX_MATERIAL_QUADS: usize = 65_536;
 const WORLD_MAX_MATERIAL_QUADS_PER_BATCH: usize = 4_096;
 pub const WORLD_MAX_MESH_VERTICES: usize = 65_536;
 pub const WORLD_MAX_MESH_INDEX_BYTES: usize = 393_216;
-pub const WORLD_MAX_MESH_SECTIONS: usize = 256;
+pub const WORLD_MAX_MESH_SECTIONS: usize = 4_096;
 // Static terrain submits one semantic mesh instance per visible section/layer. The
 // whole-frame stream remains bounded, but must accommodate a fully admitted
 // terrain frame rather than the earlier diagnostic-only subset.
@@ -1233,10 +1233,11 @@ impl WorldMeshAsset {
 /// color/material/light semantics but no Minecraft atlas UV ownership.
 pub const WORLD_LOD_VERTEX_LAYOUT_V1: u32 = 1;
 pub const WORLD_LOD_MAX_SEGMENTS_PER_COLUMN: usize = 512;
-/// Maximum retained DH columns in one Rust-owned semantic generation. This
-/// matches the Java collector's residency contract and bounds all derived LOD
-/// CPU/GPU maps before packing or upload work begins.
-pub const WORLD_LOD_MAX_COLUMNS: usize = 512;
+/// A visible DH column may contain just one segment. Admission must therefore
+/// permit the same worst-case column count as the Java visible-candidate and
+/// Rust visible-segment contracts. The former 512-column cap rejected dense
+/// quadtree frames before either visible bound was reached.
+pub const WORLD_LOD_MAX_COLUMNS: usize = WORLD_LOD_MAX_VISIBLE_SEGMENTS;
 /// Maximum visible DH segment instances retained in one semantic frame.
 pub const WORLD_LOD_MAX_VISIBLE_SEGMENTS: usize = 16_384;
 /// Maximum derived DH voxel source meshes retained across frames. The cache
@@ -3445,6 +3446,9 @@ struct MeshResources {
     pipeline: Handle,
     shadow_pipeline: Option<Handle>,
     resource_set: Handle,
+    /// Borrowed from `mesh_page_resource_sets`; cleared whenever that owner
+    /// retires its sets or the instance-stream binding changes.
+    page_resource_set: Option<Handle>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -4474,6 +4478,7 @@ impl NamedSourceFrameSubmission {
                     .discard(final_output, gal);
                 return Err(error);
             }
+            frontend.release_uploaded_lod_gpu_payloads();
         }
         if let Err(error) = color_transaction.confirm(
             frontend.shader_runtime.as_mut().ok_or_else(|| {
@@ -11163,18 +11168,18 @@ impl WorldPrimitiveFrontend {
         let retired_keys: BTreeSet<u64> = retirements
             .iter()
             .filter_map(|retirement| {
-                self.lod_column_assets
+                self.lod_gpu_column_assets
                     .get(&retirement.column_key)
                     .filter(|asset| asset.column_generation == retirement.column_generation)
                     .map(|_| retirement.column_key)
             })
             .collect();
         let mut projected_columns = self
-            .lod_column_assets
+            .lod_gpu_column_assets
             .len()
             .saturating_sub(retired_keys.len());
         for asset in &assets {
-            if !self.lod_column_assets.contains_key(&asset.column_key) {
+            if !self.lod_gpu_column_assets.contains_key(&asset.column_key) {
                 projected_columns = projected_columns.checked_add(1).ok_or_else(|| {
                     GalError::invalid_argument("world LOD retained column count overflows")
                 })?;
@@ -11187,7 +11192,7 @@ impl WorldPrimitiveFrontend {
         }
         let mut prepared = Vec::with_capacity(assets.len());
         for asset in assets {
-            if let Some(current) = self.lod_column_assets.get(&asset.column_key) {
+            if let Some(current) = self.lod_gpu_column_assets.get(&asset.column_key) {
                 if current.column_generation >= asset.column_generation {
                     return Err(GalError::invalid_argument(format!(
                         "stale world LOD column {} generation {}; current generation is {}",
@@ -11210,7 +11215,7 @@ impl WorldPrimitiveFrontend {
                 ));
             }
             for (segment_index, segment) in gpu.segments.iter().enumerate() {
-                if segment.vertex_bytes.is_empty() || segment.index_bytes.is_empty() {
+                if segment.vertex_count == 0 || segment.index_count == 0 {
                     return Err(GalError::invalid_argument(format!(
                         "world LOD GPU payload segment {segment_index} is empty",
                     )));
@@ -11245,19 +11250,26 @@ impl WorldPrimitiveFrontend {
         }
         for (asset, expanded, gpu, textured) in prepared {
             let key = asset.column_key;
-            self.lod_expanded_column_assets.insert(key, expanded);
             self.lod_gpu_column_assets.insert(key, gpu);
             if let Some((provenance, textured_gpu, textured_plan)) = textured {
+                // Exact-atlas/source execution needs the original copied column
+                // and typed expansion to prove its material contract. Ordinary
+                // reduced-color DH frames never read either representation after
+                // this point; retaining them alongside the packed upload asset
+                // multiplied large real-world columns in native memory.
+                self.lod_column_assets.insert(key, asset);
+                self.lod_expanded_column_assets.insert(key, expanded);
                 self.lod_material_provenance.insert(key, provenance);
                 self.lod_textured_gpu_column_assets
                     .insert(key, textured_gpu);
                 self.lod_textured_column_plans.insert(key, textured_plan);
             } else {
+                self.lod_column_assets.remove(&key);
+                self.lod_expanded_column_assets.remove(&key);
                 self.lod_material_provenance.remove(&key);
                 self.lod_textured_gpu_column_assets.remove(&key);
                 self.lod_textured_column_plans.remove(&key);
             }
-            self.lod_column_assets.insert(key, asset);
         }
         self.lod_voxel_source_meshes
             .retain(|(column_key, _), entry| {
@@ -11267,6 +11279,30 @@ impl WorldPrimitiveFrontend {
             });
         self.lod_asset_generation = generation;
         Ok(())
+    }
+
+    /// Once a generation has reached private Vulkan buffers, ordinary
+    /// reduced-color DH rendering keeps only the compact draw metadata. Exact
+    /// material/source paths deliberately retain their CPU payload because
+    /// their later provenance and audit stages can still inspect it.
+    fn release_uploaded_lod_gpu_payloads(&mut self) {
+        let (gpu_assets, source_assets, expanded_assets, residency) = (
+            &mut self.lod_gpu_column_assets,
+            &self.lod_column_assets,
+            &self.lod_expanded_column_assets,
+            &self.lod_gpu_residency,
+        );
+        for (&column_key, asset) in gpu_assets.iter_mut() {
+            if source_assets.contains_key(&column_key) || expanded_assets.contains_key(&column_key)
+            {
+                continue;
+            }
+            if residency.active_generation(column_key) == Some(asset.column_generation) {
+                for segment in &mut asset.segments {
+                    segment.release_uploaded_payload();
+                }
+            }
+        }
     }
 
     pub fn apply_world_mesh_asset_update(
@@ -22937,6 +22973,7 @@ impl WorldPrimitiveFrontend {
         }
         self.lod_gpu_residency.confirm_submission(gal)?;
         self.lod_textured_gpu_residency.confirm_submission(gal)?;
+        self.release_uploaded_lod_gpu_payloads();
         let terrain_atlas_generation =
             self.mesh_texture_generation(WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS);
         if let Some(runtime) = self.shader_runtime.as_mut() {
@@ -29538,31 +29575,6 @@ impl WorldPrimitiveFrontend {
             ));
         }
         for instance in &frame.lod_instances {
-            let asset = self
-                .lod_column_assets
-                .get(&instance.column_key)
-                .ok_or_else(|| {
-                    GalError::invalid_argument(format!(
-                        "world LOD instance {} references an unavailable column asset",
-                        instance.column_key
-                    ))
-                })?;
-            validate_world_lod_column_instance(instance, asset)?;
-            let expanded = self
-                .lod_expanded_column_assets
-                .get(&instance.column_key)
-                .ok_or_else(|| {
-                    GalError::invalid_argument(format!(
-                        "world LOD instance {} has no Rust-owned expanded column asset",
-                        instance.column_key
-                    ))
-                })?;
-            if expanded.column_generation != instance.column_generation {
-                return Err(GalError::invalid_argument(
-                    "world LOD expanded column generation does not match visible instance",
-                ));
-            }
-            lod::validate_expanded_instance(expanded, instance.segment_index, instance.layer)?;
             let gpu = self
                 .lod_gpu_column_assets
                 .get(&instance.column_key)
@@ -29572,7 +29584,9 @@ impl WorldPrimitiveFrontend {
                         instance.column_key
                     ))
                 })?;
-            if gpu.column_generation != instance.column_generation {
+            if gpu.column_key != instance.column_key
+                || gpu.column_generation != instance.column_generation
+            {
                 return Err(GalError::invalid_argument(
                     "world LOD GPU payload generation does not match visible instance",
                 ));
@@ -30772,6 +30786,7 @@ impl WorldPrimitiveFrontend {
                     &mesh_batches,
                     stats.profile.world_prepare_mesh_stream_required_bytes,
                     source_terrain_programs.is_none(),
+                    std::env::var_os("MATTMC_RUST_DISABLE_TRANSLUCENT_PAGE_INDIRECT").is_none(),
                 )?;
                 stats.profile.world_mesh_stream_payload_pack_nanos =
                     elapsed_nanos_u64(mesh_pack_started);
@@ -31661,7 +31676,8 @@ impl WorldPrimitiveFrontend {
                         clear_color: None,
                     }),
                 });
-                let mut indexed_draw_state = IndexedDrawState::default();
+                let mut indexed_draw_state =
+                    IndexedDrawState::with_indirect_limit(gal.capabilities().limits.max_draw_count);
                 // Vanilla composites translucent terrain over entity shadows.
                 // Keep receiver geometry first and preserve draw order within
                 // each group. Only the shadow-bearing direct route needs this
@@ -31727,7 +31743,9 @@ impl WorldPrimitiveFrontend {
                                 clear_color: None,
                             }),
                         });
-                        indexed_draw_state = IndexedDrawState::default();
+                        indexed_draw_state = IndexedDrawState::with_indirect_limit(
+                            gal.capabilities().limits.max_draw_count,
+                        );
                     }
                     if after_receiver_shadows(&draw) && !receiver_shadow_ops.is_empty() {
                         ops.push(CommandOp::EndPass);
@@ -31743,7 +31761,9 @@ impl WorldPrimitiveFrontend {
                             }),
                         });
                         ops.append(&mut receiver_shadow_ops);
-                        indexed_draw_state = IndexedDrawState::default();
+                        indexed_draw_state = IndexedDrawState::with_indirect_limit(
+                            gal.capabilities().limits.max_draw_count,
+                        );
                     }
                     append_indexed_draw(
                         &mut ops,
@@ -34241,6 +34261,7 @@ impl WorldPrimitiveFrontend {
                 pipeline,
                 shadow_pipeline,
                 resource_set,
+                page_resource_set: None,
             };
             let _ = (index_offset, index_count, index_type);
             Ok(resources)
@@ -34556,6 +34577,9 @@ impl WorldPrimitiveFrontend {
     }
 
     fn destroy_mesh_page_resource_sets(&mut self, gal: &mut VulkanicGal) {
+        for resources in self.mesh_resources.values_mut() {
+            resources.page_resource_set = None;
+        }
         for (_, set) in std::mem::take(&mut self.mesh_page_resource_sets) {
             let _ = gal.destroy(set);
         }
@@ -34568,11 +34592,14 @@ impl WorldPrimitiveFrontend {
         stream: MeshInstanceStreamBinding,
         lightmap_layout: Handle,
     ) -> GalResult<Handle> {
-        let vertex_buffer = self
+        let mesh = self
             .mesh_resources
             .get(&mesh_key)
-            .ok_or_else(|| GalError::backend("world mesh resources missing before page binding"))?
-            .vertex_buffer;
+            .ok_or_else(|| GalError::backend("world mesh resources missing before page binding"))?;
+        if let Some(set) = mesh.page_resource_set {
+            return Ok(set);
+        }
+        let vertex_buffer = mesh.vertex_buffer;
         let mut pipeline_key = mesh_pipeline_key(mesh_key)?;
         pipeline_key.shader_resource_layout = Some(lightmap_layout);
         let pipeline = self
@@ -34597,6 +34624,10 @@ impl WorldPrimitiveFrontend {
             observation_buffer: None,
         };
         if let Some(set) = self.mesh_page_resource_sets.get(&key) {
+            self.mesh_resources
+                .get_mut(&mesh_key)
+                .expect("world mesh resource still exists")
+                .page_resource_set = Some(*set);
             return Ok(*set);
         }
         let vertex_range = self
@@ -34617,6 +34648,10 @@ impl WorldPrimitiveFrontend {
             None,
         )?;
         self.mesh_page_resource_sets.insert(key, set);
+        self.mesh_resources
+            .get_mut(&mesh_key)
+            .expect("world mesh resource still exists")
+            .page_resource_set = Some(set);
         Ok(set)
     }
 
@@ -40441,12 +40476,19 @@ fn order_compatible_page_indirect_draws(draws: &mut [PendingMeshDraw]) {
         {
             end += 1;
         }
-        draws[start..end].sort_by(|left, right| {
-            page_indirect_draw_order(left, right).then_with(|| {
-                left.front_to_back_distance_squared
-                    .total_cmp(&right.front_to_back_distance_squared)
-            })
-        });
+        // Camera-sorted translucent batches carry an exact back-to-front
+        // order. Page addressing changes their bindings, never their order.
+        if matches!(
+            mode,
+            TerrainMaterialPassMode::Opaque | TerrainMaterialPassMode::Cutout
+        ) {
+            draws[start..end].sort_by(|left, right| {
+                page_indirect_draw_order(left, right).then_with(|| {
+                    left.front_to_back_distance_squared
+                        .total_cmp(&right.front_to_back_distance_squared)
+                })
+            });
+        }
         start = end;
     }
 }
@@ -44019,13 +44061,17 @@ struct PackedMeshDrawStream {
     first_instances: Vec<Option<u32>>,
 }
 
-fn mesh_batch_supports_page_indirect(batch: &MeshBatch) -> bool {
+fn mesh_batch_supports_page_indirect(batch: &MeshBatch, enable_translucent: bool) -> bool {
     !batch.key.g_buffer
         && batch.key.stratum == WORLD_STRATUM_TERRAIN
-        && matches!(
+        && (matches!(
             batch.key.material_mode,
             WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT
-        )
+        ) || (enable_translucent
+            && matches!(
+                batch.key.material_mode,
+                WORLD_MATERIAL_MODE_TRANSLUCENT | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
+            )))
         && batch.key.texture_id == WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS
         && !batch.key.standard_item_foil
         && batch.key.view_layering.is_none()
@@ -44042,19 +44088,35 @@ fn packed_mesh_draw_stream(
     mesh_batches: &[MeshBatch],
     capacity_hint: u64,
     enable_page_indirect: bool,
+    enable_translucent_page_indirect: bool,
 ) -> GalResult<PackedMeshDrawStream> {
     let mut payload = Vec::with_capacity(capacity_hint as usize);
     let mut dynamic_offsets = vec![0; mesh_batches.len()];
     let mut first_instances = vec![None; mesh_batches.len()];
     let header = packed_mesh_uniform_header(frame);
     let mut next_instance = 0u32;
-    if enable_page_indirect && mesh_batches.iter().any(mesh_batch_supports_page_indirect) {
+    if enable_page_indirect
+        && mesh_batches
+            .iter()
+            .any(|batch| mesh_batch_supports_page_indirect(batch, enable_translucent_page_indirect))
+    {
         payload.extend_from_slice(&header);
         for (index, batch) in mesh_batches.iter().enumerate() {
-            if enable_page_indirect && mesh_batch_supports_page_indirect(batch) {
-                if batch.indices.iter().any(|instance_index| {
+            if enable_page_indirect
+                && mesh_batch_supports_page_indirect(batch, enable_translucent_page_indirect)
+            {
+                let non_translation = batch.indices.iter().any(|instance_index| {
                     !is_translation_only_transform(&frame.mesh_instances[*instance_index].transform)
-                }) {
+                });
+                if non_translation
+                    && matches!(
+                        batch.key.material_mode,
+                        WORLD_MATERIAL_MODE_TRANSLUCENT | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
+                    )
+                {
+                    continue;
+                }
+                if non_translation {
                     return Err(GalError::invalid_argument(
                         "compact vanilla terrain placement must be translation-only",
                     ));
@@ -47503,6 +47565,25 @@ mod tests {
         assert!(draws
             .windows(2)
             .all(|pair| page_indirect_draw_order(&pair[0], &pair[1]) == std::cmp::Ordering::Equal));
+    }
+
+    #[test]
+    fn translucent_page_draws_keep_camera_order_across_pipeline_changes() {
+        let mut draws = vec![
+            pending_page_draw(30, 3, TerrainMaterialPassMode::Translucent, true, 900.0),
+            pending_page_draw(10, 1, TerrainMaterialPassMode::Translucent, true, 100.0),
+            pending_page_draw(20, 2, TerrainMaterialPassMode::Translucent, true, 400.0),
+        ];
+
+        order_compatible_page_indirect_draws(&mut draws);
+
+        assert_eq!(
+            vec![30, 10, 20],
+            draws
+                .iter()
+                .map(|pending| pending.draw.index_count)
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -62763,13 +62844,14 @@ mod tests {
                 }],
             )
             .unwrap();
-        assert_eq!(
-            2,
-            frontend.lod_column_assets[&0x4448_434f_4c55_4d4e].column_generation
-        );
-        assert_eq!(
-            2, frontend.lod_expanded_column_assets[&0x4448_434f_4c55_4d4e].column_generation,
-            "the private typed expansion must retire and replace atomically with its transport asset"
+        assert!(
+            !frontend
+                .lod_column_assets
+                .contains_key(&0x4448_434f_4c55_4d4e)
+                && !frontend
+                    .lod_expanded_column_assets
+                    .contains_key(&0x4448_434f_4c55_4d4e),
+            "ordinary reduced-color columns must not retain raw or expanded CPU geometry"
         );
         assert_eq!(
             2, frontend.lod_gpu_column_assets[&0x4448_434f_4c55_4d4e].column_generation,
@@ -62791,7 +62873,7 @@ mod tests {
         assert_eq!(3, frontend.lod_asset_generation);
         assert_eq!(
             2,
-            frontend.lod_column_assets[&0x4448_434f_4c55_4d4e].column_generation
+            frontend.lod_gpu_column_assets[&0x4448_434f_4c55_4d4e].column_generation
         );
         assert_eq!(1, frontend.lod_asset_update_failures);
     }
@@ -62870,6 +62952,11 @@ mod tests {
                 .lod_gpu_residency
                 .active_generation(0x4c4f_445f_4750_555f)
         );
+        frontend.release_uploaded_lod_gpu_payloads();
+        let released = &frontend.lod_gpu_column_assets[&0x4c4f_445f_4750_555f].segments[0];
+        assert!(released.vertex_bytes.is_empty() && released.index_bytes.is_empty());
+        assert_eq!(4, released.vertex_count);
+        assert_eq!(6, released.index_count);
 
         let mut reused = Vec::new();
         frontend
@@ -71956,6 +72043,26 @@ mod tests {
             ]
         );
         assert_eq!(batches.iter().map(|b| b.index_count).sum::<u32>(), 18);
+        let page_stream = packed_mesh_draw_stream(
+            &frame,
+            &frontend,
+            &batches,
+            required_mesh_instance_stream_bytes(&batches).unwrap(),
+            true,
+            true,
+        )
+        .unwrap();
+        assert_eq!(page_stream.first_instances, vec![Some(0), Some(1), Some(2)]);
+        let ordinary_stream = packed_mesh_draw_stream(
+            &frame,
+            &frontend,
+            &batches,
+            required_mesh_instance_stream_bytes(&batches).unwrap(),
+            true,
+            false,
+        )
+        .unwrap();
+        assert_eq!(ordinary_stream.first_instances, vec![None; 3]);
         assert!(frontend.mesh_assets[&9182]
             .translucent_order
             .borrow()

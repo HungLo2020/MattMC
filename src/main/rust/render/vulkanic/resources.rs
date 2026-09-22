@@ -126,7 +126,7 @@ pub struct TextureViewDesc {
     pub layer_count: u32,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TextureSubresourceRange {
     pub base_mip: u32,
     pub mip_count: u32,

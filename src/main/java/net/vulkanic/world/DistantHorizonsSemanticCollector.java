@@ -120,9 +120,17 @@ public final class DistantHorizonsSemanticCollector {
 	 * semantic snapshot map remains the sole data owner; this prevents a Long
 	 * allocation for every recursive {@code LodRenderSection.canRender} probe. */
 	private static final LongOpenHashSet COLUMN_KEYS = new LongOpenHashSet();
-	/** Last acknowledged immutable asset per live column. The visible render list
-	 * may keep using it while DH builds a replacement generation. */
+	/** Last acknowledged immutable asset per live column, retained only when an
+	 * explicit source/capture consumer needs its full CPU geometry. Ordinary
+	 * whole-frame rendering retains the compact draw descriptor below instead. */
 	private static final Map<Long, LodColumnSnapshot> PUBLISHED_COLUMNS = new LinkedHashMap<>();
+	/**
+	 * Minimal published identity needed to reproduce DH's real visible list after
+	 * the native upload owns the immutable geometry. Keeping copied vertex arrays
+	 * here needlessly retained the full copied columns after Rust had accepted
+	 * them, even though later frames submit only column/segment identities.
+	 */
+	private static final Map<Long, PublishedColumnDrawMetadata> PUBLISHED_DRAW_METADATA = new LinkedHashMap<>();
 	/** Exact material provenance retained beside, never inside, the legacy LOD ABI. */
 	private static final Map<Long, LodMaterialProvenanceSnapshot> MATERIAL_PROVENANCE = new LinkedHashMap<>();
 	/** Provenance paired with the acknowledged asset, never with a newer build. */
@@ -417,6 +425,25 @@ public final class DistantHorizonsSemanticCollector {
 		}
 	}
 
+	/** Immutable non-geometry descriptor for an acknowledged LOD column. */
+	private record PublishedColumnDrawMetadata(
+		long generation,
+		int opaqueSegments,
+		int transparentSideSegments,
+		int transparentUpSegments,
+		int waterSegments
+	) {
+		static PublishedColumnDrawMetadata from(LodColumnSnapshot column) {
+			return new PublishedColumnDrawMetadata(
+				column.generation(),
+				emittedSegmentCount(column.opaque()),
+				emittedSegmentCount(column.transparentSide()),
+				emittedSegmentCount(column.transparentUp()),
+				emittedSegmentCount(column.transparentWaterUp())
+			);
+		}
+	}
+
 	private static List<VulkanicGalBridge.WorldLodColumnInstanceRecord> executedSegmentsForWorldFrameLocked(long worldFrame) {
 		List<ExecutedVisibleSegmentSnapshot> snapshots = EXECUTED_VISIBLE_SEGMENTS_BY_WORLD_FRAME.get(worldFrame);
 		if (snapshots == null) {
@@ -490,6 +517,16 @@ public final class DistantHorizonsSemanticCollector {
 			|| selectedSourceExecutionRequested();
 	}
 
+	/**
+	 * Exact material sidecars are source-execution and capture inputs. The
+	 * ordinary DH path consumes the copied reduced-color/material-category
+	 * stream, so retaining and expanding an exact-atlas representation there
+	 * only duplicates memory and CPU work.
+	 */
+	private static boolean materialProvenancePublicationRequired() {
+		return exactAtlasCoverageRequested() || selectedSourceExecutionRequested();
+	}
+
 	/** True only for the backend-owned whole-frame route. Diagnostic capture by
 	 * itself must continue through DH's ordinary Java upload lifecycle. */
 	public static boolean usesRustWholeFrameSemanticBuild() {
@@ -520,7 +557,8 @@ public final class DistantHorizonsSemanticCollector {
 	 * the same source work while Rust owns the eventual presentation. */
 	public static boolean hasColumn(long columnKey) {
 		synchronized (COLUMNS) {
-			return COLUMN_KEYS.contains(columnKey);
+			return COLUMN_KEYS.contains(columnKey)
+				|| (publishedDrawMetadataLocked(columnKey) != null && !PENDING_RETIREMENTS.containsKey(columnKey));
 		}
 	}
 
@@ -529,7 +567,12 @@ public final class DistantHorizonsSemanticCollector {
 		if (columnGeneration == 0L) return false;
 		synchronized (COLUMNS) {
 			LodColumnSnapshot column = COLUMNS.get(columnKey);
-			return column != null && column.generation() == columnGeneration;
+			if (column != null && column.generation() == columnGeneration) {
+				return true;
+			}
+			PublishedColumnDrawMetadata published = publishedDrawMetadataLocked(columnKey);
+			return published != null && published.generation() == columnGeneration
+				&& !Objects.equals(PENDING_RETIREMENTS.get(columnKey), columnGeneration);
 		}
 	}
 
@@ -538,7 +581,7 @@ public final class DistantHorizonsSemanticCollector {
 	 * this boundary, never the merely-collected quadtree state above. */
 	public static boolean hasPublishedColumn(long columnKey) {
 		synchronized (COLUMNS) {
-			return PUBLISHED_COLUMNS.containsKey(columnKey);
+			return publishedDrawMetadataLocked(columnKey) != null || publishedColumnLocked(columnKey) != null;
 		}
 	}
 
@@ -556,11 +599,11 @@ public final class DistantHorizonsSemanticCollector {
 		}
 		synchronized (COLUMNS) {
 			LodColumnSnapshot current = COLUMNS.get(columnKey);
-			LodColumnSnapshot published = PUBLISHED_COLUMNS.get(columnKey);
-			if (current != null && (published == null || published.generation() != current.generation())) {
+			Long publishedGeneration = PUBLISHED_GENERATIONS.get(columnKey);
+			if (current != null && (publishedGeneration == null || publishedGeneration.longValue() != current.generation())) {
 				markPendingVisibleColumnLocked(columnKey);
 			}
-			return published != null;
+			return publishedDrawMetadataLocked(columnKey) != null || publishedColumnLocked(columnKey) != null;
 		}
 	}
 
@@ -1552,13 +1595,15 @@ public final class DistantHorizonsSemanticCollector {
 		recordPackedWaterColorSamples(transparentSide.packedVertexBuffers(), "transparent-side");
 		recordPackedWaterColorSamples(transparentUp.packedVertexBuffers(), "transparent-up");
 		recordPackedWaterColorSamples(transparentWaterUp.packedVertexBuffers(), "water-up");
-		LodMaterialProvenanceSnapshot provenance = new LodMaterialProvenanceSnapshot(
-			semanticMaterials, inputCoverage, outputCoverage,
-			validateOwnedMaterialIds(opaque, semanticMaterials.size()), opaque.semanticVariantStates(), opaque.semanticVariantPositions(),
-			validateOwnedMaterialIds(transparentSide, semanticMaterials.size()), transparentSide.semanticVariantStates(), transparentSide.semanticVariantPositions(),
-			validateOwnedMaterialIds(transparentUp, semanticMaterials.size()), transparentUp.semanticVariantStates(), transparentUp.semanticVariantPositions(),
-			validateOwnedMaterialIds(transparentWaterUp, semanticMaterials.size()), transparentWaterUp.semanticVariantStates(), transparentWaterUp.semanticVariantPositions()
-		);
+		LodMaterialProvenanceSnapshot provenance = materialProvenancePublicationRequired()
+			? new LodMaterialProvenanceSnapshot(
+				semanticMaterials, inputCoverage, outputCoverage,
+				validateOwnedMaterialIds(opaque, semanticMaterials.size()), opaque.semanticVariantStates(), opaque.semanticVariantPositions(),
+				validateOwnedMaterialIds(transparentSide, semanticMaterials.size()), transparentSide.semanticVariantStates(), transparentSide.semanticVariantPositions(),
+				validateOwnedMaterialIds(transparentUp, semanticMaterials.size()), transparentUp.semanticVariantStates(), transparentUp.semanticVariantPositions(),
+				validateOwnedMaterialIds(transparentWaterUp, semanticMaterials.size()), transparentWaterUp.semanticVariantStates(), transparentWaterUp.semanticVariantPositions()
+			)
+			: null;
 		return recordOwnedPackedColumnSnapshot(
 			columnKey, origin, opaque.packedVertexBuffers(), transparentSide.packedVertexBuffers(),
 			transparentUp.packedVertexBuffers(), transparentWaterUp.packedVertexBuffers(), provenance
@@ -1811,23 +1856,25 @@ public final class DistantHorizonsSemanticCollector {
 		recordPackedWaterColorBufferSamples(transparentWaterUp.vertexBuffers(), "water-up");
 		Objects.requireNonNull(inputCoverage, "inputCoverage");
 		Objects.requireNonNull(outputCoverage, "outputCoverage");
-		LodMaterialProvenanceSnapshot provenance = new LodMaterialProvenanceSnapshot(
-			semanticMaterials,
-			inputCoverage,
-			outputCoverage,
-			copyMaterialIds(opaque, semanticMaterials.size()),
-			copyVariantStates(opaque),
-			copyVariantPositions(opaque),
-			copyMaterialIds(transparentSide, semanticMaterials.size()),
-			copyVariantStates(transparentSide),
-			copyVariantPositions(transparentSide),
-			copyMaterialIds(transparentUp, semanticMaterials.size()),
-			copyVariantStates(transparentUp),
-			copyVariantPositions(transparentUp),
-			copyMaterialIds(transparentWaterUp, semanticMaterials.size())
-			,copyVariantStates(transparentWaterUp),
-			copyVariantPositions(transparentWaterUp)
-		);
+		LodMaterialProvenanceSnapshot provenance = materialProvenancePublicationRequired()
+			? new LodMaterialProvenanceSnapshot(
+				semanticMaterials,
+				inputCoverage,
+				outputCoverage,
+				copyMaterialIds(opaque, semanticMaterials.size()),
+				copyVariantStates(opaque),
+				copyVariantPositions(opaque),
+				copyMaterialIds(transparentSide, semanticMaterials.size()),
+				copyVariantStates(transparentSide),
+				copyVariantPositions(transparentSide),
+				copyMaterialIds(transparentUp, semanticMaterials.size()),
+				copyVariantStates(transparentUp),
+				copyVariantPositions(transparentUp),
+				copyMaterialIds(transparentWaterUp, semanticMaterials.size()),
+				copyVariantStates(transparentWaterUp),
+				copyVariantPositions(transparentWaterUp)
+			)
+			: null;
 		recordBuiltColumnSnapshot(
 			columnKey, origin,
 			opaque.vertexBuffers(), transparentSide.vertexBuffers(),
@@ -1966,6 +2013,11 @@ public final class DistantHorizonsSemanticCollector {
 		synchronized (COLUMNS) {
 			LodColumnSnapshot current = COLUMNS.get(columnKey);
 			if (current != null && current.generation() == columnGeneration) {
+				removeColumnLocked(columnKey);
+				return;
+			}
+			PublishedColumnDrawMetadata published = publishedDrawMetadataLocked(columnKey);
+			if (current == null && published != null && published.generation() == columnGeneration) {
 				removeColumnLocked(columnKey);
 			}
 		}
@@ -2392,23 +2444,27 @@ public final class DistantHorizonsSemanticCollector {
 		}
 		synchronized (COLUMNS) {
 			LodColumnSnapshot current = COLUMNS.get(columnKey);
-			if (current == null) {
-				return VisibleColumnSegments.EMPTY;
-			}
-			LodColumnSnapshot column = publishedColumnLocked(columnKey);
+			PublishedColumnDrawMetadata column = publishedDrawMetadataLocked(columnKey);
 			if (column == null) {
+				if (current == null) {
+					return VisibleColumnSegments.EMPTY;
+				}
 				markPendingVisibleColumnLocked(columnKey);
 				routeUnpublishedVisibleColumns++;
 				return VisibleColumnSegments.EMPTY;
 			}
-			if (column.generation() != current.generation()) {
+			if (current != null && column.generation() != current.generation()) {
 				// Preserve one acknowledged Rust asset during asynchronous rebuilds;
 				// switch to the replacement only after its asset update is acknowledged.
 				markPendingVisibleColumnLocked(columnKey);
 			}
-			int opaqueSegments = emittedSegmentCount(column.opaque());
+			int opaqueSegments = column.opaqueSegments();
 			if (exactAtlasCoverageRequested()) {
-				ExactAtlasIdentityCoverage exactAtlasCoverage = exactAtlasIdentityCoverageCached(column);
+				LodColumnSnapshot exactAtlasColumn = publishedColumnLocked(columnKey);
+				if (exactAtlasColumn == null || exactAtlasColumn.generation() != column.generation()) {
+					throw new IllegalStateException("exact-atlas coverage requires its published LOD geometry");
+				}
+				ExactAtlasIdentityCoverage exactAtlasCoverage = exactAtlasIdentityCoverageCached(exactAtlasColumn);
 				routeExactAtlasIdentitySegments += exactAtlasCoverage.completeSegments();
 				routeExactAtlasIdentityQuads += exactAtlasCoverage.completeQuads();
 				routeExactAtlasPartialSegments += exactAtlasCoverage.partialSegments();
@@ -2444,23 +2500,20 @@ public final class DistantHorizonsSemanticCollector {
 					);
 				}
 			}
-			int transparentSideSegments = emittedSegmentCount(column.transparentSide());
-			int transparentUpSegments = emittedSegmentCount(column.transparentUp());
-			int waterSegments = emittedSegmentCount(column.transparentWaterUp());
+			int transparentSideSegments = column.transparentSideSegments();
+			int transparentUpSegments = column.transparentUpSegments();
+			int waterSegments = column.waterSegments();
 			int transparentSegments = transparentSideSegments + transparentUpSegments;
 			int admittedSegments = opaqueSegments + transparentSegments + waterSegments;
 			if (PENDING_VISIBLE_SEGMENTS.size() + admittedSegments > MAX_VISIBLE_SEGMENTS) {
 				throw new IllegalStateException("Distant Horizons visible LOD segment capture exceeds " + MAX_VISIBLE_SEGMENTS);
 			}
-			appendVisibleSegments(column, 1, 0, column.opaque());
-			appendVisibleSegments(column, 2, opaqueSegments, column.transparentSide());
-			appendVisibleSegments(
-				column, 3, opaqueSegments + transparentSideSegments, column.transparentUp()
-			);
-			appendVisibleSegments(
-				column, 4, opaqueSegments + transparentSideSegments + transparentUpSegments,
-				column.transparentWaterUp()
-			);
+			appendVisibleSegments(columnKey, column.generation(), 1, 0, opaqueSegments);
+			appendVisibleSegments(columnKey, column.generation(), 2, opaqueSegments, transparentSideSegments);
+			appendVisibleSegments(columnKey, column.generation(), 3,
+				opaqueSegments + transparentSideSegments, transparentUpSegments);
+			appendVisibleSegments(columnKey, column.generation(), 4,
+				opaqueSegments + transparentSideSegments + transparentUpSegments, waterSegments);
 			return new VisibleColumnSegments(opaqueSegments, transparentSegments, waterSegments);
 		}
 	}
@@ -2494,6 +2547,16 @@ public final class DistantHorizonsSemanticCollector {
 				globalSegmentOffset + compactIndex, nextVisibleOrder++
 			));
 			compactIndex++;
+		}
+	}
+
+	private static void appendVisibleSegments(
+		long columnKey, long generation, int layer, int globalSegmentOffset, int segmentCount
+	) {
+		for (int compactIndex = 0; compactIndex < segmentCount; compactIndex++) {
+			PENDING_VISIBLE_SEGMENTS.add(new VulkanicGalBridge.WorldLodColumnInstanceRecord(
+				columnKey, generation, layer, globalSegmentOffset + compactIndex, nextVisibleOrder++
+			));
 		}
 	}
 
@@ -3201,6 +3264,7 @@ public final class DistantHorizonsSemanticCollector {
 			COLUMNS.clear();
 			COLUMN_KEYS.clear();
 			PUBLISHED_COLUMNS.clear();
+			PUBLISHED_DRAW_METADATA.clear();
 			MATERIAL_PROVENANCE.clear();
 			PUBLISHED_MATERIAL_PROVENANCE.clear();
 			EXACT_ATLAS_COVERAGE_CACHE.clear();
@@ -3336,6 +3400,29 @@ public final class DistantHorizonsSemanticCollector {
 		return publishedGeneration != null && publishedGeneration.longValue() == column.generation()
 			? column
 			: null;
+	}
+
+	private static PublishedColumnDrawMetadata publishedDrawMetadataLocked(long columnKey) {
+		PublishedColumnDrawMetadata metadata = PUBLISHED_DRAW_METADATA.get(columnKey);
+		Long generation = PUBLISHED_GENERATIONS.get(columnKey);
+		return metadata != null && generation != null && generation.longValue() == metadata.generation()
+			? metadata
+			: null;
+	}
+
+	/**
+	 * After Rust has synchronously accepted an ordinary reduced-color column, the
+	 * native asset/resource ownership is sufficient for future frames. Keep only
+	 * the generation-qualified segment descriptor in Java; source execution and
+	 * diagnostics deliberately retain their complete immutable snapshots.
+	 */
+	private static void discardAcknowledgedPayloadLocked(long columnKey, LodColumnSnapshot snapshot) {
+		if (!COLUMNS.remove(columnKey, snapshot)) {
+			return;
+		}
+		COLUMN_KEYS.remove(columnKey);
+		retainedBytes -= snapshot.byteSize();
+		removeMaterialProvenanceLocked(columnKey);
 	}
 
 	private static LodMaterialProvenanceSnapshot publishedMaterialProvenanceLocked(long columnKey) {
@@ -3506,6 +3593,7 @@ public final class DistantHorizonsSemanticCollector {
 					// Retire that exact Rust generation; never resurrect it locally.
 					PUBLISHED_GENERATIONS.remove(asset.columnKey());
 					PUBLISHED_COLUMNS.remove(asset.columnKey());
+					PUBLISHED_DRAW_METADATA.remove(asset.columnKey());
 					PUBLISHED_MATERIAL_PROVENANCE.remove(asset.columnKey());
 					PENDING_RETIREMENTS.put(asset.columnKey(), asset.columnGeneration());
 				} else if (current.generation() != asset.columnGeneration() && invalidatedInFlight) {
@@ -3520,12 +3608,20 @@ public final class DistantHorizonsSemanticCollector {
 					// is still in flight. Keep that older acknowledged transaction
 					// drawable until the replacement is accepted.
 					PUBLISHED_GENERATIONS.put(asset.columnKey(), asset.columnGeneration());
-					PUBLISHED_COLUMNS.put(asset.columnKey(), snapshot);
+					PUBLISHED_DRAW_METADATA.put(asset.columnKey(), PublishedColumnDrawMetadata.from(snapshot));
+					if (executionSnapshotsEnabled()) {
+						PUBLISHED_COLUMNS.put(asset.columnKey(), snapshot);
+					} else {
+						PUBLISHED_COLUMNS.remove(asset.columnKey());
+					}
 					LodMaterialProvenanceSnapshot publishedProvenance = update.materialProvenanceByColumn().get(asset.columnKey());
 					if (publishedProvenance == null) {
 						PUBLISHED_MATERIAL_PROVENANCE.remove(asset.columnKey());
 					} else {
 						PUBLISHED_MATERIAL_PROVENANCE.put(asset.columnKey(), publishedProvenance);
+					}
+					if (!executionSnapshotsEnabled() && current.generation() == asset.columnGeneration()) {
+						discardAcknowledgedPayloadLocked(asset.columnKey(), current);
 					}
 				}
 				if (current != null && current.generation() == asset.columnGeneration()) {
@@ -3547,6 +3643,7 @@ public final class DistantHorizonsSemanticCollector {
 				if (Objects.equals(PUBLISHED_GENERATIONS.get(retirement.columnKey()), retirement.columnGeneration())) {
 					PUBLISHED_GENERATIONS.remove(retirement.columnKey());
 					PUBLISHED_COLUMNS.remove(retirement.columnKey());
+					PUBLISHED_DRAW_METADATA.remove(retirement.columnKey());
 					PUBLISHED_MATERIAL_PROVENANCE.remove(retirement.columnKey());
 				}
 				if (Objects.equals(
@@ -3881,6 +3978,7 @@ public final class DistantHorizonsSemanticCollector {
 			COLUMNS.clear();
 			COLUMN_KEYS.clear();
 			PUBLISHED_COLUMNS.clear();
+			PUBLISHED_DRAW_METADATA.clear();
 			MATERIAL_PROVENANCE.clear();
 			PUBLISHED_MATERIAL_PROVENANCE.clear();
 			EXACT_ATLAS_COVERAGE_CACHE.clear();

@@ -6088,9 +6088,43 @@ pub(crate) struct WorldLodTexturedGpuColumnAsset {
 pub(crate) struct WorldLodGpuSegment {
     pub layer: u32,
     pub vertex_layout_version: u32,
+    /// Counts survive upload-payload release. They are validated while the
+    /// immutable asset enters Rust and are all later draw planning needs once
+    /// private Vulkan buffers own the geometry.
+    pub vertex_count: u32,
     pub vertex_bytes: Vec<u8>,
     pub index_type: IndexType,
+    pub index_count: u32,
     pub index_bytes: Vec<u8>,
+}
+
+impl WorldLodGpuSegment {
+    /// Frees the CPU upload copy only after the same generation has become a
+    /// live private GPU resource. Retaining the layout, counts, layer, and
+    /// index type keeps generation-checked draw validation intact without
+    /// duplicating immutable geometry for the lifetime of a visible column.
+    pub(crate) fn release_uploaded_payload(&mut self) {
+        self.vertex_bytes = Vec::new();
+        self.index_bytes = Vec::new();
+    }
+
+    fn upload_payload_is_present(&self) -> bool {
+        self.vertex_bytes.len()
+            == usize::try_from(self.vertex_count)
+                .ok()
+                .and_then(|count| count.checked_mul(WORLD_LOD_GPU_VERTEX_BYTES))
+                .unwrap_or(usize::MAX)
+            && self.index_bytes.len()
+                == usize::try_from(self.index_count)
+                    .ok()
+                    .and_then(|count| {
+                        count.checked_mul(match self.index_type {
+                            IndexType::U16 => std::mem::size_of::<u16>(),
+                            IndexType::U32 => std::mem::size_of::<u32>(),
+                        })
+                    })
+                    .unwrap_or(usize::MAX)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -6338,24 +6372,13 @@ impl WorldLodGpuResidency {
                 ));
             }
             if segment.vertex_layout_version != WORLD_LOD_GPU_VERTEX_LAYOUT_V2
-                || segment.vertex_bytes.len() % WORLD_LOD_GPU_VERTEX_BYTES != 0
+                || segment.vertex_count == 0
             {
                 return Err(GalError::invalid_argument(
-                    "world LOD draw references an unsupported GPU vertex payload",
+                    "world LOD draw references an unsupported GPU vertex layout",
                 ));
             }
-            let index_stride = match segment.index_type {
-                IndexType::U16 => std::mem::size_of::<u16>(),
-                IndexType::U32 => std::mem::size_of::<u32>(),
-            };
-            if segment.index_bytes.len() % index_stride != 0 {
-                return Err(GalError::invalid_argument(
-                    "world LOD draw index payload is not aligned to its explicit index type",
-                ));
-            }
-            let index_count = u32::try_from(segment.index_bytes.len() / index_stride)
-                .map_err(|_| GalError::invalid_argument("world LOD index count exceeds u32"))?;
-            if index_count == 0 || index_count % 3 != 0 {
+            if segment.index_count == 0 || segment.index_count % 3 != 0 {
                 return Err(GalError::invalid_argument(
                     "world LOD draw requires a non-empty triangle-aligned index range",
                 ));
@@ -6381,7 +6404,7 @@ impl WorldLodGpuResidency {
                 vertex_buffer: resources.vertex_buffer,
                 index_buffer: resources.index_buffer,
                 index_type: segment.index_type,
-                index_count,
+                index_count: segment.index_count,
             });
         }
         Ok(())
@@ -6442,7 +6465,6 @@ impl WorldLodGpuResidency {
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn active_generation(&self, column_key: u64) -> Option<u64> {
         self.active
             .get(&column_key)
@@ -7425,6 +7447,10 @@ pub(crate) fn pack_world_lod_gpu_column_asset(
 ) -> GalResult<WorldLodGpuColumnAsset> {
     let mut segments = Vec::with_capacity(asset.segments.len());
     for segment in &asset.segments {
+        let vertex_count = u32::try_from(segment.vertices.len())
+            .map_err(|_| GalError::invalid_argument("world LOD GPU vertex count exceeds u32"))?;
+        let index_count = u32::try_from(segment.indices.len())
+            .map_err(|_| GalError::invalid_argument("world LOD GPU index count exceeds u32"))?;
         let vertex_capacity = segment
             .vertices
             .len()
@@ -7468,8 +7494,10 @@ pub(crate) fn pack_world_lod_gpu_column_asset(
         segments.push(WorldLodGpuSegment {
             layer: segment.layer,
             vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V2,
+            vertex_count,
             vertex_bytes,
             index_type,
+            index_count,
             index_bytes,
         });
     }
@@ -7652,6 +7680,12 @@ fn create_column_resources(
     let mut segments = Vec::with_capacity(asset.segments.len());
     let result = (|| -> GalResult<()> {
         for (segment_index, segment) in asset.segments.iter().enumerate() {
+            if !segment.upload_payload_is_present() {
+                return Err(GalError::invalid_argument(format!(
+                    "world LOD column {} generation {} segment {segment_index} upload payload was released before GPU residency",
+                    asset.column_key, asset.column_generation
+                )));
+            }
             let label = format!(
                 "world-lod-column{}-gen{}-segment{segment_index}",
                 asset.column_key, asset.column_generation

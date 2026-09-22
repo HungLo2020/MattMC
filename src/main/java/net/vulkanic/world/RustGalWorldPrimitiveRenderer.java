@@ -585,7 +585,10 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** Must mirror the stricter Rust world-frontend mesh limits. */
 	private static final int MAX_WORLD_MESH_VERTICES = 65_536;
 	private static final int MAX_WORLD_MESH_FRONTEND_INDEX_BYTES = 393_216;
-	private static final int MAX_WORLD_MESH_SECTIONS = 256;
+	// Translucent terrain preserves sorted material runs. Dense glass/water
+	// sections can legitimately contain more than 256 alternating runs even
+	// while their vertices and indices remain within the mesh contract.
+	private static final int MAX_WORLD_MESH_SECTIONS = 4_096;
 	private static final int MAX_ENCODED_ATLAS_SNAPSHOTS = 8;
 	private static final int MAX_PARTICLE_ATLAS_IDENTITIES = 1_024;
 	private static final int MAX_DYNAMIC_WORLD_ASSET_FINGERPRINTS = 4_096;
@@ -10212,7 +10215,9 @@ public final class RustGalWorldPrimitiveRenderer {
 			|| indexBytes == 0 || indexBytes > MAX_WORLD_MESH_FRONTEND_INDEX_BYTES
 			|| indexStride == 0 || indexBytes % indexStride != 0
 			|| asset.sections().isEmpty() || asset.sections().size() > MAX_WORLD_MESH_SECTIONS) {
-			throw new IllegalArgumentException("Rust VulkanicGAL " + source + " mesh exceeds bounded vertex/index/section contract");
+			throw new IllegalArgumentException("Rust VulkanicGAL " + source
+				+ " mesh exceeds bounded vertex/index/section contract: vertices=" + vertexCount
+				+ " indexBytes=" + indexBytes + " sections=" + asset.sections().size());
 		}
 		int indexCount = indexBytes / indexStride;
 		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : asset.vertices()) {

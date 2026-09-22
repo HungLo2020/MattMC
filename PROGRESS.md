@@ -32,7 +32,7 @@ window and moving-path warmup for Current and Frozen.
 | latest settled-static (60 frames) | 5.208 ms | 4.737 ms | 1.10x |
 | latest moving-camera (60 frames) | 5.924 ms | 3.140 ms | 1.89x |
 
-Both latest pairs are crash/device-loss free with empty comparison rejections and clean validation. The moving run discarded one post-frame partial window, then measured 60 frames with zero completed terrain builds; the earlier 2.17x moving result had admitted an under-populated Frozen path and is rejected. Performance is now within the 2x target; correctness and DH validation remain before completion.
+These are bounded fixture results, not evidence of broad 2x parity. A real `Origin Prime City 3` launch exposed a 1–2 FPS path and a DH admission crash after 515 columns; Goal 2.5 remains open. The moving fixture discarded one partial window and measured 60 frames with zero completed terrain builds; an earlier 2.17x comparison used an under-populated Frozen path and is rejected.
 
 The settled pair held 513 mesh batches and a visible-cache hit; moving held about 542 batches with no completed-build churn. In the moving Current sample, semantic world extraction was 2.47 ms, native submit-return 2.42 ms, FFI decode 0.10 ms, Vulkan queue submit 0.015 ms, and GPU frame total 2.93 ms (terrain cutout 1.72 ms). The measured gap is Java semantic production, command preparation, and terrain fragment work; FFI is not the limiting boundary, and no evidence supports weakening Rust/Vulkan ownership or safety.
 
@@ -168,7 +168,7 @@ counts, so the small end-to-end change is not credited as a speedup.
 - Repaired the paired inventory capture harness: both backends now use the ordinary semantic inventory fixture, and the acknowledged Current/Frozen images are comparable. The fresh pair passed visual parity (mean RGB error below 0.6) with `inventoryOpen=true`; the prior XTest timing path was removed.
 - Hardened the resource-reload boundary: transient GUI item semantic collection now defers while the old atlas is staging, so stale `TextureAtlasSprite` payloads cannot cross generations or become fatal unsupported items. A fresh paired reload witness completed on both backends with `futureComplete=true`, `complete=true`, and two post-reload presentations.
 - Repaired the dedicated DH parity fixture so Frozen receives the same bounded radius, fade, and fog inputs as Current. The fresh full-attachment DH witness passed semantic and visual parity, proved 17,626 far-world pixels against the private-color/depth boundary, recorded 3,275 submitted LOD instances, and remained crash/device-loss/Vulkan-validation clean. The selected glass-pane hand was removed only from this paired fixture.
-- Fixed the real-world load crash where the F3 3D crosshair entered the Rust line stream before `beginFrame` seeded its bounded viewport and matrices. The crosshair now follows the frame seed; quick-play reached the same `New` world/player path without the exception and continued clean whole-frame submissions. A trace also confirms cold DH admission is bounded to roughly 11–16 columns and 11–16 MiB per update; its remaining 0.1–0.4 s update cost is separate performance work.
+- Fixed the F3 crosshair's unseeded Rust line stream. Dense-world profiling found 11.8–14.6 GiB RSS, about 1–2 FPS, and a reproducible crash at 515 DH columns because Rust allowed only 512 while the visible contract permits 16,384. Ordinary DH columns now release Java raw snapshots after admission, skip unused material provenance, retain one Rust packed upload copy before residency, and release it after successful GPU submission; retired generations use the authoritative packed-asset map. Rust's column bound now matches the visible contract. Dense sorted translucent sections may contain more than 256 material runs, so the shared Java/Rust section bound is 4,096. Release quick-play `Origin Prime City 3` passed the old crash point and reached frame 416 without a world-frame crash or translucent section rejection. The first complete profile found the principal frame bottleneck in GAL hazard analysis: a linear duplicate-read scan over a roughly 100,000-operation submission. Hash-indexed read membership preserves deterministic access order and all conflict checks; matched city frames at about 100,670 operations reduced median hazard validation from 687 to 15 ms and GAL submission from 724 to 52 ms. At about 133,000 operations, hazard validation is near 19 ms, but total frontend time remains about 210 ms/frame, graph construction about 129 ms, and RSS about 13 GiB. Full goal parity remains unresolved.
 
 Validation: `./gradlew compileJava`, `cargo check --manifest-path src/main/rust/Cargo.toml`,
 `git diff --check`, the native Rust suite, and focused terrain/hand/inventory suites pass.
@@ -180,9 +180,8 @@ completed 60 frames with zero concrete VUIDs. Fresh vanilla `20260922-100417` an
 
 1. Keep the measured CPU/GPU boundaries explicit; do not optimize FFI or merge
    Iris/DH source/material passes without a new profile showing a real cost.
-2. Run vanilla load, DH movement, and strict Vulkan validation against the
-   queue-gated build before completion; inventory and resource reload now have
-   fresh clean witnesses.
+2. Finish the dense saved-world repeat, profile its remaining native memory and
+   frame time, then rerun matching Frozen/Current city and queue-gated fixtures.
 3. Keep only result-bearing diagnostics and prune one-off traces.
 
 ## Completion gate

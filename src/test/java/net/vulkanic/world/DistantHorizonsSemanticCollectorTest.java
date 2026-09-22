@@ -53,6 +53,32 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
+	void normalPublicationKeepsCompactReadinessAfterReleasingCopiedGeometry() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		DistantHorizonsSemanticCollector.resetForTest();
+		long columnKey = 74L;
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			columnKey, new DhBlockPos(0, 64, 0),
+			List.of(quadBuffer(0, 0, 0, 0xB7, 1, 2, 3, 255, 1, 2)), List.of(), List.of(), List.of()
+		);
+		var update = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		long generation = update.assets().getFirst().columnGeneration();
+		System.clearProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY);
+		DistantHorizonsSemanticCollector.acknowledgeForTest(update);
+		assertNull(DistantHorizonsSemanticCollector.snapshotForTest(columnKey));
+		assertTrue(DistantHorizonsSemanticCollector.hasColumn(columnKey, generation));
+		assertTrue(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		assertTrue(DistantHorizonsSemanticCollector.requestColumnPublication(columnKey));
+		DistantHorizonsSemanticCollector.removeColumn(columnKey, generation);
+		assertFalse(DistantHorizonsSemanticCollector.hasColumn(columnKey, generation));
+		assertTrue(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
+		DistantHorizonsSemanticCollector.acknowledgeForTest(
+			DistantHorizonsSemanticCollector.pendingUpdateForTest());
+		assertFalse(DistantHorizonsSemanticCollector.hasPublishedColumn(columnKey));
+	}
+
+	@Test
 	void primitiveColumnMembershipTracksTheSemanticSnapshotLifecycle() {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
 		DistantHorizonsSemanticCollector.resetForTest();

@@ -72,7 +72,7 @@ pub struct ClearColor {
 }
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum AttachmentLoadOp {
     Load = 1,
     Clear = 2,
@@ -80,7 +80,7 @@ pub enum AttachmentLoadOp {
 }
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum AttachmentStoreOp {
     Store = 1,
     DontCare = 2,
