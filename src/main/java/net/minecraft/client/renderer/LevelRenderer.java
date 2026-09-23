@@ -1427,7 +1427,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.entity-traversal");
 		if (worldText) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.world-text-submit");
-				this.submitWholeFrameWorldText(poseStack, this.levelRenderState);
+				this.submitWholeFrameWorldText(poseStack, this.levelRenderState, modelMeshes);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.world-text-submit");
 		}
 		if (net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) {
@@ -1553,17 +1553,33 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	/**
-	 * Replays real entity and block-entity submit callbacks into a text-only
-	 * semantic collector. Producers retain control of their text placement and
-	 * ordering while every non-text feature is discarded before it can become
-	 * Java render work.
+	 * Replays entity and block-entity callbacks for world text. Producers retain
+	 * text placement and ordering; the collector also forwards explicitly
+	 * admitted special geometry, so only proven duplicate producer work can be
+	 * skipped here.
 	 */
-	private void submitWholeFrameWorldText(PoseStack poseStack, LevelRenderState levelRenderState) {
+	private void submitWholeFrameWorldText(PoseStack poseStack, LevelRenderState levelRenderState, boolean modelMeshes) {
 		this.rustWorldTextSubmitNodeStorage.clear();
 		Vec3 cameraPos = levelRenderState.cameraRenderState.pos;
 		WorldTextSubmitSemanticCollector collector = new WorldTextSubmitSemanticCollector(this.rustWorldTextSubmitNodeStorage);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.world-text.waypoints");
 		net.voxelmap.VoxelConstants.submitRustWaypointSemantics(collector, poseStack, this.minecraft.gameRenderer.getMainCamera());
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.world-text.waypoints");
+		int nameTagsAfterWaypoints = collector.nameTagCallbackCount();
+		int textAfterWaypoints = collector.textCallbackCount();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.world-text.entities");
+		int duplicatePaintingsSkipped = 0;
 		for (EntityRenderState entityRenderState : levelRenderState.entityRenderStates) {
+			if (modelMeshes
+				&& entityRenderState.getClass() == net.minecraft.client.renderer.entity.state.PaintingRenderState.class
+				&& entityRenderState.nameTag == null
+				&& this.entityRenderDispatcher.getRenderer(entityRenderState).getClass() == net.minecraft.client.renderer.entity.PaintingRenderer.class) {
+				// The primary entity pass already owns every painting quad. A
+				// name-free vanilla painting emits no world text; replaying it here
+				// re-generates and enqueues the same six faces per tile.
+				duplicatePaintingsSkipped++;
+				continue;
+			}
 			this.entityRenderDispatcher.submitSemantic(
 					entityRenderState,
 					levelRenderState.cameraRenderState,
@@ -1574,6 +1590,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 					collector
 				);
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.world-text.entities");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("world.indexed-mesh.world-text.duplicate-paintings-skipped", duplicatePaintingsSkipped);
+		int nameTagsAfterEntities = collector.nameTagCallbackCount();
+		int textAfterEntities = collector.textCallbackCount();
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.indexed-mesh.world-text.block-entities");
 		for (BlockEntityRenderState blockEntityRenderState : levelRenderState.blockEntityRenderStates) {
 			BlockPos blockPos = blockEntityRenderState.blockPos;
 			poseStack.pushPose();
@@ -1581,6 +1602,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.blockEntityRenderDispatcher.submitSemantic(blockEntityRenderState, poseStack, collector, levelRenderState.cameraRenderState);
 			poseStack.popPose();
 		}
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.world-text.block-entities");
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("world.indexed-mesh.world-text.waypoint-callbacks", textAfterWaypoints + nameTagsAfterWaypoints);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("world.indexed-mesh.world-text.entity-callbacks", nameTagsAfterEntities - nameTagsAfterWaypoints + textAfterEntities - textAfterWaypoints);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("world.indexed-mesh.world-text.block-entity-callbacks", collector.textCallbackCount() - textAfterEntities + collector.nameTagCallbackCount() - nameTagsAfterEntities);
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordWorldTextTraversal(
 				levelRenderState.entityRenderStates.size(), collector.nameTagCallbackCount(), collector.textCallbackCount()
 			);

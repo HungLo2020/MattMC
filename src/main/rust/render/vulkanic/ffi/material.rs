@@ -358,6 +358,12 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
                         format!("unknown world mesh material id {}", section.material_id),
                     )
                 })?;
+            if section.source_facing > 6 {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh source facing {}", section.source_facing),
+                ));
+            }
             sections.push(WorldMeshSection {
                 material_id,
                 texture_id: section.texture_id,
@@ -366,6 +372,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
                 winding: section.winding,
                 index_offset: section.index_offset,
                 index_count: section.index_count,
+                source_facing: section.source_facing,
             });
         }
         let entity_identity = read_label(

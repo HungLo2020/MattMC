@@ -176,22 +176,22 @@ public final class WorldTextSemanticCollector {
 		for (TextGlyphQuad glyph : glyphs) {
 			int semanticColor = lightTexture.rustSemanticPackedLightColor(packedLight, glyph.colorArgb());
 			FontTexture.SemanticAtlasSnapshot atlas = FontTexture.semanticAtlasSnapshot(glyph.atlasIdentity());
+			TextureAtlas.SemanticRawSnapshot raw = null;
+			RustGalGuiRawImageAssets.SemanticRawImageSnapshot rawImage = null;
 			String imageIdentity = glyph.atlasIdentity();
 			long imageGeneration;
 			long imageRevision;
 			boolean imageColored;
 			int imageWidth;
 			int imageHeight;
-			byte[] atlasPixels;
 			if (atlas != null) {
 				imageGeneration = atlas.generation();
 				imageRevision = atlas.revision();
 				imageColored = atlas.colored();
 				imageWidth = atlas.width();
 				imageHeight = atlas.height();
-				atlasPixels = atlas.pixels();
 			} else {
-				TextureAtlas.SemanticRawSnapshot raw = semanticTextureAtlasSnapshot(glyph.atlasIdentity());
+				raw = semanticTextureAtlasSnapshot(glyph.atlasIdentity());
 				if (raw != null) {
 					imageGeneration = raw.generation();
 					// TextureAtlas snapshots predate the font-atlas revision field, but
@@ -202,20 +202,15 @@ public final class WorldTextSemanticCollector {
 					imageColored = true;
 					imageWidth = raw.width();
 					imageHeight = raw.height();
-					atlasPixels = raw.pixels();
 				} else {
-					RustGalGuiRawImageAssets.SemanticRawImageSnapshot image = semanticRawImageSnapshot(glyph.atlasIdentity());
-					if (image == null) return 1;
-					imageGeneration = image.generation();
-					imageRevision = image.revision();
+					rawImage = semanticRawImageSnapshot(glyph.atlasIdentity());
+					if (rawImage == null) return 1;
+					imageGeneration = rawImage.generation();
+					imageRevision = rawImage.revision();
 					imageColored = true;
-					imageWidth = image.width();
-					imageHeight = image.height();
-					atlasPixels = image.pixels();
+					imageWidth = rawImage.width();
+					imageHeight = rawImage.height();
 				}
-			}
-			if (atlasPixels.length > MAX_SEMANTIC_ATLAS_BYTES) {
-				return 1;
 			}
 			long assetId = semanticAssetId(imageIdentity, imageColored);
 			WorldTextImage previous = images.get(assetId);
@@ -243,6 +238,14 @@ public final class WorldTextSemanticCollector {
 					packedLight, semanticColor, distanceToCameraSq, matrixValues(pose), blockEntityId, glyph
 				));
 				continue;
+			}
+			// Snapshot accessors defensively copy pixels. The vast majority of
+			// glyphs in a sign-heavy frame reuse an atlas already staged above;
+			// inspect its identity and generation before requesting those bytes.
+			byte[] atlasPixels = atlas != null ? atlas.pixels()
+				: raw != null ? raw.pixels() : rawImage.pixels();
+			if (atlasPixels.length > MAX_SEMANTIC_ATLAS_BYTES) {
+				return 1;
 			}
 			WorldTextImage image = new WorldTextImage(
 				assetId, imageIdentity, imageGeneration, imageRevision, imageColored,

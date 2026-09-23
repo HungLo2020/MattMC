@@ -1319,6 +1319,16 @@ def canonical_fixture_id(args: argparse.Namespace) -> str:
         "1", "true", "yes"
     }:
         dh_flags += "-dh-source-save"
+    if getattr(args, "world_distant_horizons_real_world", False):
+        source_override = os.environ.get("MATTMC_CAPTURE_RUN_SOURCE", "").strip()
+        if source_override:
+            source_run = Path(source_override).resolve()
+            source_db = source_run / "saves" / world / "data" / "DistantHorizons.sqlite"
+            db_stat = source_db.stat() if source_db.is_file() else None
+            source_key = (str(source_run), db_stat.st_size if db_stat else 0,
+                          db_stat.st_mtime_ns if db_stat else 0)
+            source_id = hashlib.sha256(repr(source_key).encode()).hexdigest()[:12]
+            dh_flags += f"-source-{source_id}"
     world_profile = getattr(args, "world_profile", "migration-gate")
     return f"{world}-{world_profile}-{scenario}-{resource_pack}-{model_scenario}{destroy_stage_suffix}{statue_suffix}-{beacon_scenario}-{text_scenario}-{terrain_particle_scenario}-{weather_scenario}-{cloud_scenario}-{background_scenario}-{dh_flags}-{PARITY_FIXTURE_SCHEMA}".replace("/", "_").replace(" ", "_")
 
@@ -1607,7 +1617,12 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
     existing = getattr(args, "_canonical_fixture_run_source", None)
     if existing:
         return Path(existing)
-    source_run = targets["current"].root / "run"
+    source_override = (
+        os.environ.get("MATTMC_CAPTURE_RUN_SOURCE", "").strip()
+        if getattr(args, "world_distant_horizons_real_world", False)
+        else ""
+    )
+    source_run = Path(source_override).resolve() if source_override else targets["current"].root / "run"
     world = getattr(args, "world", "") or WORLD_PROFILES[getattr(args, "world_profile", "migration-gate")].world
     source_world = source_run / "saves" / world
     if not source_world.is_dir():
@@ -1720,8 +1735,8 @@ def canonical_dh_capture_radius() -> int:
     raw = os.environ.get("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE", "").strip()
     if not raw:
         return 8
-    if not raw.isdigit() or not 1 <= int(raw) <= 32:
-        raise ValueError("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE must be an integer from 1 to 32")
+    if not raw.isdigit() or not 1 <= int(raw) <= 256:
+        raise ValueError("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE must be an integer from 1 to 256")
     return int(raw)
 
 
@@ -36082,6 +36097,7 @@ def build_capture_command(
             "world_distant_horizons_non_water",
             "world_distant_horizons_water",
             "world_distant_horizons_texture_palette",
+            "world_distant_horizons_real_world",
         )
     )
     if (
@@ -36732,8 +36748,14 @@ def build_capture_command(
     env["MATTMC_CAPTURE_DH_LOD_ONLY"] = (
         "true" if dh_composition_mode == "LOD_ONLY" else "false"
     )
-    if dh_real_world and not (dh_opaque_only or dh_non_water or dh_water):
+    if dh_real_world and tool_kind != "gameplay" and not (dh_opaque_only or dh_non_water or dh_water):
         raise ValueError("--world-distant-horizons-real-world requires an explicit DH stream")
+    if dh_real_world and tool_kind == "gameplay" and mode.backend == "rust-vulkan" and not (
+        dh_opaque_only or dh_non_water or dh_water
+    ):
+        # Real-save performance must exercise the ordinary DH route, without
+        # fixture stream controls that change its configuration or workload.
+        java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution=true")
     if tool_kind == "capture" and (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette):
         # Dedicated DH rows must consume the same immutable LOD database in
         # Current and Frozen. The canonical fixture already carries that
@@ -36807,6 +36829,7 @@ def build_capture_command(
     ordinary_gameplay_capture = (
         tool_kind == "gameplay"
         and args.world == "Origin"
+        and not dh_real_world
         and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
         and not getattr(args, "world_distant_horizons_opaque", False)
         and not getattr(args, "world_distant_horizons_non_water", False)
@@ -36816,6 +36839,7 @@ def build_capture_command(
     ordinary_vanilla_run = (
         tool_kind in {"capture", "gameplay", "subsystem"}
         and args.world == "Origin"
+        and not dh_real_world
         and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
     )
     if (

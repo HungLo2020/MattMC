@@ -223,7 +223,16 @@ public final class NativeStaticBlockModelRegistry {
         if (!FORCE_JAVA_MODELS && model != null && state.getRenderShape() == RenderShape.MODEL) {
             selectorId = registerSelector(state, model, stateId);
             if (selectorId != MISSING_ID && tintType == TINT_NONE && modelHasTintedQuads(model)) {
-                selectorId = MISSING_ID;
+                // Some authored models (for example the stonecutter saw) mark
+                // quads tinted even though no BlockColors provider exists.
+                // Vanilla resolves those indices to white. Admit them with
+                // that explicit constant semantic, while retaining the Java
+                // fallback for unknown registered color providers.
+                if (!Minecraft.getInstance().getBlockColors().hasColorProvider(state.getBlock())) {
+                    tintType = TINT_CONSTANT;
+                } else {
+                    selectorId = MISSING_ID;
+                }
             }
         }
         STATE_SELECTORS.put(state, selectorId);

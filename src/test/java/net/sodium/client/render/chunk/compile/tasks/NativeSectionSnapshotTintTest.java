@@ -4,8 +4,21 @@ import net.minecraft.client.color.block.BlockColors;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NativeSectionSnapshotTintTest {
+    @Test
+    void stonecutterTintedSawHasVanillaWhiteTintWithoutAColorProvider() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+        var colors = BlockColors.createDefault();
+        var stonecutter = net.minecraft.world.level.block.Blocks.STONECUTTER.defaultBlockState();
+        assertFalse(colors.hasColorProvider(stonecutter.getBlock()));
+        assertEquals(-1, colors.getColor(stonecutter, null, null, 0));
+        assertTrue(colors.hasColorProvider(net.minecraft.world.level.block.Blocks.GRASS_BLOCK));
+    }
+
     @Test
     void leafLitterUsesDryFoliageRatherThanGreenFoliageAcrossCopiedLattice() throws Exception {
         net.minecraft.SharedConstants.tryDetectVersion();

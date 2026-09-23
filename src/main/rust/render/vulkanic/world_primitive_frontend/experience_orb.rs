@@ -98,6 +98,7 @@ impl ExperienceOrbPlacement {
             mesh_key,
             mesh_generation,
             mesh_section_index: WORLD_MESH_SECTION_ALL,
+            terrain_visible_facing_mask: 0x7f,
             // Frozen ITEM_ENTITY_TRANSLUCENT_CULL retains LEQUAL + depth writes.
             depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
             cull_policy: WORLD_CULL_BACK,
@@ -135,6 +136,7 @@ impl ExperienceOrbAppearance {
                 winding: WORLD_WINDING_CCW,
                 index_offset: 0,
                 index_count: 6,
+                source_facing: 6,
             }],
             entity_identity: "minecraft:experience_orb".to_owned(),
         };

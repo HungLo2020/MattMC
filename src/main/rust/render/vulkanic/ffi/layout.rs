@@ -1080,7 +1080,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 cull_policy,
                 winding,
                 index_offset,
-                index_count
+                index_count,
+                source_facing
             ]
         ),
         66 => layout!(

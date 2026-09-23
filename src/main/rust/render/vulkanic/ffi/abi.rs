@@ -1065,6 +1065,7 @@ pub struct FfiWorldMeshSectionRecord {
     pub winding: u32,
     pub index_offset: u32,
     pub index_count: u32,
+    pub source_facing: u32,
 }
 
 #[repr(C)]

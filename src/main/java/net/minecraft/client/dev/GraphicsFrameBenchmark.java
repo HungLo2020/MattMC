@@ -70,6 +70,8 @@ public final class GraphicsFrameBenchmark {
 	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
 	private static final boolean REQUIRE_DH_EXECUTION =
 		Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution");
+	private static final int MIN_DH_VISIBLE_COLUMNS = Math.max(1,
+		Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.minDistantHorizonsVisibleColumns", 1));
 	/**
 	 * A DH gameplay sample is not steady-state while the independent vanilla
 	 * terrain source is still ingesting section builds.  Keep this gate opt-out
@@ -365,6 +367,10 @@ public final class GraphicsFrameBenchmark {
 		}
 		activeBeginFrameCalls++;
 		lastFrameLifecycle = "begin-active";
+		// An unattended world can spend over a minute reaching the settled
+		// window. Keep Minecraft's AFK frame limiter from changing the timed
+		// workload; this benchmark already owns the fixed camera and input path.
+		minecraft.getFramerateLimitTracker().onInputReceived();
 		// Status serialization is deliberately outside the measurement window.
 		// A periodic write here previously inserted a 500–700 ms gap between two
 		// otherwise adjacent samples, then made the wall-clock validator reject
@@ -846,11 +852,18 @@ public final class GraphicsFrameBenchmark {
 	 * half-interpolated player pose to either renderer.
 	 */
 	private static void applyBenchmarkCameraPath(Minecraft minecraft) {
-		if (!"moving-camera".equals(CAMERA_PATH_TYPE) || CAMERA_YAW_DELTA == 0.0F
+		if ((!"moving-camera".equals(CAMERA_PATH_TYPE) && !"settled-sine-yaw".equals(CAMERA_PATH_TYPE))
+			|| CAMERA_YAW_DELTA == 0.0F
 			|| minecraft.player == null || initialPosition == null) {
 			return;
 		}
-		float yaw = initialYaw + frameIndex * CAMERA_YAW_DELTA;
+		float yaw;
+		if ("settled-sine-yaw".equals(CAMERA_PATH_TYPE)) {
+			double period = Math.max(1.0, WARMUP_FRAMES + MEASURE_FRAMES);
+			yaw = initialYaw + (float)Math.sin((frameIndex / period) * Math.PI * 2.0) * CAMERA_YAW_DELTA;
+		} else {
+			yaw = initialYaw + frameIndex * CAMERA_YAW_DELTA;
+		}
 		minecraft.player.setYRot(yaw);
 		minecraft.player.yRotO = yaw;
 		minecraft.player.yHeadRot = yaw;
@@ -978,6 +991,10 @@ public final class GraphicsFrameBenchmark {
 		if (REQUIRE_DH_EXECUTION) {
 			DistantHorizonsSemanticCollector.RouteDiagnostics route =
 				DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+			if (route.visibleColumns() < MIN_DH_VISIBLE_COLUMNS) {
+				missing.add("distant-horizons-visible-columns=" + route.visibleColumns()
+					+ "/" + MIN_DH_VISIBLE_COLUMNS);
+			}
 			if (route.semanticUnpublishedCandidates() != 0
 				|| route.unpublishedVisibleColumns() != 0) {
 				missing.add("distant-horizons-publication");
@@ -1838,6 +1855,7 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"settleFramesRequested\": ").append(SETTLE_FRAMES).append(",\n");
 		json.append("  \"warmupFramesRequested\": ").append(WARMUP_FRAMES).append(",\n");
 		json.append("  \"measureFramesRequested\": ").append(MEASURE_FRAMES).append(",\n");
+		json.append("  \"minDistantHorizonsVisibleColumns\": ").append(REQUIRE_DH_EXECUTION ? MIN_DH_VISIBLE_COLUMNS : 0).append(",\n");
 		json.append("  \"readinessTimeoutNanos\": ").append(READINESS_TIMEOUT_NANOS).append(",\n");
 		json.append("  \"terrainQueueDrainRequired\": ").append(REQUIRE_TERRAIN_QUEUE_DRAIN).append(",\n");
 		json.append("  \"terrainQueueDrainStableFramesRequired\": ").append(TERRAIN_QUEUE_DRAIN_STABLE_FRAMES).append(",\n");

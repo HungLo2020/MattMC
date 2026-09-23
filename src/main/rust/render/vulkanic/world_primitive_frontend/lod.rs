@@ -6139,6 +6139,25 @@ pub(crate) struct WorldLodGpuColumnAsset {
 pub(crate) struct WorldLodGpuSegmentResources {
     pub vertex_buffer: Handle,
     pub index_buffer: Handle,
+    vertex_upload_buffer: Option<Handle>,
+    index_upload_buffer: Option<Handle>,
+}
+
+impl WorldLodGpuSegmentResources {
+    fn retire_uploads(&mut self, gal: &mut VulkanicGal) {
+        if let Some(buffer) = self.index_upload_buffer.take() {
+            let _ = gal.destroy(buffer);
+        }
+        if let Some(buffer) = self.vertex_upload_buffer.take() {
+            let _ = gal.destroy(buffer);
+        }
+    }
+
+    fn destroy(mut self, gal: &mut VulkanicGal) {
+        self.retire_uploads(gal);
+        let _ = gal.destroy(self.index_buffer);
+        let _ = gal.destroy(self.vertex_buffer);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -6171,8 +6190,7 @@ pub(crate) struct WorldLodGpuDraw {
 impl WorldLodGpuColumnResources {
     fn destroy(self, gal: &mut VulkanicGal) {
         for segment in self.segments.into_iter().rev() {
-            let _ = gal.destroy(segment.index_buffer);
-            let _ = gal.destroy(segment.vertex_buffer);
+            segment.destroy(gal);
         }
     }
 }
@@ -6414,7 +6432,12 @@ impl WorldLodGpuResidency {
         let Some(created) = self.pending.take() else {
             return Ok(());
         };
-        for (column_key, resources) in created {
+        for (column_key, mut resources) in created {
+            // The successful combined submission recorded the staging copies.
+            // GAL defers these destroys until that submission completes.
+            for segment in &mut resources.segments {
+                segment.retire_uploads(gal);
+            }
             if let Some(previous) = self.active.insert(column_key, resources) {
                 previous.destroy(gal);
             }
@@ -7690,39 +7713,65 @@ fn create_column_resources(
                 "world-lod-column{}-gen{}-segment{segment_index}",
                 asset.column_key, asset.column_generation
             );
-            let vertex_buffer = gal.create_buffer(BufferDesc {
-                label: format!("{label}.vertices"),
-                size: segment.vertex_bytes.len() as u64,
-                memory: MemoryDomain::Upload,
-                usages: vec![
-                    BufferUsage::Vertex,
-                    BufferUsage::Storage,
-                    BufferUsage::HostWrite,
-                ],
-            })?;
-            let index_buffer = match gal.create_buffer(BufferDesc {
-                label: format!("{label}.indices"),
-                size: segment.index_bytes.len() as u64,
-                memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::Index, BufferUsage::HostWrite],
-            }) {
-                Ok(buffer) => buffer,
+            // These immutable streams are read on every visible frame. Keep
+            // the retained copies in device-local memory; upload buffers are
+            // retired after the same generation's first accepted submission.
+            let mut created = Vec::with_capacity(4);
+            let created_segment = (|| -> GalResult<WorldLodGpuSegmentResources> {
+                let vertex_upload_buffer = gal.create_buffer(BufferDesc {
+                    label: format!("{label}.vertices-upload"),
+                    size: segment.vertex_bytes.len() as u64,
+                    memory: MemoryDomain::Upload,
+                    usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
+                })?;
+                created.push(vertex_upload_buffer);
+                let vertex_buffer = gal.create_buffer(BufferDesc {
+                    label: format!("{label}.vertices"),
+                    size: segment.vertex_bytes.len() as u64,
+                    memory: MemoryDomain::DeviceLocal,
+                    usages: vec![
+                        BufferUsage::Vertex,
+                        BufferUsage::Storage,
+                        BufferUsage::TransferDst,
+                    ],
+                })?;
+                created.push(vertex_buffer);
+                let index_upload_buffer = gal.create_buffer(BufferDesc {
+                    label: format!("{label}.indices-upload"),
+                    size: segment.index_bytes.len() as u64,
+                    memory: MemoryDomain::Upload,
+                    usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
+                })?;
+                created.push(index_upload_buffer);
+                let index_buffer = gal.create_buffer(BufferDesc {
+                    label: format!("{label}.indices"),
+                    size: segment.index_bytes.len() as u64,
+                    memory: MemoryDomain::DeviceLocal,
+                    usages: vec![BufferUsage::Index, BufferUsage::TransferDst],
+                })?;
+                created.push(index_buffer);
+                Ok(WorldLodGpuSegmentResources {
+                    vertex_buffer,
+                    index_buffer,
+                    vertex_upload_buffer: Some(vertex_upload_buffer),
+                    index_upload_buffer: Some(index_upload_buffer),
+                })
+            })();
+            match created_segment {
+                Ok(resources) => segments.push(resources),
                 Err(error) => {
-                    let _ = gal.destroy(vertex_buffer);
+                    for handle in created.into_iter().rev() {
+                        let _ = gal.destroy(handle);
+                    }
                     return Err(error);
                 }
-            };
-            segments.push(WorldLodGpuSegmentResources {
-                vertex_buffer,
-                index_buffer,
-            });
+            }
         }
         Ok(())
     })();
     if let Err(error) = result {
         for segment in segments.into_iter().rev() {
-            let _ = gal.destroy(segment.index_buffer);
-            let _ = gal.destroy(segment.vertex_buffer);
+            segment.destroy(gal);
         }
         return Err(error);
     }
@@ -7737,12 +7786,33 @@ fn upload_ops(
     resources: &WorldLodGpuColumnResources,
 ) -> Vec<CommandOp> {
     debug_assert_eq!(asset.segments.len(), resources.segments.len());
-    let mut ops = Vec::with_capacity(asset.segments.len() * 4);
+    let mut ops = Vec::with_capacity(asset.segments.len() * 10);
     for (segment, resources) in asset.segments.iter().zip(&resources.segments) {
+        let vertex_upload_buffer = resources
+            .vertex_upload_buffer
+            .expect("new LOD resources retain vertex staging until submission");
+        let index_upload_buffer = resources
+            .index_upload_buffer
+            .expect("new LOD resources retain index staging until submission");
         ops.push(CommandOp::HostWriteBuffer {
-            buffer: resources.vertex_buffer,
+            buffer: vertex_upload_buffer,
             offset: 0,
             data: segment.vertex_bytes.clone(),
+        });
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            vertex_upload_buffer,
+            TextureUsageState::TransferDst,
+            TextureUsageState::TransferSrc,
+        )));
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            resources.vertex_buffer,
+            TextureUsageState::Undefined,
+            TextureUsageState::TransferDst,
+        )));
+        ops.push(CommandOp::CopyBuffer {
+            src: vertex_upload_buffer,
+            dst: resources.vertex_buffer,
+            size: segment.vertex_bytes.len() as u64,
         });
         ops.push(CommandOp::Barrier(buffer_barrier(
             resources.vertex_buffer,
@@ -7750,9 +7820,24 @@ fn upload_ops(
             TextureUsageState::ShaderRead,
         )));
         ops.push(CommandOp::HostWriteBuffer {
-            buffer: resources.index_buffer,
+            buffer: index_upload_buffer,
             offset: 0,
             data: segment.index_bytes.clone(),
+        });
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            index_upload_buffer,
+            TextureUsageState::TransferDst,
+            TextureUsageState::TransferSrc,
+        )));
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            resources.index_buffer,
+            TextureUsageState::Undefined,
+            TextureUsageState::TransferDst,
+        )));
+        ops.push(CommandOp::CopyBuffer {
+            src: index_upload_buffer,
+            dst: resources.index_buffer,
+            size: segment.index_bytes.len() as u64,
         });
         ops.push(CommandOp::Barrier(buffer_barrier(
             resources.index_buffer,
@@ -9040,6 +9125,66 @@ mod tests {
         assert!(residency
             .resolve_visible_draws_cached_into(&assets, &[instance], &mut cached)
             .is_err());
+    }
+
+    #[test]
+    fn immutable_lod_upload_copies_to_device_local_and_retires_staging_after_submission() {
+        let expanded = expand_world_lod_column_asset(&asset()).unwrap();
+        let packed = pack_world_lod_gpu_column_asset(&expanded).unwrap();
+        let assets = BTreeMap::from([(packed.column_key, packed)]);
+        let instance = WorldLodColumnInstanceRequest {
+            column_key: 7,
+            column_generation: 3,
+            layer: WORLD_LOD_LAYER_OPAQUE,
+            segment_index: 0,
+            order: 0,
+        };
+        let mut gal = VulkanicGal::new_with_backend(
+            Box::new(MockBackend::with_capabilities(presentation_capabilities(
+                vulkan_capabilities(),
+            ))),
+            false,
+        );
+        let mut residency = WorldLodGpuResidency::default();
+        let mut ops = Vec::new();
+        residency
+            .stage_visible_uploads(&mut gal, &assets, &[instance], &mut ops)
+            .unwrap();
+        let staged = residency.pending.as_ref().unwrap()[&7].segments[0];
+        let vertex_upload = staged.vertex_upload_buffer.unwrap();
+        let index_upload = staged.index_upload_buffer.unwrap();
+        assert!(ops.iter().any(|op| matches!(
+            op,
+            CommandOp::CopyBuffer { src, dst, size }
+                if *src == vertex_upload && *dst == staged.vertex_buffer && *size == 4 * WORLD_LOD_GPU_VERTEX_BYTES as u64
+        )));
+        assert!(ops.iter().any(|op| matches!(
+            op,
+            CommandOp::CopyBuffer { src, dst, size }
+                if *src == index_upload && *dst == staged.index_buffer && *size == 6 * std::mem::size_of::<u16>() as u64
+        )));
+        gal.submit(SubmissionBatch {
+            label: "world-lod.device-local-upload".to_string(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "world-lod.device-local-upload.commands".to_string(),
+                operations: ops,
+            })],
+        })
+        .unwrap();
+        residency.confirm_submission(&mut gal).unwrap();
+        let active = residency.active[&7].segments[0];
+        assert_eq!(staged.vertex_buffer, active.vertex_buffer);
+        assert_eq!(staged.index_buffer, active.index_buffer);
+        assert_eq!(None, active.vertex_upload_buffer);
+        assert_eq!(None, active.index_upload_buffer);
+        assert_eq!(
+            active.vertex_buffer,
+            residency
+                .resolve_visible_draws(&assets, &[instance])
+                .unwrap()[0]
+                .vertex_buffer
+        );
+        residency.destroy(&mut gal);
     }
 
     #[test]

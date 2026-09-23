@@ -22,6 +22,40 @@ class WorldMeshTextureReplacementTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void rollbackCheckpointKeepsItsOriginalTextureMembershipAfterCacheInvalidation() throws Exception {
+        var texturesField = RustGalWorldPrimitiveRenderer.class.getDeclaredField("WORLD_MESH_TEXTURES");
+        var invalidate = RustGalWorldPrimitiveRenderer.class.getDeclaredMethod("invalidateModelCheckpointAssetKeysLocked");
+        var snapshotField = RustGalWorldPrimitiveRenderer.ModelMeshBatchCheckpoint.class.getDeclaredField("textureAssets");
+        texturesField.setAccessible(true);
+        invalidate.setAccessible(true);
+        snapshotField.setAccessible(true);
+        var textures = (java.util.Map<Integer, WorldMeshTextureAssetRecord>) texturesField.get(null);
+        int originalId = 0x71436b01;
+        int laterId = 0x71436b02;
+        var previous = textures.put(originalId, new WorldMeshTextureAssetRecord(originalId, new byte[]{1}));
+        try {
+            invalidate.invoke(null);
+            var before = RustGalWorldPrimitiveRenderer.markModelMeshBatch();
+            textures.put(laterId, new WorldMeshTextureAssetRecord(laterId, new byte[]{2}));
+            invalidate.invoke(null);
+            var after = RustGalWorldPrimitiveRenderer.markModelMeshBatch();
+            assertFalse(((java.util.Set<Integer>) snapshotField.get(before)).contains(laterId));
+            assertTrue(((java.util.Set<Integer>) snapshotField.get(after)).contains(laterId));
+            RustGalWorldPrimitiveRenderer.rollbackModelMeshBatch(before);
+            assertTrue(textures.containsKey(originalId));
+            assertFalse(textures.containsKey(laterId));
+            var restored = RustGalWorldPrimitiveRenderer.markModelMeshBatch();
+            assertFalse(((java.util.Set<Integer>) snapshotField.get(restored)).contains(laterId));
+        } finally {
+            if (previous == null) textures.remove(originalId);
+            else textures.put(originalId, previous);
+            textures.remove(laterId);
+            invalidate.invoke(null);
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void realReloadRetainsPublicationWorkForUnchangedTexturePayloads() throws Exception {
         var texturesField = RustGalWorldPrimitiveRenderer.class.getDeclaredField("WORLD_MESH_TEXTURES");
         var dirtyField = RustGalWorldPrimitiveRenderer.class.getDeclaredField("DIRTY_WORLD_MESH_TEXTURES");

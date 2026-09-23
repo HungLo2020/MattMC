@@ -7,23 +7,66 @@ use crate::render::vulkanic::world_primitive_frontend::world_text::{
     WORLD_TEXT_DEPTH_SEE_THROUGH,
 };
 use crate::render::vulkanic::world_primitive_frontend::{
-    WorldFeatureCoverageFrame, WorldFirstPersonFrame, WorldLodRenderFrame,
-    WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_MAX_COLUMNS,
+    WorldDistantHorizonsGenericBoxRequest, WorldFeatureCoverageFrame, WorldFirstPersonFrame,
+    WorldLodRenderFrame, WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_MAX_COLUMNS,
     WORLD_LOD_MAX_NORMAL_INDEX, WORLD_LOD_MAX_SEGMENTS_PER_COLUMN,
     WORLD_LOD_MAX_VERTICES_PER_SEGMENT, WORLD_LOD_MAX_VISIBLE_SEGMENTS,
-    WORLD_MATERIAL_ID_OPAQUE_TEXTURED, WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
     WORLD_MATERIAL_SOURCE_CLOUDS, WORLD_MATERIAL_SOURCE_ENTITY_MODEL,
     WORLD_MATERIAL_SOURCE_PARTICLES, WORLD_MATERIAL_SOURCE_TEXTURED,
     WORLD_MATERIAL_SOURCE_UNSPECIFIED, WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
     WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS, WORLD_MATERIAL_SOURCE_WEATHER,
-    WORLD_MATERIAL_TEXTURE_GENERATED_WHITE, WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS,
-    WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY, WORLD_MESH_SECTION_ALL, WORLD_STRATUM_DH_GENERIC,
-    WORLD_STRATUM_DH_GENERIC_SSAO,
+    WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS, WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY,
+    WORLD_MESH_SECTION_ALL, WORLD_STRATUM_DH_GENERIC,
+};
+#[cfg(test)]
+use crate::render::vulkanic::world_primitive_frontend::{
+    WORLD_MATERIAL_ID_OPAQUE_TEXTURED, WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
+    WORLD_MATERIAL_TEXTURE_GENERATED_WHITE, WORLD_STRATUM_DH_GENERIC_SSAO,
 };
 use std::collections::BTreeSet;
 
 const DH_GENERIC_BOX_FACE_COUNT: usize = 6;
 
+fn decode_dh_generic_box_semantics(
+    records: &[FfiWorldDistantHorizonsGenericBoxRecord],
+) -> GalResult<Vec<WorldDistantHorizonsGenericBoxRequest>> {
+    records
+        .iter()
+        .map(|record| {
+            validate_item_size::<FfiWorldDistantHorizonsGenericBoxRecord>(
+                record.byte_size,
+                "DH generic box",
+            )?;
+            if record.flags & !1 != 0
+                || record
+                    .min
+                    .iter()
+                    .chain(record.max.iter())
+                    .chain(record.shading.iter())
+                    .any(|value| !value.is_finite())
+                || record
+                    .min
+                    .iter()
+                    .zip(record.max.iter())
+                    .any(|(min, max)| min > max)
+            {
+                return Err(GalError::invalid_argument(
+                    "DH generic box has invalid flags, bounds, or shading",
+                ));
+            }
+            Ok(WorldDistantHorizonsGenericBoxRequest {
+                min: record.min,
+                max: record.max,
+                color_argb: record.color_argb,
+                packed_light: record.packed_light,
+                shading: record.shading,
+                ssao_enabled: record.flags & 1 != 0,
+            })
+        })
+        .collect()
+}
+
+#[cfg(test)]
 fn shade_dh_generic_box_color(color: u32, shading: f32) -> u32 {
     let shade = |component: u32| -> u32 {
         ((component as f32 * shading).round() as i32).clamp(0, 255) as u32
@@ -34,6 +77,7 @@ fn shade_dh_generic_box_color(color: u32, shading: f32) -> u32 {
         | shade(color & 0xff)
 }
 
+#[cfg(test)]
 fn decode_dh_generic_boxes(
     records: &[FfiWorldDistantHorizonsGenericBoxRecord],
     viewport_width: u32,
@@ -388,6 +432,24 @@ fn decode_mesh_instance_transform(instance: &FfiWorldMeshInstanceRecord) -> GalR
             "incoherent semantic terrain placement",
         )),
     }
+}
+
+pub(crate) fn terrain_visible_facing_mask(instance: &FfiWorldMeshInstanceRecord) -> u8 {
+    if instance.terrain_placement_mode != 1 {
+        return 0x7f;
+    }
+    let camera = instance.terrain_camera.map(|axis| axis.floor() as i64);
+    let origin = instance.terrain_origin.map(i64::from);
+    let mut mask = 1u8 << 6;
+    for axis in 0..3 {
+        if camera[axis] > origin[axis] - 3 {
+            mask |= 1 << axis;
+        }
+        if camera[axis] < origin[axis] + 19 {
+            mask |= 1 << (axis + 3);
+        }
+    }
+    mask
 }
 
 pub(crate) unsafe fn decode_world_text_image_update(
@@ -1906,15 +1968,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             });
         }
     }
-    material_quads.extend(decode_dh_generic_boxes(
-        raw_dh_generic_boxes,
-        u32::try_from(request.viewport_width).map_err(|_| {
-            GalError::invalid_argument("DH generic box viewport width must be non-negative")
-        })?,
-        u32::try_from(request.viewport_height).map_err(|_| {
-            GalError::invalid_argument("DH generic box viewport height must be non-negative")
-        })?,
-    )?);
+    let decoded_dh_generic_boxes = decode_dh_generic_box_semantics(raw_dh_generic_boxes)?;
     if !raw_particles.is_empty() {
         material_quads = merge_particle_semantics(
             material_quads,
@@ -1990,6 +2044,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             decode_world_viewport_axis(instance.viewport_width, "world mesh viewport width")?;
         let viewport_height =
             decode_world_viewport_axis(instance.viewport_height, "world mesh viewport height")?;
+        let transform = decode_mesh_instance_transform(instance)?;
         mesh_instances.push(WorldMeshInstanceRequest {
             model_submission_order: decode_model_submission_order(instance)?,
             item_foil: decode_world_item_foil(instance)?,
@@ -1998,6 +2053,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             mesh_key: instance.mesh_key,
             mesh_generation: instance.mesh_generation,
             mesh_section_index: instance.mesh_section_index,
+            terrain_visible_facing_mask: terrain_visible_facing_mask(instance),
             depth_policy: instance.depth_policy,
             cull_policy: instance.cull_policy,
             winding: instance.winding,
@@ -2005,7 +2061,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             entity_id: instance.entity_id,
             entity_color_argb: instance.entity_color_argb,
             packed_light: instance.packed_light,
-            transform: decode_mesh_instance_transform(instance)?,
+            transform,
             outline_color_argb: instance.outline_color_argb,
             flags: instance.flags,
             block_entity_id: instance.block_entity_id,
@@ -2138,6 +2194,14 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         });
     }
     let lod_render_frame = decode_world_lod_render_frame(request.world_lod_render_frame)?;
+    // DH may publish generic-object callbacks during the transition before
+    // its private route is selected for this exact world frame. The copied
+    // records are validated above, but have no admitted destination yet.
+    let dh_generic_boxes = if lod_render_frame.rust_route_selected() {
+        decoded_dh_generic_boxes
+    } else {
+        Vec::new()
+    };
     let first_person = decode_world_first_person_frame(request.world_first_person_frame)?;
     let first_person_mesh_instances = unsafe {
         decode_world_first_person_mesh_instances(
@@ -2224,6 +2288,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             crack_quads,
             border_quads,
             material_quads,
+            dh_generic_boxes,
             mesh_instances,
             text_quads,
             lod_instances,
@@ -2364,6 +2429,7 @@ unsafe fn decode_world_first_person_mesh_instances(
             mesh_key: instance.mesh_key,
             mesh_generation: instance.mesh_generation,
             mesh_section_index: instance.mesh_section_index,
+            terrain_visible_facing_mask: 0x7f,
             depth_policy: instance.depth_policy,
             cull_policy: instance.cull_policy,
             winding: instance.winding,

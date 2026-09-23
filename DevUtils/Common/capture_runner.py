@@ -1106,8 +1106,8 @@ class CaptureRunner:
         )
         dh_radius_override = os.environ.get("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE", "").strip()
         if dh_radius_override:
-            if not dh_radius_override.isdigit() or not 1 <= int(dh_radius_override) <= 32:
-                raise SystemExit("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE must be an integer from 1 to 32")
+            if not dh_radius_override.isdigit() or not 1 <= int(dh_radius_override) <= 256:
+                raise SystemExit("MATTMC_CAPTURE_DH_RADIUS_OVERRIDE must be an integer from 1 to 256")
             if upsert_toml_value(dh_file, "lodChunkRenderDistanceRadius", dh_radius_override):
                 self.append_meta(f"forced_dh_radius_override={dh_radius_override}")
         dh_dither_override = os.environ.get("MATTMC_CAPTURE_DH_DITHER", "").strip().lower()
@@ -1159,10 +1159,9 @@ class CaptureRunner:
                 if upsert_toml_value(dh_file, key, value):
                     self.append_meta(f"forced_dh_throttle_for_terrain_{key}={value}")
         if dh_opaque_only or dh_non_water:
-            # Both bounded routes exclude legacy auxiliary work. Keep DH's
-            # renderer mode DEFAULT so the real CPU render-list traversal can
-            # run; `enableRendering=false` below prevents the legacy GL draw
-            # without making the semantic collector reject the frame.
+            # Both bounded routes keep DH's renderer mode DEFAULT so the real
+            # CPU render-list traversal can run. The enableRendering setting
+            # below controls debug wireframe, not ordinary LOD rendering.
             bounded_settings = [
                 # The normal matrix disables this auxiliary pass. A paired
                 # SSAO diagnostic explicitly enables the copied semantic
@@ -1179,10 +1178,8 @@ class CaptureRunner:
             if not dh_radius_override:
                 bounded_settings.append(("lodChunkRenderDistanceRadius", "4"))
             if not frozen_dh_baseline:
-                # Current Rust owns the whole-frame DH submission, so its
-                # legacy Java draw must stay disabled to prevent duplicate
-                # geometry. Frozen is the source baseline and deliberately
-                # retains Java OpenGL rendering under the same bounded inputs.
+                # Keep Current's debug wireframe off. Frozen retains its
+                # copied configuration under the same bounded inputs.
                 bounded_settings.insert(3, ("enableRendering", "false"))
             for key, value in bounded_settings:
                 if upsert_toml_value(dh_file, key, value):
@@ -1213,13 +1210,9 @@ class CaptureRunner:
                 # deterministic coverage row; normal captures retain the
                 # copied configuration.
                 self.append_meta('forced_dh_non_water_transparency="COMPLETE"')
-        if dh_water and upsert_toml_value(dh_file, "numberOfThreads", "1"):
-            self.append_meta("forced_dh_water_numberOfThreads=1")
         if dh_water and not frozen_dh_baseline and upsert_toml_value(dh_file, "enableRendering", "false"):
-            # The Rust water row owns the complete copied DH frame, including
-            # opaque and transparent streams.  Keep the legacy Java DH draw
-            # disabled on Current so it cannot duplicate or depth-conflict
-            # with the Rust presenter. Frozen deliberately retains Java GL.
+            # Keep debug wireframe off on the Rust water row. The ordinary
+            # LOD renderer is controlled by rendererMode, which remains DEFAULT.
             self.append_meta("forced_dh_water_enableRendering=false")
         # The canonical fixture establishes the same bounded radius for both
         # Current and Frozen. Do not narrow Current's water run here: doing so

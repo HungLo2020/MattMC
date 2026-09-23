@@ -597,13 +597,15 @@ const TEXTURES: &[SemanticTexture] = &[
 ];
 
 pub(crate) fn material(key: u32) -> Option<&'static SemanticMaterial> {
-    let canonical = canonical_material_key(key)?;
-    MATERIALS.iter().find(|entry| entry.key == canonical)
+    MATERIALS
+        .iter()
+        .find(|entry| entry.key == key || entry.legacy_keys.contains(&key))
 }
 
 pub(crate) fn texture(key: u32) -> Option<&'static SemanticTexture> {
-    let canonical = canonical_texture_key(key)?;
-    TEXTURES.iter().find(|entry| entry.key == canonical)
+    TEXTURES
+        .iter()
+        .find(|entry| entry.key == key || entry.legacy_keys.contains(&key))
 }
 
 pub(crate) fn canonical_material_key(key: u32) -> Option<u32> {
@@ -618,10 +620,6 @@ pub(crate) fn canonical_texture_key(key: u32) -> Option<u32> {
         .iter()
         .find(|entry| entry.key == key || entry.legacy_keys.contains(&key))
         .map(|entry| entry.key)
-}
-
-pub(crate) fn is_known_material_key(key: u32) -> bool {
-    canonical_material_key(key).is_some()
 }
 
 pub(crate) fn material_matches_mode(material_key: u32, mode: u32) -> bool {

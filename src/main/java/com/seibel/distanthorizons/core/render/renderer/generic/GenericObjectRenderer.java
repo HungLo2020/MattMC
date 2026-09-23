@@ -586,12 +586,15 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		{
 			return;
 		}
-		float centerX = direction.x * 6.0F;
-		float centerY = direction.y * 6.0F;
-		float centerZ = direction.z * 6.0F;
+		// The private DH pass clips near geometry at the vanilla/DH seam.
+		// Place this positive-path probe beyond that seam so its submitted
+		// faces can actually appear in the final deterministic screenshot.
+		float centerX = direction.x * 110.0F;
+		float centerY = direction.y * 110.0F;
+		float centerZ = direction.z * 110.0F;
 		DhApiRenderableBox fixtureBox = new DhApiRenderableBox(
-			new DhApiVec3d(centerX - 1.5F, centerY - 1.5F, centerZ - 1.5F),
-			new DhApiVec3d(centerX + 1.5F, centerY + 1.5F, centerZ + 1.5F),
+			new DhApiVec3d(centerX - 12.0F, centerY - 12.0F, centerZ - 12.0F),
+			new DhApiVec3d(centerX + 12.0F, centerY + 12.0F, centerZ + 12.0F),
 			new Color(255, 32, 224, 255),
 			EDhApiBlockMaterial.ILLUMINATED);
 		RenderableBoxGroup fixture = new RenderableBoxGroup(

@@ -1,6 +1,7 @@
 package net.vulkanic.world;
 
 import net.minecraft.Util;
+import java.lang.ref.WeakReference;
 import net.blaze3d.vertex.PoseStack;
 import net.blaze3d.pipeline.BlendFunction;
 import com.seibel.distanthorizons.api.DhApi;
@@ -510,6 +511,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final List<EntityLeashSemanticDiagnostic> ENTITY_LEASH_SEMANTIC_DIAGNOSTICS = new ArrayList<>();
 	private static final List<EntityLeashExecutionDiagnostic> ENTITY_LEASH_EXECUTION_DIAGNOSTICS = new ArrayList<>();
 	private static final Map<Long, VulkanicGalBridge.WorldMeshAssetRecord> WORLD_MESH_ASSETS = new LinkedHashMap<>();
+	/** Immutable key snapshots can be shared by successive rollback checkpoints until registry membership changes. */
+	private static Set<Long> checkpointWorldMeshAssetKeys;
+	private static Set<Integer> checkpointWorldMeshTextureKeys;
 	/**
 	 * Immutable ModelPart topology is shared by every animated instance of the
 	 * same baked model. Poses remain frame-local instance data. The bounded LRU
@@ -557,6 +561,9 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** Fingerprints for CPU-backed dynamic/atlas textures already copied into the explicit asset stream. */
 	private static final Map<ResourceLocation, Long> DYNAMIC_WORLD_ASSET_FINGERPRINTS = new LinkedHashMap<>();
 	private static final Map<ResourceLocation, Integer> DYNAMIC_WORLD_ASSET_BYTES = new LinkedHashMap<>();
+	private static WeakReference<TextureAtlas> paintingAtlasFrameAsset = new WeakReference<>(null);
+	private static long paintingAtlasFrameSequence = -1L;
+	private static long paintingAtlasFrameGeneration = -1L;
 	private static final Set<Integer> DIRTY_WORLD_MESH_TEXTURES = new LinkedHashSet<>();
 	private static final Map<Long, Long> UPLOADED_WORLD_MESH_GENERATIONS = new LinkedHashMap<>();
 	/** Texture identity to its own accepted native upload generation (not the latest batch). */
@@ -1450,6 +1457,9 @@ public final class RustGalWorldPrimitiveRenderer {
 					staticShieldAtlasPublication = null;
 				DYNAMIC_WORLD_ASSET_FINGERPRINTS.clear();
 				DYNAMIC_WORLD_ASSET_BYTES.clear();
+				paintingAtlasFrameAsset.clear();
+				paintingAtlasFrameSequence = -1L;
+				paintingAtlasFrameGeneration = -1L;
 				// Retained immutable payloads still need publication in the new
 				// generation, even when extraction produces identical bytes. Clearing
 				// this set loses that work while the acceptance receipts below are reset.
@@ -2019,6 +2029,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		WORLD_MESH_TEXTURES.put(sun.textureId(), sun);
 		WORLD_MESH_TEXTURES.put(moon.textureId(), moon);
 		WORLD_MESH_TEXTURES.put(endSky.textureId(), endSky);
+		invalidateModelCheckpointAssetKeysLocked();
 		DIRTY_WORLD_MESH_TEXTURES.add(sun.textureId());
 		DIRTY_WORLD_MESH_TEXTURES.add(moon.textureId());
 		DIRTY_WORLD_MESH_TEXTURES.add(endSky.textureId());
@@ -4052,6 +4063,12 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** Captures the semantic mesh streams before a multi-group model producer. */
 	public static ModelMeshBatchCheckpoint markModelMeshBatch() {
 		synchronized (LOCK) {
+			if (checkpointWorldMeshAssetKeys == null) {
+				checkpointWorldMeshAssetKeys = Set.copyOf(WORLD_MESH_ASSETS.keySet());
+			}
+			if (checkpointWorldMeshTextureKeys == null) {
+				checkpointWorldMeshTextureKeys = Set.copyOf(WORLD_MESH_TEXTURES.keySet());
+			}
 			return new ModelMeshBatchCheckpoint(
 				PENDING_MESH_INSTANCES.size(),
 				PENDING_FIRST_PERSON_MESH_INSTANCES.size(),
@@ -4060,8 +4077,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				Set.copyOf(PENDING_MODEL_MESH_SEMANTICS),
 				Set.copyOf(PENDING_MODEL_MESH_KEYS),
 				Set.copyOf(PENDING_MODEL_PART_MESH_KEYS),
-				Set.copyOf(WORLD_MESH_ASSETS.keySet()),
-				Set.copyOf(WORLD_MESH_TEXTURES.keySet()),
+				checkpointWorldMeshAssetKeys,
+				checkpointWorldMeshTextureKeys,
 				DYNAMIC_WORLD_MESH_LIFETIME.copy(),
 				Map.copyOf(PENDING_WORLD_MESH_RETIREMENTS),
 				worldMeshAssetGeneration,
@@ -4105,6 +4122,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				DIRTY_WORLD_MESH_TEXTURES.remove(key);
 				return true;
 			});
+			invalidateModelCheckpointAssetKeysLocked();
 			DYNAMIC_WORLD_MESH_LIFETIME.restore(checkpoint.dynamicMeshLifetime);
 			PENDING_WORLD_MESH_RETIREMENTS.clear();
 			PENDING_WORLD_MESH_RETIREMENTS.putAll(checkpoint.pendingMeshRetirements);
@@ -4156,9 +4174,11 @@ public final class RustGalWorldPrimitiveRenderer {
 			this.modelSemantics = Set.copyOf(modelSemantics);
 			this.modelMeshKeys = Set.copyOf(modelMeshKeys);
 			this.modelPartMeshKeys = Set.copyOf(modelPartMeshKeys);
-			this.meshAssets = Set.copyOf(meshAssets);
-			this.textureAssets = Set.copyOf(textureAssets);
-			this.dynamicMeshLifetime = dynamicMeshLifetime.copy();
+			// markModelMeshBatch supplies immutable cached snapshots under LOCK.
+			this.meshAssets = meshAssets;
+			this.textureAssets = textureAssets;
+			// markModelMeshBatch already creates a private lifetime snapshot.
+			this.dynamicMeshLifetime = dynamicMeshLifetime;
 			this.pendingMeshRetirements = Map.copyOf(pendingMeshRetirements);
 			this.meshGeneration = meshGeneration;
 			this.attemptedGeneration = attemptedGeneration;
@@ -10254,6 +10274,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (!materialMatchesMode || section.textureId() == 0 || section.indexOffset() < 0 || section.indexCount() < 0
 				|| section.cullPolicy() < CULL_NONE || section.cullPolicy() > CULL_BACK
 				|| (section.winding() != WORLD_WINDING_CCW && section.winding() != WORLD_WINDING_CW)
+				|| section.sourceFacing() < 0 || section.sourceFacing() > 6
 				|| section.indexOffset() % indexStride != 0
 				|| (long) section.indexOffset() / indexStride + section.indexCount() > indexCount) {
 				throw new IllegalArgumentException("Rust VulkanicGAL " + source + " mesh contains an invalid section range");
@@ -10959,7 +10980,14 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	/** Caller holds LOCK; every registry membership change invalidates both immutable checkpoint views. */
+	private static void invalidateModelCheckpointAssetKeysLocked() {
+		checkpointWorldMeshAssetKeys = null;
+		checkpointWorldMeshTextureKeys = null;
+	}
+
 	private static void markWorldMeshAssetsChangedLocked() {
+		invalidateModelCheckpointAssetKeysLocked();
 		worldMeshAssetGeneration++;
 		attemptedWorldMeshAssetGeneration = Math.min(attemptedWorldMeshAssetGeneration, uploadedWorldMeshAssetGeneration);
 		lastWorldMeshAssetPayloadCount = DIRTY_WORLD_MESH_ASSETS.size() + DIRTY_WORLD_MESH_TEXTURES.size() + DIRTY_WORLD_MESH_SORTED_INDICES.size();
@@ -12522,13 +12550,34 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	/**
-	 * Registers a bounded semantic image from the resource manager first, then
-	 * falls back to CPU-backed dynamic/atlas state. This keeps direct
+	 * Registers a bounded semantic image from the resource manager, or from the
+	 * live CPU-backed painting atlas. This keeps direct
 	 * resource-pack billboard textures on the same explicit asset contract as
 	 * skins and generated map images without acquiring a Java GPU object.
 	 */
 	private static boolean registerSemanticTextureAsset(ResourceLocation identity, int textureId, String source) {
 		if (identity == null || textureId == 0) return false;
+		if (identity.equals(net.minecraft.client.renderer.Sheets.PAINTINGS_SHEET)
+			&& Minecraft.getInstance().getTextureManager().getTexture(identity) instanceof TextureAtlas atlas) {
+			long generation = atlas.semanticSnapshotGeneration();
+			synchronized (LOCK) {
+				if (paintingAtlasFrameSequence == semanticFrameSequence
+					&& paintingAtlasFrameGeneration == generation
+					&& paintingAtlasFrameAsset.get() == atlas
+					&& WORLD_MESH_TEXTURES.containsKey(textureId)) return true;
+			}
+			if (registerDynamicTextureAsset(identity, textureId)) {
+				synchronized (LOCK) {
+					if (atlas.semanticSnapshotGeneration() == generation
+						&& WORLD_MESH_TEXTURES.containsKey(textureId)) {
+						paintingAtlasFrameAsset = new WeakReference<>(atlas);
+						paintingAtlasFrameSequence = semanticFrameSequence;
+						paintingAtlasFrameGeneration = generation;
+					}
+				}
+				return true;
+			}
+		}
 		byte[] resourcePayload = readTexturePayloadForResource(identity);
 		if (resourcePayload != null) {
 			registerWorldMeshTexture(minecraftModelTextureAsset(textureId, resourcePayload),
@@ -18736,6 +18785,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(meshKey);
 		if (asset != null && asset.meshGeneration() == meshGeneration) {
 			WORLD_MESH_ASSETS.remove(meshKey);
+			invalidateModelCheckpointAssetKeysLocked();
 		}
 		RustGalTerrainRenderer.releaseUploadedStaticTerrainPayload(meshKey, meshGeneration);
 	}

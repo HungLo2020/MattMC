@@ -2638,6 +2638,7 @@ fn mesh_section(texture_id: u32) -> FfiWorldMeshSectionRecord {
         winding: WORLD_WINDING_CCW,
         index_offset: 0,
         index_count: 3,
+        source_facing: 6,
     }
 }
 
@@ -2708,6 +2709,24 @@ fn mesh_instance() -> FfiWorldMeshInstanceRecord {
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
     }
+}
+
+#[test]
+fn terrain_face_mask_matches_sodium_section_bounds() {
+    let mut instance = mesh_instance();
+    instance.terrain_placement_mode = 1;
+    instance.terrain_origin = [0, 0, 0];
+    instance.terrain_camera = [100.0, 0.0, -100.0];
+    assert_eq!(
+        super::world::terrain_visible_facing_mask(&instance),
+        0b1110011
+    );
+    instance.terrain_camera = [-3.0, 0.0, 0.0];
+    assert_eq!(super::world::terrain_visible_facing_mask(&instance) & 1, 0);
+    instance.terrain_camera = [-2.0, 0.0, 0.0];
+    assert_eq!(super::world::terrain_visible_facing_mask(&instance) & 1, 1);
+    instance.terrain_placement_mode = 0;
+    assert_eq!(super::world::terrain_visible_facing_mask(&instance), 0x7f);
 }
 
 #[test]

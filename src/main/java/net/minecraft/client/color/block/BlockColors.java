@@ -125,6 +125,10 @@ public class BlockColors {
 		return blockColor == null ? -1 : blockColor.getColor(blockState, blockAndTintGetter, blockPos, i);
 	}
 
+	public boolean hasColorProvider(Block block) {
+		return this.blockColors.byId(BuiltInRegistries.BLOCK.getId(block)) != null;
+	}
+
 	public void register(BlockColor blockColor, Block... blocks) {
 		for (Block block : blocks) {
 			this.blockColors.addMapping(blockColor, BuiltInRegistries.BLOCK.getId(block));

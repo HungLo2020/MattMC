@@ -196,6 +196,7 @@ mod tests {
             winding: WORLD_WINDING_CCW,
             index_offset: 0,
             index_count: 6,
+            source_facing: 6,
         }];
         assert!(prepare(&asset).is_ok());
         asset.sections[0].index_offset = 2;

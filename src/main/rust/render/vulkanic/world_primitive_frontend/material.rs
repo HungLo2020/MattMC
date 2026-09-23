@@ -35,12 +35,12 @@ pub(super) fn validate_quad(
             ));
         }
     }
-    if !is_known_material_id(quad.material_id) {
+    let Some(material) = super::material_registry::material(quad.material_id) else {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown world material id {}", quad.material_id),
         ));
-    }
+    };
     let dynamic_particle_texture = quad.source_program == WORLD_MATERIAL_SOURCE_PARTICLES
         && quad.source_uv_space == WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE
         && quad.texture_id != 0;
@@ -112,7 +112,7 @@ pub(super) fn validate_quad(
             ),
         ));
     }
-    if !super::material_registry::material_matches_mode(quad.material_id, quad.material_mode) {
+    if material.mode != quad.material_mode {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!(
@@ -169,10 +169,6 @@ pub(super) fn validate_quad(
         }
     }
     Ok(())
-}
-
-pub(crate) fn is_known_material_id(material_id: u32) -> bool {
-    super::material_registry::is_known_material_key(material_id)
 }
 
 pub(crate) fn is_known_texture_id(texture_id: u32) -> bool {

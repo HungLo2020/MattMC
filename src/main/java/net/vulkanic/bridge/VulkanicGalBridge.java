@@ -3142,6 +3142,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 					Struct.WORLD_MESH_SECTION_RECORD.setInt(sectionItem, 5, section.winding());
 					Struct.WORLD_MESH_SECTION_RECORD.setInt(sectionItem, 6, section.indexOffset());
 					Struct.WORLD_MESH_SECTION_RECORD.setInt(sectionItem, 7, section.indexCount());
+					Struct.WORLD_MESH_SECTION_RECORD.setInt(sectionItem, 8, section.sourceFacing());
 				}
 				Abi.writeSlice(item, Struct.WORLD_MESH_ASSET_RECORD, 8, sectionArray, mesh.sections().size());
 				Abi.writeBytes(updateArena, item, Struct.WORLD_MESH_ASSET_RECORD, 9, mesh.entityIdentity());
@@ -4070,8 +4071,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int cullPolicy,
 		int winding,
 		int indexOffset,
-		int indexCount
+		int indexCount,
+		int sourceFacing
 	) {
+		public WorldMeshSectionRecord(int materialId, int textureId, int materialMode,
+			int cullPolicy, int winding, int indexOffset, int indexCount) {
+			this(materialId, textureId, materialMode, cullPolicy, winding, indexOffset, indexCount, 6);
+		}
 	}
 
 	public record WorldMeshAssetRecord(

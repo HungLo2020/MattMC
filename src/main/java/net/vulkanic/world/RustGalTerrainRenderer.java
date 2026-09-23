@@ -2357,7 +2357,8 @@ public final class RustGalTerrainRenderer {
 					RustGalWorldPrimitiveRenderer.CULL_BACK,
 					RustGalWorldPrimitiveRenderer.WORLD_WINDING_CCW,
 					firstIndex * 2,
-					indices.size() - firstIndex
+					indices.size() - firstIndex,
+					facing
 				));
 			}
 			cursor += segmentVertexCount;
@@ -3997,6 +3998,7 @@ public final class RustGalTerrainRenderer {
 			hash = fnv64Int(hash, section.winding());
 			hash = fnv64Int(hash, section.indexOffset());
 			hash = fnv64Int(hash, section.indexCount());
+			hash = fnv64Int(hash, section.sourceFacing());
 		}
 		hash = fnv64Bytes(hash, indexBytes);
 		return hash == 0L ? 1L : hash;

@@ -904,6 +904,64 @@ void main() {
 }
 "#;
 
+// A DH generic box keeps one 64-byte Rust-owned record while this vertex
+// program derives the same six ordered, back-face-culled material faces as the
+// old 192-byte-per-face quad stream. The fragment/lightmap contract is shared.
+const WORLD_DH_GENERIC_BOX_VERTEX_SHADER_VULKAN: &[u8] = br#"#version 450
+#ifdef VULKANIC_GAL_PARTICLE_LIGHTMAP
+layout(set = 1, binding = 0) uniform texture2D LightmapTex;
+layout(set = 1, binding = 1) uniform sampler LightmapSamp;
+#endif
+struct GenericBox {
+    vec4 min_corner;
+    vec4 max_corner;
+    uvec4 colors_0_3;
+    uvec4 colors_4_5_light;
+};
+layout(set = 0, binding = 0, std430) readonly buffer WorldDhGenericBoxes {
+    mat4 view;
+    mat4 projection;
+    vec4 viewport_cutout;
+    GenericBox boxes[4096];
+};
+layout(location = 0) out vec2 v_uv;
+layout(location = 1) out vec4 v_color;
+layout(location = 2) flat out vec4 v_material;
+layout(location = 3) out float v_camera_distance;
+layout(location = 4) out vec2 v_lightmap_uv;
+const vec2 corner[4] = vec2[4](vec2(0.0,0.0),vec2(1.0,0.0),vec2(1.0,1.0),vec2(0.0,1.0));
+void main() {
+    uint face = uint(gl_InstanceIndex) % 6u;
+    GenericBox box = boxes[uint(gl_InstanceIndex) / 6u];
+    vec3 a = box.min_corner.xyz;
+    vec3 b = box.max_corner.xyz;
+    vec3 p0; vec3 p1; vec3 p2; vec3 p3;
+    if (face == 0u) { p0=vec3(b.x,b.y,a.z); p1=vec3(b.x,a.y,a.z); p2=vec3(a.x,a.y,a.z); p3=vec3(a.x,b.y,a.z); }
+    else if (face == 1u) { p0=vec3(b.x,a.y,b.z); p1=vec3(b.x,b.y,b.z); p2=vec3(a.x,b.y,b.z); p3=vec3(a.x,a.y,b.z); }
+    else if (face == 2u) { p0=vec3(a.x,b.y,a.z); p1=vec3(a.x,a.y,a.z); p2=vec3(a.x,a.y,b.z); p3=vec3(a.x,b.y,b.z); }
+    else if (face == 3u) { p0=vec3(b.x,b.y,a.z); p1=vec3(b.x,b.y,b.z); p2=vec3(b.x,a.y,b.z); p3=vec3(b.x,a.y,a.z); }
+    else if (face == 4u) { p0=vec3(a.x,a.y,a.z); p1=vec3(b.x,a.y,a.z); p2=vec3(b.x,a.y,b.z); p3=vec3(a.x,a.y,b.z); }
+    else { p0=vec3(a.x,b.y,b.z); p1=vec3(b.x,b.y,b.z); p2=vec3(b.x,b.y,a.z); p3=vec3(a.x,b.y,a.z); }
+    vec2 c = corner[gl_VertexIndex];
+    vec3 position = mix(mix(p0,p1,c.x),mix(p3,p2,c.x),c.y);
+    vec4 clip = projection * view * vec4(position, 1.0);
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    clip.z = clip.z * 0.5 + clip.w * 0.5;
+#endif
+    gl_Position = clip;
+    v_uv = c;
+    uint color = face < 4u ? box.colors_0_3[face] : box.colors_4_5_light[face - 4u];
+    v_color = vec4(float((color >> 16u) & 255u),float((color >> 8u) & 255u),float(color & 255u),float(color >> 24u)) / 255.0;
+    uint packed_light = box.colors_4_5_light.z;
+    v_lightmap_uv = vec2(float(packed_light & 255u),float((packed_light >> 16u) & 255u));
+#ifdef VULKANIC_GAL_PARTICLE_LIGHTMAP
+    v_color *= texelFetch(sampler2D(LightmapTex, LightmapSamp), ivec2(v_lightmap_uv) / 16, 0);
+#endif
+    v_material = vec4(viewport_cutout.z,viewport_cutout.w,0.0,0.0);
+    v_camera_distance = length((view * vec4(position,1.0)).xyz);
+}
+"#;
+
 const WORLD_MATERIAL_FRAGMENT_SHADER_VULKAN: &[u8] = br#"#version 450
 layout(set = 0, binding = 1) uniform texture2D Tex0;
 layout(set = 0, binding = 2) uniform sampler Samp0;
@@ -1072,6 +1130,9 @@ pub struct WorldMeshSection {
     pub winding: u32,
     pub index_offset: u32,
     pub index_count: u32,
+    /// Sodium's baked quad facing (0..5); 6 is unassigned and always visible.
+    /// This remains asset metadata so each render pass can select its own cull policy.
+    pub source_facing: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -2030,6 +2091,9 @@ pub struct WorldMeshInstanceRequest {
     pub mesh_key: u64,
     pub mesh_generation: u64,
     pub mesh_section_index: u32,
+    /// Camera-side Sodium face selection for ordinary vanilla terrain only.
+    /// Source shadow passes use their own visibility policy.
+    pub terrain_visible_facing_mask: u8,
     pub depth_policy: u32,
     pub cull_policy: u32,
     pub winding: u32,
@@ -2303,6 +2367,9 @@ pub struct WorldPrimitiveFrame {
     pub crack_quads: Vec<WorldCrackQuadRequest>,
     pub border_quads: Vec<WorldBorderQuadRequest>,
     pub material_quads: Vec<WorldMaterialQuadRequest>,
+    /// Copied DH generic objects retain one semantic record per box. Rust
+    /// resolves their six shaded faces in the private DH material pass.
+    pub dh_generic_boxes: Vec<WorldDistantHorizonsGenericBoxRequest>,
     pub mesh_instances: Vec<WorldMeshInstanceRequest>,
     pub(crate) text_quads: Vec<world_text::WorldTextQuadRequest>,
     /// Visible DH LOD references are transport-only until a complete Rust LOD
@@ -2310,6 +2377,16 @@ pub struct WorldPrimitiveFrame {
     /// preserves the real producer ordering without borrowing legacy GL state.
     pub lod_instances: Vec<WorldLodColumnInstanceRequest>,
     pub lod_render_frame: WorldLodRenderFrame,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct WorldDistantHorizonsGenericBoxRequest {
+    pub min: [f32; 3],
+    pub max: [f32; 3],
+    pub color_argb: u32,
+    pub packed_light: u32,
+    pub shading: [f32; 6],
+    pub ssao_enabled: bool,
 }
 
 impl WorldPrimitiveFrame {
@@ -2976,6 +3053,7 @@ impl BorderResources {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 struct MaterialResourceKey {
     raster_y_direction: RasterYDirection,
+    compact_dh_box: bool,
     stratum: u32,
     material_id: u32,
     texture_id: u32,
@@ -3345,6 +3423,7 @@ impl MeshAssetStore {
         let key = MeshSectionRangeCacheKey {
             stratum: instance.stratum,
             depth_policy: instance.depth_policy,
+            terrain_visible_facing_mask: instance.terrain_visible_facing_mask,
             standard_item_foil: instance.item_foil.is_some(),
             color_format,
             raster_y_direction,
@@ -24596,6 +24675,7 @@ impl WorldPrimitiveFrontend {
         // The complete source transaction below consumes the real selected DH
         // semantics through its dedicated source plan.
         snapshot.lod_instances.clear();
+        snapshot.dh_generic_boxes.clear();
         snapshot.lod_render_frame = WorldLodRenderFrame::default();
         // This call only rebuilds the exact semantic snapshot.  Do not let
         // the normal graph start a lowered source terrain transaction before
@@ -29736,7 +29816,12 @@ impl WorldPrimitiveFrontend {
             material_color_format,
             raster_y_direction,
         );
-        if use_g_buffer_mesh_path && !distant_horizons_generic_batches.is_empty() {
+        let distant_horizons_box_batches =
+            distant_horizons_generic_box_batches(&frame, material_color_format, raster_y_direction);
+        if use_g_buffer_mesh_path
+            && (!distant_horizons_generic_batches.is_empty()
+                || !distant_horizons_box_batches.is_empty())
+        {
             return Err(GalError::unsupported_feature(
                 "DH generic objects require their private direct target; selected-source lowering is not admitted yet",
             ));
@@ -29924,6 +30009,7 @@ impl WorldPrimitiveFrontend {
         let builtin_terrain_lightmap_required = (!mesh_batches.is_empty()
             && source_terrain_programs.is_none())
             || !distant_horizons_generic_batches.is_empty()
+            || !distant_horizons_box_batches.is_empty()
             || material_batches
                 .iter()
                 .any(|batch| material_uses_particle_shader(batch.key.source_program));
@@ -29989,6 +30075,9 @@ impl WorldPrimitiveFrontend {
                 self.ensure_material_resources(gal, batch.key)?;
             }
             for batch in &distant_horizons_generic_batches {
+                self.ensure_material_resources(gal, batch.key)?;
+            }
+            for batch in &distant_horizons_box_batches {
                 self.ensure_material_resources(gal, batch.key)?;
             }
             Ok(())
@@ -30070,6 +30159,11 @@ impl WorldPrimitiveFrontend {
             self.ensure_material_resource_slots(gal, batch.key, *count)?;
         }
         for batch in &distant_horizons_generic_batches {
+            let count = material_slot_counts.entry(batch.key).or_insert(0usize);
+            *count += 1;
+            self.ensure_material_resource_slots(gal, batch.key, *count)?;
+        }
+        for batch in &distant_horizons_box_batches {
             let count = material_slot_counts.entry(batch.key).or_insert(0usize);
             *count += 1;
             self.ensure_material_resource_slots(gal, batch.key, *count)?;
@@ -30226,7 +30320,8 @@ impl WorldPrimitiveFrontend {
             crack_batch_count: crack_batches(&frame).len() as u64,
             border_quad_count: frame.border_quads.len() as u64,
             border_batch_count: border_batches(&frame).len() as u64,
-            material_quad_count: frame.material_quads.len() as u64,
+            material_quad_count: frame.material_quads.len() as u64
+                + frame.dh_generic_boxes.len() as u64 * 6,
             material_batch_count: material_batches.len() as u64,
             mesh_instance_count: frame.mesh_instances.len() as u64,
             mesh_batch_count: mesh_batches.len() as u64,
@@ -30343,6 +30438,7 @@ impl WorldPrimitiveFrontend {
         let direct_dh_fog_composition = !use_g_buffer_mesh_path
             && frame.lod_render_frame.rust_route_selected()
             && (!distant_horizons_generic_batches.is_empty()
+                || !distant_horizons_box_batches.is_empty()
                 || frame.lod_render_frame.dh_fog_parameters[16] >= 0.5
                 || frame.lod_render_frame.ssao_parameters[0] >= 0.5
                 || vanilla_fade_mode > 0.0
@@ -30661,7 +30757,8 @@ impl WorldPrimitiveFrontend {
                 Vec::new()
             };
         let mut post_ssao_generic_draws = Vec::new();
-        if !distant_horizons_generic_batches.is_empty() {
+        if !distant_horizons_generic_batches.is_empty() || !distant_horizons_box_batches.is_empty()
+        {
             if !direct_dh_fog_composition {
                 return Err(GalError::unsupported_feature(
                     "DH generic objects require the private direct DH composition target",
@@ -30711,6 +30808,55 @@ impl WorldPrimitiveFrontend {
                     index_type: IndexType::U32,
                     index_count: 6,
                     instance_count: batch.count() as u32,
+                    indexed_indirect: None,
+                    stratum: batch.key.stratum,
+                    material_mode: terrain_material_pass_mode(batch.key.material_mode)?,
+                    shadow_participation: TerrainShadowParticipation::Unavailable,
+                };
+                if batch.key.stratum == WORLD_STRATUM_DH_GENERIC_SSAO {
+                    pre_ssao_generic_draws.push(draw);
+                } else {
+                    post_ssao_generic_draws.push(draw);
+                }
+            }
+            for batch in &distant_horizons_box_batches {
+                let slot_index = slot_indices.entry(batch.key).or_insert(0usize);
+                let resources = self.material_resources.get(&batch.key).ok_or_else(|| {
+                    GalError::backend("compact DH generic box resources vanished before submit")
+                })?;
+                let slot = resources
+                    .data_slots
+                    .get(*slot_index)
+                    .ok_or_else(|| GalError::backend("compact DH generic box data slot missing"))?;
+                *slot_index += 1;
+                ops.push(CommandOp::Barrier(buffer_barrier(
+                    slot.uniform_buffer,
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::TransferDst,
+                )));
+                ops.push(CommandOp::HostWriteBuffer {
+                    buffer: slot.uniform_buffer,
+                    offset: 0,
+                    data: packed_dh_generic_box_uniforms_for_batch(&frame, batch),
+                });
+                ops.push(CommandOp::Barrier(buffer_barrier(
+                    slot.uniform_buffer,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                )));
+                let draw = TerrainMeshDraw {
+                    shadow: None,
+                    pipeline: resources.pipeline,
+                    offscreen_pipeline: Some(resources.pipeline),
+                    pipeline_layout: resources.pipeline_layout,
+                    resource_set: slot.resource_set,
+                    resource_set_dynamic_offsets: SmallVec::new(),
+                    shader_resource_set: Some(lightmap),
+                    index_buffer: resources.index_buffer,
+                    index_offset: 0,
+                    index_type: IndexType::U32,
+                    index_count: 6,
+                    instance_count: batch.face_count(),
                     indexed_indirect: None,
                     stratum: batch.key.stratum,
                     material_mode: terrain_material_pass_mode(batch.key.material_mode)?,
@@ -30834,6 +30980,7 @@ impl WorldPrimitiveFrontend {
                     indirect_draw_count * WORLD_MESH_INDEXED_INDIRECT_COMMAND_BYTES as usize,
                 );
                 let mut pending_draws = Vec::with_capacity(mesh_batches.len());
+                let mut previous_page_set: Option<(MeshResourceKey, Handle)> = None;
                 let mesh_draw_record_started = std::time::Instant::now();
                 for (batch_index, batch) in mesh_batches.iter().enumerate() {
                     let index_type = self
@@ -30854,6 +31001,7 @@ impl WorldPrimitiveFrontend {
                         pipeline,
                         pipeline_layout,
                         resource_set,
+                        cached_page_resource_set,
                         shader_resource_set,
                     ) = if let Some(programs) = source_terrain_programs.as_ref() {
                         let candidate = programs.for_material_mode(batch.key.material_mode)?;
@@ -30871,6 +31019,7 @@ impl WorldPrimitiveFrontend {
                             resources.pipeline,
                             resources.pipeline_layout,
                             resources.resource_set,
+                            None,
                             candidate.binding.map(|binding| binding.resource_set),
                         )
                     } else {
@@ -30886,21 +31035,37 @@ impl WorldPrimitiveFrontend {
                             resources.pipeline,
                             resources.pipeline_layout,
                             resources.resource_set,
+                            resources.page_resource_set,
                             builtin_terrain_lightmap_resource_set,
                         )
                     };
                     let (resource_set, dynamic_offsets, draw_index_offset, page_command) =
                         if use_indirect {
-                            let page_set = self.ensure_mesh_page_resource_set(
-                                gal,
-                                batch.key,
-                                mesh_stream_binding,
-                                builtin_mesh_resource_layout.ok_or_else(|| {
-                                    GalError::backend(
-                                        "indexed mesh page binding requires a Rust-owned lightmap layout",
-                                    )
-                                })?,
-                            )?;
+                            // Resource sets are stable throughout this frame's draw-record
+                            // construction. Camera-sorted translucent quads repeatedly use
+                            // the same exact mesh key, so borrow the adjacent binding
+                            // instead of revisiting the residency map for every quad.
+                            let page_set = match previous_page_set {
+                                Some((key, set)) if key == batch.key => set,
+                                _ => {
+                                    let set = if let Some(set) = cached_page_resource_set {
+                                        set
+                                    } else {
+                                        self.ensure_mesh_page_resource_set(
+                                            gal,
+                                            batch.key,
+                                            mesh_stream_binding,
+                                            builtin_mesh_resource_layout.ok_or_else(|| {
+                                                GalError::backend(
+                                                    "indexed mesh page binding requires a Rust-owned lightmap layout",
+                                                )
+                                            })?,
+                                        )?
+                                    };
+                                    previous_page_set = Some((batch.key, set));
+                                    set
+                                }
+                            };
                             let index_size = match index_type {
                                 IndexType::U16 => 2u64,
                                 IndexType::U32 => 4u64,
@@ -30929,7 +31094,7 @@ impl WorldPrimitiveFrontend {
                             })?;
                             (
                                 page_set,
-                                vec![0, 0],
+                                smallvec![0, 0],
                                 0,
                                 Some(PageIndexedDrawCommand {
                                     index_count: batch.index_count,
@@ -30943,7 +31108,7 @@ impl WorldPrimitiveFrontend {
                         } else {
                             (
                                 resource_set,
-                                mesh_stream_dynamic_offsets(
+                                mesh_stream_dynamic_offsets_inline(
                                     batch,
                                     vertex_offset,
                                     packed_stream.dynamic_offsets[batch_index],
@@ -30958,7 +31123,11 @@ impl WorldPrimitiveFrontend {
                                 None,
                             )
                         };
-                    let front_to_back_distance_squared = if page_command.is_some() {
+                    let front_to_back_distance_squared = if page_command.is_some()
+                        && matches!(
+                            batch.key.material_mode,
+                            WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT
+                        ) {
                         batch
                             .indices
                             .iter()
@@ -30984,14 +31153,14 @@ impl WorldPrimitiveFrontend {
                                 pipeline,
                                 pipeline_layout,
                                 resource_set,
-                                resource_set_dynamic_offsets: dynamic_offsets.clone().into(),
+                                resource_set_dynamic_offsets: dynamic_offsets.clone(),
                                 shader_resource_set,
                             }),
                             pipeline,
                             offscreen_pipeline: None,
                             pipeline_layout,
                             resource_set,
-                            resource_set_dynamic_offsets: dynamic_offsets.into(),
+                            resource_set_dynamic_offsets: dynamic_offsets,
                             shader_resource_set,
                             index_buffer,
                             index_offset: draw_index_offset,
@@ -32266,6 +32435,7 @@ impl WorldPrimitiveFrontend {
         hand_frame.material_quads.clear();
         hand_frame.text_quads.clear();
         hand_frame.lod_instances.clear();
+        hand_frame.dh_generic_boxes.clear();
         hand_frame.lod_render_frame = WorldLodRenderFrame::default();
         self.append_frame_ops_inner(
             gal,
@@ -33255,9 +33425,10 @@ impl WorldPrimitiveFrontend {
             return Ok(());
         }
         let label = format!(
-            "world-material-reg{}-stratum{}-{}-texture{}-mode{}-depth{}-cull{}-winding{}-gen{}",
+            "world-material-reg{}-stratum{}-compact{}-{}-texture{}-mode{}-depth{}-cull{}-winding{}-gen{}",
             material_registry::WORLD_MATERIAL_REGISTRY_VERSION,
             key.stratum,
+            key.compact_dh_box,
             key.material_id,
             key.texture_id,
             key.material_mode,
@@ -33370,8 +33541,12 @@ impl WorldPrimitiveFrontend {
             created.push(sampler);
             let particle_material = material_uses_particle_shader(key.source_program);
             let lightmapped_material = material_uses_lightmap(key);
-            let vertex_source = std::str::from_utf8(WORLD_MATERIAL_VERTEX_SHADER_VULKAN)
-                .expect("world material shader is UTF-8");
+            let vertex_source = std::str::from_utf8(if key.compact_dh_box {
+                WORLD_DH_GENERIC_BOX_VERTEX_SHADER_VULKAN
+            } else {
+                WORLD_MATERIAL_VERTEX_SHADER_VULKAN
+            })
+            .expect("world material shader is UTF-8");
             let vertex_source = if lightmapped_material {
                 vertex_source.replacen(
                     "#version 450",
@@ -37393,6 +37568,31 @@ fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
         ));
     }
     validate_lod_render_frame(&frame.lod_render_frame, !frame.lod_instances.is_empty())?;
+    if frame.dh_generic_boxes.len() > 10_000
+        || (!frame.dh_generic_boxes.is_empty() && !frame.lod_render_frame.rust_route_selected())
+    {
+        return Err(GalError::invalid_argument(
+            "DH generic boxes require a selected bounded DH route",
+        ));
+    }
+    for item in &frame.dh_generic_boxes {
+        if item
+            .min
+            .iter()
+            .chain(item.max.iter())
+            .chain(item.shading.iter())
+            .any(|value| !value.is_finite())
+            || item
+                .min
+                .iter()
+                .zip(item.max.iter())
+                .any(|(min, max)| min > max)
+        {
+            return Err(GalError::invalid_argument(
+                "DH generic box bounds and shading must be finite and ordered",
+            ));
+        }
+    }
     if frame.lod_instances.len() > WORLD_LOD_MAX_VISIBLE_SEGMENTS {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -37976,6 +38176,15 @@ fn validate_mesh_asset(mesh: &WorldMeshAsset) -> GalResult<()> {
             ));
         }
         let _ = cull_mode_from_policy(section.cull_policy)?;
+        if section.source_facing > 6 {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!(
+                    "unsupported world mesh section source facing {}",
+                    section.source_facing
+                ),
+            ));
+        }
         if !matches!(section.winding, WORLD_WINDING_CCW | WORLD_WINDING_CW) {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -40389,6 +40598,18 @@ struct MaterialBatch {
     indices: Vec<usize>,
 }
 
+#[derive(Clone, Debug)]
+struct DistantHorizonsGenericBoxBatch {
+    key: MaterialResourceKey,
+    indices: Vec<usize>,
+}
+
+impl DistantHorizonsGenericBoxBatch {
+    fn face_count(&self) -> u32 {
+        (self.indices.len() * 6) as u32
+    }
+}
+
 /// Preserves semantic source-material ordering while grouping only adjacent
 /// quads with identical raster and semantic texture bindings. A local
 /// material texture remains a Rust-owned source resource; it is never an
@@ -40550,6 +40771,7 @@ struct MeshBatchInstanceKey {
     cull_policy: u32,
     winding: u32,
     flags: u32,
+    terrain_visible_facing_mask: u8,
     model_submission_order: Option<i32>,
     standard_foil_kind: Option<super::item_foil::StandardFoilKind>,
     has_decal_foil: bool,
@@ -40908,6 +41130,56 @@ fn distant_horizons_generic_material_batches(
             let batch_index = batches.len();
             key_to_batch.insert(key, batch_index);
             batches.push(MaterialBatch {
+                key,
+                indices: vec![index],
+            });
+        }
+    }
+    batches
+}
+
+fn distant_horizons_generic_box_batches(
+    frame: &WorldPrimitiveFrame,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+) -> Vec<DistantHorizonsGenericBoxBatch> {
+    let mut batches = Vec::<DistantHorizonsGenericBoxBatch>::new();
+    let mut key_to_batch = HashMap::<MaterialResourceKey, usize>::new();
+    for (index, item) in frame.dh_generic_boxes.iter().enumerate() {
+        let translucent = item.color_argb >> 24 != 0xff;
+        let key = MaterialResourceKey {
+            raster_y_direction,
+            compact_dh_box: true,
+            stratum: if item.ssao_enabled {
+                WORLD_STRATUM_DH_GENERIC_SSAO
+            } else {
+                WORLD_STRATUM_DH_GENERIC
+            },
+            material_id: if translucent {
+                WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED
+            } else {
+                WORLD_MATERIAL_ID_OPAQUE_TEXTURED
+            },
+            texture_id: WORLD_MATERIAL_TEXTURE_GENERATED_WHITE,
+            source_program: WORLD_MATERIAL_SOURCE_TEXTURED,
+            material_mode: if translucent {
+                WORLD_MATERIAL_MODE_TRANSLUCENT
+            } else {
+                WORLD_MATERIAL_MODE_OPAQUE
+            },
+            depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+            cull_policy: WORLD_CULL_BACK,
+            winding: WORLD_WINDING_CCW,
+            color_format,
+        };
+        let reusable = key_to_batch.get(&key).copied().filter(|batch_index| {
+            batches[*batch_index].indices.len() < WORLD_MAX_MATERIAL_QUADS_PER_BATCH
+        });
+        if let Some(batch_index) = reusable {
+            batches[batch_index].indices.push(index);
+        } else {
+            key_to_batch.insert(key, batches.len());
+            batches.push(DistantHorizonsGenericBoxBatch {
                 key,
                 indices: vec![index],
             });
@@ -41544,6 +41816,7 @@ fn material_key(
     let (depth_policy, cull_policy) = material_depth_and_cull(quad);
     MaterialResourceKey {
         raster_y_direction,
+        compact_dh_box: false,
         stratum: quad.stratum,
         material_id: quad.material_id,
         texture_id: quad.texture_id,
@@ -42227,6 +42500,7 @@ fn mesh_batch_instance_key(instance: &WorldMeshInstanceRequest) -> MeshBatchInst
         cull_policy: instance.cull_policy,
         winding: instance.winding,
         flags: instance.flags,
+        terrain_visible_facing_mask: instance.terrain_visible_facing_mask,
         model_submission_order: instance.model_submission_order,
         standard_foil_kind: instance.item_foil.map(|foil| foil.kind),
         has_decal_foil: instance.decal_foil.is_some(),
@@ -42580,6 +42854,7 @@ fn static_terrain_batch_projected_bounds(
 struct MeshSectionRangeCacheKey {
     stratum: u32,
     depth_policy: u32,
+    terrain_visible_facing_mask: u8,
     standard_item_foil: bool,
     color_format: ColorFormat,
     raster_y_direction: RasterYDirection,
@@ -42640,13 +42915,16 @@ fn compatible_mesh_section_ranges_per_texture(
     texture_is_animated: impl Fn(u32) -> bool,
 ) -> GalResult<Vec<MeshSectionRange>> {
     let mut ranges = Vec::new();
-    let Some(first) = asset.sections.first() else {
+    let mut visible_sections = asset.sections.iter().enumerate().filter(|(_, section)| {
+        instance.terrain_visible_facing_mask & (1u8 << section.source_facing) != 0
+    });
+    let Some((first_index, first)) = visible_sections.next() else {
         return Ok(ranges);
     };
     let mut current_key = mesh_key_for_section(
         instance,
         first,
-        0,
+        first_index as u32,
         first.cull_policy,
         asset.mesh_generation,
         asset.vertex_bytes.len() / WORLD_MESH_GPU_VERTEX_BYTES,
@@ -42658,7 +42936,7 @@ fn compatible_mesh_section_ranges_per_texture(
     let mut current_offset = first.index_offset as u64;
     let mut current_count = first.index_count;
     let mut previous = first;
-    for (section_index, section) in asset.sections.iter().enumerate().skip(1) {
+    for (section_index, section) in visible_sections {
         let key = mesh_key_for_section(
             instance,
             section,
@@ -43771,6 +44049,61 @@ fn packed_material_uniforms_for_batch(
     Ok(out)
 }
 
+fn packed_dh_generic_box_uniforms_for_batch(
+    frame: &WorldPrimitiveFrame,
+    batch: &DistantHorizonsGenericBoxBatch,
+) -> Vec<u8> {
+    let mut out = Vec::with_capacity(WORLD_MATERIAL_HEADER_BYTES + batch.indices.len() * 64);
+    for value in [
+        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+    ] {
+        push_f32(&mut out, value);
+    }
+    for value in frame.lod_render_frame.combined_matrix {
+        push_f32(&mut out, value);
+    }
+    for value in [
+        frame.viewport_width as f32,
+        frame.viewport_height as f32,
+        0.0,
+        0.0,
+    ] {
+        push_f32(&mut out, value);
+    }
+    for index in &batch.indices {
+        let item = &frame.dh_generic_boxes[*index];
+        for value in item
+            .min
+            .into_iter()
+            .chain([0.0])
+            .chain(item.max)
+            .chain([0.0])
+        {
+            push_f32(&mut out, value);
+        }
+        for shading in [
+            item.shading[0],
+            item.shading[1],
+            item.shading[3],
+            item.shading[2],
+            item.shading[5],
+            item.shading[4],
+        ] {
+            let shade = |component: u32| -> u32 {
+                ((component as f32 * shading).round() as i32).clamp(0, 255) as u32
+            };
+            let color = (item.color_argb & 0xff00_0000)
+                | (shade((item.color_argb >> 16) & 0xff) << 16)
+                | (shade((item.color_argb >> 8) & 0xff) << 8)
+                | shade(item.color_argb & 0xff);
+            push_u32(&mut out, color);
+        }
+        push_u32(&mut out, item.packed_light);
+        push_u32(&mut out, 0);
+    }
+    out
+}
+
 fn required_mesh_instance_stream_bytes(mesh_batches: &[MeshBatch]) -> GalResult<u64> {
     let mut cursor = 0u64;
     for batch in mesh_batches {
@@ -43807,7 +44140,15 @@ fn mesh_stream_dynamic_offsets(
     vertex_offset: u64,
     instance_offset: u64,
 ) -> GalResult<Vec<u64>> {
-    let mut offsets = vec![vertex_offset, instance_offset];
+    Ok(mesh_stream_dynamic_offsets_inline(batch, vertex_offset, instance_offset)?.into_vec())
+}
+
+fn mesh_stream_dynamic_offsets_inline(
+    batch: &MeshBatch,
+    vertex_offset: u64,
+    instance_offset: u64,
+) -> GalResult<SmallVec<[u64; 3]>> {
+    let mut offsets = smallvec![vertex_offset, instance_offset];
     if batch.key.standard_item_foil {
         if batch.key.material_mode != WORLD_MATERIAL_MODE_GLINT {
             return Err(GalError::invalid_argument(
@@ -51264,6 +51605,7 @@ mod tests {
             crack_quads: Vec::new(),
             border_quads: Vec::new(),
             material_quads: Vec::new(),
+            dh_generic_boxes: Vec::new(),
             mesh_instances: Vec::new(),
             text_quads: Vec::new(),
             lod_instances: Vec::new(),
@@ -54975,6 +55317,7 @@ mod tests {
                 winding: WORLD_WINDING_CCW,
                 index_offset: 0,
                 index_count: 6,
+                source_facing: 6,
             }],
             entity_identity: String::new(),
         }
@@ -56110,6 +56453,7 @@ mod tests {
             mesh_key,
             mesh_generation: generation,
             mesh_section_index: 0,
+            terrain_visible_facing_mask: 0x7f,
             depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
             cull_policy: WORLD_CULL_BACK,
             winding: WORLD_WINDING_CCW,
@@ -60639,6 +60983,7 @@ mod tests {
                 winding: WORLD_WINDING_CCW,
                 index_offset: second_section_offset,
                 index_count: 6,
+                source_facing: 6,
             });
 
             let prepared = prepare_source_terrain_mesh_asset(&mesh).unwrap();
@@ -62925,7 +63270,7 @@ mod tests {
                 &mut operations,
             )
             .unwrap();
-        assert_eq!(4, operations.len());
+        assert_eq!(10, operations.len());
         assert_eq!(
             2,
             operations
@@ -62993,7 +63338,7 @@ mod tests {
                 &mut replacement,
             )
             .unwrap();
-        assert_eq!(4, replacement.len());
+        assert_eq!(10, replacement.len());
         frontend.lod_gpu_residency.discard_submission(&mut gal);
 
         gal.retire_through(token.submission).unwrap();
@@ -63651,6 +63996,7 @@ mod tests {
             winding: WORLD_WINDING_CCW,
             index_offset: 12,
             index_count: 3,
+            source_facing: 6,
         });
         validate_mesh_asset(&asset).unwrap();
 
@@ -63725,6 +64071,53 @@ mod tests {
     }
 
     #[test]
+    fn terrain_face_mask_filters_ranges_and_invalidates_cached_selection() {
+        let mut asset = mesh_asset(0xfaced, 1, IndexType::U16);
+        asset.sections[0].source_facing = 0;
+        let next_offset = asset.index_bytes.len() as u32;
+        asset.index_bytes.extend_from_within(..);
+        let mut second = asset.sections[0].clone();
+        second.index_offset = next_offset;
+        second.source_facing = 3;
+        asset.sections.push(second);
+
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend
+            .apply_world_mesh_asset_update(&mut gal, 1, vec![asset], Vec::new())
+            .unwrap();
+        let stored = frontend.mesh_assets.get(&0xfaced).unwrap();
+        let mut instance = mesh_instance(0xfaced, 1);
+        instance.mesh_section_index = WORLD_MESH_SECTION_ALL;
+        instance.terrain_visible_facing_mask = (1 << 0) | (1 << 6);
+        let first = stored
+            .compatible_section_ranges(
+                &instance,
+                ColorFormat::Bgra8Unorm,
+                RasterYDirection::Up,
+                false,
+                false,
+            )
+            .unwrap();
+        assert_eq!(first.len(), 1);
+        assert_eq!((first[0].index_offset, first[0].index_count), (0, 6));
+
+        instance.terrain_visible_facing_mask = (1 << 3) | (1 << 6);
+        let second = stored
+            .compatible_section_ranges(
+                &instance,
+                ColorFormat::Bgra8Unorm,
+                RasterYDirection::Up,
+                false,
+                false,
+            )
+            .unwrap();
+        assert_eq!(second.len(), 1);
+        assert_eq!((second[0].index_offset, second[0].index_count), (12, 6));
+        assert!(!Arc::ptr_eq(&first, &second));
+    }
+
+    #[test]
     fn world_mesh_stream_growth_rebinds_cached_mesh_resource_sets() {
         let mut asset = mesh_asset(188, 1, IndexType::U16);
         asset.index_bytes.extend_from_slice(&[0, 0, 2, 0, 3, 0]);
@@ -63736,6 +64129,7 @@ mod tests {
             winding: WORLD_WINDING_CCW,
             index_offset: 12,
             index_count: 3,
+            source_facing: 6,
         });
         validate_mesh_asset(&asset).unwrap();
 
@@ -64287,6 +64681,7 @@ mod tests {
             winding: WORLD_WINDING_CCW,
             index_offset: 12,
             index_count: 3,
+            source_facing: 6,
         });
         validate_mesh_asset(&asset).unwrap();
 
@@ -64975,6 +65370,7 @@ mod tests {
             winding: WORLD_WINDING_CCW,
             index_offset: 0,
             index_count: 6,
+            source_facing: 6,
         };
         let vertices = 16384;
         let key = mesh_key_for_section(
@@ -68223,6 +68619,7 @@ mod tests {
             winding: WORLD_WINDING_CCW,
             index_offset: 12,
             index_count: 3,
+            source_facing: 6,
         });
         let mut gal = gal();
         let mut frontend = WorldPrimitiveFrontend::default();
@@ -70196,6 +70593,7 @@ mod tests {
                 winding: WORLD_WINDING_CCW,
                 index_offset: 0,
                 index_count: (quad_count * 6) as u32,
+                source_facing: 6,
             }],
             entity_identity: String::new(),
         }
@@ -70593,6 +70991,7 @@ mod tests {
             mesh_key,
             mesh_generation: generation,
             mesh_section_index: WORLD_MESH_SECTION_ALL,
+            terrain_visible_facing_mask: 0x7f,
             depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
             cull_policy: WORLD_CULL_BACK,
             winding: WORLD_WINDING_CCW,
@@ -71912,6 +72311,25 @@ mod tests {
             false,
         );
         assert_ne!(first, camera_sorted);
+
+        frame.mesh_instances[0].stratum = WORLD_STRATUM_TERRAIN;
+        frame.mesh_instances[0].flags = 0;
+        let terrain_facing = mesh_batch_plan_key(
+            &frame,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+        );
+        frame.mesh_instances[0].terrain_visible_facing_mask = (1 << 0) | (1 << 6);
+        let turned_terrain = mesh_batch_plan_key(
+            &frame,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+        );
+        assert_ne!(terrain_facing, turned_terrain);
     }
 
     #[test]
@@ -71995,6 +72413,7 @@ mod tests {
                 winding: WORLD_WINDING_CCW,
                 index_offset: quad as u32 * 24,
                 index_count: 6,
+                source_facing: 6,
             });
         }
         let mut replacement = mesh.clone();
