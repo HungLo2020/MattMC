@@ -60,6 +60,19 @@ use crate::render::vulkanic::shader_pack::terrain_source_resources::{
 use crate::render::vulkanic::CullMode;
 
 const MICRO_OFFSET_SCALE: f32 = 0.01;
+const MAX_PACKED_LOD_UNIFORM_SLOTS: usize = 16_384;
+const PACKED_LOD_UNIFORM_BYTES: usize = 240;
+const MAX_VULKAN_UPDATE_BUFFER_BYTES: usize = 65_536;
+// The private shader carries a segment's vertex base in an existing float
+// lane. Integers through 2^24 are exact in f32, so never pack a larger stream.
+const MAX_SHARED_LOD_VERTEX_BYTES: u64 = (1 << 24) * WORLD_LOD_GPU_VERTEX_BYTES as u64;
+
+fn packed_lod_uniforms_enabled() -> bool {
+    !matches!(
+        std::env::var("MATTMC_RUST_DH_PACKED_UNIFORMS").as_deref(),
+        Ok("0") | Ok("false") | Ok("FALSE") | Ok("off") | Ok("OFF")
+    )
+}
 
 /// Distant Horizons preserves the source OpenGL quad order in both its
 /// reduced-color and provenance-resolved exact-atlas streams. The GAL
@@ -153,7 +166,7 @@ impl WorldLodDrawUniform {
                 draw.origin[0] as f32 - camera_world_position[0],
                 draw.origin[1] as f32 - camera_world_position[1],
                 draw.origin[2] as f32 - camera_world_position[2],
-                0.0,
+                draw.vertex_base as f32,
             ],
             clip_micro_noise_earth: [
                 frame.clip_distance,
@@ -816,7 +829,7 @@ impl WorldLodPipelineResources {
 
 #[derive(Debug)]
 struct WorldLodDrawResources {
-    uniform_buffer: Handle,
+    uniform_buffer: Option<Handle>,
     resource_set: Handle,
     /// The frame block is owned by this immutable column/segment resource.
     /// Keep the last packed bytes so settled DH frames do not enqueue a
@@ -859,7 +872,117 @@ struct WorldLodLightmapResources {
 impl WorldLodDrawResources {
     fn destroy(self, gal: &mut VulkanicGal) {
         let _ = gal.destroy(self.resource_set);
-        let _ = gal.destroy(self.uniform_buffer);
+        if let Some(uniform_buffer) = self.uniform_buffer {
+            let _ = gal.destroy(uniform_buffer);
+        }
+    }
+}
+
+/// One Rust-owned upload target for a material pass. Draw offsets are assigned
+/// afresh each frame, while the GPU buffer and geometry descriptor sets remain
+/// stable across frames. Updates are recorded before all LOD draws on the same
+/// queue, so reuse cannot race a prior submitted frame.
+struct WorldLodPackedUniforms {
+    buffer: Handle,
+    stride: usize,
+    bytes: Vec<u8>,
+    last_uploaded_bytes: Vec<u8>,
+}
+
+impl WorldLodPackedUniforms {
+    fn new(gal: &mut VulkanicGal, label: &str) -> GalResult<Self> {
+        let alignment = usize::try_from(
+            gal.capabilities()
+                .limits
+                .uniform_buffer_offset_alignment
+                .max(1),
+        )
+        .map_err(|_| GalError::invalid_argument("LOD uniform alignment exceeds host size"))?;
+        let stride = PACKED_LOD_UNIFORM_BYTES
+            .checked_add(alignment - 1)
+            .map(|value| value / alignment * alignment)
+            .ok_or_else(|| GalError::invalid_argument("LOD uniform stride overflow"))?;
+        let size = stride
+            .checked_mul(MAX_PACKED_LOD_UNIFORM_SLOTS)
+            .ok_or_else(|| GalError::invalid_argument("LOD uniform arena size overflow"))?;
+        if size as u64 > gal.capabilities().limits.max_buffer_size {
+            return Err(GalError::invalid_argument(
+                "LOD uniform arena exceeds backend buffer limit",
+            ));
+        }
+        let buffer = gal.create_buffer(BufferDesc {
+            label: format!("{label}.packed-frame-uniforms"),
+            size: size as u64,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
+        })?;
+        Ok(Self {
+            buffer,
+            stride,
+            bytes: Vec::with_capacity(stride * 1024),
+            last_uploaded_bytes: Vec::new(),
+        })
+    }
+
+    fn begin_frame(&mut self) {
+        self.bytes.clear();
+    }
+
+    fn push(&mut self, packed: [u8; PACKED_LOD_UNIFORM_BYTES]) -> GalResult<u64> {
+        let slot = self.bytes.len() / self.stride;
+        if slot >= MAX_PACKED_LOD_UNIFORM_SLOTS {
+            return Err(GalError::invalid_argument(
+                "LOD packed uniform slots exceed visible segment limit",
+            ));
+        }
+        let offset = self.bytes.len() as u64;
+        self.bytes.extend_from_slice(&packed);
+        self.bytes.resize((slot + 1) * self.stride, 0);
+        Ok(offset)
+    }
+
+    fn flush(&mut self, ops: &mut Vec<CommandOp>) {
+        if self.bytes.is_empty() {
+            return;
+        }
+        let changed_chunks = self
+            .bytes
+            .chunks(MAX_VULKAN_UPDATE_BUFFER_BYTES)
+            .enumerate()
+            .filter_map(|(index, chunk)| {
+                let start = index * MAX_VULKAN_UPDATE_BUFFER_BYTES;
+                (self.last_uploaded_bytes.get(start..start + chunk.len()) != Some(chunk))
+                    .then_some(index)
+            })
+            .collect::<Vec<_>>();
+        if changed_chunks.is_empty() {
+            std::mem::swap(&mut self.bytes, &mut self.last_uploaded_bytes);
+            return;
+        }
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            self.buffer,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::TransferDst,
+        )));
+        for index in changed_chunks {
+            let start = index * MAX_VULKAN_UPDATE_BUFFER_BYTES;
+            let end = (start + MAX_VULKAN_UPDATE_BUFFER_BYTES).min(self.bytes.len());
+            ops.push(CommandOp::HostWriteBuffer {
+                buffer: self.buffer,
+                offset: start as u64,
+                data: self.bytes[start..end].to_vec(),
+            });
+        }
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            self.buffer,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
+        std::mem::swap(&mut self.bytes, &mut self.last_uploaded_bytes);
+    }
+
+    fn destroy(self, gal: &mut VulkanicGal) {
+        let _ = gal.destroy(self.buffer);
     }
 }
 
@@ -875,6 +998,8 @@ struct WorldLodPassResources {
     pipeline: Option<WorldLodPipelineResources>,
     draws: BTreeMap<WorldLodDrawResourceKey, WorldLodDrawResources>,
     lightmaps: BTreeMap<WorldLodLightmapResourceKey, WorldLodLightmapResources>,
+    packed_uniforms: Option<WorldLodPackedUniforms>,
+    use_packed_uniforms: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -886,8 +1011,10 @@ pub(crate) struct WorldLodPreparedDraw {
     pub geometry_resource_set: Handle,
     pub lightmap_resource_set: Handle,
     pub index_buffer: Handle,
+    pub index_offset: u64,
     pub index_type: IndexType,
     pub index_count: u32,
+    pub uniform_dynamic_offset: Option<u64>,
 }
 
 /// Rust-owned framebuffer boundary for the ordinary DH route.  The direct
@@ -2333,6 +2460,20 @@ impl WorldLodPassResources {
             pipeline: None,
             draws: BTreeMap::new(),
             lightmaps: BTreeMap::new(),
+            packed_uniforms: None,
+            use_packed_uniforms: !deferred && packed_lod_uniforms_enabled(),
+        }
+    }
+
+    fn begin_frame(&mut self) {
+        if let Some(packed) = self.packed_uniforms.as_mut() {
+            packed.begin_frame();
+        }
+    }
+
+    fn flush_packed_uniforms(&mut self, ops: &mut Vec<CommandOp>) {
+        if let Some(packed) = self.packed_uniforms.as_mut() {
+            packed.flush(ops);
         }
     }
 
@@ -2355,21 +2496,37 @@ impl WorldLodPassResources {
             ));
         }
         self.ensure_pipeline(gal)?;
+        if self.use_packed_uniforms && self.packed_uniforms.is_none() {
+            self.packed_uniforms = Some(WorldLodPackedUniforms::new(
+                gal,
+                &format!("world-lod-{:?}", self.pass),
+            )?);
+        }
         let key = WorldLodDrawResourceKey::from_draw(draw);
         if !self.draws.contains_key(&key) {
             let pipeline = self
                 .pipeline
                 .as_ref()
                 .expect("world LOD pipeline exists after successful initialization");
-            let uniform_buffer = gal.create_buffer(BufferDesc {
-                label: format!(
-                    "world-lod-column{}-gen{}-segment{}.frame",
-                    key.column_key, key.column_generation, key.segment_index
-                ),
-                size: 240,
-                memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
-            })?;
+            let own_uniform_buffer = if self.use_packed_uniforms {
+                None
+            } else {
+                Some(gal.create_buffer(BufferDesc {
+                    label: format!(
+                        "world-lod-column{}-gen{}-segment{}.frame",
+                        key.column_key, key.column_generation, key.segment_index
+                    ),
+                    size: PACKED_LOD_UNIFORM_BYTES as u64,
+                    memory: MemoryDomain::Upload,
+                    usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
+                })?)
+            };
+            let uniform_buffer = own_uniform_buffer.unwrap_or_else(|| {
+                self.packed_uniforms
+                    .as_ref()
+                    .expect("packed uniform arena exists")
+                    .buffer
+            });
             let resource_set = match gal.create_resource_set(ResourceSetDesc {
                 label: format!(
                     "world-lod-column{}-gen{}-segment{}.geometry-and-frame-set",
@@ -2392,21 +2549,29 @@ impl WorldLodPassResources {
                         resource: uniform_buffer,
                         kind: ResourceBindingKind::UniformBuffer,
                         access: AccessFlags::READ,
-                        dynamic_offsets: Vec::new(),
-                        buffer_range: None,
+                        dynamic_offsets: if self.use_packed_uniforms {
+                            vec![0]
+                        } else {
+                            Vec::new()
+                        },
+                        buffer_range: self
+                            .use_packed_uniforms
+                            .then_some(PACKED_LOD_UNIFORM_BYTES as u64),
                     },
                 ],
             }) {
                 Ok(set) => set,
                 Err(error) => {
-                    let _ = gal.destroy(uniform_buffer);
+                    if let Some(own_uniform_buffer) = own_uniform_buffer {
+                        let _ = gal.destroy(own_uniform_buffer);
+                    }
                     return Err(error);
                 }
             };
             self.draws.insert(
                 key,
                 WorldLodDrawResources {
-                    uniform_buffer,
+                    uniform_buffer: own_uniform_buffer,
                     resource_set,
                     last_uniform_bytes: None,
                 },
@@ -2418,7 +2583,8 @@ impl WorldLodPassResources {
                 .draws
                 .get_mut(&key)
                 .expect("world LOD material resource entry exists after creation");
-            let uniform_changed = resources.last_uniform_bytes != Some(packed_uniform);
+            let uniform_changed =
+                !self.use_packed_uniforms && resources.last_uniform_bytes != Some(packed_uniform);
             if uniform_changed {
                 resources.last_uniform_bytes = Some(packed_uniform);
             }
@@ -2432,7 +2598,18 @@ impl WorldLodPassResources {
             Ok(resource_set) => resource_set,
             Err(error) => return Err(error),
         };
+        let uniform_dynamic_offset = if self.use_packed_uniforms {
+            Some(
+                self.packed_uniforms
+                    .as_mut()
+                    .expect("packed uniform arena exists")
+                    .push(packed_uniform)?,
+            )
+        } else {
+            None
+        };
         if uniform_changed {
+            let uniform_buffer = uniform_buffer.expect("per-draw uniform buffer exists");
             ops.extend([
                 CommandOp::Barrier(buffer_barrier(
                     uniform_buffer,
@@ -2463,8 +2640,10 @@ impl WorldLodPassResources {
             geometry_resource_set,
             lightmap_resource_set,
             index_buffer: draw.index_buffer,
+            index_offset: draw.index_offset,
             index_type: draw.index_type,
             index_count: draw.index_count,
+            uniform_dynamic_offset,
         })
     }
 
@@ -2479,6 +2658,11 @@ impl WorldLodPassResources {
                 "forward DH pass color format changed after pipeline creation",
             ));
         }
+        if self.pipeline.is_none() {
+            // Transparent and water owners can also serve deferred draws;
+            // only the explicit forward setup enables the packed experiment.
+            self.use_packed_uniforms = packed_lod_uniforms_enabled();
+        }
         self.color_format = Some(format);
         Ok(())
     }
@@ -2486,6 +2670,9 @@ impl WorldLodPassResources {
     pub(crate) fn destroy(&mut self, gal: &mut VulkanicGal) {
         for (_, draw) in std::mem::take(&mut self.draws) {
             draw.destroy(gal);
+        }
+        if let Some(packed) = self.packed_uniforms.take() {
+            packed.destroy(gal);
         }
         self.clear_lightmap_bindings(gal);
         if let Some(pipeline) = self.pipeline.take() {
@@ -2631,8 +2818,11 @@ impl WorldLodPassResources {
             gal.capabilities().api,
         ))?;
         let depth_compare = selected_source_raster_probe_depth_compare(Some(depth_compare))?;
-        let [geometry_and_frame_desc, lightmap_desc] =
+        let [mut geometry_and_frame_desc, lightmap_desc] =
             distant_horizons_lod_opaque_resource_layouts(label);
+        if self.use_packed_uniforms {
+            geometry_and_frame_desc.bindings[1].dynamic_offset_count = 1;
+        }
         let mut created = Vec::new();
         let result = (|| -> GalResult<WorldLodPipelineResources> {
             let geometry_and_frame_layout = gal.create_resource_layout(geometry_and_frame_desc)?;
@@ -2971,6 +3161,14 @@ impl Default for WorldLodForwardOpaquePassResources {
 }
 
 impl WorldLodForwardOpaquePassResources {
+    pub(crate) fn begin_frame(&mut self) {
+        self.inner.begin_frame();
+    }
+
+    pub(crate) fn flush_packed_uniforms(&mut self, ops: &mut Vec<CommandOp>) {
+        self.inner.flush_packed_uniforms(ops);
+    }
+
     pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
         self.inner.set_forward_color_format(format)
     }
@@ -3040,6 +3238,16 @@ impl Default for WorldLodTransparentPassResources {
 }
 
 impl WorldLodTransparentPassResources {
+    pub(crate) fn begin_frame(&mut self) {
+        self.inner_side.begin_frame();
+        self.inner_up.begin_frame();
+    }
+
+    pub(crate) fn flush_packed_uniforms(&mut self, ops: &mut Vec<CommandOp>) {
+        self.inner_side.flush_packed_uniforms(ops);
+        self.inner_up.flush_packed_uniforms(ops);
+    }
+
     pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
         self.inner_side.set_forward_color_format(format)?;
         self.inner_up.set_forward_color_format(format)
@@ -3147,6 +3355,14 @@ impl Default for WorldLodWaterPassResources {
 }
 
 impl WorldLodWaterPassResources {
+    pub(crate) fn begin_frame(&mut self) {
+        self.inner.begin_frame();
+    }
+
+    pub(crate) fn flush_packed_uniforms(&mut self, ops: &mut Vec<CommandOp>) {
+        self.inner.flush_packed_uniforms(ops);
+    }
+
     pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
         self.inner.set_forward_color_format(format)
     }
@@ -3508,7 +3724,7 @@ impl WorldLodExactAtlasPassResources {
             self.draws.insert(
                 key,
                 WorldLodDrawResources {
-                    uniform_buffer,
+                    uniform_buffer: Some(uniform_buffer),
                     resource_set,
                     last_uniform_bytes: None,
                 },
@@ -3532,6 +3748,7 @@ impl WorldLodExactAtlasPassResources {
         };
         let material_set = self.ensure_material_set(gal, atlas, lightmap)?;
         if uniform_changed {
+            let uniform_buffer = uniform_buffer.expect("exact-atlas uniform buffer exists");
             ops.extend([
                 CommandOp::Barrier(buffer_barrier(
                     uniform_buffer,
@@ -4128,6 +4345,7 @@ impl WorldLodExactAtlasSourcePassResources {
             pack_resources_layout: pipeline.pack_resources_layout,
             source_extra_resource_set: Some(atlas_set),
             index_buffer: draw.index_buffer,
+            index_offset: 0,
             index_type: draw.index_type,
             index_count: draw.index_count,
         })
@@ -4427,6 +4645,7 @@ pub(crate) struct WorldLodPreparedSourceDraw {
     /// draws leave this absent.
     pub source_extra_resource_set: Option<Handle>,
     pub index_buffer: Handle,
+    pub index_offset: u64,
     pub index_type: IndexType,
     pub index_count: u32,
 }
@@ -4787,7 +5006,7 @@ impl WorldLodSourcePassResources {
         }
         ops.push(CommandOp::SetIndexBuffer {
             buffer: draw.index_buffer,
-            offset: 0,
+            offset: draw.index_offset,
             index_type: draw.index_type,
         });
         ops.push(CommandOp::DrawIndexed {
@@ -4956,7 +5175,7 @@ impl WorldLodSourcePassResources {
             }
             ops.push(CommandOp::SetIndexBuffer {
                 buffer: draw.index_buffer,
-                offset: 0,
+                offset: draw.index_offset,
                 index_type: draw.index_type,
             });
             ops.push(CommandOp::DrawIndexed {
@@ -5139,6 +5358,7 @@ impl WorldLodSourcePassResources {
             pack_resources_layout: pipeline.pack_resources_layout,
             source_extra_resource_set: None,
             index_buffer: draw.index_buffer,
+            index_offset: draw.index_offset,
             index_type: draw.index_type,
             index_count: draw.index_count,
         })
@@ -6138,16 +6358,13 @@ pub(crate) struct WorldLodGpuColumnAsset {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct WorldLodGpuSegmentResources {
     pub vertex_buffer: Handle,
-    pub index_buffer: Handle,
     vertex_upload_buffer: Option<Handle>,
-    index_upload_buffer: Option<Handle>,
+    pub vertex_base: u32,
+    pub index_offset: u64,
 }
 
 impl WorldLodGpuSegmentResources {
     fn retire_uploads(&mut self, gal: &mut VulkanicGal) {
-        if let Some(buffer) = self.index_upload_buffer.take() {
-            let _ = gal.destroy(buffer);
-        }
         if let Some(buffer) = self.vertex_upload_buffer.take() {
             let _ = gal.destroy(buffer);
         }
@@ -6155,7 +6372,6 @@ impl WorldLodGpuSegmentResources {
 
     fn destroy(mut self, gal: &mut VulkanicGal) {
         self.retire_uploads(gal);
-        let _ = gal.destroy(self.index_buffer);
         let _ = gal.destroy(self.vertex_buffer);
     }
 }
@@ -6164,6 +6380,10 @@ impl WorldLodGpuSegmentResources {
 pub(crate) struct WorldLodGpuColumnResources {
     pub column_generation: u64,
     pub segments: Vec<WorldLodGpuSegmentResources>,
+    shared_vertex_buffer: Option<Handle>,
+    shared_vertex_upload_buffer: Option<Handle>,
+    pub index_buffer: Handle,
+    index_upload_buffer: Option<Handle>,
 }
 
 /// One generation-checked LOD draw range ready for a later Rust-owned
@@ -6182,15 +6402,33 @@ pub(crate) struct WorldLodGpuDraw {
     /// ordering before the backend receives any draw operations.
     pub order: u32,
     pub vertex_buffer: Handle,
+    /// Vertex address within the private column stream; original segment
+    /// indices remain unchanged in both the direct and source paths.
+    pub vertex_base: u32,
     pub index_buffer: Handle,
+    pub index_offset: u64,
     pub index_type: IndexType,
     pub index_count: u32,
 }
 
 impl WorldLodGpuColumnResources {
-    fn destroy(self, gal: &mut VulkanicGal) {
-        for segment in self.segments.into_iter().rev() {
-            segment.destroy(gal);
+    fn destroy(mut self, gal: &mut VulkanicGal) {
+        if let Some(buffer) = self.shared_vertex_upload_buffer.take() {
+            let _ = gal.destroy(buffer);
+        }
+        if let Some(buffer) = self.index_upload_buffer.take() {
+            let _ = gal.destroy(buffer);
+        }
+        let _ = gal.destroy(self.index_buffer);
+        if let Some(buffer) = self.shared_vertex_buffer {
+            for segment in &mut self.segments {
+                segment.retire_uploads(gal);
+            }
+            let _ = gal.destroy(buffer);
+        } else {
+            for segment in self.segments.into_iter().rev() {
+                segment.destroy(gal);
+            }
         }
     }
 }
@@ -6401,9 +6639,9 @@ impl WorldLodGpuResidency {
                     "world LOD draw requires a non-empty triangle-aligned index range",
                 ));
             }
-            let resources =
+            let column_resources =
                 self.resources_for_submission(instance.column_key, instance.column_generation)?;
-            let resources = resources
+            let resources = column_resources
                 .segments
                 .get(instance.segment_index as usize)
                 .ok_or_else(|| {
@@ -6420,7 +6658,9 @@ impl WorldLodGpuResidency {
                 segment_index: instance.segment_index,
                 order: instance.order,
                 vertex_buffer: resources.vertex_buffer,
-                index_buffer: resources.index_buffer,
+                vertex_base: resources.vertex_base,
+                index_buffer: column_resources.index_buffer,
+                index_offset: resources.index_offset,
                 index_type: segment.index_type,
                 index_count: segment.index_count,
             });
@@ -6435,6 +6675,12 @@ impl WorldLodGpuResidency {
         for (column_key, mut resources) in created {
             // The successful combined submission recorded the staging copies.
             // GAL defers these destroys until that submission completes.
+            if let Some(buffer) = resources.shared_vertex_upload_buffer.take() {
+                let _ = gal.destroy(buffer);
+            }
+            if let Some(buffer) = resources.index_upload_buffer.take() {
+                let _ = gal.destroy(buffer);
+            }
             for segment in &mut resources.segments {
                 segment.retire_uploads(gal);
             }
@@ -6772,6 +7018,7 @@ impl WorldLodTexturedGpuResidency {
         })?;
         Ok(Some(WorldLodGpuDraw {
             index_buffer,
+            index_offset: 0,
             index_type: IndexType::U32,
             index_count,
             ..source_draw
@@ -7532,6 +7779,97 @@ pub(crate) fn pack_world_lod_gpu_column_asset(
     })
 }
 
+/// Packs the ordinary reduced-color stream without retaining a second,
+/// expanded vertex/index copy. Exact-atlas columns still use the expanded
+/// representation for their provenance and source-material checks.
+pub(crate) fn pack_world_lod_gpu_column_asset_from_compact(
+    asset: &WorldLodColumnAsset,
+) -> GalResult<WorldLodGpuColumnAsset> {
+    validate_world_lod_column_asset(asset)?;
+    let mut segments = Vec::with_capacity(asset.segments.len());
+    for segment in &asset.segments {
+        let vertex_count = u32::try_from(segment.vertices.len())
+            .map_err(|_| GalError::invalid_argument("world LOD GPU vertex count exceeds u32"))?;
+        let index_count = u32::try_from(segment.vertices.len() / 4)
+            .ok()
+            .and_then(|quads| quads.checked_mul(6))
+            .ok_or_else(|| GalError::invalid_argument("world LOD GPU index count exceeds u32"))?;
+        let vertex_capacity = segment
+            .vertices
+            .len()
+            .checked_mul(WORLD_LOD_GPU_VERTEX_BYTES)
+            .ok_or_else(|| GalError::invalid_argument("world LOD GPU vertex payload overflows"))?;
+        let index_type = if segment.vertices.len() <= (u16::MAX as usize + 1) {
+            IndexType::U16
+        } else {
+            IndexType::U32
+        };
+        let index_stride = match index_type {
+            IndexType::U16 => std::mem::size_of::<u16>(),
+            IndexType::U32 => std::mem::size_of::<u32>(),
+        };
+        let index_capacity = usize::try_from(index_count)
+            .ok()
+            .and_then(|count| count.checked_mul(index_stride))
+            .ok_or_else(|| GalError::invalid_argument("world LOD GPU index payload overflows"))?;
+        let mut vertex_bytes = Vec::with_capacity(vertex_capacity);
+        for vertex in &segment.vertices {
+            write_compact_vertex(&mut vertex_bytes, vertex);
+        }
+        let mut index_bytes = Vec::with_capacity(index_capacity);
+        for quad in 0..segment.vertices.len() / 4 {
+            let base = u32::try_from(quad)
+                .ok()
+                .and_then(|quad| quad.checked_mul(4))
+                .ok_or_else(|| GalError::invalid_argument("world LOD vertex index exceeds u32 range"))?;
+            for index in [base, base + 1, base + 2, base + 2, base + 3, base] {
+                match index_type {
+                    IndexType::U16 => index_bytes.extend_from_slice(
+                        &u16::try_from(index)
+                            .map_err(|_| GalError::invalid_argument("world LOD u16 index overflow"))?
+                            .to_le_bytes(),
+                    ),
+                    IndexType::U32 => index_bytes.extend_from_slice(&index.to_le_bytes()),
+                }
+            }
+        }
+        segments.push(WorldLodGpuSegment {
+            layer: segment.layer,
+            vertex_layout_version: WORLD_LOD_GPU_VERTEX_LAYOUT_V2,
+            vertex_count,
+            vertex_bytes,
+            index_type,
+            index_count,
+            index_bytes,
+        });
+    }
+    Ok(WorldLodGpuColumnAsset {
+        column_key: asset.column_key,
+        column_generation: asset.column_generation,
+        origin: asset.origin,
+        segments,
+    })
+}
+
+fn write_compact_vertex(bytes: &mut Vec<u8>, vertex: &WorldLodVertex) {
+    let mut encoded = [0_u8; WORLD_LOD_GPU_VERTEX_BYTES];
+    for (axis, component) in vertex.local_position.into_iter().enumerate() {
+        debug_assert!(component <= i16::MAX as u16);
+        encoded[axis * 2..axis * 2 + 2].copy_from_slice(&(component as i16).to_le_bytes());
+    }
+    let micro = (vertex.packed_light_and_micro_offset >> 8) as u8;
+    let canonical_axis = |axis: u8| if axis & 0b10 != 0 { 0b10 } else { axis & 0b01 };
+    encoded[6] = canonical_axis(micro & 0b11)
+        | (canonical_axis((micro >> 2) & 0b11) << 2)
+        | (canonical_axis((micro >> 4) & 0b11) << 4);
+    encoded[8..12].copy_from_slice(&vertex.color_rgba);
+    encoded[12] = (vertex.packed_light_and_micro_offset & 0x0f) as u8;
+    encoded[13] = ((vertex.packed_light_and_micro_offset >> 4) & 0x0f) as u8;
+    encoded[14] = vertex.material_id;
+    encoded[15] = vertex.normal_index;
+    bytes.extend_from_slice(&encoded);
+}
+
 pub(crate) fn validate_expanded_instance(
     column: &WorldLodExpandedColumnAsset,
     segment_index: u32,
@@ -7701,7 +8039,41 @@ fn create_column_resources(
     asset: &WorldLodGpuColumnAsset,
 ) -> GalResult<WorldLodGpuColumnResources> {
     let mut segments = Vec::with_capacity(asset.segments.len());
-    let result = (|| -> GalResult<()> {
+    let mut index_bytes = 0u64;
+    let vertex_bytes = asset.segments.iter().try_fold(0u64, |total, segment| {
+        total
+            .checked_add(segment.vertex_bytes.len() as u64)
+            .ok_or_else(|| GalError::invalid_argument("world LOD vertex stream overflow"))
+    })?;
+    // A single private storage stream removes per-segment GPU allocations and
+    // transfer copies. Oversized columns retain the original segment path;
+    // no admitted asset can exceed the backend's buffer limit merely because
+    // its independent segments are combined here.
+    let pack_vertices = vertex_bytes > 0
+        && vertex_bytes <= gal.capabilities().limits.max_buffer_size.min(MAX_SHARED_LOD_VERTEX_BYTES);
+    let mut shared_vertex_upload_buffer = None;
+    let mut shared_vertex_buffer = None;
+    let result = (|| -> GalResult<(Handle, Handle)> {
+        if pack_vertices {
+            let label = format!(
+                "world-lod-column{}-gen{}.vertices",
+                asset.column_key, asset.column_generation
+            );
+            let upload = gal.create_buffer(BufferDesc {
+                label: format!("{label}-upload"),
+                size: vertex_bytes,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
+            })?;
+            shared_vertex_upload_buffer = Some(upload);
+            shared_vertex_buffer = Some(gal.create_buffer(BufferDesc {
+                label,
+                size: vertex_bytes,
+                memory: MemoryDomain::DeviceLocal,
+                usages: vec![BufferUsage::Vertex, BufferUsage::Storage, BufferUsage::TransferDst],
+            })?);
+        }
+        let mut vertex_base = 0u32;
         for (segment_index, segment) in asset.segments.iter().enumerate() {
             if !segment.upload_payload_is_present() {
                 return Err(GalError::invalid_argument(format!(
@@ -7713,10 +8085,31 @@ fn create_column_resources(
                 "world-lod-column{}-gen{}-segment{segment_index}",
                 asset.column_key, asset.column_generation
             );
-            // These immutable streams are read on every visible frame. Keep
-            // the retained copies in device-local memory; upload buffers are
-            // retired after the same generation's first accepted submission.
-            let mut created = Vec::with_capacity(4);
+            // All segments in a column share one immutable index stream. A
+            // four-byte boundary keeps both U16 and U32 index offsets valid.
+            let index_offset = index_bytes
+                .checked_add(3)
+                .map(|value| value & !3)
+                .ok_or_else(|| GalError::invalid_argument("world LOD index offset overflow"))?;
+            index_bytes = index_offset
+                .checked_add(segment.index_bytes.len() as u64)
+                .ok_or_else(|| GalError::invalid_argument("world LOD index stream overflow"))?;
+            let segment_vertex_base = if pack_vertices { vertex_base } else { 0 };
+            if pack_vertices {
+                vertex_base = vertex_base
+                    .checked_add(segment.vertex_count)
+                    .ok_or_else(|| GalError::invalid_argument("world LOD vertex base overflow"))?;
+            }
+            if let Some(vertex_buffer) = shared_vertex_buffer {
+                segments.push(WorldLodGpuSegmentResources {
+                    vertex_buffer,
+                    vertex_upload_buffer: None,
+                    vertex_base: segment_vertex_base,
+                    index_offset,
+                });
+                continue;
+            }
+            // Oversized columns keep the original device-local segment path.
             let created_segment = (|| -> GalResult<WorldLodGpuSegmentResources> {
                 let vertex_upload_buffer = gal.create_buffer(BufferDesc {
                     label: format!("{label}.vertices-upload"),
@@ -7724,8 +8117,7 @@ fn create_column_resources(
                     memory: MemoryDomain::Upload,
                     usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
                 })?;
-                created.push(vertex_upload_buffer);
-                let vertex_buffer = gal.create_buffer(BufferDesc {
+                let vertex_buffer = match gal.create_buffer(BufferDesc {
                     label: format!("{label}.vertices"),
                     size: segment.vertex_bytes.len() as u64,
                     memory: MemoryDomain::DeviceLocal,
@@ -7734,50 +8126,78 @@ fn create_column_resources(
                         BufferUsage::Storage,
                         BufferUsage::TransferDst,
                     ],
-                })?;
-                created.push(vertex_buffer);
-                let index_upload_buffer = gal.create_buffer(BufferDesc {
-                    label: format!("{label}.indices-upload"),
-                    size: segment.index_bytes.len() as u64,
-                    memory: MemoryDomain::Upload,
-                    usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
-                })?;
-                created.push(index_upload_buffer);
-                let index_buffer = gal.create_buffer(BufferDesc {
-                    label: format!("{label}.indices"),
-                    size: segment.index_bytes.len() as u64,
-                    memory: MemoryDomain::DeviceLocal,
-                    usages: vec![BufferUsage::Index, BufferUsage::TransferDst],
-                })?;
-                created.push(index_buffer);
+                }) {
+                    Ok(buffer) => buffer,
+                    Err(error) => {
+                        let _ = gal.destroy(vertex_upload_buffer);
+                        return Err(error);
+                    }
+                };
                 Ok(WorldLodGpuSegmentResources {
                     vertex_buffer,
-                    index_buffer,
                     vertex_upload_buffer: Some(vertex_upload_buffer),
-                    index_upload_buffer: Some(index_upload_buffer),
+                    vertex_base: 0,
+                    index_offset,
                 })
             })();
             match created_segment {
                 Ok(resources) => segments.push(resources),
-                Err(error) => {
-                    for handle in created.into_iter().rev() {
-                        let _ = gal.destroy(handle);
-                    }
-                    return Err(error);
-                }
+                Err(error) => return Err(error),
             }
         }
-        Ok(())
-    })();
-    if let Err(error) = result {
-        for segment in segments.into_iter().rev() {
-            segment.destroy(gal);
+        if index_bytes == 0 {
+            return Err(GalError::invalid_argument(
+                "world LOD column has no index payload",
+            ));
         }
-        return Err(error);
-    }
+        let label = format!(
+            "world-lod-column{}-gen{}.indices",
+            asset.column_key, asset.column_generation
+        );
+        let index_upload_buffer = gal.create_buffer(BufferDesc {
+            label: format!("{label}-upload"),
+            size: index_bytes,
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
+        })?;
+        let index_buffer = match gal.create_buffer(BufferDesc {
+            label,
+            size: index_bytes,
+            memory: MemoryDomain::DeviceLocal,
+            usages: vec![BufferUsage::Index, BufferUsage::TransferDst],
+        }) {
+            Ok(buffer) => buffer,
+            Err(error) => {
+                let _ = gal.destroy(index_upload_buffer);
+                return Err(error);
+            }
+        };
+        Ok((index_upload_buffer, index_buffer))
+    })();
+    let (index_upload_buffer, index_buffer) = match result {
+        Ok(handles) => handles,
+        Err(error) => {
+            for segment in segments.into_iter().rev() {
+                if shared_vertex_buffer.is_none() {
+                    segment.destroy(gal);
+                }
+            }
+            if let Some(buffer) = shared_vertex_buffer {
+                let _ = gal.destroy(buffer);
+            }
+            if let Some(buffer) = shared_vertex_upload_buffer {
+                let _ = gal.destroy(buffer);
+            }
+            return Err(error);
+        }
+    };
     Ok(WorldLodGpuColumnResources {
         column_generation: asset.column_generation,
         segments,
+        shared_vertex_buffer,
+        shared_vertex_upload_buffer,
+        index_buffer,
+        index_upload_buffer: Some(index_upload_buffer),
     })
 }
 
@@ -7786,18 +8206,24 @@ fn upload_ops(
     resources: &WorldLodGpuColumnResources,
 ) -> Vec<CommandOp> {
     debug_assert_eq!(asset.segments.len(), resources.segments.len());
-    let mut ops = Vec::with_capacity(asset.segments.len() * 10);
-    for (segment, resources) in asset.segments.iter().zip(&resources.segments) {
-        let vertex_upload_buffer = resources
-            .vertex_upload_buffer
-            .expect("new LOD resources retain vertex staging until submission");
-        let index_upload_buffer = resources
-            .index_upload_buffer
-            .expect("new LOD resources retain index staging until submission");
+    let mut ops = Vec::with_capacity(asset.segments.len() * 5 + 5);
+    let mut index_payload = Vec::new();
+    if let (Some(vertex_buffer), Some(vertex_upload_buffer)) = (
+        resources.shared_vertex_buffer,
+        resources.shared_vertex_upload_buffer,
+    ) {
+        let mut vertex_payload = Vec::with_capacity(
+            usize::try_from(asset.segments.iter().map(|segment| segment.vertex_bytes.len() as u64).sum::<u64>())
+                .expect("validated LOD vertex stream fits host address space"),
+        );
+        for segment in &asset.segments {
+            vertex_payload.extend_from_slice(&segment.vertex_bytes);
+        }
+        let size = vertex_payload.len() as u64;
         ops.push(CommandOp::HostWriteBuffer {
             buffer: vertex_upload_buffer,
             offset: 0,
-            data: segment.vertex_bytes.clone(),
+            data: vertex_payload,
         });
         ops.push(CommandOp::Barrier(buffer_barrier(
             vertex_upload_buffer,
@@ -7805,46 +8231,84 @@ fn upload_ops(
             TextureUsageState::TransferSrc,
         )));
         ops.push(CommandOp::Barrier(buffer_barrier(
-            resources.vertex_buffer,
+            vertex_buffer,
             TextureUsageState::Undefined,
             TextureUsageState::TransferDst,
         )));
         ops.push(CommandOp::CopyBuffer {
             src: vertex_upload_buffer,
-            dst: resources.vertex_buffer,
-            size: segment.vertex_bytes.len() as u64,
+            dst: vertex_buffer,
+            size,
         });
         ops.push(CommandOp::Barrier(buffer_barrier(
-            resources.vertex_buffer,
+            vertex_buffer,
             TextureUsageState::TransferDst,
             TextureUsageState::ShaderRead,
         )));
-        ops.push(CommandOp::HostWriteBuffer {
-            buffer: index_upload_buffer,
-            offset: 0,
-            data: segment.index_bytes.clone(),
-        });
-        ops.push(CommandOp::Barrier(buffer_barrier(
-            index_upload_buffer,
-            TextureUsageState::TransferDst,
-            TextureUsageState::TransferSrc,
-        )));
-        ops.push(CommandOp::Barrier(buffer_barrier(
-            resources.index_buffer,
-            TextureUsageState::Undefined,
-            TextureUsageState::TransferDst,
-        )));
-        ops.push(CommandOp::CopyBuffer {
-            src: index_upload_buffer,
-            dst: resources.index_buffer,
-            size: segment.index_bytes.len() as u64,
-        });
-        ops.push(CommandOp::Barrier(buffer_barrier(
-            resources.index_buffer,
-            TextureUsageState::TransferDst,
-            TextureUsageState::IndexRead,
-        )));
     }
+    for (segment, resources) in asset.segments.iter().zip(&resources.segments) {
+        if let Some(vertex_upload_buffer) = resources.vertex_upload_buffer {
+            ops.push(CommandOp::HostWriteBuffer {
+                buffer: vertex_upload_buffer,
+                offset: 0,
+                data: segment.vertex_bytes.clone(),
+            });
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                vertex_upload_buffer,
+                TextureUsageState::TransferDst,
+                TextureUsageState::TransferSrc,
+            )));
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                resources.vertex_buffer,
+                TextureUsageState::Undefined,
+                TextureUsageState::TransferDst,
+            )));
+            ops.push(CommandOp::CopyBuffer {
+                src: vertex_upload_buffer,
+                dst: resources.vertex_buffer,
+                size: segment.vertex_bytes.len() as u64,
+            });
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                resources.vertex_buffer,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            )));
+        }
+        let index_offset = usize::try_from(resources.index_offset)
+            .expect("validated LOD index stream fits host address space");
+        debug_assert!(index_payload.len() <= index_offset);
+        index_payload.resize(index_offset, 0);
+        index_payload.extend_from_slice(&segment.index_bytes);
+    }
+    let index_upload_buffer = resources
+        .index_upload_buffer
+        .expect("new LOD column retains index staging until submission");
+    let index_payload_bytes = index_payload.len() as u64;
+    ops.push(CommandOp::HostWriteBuffer {
+        buffer: index_upload_buffer,
+        offset: 0,
+        data: index_payload,
+    });
+    ops.push(CommandOp::Barrier(buffer_barrier(
+        index_upload_buffer,
+        TextureUsageState::TransferDst,
+        TextureUsageState::TransferSrc,
+    )));
+    ops.push(CommandOp::Barrier(buffer_barrier(
+        resources.index_buffer,
+        TextureUsageState::Undefined,
+        TextureUsageState::TransferDst,
+    )));
+    ops.push(CommandOp::CopyBuffer {
+        src: index_upload_buffer,
+        dst: resources.index_buffer,
+        size: index_payload_bytes,
+    });
+    ops.push(CommandOp::Barrier(buffer_barrier(
+        resources.index_buffer,
+        TextureUsageState::TransferDst,
+        TextureUsageState::IndexRead,
+    )));
     ops
 }
 
@@ -9055,6 +9519,51 @@ mod tests {
     }
 
     #[test]
+    fn direct_compact_packing_matches_expanded_bytes_at_both_index_widths() {
+        for repeated_quads in [1, 16_385] {
+            let mut source = asset();
+            source.segments[0].vertices = source.segments[0]
+                .vertices
+                .repeat(repeated_quads);
+            let expanded = expand_world_lod_column_asset(&source).unwrap();
+            let traditional = pack_world_lod_gpu_column_asset(&expanded).unwrap();
+            let direct = pack_world_lod_gpu_column_asset_from_compact(&source).unwrap();
+            assert_eq!(traditional, direct);
+            assert_eq!(
+                if repeated_quads == 1 {
+                    IndexType::U16
+                } else {
+                    IndexType::U32
+                },
+                direct.segments[0].index_type,
+            );
+        }
+    }
+
+    #[test]
+    fn direct_compact_packing_preserves_every_micro_pattern_and_color_byte() {
+        let mut source = asset();
+        let quad = source.segments[0].vertices.clone();
+        source.segments[0].vertices.clear();
+        for sample in 0..=u8::MAX {
+            for mut vertex in quad.iter().copied() {
+                vertex.local_position = [u16::from(sample), 2, 3];
+                vertex.packed_light_and_micro_offset =
+                    (u16::from(sample) << 8) | 0x75;
+                vertex.color_rgba = [sample, 255 - sample, sample.wrapping_mul(37), sample];
+                vertex.material_id = sample % 16;
+                vertex.normal_index = sample % 6;
+                source.segments[0].vertices.push(vertex);
+            }
+        }
+        let expanded = expand_world_lod_column_asset(&source).unwrap();
+        assert_eq!(
+            pack_world_lod_gpu_column_asset(&expanded).unwrap(),
+            pack_world_lod_gpu_column_asset_from_compact(&source).unwrap(),
+        );
+    }
+
+    #[test]
     fn rejects_out_of_range_expanded_index_before_gpu_asset_creation() {
         let mut expanded = expand_world_lod_column_asset(&asset()).unwrap();
         expanded.segments[0].indices[0] = 4;
@@ -9128,6 +9637,127 @@ mod tests {
     }
 
     #[test]
+    fn column_index_stream_preserves_each_segments_index_range() {
+        let expanded = expand_world_lod_column_asset(&asset()).unwrap();
+        let mut packed = pack_world_lod_gpu_column_asset(&expanded).unwrap();
+        let mut second = packed.segments[0].clone();
+        let second_indices = second
+            .index_bytes
+            .chunks_exact(2)
+            .flat_map(|bytes| u32::from(u16::from_le_bytes([bytes[0], bytes[1]])).to_le_bytes())
+            .collect::<Vec<_>>();
+        second.index_type = IndexType::U32;
+        second.index_bytes = second_indices.clone();
+        second.layer = WORLD_LOD_LAYER_TRANSPARENT_SIDE;
+        packed.segments[0].index_count = 3;
+        packed.segments[0]
+            .index_bytes
+            .truncate(3 * std::mem::size_of::<u16>());
+        let first_indices = packed.segments[0].index_bytes.clone();
+        packed.segments.push(second);
+        let assets = BTreeMap::from([(packed.column_key, packed)]);
+        let instances = [
+            WorldLodColumnInstanceRequest {
+                column_key: 7,
+                column_generation: 3,
+                layer: WORLD_LOD_LAYER_OPAQUE,
+                segment_index: 0,
+                order: 0,
+            },
+            WorldLodColumnInstanceRequest {
+                column_key: 7,
+                column_generation: 3,
+                layer: WORLD_LOD_LAYER_TRANSPARENT_SIDE,
+                segment_index: 1,
+                order: 1,
+            },
+        ];
+        let mut gal = VulkanicGal::new_with_backend(
+            Box::new(MockBackend::with_capabilities(presentation_capabilities(
+                vulkan_capabilities(),
+            ))),
+            false,
+        );
+        let mut residency = WorldLodGpuResidency::default();
+        let mut ops = Vec::new();
+        residency
+            .stage_visible_uploads(&mut gal, &assets, &instances, &mut ops)
+            .unwrap();
+        let draws = residency
+            .resolve_visible_draws(&assets, &instances)
+            .unwrap();
+        assert_eq!(draws[0].vertex_buffer, draws[1].vertex_buffer);
+        assert_eq!([0, 4], [draws[0].vertex_base, draws[1].vertex_base]);
+        let frame = WorldLodRenderFrame {
+            enabled: true,
+            combined_matrix: [1.0; 16],
+            micro_offset: MICRO_OFFSET_SCALE,
+            ..WorldLodRenderFrame::default()
+        };
+        assert_eq!(
+            4.0,
+            WorldLodDrawUniform::from_semantics(&frame, draws[1])
+                .unwrap()
+                .model_offset_and_reserved[3]
+        );
+        assert_eq!(draws[0].index_buffer, draws[1].index_buffer);
+        assert_eq!([0, 8], [draws[0].index_offset, draws[1].index_offset]);
+        assert_eq!(
+            [IndexType::U16, IndexType::U32],
+            [draws[0].index_type, draws[1].index_type]
+        );
+        let index_upload = residency.pending.as_ref().unwrap()[&7]
+            .index_upload_buffer
+            .unwrap();
+        let vertex_upload = residency.pending.as_ref().unwrap()[&7]
+            .shared_vertex_upload_buffer
+            .unwrap();
+        assert_eq!(
+            1,
+            ops.iter()
+                .filter(|op| matches!(op, CommandOp::HostWriteBuffer { buffer, .. } if *buffer == vertex_upload))
+                .count()
+        );
+        let writes = ops
+            .iter()
+            .filter_map(|op| match op {
+                CommandOp::HostWriteBuffer { buffer, data, .. } if *buffer == index_upload => {
+                    Some(data.as_slice())
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(1, writes.len());
+        assert_eq!(&first_indices[..], &writes[0][..first_indices.len()]);
+        assert_eq!(&[0, 0], &writes[0][first_indices.len()..8]);
+        assert_eq!(&second_indices[..], &writes[0][8..]);
+        residency.discard_submission(&mut gal);
+
+        let mut small_limit = presentation_capabilities(vulkan_capabilities());
+        small_limit.limits.max_buffer_size = 4 * WORLD_LOD_GPU_VERTEX_BYTES as u64;
+        let mut fallback_gal = VulkanicGal::new_with_backend(
+            Box::new(MockBackend::with_capabilities(small_limit)),
+            false,
+        );
+        let mut fallback = WorldLodGpuResidency::default();
+        let mut fallback_ops = Vec::new();
+        fallback
+            .stage_visible_uploads(&mut fallback_gal, &assets, &instances, &mut fallback_ops)
+            .unwrap();
+        let fallback_draws = fallback.resolve_visible_draws(&assets, &instances).unwrap();
+        assert_ne!(fallback_draws[0].vertex_buffer, fallback_draws[1].vertex_buffer);
+        assert_eq!([0, 0], [fallback_draws[0].vertex_base, fallback_draws[1].vertex_base]);
+        assert_eq!(
+            3,
+            fallback_ops
+                .iter()
+                .filter(|op| matches!(op, CommandOp::CopyBuffer { .. }))
+                .count()
+        );
+        fallback.discard_submission(&mut fallback_gal);
+    }
+
+    #[test]
     fn immutable_lod_upload_copies_to_device_local_and_retires_staging_after_submission() {
         let expanded = expand_world_lod_column_asset(&asset()).unwrap();
         let packed = pack_world_lod_gpu_column_asset(&expanded).unwrap();
@@ -9150,9 +9780,13 @@ mod tests {
         residency
             .stage_visible_uploads(&mut gal, &assets, &[instance], &mut ops)
             .unwrap();
-        let staged = residency.pending.as_ref().unwrap()[&7].segments[0];
-        let vertex_upload = staged.vertex_upload_buffer.unwrap();
-        let index_upload = staged.index_upload_buffer.unwrap();
+        let staged_column = &residency.pending.as_ref().unwrap()[&7];
+        let staged = staged_column.segments[0];
+        let staged_index_buffer = staged_column.index_buffer;
+        let vertex_upload = staged_column.shared_vertex_upload_buffer.unwrap();
+        assert_eq!(Some(staged.vertex_buffer), staged_column.shared_vertex_buffer);
+        assert_eq!(None, staged.vertex_upload_buffer);
+        let index_upload = staged_column.index_upload_buffer.unwrap();
         assert!(ops.iter().any(|op| matches!(
             op,
             CommandOp::CopyBuffer { src, dst, size }
@@ -9161,7 +9795,7 @@ mod tests {
         assert!(ops.iter().any(|op| matches!(
             op,
             CommandOp::CopyBuffer { src, dst, size }
-                if *src == index_upload && *dst == staged.index_buffer && *size == 6 * std::mem::size_of::<u16>() as u64
+                if *src == index_upload && *dst == staged_index_buffer && *size == 6 * std::mem::size_of::<u16>() as u64
         )));
         gal.submit(SubmissionBatch {
             label: "world-lod.device-local-upload".to_string(),
@@ -9172,11 +9806,13 @@ mod tests {
         })
         .unwrap();
         residency.confirm_submission(&mut gal).unwrap();
-        let active = residency.active[&7].segments[0];
+        let active_column = &residency.active[&7];
+        let active = active_column.segments[0];
         assert_eq!(staged.vertex_buffer, active.vertex_buffer);
-        assert_eq!(staged.index_buffer, active.index_buffer);
+        assert_eq!(staged_index_buffer, active_column.index_buffer);
         assert_eq!(None, active.vertex_upload_buffer);
-        assert_eq!(None, active.index_upload_buffer);
+        assert_eq!(None, active_column.shared_vertex_upload_buffer);
+        assert_eq!(None, active_column.index_upload_buffer);
         assert_eq!(
             active.vertex_buffer,
             residency
@@ -9287,7 +9923,9 @@ mod tests {
             segment_index: 0,
             order: 0,
             vertex_buffer: Handle::from_raw(1),
+            vertex_base: 0,
             index_buffer: Handle::from_raw(2),
+            index_offset: 0,
             index_type: IndexType::U16,
             index_count: 3,
         };
@@ -9762,6 +10400,99 @@ mod tests {
             gal.destroy(handle).unwrap();
         }
         pass_resources.destroy(&mut gal);
+        residency.discard_submission(&mut gal);
+    }
+
+    #[test]
+    fn packed_forward_lod_uniforms_share_one_upload_with_aligned_draw_offsets() {
+        let expanded = expand_world_lod_column_asset(&asset()).unwrap();
+        let packed = pack_world_lod_gpu_column_asset(&expanded).unwrap();
+        let assets = BTreeMap::from([(packed.column_key, packed)]);
+        let instance = WorldLodColumnInstanceRequest {
+            column_key: 7,
+            column_generation: 3,
+            layer: WORLD_LOD_LAYER_OPAQUE,
+            segment_index: 0,
+            order: 0,
+        };
+        let mut gal = VulkanicGal::new_with_backend(
+            Box::new(MockBackend::with_capabilities(presentation_capabilities(
+                vulkan_capabilities(),
+            ))),
+            false,
+        );
+        let mut residency = WorldLodGpuResidency::default();
+        residency
+            .stage_visible_uploads(&mut gal, &assets, &[instance], &mut Vec::new())
+            .unwrap();
+        let draw = residency
+            .resolve_visible_draws(&assets, &[instance])
+            .unwrap()[0];
+        let frame = WorldLodRenderFrame {
+            enabled: true,
+            combined_matrix: [1.0; 16],
+            micro_offset: MICRO_OFFSET_SCALE,
+            ..WorldLodRenderFrame::default()
+        };
+        let first = admit_world_lod_draw(&frame, draw).unwrap();
+        let second = WorldLodOpaqueDraw {
+            uniforms: first
+                .uniforms
+                .with_fog([0.2, 0.3, 0.4, 0.9], [8.0, 64.0, 16.0, 96.0]),
+            ..first
+        };
+        let (lightmap, lightmap_handles) = lightmap_binding(&mut gal);
+        let mut pass = WorldLodForwardOpaquePassResources::default();
+        pass.set_color_format(TextureFormat::Rgba8Unorm).unwrap();
+        pass.inner.use_packed_uniforms = true;
+        pass.begin_frame();
+        let mut ops = Vec::new();
+        let first_prepared = pass
+            .stage_draw(&mut gal, first, lightmap, &mut ops)
+            .unwrap();
+        let second_prepared = pass
+            .stage_draw(&mut gal, second, lightmap, &mut ops)
+            .unwrap();
+        assert_eq!(
+            first_prepared.geometry_resource_set,
+            second_prepared.geometry_resource_set
+        );
+        assert_eq!(Some(0), first_prepared.uniform_dynamic_offset);
+        assert_eq!(Some(256), second_prepared.uniform_dynamic_offset);
+        assert!(ops.is_empty());
+        pass.flush_packed_uniforms(&mut ops);
+        assert_eq!(3, ops.len());
+        let CommandOp::HostWriteBuffer { data, .. } = &ops[1] else {
+            panic!("packed LOD uniform write missing");
+        };
+        assert_eq!(512, data.len());
+        assert_eq!(&first.uniforms.pack_std140(), &data[..240]);
+        assert_eq!(&second.uniforms.pack_std140(), &data[256..496]);
+        pass.begin_frame();
+        ops.clear();
+        pass.stage_draw(&mut gal, first, lightmap, &mut ops)
+            .unwrap();
+        pass.stage_draw(&mut gal, second, lightmap, &mut ops)
+            .unwrap();
+        pass.flush_packed_uniforms(&mut ops);
+        assert!(ops.is_empty(), "unchanged packed uniforms must not upload");
+        pass.begin_frame();
+        let changed = WorldLodOpaqueDraw {
+            uniforms: first
+                .uniforms
+                .with_fog([0.3, 0.3, 0.4, 0.9], [8.0, 64.0, 16.0, 96.0]),
+            ..first
+        };
+        pass.stage_draw(&mut gal, changed, lightmap, &mut ops)
+            .unwrap();
+        pass.stage_draw(&mut gal, second, lightmap, &mut ops)
+            .unwrap();
+        pass.flush_packed_uniforms(&mut ops);
+        assert_eq!(3, ops.len());
+        pass.destroy(&mut gal);
+        for handle in lightmap_handles {
+            gal.destroy(handle).unwrap();
+        }
         residency.discard_submission(&mut gal);
     }
 

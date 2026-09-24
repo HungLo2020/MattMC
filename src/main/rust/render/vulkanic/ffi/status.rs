@@ -1291,6 +1291,7 @@ pub(crate) fn blend_mode(raw: u32) -> GalResult<BlendMode> {
         11 => Ok(BlendMode::AlphaPreserveAlpha),
         12 => Ok(BlendMode::Crumbling),
         13 => Ok(BlendMode::AlphaSource),
+        14 => Ok(BlendMode::DepthMask),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown blend mode {raw}"),

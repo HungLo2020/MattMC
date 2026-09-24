@@ -238,6 +238,7 @@ pub(super) fn vulkan_capabilities() -> BackendCapabilities {
         },
         limits: BackendLimits {
             max_buffer_size: 256 * 1024 * 1024,
+            uniform_buffer_offset_alignment: 256,
             max_texture_extent_2d: 8192,
             max_texture_extent_3d: 2048,
             max_texture_mip_levels: 13,
@@ -291,6 +292,7 @@ pub(super) fn opengl_capabilities() -> BackendCapabilities {
         },
         limits: BackendLimits {
             max_buffer_size: 64 * 1024 * 1024,
+            uniform_buffer_offset_alignment: 256,
             max_texture_extent_2d: 4096,
             // The isolated GL path supports D3 allocation, explicit mips, box
             // upload/readback, and sampled binding. Storage images remain

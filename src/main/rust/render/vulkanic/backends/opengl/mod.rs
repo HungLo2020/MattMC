@@ -177,6 +177,8 @@ impl OpenGlBackend {
 impl Backend for OpenGlBackend {
     fn capabilities(&self) -> BackendCapabilities {
         let mut capabilities = opengl_capabilities();
+        capabilities.limits.uniform_buffer_offset_alignment =
+            self.context.uniform_buffer_offset_alignment();
         let (max_texture_extent_2d, max_texture_extent_3d) = self.context.texture_extent_limits();
         capabilities.limits.max_texture_extent_2d = capabilities
             .limits

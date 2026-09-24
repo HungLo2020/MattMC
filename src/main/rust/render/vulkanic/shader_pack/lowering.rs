@@ -4754,7 +4754,7 @@ layout(set = 0, binding = 1, std140) uniform VulkanicDistantHorizonsColumnFrame 
     vec4 vulkanic_source_dh_clip_micro_noise_earth;
     uvec4 vulkanic_source_dh_flags_and_noise;
 };
-#define vulkanic_source_dh_vertex vulkanic_source_dh_vertices[gl_VertexIndex]
+#define vulkanic_source_dh_vertex vulkanic_source_dh_vertices[gl_VertexIndex + int(vulkanic_source_dh_model_offset_and_reserved.w)]
 int vulkanic_source_dh_i16(uint value) {
     int decoded = int(value & 0xffffu);
     return decoded >= 32768 ? decoded - 65536 : decoded;
@@ -8886,5 +8886,8 @@ mod tests {
     fn lowered_distant_horizons_positions_do_not_apply_dimension_world_y_offset_twice() {
         assert!(!DISTANT_HORIZONS_VERTEX_SEMANTIC_PREAMBLE
             .contains("+ vec3(0.0, vulkanic_source_dh_column_origin_and_world_y.w, 0.0)"));
+        assert!(DISTANT_HORIZONS_VERTEX_SEMANTIC_PREAMBLE.contains(
+            "gl_VertexIndex + int(vulkanic_source_dh_model_offset_and_reserved.w)"
+        ));
     }
 }

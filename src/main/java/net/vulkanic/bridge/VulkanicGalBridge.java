@@ -3207,6 +3207,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		Objects.requireNonNull(assets, "assets");
 		Objects.requireNonNull(retirements, "retirements");
 		Objects.requireNonNull(materialProvenance, "materialProvenance");
+		boolean profileUpdate = Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.dhChurnCounters");
+		long packStarted = profileUpdate ? System.nanoTime() : 0L;
 		try (Arena updateArena = Arena.ofConfined()) {
 			Map<String, MemorySegment> updateIdentitySegments = new LinkedHashMap<>();
 			MemorySegment assetArray = Struct.WORLD_LOD_COLUMN_ASSET_RECORD.array(updateArena, assets.size());
@@ -3362,7 +3364,16 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.WORLD_LOD_ASSET_UPDATE.setLong(request, 4, negotiatedFeatures);
 			Abi.writeSlice(request, Struct.WORLD_LOD_ASSET_UPDATE, 5, provenanceArray, materialProvenance.size());
 			MemorySegment status = Struct.STATUS.allocate(updateArena);
-			checkStatus(Native.worldLodUpdateAssets(contextId, request, status), "world LOD asset update");
+			long nativeStarted = profileUpdate ? System.nanoTime() : 0L;
+			int nativeResult = Native.worldLodUpdateAssets(contextId, request, status);
+			if (profileUpdate) {
+				long nativeEnded = System.nanoTime();
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+					"world.distant-horizons.asset-java-pack", nativeStarted - packStarted);
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+					"world.distant-horizons.asset-native-update", nativeEnded - nativeStarted);
+			}
+			checkStatus(nativeResult, "world LOD asset update");
 			return new Status(Struct.STATUS.getLong(status, 5), Struct.STATUS.metricsFfiCalls(status), Struct.STATUS.metricsFfiInputBytes(status), Struct.STATUS.backendMetrics(status));
 		}
 	}

@@ -27,7 +27,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.FenceBlock;
 import net.minecraft.world.level.block.LiquidBlock;
-import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.RedStoneWireBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.SlabBlock;
@@ -796,7 +795,8 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
         if (!state.getFluidState().isEmpty()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_FLUID;
         if (state.isSolidRender()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_SOLID_RENDER
                 | NativeStaticBlockModelRegistry.STATE_FLAG_FULL_OCCLUSION;
-        if (state.getBlock() instanceof LightBlock) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_LIGHT_BLOCK;
+        // Invisible light blocks remain in the replay snapshot for lighting;
+        // they do not contribute a rendered terrain quad.
         if (state.hasBlockEntity()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_BLOCK_ENTITY;
         if (state.canOcclude()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_CAN_OCCLUDE;
         if (state.blocksMotion()) flags |= NativeStaticBlockModelRegistry.STATE_FLAG_BLOCKS_MOTION;

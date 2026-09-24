@@ -33,6 +33,7 @@ fn test_capabilities() -> BackendCapabilities {
         },
         limits: BackendLimits {
             max_buffer_size: 1024 * 1024,
+            uniform_buffer_offset_alignment: 256,
             max_texture_extent_2d: 4096,
             max_texture_extent_3d: 0,
             max_texture_mip_levels: 1,
@@ -65,11 +66,12 @@ fn blend_mode_wire_values_cover_every_declared_mode_including_crumbling() {
         BlendMode::AlphaPreserveAlpha,
         BlendMode::Crumbling,
         BlendMode::AlphaSource,
+        BlendMode::DepthMask,
     ];
     for (index, expected_mode) in expected.into_iter().enumerate() {
         assert_eq!(expected_mode, status::blend_mode(index as u32 + 1).unwrap());
     }
-    let error = status::blend_mode(14).expect_err("unassigned blend mode must fail closed");
+    let error = status::blend_mode(15).expect_err("unassigned blend mode must fail closed");
     assert_eq!(StatusCode::UnknownEnum, error.code);
 }
 
@@ -4550,8 +4552,8 @@ fn compact_world_material_ffi_preserves_private_dh_generic_stratum() {
     table[0].texture_id = WORLD_MATERIAL_TEXTURE_GENERATED_WHITE;
     table[0].source_program = WORLD_MATERIAL_SOURCE_TEXTURED;
     table[0].cull_policy = WORLD_CULL_NONE;
-    let request =
-        whole_frame_request_with_compact_materials(&table, &[compact_material_quad_request()]);
+    let compact = [compact_material_quad_request()];
+    let request = whole_frame_request_with_compact_materials(&table, &compact);
 
     let (_, _, frame, _) =
         unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
@@ -4658,8 +4660,8 @@ fn compact_world_material_ffi_accepts_the_explicit_cloud_source_family() {
     table[0].depth_policy = WORLD_DEPTH_POLICY_TEST_NO_WRITE;
     table[0].cull_policy = WORLD_CULL_NONE;
     table[0].source_program = WORLD_MATERIAL_SOURCE_CLOUDS;
-    let request =
-        whole_frame_request_with_compact_materials(&table, &[compact_material_quad_request()]);
+    let compact = [compact_material_quad_request()];
+    let request = whole_frame_request_with_compact_materials(&table, &compact);
     let (_generation, _target, frame, _gui) =
         unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
 
@@ -4694,8 +4696,8 @@ fn compact_world_material_ffi_accepts_the_explicit_particle_source_family() {
     table[0].depth_policy = WORLD_DEPTH_POLICY_TEST_NO_WRITE;
     table[0].cull_policy = WORLD_CULL_NONE;
     table[0].source_program = WORLD_MATERIAL_SOURCE_PARTICLES;
-    let request =
-        whole_frame_request_with_compact_materials(&table, &[compact_material_quad_request()]);
+    let compact = [compact_material_quad_request()];
+    let request = whole_frame_request_with_compact_materials(&table, &compact);
     let (_generation, _target, frame, _gui) =
         unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
 
@@ -4713,8 +4715,8 @@ fn compact_world_material_ffi_accepts_the_explicit_entity_model_source_family() 
     table[0].depth_policy = WORLD_DEPTH_POLICY_TEST_NO_WRITE;
     table[0].cull_policy = WORLD_CULL_NONE;
     table[0].source_program = WORLD_MATERIAL_SOURCE_ENTITY_MODEL;
-    let request =
-        whole_frame_request_with_compact_materials(&table, &[compact_material_quad_request()]);
+    let compact = [compact_material_quad_request()];
+    let request = whole_frame_request_with_compact_materials(&table, &compact);
     let (_generation, _target, frame, _gui) =
         unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap() };
 
@@ -4743,8 +4745,8 @@ fn compact_world_material_ffi_rejects_malformed_indexes_and_preserves_mixed_full
 
     let mut bad_table = vec![material_table_record()];
     bad_table[0].material_mode = 999;
-    let request =
-        whole_frame_request_with_compact_materials(&bad_table, &[compact_material_quad_request()]);
+    let bad_table_compact = [compact_material_quad_request()];
+    let request = whole_frame_request_with_compact_materials(&bad_table, &bad_table_compact);
     let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
         .expect_err("unknown compact material mode must fail");
     assert_eq!(StatusCode::UnknownEnum, error.code);
@@ -4758,10 +4760,9 @@ fn compact_world_material_ffi_rejects_malformed_indexes_and_preserves_mixed_full
 
     let mut bad_source_table = vec![material_table_record()];
     bad_source_table[0].source_program = 77;
-    let request = whole_frame_request_with_compact_materials(
-        &bad_source_table,
-        &[compact_material_quad_request()],
-    );
+    let bad_source_compact = [compact_material_quad_request()];
+    let request =
+        whole_frame_request_with_compact_materials(&bad_source_table, &bad_source_compact);
     let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
         .expect_err("unknown compact material source program must fail");
     assert_eq!(StatusCode::UnknownEnum, error.code);

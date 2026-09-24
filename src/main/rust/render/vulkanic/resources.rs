@@ -384,6 +384,8 @@ pub enum BlendMode {
     /// transparent blend setup preserves RGB alpha-over while leaving the
     /// alpha attachment equal to the current source.
     AlphaSource = 13,
+    /// Keep a color attachment bound while writing only depth, as in vanilla's boat water mask.
+    DepthMask = 14,
 }
 
 #[repr(u32)]
@@ -542,6 +544,8 @@ impl BackendFeatureFlags {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BackendLimits {
     pub max_buffer_size: u64,
+    /// Required alignment for a uniform-buffer dynamic offset in bytes.
+    pub uniform_buffer_offset_alignment: u64,
     pub max_texture_extent_2d: u32,
     pub max_texture_extent_3d: u32,
     pub max_texture_mip_levels: u32,
@@ -617,7 +621,7 @@ impl BackendCapabilities {
 
     pub fn fingerprint_json(self) -> String {
         format!(
-            "{{\"name\":\"{}\",\"features\":{{\"graphics\":{},\"compute\":{},\"descriptor_arrays\":{},\"optional_bindings\":{},\"dynamic_buffer_offsets\":{},\"uniform_buffers\":{},\"storage_buffers\":{},\"storage_textures\":{},\"indirect_draw\":{},\"indirect_dispatch\":{},\"multiple_color_attachments\":{},\"depth_only_pass\":{},\"blended_pass\":{},\"texture_subresource_copies\":{},\"texture_mip_levels\":{},\"texture_array_layers\":{},\"host_buffer_access\":{},\"presentation\":{},\"renderdoc_capture\":{},\"tracy_zones\":{},\"texture_3d\":{}}},\"limits\":{{\"max_buffer_size\":{},\"max_texture_extent_2d\":{},\"max_texture_extent_3d\":{},\"max_texture_mip_levels\":{},\"max_texture_array_layers\":{},\"max_resource_layout_bindings\":{},\"max_binding_array_count\":{},\"max_color_attachments\":{},\"max_dynamic_offsets_per_binding\":{},\"max_command_lists_per_submission\":{},\"max_draw_count\":{},\"max_dispatch_groups_per_axis\":{}}}}}",
+            "{{\"name\":\"{}\",\"features\":{{\"graphics\":{},\"compute\":{},\"descriptor_arrays\":{},\"optional_bindings\":{},\"dynamic_buffer_offsets\":{},\"uniform_buffers\":{},\"storage_buffers\":{},\"storage_textures\":{},\"indirect_draw\":{},\"indirect_dispatch\":{},\"multiple_color_attachments\":{},\"depth_only_pass\":{},\"blended_pass\":{},\"texture_subresource_copies\":{},\"texture_mip_levels\":{},\"texture_array_layers\":{},\"host_buffer_access\":{},\"presentation\":{},\"renderdoc_capture\":{},\"tracy_zones\":{},\"texture_3d\":{}}},\"limits\":{{\"max_buffer_size\":{},\"uniform_buffer_offset_alignment\":{},\"max_texture_extent_2d\":{},\"max_texture_extent_3d\":{},\"max_texture_mip_levels\":{},\"max_texture_array_layers\":{},\"max_resource_layout_bindings\":{},\"max_binding_array_count\":{},\"max_color_attachments\":{},\"max_dynamic_offsets_per_binding\":{},\"max_command_lists_per_submission\":{},\"max_commands_per_list\":{},\"max_draw_count\":{},\"max_dispatch_groups_per_axis\":{}}}}}",
             self.name,
             self.features.graphics,
             self.features.compute,
@@ -641,6 +645,7 @@ impl BackendCapabilities {
             self.features.tracy_zones,
             self.features.texture_3d,
             self.limits.max_buffer_size,
+            self.limits.uniform_buffer_offset_alignment,
             self.limits.max_texture_extent_2d,
             self.limits.max_texture_extent_3d,
             self.limits.max_texture_mip_levels,
@@ -651,7 +656,8 @@ impl BackendCapabilities {
             self.limits.max_dynamic_offsets_per_binding,
             self.limits.max_command_lists_per_submission,
             self.limits.max_commands_per_list,
-            self.limits.max_draw_count
+            self.limits.max_draw_count,
+            self.limits.max_dispatch_groups_per_axis
         )
     }
 }

@@ -22,19 +22,38 @@ final class DynamicWorldMeshLifetimeTest {
 	}
 
 	@Test
-	void reuseRefreshesLifetimeAndRollbackRestoresPriorUsage() {
+	void nestedCheckpointsRestoreOnlyChangesAfterTheirMarks() {
 		DynamicWorldMeshLifetime lifetime = new DynamicWorldMeshLifetime();
 		lifetime.observe(21L, 201L, 1L);
-		DynamicWorldMeshLifetime checkpoint = lifetime.copy();
-		lifetime.observe(21L, 201L, 3L);
-		lifetime.observe(22L, 202L, 3L);
-		lifetime.restore(checkpoint);
+		lifetime.observe(22L, 202L, 1L);
+		var outer = lifetime.checkpoint(2L);
+		lifetime.observe(21L, 201L, 2L);
+		var inner = lifetime.checkpoint(2L);
+		lifetime.observe(22L, 202L, 2L);
+		lifetime.observe(23L, 203L, 2L);
+		lifetime.rollbackTo(inner);
+		assertEquals(2, lifetime.size());
+		lifetime.observe(24L, 204L, 2L);
+		lifetime.rollbackTo(outer);
+		assertEquals(List.of(
+			new DynamicWorldMeshLifetime.Retirement(21L, 201L),
+			new DynamicWorldMeshLifetime.Retirement(22L, 202L)
+		), lifetime.retireBeforeFrame(3L));
+	}
 
-		assertEquals(
-			List.of(new DynamicWorldMeshLifetime.Retirement(21L, 201L)),
-			lifetime.retireBeforeFrame(3L)
-		);
-		assertEquals(0, lifetime.size());
+	@Test
+	void rollbackRestoresForgottenKeysAndRetirementOrder() {
+		DynamicWorldMeshLifetime lifetime = new DynamicWorldMeshLifetime();
+		lifetime.observe(11L, 101L, 1L);
+		lifetime.observe(12L, 102L, 1L);
+		var checkpoint = lifetime.checkpoint(2L);
+		lifetime.forget(11L);
+		lifetime.observe(13L, 103L, 2L);
+		lifetime.rollbackTo(checkpoint);
+		assertEquals(List.of(
+			new DynamicWorldMeshLifetime.Retirement(11L, 101L),
+			new DynamicWorldMeshLifetime.Retirement(12L, 102L)
+		), lifetime.retireBeforeFrame(3L));
 	}
 
 	@Test
@@ -44,6 +63,6 @@ final class DynamicWorldMeshLifetimeTest {
 		assertThrows(IllegalArgumentException.class, () -> lifetime.observe(1L, 0L, 1L));
 		assertThrows(IllegalArgumentException.class, () -> lifetime.observe(1L, 1L, 0L));
 		assertThrows(IllegalArgumentException.class, () -> lifetime.retireBeforeFrame(0L));
-		assertThrows(IllegalArgumentException.class, () -> lifetime.restore(null));
+		assertThrows(IllegalArgumentException.class, () -> lifetime.rollbackTo(null));
 	}
 }

@@ -79,10 +79,12 @@ use super::shader_pack::programs::{
     ProgramIdentity, TerrainMaterialProgram, TerrainMaterialProgramKind,
     TerrainSourceExecutionLayouts, TerrainSourceTextureTransforms,
     COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID, COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
-    MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT, MINIMAL_ENTITY_OUTLINE_BLUR_FRAGMENT,
-    MINIMAL_ENTITY_OUTLINE_FULLSCREEN_VERTEX, MINIMAL_ENTITY_OUTLINE_SOBEL_FRAGMENT,
-    STANDARD_ITEM_FOIL_PROGRAM_ID, STATIC_COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
-    STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID, TERRAIN_SOURCE_INSTANCE_BYTES,
+    COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID, MINIMAL_ENTITY_OUTLINE_BLIT_FRAGMENT,
+    MINIMAL_ENTITY_OUTLINE_BLUR_FRAGMENT, MINIMAL_ENTITY_OUTLINE_FULLSCREEN_VERTEX,
+    MINIMAL_ENTITY_OUTLINE_SOBEL_FRAGMENT, STANDARD_ITEM_FOIL_PROGRAM_ID,
+    STATIC_COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
+    STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
+    STATIC_COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID, TERRAIN_SOURCE_INSTANCE_BYTES,
     TERRAIN_SOURCE_VERTEX_BYTES, WORLD_DECAL_FOIL_PROGRAM_ID,
 };
 use super::shader_pack::runtime::{
@@ -461,6 +463,8 @@ pub const WORLD_MATERIAL_ID_MODEL_EYES: u32 = 0x4559_4553;
 pub const WORLD_MATERIAL_ID_MODEL_TRANSLUCENT_EMISSIVE: u32 = 0x4d45_4d31;
 /// Vanilla Breeze wind: lightmapped scrolling translucent cutout without cardinal lighting.
 pub const WORLD_MATERIAL_ID_MODEL_BREEZE_WIND: u32 = 0x4257_5f44;
+/// Textureless boat water patch: writes depth without changing the color attachment.
+pub const WORLD_MATERIAL_ID_BOAT_WATER_MASK: u32 = 0x4257_4d4b;
 pub const WORLD_MATERIAL_ID_WATER_TRANSLUCENT: u32 = 0x39e0_a7e4;
 pub const WORLD_MATERIAL_ID_BLOCK_MARKER_CUTOUT: u32 = 0x224a_8659;
 pub const WORLD_MATERIAL_ID_DEFAULT_OPAQUE: u32 = WORLD_MATERIAL_ID_OPAQUE_TEXTURED;
@@ -3521,6 +3525,7 @@ struct MeshResources {
     vertex_stride: usize,
     index_buffer: Handle,
     index_offset: u64,
+    index_type: IndexType,
     pipeline_layout: Handle,
     pipeline: Handle,
     shadow_pipeline: Option<Handle>,
@@ -3552,6 +3557,8 @@ struct MeshGeometryResources {
 
 struct MeshGeometryArenaPage {
     buffer: Handle,
+    staging_buffer: Option<Handle>,
+    upload_initialized: bool,
     capacity: u64,
     free_ranges: Vec<(u64, u64)>,
 }
@@ -3569,6 +3576,7 @@ struct SourceMeshResources {
     vertex_stride: usize,
     index_buffer: Handle,
     index_offset: u64,
+    index_type: IndexType,
     pipeline_layout: Handle,
     pipeline: Handle,
     shadow_pipeline: Option<Handle>,
@@ -5074,6 +5082,7 @@ impl MeshGeometryArena {
         label: &str,
         bytes: u64,
     ) -> GalResult<(Handle, u64)> {
+        let device_local = gal.capabilities().api == BackendApi::Vulkan;
         Self::allocate_in_pages(
             gal,
             &mut self.vertex_pages,
@@ -5081,6 +5090,7 @@ impl MeshGeometryArena {
             bytes,
             BufferUsage::Storage,
             "vertices",
+            device_local,
         )
     }
 
@@ -5097,6 +5107,7 @@ impl MeshGeometryArena {
             bytes,
             BufferUsage::Index,
             "indices",
+            false,
         )
     }
 
@@ -5107,6 +5118,7 @@ impl MeshGeometryArena {
         bytes: u64,
         usage: BufferUsage,
         kind: &str,
+        device_local: bool,
     ) -> GalResult<(Handle, u64)> {
         let bytes = align_up_multiple_u64(bytes, WORLD_MESH_GEOMETRY_ALIGNMENT)?;
         if bytes == 0 {
@@ -5132,11 +5144,41 @@ impl MeshGeometryArena {
         let buffer = gal.create_buffer(BufferDesc {
             label: format!("world-mesh.geometry-arena.{kind}.{}", pages.len()),
             size: capacity,
-            memory: MemoryDomain::Upload,
-            usages: vec![usage, BufferUsage::HostWrite],
+            memory: if device_local {
+                MemoryDomain::DeviceLocal
+            } else {
+                MemoryDomain::Upload
+            },
+            usages: if device_local {
+                vec![usage, BufferUsage::TransferDst]
+            } else {
+                vec![usage, BufferUsage::HostWrite]
+            },
         })?;
+        let staging_buffer = if device_local {
+            match gal.create_buffer(BufferDesc {
+                label: format!("world-mesh.geometry-arena.{kind}.{}.staging", pages.len()),
+                size: capacity,
+                memory: MemoryDomain::Upload,
+                usages: vec![
+                    BufferUsage::TransferSrc,
+                    BufferUsage::TransferDst,
+                    BufferUsage::HostWrite,
+                ],
+            }) {
+                Ok(staging) => Some(staging),
+                Err(error) => {
+                    let _ = gal.destroy(buffer);
+                    return Err(error);
+                }
+            }
+        } else {
+            None
+        };
         let mut page = MeshGeometryArenaPage {
             buffer,
+            staging_buffer,
+            upload_initialized: false,
             capacity,
             free_ranges: Vec::new(),
         };
@@ -5146,6 +5188,19 @@ impl MeshGeometryArena {
         pages.push(page);
         let _ = label;
         Ok((buffer, 0))
+    }
+
+    fn vertex_upload_page(&self, buffer: Handle) -> Option<(Handle, bool)> {
+        self.vertex_pages
+            .iter()
+            .find(|page| page.buffer == buffer)
+            .and_then(|page| page.staging_buffer.map(|staging| (staging, page.upload_initialized)))
+    }
+
+    fn mark_vertex_uploaded(&mut self, buffer: Handle) {
+        if let Some(page) = self.vertex_pages.iter_mut().find(|page| page.buffer == buffer) {
+            page.upload_initialized = true;
+        }
     }
 
     fn release_vertex(&mut self, buffer: Handle, offset: u64, bytes: u64) {
@@ -5197,6 +5252,9 @@ impl MeshGeometryArena {
                     // completion check and may defer destruction if another
                     // explicit dependency references the page.
                     let _ = gal.destroy(page.buffer);
+                    if let Some(staging) = page.staging_buffer {
+                        let _ = gal.destroy(staging);
+                    }
                 } else {
                     retained.push(page);
                 }
@@ -5216,6 +5274,9 @@ impl MeshGeometryArena {
             .chain(self.index_pages.drain(..))
         {
             let _ = gal.destroy(page.buffer);
+            if let Some(staging) = page.staging_buffer {
+                let _ = gal.destroy(staging);
+            }
         }
     }
 }
@@ -5679,6 +5740,7 @@ pub struct WorldPrimitiveFrontend {
     >,
     mesh_instance_stream_slots: Vec<MeshInstanceStreamSlot>,
     mesh_indirect_stream: Option<MeshIndirectStreamSlot>,
+    mesh_sorted_index_stream: Option<MeshIndirectStreamSlot>,
     world_text: world_text::WorldTextFrontend,
     source_terrain_frame_stream_slots: Vec<SourceTerrainFrameStreamSlot>,
     /// Asset-generation uploads discovered while preparing a private lowered
@@ -11126,14 +11188,18 @@ impl WorldPrimitiveFrontend {
         retirements: Vec<WorldLodColumnRetirement>,
         material_provenance: Vec<WorldLodColumnMaterialProvenance>,
     ) -> GalResult<()> {
+        let asset_count = assets.len();
+        let trace_started = std::time::Instant::now();
         let result = self.apply_world_lod_column_asset_update_inner(
             generation,
             assets,
             retirements,
             material_provenance,
         );
+        let inner_nanos = elapsed_nanos_u64(trace_started);
         match result {
             Ok(()) => {
+                let reconcile_started = std::time::Instant::now();
                 self.lod_gpu_residency
                     .reconcile_assets(gal, &self.lod_gpu_column_assets);
                 self.lod_textured_gpu_residency
@@ -11180,6 +11246,15 @@ impl WorldPrimitiveFrontend {
                     .reconcile_assets(gal, &self.lod_gpu_column_assets);
                 self.lod_source_pass_resources
                     .reconcile_assets(gal, &self.lod_gpu_column_assets);
+                if matches!(
+                    std::env::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
+                    Ok("1" | "true" | "TRUE")
+                ) {
+                    println!(
+                        "world-lod.asset-phase generation={generation} columns={asset_count} inner_nanos={inner_nanos} reconcile_nanos={}",
+                        elapsed_nanos_u64(reconcile_started),
+                    );
+                }
                 Ok(())
             }
             Err(error) => {
@@ -11196,6 +11271,7 @@ impl WorldPrimitiveFrontend {
         retirements: Vec<WorldLodColumnRetirement>,
         material_provenance: Vec<WorldLodColumnMaterialProvenance>,
     ) -> GalResult<()> {
+        let validate_started = std::time::Instant::now();
         if generation == 0 {
             return Err(GalError::invalid_argument(
                 "world LOD asset update generation must be non-zero",
@@ -11239,8 +11315,12 @@ impl WorldPrimitiveFrontend {
             }
         }
 
+        let validate_nanos = elapsed_nanos_u64(validate_started);
+        let provenance_started = std::time::Instant::now();
+
         let provenance_by_key =
             validate_world_lod_material_provenance(&assets, &retirements, material_provenance)?;
+        let provenance_nanos = elapsed_nanos_u64(provenance_started);
 
         // Build all replacement artifacts before touching retained state. This
         // preserves failure atomicity without cloning every retained DH cache.
@@ -11269,7 +11349,11 @@ impl WorldPrimitiveFrontend {
                 "world LOD retained column count {projected_columns} exceeds bounded limit {WORLD_LOD_MAX_COLUMNS}"
             )));
         }
-        let mut prepared = Vec::with_capacity(assets.len());
+        let asset_count = assets.len();
+        let prepare_started = std::time::Instant::now();
+        let mut expand_nanos = 0_u64;
+        let mut pack_nanos = 0_u64;
+        let mut prepared = Vec::with_capacity(asset_count);
         for asset in assets {
             if let Some(current) = self.lod_gpu_column_assets.get(&asset.column_key) {
                 if current.column_generation >= asset.column_generation {
@@ -11279,8 +11363,20 @@ impl WorldPrimitiveFrontend {
                     )));
                 }
             }
-            let expanded = lod::expand_world_lod_column_asset(&asset)?;
-            let gpu = lod::pack_world_lod_gpu_column_asset(&expanded)?;
+            let pack_started = std::time::Instant::now();
+            let (expanded, gpu) = if provenance_by_key.contains_key(&asset.column_key) {
+                let expand_started = std::time::Instant::now();
+                let expanded = lod::expand_world_lod_column_asset(&asset)?;
+                expand_nanos = expand_nanos.saturating_add(elapsed_nanos_u64(expand_started));
+                let gpu = lod::pack_world_lod_gpu_column_asset(&expanded)?;
+                (Some(expanded), gpu)
+            } else {
+                (
+                    None,
+                    lod::pack_world_lod_gpu_column_asset_from_compact(&asset)?,
+                )
+            };
+            pack_nanos = pack_nanos.saturating_add(elapsed_nanos_u64(pack_started));
             if gpu.column_key != asset.column_key
                 || gpu.column_generation != asset.column_generation
             {
@@ -11319,6 +11415,8 @@ impl WorldPrimitiveFrontend {
             };
             prepared.push((asset, expanded, gpu, textured));
         }
+        let prepare_nanos = elapsed_nanos_u64(prepare_started);
+        let commit_started = std::time::Instant::now();
         for key in retired_keys {
             self.lod_column_assets.remove(&key);
             self.lod_expanded_column_assets.remove(&key);
@@ -11337,7 +11435,10 @@ impl WorldPrimitiveFrontend {
                 // this point; retaining them alongside the packed upload asset
                 // multiplied large real-world columns in native memory.
                 self.lod_column_assets.insert(key, asset);
-                self.lod_expanded_column_assets.insert(key, expanded);
+                self.lod_expanded_column_assets.insert(
+                    key,
+                    expanded.expect("exact-atlas provenance requires the expanded DH column"),
+                );
                 self.lod_material_provenance.insert(key, provenance);
                 self.lod_textured_gpu_column_assets
                     .insert(key, textured_gpu);
@@ -11357,6 +11458,15 @@ impl WorldPrimitiveFrontend {
                     .is_some_and(|asset| asset.column_generation == entry.mesh.mesh_generation)
             });
         self.lod_asset_generation = generation;
+        if matches!(
+            std::env::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
+            Ok("1" | "true" | "TRUE")
+        ) {
+            println!(
+                "world-lod.asset-inner generation={generation} columns={asset_count} validate_nanos={validate_nanos} provenance_nanos={provenance_nanos} prepare_nanos={prepare_nanos} expand_nanos={expand_nanos} pack_nanos={pack_nanos} commit_nanos={}",
+                elapsed_nanos_u64(commit_started),
+            );
+        }
         Ok(())
     }
 
@@ -17097,7 +17207,9 @@ impl WorldPrimitiveFrontend {
                             segment_index: draw.source_segment_index,
                             order: draw.order,
                             vertex_buffer: draw.vertex_buffer,
+                            vertex_base: 0,
                             index_buffer: draw.index_buffer,
+                            index_offset: 0,
                             index_type: draw.index_type,
                             index_count: draw.index_count,
                         },
@@ -28104,6 +28216,11 @@ impl WorldPrimitiveFrontend {
         if frame.lod_instances.is_empty() {
             return Ok(Vec::new());
         }
+        if !deferred {
+            self.lod_forward_opaque_pass_resources.begin_frame();
+            self.lod_transparent_pass_resources.begin_frame();
+            self.lod_water_pass_resources.begin_frame();
+        }
         // Deferred DH alpha still lands in the graph's one-color translucent
         // attachment. Keep its exact-atlas owners on that attachment format;
         // the acquired target format is only valid for the direct forward
@@ -28567,13 +28684,13 @@ impl WorldPrimitiveFrontend {
                 offscreen_pipeline: prepared.offscreen_pipeline,
                 pipeline_layout: prepared.pipeline_layout,
                 resource_set: prepared.geometry_resource_set,
-                resource_set_dynamic_offsets: Vec::new().into(),
+                resource_set_dynamic_offsets: prepared.uniform_dynamic_offset.into_iter().collect(),
                 shader_resource_set: Some(TerrainShaderResourceSet {
                     set_index: 1,
                     set: prepared.lightmap_resource_set,
                 }),
                 index_buffer: prepared.index_buffer,
-                index_offset: 0,
+                index_offset: prepared.index_offset,
                 index_type: prepared.index_type,
                 index_count: prepared.index_count,
                 instance_count: 1,
@@ -28595,7 +28712,9 @@ impl WorldPrimitiveFrontend {
                         segment_index: draw.source_segment_index,
                         order: draw.order,
                         vertex_buffer: draw.vertex_buffer,
+                        vertex_base: 0,
                         index_buffer: draw.index_buffer,
+                        index_offset: 0,
                         index_type: draw.index_type,
                         index_count: draw.index_count,
                     },
@@ -28764,13 +28883,16 @@ impl WorldPrimitiveFrontend {
                     offscreen_pipeline: prepared.offscreen_pipeline,
                     pipeline_layout: prepared.pipeline_layout,
                     resource_set: prepared.geometry_resource_set,
-                    resource_set_dynamic_offsets: Vec::new().into(),
+                    resource_set_dynamic_offsets: prepared
+                        .uniform_dynamic_offset
+                        .into_iter()
+                        .collect(),
                     shader_resource_set: Some(TerrainShaderResourceSet {
                         set_index: 1,
                         set: prepared.lightmap_resource_set,
                     }),
                     index_buffer: prepared.index_buffer,
-                    index_offset: 0,
+                    index_offset: prepared.index_offset,
                     index_type: prepared.index_type,
                     index_count: prepared.index_count,
                     instance_count: 1,
@@ -28781,9 +28903,13 @@ impl WorldPrimitiveFrontend {
                 });
             }
         }
-        if direct_dh_fog_composition {
-            // Reorder the reusable plan in place; its entries are copied below
-            // and the vector capacity remains available for the next frame.
+        if !deferred {
+            // Frozen's ordinary transparent render plan draws every side
+            // bucket before every upward bucket, regardless of whether DH
+            // fog/SSAO needs the direct compositor. Keep that source order
+            // when those effects are disabled too. Reorder the reusable plan
+            // in place; its entries are copied below and its capacity remains
+            // available for the next frame.
             plan.transparent_draws
                 .sort_by_key(|admitted| match admitted.pass {
                     lod::WorldLodPassClass::TransparentSide => 0u8,
@@ -28871,13 +28997,13 @@ impl WorldPrimitiveFrontend {
                 offscreen_pipeline: prepared.offscreen_pipeline,
                 pipeline_layout: prepared.pipeline_layout,
                 resource_set: prepared.geometry_resource_set,
-                resource_set_dynamic_offsets: Vec::new().into(),
+                resource_set_dynamic_offsets: prepared.uniform_dynamic_offset.into_iter().collect(),
                 shader_resource_set: Some(TerrainShaderResourceSet {
                     set_index: 1,
                     set: prepared.lightmap_resource_set,
                 }),
                 index_buffer: prepared.index_buffer,
-                index_offset: 0,
+                index_offset: prepared.index_offset,
                 index_type: prepared.index_type,
                 index_count: prepared.index_count,
                 instance_count: 1,
@@ -28960,13 +29086,13 @@ impl WorldPrimitiveFrontend {
                 offscreen_pipeline: prepared.offscreen_pipeline,
                 pipeline_layout: prepared.pipeline_layout,
                 resource_set: prepared.geometry_resource_set,
-                resource_set_dynamic_offsets: Vec::new().into(),
+                resource_set_dynamic_offsets: prepared.uniform_dynamic_offset.into_iter().collect(),
                 shader_resource_set: Some(TerrainShaderResourceSet {
                     set_index: 1,
                     set: prepared.lightmap_resource_set,
                 }),
                 index_buffer: prepared.index_buffer,
-                index_offset: 0,
+                index_offset: prepared.index_offset,
                 index_type: prepared.index_type,
                 index_count: prepared.index_count,
                 instance_count: 1,
@@ -28975,6 +29101,13 @@ impl WorldPrimitiveFrontend {
                 material_mode: TerrainMaterialPassMode::Translucent,
                 shadow_participation: TerrainShadowParticipation::Unavailable,
             });
+        }
+        if !deferred {
+            self.lod_forward_opaque_pass_resources
+                .flush_packed_uniforms(ops);
+            self.lod_transparent_pass_resources
+                .flush_packed_uniforms(ops);
+            self.lod_water_pass_resources.flush_packed_uniforms(ops);
         }
         Ok(draws)
     }
@@ -29887,6 +30020,7 @@ impl WorldPrimitiveFrontend {
             self.mesh_batch_identity_scratch = mesh_identity_scratch;
             batches
         };
+        let mut sorted_index_payload = Vec::new();
         let mesh_batch_plan = if has_camera_sorted_meshes {
             let mut combined = Vec::with_capacity(
                 static_mesh_batch_plan.len()
@@ -29899,7 +30033,7 @@ impl WorldPrimitiveFrontend {
                         .count(),
             );
             combined.extend(static_mesh_batch_plan.iter().cloned());
-            combined.extend(mesh_batches_selected(
+            combined.extend(mesh_batches_selected_with_sorted_indices(
                 &frame,
                 self,
                 color_format,
@@ -29907,6 +30041,7 @@ impl WorldPrimitiveFrontend {
                 use_g_buffer_mesh_path,
                 false,
                 MeshBatchSelection::CameraSorted,
+                (!use_g_buffer_mesh_path).then_some(&mut sorted_index_payload),
             )?);
             sort_mesh_batches(&mut combined, &frame);
             Arc::new(combined)
@@ -29918,7 +30053,7 @@ impl WorldPrimitiveFrontend {
         // a private copy only for a selector that actually changes topology
         // or destination policy for this frame.
         let mut mesh_batches: Cow<'_, [MeshBatch]> = Cow::Borrowed(mesh_batch_plan.as_slice());
-        trace_static_terrain_mesh_batch(&frame, self, &mesh_batches);
+        trace_static_terrain_mesh_batch(&frame, self, &mesh_batches, &sorted_index_payload);
         if self.pending_terrain_fabulous_handoff {
             // These entity draws target the canonical Fabulous item/entity
             // attachment, not the oriented deferred world images. Match the
@@ -30120,14 +30255,20 @@ impl WorldPrimitiveFrontend {
                     continue;
                 }
                 let had_resources = self.mesh_resources.contains_key(&batch.key);
-                if let Some(lightmap_layout) = builtin_mesh_resource_layout {
-                    self.ensure_mesh_resources_with_shader_resource_layout(
-                        gal,
-                        batch.key,
-                        Some(lightmap_layout),
-                    )?;
-                } else {
-                    self.ensure_mesh_resources(gal, batch.key)?;
+                // A resident non-foil resource already carries the exact
+                // content generation and pipeline variant in its key. Skip
+                // the second residency probe inside ensure_mesh_resources;
+                // foil still validates its texture contract every call.
+                if !had_resources || batch.key.standard_item_foil {
+                    if let Some(lightmap_layout) = builtin_mesh_resource_layout {
+                        self.ensure_mesh_resources_with_shader_resource_layout(
+                            gal,
+                            batch.key,
+                            Some(lightmap_layout),
+                        )?;
+                    } else {
+                        self.ensure_mesh_resources(gal, batch.key)?;
+                    }
                 }
                 if let Some(programs) = source_terrain_programs.as_ref() {
                     self.ensure_source_mesh_resources(
@@ -30411,6 +30552,35 @@ impl WorldPrimitiveFrontend {
                 + material_batches.len() * 9
                 + mesh_batches.len() * 8,
         );
+        let sorted_index_stream = if sorted_index_payload.is_empty() {
+            None
+        } else {
+            let stream =
+                self.ensure_mesh_sorted_index_stream(gal, sorted_index_payload.len() as u64)?;
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                stream.buffer,
+                if stream.initialized {
+                    TextureUsageState::IndexRead
+                } else {
+                    TextureUsageState::Undefined
+                },
+                TextureUsageState::TransferDst,
+            )));
+            ops.push(CommandOp::HostWriteBuffer {
+                buffer: stream.buffer,
+                offset: 0,
+                data: sorted_index_payload,
+            });
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                stream.buffer,
+                TextureUsageState::TransferDst,
+                TextureUsageState::IndexRead,
+            )));
+            if let Some(slot) = self.mesh_sorted_index_stream.as_mut() {
+                slot.initialized = true;
+            }
+            Some(stream)
+        };
         // Frozen invokes DH's opaque render immediately before vanilla opaque
         // terrain. Resolve the private direct-DH target at that same boundary
         // so vanilla opaque depth/color can overwrite the near-field fade and
@@ -30983,17 +31153,11 @@ impl WorldPrimitiveFrontend {
                 let mut previous_page_set: Option<(MeshResourceKey, Handle)> = None;
                 let mesh_draw_record_started = std::time::Instant::now();
                 for (batch_index, batch) in mesh_batches.iter().enumerate() {
-                    let index_type = self
-                        .mesh_assets
-                        .get(&batch.key.mesh_key)
-                        .ok_or_else(|| {
-                            GalError::backend("world mesh asset vanished before submit")
-                        })?
-                        .index_type;
                     let use_indirect = source_terrain_programs.is_none()
                         && packed_stream.first_instances[batch_index].is_some();
                     let (
                         index_buffer,
+                        index_type,
                         geometry_index_offset,
                         vertex_offset,
                         vertex_stride,
@@ -31012,6 +31176,7 @@ impl WorldPrimitiveFrontend {
                             })?;
                         (
                             resources.index_buffer,
+                            resources.index_type,
                             resources.index_offset,
                             resources.vertex_offset,
                             resources.vertex_stride,
@@ -31028,6 +31193,7 @@ impl WorldPrimitiveFrontend {
                         })?;
                         (
                             resources.index_buffer,
+                            resources.index_type,
                             resources.index_offset,
                             resources.vertex_offset,
                             resources.vertex_stride,
@@ -31039,6 +31205,15 @@ impl WorldPrimitiveFrontend {
                             builtin_terrain_lightmap_resource_set,
                         )
                     };
+                    let (index_buffer, geometry_index_offset, batch_index_offset) =
+                        if let Some(offset) = batch.sorted_index_offset {
+                            let stream = sorted_index_stream.ok_or_else(|| {
+                                GalError::backend("camera-sorted index stream was not uploaded")
+                            })?;
+                            (stream.buffer, 0, offset)
+                        } else {
+                            (index_buffer, geometry_index_offset, batch.index_offset)
+                        };
                     let (resource_set, dynamic_offsets, draw_index_offset, page_command) =
                         if use_indirect {
                             // Resource sets are stable throughout this frame's draw-record
@@ -31071,7 +31246,7 @@ impl WorldPrimitiveFrontend {
                                 IndexType::U32 => 4u64,
                             };
                             let absolute_index_offset = geometry_index_offset
-                                .checked_add(batch.index_offset)
+                                .checked_add(batch_index_offset)
                                 .ok_or_else(|| {
                                     GalError::invalid_argument("world mesh index offset overflow")
                                 })?;
@@ -31114,7 +31289,7 @@ impl WorldPrimitiveFrontend {
                                     packed_stream.dynamic_offsets[batch_index],
                                 )?,
                                 geometry_index_offset
-                                    .checked_add(batch.index_offset)
+                                    .checked_add(batch_index_offset)
                                     .ok_or_else(|| {
                                         GalError::invalid_argument(
                                             "world mesh index offset overflow",
@@ -33903,9 +34078,10 @@ impl WorldPrimitiveFrontend {
             let kind = match key.material_mode {
                 WORLD_MATERIAL_MODE_OPAQUE => TerrainMaterialProgramKind::Opaque,
                 WORLD_MATERIAL_MODE_CUTOUT => TerrainMaterialProgramKind::Cutout,
+                WORLD_MATERIAL_MODE_TRANSLUCENT => TerrainMaterialProgramKind::Translucent,
                 _ => {
                     return Err(GalError::invalid_argument(
-                        "compact direct terrain pipeline requires opaque/cutout material",
+                        "compact direct terrain pipeline requires opaque/cutout/translucent material",
                     ));
                 }
             };
@@ -33913,6 +34089,8 @@ impl WorldPrimitiveFrontend {
                 == STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID
                 || key.shader_program_identity.as_str()
                     == STATIC_COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID
+                || key.shader_program_identity.as_str()
+                    == STATIC_COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID
             {
                 minimal_static_compact_direct_terrain_program(kind)
             } else {
@@ -34432,6 +34610,7 @@ impl WorldPrimitiveFrontend {
                 vertex_stride,
                 index_buffer,
                 index_offset: geometry_index_offset,
+                index_type,
                 pipeline_layout,
                 pipeline,
                 shadow_pipeline,
@@ -34582,10 +34761,16 @@ impl WorldPrimitiveFrontend {
         // Source-derived programs retain the complete 80-byte semantic ABI
         // even when the shader-off builtin route has a compact GPU lowering.
         let rich_geometry_key = mesh_key.geometry_key_for_abi(MeshVertexAbi::Rich80);
-        let (rich_vertices, index_bytes) = self
+        let (rich_vertices, index_bytes, index_type) = self
             .mesh_assets
             .get(&mesh_key.mesh_key)
-            .map(|asset| (asset.vertex_bytes.clone(), asset.index_bytes.clone()))
+            .map(|asset| {
+                (
+                    asset.vertex_bytes.clone(),
+                    asset.index_bytes.clone(),
+                    asset.index_type,
+                )
+            })
             .ok_or_else(|| GalError::backend("source mesh asset vanished before lowering"))?;
         self.ensure_mesh_geometry_resources(
             gal,
@@ -34670,6 +34855,7 @@ impl WorldPrimitiveFrontend {
                 vertex_stride: WORLD_MESH_GPU_VERTEX_BYTES,
                 index_buffer,
                 index_offset,
+                index_type,
                 pipeline_layout,
                 pipeline,
                 shadow_pipeline,
@@ -34862,6 +35048,43 @@ impl WorldPrimitiveFrontend {
         Ok(self
             .mesh_indirect_stream
             .expect("installed indirect stream"))
+    }
+
+    fn ensure_mesh_sorted_index_stream(
+        &mut self,
+        gal: &mut VulkanicGal,
+        required_bytes: u64,
+    ) -> GalResult<MeshIndirectStreamSlot> {
+        if let Some(slot) = self.mesh_sorted_index_stream {
+            if slot.capacity >= required_bytes {
+                return Ok(slot);
+            }
+        }
+        let capacity = align_up_u64(required_bytes.max(4_096), 256)?;
+        let buffer = gal.create_buffer(BufferDesc {
+            label: "world-mesh.camera-sorted-index-stream".to_string(),
+            size: capacity,
+            memory: MemoryDomain::Upload,
+            usages: vec![
+                BufferUsage::Index,
+                BufferUsage::HostWrite,
+                BufferUsage::TransferDst,
+            ],
+        })?;
+        if let Some(previous) = self
+            .mesh_sorted_index_stream
+            .replace(MeshIndirectStreamSlot {
+                buffer,
+                capacity,
+                initialized: false,
+            })
+        {
+            self.deferred_mesh_stream_buffer_destroys
+                .push(previous.buffer);
+        }
+        Ok(self
+            .mesh_sorted_index_stream
+            .expect("installed sorted index stream"))
     }
 
     /// Reserves one bounded source-program frame-data range. The allocation is
@@ -35622,32 +35845,72 @@ impl WorldPrimitiveFrontend {
         vertex_bytes: Vec<u8>,
         index_bytes: Vec<u8>,
     ) -> GalResult<()> {
-        self.submit_or_queue_world_upload(
-            gal,
-            "world-mesh.upload",
-            vec![
-                CommandOp::HostWriteBuffer {
-                    buffer: resources.vertex_buffer,
-                    offset: resources.vertex_offset,
-                    data: vertex_bytes,
-                },
-                CommandOp::Barrier(buffer_barrier(
-                    resources.vertex_buffer,
+        let staged_vertex_page = self
+            .mesh_geometry_arena
+            .vertex_upload_page(resources.vertex_buffer);
+        let mut ops = Vec::with_capacity(if staged_vertex_page.is_some() { 8 } else { 4 });
+        if let Some((staging, initialized)) = staged_vertex_page {
+            if initialized {
+                ops.push(CommandOp::Barrier(buffer_barrier(
+                    staging,
+                    TextureUsageState::TransferSrc,
                     TextureUsageState::TransferDst,
-                    TextureUsageState::ShaderRead,
-                )),
-                CommandOp::HostWriteBuffer {
-                    buffer: resources.index_buffer,
-                    offset: resources.index_offset,
-                    data: index_bytes,
+                )));
+            }
+            ops.push(CommandOp::HostWriteBuffer {
+                buffer: staging,
+                offset: resources.vertex_offset,
+                data: vertex_bytes,
+            });
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                staging,
+                TextureUsageState::TransferDst,
+                TextureUsageState::TransferSrc,
+            )));
+            ops.push(CommandOp::Barrier(buffer_barrier(
+                resources.vertex_buffer,
+                if initialized {
+                    TextureUsageState::ShaderRead
+                } else {
+                    TextureUsageState::Undefined
                 },
-                CommandOp::Barrier(buffer_barrier(
-                    resources.index_buffer,
-                    TextureUsageState::TransferDst,
-                    TextureUsageState::IndexRead,
-                )),
-            ],
-        )
+                TextureUsageState::TransferDst,
+            )));
+            ops.push(CommandOp::CopyBufferRegion {
+                src: staging,
+                src_offset: resources.vertex_offset,
+                dst: resources.vertex_buffer,
+                dst_offset: resources.vertex_offset,
+                size: resources.vertex_range,
+            });
+        } else {
+            ops.push(CommandOp::HostWriteBuffer {
+                buffer: resources.vertex_buffer,
+                offset: resources.vertex_offset,
+                data: vertex_bytes,
+            });
+        }
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            resources.vertex_buffer,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
+        ops.push(CommandOp::HostWriteBuffer {
+            buffer: resources.index_buffer,
+            offset: resources.index_offset,
+            data: index_bytes,
+        });
+        ops.push(CommandOp::Barrier(buffer_barrier(
+            resources.index_buffer,
+            TextureUsageState::TransferDst,
+            TextureUsageState::IndexRead,
+        )));
+        self.submit_or_queue_world_upload(gal, "world-mesh.upload", ops)?;
+        if staged_vertex_page.is_some() {
+            self.mesh_geometry_arena
+                .mark_vertex_uploaded(resources.vertex_buffer);
+        }
+        Ok(())
     }
 
     fn apply_mesh_sorted_index_update(
@@ -37321,6 +37584,9 @@ impl WorldPrimitiveFrontend {
             let _ = gal.destroy(slot.buffer);
         }
         if let Some(slot) = self.mesh_indirect_stream.take() {
+            let _ = gal.destroy(slot.buffer);
+        }
+        if let Some(slot) = self.mesh_sorted_index_stream.take() {
             let _ = gal.destroy(slot.buffer);
         }
     }
@@ -40645,6 +40911,9 @@ struct MeshBatch {
     key: MeshResourceKey,
     index_offset: u64,
     index_count: u32,
+    /// Frame-local index bytes in camera order. The immutable mesh index
+    /// buffer remains the source for every ordinary and source-program draw.
+    sorted_index_offset: Option<u64>,
     /// Most visible world mesh batches contain one instance. Keep that common
     /// case inline so rebuilding the semantic batch view does not allocate a
     /// heap vector per section; larger batches spill to the same SmallVec
@@ -40985,11 +41254,20 @@ fn material_uses_particle_shader(source_program: u32) -> bool {
 }
 
 fn append_private_dh_draws(draws: &[TerrainMeshDraw], ops: &mut Vec<CommandOp>) -> GalResult<()> {
+    // This helper emits one uninterrupted private-target pass. Keep its bound
+    // pipeline and lightmap state locally so repeated DH segments do not
+    // manufacture commands that GAL would discard during normalization.
+    let mut bound_pipeline = None;
+    let mut bound_shader_set = None;
     for draw in draws {
         let pipeline = draw.offscreen_pipeline.ok_or_else(|| {
             GalError::backend("direct DH draw has no private offscreen pipeline variant")
         })?;
-        ops.push(CommandOp::BindGraphicsPipeline(pipeline));
+        if bound_pipeline != Some((pipeline, draw.pipeline_layout)) {
+            ops.push(CommandOp::BindGraphicsPipeline(pipeline));
+            bound_pipeline = Some((pipeline, draw.pipeline_layout));
+            bound_shader_set = None;
+        }
         ops.push(CommandOp::BindResourceSet {
             pipeline_layout: draw.pipeline_layout,
             set_index: 0,
@@ -40997,12 +41275,20 @@ fn append_private_dh_draws(draws: &[TerrainMeshDraw], ops: &mut Vec<CommandOp>) 
             dynamic_offsets: draw.resource_set_dynamic_offsets.to_vec(),
         });
         if let Some(shader_resource_set) = draw.shader_resource_set {
-            ops.push(CommandOp::BindResourceSet {
-                pipeline_layout: draw.pipeline_layout,
-                set_index: shader_resource_set.set_index,
-                set: shader_resource_set.set,
-                dynamic_offsets: Vec::new(),
-            });
+            let shader_set = (
+                draw.pipeline_layout,
+                shader_resource_set.set_index,
+                shader_resource_set.set,
+            );
+            if shader_resource_set.set_index == 0 || bound_shader_set != Some(shader_set) {
+                ops.push(CommandOp::BindResourceSet {
+                    pipeline_layout: draw.pipeline_layout,
+                    set_index: shader_resource_set.set_index,
+                    set: shader_resource_set.set,
+                    dynamic_offsets: Vec::new(),
+                });
+                bound_shader_set = Some(shader_set);
+            }
         }
         ops.push(CommandOp::SetIndexBuffer {
             buffer: draw.index_buffer,
@@ -42308,6 +42594,28 @@ fn mesh_batches_selected(
     allow_optical: bool,
     selection: MeshBatchSelection,
 ) -> GalResult<Vec<MeshBatch>> {
+    mesh_batches_selected_with_sorted_indices(
+        frame,
+        frontend,
+        color_format,
+        raster_y_direction,
+        g_buffer,
+        allow_optical,
+        selection,
+        None,
+    )
+}
+
+fn mesh_batches_selected_with_sorted_indices(
+    frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+    g_buffer: bool,
+    allow_optical: bool,
+    selection: MeshBatchSelection,
+    mut sorted_indices: Option<&mut Vec<u8>>,
+) -> GalResult<Vec<MeshBatch>> {
     // Preserve first-seen batch order for deterministic submission, but use a
     // hash index for membership.  The previous ordered tree made terrain
     // streaming cost scale as O(instances * log batches); a settled world can
@@ -42362,6 +42670,7 @@ fn mesh_batches_selected(
                 raster_y_direction,
                 g_buffer,
                 &mut batches,
+                sorted_indices.as_mut().map(|bytes| &mut **bytes),
             )?;
             continue;
         }
@@ -42531,6 +42840,7 @@ fn trace_static_terrain_mesh_batch(
     frame: &WorldPrimitiveFrame,
     frontend: &WorldPrimitiveFrontend,
     batches: &[MeshBatch],
+    sorted_indices: &[u8],
 ) {
     let Some(root) = std::env::var_os("MATTMC_STATIC_TERRAIN_BATCH_TRACE_DIR") else {
         return;
@@ -42577,31 +42887,33 @@ fn trace_static_terrain_mesh_batch(
         .iter()
         .take(128)
         .filter_map(|candidate| {
-            static_terrain_batch_projected_bounds(frame, frontend, candidate).map(|bounds| {
-                format!(
-                    concat!(
-                        "{{\"meshKey\":\"{:016x}\",\"meshGeneration\":{},",
-                        "\"textureId\":{},\"materialId\":{},",
-                        "\"indexOffset\":{},\"indexCount\":{},\"instances\":{},",
-                        "\"ndcBounds\":[{:.6},{:.6},{:.6},{:.6}]}}"
-                    ),
-                    candidate.key.mesh_key,
-                    frontend
-                        .mesh_assets
-                        .get(&candidate.key.mesh_key)
-                        .map(|asset| asset.mesh_generation)
-                        .unwrap_or_default(),
-                    candidate.key.texture_id,
-                    candidate.key.material_id,
-                    candidate.index_offset,
-                    candidate.index_count,
-                    candidate.indices.len(),
-                    bounds[0],
-                    bounds[1],
-                    bounds[2],
-                    bounds[3],
-                )
-            })
+            static_terrain_batch_projected_bounds(frame, frontend, candidate, sorted_indices).map(
+                |bounds| {
+                    format!(
+                        concat!(
+                            "{{\"meshKey\":\"{:016x}\",\"meshGeneration\":{},",
+                            "\"textureId\":{},\"materialId\":{},",
+                            "\"indexOffset\":{},\"indexCount\":{},\"instances\":{},",
+                            "\"ndcBounds\":[{:.6},{:.6},{:.6},{:.6}]}}"
+                        ),
+                        candidate.key.mesh_key,
+                        frontend
+                            .mesh_assets
+                            .get(&candidate.key.mesh_key)
+                            .map(|asset| asset.mesh_generation)
+                            .unwrap_or_default(),
+                        candidate.key.texture_id,
+                        candidate.key.material_id,
+                        candidate.index_offset,
+                        candidate.index_count,
+                        candidate.indices.len(),
+                        bounds[0],
+                        bounds[1],
+                        bounds[2],
+                        bounds[3],
+                    )
+                },
+            )
         })
         .collect::<Vec<_>>();
     let mesh_key = batch.key.mesh_key;
@@ -42615,7 +42927,11 @@ fn trace_static_terrain_mesh_batch(
         return;
     };
     let index_stride = index_stride(asset.index_type) as usize;
-    let start = batch.index_offset as usize;
+    let (index_bytes, start) = if let Some(offset) = batch.sorted_index_offset {
+        (sorted_indices, offset as usize)
+    } else {
+        (asset.index_bytes.as_slice(), batch.index_offset as usize)
+    };
     let sample_count = usize::try_from(batch.index_count).unwrap_or(0).min(12);
     let mut samples = Vec::new();
     for ordinal in 0..sample_count {
@@ -42625,11 +42941,8 @@ fn trace_static_terrain_mesh_batch(
         else {
             break;
         };
-        let index = match mesh_index_value(
-            &asset.index_bytes,
-            asset.index_type,
-            byte_index / index_stride,
-        ) {
+        let index = match mesh_index_value(index_bytes, asset.index_type, byte_index / index_stride)
+        {
             Ok(index) => index,
             Err(_) => break,
         };
@@ -42793,12 +43106,20 @@ fn static_terrain_batch_projected_bounds(
     frame: &WorldPrimitiveFrame,
     frontend: &WorldPrimitiveFrontend,
     batch: &MeshBatch,
+    sorted_indices: &[u8],
 ) -> Option<[f32; 4]> {
     let asset = frontend.mesh_assets.get(&batch.key.mesh_key)?;
     let instance_index = *batch.indices.first()?;
     let instance = frame.mesh_instances.get(instance_index)?;
     let index_stride = index_stride(asset.index_type) as usize;
-    let start = usize::try_from(batch.index_offset).ok()?;
+    let (index_bytes, start) = if let Some(offset) = batch.sorted_index_offset {
+        (sorted_indices, usize::try_from(offset).ok()?)
+    } else {
+        (
+            asset.index_bytes.as_slice(),
+            usize::try_from(batch.index_offset).ok()?,
+        )
+    };
     let count = usize::try_from(batch.index_count).ok()?.min(4_096);
     let mut bounds = [
         f32::INFINITY,
@@ -42809,12 +43130,8 @@ fn static_terrain_batch_projected_bounds(
     let mut found = false;
     for ordinal in 0..count {
         let byte_index = ordinal.checked_mul(index_stride)?.checked_add(start)?;
-        let index = mesh_index_value(
-            &asset.index_bytes,
-            asset.index_type,
-            byte_index / index_stride,
-        )
-        .ok()?;
+        let index =
+            mesh_index_value(index_bytes, asset.index_type, byte_index / index_stride).ok()?;
         let vertex_offset = usize::try_from(index)
             .ok()?
             .checked_mul(WORLD_MESH_GPU_VERTEX_BYTES)?;
@@ -43045,6 +43362,7 @@ fn push_mesh_batch(
                 key,
                 index_offset,
                 index_count,
+                sorted_index_offset: None,
                 indices: smallvec![instance_index],
             });
         }
@@ -43066,6 +43384,7 @@ fn push_mesh_batch(
             key,
             index_offset,
             index_count,
+            sorted_index_offset: None,
             indices: smallvec![instance_index],
         });
     }
@@ -43123,7 +43442,9 @@ fn mesh_vertex_abi_for_builtin(key: MeshResourceKey) -> MeshVertexAbi {
         && key.stratum == WORLD_STRATUM_TERRAIN
         && matches!(
             key.material_mode,
-            WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_CUTOUT
+            WORLD_MATERIAL_MODE_OPAQUE
+                | WORLD_MATERIAL_MODE_CUTOUT
+                | WORLD_MATERIAL_MODE_TRANSLUCENT
         )
         && key.texture_id == WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS
         && !key.standard_item_foil
@@ -43147,9 +43468,15 @@ fn mesh_pipeline_key(key: MeshResourceKey) -> GalResult<MeshPipelineResourceKey>
         ProgramIdentity::new(match (key.material_mode, static_terrain_specialization) {
             (WORLD_MATERIAL_MODE_OPAQUE, true) => STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
             (WORLD_MATERIAL_MODE_CUTOUT, true) => STATIC_COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
+            (WORLD_MATERIAL_MODE_TRANSLUCENT, true) => {
+                STATIC_COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID
+            }
             (WORLD_MATERIAL_MODE_OPAQUE, false) => COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
             (WORLD_MATERIAL_MODE_CUTOUT, false) => COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
-            _ => unreachable!("compact terrain predicate admits only opaque/cutout"),
+            (WORLD_MATERIAL_MODE_TRANSLUCENT, false) => {
+                COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID
+            }
+            _ => unreachable!("compact terrain predicate admits only opaque/cutout/translucent"),
         })
     } else if key.standard_item_foil {
         if key.material_mode != WORLD_MATERIAL_MODE_GLINT {
@@ -47863,6 +48190,49 @@ mod tests {
     }
 
     #[test]
+    fn private_dh_draws_reuse_pass_local_pipeline_and_lightmap_bindings() {
+        let handle = |kind, index| Handle::new(kind, index, 1).unwrap();
+        let mut first = pending_page_draw(6, 1, TerrainMaterialPassMode::Opaque, false, 0.0).draw;
+        first.offscreen_pipeline = Some(handle(HandleKind::GraphicsPipeline, 10));
+        first.shader_resource_set = Some(TerrainShaderResourceSet {
+            set_index: 1,
+            set: handle(HandleKind::ResourceSet, 20),
+        });
+        let mut second = first.clone();
+        second.resource_set = handle(HandleKind::ResourceSet, 2);
+        let mut third = second.clone();
+        third.offscreen_pipeline = Some(handle(HandleKind::GraphicsPipeline, 11));
+        let mut ops = Vec::new();
+
+        append_private_dh_draws(&[first, second, third], &mut ops).unwrap();
+
+        assert_eq!(
+            2,
+            ops.iter()
+                .filter(|op| matches!(op, CommandOp::BindGraphicsPipeline(_)))
+                .count()
+        );
+        assert_eq!(
+            3,
+            ops.iter()
+                .filter(|op| matches!(op, CommandOp::BindResourceSet { set_index: 0, .. }))
+                .count()
+        );
+        assert_eq!(
+            2,
+            ops.iter()
+                .filter(|op| matches!(op, CommandOp::BindResourceSet { set_index: 1, .. }))
+                .count()
+        );
+        assert_eq!(
+            3,
+            ops.iter()
+                .filter(|op| matches!(op, CommandOp::DrawIndexed { .. }))
+                .count()
+        );
+    }
+
+    #[test]
     fn page_indirect_order_groups_compatible_draws_without_crossing_boundaries() {
         let mut draws = vec![
             pending_page_draw(30, 3, TerrainMaterialPassMode::Opaque, true, 30.0),
@@ -50443,6 +50813,7 @@ mod tests {
                 key: invalid_key,
                 index_offset: invalid_batches[0].index_offset,
                 index_count: invalid_batches[0].index_count,
+                sorted_index_offset: None,
                 indices: invalid_batches[0].indices.clone(),
             });
             let invalid_plan_error = frontend
@@ -52214,6 +52585,7 @@ mod tests {
             },
             index_offset: 0,
             index_count: 36,
+            sorted_index_offset: None,
             indices: smallvec![0],
         };
         let mut entity = terrain.key;
@@ -60534,7 +60906,7 @@ mod tests {
             })
         );
         assert_eq!(
-            MeshVertexAbi::Rich80,
+            MeshVertexAbi::DirectTerrain32,
             mesh_vertex_abi_for_builtin(MeshResourceKey {
                 material_mode: WORLD_MATERIAL_MODE_TRANSLUCENT,
                 ..compact
@@ -64871,6 +65243,65 @@ mod tests {
     }
 
     #[test]
+    fn vulkan_mesh_vertex_pages_stage_distinct_ranges_into_device_local_residency() {
+        let mut gal = gal();
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend.defer_world_uploads = true;
+        let mut ranges = Vec::new();
+        for _ in 0..2 {
+            let (vertex_buffer, vertex_offset) = frontend
+                .mesh_geometry_arena
+                .allocate_vertex(&mut gal, "staged-vertex", 32)
+                .unwrap();
+            let (index_buffer, index_offset) = frontend
+                .mesh_geometry_arena
+                .allocate_index(&mut gal, "staged-index", 6)
+                .unwrap();
+            let resources = MeshGeometryResources {
+                vertex_buffer,
+                vertex_offset,
+                vertex_range: 32,
+                vertex_stride: 32,
+                index_buffer,
+                index_offset,
+                index_range: 6,
+            };
+            frontend
+                .upload_mesh_geometry_resources(&mut gal, &resources, vec![7; 32], vec![0; 6])
+                .unwrap();
+            ranges.push(resources);
+        }
+        let page = &frontend.mesh_geometry_arena.vertex_pages[0];
+        let staging = page.staging_buffer.expect("Vulkan vertex page has staging");
+        assert!(page.upload_initialized);
+        assert_eq!(ranges[0].vertex_buffer, ranges[1].vertex_buffer);
+        assert_ne!(ranges[0].vertex_offset, ranges[1].vertex_offset);
+        let copies = frontend
+            .pending_world_upload_ops
+            .iter()
+            .filter_map(|op| match op {
+                CommandOp::CopyBufferRegion {
+                    src,
+                    src_offset,
+                    dst,
+                    dst_offset,
+                    size,
+                } => Some((*src, *src_offset, *dst, *dst_offset, *size)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(2, copies.len());
+        for (copy, resource) in copies.iter().zip(&ranges) {
+            assert_eq!(copy.0, staging);
+            assert_eq!(copy.1, resource.vertex_offset);
+            assert_eq!(copy.2, resource.vertex_buffer);
+            assert_eq!(copy.3, resource.vertex_offset);
+            assert_eq!(copy.4, resource.vertex_range);
+        }
+        frontend.flush_pending_world_uploads(&mut gal).unwrap();
+    }
+
+    #[test]
     fn world_mesh_geometry_arena_trims_fully_released_pages() {
         let mut gal = gal();
         let mut arena = MeshGeometryArena::default();
@@ -64887,7 +65318,7 @@ mod tests {
 
         assert!(arena.vertex_pages.is_empty());
         assert!(arena.index_pages.is_empty());
-        assert_eq!(2, gal.metrics().resource_destroys);
+        assert_eq!(3, gal.metrics().resource_destroys);
     }
 
     #[test]
@@ -72462,6 +72893,101 @@ mod tests {
             ]
         );
         assert_eq!(batches.iter().map(|b| b.index_count).sum::<u32>(), 18);
+        let mut sorted_indices = Vec::new();
+        let sorted_batches = mesh_batches_selected_with_sorted_indices(
+            &frame,
+            &frontend,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+            MeshBatchSelection::CameraSorted,
+            Some(&mut sorted_indices),
+        )
+        .unwrap();
+        assert_eq!(
+            sorted_batches
+                .iter()
+                .map(|batch| batch.sorted_index_offset)
+                .collect::<Vec<_>>(),
+            vec![Some(0), Some(24), Some(48)]
+        );
+        assert_eq!(
+            sorted_batches
+                .iter()
+                .map(|batch| batch.key.material_id)
+                .collect::<Vec<_>>(),
+            batches
+                .iter()
+                .map(|batch| batch.key.material_id)
+                .collect::<Vec<_>>()
+        );
+        let original_indices = &frontend.mesh_assets[&9182].index_bytes;
+        assert_eq!(&sorted_indices[0..24], &original_indices[0..24]);
+        assert_eq!(&sorted_indices[24..48], &original_indices[48..72]);
+        assert_eq!(&sorted_indices[48..72], &original_indices[24..48]);
+        assert_eq!(
+            sorted_batches
+                .iter()
+                .map(|batch| batch.index_count)
+                .sum::<u32>(),
+            18
+        );
+        let mut shifted_frame = frame.clone();
+        shifted_frame.mesh_instances.insert(0, mesh_instance(9183, 1));
+        let mut shifted_indices = vec![0xaa; 4];
+        let shifted_batches = mesh_batches_selected_with_sorted_indices(
+            &shifted_frame,
+            &frontend,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+            MeshBatchSelection::CameraSorted,
+            Some(&mut shifted_indices),
+        )
+        .unwrap();
+        assert_eq!(&shifted_indices[4..], sorted_indices.as_slice());
+        assert_eq!(shifted_batches.len(), sorted_batches.len());
+        for (original, shifted) in sorted_batches.iter().zip(&shifted_batches) {
+            assert_eq!(shifted.indices.as_slice(), &[1]);
+            assert_eq!(shifted.index_count, original.index_count);
+            assert_eq!(shifted.key, original.key);
+            assert_eq!(
+                shifted.sorted_index_offset,
+                original.sorted_index_offset.map(|offset| offset + 4)
+            );
+        }
+        assert!(translucent_order::has_direct_template(&frontend.mesh_assets[&9182]));
+        shifted_frame.mesh_instances[1].transform[14] = -6.;
+        let mut moved_indices = Vec::new();
+        let moved_batches = mesh_batches_selected_with_sorted_indices(
+            &shifted_frame,
+            &frontend,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+            MeshBatchSelection::CameraSorted,
+            Some(&mut moved_indices),
+        )
+        .unwrap();
+        assert!(!translucent_order::has_direct_template(&frontend.mesh_assets[&9182]));
+        let mut repeated_indices = Vec::new();
+        let repeated_batches = mesh_batches_selected_with_sorted_indices(
+            &shifted_frame,
+            &frontend,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+            MeshBatchSelection::CameraSorted,
+            Some(&mut repeated_indices),
+        )
+        .unwrap();
+        assert!(translucent_order::has_direct_template(&frontend.mesh_assets[&9182]));
+        assert_eq!(moved_indices, repeated_indices);
+        assert_eq!(moved_batches.len(), repeated_batches.len());
         let page_stream = packed_mesh_draw_stream(
             &frame,
             &frontend,
@@ -72580,6 +73106,30 @@ mod tests {
         assert_eq!(
             moved.iter().map(|b| b.index_offset).collect::<Vec<_>>(),
             vec![0, 24, 48]
+        );
+        let mut moved_sorted_indices = Vec::new();
+        let moved_sorted = mesh_batches_selected_with_sorted_indices(
+            &frame,
+            &frontend,
+            ColorFormat::Bgra8Unorm,
+            RasterYDirection::Up,
+            false,
+            false,
+            MeshBatchSelection::CameraSorted,
+            Some(&mut moved_sorted_indices),
+        )
+        .unwrap();
+        assert_eq!(moved_sorted.len(), 2);
+        assert_eq!(
+            moved_sorted
+                .iter()
+                .map(|b| b.index_count)
+                .collect::<Vec<_>>(),
+            vec![12, 6]
+        );
+        assert_eq!(
+            moved_sorted_indices,
+            frontend.mesh_assets[&9182].index_bytes
         );
         assert_eq!(
             frontend.mesh_assets[&9182].index_bytes,

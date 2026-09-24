@@ -409,6 +409,9 @@ fn backend_capabilities_are_queryable_and_fingerprinted_without_api_tokens() {
     assert!(fingerprint.contains("\"max_color_attachments\":4"));
     assert!(fingerprint.contains("\"texture_3d\":true"));
     assert!(fingerprint.contains("\"max_texture_extent_3d\":2048"));
+    assert!(fingerprint.contains("\"uniform_buffer_offset_alignment\":256"));
+    assert!(fingerprint.contains("\"max_commands_per_list\":8192"));
+    assert!(fingerprint.contains("\"max_dispatch_groups_per_axis\":0"));
     for forbidden in [
         concat!("glow", "::"),
         concat!("ash", "::"),
@@ -1988,6 +1991,22 @@ fn resource_sets_require_complete_arrays_and_explicit_optionality() {
         }),
         super::StatusCode::InvalidArgument,
     );
+    assert_code(
+        gal.create_resource_set(ResourceSetDesc {
+            label: "unaligned-dynamic-offset".to_owned(),
+            layout: dynamic_layout,
+            bindings: vec![ResourceBinding {
+                binding: 0,
+                array_index: 0,
+                resource: first,
+                kind: ResourceBindingKind::UniformBuffer,
+                access: AccessFlags::READ,
+                dynamic_offsets: vec![64],
+                buffer_range: None,
+            }],
+        }),
+        super::StatusCode::InvalidArgument,
+    );
     gal.create_resource_set(ResourceSetDesc {
         label: "dynamic-offset".to_owned(),
         layout: dynamic_layout,
@@ -1997,7 +2016,7 @@ fn resource_sets_require_complete_arrays_and_explicit_optionality() {
             resource: first,
             kind: ResourceBindingKind::UniformBuffer,
             access: AccessFlags::READ,
-            dynamic_offsets: vec![64],
+            dynamic_offsets: vec![256],
             buffer_range: None,
         }],
     })
@@ -4919,6 +4938,7 @@ fn hazard_tracking_still_checks_same_resource_ranges() {
         }),
         super::StatusCode::InvalidArgument,
     );
+
 }
 
 #[test]

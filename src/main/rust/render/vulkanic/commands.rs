@@ -202,6 +202,13 @@ pub enum CommandOp {
         dst: Handle,
         size: u64,
     },
+    CopyBufferRegion {
+        src: Handle,
+        src_offset: u64,
+        dst: Handle,
+        dst_offset: u64,
+        size: u64,
+    },
     CopyBufferToTexture(BufferImageCopyRegion),
     CopyTextureToBuffer(BufferImageCopyRegion),
     CopyTexture(TextureImageCopyRegion),

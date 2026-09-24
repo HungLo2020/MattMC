@@ -481,6 +481,12 @@ fn ensure_geometry_unwritten(
                 data,
             } => *dst == buffer && overlaps(*offset, data.len() as u64),
             CommandOp::CopyBuffer { dst, size, .. } => *dst == buffer && overlaps(0, *size),
+            CommandOp::CopyBufferRegion {
+                dst,
+                dst_offset,
+                size,
+                ..
+            } => *dst == buffer && overlaps(*dst_offset, *size),
             // Conservatively reject texture/programmable writes to this buffer;
             // their potential byte coverage is not the retained host payload.
             CommandOp::CopyTextureToBuffer(region) => region.buffer == buffer,

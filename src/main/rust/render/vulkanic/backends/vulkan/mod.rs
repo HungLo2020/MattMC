@@ -215,6 +215,8 @@ impl Backend for VulkanBackend {
                 .instance
                 .get_physical_device_properties(self.context.physical_device)
         };
+        capabilities.limits.uniform_buffer_offset_alignment =
+            properties.limits.min_uniform_buffer_offset_alignment.max(1);
         capabilities.limits.max_texture_extent_2d = capabilities
             .limits
             .max_texture_extent_2d
@@ -1012,6 +1014,11 @@ mod tests {
             }
         };
         let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+        assert!(gal
+            .capabilities()
+            .limits
+            .uniform_buffer_offset_alignment
+            .is_power_of_two());
         let uniform = gal
             .create_buffer(BufferDesc {
                 label: "dynamic-uniform".to_string(),

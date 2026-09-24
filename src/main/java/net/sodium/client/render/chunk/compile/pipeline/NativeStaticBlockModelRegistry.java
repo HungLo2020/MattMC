@@ -23,7 +23,6 @@ import net.minecraft.util.random.Weighted;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.IronBarsBlock;
-import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.StemBlock;
 import net.minecraft.world.level.block.RedStoneWireBlock;
@@ -266,9 +265,10 @@ public final class NativeStaticBlockModelRegistry {
         if (state.isSolidRender()) {
             flags |= STATE_FLAG_SOLID_RENDER | STATE_FLAG_FULL_OCCLUSION;
         }
-        if (state.getBlock() instanceof LightBlock) {
-            flags |= STATE_FLAG_LIGHT_BLOCK;
-        }
+        // Light blocks have an invisible render shape. Their state and light
+        // remain in the section snapshot for neighboring faces, but they do
+        // not own a terrain quad. Dispatching a zero-area cutout marker here
+        // inflates section geometry and differs from the Java mesh producer.
         if (state.hasBlockEntity()) {
             flags |= STATE_FLAG_BLOCK_ENTITY;
         }

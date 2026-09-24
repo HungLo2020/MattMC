@@ -15,6 +15,8 @@ type Range = (Handle, u64, usize);
 pub(super) struct BufferUploadCapture {
     accepted: BTreeMap<Range, Option<(Vec<u8>, SubmissionId)>>,
     pending: BTreeMap<Range, Option<Vec<u8>>>,
+    pending_host_sources: Vec<(Handle, u64, Vec<u8>)>,
+    pending_host_source_bytes: usize,
 }
 
 impl BufferUploadCapture {
@@ -52,6 +54,8 @@ impl BufferUploadCapture {
             }
         }
         self.pending.clear();
+        self.pending_host_sources.clear();
+        self.pending_host_source_bytes = 0;
     }
     pub(super) fn write(&mut self, buffer: Handle, offset: u64, size: u64) {
         for key in self.accepted.keys() {
@@ -59,9 +63,28 @@ impl BufferUploadCapture {
                 self.pending.insert(*key, None);
             }
         }
+        let mut retained_bytes = 0;
+        self.pending_host_sources.retain(|(source, start, data)| {
+            let keep = *source != buffer
+                || *start >= offset.saturating_add(size)
+                || offset >= start.saturating_add(data.len() as u64);
+            if keep {
+                retained_bytes += data.len();
+            }
+            keep
+        });
+        self.pending_host_source_bytes = retained_bytes;
     }
     pub(super) fn host_write(&mut self, buffer: Handle, offset: u64, bytes: &[u8]) {
         self.write(buffer, offset, bytes.len() as u64);
+        if !self.accepted.is_empty()
+            && bytes.len() <= MAX_BYTES
+            && self.pending_host_source_bytes <= MAX_TOTAL_BYTES.saturating_sub(bytes.len())
+        {
+            self.pending_host_sources
+                .push((buffer, offset, bytes.to_vec()));
+            self.pending_host_source_bytes += bytes.len();
+        }
         let Some(end) = offset.checked_add(bytes.len() as u64) else {
             return;
         };
@@ -71,6 +94,26 @@ impl BufferUploadCapture {
                 let first = (start - offset) as usize;
                 self.pending
                     .insert(*key, Some(bytes[first..first + size].to_vec()));
+            }
+        }
+    }
+    pub(super) fn copy(&mut self, src: Handle, src_offset: u64, dst: Handle, dst_offset: u64, size: u64) {
+        for (&key, _) in &self.accepted {
+            let (watched, start, length) = key;
+            if watched != dst || start < dst_offset
+                || start.saturating_add(length as u64) > dst_offset.saturating_add(size) {
+                continue;
+            }
+            let Some(source_start) = src_offset.checked_add(start - dst_offset) else { continue };
+            let Some(source_end) = source_start.checked_add(length as u64) else { continue };
+            if let Some((_, written_start, data)) = self.pending_host_sources.iter().rev().find(
+                |(handle, written_start, data)| {
+                    *handle == src && *written_start <= source_start
+                        && written_start.saturating_add(data.len() as u64) >= source_end
+                },
+            ) {
+                let first = (source_start - written_start) as usize;
+                self.pending.insert(key, Some(data[first..first + length].to_vec()));
             }
         }
     }
@@ -84,6 +127,8 @@ impl BufferUploadCapture {
     pub(super) fn forget(&mut self, buffer: Handle) {
         self.accepted.retain(|k, _| k.0 != buffer);
         self.pending.retain(|k, _| k.0 != buffer);
+        self.pending_host_sources.retain(|(source, _, _)| *source != buffer);
+        self.pending_host_source_bytes = self.pending_host_sources.iter().map(|(_, _, data)| data.len()).sum();
     }
     pub(super) fn unwatch(&mut self, buffer: Handle, offset: u64, size: usize) {
         self.accepted.remove(&(buffer, offset, size));
@@ -244,6 +289,32 @@ mod tests {
         c.forget(b);
         assert!(c.accepted.is_empty());
         assert!(c.pending.is_empty());
+    }
+    #[test]
+    fn copied_host_bytes_prove_only_the_covered_destination_range() {
+        let src = Handle::NULL;
+        let dst = Handle::new(super::super::handles::HandleKind::Buffer, 1, 1).unwrap();
+        let mut capture = BufferUploadCapture::default();
+        capture.watch(dst, 8, 4).unwrap();
+        capture.begin();
+        capture.host_write(src, 4, &[1, 2, 3, 4, 5, 6]);
+        capture.write(dst, 8, 4);
+        capture.copy(src, 4, dst, 8, 4);
+        capture.accept(SubmissionId(1));
+        assert_eq!(capture.get(dst, 8, 4).unwrap().0, &[1, 2, 3, 4]);
+        capture.begin();
+        capture.host_write(src, 4, &[9, 9]);
+        capture.write(dst, 8, 4);
+        capture.copy(src, 4, dst, 8, 4);
+        capture.accept(SubmissionId(2));
+        assert!(capture.get(dst, 8, 4).is_none());
+        capture.begin();
+        capture.host_write(src, 4, &[1, 2, 3, 4]);
+        capture.write(src, 6, 1); // A GPU write invalidates source proof.
+        capture.write(dst, 8, 4);
+        capture.copy(src, 4, dst, 8, 4);
+        capture.accept(SubmissionId(3));
+        assert!(capture.get(dst, 8, 4).is_none());
     }
     #[test]
     fn small_animated_allocations_share_a_fixed_total_byte_budget() {

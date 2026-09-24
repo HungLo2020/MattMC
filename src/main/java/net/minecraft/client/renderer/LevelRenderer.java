@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.ArrayList;
@@ -175,6 +176,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public ClientLevel level; // Already public
 	private final SectionOcclusionGraph sectionOcclusionGraph = new SectionOcclusionGraph();
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections = new ObjectArrayList<>(10000);
+	private final LongOpenHashSet rustExtractedBlockEntityPositions = new LongOpenHashSet(512);
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> nearbyVisibleSections = new ObjectArrayList<>(50);
 	@Nullable
 	private ViewArea viewArea;
@@ -2836,7 +2838,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 	public void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) { // Made public for Iris shadow rendering
 		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			Set<Long> extractedBlockEntityPositions = Sets.newHashSet();
+			LongOpenHashSet extractedBlockEntityPositions = this.rustExtractedBlockEntityPositions;
+			extractedBlockEntityPositions.clear();
 			PoseStack poseStack = new PoseStack();
 			for (SectionRenderDispatcher.RenderSection section : this.visibleSections) {
 				if (!(section.getSectionMesh() instanceof CompiledSectionMesh compiled)) continue;

@@ -261,6 +261,14 @@ impl OpenGlContext {
         }
     }
 
+    pub(super) fn uniform_buffer_offset_alignment(&self) -> u64 {
+        unsafe {
+            self.gl
+                .get_parameter_i32(glow::UNIFORM_BUFFER_OFFSET_ALIGNMENT)
+                .max(1) as u64
+        }
+    }
+
     pub(super) fn from_existing_context(desc: ExistingOpenGlContextDesc) -> GalResult<Self> {
         if std::thread::current().id() != desc.render_thread {
             return Err(GalError::backend(

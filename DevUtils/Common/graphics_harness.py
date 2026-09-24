@@ -1652,7 +1652,7 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
         materialize_external_dh_fixture(args, run_root / "saves" / world)
         materialize_external_model_fixture(args, run_root / "saves" / world)
         apply_canonical_dh_capture_settings(run_root / "config" / "DistantHorizons.toml", args)
-    if not any(getattr(args, flag, False) for flag in (
+    if not getattr(args, "world_distant_horizons_real_world", False) and not any(getattr(args, flag, False) for flag in (
         "world_distant_horizons_opaque", "world_distant_horizons_non_water",
         "world_distant_horizons_water", "world_distant_horizons_texture_palette",
     )):
@@ -2033,6 +2033,19 @@ def canonical_camera_options(args: argparse.Namespace) -> dict[str, float | str]
             camera["y"] = 160.0
             camera["pitch"] = -90.0
             camera["pose_sequence"] = "cloud-overhead-static-v1"
+    requested_pose = str(getattr(args, "capture_camera_pose", "") or "").strip()
+    if requested_pose:
+        components = requested_pose.split(",")
+        if len(components) != 5:
+            raise ValueError("--capture-camera-pose requires x,y,z,yaw,pitch")
+        try:
+            x, y, z, yaw, pitch = (float(component.strip()) for component in components)
+        except ValueError as error:
+            raise ValueError("--capture-camera-pose requires numeric x,y,z,yaw,pitch") from error
+        if not all(math.isfinite(value) for value in (x, y, z, yaw, pitch)):
+            raise ValueError("--capture-camera-pose values must be finite")
+        camera.update(x=x, y=y, z=z, yaw=yaw, pitch=pitch,
+                      pose_sequence="explicit-static-camera-v1")
     return camera
 
 
@@ -22216,6 +22229,7 @@ def workload_signature(
     shaderpack_text: str,
 ) -> dict[str, object]:
     runtime = frame_runtime_state(frame_doc)
+    dh_composition = dh_composition_settings(capture_dir)
     deterministic_camera = deterministic_camera_signature(deterministic_doc)
     # A capture row's retained image is produced by the deterministic camera,
     # while its optional benchmark deliberately uses a moving workload camera.
@@ -22265,7 +22279,7 @@ def workload_signature(
         "parity_config": normalized_parity_config(mode, meta),
         "dh": dh_state_from_text(combined_logs, meta),
         "config_before": config_snapshot_hash(capture_dir, "config_before"),
-        "dh_composition": dh_composition_settings(capture_dir),
+        "dh_composition": dh_composition,
         "dh_fog": dh_fog_settings(capture_dir),
         "workload_counter_definitions": workload_counter_definitions(),
         "workload_counter_instrumentation": {
@@ -22278,6 +22292,7 @@ def workload_signature(
             ordinary_dh_disabled=(
                 "reason=ordinary-selected-source" in meta.get("forced_dh_enableDistantGeneration", "")
                 or meta.get("forced_dh_ordinary_enableRendering") == "false"
+                or dh_composition.get("rendererMode") == "DISABLED"
             ),
         ),
         "backend_work_counters": backend_work_counter_summary(frame_doc),
@@ -22315,7 +22330,9 @@ def dh_fog_settings(capture_dir: Path) -> dict[str, object]:
     return {"status": "recorded", "enableDhFog": values[0].strip().strip('"')}
 
 
-def vanilla_dh_isolation_evidence(capture_dir: Path, meta: Mapping[str, str]) -> dict[str, object]:
+def vanilla_dh_isolation_evidence(
+    capture_dir: Path, meta: Mapping[str, str], frame_doc: Mapping[str, object] | None = None
+) -> dict[str, object]:
     requested = ("dh-none" in meta.get("parity_fixture_id", "").lower()
                  or meta.get("forced_dh_ordinary_enableRendering") == "false"
                  or "reason=ordinary-selected-source" in meta.get("forced_dh_enableDistantGeneration", ""))
@@ -22324,7 +22341,15 @@ def vanilla_dh_isolation_evidence(capture_dir: Path, meta: Mapping[str, str]) ->
     settings = dh_composition_settings(capture_dir)
     passed = (settings.get("status") == "recorded" and settings.get("rendererMode") == "DISABLED"
               and settings.get("vanillaFadeMode") == "NONE" and settings.get("lodOnlyMode") == "false")
-    return {"requested": True, "passed": passed, "settings": settings}
+    route = frame_doc.get("distantHorizonsRoute", {}) if isinstance(frame_doc, Mapping) else {}
+    executed_instances = route.get("lastExecutedInstances", 0) if isinstance(route, Mapping) else 0
+    visible_columns = route.get("visibleColumns", 0) if isinstance(route, Mapping) else 0
+    if ((isinstance(executed_instances, (int, float)) and executed_instances > 0)
+            or (isinstance(visible_columns, (int, float)) and visible_columns > 0)):
+        passed = False
+    return {"requested": True, "passed": passed, "settings": settings,
+            "last_executed_instances": executed_instances,
+            "visible_columns": visible_columns}
 
 
 def normalized_parity_config(mode: ModeSpec, meta: Mapping[str, str]) -> dict[str, object]:
@@ -32870,9 +32895,9 @@ def normalize_capture_artifact(
             "title-screen capture retained its bounded desktop screenshot after a non-TitleScreen log state; "
             "the observed screen is diagnostic only because startup logs can lag the presented frame"
         )
-    dh_isolation = vanilla_dh_isolation_evidence(capture_dir, effective_meta)
+    dh_isolation = vanilla_dh_isolation_evidence(capture_dir, effective_meta, frame_doc)
     if not dh_isolation["passed"]:
-        validation_messages.append("vanilla fixture lacks verified DH renderer/fade isolation")
+        validation_messages.append("vanilla fixture lacks verified DH renderer/fade/execution isolation")
     common_complete = (
         bool(files["meta"])
         and dh_isolation["passed"]
@@ -36146,6 +36171,19 @@ def build_capture_command(
         settled_static_ready_max_wait_frames = 900 if args.profile == "extended" else 300
     else:
         settled_static_ready_max_wait_frames = world_profile.deterministic_ready_max_wait_frames
+    explicit_ready_wait = [
+        value.partition("=")[2]
+        for value in (getattr(args, "jvm_arg", []) or [])
+        if value.startswith("-Dmattmc.dev.deterministicCameraCapture.settledReadyMaxWaitFrames=")
+    ]
+    if explicit_ready_wait:
+        try:
+            requested_ready_wait = int(explicit_ready_wait[-1])
+        except ValueError as exc:
+            raise SystemExit("settledReadyMaxWaitFrames JVM argument must be an integer") from exc
+        if not 1 <= requested_ready_wait <= 12000:
+            raise SystemExit("settledReadyMaxWaitFrames JVM argument must be within 1..12000")
+        settled_static_ready_max_wait_frames = requested_ready_wait
     # A cloud/weather/particle-only capture has no producer-specific terrain
     # quiescence contract. Leaving the migration-gate's sodium-terrain
     # readiness family enabled would make these fixtures wait forever while
@@ -36748,6 +36786,13 @@ def build_capture_command(
     env["MATTMC_CAPTURE_DH_LOD_ONLY"] = (
         "true" if dh_composition_mode == "LOD_ONLY" else "false"
     )
+    if (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette) and (
+        tool_kind in {"capture", "gameplay"}
+        and os.environ.get("MATTMC_CAPTURE_DH_DISABLE_FOG", "false").strip().lower() != "true"
+    ):
+        # Current's isolated launcher otherwise disables DH fog while the
+        # Frozen child retains the copied fixture's enabled fog setting.
+        env["MATTMC_CAPTURE_DH_KEEP_FOG"] = "true"
     if dh_real_world and tool_kind != "gameplay" and not (dh_opaque_only or dh_non_water or dh_water):
         raise ValueError("--world-distant-horizons-real-world requires an explicit DH stream")
     if dh_real_world and tool_kind == "gameplay" and mode.backend == "rust-vulkan" and not (
@@ -36838,7 +36883,6 @@ def build_capture_command(
     )
     ordinary_vanilla_run = (
         tool_kind in {"capture", "gameplay", "subsystem"}
-        and args.world == "Origin"
         and not dh_real_world
         and not (dh_opaque_only or dh_non_water or dh_water or dh_texture_palette)
     )
@@ -36992,15 +37036,16 @@ def build_capture_command(
             # same copied source save. Vulkan rows never receive this flag.
             java_options.append("-Dmattmc.dev.rustGalDistantHorizons.legacyControl=true")
         if mode.backend == "rust-vulkan":
-            java_options.extend(
-                [
-                    "-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true",
-                    # Do not begin gameplay measurement on pre-DH frames. The
-                    # asynchronous section build must first publish an
-                    # executed Rust DH receipt, preserving the route gate.
-                    "-Dmattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution=true",
-                ]
-            )
+            # Gameplay measures the normal Rust-owned reduced-color route.
+            # semanticCapture retains exact-material provenance and copied
+            # execution snapshots solely for capture diagnostics; forcing it
+            # in a performance row adds work that RunDev does not perform.
+            if tool_kind == "capture":
+                java_options.append("-Dmattmc.dev.rustGalDistantHorizons.semanticCapture=true")
+            # Do not begin gameplay measurement on pre-DH frames. The
+            # asynchronous section build must first publish an executed Rust
+            # DH receipt, preserving the route gate without capture mode.
+            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution=true")
             if tool_kind == "capture":
                 # Capture rows retain rejected-preflight diagnostics. Clean
                 # gameplay benchmarks use the route and readiness receipt
@@ -38279,11 +38324,24 @@ def build_capture_command(
             # The Java benchmark owns the measured camera path.  Keep this
             # explicit so a moving workload cannot silently fall back to the
             # fixed pose used by settled-static rows.
-            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.cameraPathType=moving-camera")
-            java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.35")
+            for property_name, default_value in (
+                ("cameraPathType", "moving-camera"),
+                ("yawDelta", "0.35"),
+            ):
+                property_prefix = f"-Dmattmc.dev.graphicsFrameBenchmark.{property_name}="
+                if not any(
+                    value.startswith(property_prefix)
+                    for value in (getattr(args, "jvm_arg", []) or [])
+                ):
+                    java_options.append(f"{property_prefix}{default_value}")
         elif workload_profile == "settled-static":
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.cameraPathType=fixed-static-terrain")
             java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.yawDelta=0.0")
+            if mode.backend == "rust-vulkan" and dh_real_world:
+                # A drained vanilla terrain queue does not imply that the
+                # independent DH semantic column stream has stopped publishing.
+                # Require a quiet DH window for a settled performance sample.
+                java_options.append("-Dmattmc.dev.graphicsFrameBenchmark.requireDhQuiescence=true")
         if (
             mode.backend == "rust-vulkan"
             and workload_profile in {"settled-static", "moving-camera"}
@@ -39279,16 +39337,12 @@ def run_mode(
     managed_run_root = output_path.parent
     retention_policy = getattr(args, "_retention_policy", None)
     # A cross-repository matrix can only compare the two deterministic capture
-    # rows after *both* have completed.  Retention normally runs after every
-    # row, but a zero-success retention policy would otherwise erase the
-    # Frozen capture before the Current capture exists and make a matrix report
-    # a misleading successful `pair_count: 0`.  Keep only capture evidence
-    # through matrix aggregation; gameplay and subsystem rows retain their
-    # ordinary eager cleanup, and the invocation-level cleanup below releases
-    # these two rows immediately after the comparison is written.
+    # rows after *both* have completed. Retention normally runs after every
+    # row, but can erase the first heavy gameplay row before aggregate_matrix
+    # sees it, yielding a misleading one-row comparison. Protect every
+    # multi-mode invocation until aggregation, then restore normal retention.
     defer_matrix_capture_retention = (
-        args.tool == "matrix"
-        and tool_kind == "capture"
+        len(selected_modes(args)) > 1
         and not getattr(args, "artifact_preserve", False)
     )
     emit_matrix_progress(args, row_label, "preflight-started", f"target={target.name}")
@@ -39997,7 +40051,12 @@ def aggregate_matrix(artifact_paths: Iterable[Path]) -> dict[str, object]:
         if reference is None:
             references[reference_key] = artifact
         else:
-            comparison = compare_workloads(reference, artifact)
+            reference_repo = reference.get("repository") if isinstance(reference.get("repository"), dict) else {}
+            artifact_repo = artifact.get("repository") if isinstance(artifact.get("repository"), dict) else {}
+            comparison = compare_workloads(
+                reference, artifact,
+                cross_repository=reference_repo.get("target") != artifact_repo.get("target"),
+            )
             if not comparison["comparable"]:
                 rejections.append({"mode": artifact.get("mode", {}).get("name") if isinstance(artifact.get("mode"), dict) else "unknown", **comparison})
         frame = artifact["metrics"]["frame_time_ms"] if isinstance(artifact.get("metrics"), dict) else {}
@@ -40214,6 +40273,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         subparser.add_argument("--frozen-repo")
         subparser.add_argument("--artifact-root", type=Path, help="Managed root for generated graphics-audit artifacts.")
         subparser.add_argument("--artifact-dir", type=Path)
+        subparser.add_argument("--capture-camera-pose", default="",
+                               help="Deterministic copied-world capture pose as x,y,z,yaw,pitch.")
         subparser.add_argument("--artifact-preserve", action="store_true", help="Opt out of automatic retention cleanup for this run.")
         subparser.add_argument("--artifact-preserve-current-run", action="store_true", help="Keep this run's extracted evidence while still cleaning managed temporary game dirs.")
         subparser.add_argument("--artifact-global-limit-mb", type=int)
@@ -41759,7 +41820,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     }
     manifest_path = artifact_root / MANIFEST_NAME
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    if args.tool == "matrix" and not args.artifact_preserve:
+    if len(modes_to_run) > 1 and not args.artifact_preserve:
         # `run_mode` protects capture rows while their opposite-repository
         # counterpart is still pending. Their only consumer has now written
         # the comparison reports, so restore the caller's normal retention

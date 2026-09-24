@@ -875,6 +875,9 @@ pub(crate) fn serialize_command_op(out: &mut Vec<u8>, op: &CommandOp) {
             push_u64(out, dst.raw());
             push_u64(out, *size);
         }
+        CommandOp::CopyBufferRegion { .. } => unreachable!(
+            "offset buffer copies are Rust-owned resource uploads, not Java FFI submission commands"
+        ),
         CommandOp::CopyBufferToTexture(region) => {
             push_u32(out, FfiCommandOpKind::CopyBufferToTexture as u32);
             serialize_copy_region(out, region);

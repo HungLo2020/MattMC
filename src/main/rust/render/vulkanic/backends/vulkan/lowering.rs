@@ -74,9 +74,9 @@ pub(super) struct SubmissionLowerer {
 }
 
 const GPU_TIMESTAMP_SET_COUNT: u32 = 8;
-const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 18;
+const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 20;
 const PIPELINE_STATISTICS_SET_COUNT: u32 = 8;
-const PIPELINE_STATISTICS_PASS_QUERY_COUNT: u32 = 8;
+const PIPELINE_STATISTICS_PASS_QUERY_COUNT: u32 = 12;
 const PIPELINE_STATISTICS_QUERIES_PER_SET: u32 = PIPELINE_STATISTICS_PASS_QUERY_COUNT;
 // Keep only core stages enabled by this renderer. Geometry and tessellation
 // statistics require their respective optional shader features on some
@@ -109,7 +109,9 @@ enum GpuTimestampQuery {
     FinalOutputEnd = 14,
     DistantHorizonsOpaqueStart = 15,
     DistantHorizonsOpaqueEnd = 16,
-    FrameEnd = 17,
+    DistantHorizonsTransparentSharedStart = 17,
+    DistantHorizonsTransparentSharedEnd = 18,
+    FrameEnd = 19,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -151,6 +153,7 @@ struct GpuTimestampResult {
     composite1_nanos: u64,
     final_output_nanos: u64,
     distant_horizons_opaque_nanos: u64,
+    distant_horizons_transparent_shared_nanos: u64,
     frame_total_nanos: u64,
 }
 
@@ -164,6 +167,15 @@ enum TimestampPassKind {
     Composite1,
     FinalOutput,
     DistantHorizonsOpaque,
+    DistantHorizonsTransparentShared,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PipelineStatisticsPassKind {
+    Timestamped(TimestampPassKind),
+    DistantHorizonsTransparentSide,
+    DistantHorizonsTransparentUp,
+    DistantHorizonsWater,
 }
 
 impl TimestampPassKind {
@@ -177,6 +189,8 @@ impl TimestampPassKind {
             Self::Composite1 => GpuTimestampQuery::Composite1Start,
             Self::FinalOutput => GpuTimestampQuery::FinalOutputStart,
             Self::DistantHorizonsOpaque => GpuTimestampQuery::DistantHorizonsOpaqueStart,
+            Self::DistantHorizonsTransparentShared =>
+                GpuTimestampQuery::DistantHorizonsTransparentSharedStart,
         }
     }
 
@@ -190,20 +204,26 @@ impl TimestampPassKind {
             Self::Composite1 => GpuTimestampQuery::Composite1End,
             Self::FinalOutput => GpuTimestampQuery::FinalOutputEnd,
             Self::DistantHorizonsOpaque => GpuTimestampQuery::DistantHorizonsOpaqueEnd,
+            Self::DistantHorizonsTransparentShared =>
+                GpuTimestampQuery::DistantHorizonsTransparentSharedEnd,
         }
     }
 }
 
-fn pipeline_statistics_kind_code(kind: TimestampPassKind) -> u8 {
+fn pipeline_statistics_kind_code(kind: PipelineStatisticsPassKind) -> u8 {
     match kind {
-        TimestampPassKind::ShadowDepth => 0,
-        TimestampPassKind::TerrainOpaque => 1,
-        TimestampPassKind::TerrainCutout => 2,
-        TimestampPassKind::DeferredLighting => 3,
-        TimestampPassKind::Composite0 => 4,
-        TimestampPassKind::Composite1 => 5,
-        TimestampPassKind::FinalOutput => 6,
-        TimestampPassKind::DistantHorizonsOpaque => 7,
+        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::ShadowDepth) => 0,
+        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::TerrainOpaque) => 1,
+        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::TerrainCutout) => 2,
+        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::DeferredLighting) => 3,
+        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::Composite0) => 4,
+        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::Composite1) => 5,
+        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::FinalOutput) => 6,
+        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::DistantHorizonsOpaque) => 7,
+        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::DistantHorizonsTransparentShared) => 11,
+        PipelineStatisticsPassKind::DistantHorizonsTransparentSide => 8,
+        PipelineStatisticsPassKind::DistantHorizonsTransparentUp => 9,
+        PipelineStatisticsPassKind::DistantHorizonsWater => 10,
     }
 }
 
@@ -217,6 +237,12 @@ fn pipeline_statistics_kind_name(code: u8) -> &'static str {
         5 => "composite-1",
         6 => "final-output",
         7 => "distant-horizons-opaque",
+        8 => "distant-horizons-transparent-side",
+        // The no-shader Frozen-compatible route deliberately reuses this
+        // pipeline for side, up, and water buckets under one raster policy.
+        9 => "distant-horizons-transparent-up-or-shared",
+        10 => "distant-horizons-water",
+        11 => "distant-horizons-transparent-shared-timestamped",
         _ => "unknown",
     }
 }
@@ -976,7 +1002,7 @@ impl SubmissionLowerer {
         &self,
         command_buffer: vk::CommandBuffer,
         state: &mut EncodingState,
-        next: Option<TimestampPassKind>,
+        next: Option<PipelineStatisticsPassKind>,
     ) {
         if pipeline_statistics_mode() == PipelineStatisticsMode::Disabled
             || state.current_pipeline_statistics_kind == next
@@ -1455,7 +1481,11 @@ impl SubmissionLowerer {
                     // to begin after vkCmdBeginRendering and end before
                     // vkCmdEndRendering. Timestamp writes remain outside the
                     // render pass and are intentionally handled separately.
-                    self.switch_pipeline_statistics_pass(command_buffer, state, timestamp_pass);
+                    self.switch_pipeline_statistics_pass(
+                        command_buffer,
+                        state,
+                        timestamp_pass.map(PipelineStatisticsPassKind::Timestamped),
+                    );
                     state.in_pass = true;
                     state.provoking_vertex = None;
                     state.frame_present = frame_present;
@@ -1525,7 +1555,7 @@ impl SubmissionLowerer {
                     self.switch_pipeline_statistics_pass(
                         command_buffer,
                         state,
-                        timestamp_pipeline_kind(&pipeline.label),
+                        pipeline_statistics_pipeline_kind(&pipeline.label),
                     );
                     if let Some(pipeline_timestamp_pass) = timestamp_pipeline_kind(&pipeline.label)
                     {
@@ -1717,13 +1747,27 @@ impl SubmissionLowerer {
                         *offset,
                     );
                 }
-                CommandOp::CopyBuffer { src, dst, size } => {
+                CommandOp::CopyBuffer { src, dst, size }
+                | CommandOp::CopyBufferRegion {
+                    src,
+                    dst,
+                    size,
+                    ..
+                } => {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-buffer");
                     let src = objects.buffer(*src)?;
                     let dst = objects.buffer(*dst)?;
+                    let (src_offset, dst_offset) = match op {
+                        CommandOp::CopyBufferRegion {
+                            src_offset,
+                            dst_offset,
+                            ..
+                        } => (*src_offset, *dst_offset),
+                        _ => (0, 0),
+                    };
                     let region = vk::BufferCopy {
-                        src_offset: 0,
-                        dst_offset: 0,
+                        src_offset,
+                        dst_offset,
                         size: *size,
                     };
                     self.context.device.cmd_copy_buffer(
@@ -2285,6 +2329,25 @@ impl SubmissionLowerer {
             // presentation submission. Consumers can therefore avoid sampling
             // the same retired frame again while newer GPU work is in flight.
             result.status = complete.id.0;
+            if matches!(
+                std::env::var("MATTMC_RUST_VULKAN_DH_PASS_TIMESTAMPS").as_deref(),
+                Ok("1" | "true" | "TRUE")
+            ) {
+                println!(
+                    "vulkan.dh-pass-timestamps submission={} opaque_nanos={} transparent_shared_nanos={} frame_total_nanos={}",
+                    complete.id.0,
+                    result.distant_horizons_opaque_nanos,
+                    result.distant_horizons_transparent_shared_nanos,
+                    result.frame_total_nanos,
+                );
+                if result.distant_horizons_opaque_nanos > 0 {
+                    println!(
+                        "vulkan.gpu-query-values submission={} timestamp_period={} values={values:?} ready={ready:?}",
+                        complete.id.0,
+                        self.context.timestamp_period,
+                    );
+                }
+            }
         }
         self.apply_gpu_timestamp_result(result);
     }
@@ -2509,6 +2572,8 @@ fn timestamp_pipeline_kind(label: &str) -> Option<TimestampPassKind> {
     let label = label.trim();
     if label.contains("world-lod-forward-opaque") {
         Some(TimestampPassKind::DistantHorizonsOpaque)
+    } else if label.contains("world-lod-transparent-up") {
+        Some(TimestampPassKind::DistantHorizonsTransparentShared)
     } else if label.contains("shadow_depth") || label.contains("shadow-pipeline") {
         Some(TimestampPassKind::ShadowDepth)
     } else if label.contains("terrain_opaque")
@@ -2529,6 +2594,18 @@ fn timestamp_pipeline_kind(label: &str) -> Option<TimestampPassKind> {
         Some(TimestampPassKind::FinalOutput)
     } else {
         None
+    }
+}
+
+fn pipeline_statistics_pipeline_kind(label: &str) -> Option<PipelineStatisticsPassKind> {
+    if label.contains("world-lod-transparent-side") {
+        Some(PipelineStatisticsPassKind::DistantHorizonsTransparentSide)
+    } else if label.contains("world-lod-transparent-up") {
+        Some(PipelineStatisticsPassKind::DistantHorizonsTransparentUp)
+    } else if label.contains("world-lod-water-surface") {
+        Some(PipelineStatisticsPassKind::DistantHorizonsWater)
+    } else {
+        timestamp_pipeline_kind(label).map(PipelineStatisticsPassKind::Timestamped)
     }
 }
 
@@ -2630,6 +2707,13 @@ fn decode_gpu_timestamp_result(
             ready,
             GpuTimestampQuery::DistantHorizonsOpaqueStart,
             GpuTimestampQuery::DistantHorizonsOpaqueEnd,
+            timestamp_period,
+        ),
+        distant_horizons_transparent_shared_nanos: ready_delta(
+            values,
+            ready,
+            GpuTimestampQuery::DistantHorizonsTransparentSharedStart,
+            GpuTimestampQuery::DistantHorizonsTransparentSharedEnd,
             timestamp_period,
         ),
         frame_total_nanos: frame_total,
@@ -2893,6 +2977,35 @@ mod timestamp_tests {
             Some(TimestampPassKind::DistantHorizonsOpaque),
             timestamp_pipeline_kind("world-lod-forward-opaque.pipeline")
         );
+        for (label, kind, code) in [
+            (
+                "world-lod-transparent-side.pipeline",
+                PipelineStatisticsPassKind::DistantHorizonsTransparentSide,
+                8,
+            ),
+            (
+                "world-lod-transparent-up.pipeline",
+                PipelineStatisticsPassKind::DistantHorizonsTransparentUp,
+                9,
+            ),
+            (
+                "world-lod-water-surface.pipeline",
+                PipelineStatisticsPassKind::DistantHorizonsWater,
+                10,
+            ),
+        ] {
+            assert_eq!(
+                if label.contains("transparent-up") {
+                    Some(TimestampPassKind::DistantHorizonsTransparentShared)
+                } else {
+                    None
+                },
+                timestamp_pipeline_kind(label)
+            );
+            assert_eq!(Some(kind), pipeline_statistics_pipeline_kind(label));
+            assert_ne!("unknown", pipeline_statistics_kind_name(code));
+            assert_eq!(code, pipeline_statistics_kind_code(kind));
+        }
     }
 
     #[test]
@@ -2904,17 +3017,22 @@ mod timestamp_tests {
         values[GpuTimestampQuery::ShadowDepthEnd as usize] = 18;
         values[GpuTimestampQuery::DistantHorizonsOpaqueStart as usize] = 19;
         values[GpuTimestampQuery::DistantHorizonsOpaqueEnd as usize] = 27;
+        values[GpuTimestampQuery::DistantHorizonsTransparentSharedStart as usize] = 27;
+        values[GpuTimestampQuery::DistantHorizonsTransparentSharedEnd as usize] = 29;
         values[GpuTimestampQuery::FrameEnd as usize] = 30;
         ready[GpuTimestampQuery::FrameStart as usize] = true;
         ready[GpuTimestampQuery::ShadowDepthStart as usize] = true;
         ready[GpuTimestampQuery::ShadowDepthEnd as usize] = true;
         ready[GpuTimestampQuery::DistantHorizonsOpaqueStart as usize] = true;
         ready[GpuTimestampQuery::DistantHorizonsOpaqueEnd as usize] = true;
+        ready[GpuTimestampQuery::DistantHorizonsTransparentSharedStart as usize] = true;
+        ready[GpuTimestampQuery::DistantHorizonsTransparentSharedEnd as usize] = true;
         ready[GpuTimestampQuery::FrameEnd as usize] = true;
         let result = decode_gpu_timestamp_result(&values, &ready, 2.0);
         assert_eq!(1, result.status);
         assert_eq!(12, result.shadow_depth_nanos);
         assert_eq!(16, result.distant_horizons_opaque_nanos);
+        assert_eq!(4, result.distant_horizons_transparent_shared_nanos);
         assert_eq!(40, result.frame_total_nanos);
         assert_eq!(0, result.terrain_opaque_nanos);
     }
@@ -3114,7 +3232,7 @@ struct EncodingState {
     pipeline_statistics_set: PipelineStatisticsSet,
     current_timestamp_pass: Option<TimestampPassKind>,
     current_pipeline_statistics_pass: Option<u32>,
-    current_pipeline_statistics_kind: Option<TimestampPassKind>,
+    current_pipeline_statistics_kind: Option<PipelineStatisticsPassKind>,
 }
 
 struct FramePresentTransition {
@@ -3533,7 +3651,7 @@ fn command_op_kind(op: &CommandOp) -> &'static str {
         CommandOp::DrawIndexedIndirect { .. } => "DrawIndexedIndirect",
         CommandOp::Dispatch { .. } => "Dispatch",
         CommandOp::DispatchIndirect { .. } => "DispatchIndirect",
-        CommandOp::CopyBuffer { .. } => "CopyBuffer",
+        CommandOp::CopyBuffer { .. } | CommandOp::CopyBufferRegion { .. } => "CopyBuffer",
         CommandOp::CopyBufferToTexture(_) => "CopyBufferToTexture",
         CommandOp::CopyTextureToBuffer(_) => "CopyTextureToBuffer",
         CommandOp::CopyTexture(_) => "CopyTexture",

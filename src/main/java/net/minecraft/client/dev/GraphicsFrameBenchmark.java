@@ -70,8 +70,16 @@ public final class GraphicsFrameBenchmark {
 	private static final long READINESS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(Math.max(1L, Long.getLong("mattmc.dev.graphicsFrameBenchmark.readinessTimeoutSeconds", 120L)));
 	private static final boolean REQUIRE_DH_EXECUTION =
 		Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.requireDistantHorizonsExecution");
+	private static final boolean DH_CHURN_COUNTERS =
+		Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.dhChurnCounters");
+	private static final boolean REQUIRE_DH_QUIESCENCE =
+		Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.requireDhQuiescence");
+	private static final int DH_QUIESCENCE_STABLE_FRAMES = Math.max(1,
+		Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.dhQuiescenceStableFrames", 8));
 	private static final int MIN_DH_VISIBLE_COLUMNS = Math.max(1,
 		Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.minDistantHorizonsVisibleColumns", 1));
+	private static final int EXPECTED_DH_VISIBLE_COLUMNS =
+		Integer.getInteger("mattmc.dev.graphicsFrameBenchmark.expectedDistantHorizonsVisibleColumns", -1);
 	/**
 	 * A DH gameplay sample is not steady-state while the independent vanilla
 	 * terrain source is still ingesting section builds.  Keep this gate opt-out
@@ -207,6 +215,20 @@ public final class GraphicsFrameBenchmark {
 	private static long producerWorkloadStartNanos = -1L;
 	private static long producerWorkloadWaitFrames;
 	private static long terrainQueueDrainStableFrames;
+	private static long dhQuiescenceStableFrames;
+	private static long dhQuiescenceLastColumnsBuilt = -1L;
+	private static int dhQuiescenceLastVisibleColumns = -1;
+	private static int dhQuiescenceLastOpaqueSegments = -1;
+	private static int dhQuiescenceLastTransparentSegments = -1;
+	private static int dhQuiescenceLastWaterSegments = -1;
+	private static long dhMeasurementColumnsBuiltAtStart = -1L;
+	private static int dhMeasurementVisibleColumnsAtStart = -1;
+	private static int dhMeasurementOpaqueSegmentsAtStart = -1;
+	private static int dhMeasurementTransparentSegmentsAtStart = -1;
+	private static int dhMeasurementWaterSegmentsAtStart = -1;
+	private static long lastDhSemanticColumnsBuilt = -1L;
+	private static long lastDhSemanticColumnsReused = -1L;
+	private static long lastDhSemanticColumnsReplaced = -1L;
 	private static long staticTerrainSteadyFrames;
 	private static long staticTerrainLastActiveLayers = Long.MIN_VALUE;
 	private static long staticTerrainLastActiveSectionAssets = Long.MIN_VALUE;
@@ -425,6 +447,15 @@ public final class GraphicsFrameBenchmark {
 		measurementFrame = framesAfterSettle >= WARMUP_FRAMES
 			&& FRAME_NANOS.size() < MEASURE_FRAMES
 			&& !DeterministicCameraCapture.isAwaitingCompletion();
+		if (measurementFrame && REQUIRE_DH_QUIESCENCE) {
+			DistantHorizonsSemanticCollector.RouteDiagnostics route =
+				DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+			dhMeasurementColumnsBuiltAtStart = route.semanticColumnsBuilt();
+			dhMeasurementVisibleColumnsAtStart = route.visibleColumns();
+			dhMeasurementOpaqueSegmentsAtStart = route.opaqueSegments();
+			dhMeasurementTransparentSegmentsAtStart = route.transparentSegments();
+			dhMeasurementWaterSegmentsAtStart = route.waterSegments();
+		}
 		if (measurementFrame && FRAME_NANOS.isEmpty()) {
 			measurementStartNanos = System.nanoTime();
 			displayedFpsAtMeasurementStart = minecraft.getFps();
@@ -461,6 +492,10 @@ public final class GraphicsFrameBenchmark {
 		EXCLUSIVE_PHASES.clear();
 		NESTED_PHASES.clear();
 		COUNTER_SAMPLES.clear();
+		lastDhSemanticColumnsBuilt = -1L;
+		lastDhSemanticColumnsReused = -1L;
+		lastDhSemanticColumnsReplaced = -1L;
+		dhMeasurementColumnsBuiltAtStart = -1L;
 		FRAME_TIMELINE_EVENTS.clear();
 		renderedMeasurementFrames = 0L;
 		measurementStartNanos = -1L;
@@ -514,6 +549,19 @@ public final class GraphicsFrameBenchmark {
 			}
 		}
 		if (measurementFrame) {
+			DistantHorizonsSemanticCollector.RouteDiagnostics route = REQUIRE_DH_QUIESCENCE
+				? DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot() : null;
+			if (route != null && (route.semanticColumnsBuilt() != dhMeasurementColumnsBuiltAtStart
+				|| route.visibleColumns() != dhMeasurementVisibleColumnsAtStart
+				|| route.opaqueSegments() != dhMeasurementOpaqueSegmentsAtStart
+				|| route.transparentSegments() != dhMeasurementTransparentSegmentsAtStart
+				|| route.waterSegments() != dhMeasurementWaterSegmentsAtStart)) {
+				lastProducerWorkloadBlocker = "dh-semantic-publication-post-frame";
+				restartMeasurementAfterReadinessLoss();
+				measurementFrame = false;
+			}
+		}
+		if (measurementFrame) {
 			if ("steady-state-performance".equals(STATIC_TERRAIN_SCENARIO)
 				&& !RustGalTerrainRenderer.staticTerrainExecutionSnapshot()
 					.executedAfter(staticTerrainMeasurementSubmissionBaseline)) {
@@ -527,6 +575,9 @@ public final class GraphicsFrameBenchmark {
 			renderedMeasurementFrames++;
 			FRAME_NANOS.add(frameNanos);
 			recordFrameAllocationAndGcSamples();
+			if (DH_CHURN_COUNTERS) {
+				recordDhSemanticBuildSamples();
+			}
 			long sampleNanos = System.nanoTime();
 			if (firstSampleNanos < 0L) {
 				firstSampleNanos = sampleNanos;
@@ -588,6 +639,27 @@ public final class GraphicsFrameBenchmark {
 		if (frameGcTimeAtStart >= 0L && gcTimeAtFrameEnd >= frameGcTimeAtStart) {
 			recordPhaseSample("java.gc.time-nanos", (gcTimeAtFrameEnd - frameGcTimeAtStart) * 1_000_000L);
 		}
+	}
+
+	private static void recordDhSemanticBuildSamples() {
+		DistantHorizonsSemanticCollector.RouteDiagnostics route =
+			DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+		recordCounterSample("world.distant-horizons.visible-columns", route.visibleColumns());
+		recordCounterSample("world.distant-horizons.opaque-segments", route.opaqueSegments());
+		recordCounterSample("world.distant-horizons.transparent-segments", route.transparentSegments());
+		recordCounterSample("world.distant-horizons.water-segments", route.waterSegments());
+		recordCounterSample("world.distant-horizons.executed-instances", route.lastExecutedInstances());
+		if (lastDhSemanticColumnsBuilt >= 0L) {
+			recordCounterSample("world.distant-horizons.semantic-columns-built",
+				Math.max(0L, route.semanticColumnsBuilt() - lastDhSemanticColumnsBuilt));
+			recordCounterSample("world.distant-horizons.semantic-columns-reused",
+				Math.max(0L, route.semanticColumnsReused() - lastDhSemanticColumnsReused));
+			recordCounterSample("world.distant-horizons.semantic-columns-replaced",
+				Math.max(0L, route.semanticColumnsReplaced() - lastDhSemanticColumnsReplaced));
+		}
+		lastDhSemanticColumnsBuilt = route.semanticColumnsBuilt();
+		lastDhSemanticColumnsReused = route.semanticColumnsReused();
+		lastDhSemanticColumnsReplaced = route.semanticColumnsReplaced();
 	}
 
 	public static void beginPhase(String name) {
@@ -860,9 +932,13 @@ public final class GraphicsFrameBenchmark {
 		float yaw;
 		if ("settled-sine-yaw".equals(CAMERA_PATH_TYPE)) {
 			double period = Math.max(1.0, WARMUP_FRAMES + MEASURE_FRAMES);
-			yaw = initialYaw + (float)Math.sin((frameIndex / period) * Math.PI * 2.0) * CAMERA_YAW_DELTA;
+			long pathFrame = settledFrameIndex < 0L ? 0L : frameIndex - settledFrameIndex;
+			yaw = initialYaw + (float)Math.sin((pathFrame / period) * Math.PI * 2.0) * CAMERA_YAW_DELTA;
 		} else {
-			yaw = initialYaw + frameIndex * CAMERA_YAW_DELTA;
+			// Keep the initial DH/terrain view fixed while producers settle. The
+			// moving path starts only after both routes enter their warmup window.
+			long pathFrame = settledFrameIndex < 0L ? 0L : frameIndex - settledFrameIndex;
+			yaw = initialYaw + pathFrame * CAMERA_YAW_DELTA;
 		}
 		minecraft.player.setYRot(yaw);
 		minecraft.player.yRotO = yaw;
@@ -879,6 +955,14 @@ public final class GraphicsFrameBenchmark {
 			return;
 		}
 		String screen = minecraft.screen.getClass().getSimpleName();
+		if ("DeathScreen".equals(screen)
+			&& Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.recoverDeathScreen")) {
+			lastReadinessBlocker = "respawning copied benchmark fixture";
+			minecraft.player.respawn();
+			minecraft.setScreen(null);
+			writeStatus(minecraft, "respawning_benchmark_fixture");
+			return;
+		}
 		if ("PauseScreen".equals(screen) || "GuiWelcomeScreen".equals(screen) || isStaleStartupScreen(minecraft)) {
 			lastReadinessBlocker = "auto-dismissed screen=" + screen;
 			minecraft.setScreen(null);
@@ -958,6 +1042,31 @@ public final class GraphicsFrameBenchmark {
 					+ TERRAIN_QUEUE_DRAIN_STABLE_FRAMES + ")");
 			}
 		}
+		if (REQUIRE_DH_QUIESCENCE) {
+			DistantHorizonsSemanticCollector.RouteDiagnostics route =
+				DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+			long built = route.semanticColumnsBuilt();
+			if (built == dhQuiescenceLastColumnsBuilt
+				&& route.visibleColumns() == dhQuiescenceLastVisibleColumns
+				&& route.opaqueSegments() == dhQuiescenceLastOpaqueSegments
+				&& route.transparentSegments() == dhQuiescenceLastTransparentSegments
+				&& route.waterSegments() == dhQuiescenceLastWaterSegments
+				&& route.visibleColumns() > 0
+				&& route.semanticUnpublishedCandidates() == 0) {
+				dhQuiescenceStableFrames++;
+			} else {
+				dhQuiescenceStableFrames = 0L;
+			}
+			dhQuiescenceLastColumnsBuilt = built;
+			dhQuiescenceLastVisibleColumns = route.visibleColumns();
+			dhQuiescenceLastOpaqueSegments = route.opaqueSegments();
+			dhQuiescenceLastTransparentSegments = route.transparentSegments();
+			dhQuiescenceLastWaterSegments = route.waterSegments();
+			if (dhQuiescenceStableFrames < DH_QUIESCENCE_STABLE_FRAMES) {
+				missing.add("dh-semantic-quiescence(" + dhQuiescenceStableFrames + "/"
+					+ DH_QUIESCENCE_STABLE_FRAMES + ")");
+			}
+		}
 		if (missing.isEmpty()) {
 			lastProducerWorkloadBlocker = "ready";
 			return true;
@@ -991,6 +1100,11 @@ public final class GraphicsFrameBenchmark {
 		if (REQUIRE_DH_EXECUTION) {
 			DistantHorizonsSemanticCollector.RouteDiagnostics route =
 				DistantHorizonsSemanticCollector.routeDiagnosticsSnapshot();
+			if (EXPECTED_DH_VISIBLE_COLUMNS >= 0
+				&& route.visibleColumns() != EXPECTED_DH_VISIBLE_COLUMNS) {
+				missing.add("distant-horizons-expected-visible-columns=" + route.visibleColumns()
+					+ "/" + EXPECTED_DH_VISIBLE_COLUMNS);
+			}
 			if (route.visibleColumns() < MIN_DH_VISIBLE_COLUMNS) {
 				missing.add("distant-horizons-visible-columns=" + route.visibleColumns()
 					+ "/" + MIN_DH_VISIBLE_COLUMNS);
@@ -1856,10 +1970,14 @@ public final class GraphicsFrameBenchmark {
 		json.append("  \"warmupFramesRequested\": ").append(WARMUP_FRAMES).append(",\n");
 		json.append("  \"measureFramesRequested\": ").append(MEASURE_FRAMES).append(",\n");
 		json.append("  \"minDistantHorizonsVisibleColumns\": ").append(REQUIRE_DH_EXECUTION ? MIN_DH_VISIBLE_COLUMNS : 0).append(",\n");
+		json.append("  \"expectedDistantHorizonsVisibleColumns\": ").append(REQUIRE_DH_EXECUTION ? EXPECTED_DH_VISIBLE_COLUMNS : -1).append(",\n");
 		json.append("  \"readinessTimeoutNanos\": ").append(READINESS_TIMEOUT_NANOS).append(",\n");
 		json.append("  \"terrainQueueDrainRequired\": ").append(REQUIRE_TERRAIN_QUEUE_DRAIN).append(",\n");
 		json.append("  \"terrainQueueDrainStableFramesRequired\": ").append(TERRAIN_QUEUE_DRAIN_STABLE_FRAMES).append(",\n");
 		json.append("  \"terrainQueueDrainStableFrames\": ").append(terrainQueueDrainStableFrames).append(",\n");
+		json.append("  \"dhQuiescenceRequired\": ").append(REQUIRE_DH_QUIESCENCE).append(",\n");
+		json.append("  \"dhQuiescenceStableFramesRequired\": ").append(DH_QUIESCENCE_STABLE_FRAMES).append(",\n");
+		json.append("  \"dhQuiescenceStableFrames\": ").append(dhQuiescenceStableFrames).append(",\n");
 		json.append("  \"positiveControlDelayNanos\": ").append(POSITIVE_CONTROL_DELAY_NANOS).append(",\n");
 		json.append("  \"gcBeforeMeasurement\": ").append(GC_BEFORE_MEASUREMENT).append(",\n");
 		json.append("  \"gcBeforeMeasurementOffsetFrames\": ").append(GC_BEFORE_MEASUREMENT_OFFSET_FRAMES).append(",\n");
@@ -1956,6 +2074,10 @@ public final class GraphicsFrameBenchmark {
 		json.append("    \"semanticCandidateColumns\": ").append(route.semanticCandidateColumns()).append(",\n");
 		json.append("    \"semanticUnpublishedCandidates\": ").append(route.semanticUnpublishedCandidates()).append(",\n");
 		json.append("    \"unpublishedVisibleColumns\": ").append(route.unpublishedVisibleColumns()).append(",\n");
+		json.append("    \"semanticColumnsBuilt\": ").append(route.semanticColumnsBuilt()).append(",\n");
+		json.append("    \"semanticColumnsReused\": ").append(route.semanticColumnsReused()).append(",\n");
+		json.append("    \"semanticColumnsReplaced\": ").append(route.semanticColumnsReplaced()).append(",\n");
+		field(json, "lastPayloadDifference", route.lastPayloadDifference(), 4, true);
 		json.append("    \"opaqueSegments\": ").append(route.opaqueSegments()).append(",\n");
 		json.append("    \"transparentSegments\": ").append(route.transparentSegments()).append(",\n");
 		json.append("    \"waterSegments\": ").append(route.waterSegments()).append(",\n");

@@ -81,6 +81,19 @@ const MATERIALS: &[SemanticMaterial] = &[
         legacy_keys: &[],
     },
     SemanticMaterial {
+        key: WORLD_MATERIAL_ID_BOAT_WATER_MASK,
+        resource_location: "minecraft:material/boat_water_mask",
+        mode: WORLD_MATERIAL_MODE_OPAQUE,
+        cutout_threshold: 0.0,
+        perspective_layer_scale: 1.0,
+        sampler: MaterialSamplerPolicy::NearestClamp,
+        mip: MaterialMipPolicy::SingleMip,
+        tint: MaterialTintChannel::VertexColor,
+        emissive: false,
+        fullbright: false,
+        legacy_keys: &[],
+    },
+    SemanticMaterial {
         key: WORLD_MATERIAL_ID_MODEL_CRUMBLING,
         resource_location: "minecraft:material/model_crumbling",
         mode: WORLD_MATERIAL_MODE_OPAQUE,
@@ -285,6 +298,7 @@ pub(crate) fn blend_override(material_key: u32) -> Option<BlendMode> {
         WORLD_MATERIAL_ID_SKY_STARS | WORLD_MATERIAL_ID_CELESTIAL => Some(BlendMode::Overlay),
         WORLD_MATERIAL_ID_ENERGY_SWIRL => Some(BlendMode::Additive),
         WORLD_MATERIAL_ID_MODEL_CRUMBLING => Some(BlendMode::Crumbling),
+        WORLD_MATERIAL_ID_BOAT_WATER_MASK => Some(BlendMode::DepthMask),
         _ => None,
     }
 }

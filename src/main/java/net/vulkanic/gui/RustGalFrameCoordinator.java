@@ -1180,9 +1180,10 @@ public final class RustGalFrameCoordinator {
 			METRICS.abiPackingNanos += Math.max(0L, submitEnded - packingStarted);
 			GraphicsFrameBenchmark.endPhase("rust-gal.frame.submit-call");
 			GraphicsFrameBenchmark.beginPhase("rust-gal.frame.post-submit-receipts");
-			if (wholeFrameVulkan && primitiveFrame != null && wholeFrameResult != null
+			boolean sourceShaderPackActive = wholeFrameVulkan && primitiveFrame != null
 				&& primitiveFrame.shaderEnvironmentFrame().enabled()
-				&& net.vulkanic.shaderpack.RustShaderPackSourceCollector.activeConfiguredPackName().isPresent()
+				&& net.vulkanic.shaderpack.RustShaderPackSourceCollector.activeConfiguredPackName().isPresent();
+			if (sourceShaderPackActive && wholeFrameResult != null
 				&& wholeFrameResult.profile().passCount() > 0) {
 				// These are semantic shader-pack family samples, backed by the
 				// explicit Rust frame's admitted pass graph. They are not Java Iris
@@ -1212,7 +1213,7 @@ public final class RustGalFrameCoordinator {
 					GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.lod-render", 1L);
 					GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.translucent-fade", 1L);
 					GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.opaque-fade", 1L);
-					if (primitiveFrame.shaderEnvironmentFrame().enabled()) {
+					if (sourceShaderPackActive) {
 						// Shader packs consume DH's transparent fade and its deferred
 						// translucent LOD stage as separate semantic operations.
 						GraphicsFrameBenchmark.recordPhaseSample("distant-horizons.translucent-fade", 1L);

@@ -254,10 +254,24 @@ impl OpenGlLowerer {
                 offset,
                 data,
             } => self.host_write(objects, *buffer, *offset, data),
-            CommandOp::CopyBuffer { src, dst, size } => {
+            CommandOp::CopyBuffer { src, dst, size }
+            | CommandOp::CopyBufferRegion {
+                src,
+                dst,
+                size,
+                ..
+            } => {
                 let _zone = trace::Zone::new("opengl.lowering.copy-buffer");
                 let src_gl_buffer = objects.buffer(*src)?.buffer;
                 let dst_object = objects.buffer(*dst)?;
+                let (src_offset, dst_offset) = match op {
+                    CommandOp::CopyBufferRegion {
+                        src_offset,
+                        dst_offset,
+                        ..
+                    } => (*src_offset, *dst_offset),
+                    _ => (0, 0),
+                };
                 unsafe {
                     self.gl
                         .bind_buffer(glow::COPY_READ_BUFFER, Some(src_gl_buffer));
@@ -266,8 +280,10 @@ impl OpenGlLowerer {
                     self.gl.copy_buffer_sub_data(
                         glow::COPY_READ_BUFFER,
                         glow::COPY_WRITE_BUFFER,
-                        0,
-                        0,
+                        i32::try_from(src_offset)
+                            .map_err(|_| GalError::backend("copy source offset exceeds i32"))?,
+                        i32::try_from(dst_offset)
+                            .map_err(|_| GalError::backend("copy destination offset exceeds i32"))?,
                         i32::try_from(*size)
                             .map_err(|_| GalError::backend("copy size exceeds i32"))?,
                     );
@@ -350,6 +366,9 @@ impl OpenGlLowerer {
                         self.gl.draw_buffer(glow::BACK);
                         self.gl.color_mask(true, true, true, true);
                     }
+                    // BeginPass restores color writes for clears. The next
+                    // pipeline bind must reapply a depth-mask draw's state.
+                    self.cache.blend = None;
                     self.gl.viewport(
                         0,
                         0,
@@ -1110,6 +1129,8 @@ impl OpenGlLowerer {
             }
             if self.cache.blend != Some(blend) {
                 let blend_state = opengl_blend_state(blend);
+                let color_write = blend != BlendMode::DepthMask;
+                self.gl.color_mask(color_write, color_write, color_write, color_write);
                 if blend_state.enabled {
                     self.gl.enable(glow::BLEND);
                 } else {
@@ -1521,7 +1542,7 @@ struct OpenGlBlendState {
 
 fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
     let factors = match blend {
-        BlendMode::Disabled => None,
+        BlendMode::Disabled | BlendMode::DepthMask => None,
         BlendMode::TerrainTranslucent => Some(OpenGlBlendFactors {
             src_color: glow::SRC_ALPHA,
             dst_color: glow::ONE_MINUS_SRC_ALPHA,

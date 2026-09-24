@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::backends::{
     Backend, BackendCreateDesc, BackendRuntimeMetrics, BackendToken, CompletedHostRead,
@@ -241,7 +241,7 @@ enum AccessTarget {
     },
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum AccessResourceKey {
     Buffer(Handle),
     Texture(Handle),
@@ -259,7 +259,7 @@ struct AccessEvent {
 
 #[derive(Default)]
 struct AccessTracker {
-    resources: BTreeMap<AccessResourceKey, AccessBucket>,
+    resources: HashMap<AccessResourceKey, AccessBucket>,
 }
 
 #[derive(Default)]
@@ -2398,6 +2398,22 @@ impl VulkanicGal {
             ));
         }
         for offset in offsets {
+            if binding.kind == ResourceBindingKind::UniformBuffer {
+                let alignment = self
+                    .capabilities()
+                    .limits
+                    .uniform_buffer_offset_alignment
+                    .max(1);
+                if offset % alignment != 0 {
+                    return self.validation_error(GalError::resource(
+                        StatusCode::InvalidArgument,
+                        format!(
+                            "binding {} uniform buffer offset {} is not aligned to {} bytes",
+                            binding.binding, offset, alignment
+                        ),
+                    ));
+                }
+            }
             let Some(end) = offset.checked_add(range) else {
                 return self.validation_error(GalError::resource(
                     StatusCode::InvalidArgument,
@@ -2838,7 +2854,13 @@ impl VulkanicGal {
                     }
                     self.validate_buffer_range(*buffer, *offset, 1, BufferUsage::Indirect)?;
                 }
-                CommandOp::CopyBuffer { src, dst, size } => {
+                CommandOp::CopyBuffer { src, dst, size }
+                | CommandOp::CopyBufferRegion {
+                    src,
+                    dst,
+                    size,
+                    ..
+                } => {
                     if in_pass {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
@@ -3384,9 +3406,23 @@ impl VulkanicGal {
                             profile.as_deref_mut(),
                         )?;
                     }
-                    CommandOp::CopyBuffer { src, dst, size } => {
-                        let src_target = self.buffer_access_target(*src, 0, Some(*size))?;
-                        let dst_target = self.buffer_access_target(*dst, 0, Some(*size))?;
+                    CommandOp::CopyBuffer { src, dst, size }
+                    | CommandOp::CopyBufferRegion {
+                        src,
+                        dst,
+                        size,
+                        ..
+                    } => {
+                        let (src_offset, dst_offset) = match op {
+                            CommandOp::CopyBufferRegion {
+                                src_offset,
+                                dst_offset,
+                                ..
+                            } => (*src_offset, *dst_offset),
+                            _ => (0, 0),
+                        };
+                        let src_target = self.buffer_access_target(*src, src_offset, Some(*size))?;
+                        let dst_target = self.buffer_access_target(*dst, dst_offset, Some(*size))?;
                         self.record_access(
                             &mut accesses,
                             AccessEvent {
@@ -3409,6 +3445,8 @@ impl VulkanicGal {
                             },
                             profile.as_deref_mut(),
                         )?;
+                        self.buffer_upload_capture
+                            .copy(*src, src_offset, *dst, dst_offset, *size);
                     }
                     CommandOp::CopyBufferToTexture(region) => {
                         let buffer_target = self.buffer_access_target(
@@ -4711,7 +4749,8 @@ fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
                 CommandOp::SetVertexBuffer { buffer, .. } => {
                     handles.insert(*buffer);
                 }
-                CommandOp::CopyBuffer { src, dst, .. } => {
+                CommandOp::CopyBuffer { src, dst, .. }
+                | CommandOp::CopyBufferRegion { src, dst, .. } => {
                     handles.insert(*src);
                     handles.insert(*dst);
                 }
@@ -4744,124 +4783,126 @@ pub(super) fn normalize_submission_batch_with_pipeline_layouts(
         let mut normalized = Vec::with_capacity(original.len());
         let mut state = CommandStateTracker::default();
         for op in original {
-            let keep = match &op {
-                CommandOp::TrackSubmission(_) => true,
-                CommandOp::BeginPass { .. } | CommandOp::EndPass | CommandOp::Barrier(_) => {
-                    state.invalidate();
-                    true
-                }
-                CommandOp::BindGraphicsPipeline(handle) => {
-                    if state.graphics_pipeline == Some(*handle) {
-                        stats.pipeline_binds_removed =
-                            stats.pipeline_binds_removed.saturating_add(1);
-                        false
-                    } else {
-                        state.graphics_pipeline = Some(*handle);
-                        state.compute_pipeline = None;
-                        let layout = graphics_pipeline_layouts.get(handle).copied();
-                        if layout.is_none()
-                            || !state.pipeline_layout_known
-                            || state.pipeline_layout != layout
-                        {
-                            // Descriptor sets are bound against a pipeline
-                            // layout. If the identity is unknown or changes,
-                            // replay every set; this is what protects DH's
-                            // four-binding exact-atlas set from being reused
-                            // by a two-binding reduced-color pipeline.
-                            state.resource_sets.clear();
+            let keep =
+                match &op {
+                    CommandOp::TrackSubmission(_) => true,
+                    CommandOp::BeginPass { .. } | CommandOp::EndPass | CommandOp::Barrier(_) => {
+                        state.invalidate();
+                        true
+                    }
+                    CommandOp::BindGraphicsPipeline(handle) => {
+                        if state.graphics_pipeline == Some(*handle) {
+                            stats.pipeline_binds_removed =
+                                stats.pipeline_binds_removed.saturating_add(1);
+                            false
+                        } else {
+                            state.graphics_pipeline = Some(*handle);
+                            state.compute_pipeline = None;
+                            let layout = graphics_pipeline_layouts.get(handle).copied();
+                            if layout.is_none()
+                                || !state.pipeline_layout_known
+                                || state.pipeline_layout != layout
+                            {
+                                // Descriptor sets are bound against a pipeline
+                                // layout. If the identity is unknown or changes,
+                                // replay every set; this is what protects DH's
+                                // four-binding exact-atlas set from being reused
+                                // by a two-binding reduced-color pipeline.
+                                state.resource_sets.clear();
+                            }
+                            state.pipeline_layout = layout;
+                            state.pipeline_layout_known = layout.is_some();
+                            true
                         }
-                        state.pipeline_layout = layout;
-                        state.pipeline_layout_known = layout.is_some();
-                        true
                     }
-                }
-                CommandOp::BindComputePipeline(handle) => {
-                    if state.compute_pipeline == Some(*handle) {
-                        stats.pipeline_binds_removed =
-                            stats.pipeline_binds_removed.saturating_add(1);
-                        false
-                    } else {
-                        state.compute_pipeline = Some(*handle);
-                        state.graphics_pipeline = None;
-                        let layout = compute_pipeline_layouts.get(handle).copied();
-                        if layout.is_none()
-                            || !state.pipeline_layout_known
-                            || state.pipeline_layout != layout
-                        {
-                            state.resource_sets.clear();
+                    CommandOp::BindComputePipeline(handle) => {
+                        if state.compute_pipeline == Some(*handle) {
+                            stats.pipeline_binds_removed =
+                                stats.pipeline_binds_removed.saturating_add(1);
+                            false
+                        } else {
+                            state.compute_pipeline = Some(*handle);
+                            state.graphics_pipeline = None;
+                            let layout = compute_pipeline_layouts.get(handle).copied();
+                            if layout.is_none()
+                                || !state.pipeline_layout_known
+                                || state.pipeline_layout != layout
+                            {
+                                state.resource_sets.clear();
+                            }
+                            state.pipeline_layout = layout;
+                            state.pipeline_layout_known = layout.is_some();
+                            true
                         }
-                        state.pipeline_layout = layout;
-                        state.pipeline_layout_known = layout.is_some();
+                    }
+                    CommandOp::BindResourceSet {
+                        pipeline_layout,
+                        set_index,
+                        set,
+                        dynamic_offsets,
+                    } => {
+                        let key = (*pipeline_layout, *set_index);
+                        let value = (*set, dynamic_offsets.clone());
+                        if state.resource_sets.get(&key) == Some(&value) {
+                            stats.resource_set_binds_removed =
+                                stats.resource_set_binds_removed.saturating_add(1);
+                            false
+                        } else {
+                            state.resource_sets.insert(key, value);
+                            true
+                        }
+                    }
+                    CommandOp::SetVertexBuffer {
+                        slot,
+                        buffer,
+                        offset,
+                    } => {
+                        let value = (*buffer, *offset);
+                        if state.vertex_buffers.get(slot).copied() == Some(value) {
+                            stats.vertex_buffer_binds_removed =
+                                stats.vertex_buffer_binds_removed.saturating_add(1);
+                            false
+                        } else {
+                            state.vertex_buffers.insert(*slot, value);
+                            true
+                        }
+                    }
+                    CommandOp::SetIndexBuffer {
+                        buffer,
+                        offset,
+                        index_type,
+                    } => {
+                        let value = (*buffer, *offset, *index_type);
+                        if state.index_buffer == Some(value) {
+                            stats.index_buffer_binds_removed =
+                                stats.index_buffer_binds_removed.saturating_add(1);
+                            false
+                        } else {
+                            state.index_buffer = Some(value);
+                            true
+                        }
+                    }
+                    CommandOp::CopyBuffer { .. }
+                    | CommandOp::CopyBufferRegion { .. }
+                    | CommandOp::CopyBufferToTexture(_)
+                    | CommandOp::CopyTextureToBuffer(_)
+                    | CommandOp::CopyTexture(_)
+                    | CommandOp::CopyFrameTargetToTexture { .. }
+                    | CommandOp::CopyTextureToFrameTarget { .. }
+                    | CommandOp::GenerateMipmaps { .. }
+                    | CommandOp::HostWriteBuffer { .. }
+                    | CommandOp::HostReadBuffer { .. }
+                    | CommandOp::Present { .. } => {
+                        state.invalidate();
                         true
                     }
-                }
-                CommandOp::BindResourceSet {
-                    pipeline_layout,
-                    set_index,
-                    set,
-                    dynamic_offsets,
-                } => {
-                    let key = (*pipeline_layout, *set_index);
-                    let value = (*set, dynamic_offsets.clone());
-                    if state.resource_sets.get(&key) == Some(&value) {
-                        stats.resource_set_binds_removed =
-                            stats.resource_set_binds_removed.saturating_add(1);
-                        false
-                    } else {
-                        state.resource_sets.insert(key, value);
-                        true
-                    }
-                }
-                CommandOp::SetVertexBuffer {
-                    slot,
-                    buffer,
-                    offset,
-                } => {
-                    let value = (*buffer, *offset);
-                    if state.vertex_buffers.get(slot).copied() == Some(value) {
-                        stats.vertex_buffer_binds_removed =
-                            stats.vertex_buffer_binds_removed.saturating_add(1);
-                        false
-                    } else {
-                        state.vertex_buffers.insert(*slot, value);
-                        true
-                    }
-                }
-                CommandOp::SetIndexBuffer {
-                    buffer,
-                    offset,
-                    index_type,
-                } => {
-                    let value = (*buffer, *offset, *index_type);
-                    if state.index_buffer == Some(value) {
-                        stats.index_buffer_binds_removed =
-                            stats.index_buffer_binds_removed.saturating_add(1);
-                        false
-                    } else {
-                        state.index_buffer = Some(value);
-                        true
-                    }
-                }
-                CommandOp::CopyBuffer { .. }
-                | CommandOp::CopyBufferToTexture(_)
-                | CommandOp::CopyTextureToBuffer(_)
-                | CommandOp::CopyTexture(_)
-                | CommandOp::CopyFrameTargetToTexture { .. }
-                | CommandOp::CopyTextureToFrameTarget { .. }
-                | CommandOp::GenerateMipmaps { .. }
-                | CommandOp::HostWriteBuffer { .. }
-                | CommandOp::HostReadBuffer { .. }
-                | CommandOp::Present { .. } => {
-                    state.invalidate();
-                    true
-                }
-                CommandOp::Draw { .. }
-                | CommandOp::DrawIndexed { .. }
-                | CommandOp::DrawIndirect { .. }
-                | CommandOp::DrawIndexedIndirect { .. }
-                | CommandOp::Dispatch { .. }
-                | CommandOp::DispatchIndirect { .. } => true,
-            };
+                    CommandOp::Draw { .. }
+                    | CommandOp::DrawIndexed { .. }
+                    | CommandOp::DrawIndirect { .. }
+                    | CommandOp::DrawIndexedIndirect { .. }
+                    | CommandOp::Dispatch { .. }
+                    | CommandOp::DispatchIndirect { .. } => true,
+                };
             if keep {
                 normalized.push(op);
             }
@@ -4934,6 +4975,7 @@ fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch)
                 | CommandOp::Dispatch { .. }
                 | CommandOp::DispatchIndirect { .. }
                 | CommandOp::CopyBuffer { .. }
+                | CommandOp::CopyBufferRegion { .. }
                 | CommandOp::CopyBufferToTexture(_)
                 | CommandOp::CopyTextureToBuffer(_)
                 | CommandOp::CopyTexture(_)

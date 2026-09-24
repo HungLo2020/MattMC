@@ -22,6 +22,27 @@ class WorldMeshTextureReplacementTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void stableModelTopologyReusesOnlyEqualRegisteredTexturePayload() throws Exception {
+        var texturesField = RustGalWorldPrimitiveRenderer.class.getDeclaredField("WORLD_MESH_TEXTURES");
+        texturesField.setAccessible(true);
+        var textures = (java.util.Map<Integer, WorldMeshTextureAssetRecord>) texturesField.get(null);
+        int identity = 0x71436b13;
+        var resident = new WorldMeshTextureAssetRecord(identity, new byte[]{1, 2}, List.of(new byte[]{3}));
+        var previous = textures.put(identity, resident);
+        try {
+            var equal = new WorldMeshTextureAssetRecord(identity, new byte[]{1, 2}, List.of(new byte[]{3}));
+            assertSame(resident, RustGalWorldPrimitiveRenderer.reuseRegisteredStaticModelTexture(equal));
+            var replacedMip = new WorldMeshTextureAssetRecord(identity, new byte[]{1, 2}, List.of(new byte[]{4}));
+            assertSame(replacedMip, RustGalWorldPrimitiveRenderer.reuseRegisteredStaticModelTexture(replacedMip));
+            assertSame(resident, textures.get(identity), "preflight must not publish a changed payload");
+        } finally {
+            if (previous == null) textures.remove(identity);
+            else textures.put(identity, previous);
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void rollbackCheckpointKeepsItsOriginalTextureMembershipAfterCacheInvalidation() throws Exception {
         var texturesField = RustGalWorldPrimitiveRenderer.class.getDeclaredField("WORLD_MESH_TEXTURES");
         var invalidate = RustGalWorldPrimitiveRenderer.class.getDeclaredMethod("invalidateModelCheckpointAssetKeysLocked");

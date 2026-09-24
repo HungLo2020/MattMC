@@ -10,6 +10,16 @@ pub(super) struct CachedOrder {
     quads: Vec<(u32, u64)>,
     camera: Option<[f32; 3]>,
     order: Vec<usize>,
+    stable_camera_frames: u8,
+    direct_template: Option<CachedDirectBatches>,
+}
+
+struct CachedDirectBatches {
+    instance: MeshBatchInstanceKey,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+    batches: Vec<MeshBatch>,
+    indices: Vec<u8>,
 }
 
 pub(super) fn validate_instance(instance: &WorldMeshInstanceRequest) -> GalResult<()> {
@@ -108,6 +118,8 @@ fn prepare(asset: &MeshAssetStore) -> GalResult<CachedOrder> {
         quads,
         camera: None,
         order: Vec::new(),
+        stable_camera_frames: 0,
+        direct_template: None,
     })
 }
 
@@ -119,6 +131,7 @@ pub(super) fn append_batches(
     raster_y_direction: RasterYDirection,
     g_buffer: bool,
     batches: &mut Vec<MeshBatch>,
+    mut sorted_indices: Option<&mut Vec<u8>>,
 ) -> GalResult<()> {
     validate_instance(instance)?;
     let camera = [
@@ -138,10 +151,60 @@ pub(super) fn append_batches(
             .ok_or_else(|| GalError::invalid_argument("invalid translucent camera ordering"))?;
         cache.order = order;
         cache.camera = Some(camera);
+        cache.stable_camera_frames = 0;
+        cache.direct_template = None;
+    } else {
+        cache.stable_camera_frames = cache.stable_camera_frames.saturating_add(1);
     }
+    // Immutable terrain topology and an unchanged camera produce the same
+    // material runs and index order. Keep a bounded template with the asset;
+    // only the frame's instance index and stream offset need rebinding.
+    let direct_key = (cache.stable_camera_frames > 0 && !g_buffer && sorted_indices.is_some())
+        .then(|| mesh_batch_instance_key(instance));
+    if let (Some(key), Some(template), Some(bytes)) = (
+        direct_key.as_ref(),
+        cache.direct_template.as_ref(),
+        sorted_indices.as_mut(),
+    ) {
+        if template.instance == *key
+            && template.color_format == color_format
+            && template.raster_y_direction == raster_y_direction
+        {
+            let base = (bytes.len() + 3) & !3;
+            bytes.resize(base, 0);
+            bytes.extend_from_slice(&template.indices);
+            for batch in &template.batches {
+                let mut rebound = batch.clone();
+                rebound.indices.clear();
+                rebound.indices.push(instance_index);
+                rebound.sorted_index_offset =
+                    batch.sorted_index_offset.map(|offset| offset + base as u64);
+                batches.push(rebound);
+            }
+            return Ok(());
+        }
+    }
+    let batch_start = batches.len();
+    let index_start = sorted_indices.as_ref().map(|bytes| (bytes.len() + 3) & !3);
     for &ordinal in &cache.order {
         let (section_index, index_offset) = cache.quads[ordinal];
         let section = &asset.sections[section_index as usize];
+        let sorted_index_offset = if let Some(bytes) = sorted_indices.as_mut() {
+            let byte_count = 6 * index_stride(asset.index_type) as usize;
+            let source = usize::try_from(index_offset)
+                .ok()
+                .and_then(|start| asset.index_bytes.get(start..start + byte_count))
+                .ok_or_else(|| GalError::invalid_argument("sorted quad index range is invalid"))?;
+            // U16 and U32 draws share one stream; align each new run to the
+            // stricter index type so both direct and indirect offsets are valid.
+            let aligned = (bytes.len() + 3) & !3;
+            bytes.resize(aligned, 0);
+            let offset = bytes.len() as u64;
+            bytes.extend_from_slice(source);
+            Some(offset)
+        } else {
+            None
+        };
         let key = mesh_key_for_section(
             instance,
             section,
@@ -157,10 +220,26 @@ pub(super) fn append_batches(
         // Only contiguous indices with identical resources and the same
         // instance can form one draw. Never move a pane across another material.
         if let Some(last) = batches.last_mut().filter(|last| {
-            last.key == key
+            // Direct sorted indices address the whole immutable mesh, so
+            // identical bindings may span authored section boundaries. Keep
+            // the first section as the resource identity for the run.
+            let mut comparable = last.key;
+            if sorted_index_offset.is_some() {
+                comparable.section_index = key.section_index;
+            }
+            comparable == key
                 && last.indices.as_slice() == [instance_index]
-                && last.index_offset + u64::from(last.index_count) * index_stride(asset.index_type)
-                    == index_offset
+                && match (last.sorted_index_offset, sorted_index_offset) {
+                    (Some(start), Some(next)) => {
+                        start + u64::from(last.index_count) * index_stride(asset.index_type) == next
+                    }
+                    (None, None) => {
+                        last.index_offset
+                            + u64::from(last.index_count) * index_stride(asset.index_type)
+                            == index_offset
+                    }
+                    _ => false,
+                }
         }) {
             last.index_count += 6;
         } else {
@@ -169,11 +248,41 @@ pub(super) fn append_batches(
                 key,
                 index_offset,
                 index_count: 6,
+                sorted_index_offset,
                 indices: vec![instance_index].into(),
             });
         }
     }
+    if let (Some(key), Some(start), Some(bytes)) =
+        (direct_key, index_start, sorted_indices.as_ref())
+    {
+        if bytes.len() < start || batches.len() == batch_start {
+            return Ok(());
+        }
+        let mut cached_batches = batches[batch_start..].to_vec();
+        for batch in &mut cached_batches {
+            batch.sorted_index_offset = batch
+                .sorted_index_offset
+                .map(|offset| offset - start as u64);
+        }
+        cache.direct_template = Some(CachedDirectBatches {
+            instance: key,
+            color_format,
+            raster_y_direction,
+            batches: cached_batches,
+            indices: bytes[start..].to_vec(),
+        });
+    }
     Ok(())
+}
+
+#[cfg(test)]
+pub(super) fn has_direct_template(asset: &MeshAssetStore) -> bool {
+    asset
+        .translucent_order
+        .borrow()
+        .as_ref()
+        .is_some_and(|order| order.direct_template.is_some())
 }
 
 #[cfg(test)]

@@ -2551,6 +2551,8 @@ pub(super) fn color_blend_attachment(
     match blend {
         BlendMode::Disabled => vk::PipelineColorBlendAttachmentState::default()
             .color_write_mask(vk::ColorComponentFlags::RGBA),
+        BlendMode::DepthMask => vk::PipelineColorBlendAttachmentState::default()
+            .color_write_mask(vk::ColorComponentFlags::empty()),
         BlendMode::Alpha => vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(true)
             .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
@@ -2898,6 +2900,13 @@ mod tests {
         assert!(attachment.dst_alpha_blend_factor == vk::BlendFactor::ZERO);
         assert!(attachment.alpha_blend_op == vk::BlendOp::ADD);
         assert!(attachment.color_write_mask == vk::ColorComponentFlags::RGBA);
+    }
+
+    #[test]
+    fn depth_mask_keeps_color_attachment_but_disables_its_writes() {
+        let attachment = color_blend_attachment(BlendMode::DepthMask, 0);
+        assert_eq!(vk::FALSE, attachment.blend_enable);
+        assert!(vk::ColorComponentFlags::empty() == attachment.color_write_mask);
     }
 
     #[test]

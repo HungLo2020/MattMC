@@ -2444,6 +2444,12 @@ public final class DistantHorizonsSemanticCollector {
 		}
 		synchronized (COLUMNS) {
 			LodColumnSnapshot current = COLUMNS.get(columnKey);
+			// A closed container keeps its last published descriptor until Rust
+			// acknowledges retirement. It is no longer eligible for a new frame:
+			// this render-list traversal can precede the preflight that retires it.
+			if (current == null && PENDING_RETIREMENTS.containsKey(columnKey)) {
+				return VisibleColumnSegments.EMPTY;
+			}
 			PublishedColumnDrawMetadata column = publishedDrawMetadataLocked(columnKey);
 			if (column == null) {
 				if (current == null) {
@@ -3448,12 +3454,29 @@ public final class DistantHorizonsSemanticCollector {
 		if (!enabled() || bridge == null) {
 			return null;
 		}
+		boolean profileUpdate = Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.dhChurnCounters");
+		long selectStarted = profileUpdate ? System.nanoTime() : 0L;
 		PendingAssetUpdate update = pendingUpdate(true);
+		long selectEnded = profileUpdate ? System.nanoTime() : 0L;
+		if (profileUpdate) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+				"world.distant-horizons.asset-select", selectEnded - selectStarted);
+		}
 		if (update == null) {
 			return null;
 		}
 		try {
 			long updateStarted = System.nanoTime();
+			if (profileUpdate) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+					"world.distant-horizons.asset-update-columns", update.assets().size());
+				long snapshotBytes = 0L;
+				for (LodColumnSnapshot snapshot : update.snapshots()) {
+					snapshotBytes += snapshot.byteSize();
+				}
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+					"world.distant-horizons.asset-update-bytes", snapshotBytes);
+			}
 			if (System.getenv("MATTMC_TRACE_WHOLE_FRAME") != null) {
 				long snapshotBytes = update.snapshots().stream()
 					.mapToLong(LodColumnSnapshot::byteSize)
@@ -3466,11 +3489,20 @@ public final class DistantHorizonsSemanticCollector {
 			VulkanicGalBridge.Status status = bridge.updateWorldLodAssets(
 				update.generation(), update.assets(), update.retirements(), update.materialProvenance()
 			);
+			long bridgeEnded = profileUpdate ? System.nanoTime() : 0L;
+			if (profileUpdate) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+					"world.distant-horizons.asset-bridge", bridgeEnded - updateStarted);
+			}
 			if (System.getenv("MATTMC_TRACE_WHOLE_FRAME") != null) {
 				System.err.println("whole-frame.dh-assets.end generation=" + update.generation()
 					+ " elapsed_nanos=" + (System.nanoTime() - updateStarted));
 			}
 			acknowledge(update);
+			if (profileUpdate) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+					"world.distant-horizons.asset-acknowledge", System.nanoTime() - bridgeEnded);
+			}
 			return status;
 		} catch (RuntimeException error) {
 			releaseInFlightAssets(update);
@@ -3653,7 +3685,30 @@ public final class DistantHorizonsSemanticCollector {
 					lastLifecycleRetirementsAcknowledged++;
 				}
 			}
+			invalidateVisibleReferencesForRetiredAssetsLocked(update.retirements());
 			NEXT_UPDATE_GENERATION.incrementAndGet();
+		}
+	}
+
+	private static void invalidateVisibleReferencesForRetiredAssetsLocked(
+		List<VulkanicGalBridge.WorldLodColumnRetirementRecord> retirements
+	) {
+		if (retirements.isEmpty() || PENDING_VISIBLE_SEGMENTS.isEmpty()) return;
+		int before = PENDING_VISIBLE_SEGMENTS.size();
+		PENDING_VISIBLE_SEGMENTS.removeIf(instance -> retirements.stream().anyMatch(retirement ->
+			retirement.columnKey() == instance.columnKey()
+				&& retirement.columnGeneration() == instance.columnGeneration()
+		));
+		if (PENDING_VISIBLE_SEGMENTS.size() == before) return;
+		recomputePendingVisibleRouteLocked();
+		if (PENDING_VISIBLE_SEGMENTS.isEmpty()) {
+			PENDING_RENDER_FRAME = withFlags(
+				PENDING_RENDER_FRAME,
+				PENDING_RENDER_FRAME.flags() & ~RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED
+			);
+			routeDecision = "rejected";
+			routeReason = "asset-retired-before-submit";
+			routeSelected = false;
 		}
 	}
 

@@ -4232,11 +4232,15 @@ pub const COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID: &str =
     "vulkanic:builtin/direct_terrain_opaque_compact32_v1";
 pub const COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID: &str =
     "vulkanic:builtin/direct_terrain_cutout_compact32_v1";
+pub const COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID: &str =
+    "vulkanic:builtin/direct_terrain_translucent_compact32_v1";
 pub const STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID: &str =
     "vulkanic:builtin/direct_terrain_opaque_compact32_static_v1";
 pub const STATIC_COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID: &str =
     "vulkanic:builtin/direct_terrain_cutout_compact32_static_v1";
-/// Shader-off static terrain has a deliberately smaller GPU-only vertex ABI.
+pub const STATIC_COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID: &str =
+    "vulkanic:builtin/direct_terrain_translucent_compact32_static_v1";
+/// Shader-off atlas-backed terrain has a deliberately smaller GPU-only vertex ABI.
 /// The authoritative copied mesh remains the rich semantic form used by
 /// source-derived programs; this program may only be selected alongside the
 /// matching `DirectTerrain32` lowering in the world frontend.
@@ -4247,9 +4251,7 @@ pub fn minimal_compact_direct_terrain_program(
     program.identity = ProgramIdentity::new(match kind {
         TerrainMaterialProgramKind::Opaque => COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
         TerrainMaterialProgramKind::Cutout => COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
-        TerrainMaterialProgramKind::Translucent => {
-            "vulkanic:builtin/direct_terrain_translucent_compact32_v1"
-        }
+        TerrainMaterialProgramKind::Translucent => COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID,
     });
     program.vertex.label = format!(
         "minimal-direct-terrain-{}-compact32.vertex",
@@ -4276,7 +4278,7 @@ pub fn minimal_static_compact_direct_terrain_program(
         TerrainMaterialProgramKind::Opaque => STATIC_COMPACT_DIRECT_TERRAIN_OPAQUE_PROGRAM_ID,
         TerrainMaterialProgramKind::Cutout => STATIC_COMPACT_DIRECT_TERRAIN_CUTOUT_PROGRAM_ID,
         TerrainMaterialProgramKind::Translucent => {
-            "vulkanic:builtin/direct_terrain_translucent_compact32_static_v1"
+            STATIC_COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID
         }
     });
     program.vertex.label = format!(
@@ -4666,8 +4668,8 @@ fn minimal_direct_terrain_vertex_source() -> String {
 
 fn compact_direct_terrain_vertex_source() -> String {
     // This source is deliberately separate from MINIMAL_TERRAIN_MATERIAL_VERTEX.
-    // DirectTerrain32 is admitted only for copied, atlas-backed opaque/cutout
-    // terrain with translation-only instances.  Keeping that contract explicit
+    // DirectTerrain32 is admitted only for copied, atlas-backed terrain
+    // (opaque, cutout, or translucent) with translation-only instances. Keeping that contract explicit
     // removes entity/model lighting branches and unused rich varyings without
     // changing the rich ABI used by source-derived Iris/DH programs.
     let source = r#"#version 450
@@ -5802,7 +5804,6 @@ layout(location = 2) flat out uint v_material;
 layout(location = 3) flat out uint v_normal;
 layout(location = 4) out vec3 v_world_position;
 layout(location = 5) out vec3 v_source_position;
-layout(location = 6) out float v_dh_fade;
 layout(location = 7) out vec3 v_light_color;
 layout(location = 8) out vec3 v_unlit_color;
 
@@ -5816,7 +5817,7 @@ vec3 dh_normal(uint normal) {
 }
 
 void main() {
-    DistantHorizonsLodVertex vertex = vertices[gl_VertexIndex];
+    DistantHorizonsLodVertex vertex = vertices[gl_VertexIndex + int(model_offset_and_reserved.w)];
     int local_x = int(vertex.data.x & 0xffffu);
     int local_y = int(vertex.data.x >> 16u);
     int local_z = int(vertex.data.y & 0xffffu);
@@ -5887,15 +5888,6 @@ void main() {
     // and derivative domain explicitly; absolute world coordinates remain
     // available separately for fog, fade, and depth semantics.
     v_source_position = base_local;
-    vec3 dh_camera = column_origin_and_world_y.xyz - model_offset_and_reserved.xyz;
-    float dh_distance = distance(world, dh_camera);
-    float dh_clip = clip_micro_noise_earth.x;
-    // Match DH's terrain shader: discard/dither LOD fragments until the
-    // vanilla-to-DH transition begins, then fade them in over 1.5x the
-    // copied near-clip distance.  The collector already includes DH's
-    // 16-block separation margin in this value.
-    v_dh_fade = ((flags_and_noise.w & 8u) != 0u || dh_clip <= 0.0)
-        ? 1.0 : smoothstep(dh_clip, dh_clip * 1.5, dh_distance);
 }
 "#;
 
@@ -5941,7 +5933,6 @@ layout(location = 4) flat out uint v_normal;
 layout(location = 5) out vec3 v_world_position;
 layout(location = 6) out vec3 v_source_position;
 layout(location = 7) flat out uint v_material_flags;
-layout(location = 8) out float v_dh_fade;
 layout(location = 9) out vec3 v_light_color;
 
 void main() {
@@ -5998,11 +5989,6 @@ void main() {
     v_material_flags = (vertex.light_normal_pad >> 24u) & 0xffu;
     v_world_position = world;
     v_source_position = base_local;
-    vec3 dh_camera = column_origin_and_world_y.xyz - model_offset_and_reserved.xyz;
-    float dh_distance = distance(world, dh_camera);
-    float dh_clip = clip_micro_noise_earth.x;
-    v_dh_fade = ((flags_and_noise.w & 8u) != 0u || dh_clip <= 0.0)
-        ? 1.0 : smoothstep(dh_clip, dh_clip * 1.5, dh_distance);
 }
 "#;
 
@@ -6013,7 +5999,6 @@ layout(location = 2) flat in uint v_material;
 layout(location = 3) flat in uint v_normal;
 layout(location = 4) in vec3 v_world_position;
 layout(location = 5) in vec3 v_source_position;
-layout(location = 6) in float v_dh_fade;
 layout(location = 7) in vec3 v_light_color;
 layout(location = 8) in vec3 v_unlit_color;
 layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
@@ -6392,7 +6377,6 @@ layout(location = 4) flat in uint v_normal;
 layout(location = 5) in vec3 v_world_position;
 layout(location = 6) in vec3 v_source_position;
 layout(location = 7) flat in uint v_material_flags;
-layout(location = 8) in float v_dh_fade;
 layout(location = 9) in vec3 v_light_color;
 layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
     mat4 combined_matrix;
@@ -6589,7 +6573,6 @@ layout(location = 4) flat in uint v_normal;
 layout(location = 5) in vec3 v_world_position;
 layout(location = 6) in vec3 v_source_position;
 layout(location = 7) flat in uint v_material_flags;
-layout(location = 8) in float v_dh_fade;
 layout(location = 9) in vec3 v_light_color;
 layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
     mat4 combined_matrix;
@@ -6771,7 +6754,6 @@ layout(location = 4) flat in uint v_normal;
 layout(location = 5) in vec3 v_world_position;
 layout(location = 6) in vec3 v_source_position;
 layout(location = 7) flat in uint v_material_flags;
-layout(location = 8) in float v_dh_fade;
 layout(location = 9) in vec3 v_light_color;
 layout(location = 0) out vec4 out_source_primary;
 
@@ -6846,7 +6828,6 @@ layout(location = 2) flat in uint v_material;
 layout(location = 3) flat in uint v_normal;
 layout(location = 4) in vec3 v_world_position;
 layout(location = 5) in vec3 v_source_position;
-layout(location = 6) in float v_dh_fade;
 layout(location = 7) in vec3 v_light_color;
 layout(location = 8) in vec3 v_unlit_color;
 layout(set = 0, binding = 1, std140) uniform DistantHorizonsLodFrame {
@@ -7746,6 +7727,8 @@ mod tests {
             .contains("vec3 local = base_local + vec3(micro_x, 0.0, micro_z);"));
         assert!(MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX
             .contains("vec3 base_local = vec3(local_x, local_y, local_z);"));
+        assert!(MINIMAL_DISTANT_HORIZONS_LOD_OPAQUE_VERTEX
+            .contains("gl_VertexIndex + int(model_offset_and_reserved.w)"));
         assert!(MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX
             .contains("vec3(vertex.micro_x, 0.0, vertex.micro_z)"));
         assert!(MINIMAL_DISTANT_HORIZONS_LOD_EXACT_ATLAS_OPAQUE_VERTEX
@@ -7756,7 +7739,7 @@ mod tests {
         ] {
             assert!(source.contains("vec3 world = base_local + column_origin_and_world_y.xyz;"));
             assert!(source.contains("v_source_position = base_local;"));
-            assert!(source.contains("smoothstep(dh_clip, dh_clip * 1.5, dh_distance)"));
+            assert!(!source.contains("v_dh_fade"));
             assert!(source.contains("(flags_and_noise.w & 2u) == 0u"));
             assert!(source.contains("(flags_and_noise.w & 1u) != 0u"));
         }

@@ -850,6 +850,30 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
+	void closedPublishedColumnCannotReenterFrameBeforePreflightRetirement() {
+		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
+		long columnKey = 481036337670L;
+		DistantHorizonsSemanticCollector.recordBuiltColumn(
+			columnKey, new DhBlockPos(0, 64, 0),
+			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)),
+			List.of(), List.of(), List.of()
+		);
+		var publication = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		DistantHorizonsSemanticCollector.acknowledgeForTest(publication);
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(columnKey).opaqueSegments());
+
+		DistantHorizonsSemanticCollector.removeColumn(columnKey);
+		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
+		assertEquals(0, DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(columnKey).opaqueSegments(),
+			"a published descriptor awaiting retirement must not create an instance for the next Rust frame");
+		var retirement = DistantHorizonsSemanticCollector.pendingUpdateForTest();
+		assertEquals(columnKey, retirement.retirements().getFirst().columnKey());
+		DistantHorizonsSemanticCollector.acknowledgeForTest(retirement);
+		assertEquals(0, DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(columnKey).opaqueSegments());
+	}
+
+	@Test
 	void pendingAssetPublicationIsBoundedAndAcknowledgesOnlyThePublishedSlice() {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
 		for (long columnKey = 0L; columnKey < 17L; columnKey++) {
