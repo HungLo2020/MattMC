@@ -20,6 +20,32 @@ class RustShaderPackSourceCollectorTest {
 	Path temporaryDirectory;
 
 	@Test
+	void copiedTerrainAoDirectiveControlsCpuMeshSemantics() throws Exception {
+		Files.writeString(temporaryDirectory.resolve("shaders.properties"),
+			"#ifdef MC_OS_MAC\n#define UNUSED 1\n#endif\nseparateAo = true\noldLighting = false\n");
+		assertTrue(RustShaderPackSourceCollector.copiedSeparateAo(
+			RustShaderPackSourceCollector.collect(temporaryDirectory, "ao-pack", 1L)));
+		assertTrue(RustShaderPackSourceCollector.copiedDisableDirectionalShading(
+			RustShaderPackSourceCollector.collect(temporaryDirectory, "ao-pack", 1L)));
+		Files.writeString(temporaryDirectory.resolve("shaders.properties"),
+			"#ifdef SOME_OPTION\nseparateAo = true\n#endif\n");
+		assertThrows(IOException.class, () -> RustShaderPackSourceCollector.copiedSeparateAo(
+			RustShaderPackSourceCollector.collect(temporaryDirectory, "conditional-pack", 2L)));
+	}
+
+	@Test
+	void copiedVignetteDirectiveControlsVanillaGuiOverlay() throws Exception {
+		var source = RustShaderPackSourceCollector.collect(temporaryDirectory, "vanilla", 1L);
+		assertTrue(RustShaderPackSourceCollector.copiedVignetteEnabled(source));
+		Files.writeString(temporaryDirectory.resolve("shaders.properties"), "vignette = false\n");
+		assertFalse(RustShaderPackSourceCollector.copiedVignetteEnabled(
+			RustShaderPackSourceCollector.collect(temporaryDirectory, "pack", 2L)));
+		Files.writeString(temporaryDirectory.resolve("shaders.properties"), "vignette = true\n");
+		assertTrue(RustShaderPackSourceCollector.copiedVignetteEnabled(
+			RustShaderPackSourceCollector.collect(temporaryDirectory, "pack", 3L)));
+	}
+
+	@Test
 	void diskShaderPackSelectionIsCopiedWithoutIrisRuntimeObjects() throws Exception {
 		Path config = temporaryDirectory.resolve("iris.properties");
 		Files.writeString(config, "enableShaders=true\nshaderPack=  ExamplePack  \n");

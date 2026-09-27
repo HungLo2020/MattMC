@@ -249,6 +249,52 @@ pub fn derive_entity_contract(
     })
 }
 
+/// Discovers the selected pack's shadow program as an entity-stream caster
+/// (Iris draws entity/player shadow casters with the `shadow` program). The
+/// two outputs are the shadow colour attachments by `gl_FragData` index; the
+/// pack entity-ID map is shared with the ordinary entity contract.
+pub fn derive_entity_shadow_contract(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+) -> GalResult<EntityPassContract> {
+    let stages = super::terrain_contract::shadow_source_stages_for_scope(source, scope)?;
+    let vertex = preprocess_stage(source, &stages.vertex.path, &stages.vertex.defines)?;
+    let fragment = preprocess_stage(source, &stages.fragment.path, &stages.fragment.defines)?;
+    require_any(&vertex, &["gl_Vertex", "ftransform"])?;
+    let mut inputs = vec![
+        EntitySourceInput::MaterialTexture,
+        EntitySourceInput::VertexColor,
+        EntitySourceInput::PackedLight,
+        EntitySourceInput::ViewSpaceNormal,
+        EntitySourceInput::CameraAndEnvironment,
+    ];
+    if uses_identifier(&vertex, "entityId") || uses_identifier(&fragment, "entityId") {
+        inputs.push(EntitySourceInput::EntityIdentity);
+    }
+    if uses_identifier(&fragment, "entityColor") {
+        inputs.push(EntitySourceInput::EntityColor);
+    }
+    let mut vertex_attributes = Vec::new();
+    if uses_identifier(&vertex, "mc_midTexCoord") {
+        vertex_attributes.push(EntitySourceVertexAttribute::MidTextureCoordinate);
+    }
+    if uses_identifier(&vertex, "at_tangent") {
+        vertex_attributes.push(EntitySourceVertexAttribute::Tangent);
+    }
+    Ok(EntityPassContract {
+        pack_name: source.name().to_string(),
+        generation: source.generation(),
+        scope,
+        program_path: stages.fragment.path.clone(),
+        stages,
+        inputs,
+        vertex_attributes,
+        outputs: vec![EntitySourceOutput::LitColor, EntitySourceOutput::MaterialAuxiliary],
+        output_color_slots: vec![0, 1],
+        entity_ids: ShaderPackEntityIdMap::from_source(source)?,
+    })
+}
+
 /// Lowers the paired selected entity source through the common Rust-owned
 /// indexed source stream. This validates only source and semantic resource
 /// shape; it cannot create a program, select a route, or make an entity draw
@@ -275,6 +321,46 @@ pub fn lower_entity_source_pair(
     let lowered = lower_entity_source_stages(&vertex, &fragment)?;
     lowered.require_backend_neutral_lowering()?;
     Ok(lowered)
+}
+
+/// Preprocesses and lowers the shadow stages named by an entity-shadow
+/// contract for the entity mesh stream.
+pub fn lower_entity_shadow_source_pair(
+    source: &ShaderPackSource,
+    contract: &EntityPassContract,
+) -> GalResult<LoweredEntitySourcePair> {
+    if contract.pack_name != source.name() || contract.generation != source.generation() {
+        return Err(GalError::invalid_argument(
+            "entity shadow contract does not belong to the supplied shader-pack source",
+        ));
+    }
+    let vertex = preprocess_stage_artifact(
+        source,
+        &contract.stages.vertex.path,
+        &contract.stages.vertex.defines,
+    )?;
+    let fragment = preprocess_stage_artifact(
+        source,
+        &contract.stages.fragment.path,
+        &contract.stages.fragment.defines,
+    )?;
+    let lowered =
+        super::lowering::lower_entity_shadow_source_pair(&vertex, &fragment)?;
+    lowered.require_backend_neutral_lowering()?;
+    Ok(lowered)
+}
+
+/// Derives, lowers, binds, and prepares the selected pack's entity-stream
+/// shadow caster program in one Rust-owned step.
+pub fn prepare_entity_shadow_source_program(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+) -> GalResult<super::programs::LoweredEntitySourceProgram> {
+    let contract = derive_entity_shadow_contract(source, scope)?;
+    let lowered = lower_entity_shadow_source_pair(source, &contract)?;
+    let declarations = super::terrain_source_resources::TerrainSourceResourceBindings::from_source(source)?;
+    let bindings = bind_entity_source_resources(&lowered, &declarations)?;
+    super::programs::prepare_lowered_entity_shadow_source_program(&contract, &lowered, &bindings)
 }
 
 /// Binds the selected entity source's base-color sampler to the explicit

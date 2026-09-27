@@ -38,8 +38,9 @@ public class SodiumGameOptionPages {
     private static final Window window = Minecraft.getInstance().getWindow();
 
     static boolean irisRuntimeOptionsAvailable() {
-        return !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-            && net.irisshaders.iris.Iris.getIrisConfig() != null;
+        // Shader-pack selection and options are persisted configuration; on the
+        // Rust Vulkan route Rust recollects the copied pack from that config.
+        return net.irisshaders.iris.Iris.getIrisConfig() != null;
     }
 
     public static OptionPage general() {

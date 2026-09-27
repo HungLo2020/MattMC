@@ -1,6 +1,8 @@
 package net.irisshaders.iris;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
+import net.irisshaders.iris.helpers.StringPair;
 import net.blaze3d.opengl.GlDebug;
 import net.blaze3d.platform.InputConstants;
 import net.blaze3d.vertex.DefaultVertexFormat;
@@ -88,6 +90,13 @@ public class Iris {
 	private static Path shaderpacksDirectory;
 	private static ShaderpackDirectoryManager shaderpacksDirectoryManager;
 	private static ShaderPack currentPack;
+	/**
+	 * Parsed pack used only by the shader-pack screens on the Rust Vulkan route.
+	 * It is CPU-side option/menu semantics; Rust collects its own copy of the
+	 * source and never receives this object or any Iris pipeline state.
+	 */
+	private static ShaderPack vulkanMenuPack;
+	private static boolean vulkanMenuPackLoaded;
 	private static String currentPackName;
 	private static Optional<Exception> storedError = Optional.empty();
 	private static boolean initialized;
@@ -320,9 +329,16 @@ public class Iris {
 		resetShaderPackOptions = false;
 
 		try {
-			currentPack = new ShaderPack(shaderPackPath, changedConfigs, StandardMacros.createStandardEnvironmentDefines(), isZip);
+			ShaderPack pack = new ShaderPack(shaderPackPath, changedConfigs, rustVulkanRoute()
+				? vulkanMenuEnvironmentDefines()
+				: StandardMacros.createStandardEnvironmentDefines(), isZip);
+			if (rustVulkanRoute()) {
+				vulkanMenuPack = pack;
+			} else {
+				currentPack = pack;
+			}
 
-			MutableOptionValues changedConfigsValues = currentPack.getShaderPackOptions().getOptionValues().mutableCopy();
+			MutableOptionValues changedConfigsValues = pack.getShaderPackOptions().getOptionValues().mutableCopy();
 
 			// Store changed values from those currently in use by the shader pack
 			Properties configsToSave = new Properties();
@@ -386,8 +402,32 @@ public class Iris {
 		}
 	}
 
+	/**
+	 * Environment for parsing pack options on the Rust Vulkan route. Uses the
+	 * same engine defines Rust receives instead of querying Java GPU state.
+	 */
+	private static ImmutableList<StringPair> vulkanMenuEnvironmentDefines() {
+		ImmutableList.Builder<StringPair> defines = ImmutableList.builder();
+		net.vulkanic.shaderpack.RustShaderPackSourceCollector.engineEnvironmentDefines()
+			.forEach((key, value) -> defines.add(new StringPair(key, value)));
+		return defines.build();
+	}
+
+	private static void closeZipFileSystem() {
+		if (zipFileSystem == null) {
+			return;
+		}
+		try {
+			zipFileSystem.close();
+		} catch (IOException e) {
+			logger.warn("Failed to close the shaderpack zip before reloading", e);
+		}
+		zipFileSystem = null;
+	}
+
 	private static void setShadersDisabled() {
 		currentPack = null;
+		vulkanMenuPack = null;
 		fallback = false;
 		currentPackName = "(off)";
 	}
@@ -510,7 +550,7 @@ public class Iris {
 	public static void queueDefaultShaderPackOptionValues() {
 		clearShaderPackOptionQueue();
 
-		getCurrentPack().ifPresent(pack -> {
+		getMenuPack().ifPresent(pack -> {
 			OptionSet options = pack.getShaderPackOptions().getOptionSet();
 			OptionValues values = pack.getShaderPackOptions().getOptionValues();
 
@@ -551,6 +591,12 @@ public class Iris {
 			}
 			currentPack = null;
 			fallback = false;
+			if (irisConfig != null) {
+				// Parse the selected pack for the options screen and persist queued
+				// option edits to <pack>.txt, which Rust reads as copied config.
+				reloadVulkanMenuPack();
+			}
+			net.vulkanic.gui.RustGalFrameCoordinator.requestShaderPackSourceRefresh();
 			return;
 		}
 		// allows shaderpacks to be changed at runtime
@@ -674,6 +720,33 @@ public class Iris {
 	}
 
 	@NotNull
+	private static boolean rustVulkanRoute() {
+		return VulkanicAPI.isVulkanBackendSelected() || RustGalVulkanWholeFrameMode.enabled();
+	}
+
+	private static void reloadVulkanMenuPack() {
+		vulkanMenuPackLoaded = true;
+		vulkanMenuPack = null;
+		closeZipFileSystem();
+		loadShaderpack();
+		currentPack = null;
+	}
+
+	/**
+	 * The pack whose options the shader-pack screens edit. On OpenGL this is the
+	 * active Iris pack; on the Rust Vulkan route it is a CPU-only parse of the
+	 * selected pack, loaded on first use.
+	 */
+	public static Optional<ShaderPack> getMenuPack() {
+		if (!rustVulkanRoute()) {
+			return getCurrentPack();
+		}
+		if (!vulkanMenuPackLoaded && irisConfig != null) {
+			reloadVulkanMenuPack();
+		}
+		return Optional.ofNullable(vulkanMenuPack);
+	}
+
 	public static Optional<ShaderPack> getCurrentPack() {
 		return Optional.ofNullable(currentPack);
 	}

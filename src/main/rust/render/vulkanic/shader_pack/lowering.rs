@@ -1748,6 +1748,7 @@ fn lower_shadow_fragment_surface_with_contracts(
         ("texture3D", "texture"),
         ("textureCube", "texture"),
         ("shadow2D", "vulkanic_source_shadow2D"),
+        ("shadow2DLod", "vulkanic_source_shadow2DLod"),
     ] {
         lowered = replace_identifier(&lowered, legacy, explicit);
     }
@@ -1918,6 +1919,80 @@ pub fn lower_entity_source_pair(
             &varying_contract,
             &opaque_resource_contract,
             SourceTransformSemantics::Entity,
+        )?,
+        fragment: lowered_fragment,
+        uniform_contract,
+        varying_contract,
+        opaque_resource_contract,
+    })
+}
+
+/// Lowers the selected pack's `shadow` stages for the entity mesh stream.
+/// Iris draws entity (and local-player) shadow casters with the same shadow
+/// program as terrain, but through the entity vertex format and a per-draw
+/// entity texture. The shadow matrices feed `ftransform()`/`gl_ModelView*`
+/// exactly as in the terrain shadow pass; `gl_FragData[n]` maps by index to
+/// shadow colour attachment `n`.
+pub fn lower_entity_shadow_source_pair(
+    vertex: &PreprocessedShaderSource,
+    fragment: &PreprocessedShaderSource,
+) -> GalResult<LoweredEntitySourcePair> {
+    let owned_storage_bindings = TerrainSourceResourceBindings::default();
+    let vertex = externalize_owned_semantic_storage_writes(vertex, &owned_storage_bindings)?;
+    let fragment = externalize_owned_semantic_storage_writes(fragment, &owned_storage_bindings)?;
+    let uniform_contract =
+        derive_source_uniform_contract(&vertex, &fragment, SourceTransformSemantics::Shadow)?;
+    let varying_contract = derive_terrain_source_varying_contract(&vertex, &fragment)?;
+    let opaque_resource_contract =
+        derive_terrain_source_opaque_resource_contract(&vertex, &fragment)?;
+    // Shadow fragments keep their shadow-space gl_FragCoord (the shadow pass
+    // rasterizes natively), so use the shadow lowering, not the screen-space
+    // world-material rewrite, then express its index-mapped outputs at the
+    // same locations for the entity pipeline.
+    let shadow_fragment = lower_shadow_fragment_surface_with_contracts(
+        &fragment,
+        &uniform_contract,
+        Some(&varying_contract),
+        &opaque_resource_contract,
+    )?;
+    let outputs = shadow_fragment
+        .outputs
+        .iter()
+        .map(|output| match output {
+            ShadowFragmentOutput::ShadowColor => TerrainFragmentOutput::LitColor,
+            ShadowFragmentOutput::LightShaftColor => TerrainFragmentOutput::MaterialAuxiliary,
+        })
+        .collect::<Vec<_>>();
+    let wrapped = shadow_fragment
+        .source
+        .replacen("void main()", "void vulkanic_entity_shadow_main()", 1);
+    if wrapped == shadow_fragment.source {
+        return Err(GalError::unsupported_feature(format!(
+            "entity shadow fragment '{}' has no main function for the shadow alpha test",
+            shadow_fragment.entry_path
+        )));
+    }
+    // Iris applies the pack's shadow alpha test to the shadow colour output.
+    // The entity pipeline supplies the cutoff; the default keeps every texel.
+    let wrapped = insert_after_version(
+        &format!(
+            "{wrapped}\nvoid main() {{\n    vulkanic_entity_shadow_main();\n    if (!(out_shadow_color.a > VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF)) discard;\n}}\n"
+        ),
+        "#ifndef VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF\n#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF -1.0\n#endif\n",
+    )?;
+    let lowered_fragment = LoweredTerrainFragmentSource {
+        entry_path: shadow_fragment.entry_path,
+        source: wrapped,
+        outputs,
+        remaining_dialect: shadow_fragment.remaining_dialect,
+    };
+    Ok(LoweredEntitySourcePair {
+        vertex: lower_source_vertex_surface_with_contracts(
+            &vertex,
+            &uniform_contract,
+            &varying_contract,
+            &opaque_resource_contract,
+            SourceTransformSemantics::Shadow,
         )?,
         fragment: lowered_fragment,
         uniform_contract,
@@ -2141,6 +2216,80 @@ pub fn lower_cloud_source_pair(
         varying_contract,
         opaque_resource_contract,
     })
+}
+
+/// Lowers a block-selection line pair (`gbuffers_line`) onto the compact
+/// material stream. Iris injects core-profile inputs for this stage: the
+/// camera-relative `vaPosition`, the segment direction in `vaNormal`, and the
+/// world `modelViewMatrix`/`projectionMatrix`. The pack expands each segment
+/// itself from `gl_VertexID` parity, so the stored (indexed) vertex id is
+/// exposed rather than the expanded draw index.
+pub fn lower_line_source_pair(
+    vertex: &PreprocessedShaderSource,
+    fragment: &PreprocessedShaderSource,
+    required_outputs: &[CloudFragmentOutput],
+) -> GalResult<LoweredCloudSourcePair> {
+    let owned_storage_bindings = TerrainSourceResourceBindings::default();
+    let vertex = externalize_owned_semantic_storage_writes(vertex, &owned_storage_bindings)?;
+    let fragment = externalize_owned_semantic_storage_writes(fragment, &owned_storage_bindings)?;
+    let vertex = lower_line_core_profile_inputs(&vertex)?;
+    let uniform_contract =
+        derive_source_uniform_contract(&vertex, &fragment, SourceTransformSemantics::Cloud)?;
+    let varying_contract = derive_terrain_source_varying_contract(&vertex, &fragment)?;
+    let opaque_resource_contract =
+        derive_terrain_source_opaque_resource_contract(&vertex, &fragment)?;
+    Ok(LoweredCloudSourcePair {
+        vertex: lower_source_vertex_surface_with_contracts(
+            &vertex,
+            &uniform_contract,
+            &varying_contract,
+            &opaque_resource_contract,
+            SourceTransformSemantics::Cloud,
+        )?,
+        fragment: lower_material_stream_fragment_surface_with_contracts(
+            &fragment,
+            &uniform_contract,
+            &varying_contract,
+            &opaque_resource_contract,
+            required_outputs,
+            "line",
+        )?,
+        uniform_contract,
+        varying_contract,
+        opaque_resource_contract,
+    })
+}
+
+fn lower_line_core_profile_inputs(
+    source: &PreprocessedShaderSource,
+) -> GalResult<PreprocessedShaderSource> {
+    const INJECTED: [&str; 4] = ["vaPosition", "vaNormal", "modelViewMatrix", "projectionMatrix"];
+    let mut text = String::with_capacity(source.expanded_source().len());
+    for line in source.expanded_source().lines() {
+        let trimmed = line.trim();
+        // A pack may redeclare the Iris-injected inputs; the Rust stream owns them.
+        let redeclares = (trimmed.starts_with("in ")
+            || trimmed.starts_with("attribute ")
+            || trimmed.starts_with("uniform "))
+            && trimmed.ends_with(';')
+            && INJECTED
+                .iter()
+                .any(|name| glsl_identifiers(trimmed).contains(*name));
+        if !redeclares {
+            text.push_str(line);
+        }
+        text.push('\n');
+    }
+    for (injected, explicit) in [
+        ("vaPosition", "vulkanic_source_position.xyz"),
+        ("vaNormal", "vulkanic_source_normal"),
+        ("modelViewMatrix", "gbufferModelView"),
+        ("projectionMatrix", "gbufferProjection"),
+        ("gl_VertexID", "vulkanic_source_stored_vertex_id"),
+    ] {
+        text = replace_identifier(&text, injected, explicit);
+    }
+    source.rewritten_for_lowering(text)
 }
 
 trait SelectedSourceFragmentTarget {
@@ -2921,6 +3070,7 @@ fn lower_terrain_fragment_surface_with_contracts(
         ("texture3D", "texture"),
         ("textureCube", "texture"),
         ("shadow2D", "vulkanic_source_shadow2D"),
+        ("shadow2DLod", "vulkanic_source_shadow2DLod"),
     ] {
         lowered = replace_identifier(&lowered, legacy, explicit);
     }
@@ -2968,7 +3118,7 @@ fn lower_terrain_fragment_surface_with_contracts(
     // Keep that source convention explicit for every world-material writer;
     // Vulkan's negative viewport otherwise inverts screen-space water/fog
     // reconstruction while geometry itself remains correctly transformed.
-    lowered = lower_world_material_fragment_coordinates(lowered, uniform_contract)?;
+    lowered = lower_world_material_fragment_coordinates(lowered, uniform_contract, source.world_custom_samplers())?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
     lowered = insert_after_version(&lowered, &declarations)?;
@@ -2998,6 +3148,7 @@ fn lower_textured_material_fragment_surface_with_contracts(
         ("texture3D", "texture"),
         ("textureCube", "texture"),
         ("shadow2D", "vulkanic_source_shadow2D"),
+        ("shadow2DLod", "vulkanic_source_shadow2DLod"),
     ] {
         lowered = replace_identifier(&lowered, legacy, explicit);
     }
@@ -3049,6 +3200,7 @@ fn lower_textured_material_fragment_surface_with_contracts(
     if uses_legacy_fog {
         lowered = insert_after_version(&lowered, LEGACY_FOG_SEMANTIC_PREAMBLE)?;
     }
+    lowered = lower_world_material_fragment_coordinates(lowered, uniform_contract, source.world_custom_samplers())?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
     lowered = insert_after_version(&lowered, &declarations)?;
@@ -3078,6 +3230,7 @@ fn lower_weather_fragment_surface_with_contracts(
         ("texture3D", "texture"),
         ("textureCube", "texture"),
         ("shadow2D", "vulkanic_source_shadow2D"),
+        ("shadow2DLod", "vulkanic_source_shadow2DLod"),
     ] {
         lowered = replace_identifier(&lowered, legacy, explicit);
     }
@@ -3103,6 +3256,7 @@ fn lower_weather_fragment_surface_with_contracts(
     if uses_legacy_fog {
         lowered = insert_after_version(&lowered, LEGACY_FOG_SEMANTIC_PREAMBLE)?;
     }
+    lowered = lower_world_material_fragment_coordinates(lowered, uniform_contract, source.world_custom_samplers())?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
     lowered = insert_after_version(
@@ -3124,6 +3278,32 @@ fn lower_cloud_fragment_surface_with_contracts(
     varying_contract: &TerrainSourceVaryingContract,
     opaque_resource_contract: &TerrainSourceOpaqueResourceContract,
 ) -> GalResult<LoweredCloudFragmentSource> {
+    lower_material_stream_fragment_surface_with_contracts(
+        source,
+        uniform_contract,
+        varying_contract,
+        opaque_resource_contract,
+        &[
+            CloudFragmentOutput::LitColor,
+            CloudFragmentOutput::MaterialAuxiliary,
+            CloudFragmentOutput::TranslucencyAuxiliary,
+        ],
+        "cloud",
+    )
+}
+
+/// Shared fragment lowering for compact material-stream writers (clouds,
+/// block-selection lines). `required_outputs` is the exact named-output set
+/// the selected source contract admitted; any other `gl_FragData` write is
+/// rejected rather than dropped.
+fn lower_material_stream_fragment_surface_with_contracts(
+    source: &PreprocessedShaderSource,
+    uniform_contract: &TerrainSourceUniformContract,
+    varying_contract: &TerrainSourceVaryingContract,
+    opaque_resource_contract: &TerrainSourceOpaqueResourceContract,
+    required_outputs: &[CloudFragmentOutput],
+    writer: &str,
+) -> GalResult<LoweredCloudFragmentSource> {
     let mut lowered = upgrade_version(source.expanded_source())?;
     lowered = strip_nonopaque_uniforms(&lowered)?;
     let uses_legacy_fog = lower_legacy_fog(&mut lowered);
@@ -3135,6 +3315,7 @@ fn lower_cloud_fragment_surface_with_contracts(
         ("texture3D", "texture"),
         ("textureCube", "texture"),
         ("shadow2D", "vulkanic_source_shadow2D"),
+        ("shadow2DLod", "vulkanic_source_shadow2DLod"),
     ] {
         lowered = replace_identifier(&lowered, legacy, explicit);
     }
@@ -3142,11 +3323,7 @@ fn lower_cloud_fragment_surface_with_contracts(
     lowered = apply_varying_locations(&lowered, VaryingStorage::In, varying_contract)?;
     lowered = apply_opaque_resource_bindings(&lowered, opaque_resource_contract)?;
     let mut outputs = Vec::new();
-    for output in [
-        CloudFragmentOutput::LitColor,
-        CloudFragmentOutput::MaterialAuxiliary,
-        CloudFragmentOutput::TranslucencyAuxiliary,
-    ] {
+    for &output in required_outputs {
         let (rewritten, occurrences) =
             replace_fragment_output(&lowered, output.legacy_index(), output.semantic_name())?;
         lowered = rewritten;
@@ -3156,21 +3333,16 @@ fn lower_cloud_fragment_surface_with_contracts(
     }
     if contains_fragment_output(&lowered)? {
         return Err(GalError::unsupported_feature(format!(
-            "cloud fragment '{}' writes an unsupported gl_FragData index",
+            "{writer} fragment '{}' writes an unsupported gl_FragData index",
             source.entry_path()
         )));
     }
-    let required_outputs = [
-        CloudFragmentOutput::LitColor,
-        CloudFragmentOutput::MaterialAuxiliary,
-        CloudFragmentOutput::TranslucencyAuxiliary,
-    ];
     if required_outputs
         .iter()
         .any(|output| !outputs.contains(output))
     {
         return Err(GalError::invalid_argument(format!(
-            "cloud fragment '{}' lacks one or more required named outputs",
+            "{writer} fragment '{}' lacks one or more required named outputs",
             source.entry_path()
         )));
     }
@@ -3187,6 +3359,7 @@ fn lower_cloud_fragment_surface_with_contracts(
     if uses_legacy_fog {
         lowered = insert_after_version(&lowered, LEGACY_FOG_SEMANTIC_PREAMBLE)?;
     }
+    lowered = lower_world_material_fragment_coordinates(lowered, uniform_contract, source.world_custom_samplers())?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
     lowered = insert_after_version(&lowered, &declarations)?;
@@ -3216,6 +3389,7 @@ fn lower_translucent_terrain_fragment_surface_with_contracts(
         ("texture3D", "texture"),
         ("textureCube", "texture"),
         ("shadow2D", "vulkanic_source_shadow2D"),
+        ("shadow2DLod", "vulkanic_source_shadow2DLod"),
     ] {
         lowered = replace_identifier(&lowered, legacy, explicit);
     }
@@ -3264,7 +3438,7 @@ fn lower_translucent_terrain_fragment_surface_with_contracts(
     // The water/translucent source shares the same lower-left fragment-space
     // contract as opaque terrain. Do not let it silently diverge from the
     // semantic source convention just because it has a distinct output pass.
-    lowered = lower_world_material_fragment_coordinates(lowered, uniform_contract)?;
+    lowered = lower_world_material_fragment_coordinates(lowered, uniform_contract, source.world_custom_samplers())?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
     lowered = insert_after_version(&lowered, &declarations)?;
@@ -3294,6 +3468,7 @@ fn lower_distant_horizons_fragment_surface_with_contracts(
         ("texture3D", "texture"),
         ("textureCube", "texture"),
         ("shadow2D", "vulkanic_source_shadow2D"),
+        ("shadow2DLod", "vulkanic_source_shadow2DLod"),
     ] {
         lowered = replace_identifier(&lowered, legacy, explicit);
     }
@@ -3325,7 +3500,7 @@ fn lower_distant_horizons_fragment_surface_with_contracts(
     }
     // Insert the coordinate helper before the source uniform block so the
     // subsequent insertion leaves `viewHeight` declared before the helper.
-    lowered = lower_world_material_fragment_coordinates(lowered, uniform_contract)?;
+    lowered = lower_world_material_fragment_coordinates(lowered, uniform_contract, source.world_custom_samplers())?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     lowered = insert_after_version(&lowered, FRAGMENT_SEMANTIC_PREAMBLE)?;
     lowered = insert_after_version(&lowered, &declaration)?;
@@ -3339,109 +3514,320 @@ fn lower_distant_horizons_fragment_surface_with_contracts(
 }
 
 const FRAGMENT_SEMANTIC_PREAMBLE: &str = r#"#define vulkanic_source_shadow2D(source_texture, source_coordinates) vec4(texture(source_texture, source_coordinates))
+#define vulkanic_source_shadow2DLod(source_texture, source_coordinates, source_lod) vec4(textureLod(source_texture, source_coordinates, source_lod))
 "#;
 
 /// Preserves the source pack's lower-left screen-coordinate contract for
-/// world-material fragments. Vulkan's native fragment Y origin is opposite.
-/// Integer source-target addresses stay native, though: those addresses name
-/// the Rust-owned image storage rather than a source-space screen direction.
+/// world-material fragments. Vulkan's native fragment Y origin is opposite,
+/// and Rust-owned targets are stored in native (top-down) image order, so
+/// every source-space access to a target -- filtered, explicit-LOD, integer,
+/// or through a sampler function parameter -- is flipped exactly once.
+/// Samplers the pack binds to its own images keep their authored addressing.
 fn lower_world_material_fragment_coordinates(
     mut source: String,
     uniform_contract: &TerrainSourceUniformContract,
+    custom_samplers: &[String],
 ) -> GalResult<String> {
-    if !glsl_identifiers(&source).contains("gl_FragCoord") {
-        return Ok(source);
-    }
-    if !uniform_contract
-        .fields()
-        .iter()
-        .any(|field| field.name() == "viewHeight")
+    let reads_fragment_coordinate = glsl_identifiers(&source).contains("gl_FragCoord");
+    if reads_fragment_coordinate
+        && !uniform_contract
+            .fields()
+            .iter()
+            .any(|field| field.name() == "viewHeight")
     {
         return Err(GalError::unsupported_feature(
             "world-material source reads gl_FragCoord but does not declare viewHeight for explicit coordinate conversion",
         ));
     }
-    source = replace_identifier(
-        &source,
-        "gl_FragCoord",
-        "vulkanic_source_world_fragment_coord()",
-    );
+    if reads_fragment_coordinate {
+        source = replace_identifier(
+            &source,
+            "gl_FragCoord",
+            "vulkanic_source_world_fragment_coord()",
+        );
+    }
     let (source, source_target_sampling_preamble) =
-        lower_world_material_source_target_sampling(source);
-    insert_after_version(
-        &source,
-        &format!(
-            r#"vec4 vulkanic_source_world_fragment_coord() {{
+        lower_world_material_source_target_sampling(source, custom_samplers);
+    if !reads_fragment_coordinate && source_target_sampling_preamble.is_empty() {
+        return Ok(source);
+    }
+    let fragment_coordinate = if reads_fragment_coordinate {
+        r#"vec4 vulkanic_source_world_fragment_coord() {
     vec4 coordinate = gl_FragCoord;
 #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
     coordinate.y = viewHeight - coordinate.y;
 #endif
     return coordinate;
-}}
-{}"#,
-            source_target_sampling_preamble
-        ),
+}
+"#
+    } else {
+        ""
+    };
+    insert_after_version(
+        &source,
+        &format!("{fragment_coordinate}{source_target_sampling_preamble}"),
     )
 }
+
+const WORLD_SOURCE_TARGET_SAMPLERS: &[&str] = &[
+    "depthtex0",
+    "depthtex1",
+    "depthtex2",
+    "dhDepthTex",
+    "dhDepthTex0",
+    "dhDepthTex1",
+    "gaux1",
+    "gaux2",
+    "gaux3",
+    "gaux4",
+    "colortex0",
+    "colortex1",
+    "colortex2",
+    "colortex3",
+    "colortex4",
+    "colortex5",
+    "colortex6",
+    "colortex7",
+    "colortex8",
+    "colortex9",
+    "colortex10",
+    "colortex11",
+    "colortex12",
+    "colortex13",
+    "colortex14",
+    "colortex15",
+];
 
 /// Source terrain fragments express screen coordinates in the OpenGL
 /// lower-left domain. Rust-owned pass targets are sampled in their native
 /// image domain, so source-target samplers must flip that coordinate exactly
-/// once. Atlas/material samplers deliberately remain untouched.
-fn lower_world_material_source_target_sampling(mut source: String) -> (String, String) {
-    const SOURCE_TARGET_SAMPLERS: &[&str] = &[
-        "depthtex0",
-        "depthtex1",
-        "depthtex2",
-        "dhDepthTex",
-        "dhDepthTex0",
-        "dhDepthTex1",
-        "gaux1",
-        "gaux2",
-        "gaux3",
-        "gaux4",
-        "colortex0",
-        "colortex1",
-        "colortex2",
-        "colortex3",
-        "colortex4",
-        "colortex5",
-        "colortex6",
-        "colortex7",
-        "colortex8",
-        "colortex9",
-        "colortex10",
-        "colortex11",
-        "colortex12",
-        "colortex13",
-        "colortex14",
-        "colortex15",
-    ];
-
-    let mut preamble = String::from(
+/// once. Atlas/material samplers and pack-bound images remain untouched.
+/// Returns an empty preamble when the stage touches no target.
+fn lower_world_material_source_target_sampling(
+    mut source: String,
+    custom_samplers: &[String],
+) -> (String, String) {
+    let targets = WORLD_SOURCE_TARGET_SAMPLERS
+        .iter()
+        .copied()
+        .filter(|name| !custom_samplers.iter().any(|custom| custom == name))
+        .collect::<Vec<_>>();
+    let mut helpers = String::new();
+    let mut uses_uv = false;
+    let mut uses_texel = false;
+    for sampler in &targets {
+        for (call, helper, definition) in [
+            (
+                format!("texture({sampler},"),
+                format!("vulkanic_source_sample_target_{sampler}("),
+                format!("#define vulkanic_source_sample_target_{sampler}(source_uv) texture({sampler}, vulkanic_source_world_target_uv(source_uv))\n"),
+            ),
+            (
+                format!("textureLod({sampler},"),
+                format!("vulkanic_source_sample_target_lod_{sampler}("),
+                format!("#define vulkanic_source_sample_target_lod_{sampler}(source_uv, source_lod) textureLod({sampler}, vulkanic_source_world_target_uv(source_uv), source_lod)\n"),
+            ),
+            (
+                format!("texelFetch({sampler},"),
+                format!("vulkanic_source_fetch_target_{sampler}("),
+                format!("#define vulkanic_source_fetch_target_{sampler}(source_texel, source_lod) texelFetch({sampler}, vulkanic_source_world_target_texel(ivec2(source_texel), textureSize({sampler}, source_lod)), source_lod)\n"),
+            ),
+        ] {
+            if !source.contains(&call) {
+                continue;
+            }
+            source = source.replace(&call, &helper);
+            // A macro expands at the original call site. Sampler declarations
+            // can follow this preamble, which a function body could not see.
+            helpers.push_str(&definition);
+            if call.starts_with("texelFetch") {
+                uses_texel = true;
+            } else {
+                uses_uv = true;
+            }
+        }
+    }
+    // Sampler function parameters (for example a reflection helper taking
+    // `sampler2D depthtex`) are flipped when every call site passes a target.
+    let parameter_rewrite = lower_target_sampler_parameters(&source, &targets);
+    if let Some(rewritten) = parameter_rewrite {
+        source = rewritten;
+        uses_uv = true;
+        helpers.push_str(
+            "#define vulkanic_source_sample_target_parameter(source_sampler, source_uv) texture(source_sampler, vulkanic_source_world_target_uv(source_uv))\n\
+#define vulkanic_source_sample_target_parameter_lod(source_sampler, source_uv, source_lod) textureLod(source_sampler, vulkanic_source_world_target_uv(source_uv), source_lod)\n",
+        );
+    }
+    if !uses_uv && !uses_texel {
+        return (source, String::new());
+    }
+    let preamble = format!(
         r#"#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
 #define vulkanic_source_world_target_uv(source_uv) vec2((source_uv).x, 1.0 - (source_uv).y)
+ivec2 vulkanic_source_world_target_texel(ivec2 texel, ivec2 size) {{ return ivec2(texel.x, size.y - 1 - texel.y); }}
 #else
 #define vulkanic_source_world_target_uv(source_uv) (source_uv)
+ivec2 vulkanic_source_world_target_texel(ivec2 texel, ivec2 size) {{ return texel; }}
 #endif
-"#,
+{helpers}"#
     );
-    for sampler in SOURCE_TARGET_SAMPLERS {
-        let source_call = format!("texture({sampler},");
-        if !source.contains(&source_call) {
+    (source, preamble)
+}
+
+/// Rewrites `texture`/`textureLod` on `sampler2D` function parameters whose
+/// every call site passes a Rust-owned target. Mixed call sites are left as
+/// authored rather than guessed.
+fn lower_target_sampler_parameters(source: &str, targets: &[&str]) -> Option<String> {
+    let bytes = source.as_bytes();
+    let mut rewritten = source.to_string();
+    let mut search = 0usize;
+    while let Some(relative) = source[search..].find("sampler2D ") {
+        let at = search + relative;
+        search = at + "sampler2D ".len();
+        // Only parameters: the nearest preceding structural character must be
+        // '(' or ',' inside a function signature (not a `uniform` declaration).
+        let before = source[..at].trim_end();
+        if !(before.ends_with('(') || before.ends_with(',')) {
             continue;
         }
-        let helper = format!("vulkanic_source_sample_target_{sampler}");
-        source = source.replace(&source_call, &format!("{helper}("));
-        // A macro deliberately expands at the original source call site. The
-        // source sampler declarations can occur after our semantic preamble,
-        // while a GLSL function body would require each sampler to have been
-        // declared before that body is parsed.
-        preamble.push_str(&format!(
-            "#define {helper}(source_uv) texture({sampler}, vulkanic_source_world_target_uv(source_uv))\n"
-        ));
+        let name: String = source[search..]
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
+        if name.is_empty() {
+            continue;
+        }
+        // Locate the enclosing signature and function name.
+        let Some(open) = before.rfind('(').filter(|&open| {
+            !source[open..at].contains(')') && !source[open..at].contains(';')
+        }) else {
+            continue;
+        };
+        let function: String = source[..open]
+            .trim_end()
+            .chars()
+            .rev()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        if function.is_empty() {
+            continue;
+        }
+        let parameter_index = source[open + 1..at].matches(',').count();
+        let Some(close) = matching_paren(bytes, open) else {
+            continue;
+        };
+        let Some(body_open) = source[close..].find('{').map(|offset| close + offset) else {
+            continue;
+        };
+        if !source[close + 1..body_open].trim().is_empty() {
+            continue;
+        }
+        let Some(body_close) = matching_brace(bytes, body_open) else {
+            continue;
+        };
+        // Every call of `function` (outside its own definition) must pass a
+        // target at this parameter position.
+        let mut calls = 0usize;
+        let mut all_targets = true;
+        let mut cursor = 0usize;
+        while let Some(relative) = source[cursor..].find(&format!("{function}(")) {
+            let call = cursor + relative;
+            cursor = call + function.len() + 1;
+            let preceded_by_identifier = call > 0
+                && (bytes[call - 1].is_ascii_alphanumeric() || bytes[call - 1] == b'_');
+            if preceded_by_identifier || call + function.len() == open {
+                continue;
+            }
+            let call_open = call + function.len();
+            let Some(call_close) = matching_paren(bytes, call_open) else {
+                all_targets = false;
+                break;
+            };
+            let arguments = split_top_level_arguments(&source[call_open + 1..call_close]);
+            calls += 1;
+            match arguments.get(parameter_index) {
+                Some(argument) if targets.contains(&argument.trim()) => {}
+                _ => all_targets = false,
+            }
+        }
+        if calls == 0 || !all_targets {
+            continue;
+        }
+        let body = &rewritten[body_open..body_close];
+        let new_body = body
+            .replace(
+                &format!("textureLod({name},"),
+                &format!("vulkanic_source_sample_target_parameter_lod({name},"),
+            )
+            .replace(
+                &format!("texture({name},"),
+                &format!("vulkanic_source_sample_target_parameter({name},"),
+            );
+        if new_body != body {
+            // Offsets stay valid: the rewrite only grows text after `body_open`
+            // and parameters are processed in source order below it.
+            rewritten = format!("{}{}{}", &rewritten[..body_open], new_body, &rewritten[body_close..]);
+            // Re-run on the updated text for any further parameters.
+            return lower_target_sampler_parameters(&rewritten, targets).or(Some(rewritten));
+        }
     }
-    (source, preamble)
+    None
+}
+
+fn matching_paren(bytes: &[u8], open: usize) -> Option<usize> {
+    let mut depth = 0i32;
+    for (index, &byte) in bytes.iter().enumerate().skip(open) {
+        match byte {
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(index);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn matching_brace(bytes: &[u8], open: usize) -> Option<usize> {
+    let mut depth = 0i32;
+    for (index, &byte) in bytes.iter().enumerate().skip(open) {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(index);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn split_top_level_arguments(arguments: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+    for (index, character) in arguments.char_indices() {
+        match character {
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth -= 1,
+            ',' if depth == 0 => {
+                parts.push(&arguments[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(&arguments[start..]);
+    parts
 }
 
 /// Lowers the audited terrain vertex compatibility names into an explicit
@@ -3479,10 +3865,10 @@ enum SourceTransformSemantics {
 impl SourceTransformSemantics {
     fn model_view_expression(self) -> &'static str {
         match self {
-            // First-person ModelPart poses are already expressed in the
-            // camera's hand space; compose the copied pose before the camera
-            // matrix so the hand remains in the HUD-side viewport.
-            Self::Hand => "(vulkanic_source_model_transform * gbufferModelView)",
+            // The copied hand instance contains the inverse world view and
+            // the first-person item pose. Match the OpenGL model-view stack:
+            // view * (inverse_view * hand_pose).
+            Self::Hand => "(gbufferModelView * vulkanic_source_model_transform)",
             Self::Terrain | Self::Entity => "(gbufferModelView * vulkanic_source_model_transform)",
             Self::Shadow => "(shadowModelView * vulkanic_source_model_transform)",
             Self::DistantHorizons => "(dhModelView * vulkanic_source_model_transform)",
@@ -3510,7 +3896,9 @@ impl SourceTransformSemantics {
         match self {
             Self::Terrain => "gbufferProjection",
             Self::Entity => "gbufferProjection",
-            Self::Hand => "gbufferProjection",
+            // Iris keeps gbufferProjection as the world camera uniform while
+            // its legacy GL projection changes for first-person geometry.
+            Self::Hand => "vulkanic_source_hand_projection",
             Self::TexturedMaterial => "gbufferProjection",
             Self::Weather => "gbufferProjection",
             Self::Cloud => "gbufferProjection",
@@ -3978,6 +4366,7 @@ fn lower_fullscreen_source_vertex_with_contracts(
     // GLSL declarations must precede the procedural helper functions that
     // consume them. `insert_after_version` prepends each insertion, so stage
     // helpers are inserted first and the semantic scalar block last.
+    lowered = lower_fullscreen_source_history_corner(lowered, uniform_contract)?;
     lowered = insert_after_version(&lowered, &uniform_block(uniform_contract))?;
     // Fullscreen source stages are authored with the same OpenGL clip-depth
     // convention as terrain sources. Their procedural coverage must receive
@@ -4010,6 +4399,7 @@ fn lower_fullscreen_source_fragment_with_contracts(
         ("texture3D", "texture"),
         ("textureCube", "texture"),
         ("shadow2D", "vulkanic_source_shadow2D"),
+        ("shadow2DLod", "vulkanic_source_shadow2DLod"),
     ] {
         lowered = replace_identifier(&lowered, legacy, explicit);
     }
@@ -4087,6 +4477,7 @@ fn lower_fullscreen_source_fragment_with_contracts(
     // native presentation row order. Depth attachments use that same target
     // coordinate here so color and depth remain aligned during composites.
     lowered = lower_fullscreen_fragment_coordinates(lowered, uniform_contract)?;
+    lowered = lower_fullscreen_source_history_corner(lowered, uniform_contract)?;
     // Fullscreen shader-pack stages commonly reconstruct view space from a
     // sampled depth value using the legacy OpenGL clip-depth mapping.  The
     // Vulkan depth attachment is zero-to-one, so normalize these source
@@ -4102,6 +4493,43 @@ fn lower_fullscreen_source_fragment_with_contracts(
         outputs,
         remaining_dialect,
     })
+}
+
+/// Converts an explicit source-color history texel from OpenGL's lower-left
+/// address space to the Rust target's Vulkan row order. The top-right corner
+/// carries Complementary's persistent lightshaft factor. Fragment-coordinate
+/// writes already use the converted source coordinate, but a vertex-stage
+/// texelFetch does not pass through fragment-coordinate lowering.
+fn lower_fullscreen_source_history_corner(
+    mut source: String,
+    uniform_contract: &TerrainSourceUniformContract,
+) -> GalResult<String> {
+    const SOURCE_FETCH: &str =
+        "texelFetch(colortex4, ivec2(viewWidth-1, viewHeight-1), 0)";
+    if !source.contains(SOURCE_FETCH) {
+        return Ok(source);
+    }
+    if !uniform_contract.fields().iter().any(|field| field.name() == "viewHeight") {
+        return Err(GalError::unsupported_feature(
+            "fullscreen source history-corner fetch requires copied viewHeight",
+        ));
+    }
+    source = source.replace(
+        SOURCE_FETCH,
+        "texelFetch(colortex4, vulkanic_source_fullscreen_history_corner(viewWidth, viewHeight), 0)",
+    );
+    insert_after_version(
+        &source,
+        r#"ivec2 vulkanic_source_fullscreen_history_corner(float source_width, float source_height) {
+    ivec2 source_texel = ivec2(source_width - 1.0, source_height - 1.0);
+#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
+    return ivec2(source_texel.x, int(source_height) - 1 - source_texel.y);
+#else
+    return source_texel;
+#endif
+}
+"#,
+    )
 }
 
 /// Preserves the source pack's lower-left fragment-space convention in
@@ -4148,6 +4576,8 @@ fn lower_fullscreen_fragment_coordinates(
     for anchor in [
         "vec4 screenPos = vec4(texCoord,",
         "vec4 screenPosDH = vec4(texCoord,",
+        "vec4 screenPos1 = vec4(texCoord,",
+        "vec4 screenPos1DH = vec4(texCoord,",
     ] {
         source = source.replace(
             anchor,
@@ -4156,6 +4586,31 @@ fn lower_fullscreen_fragment_coordinates(
                 "vec4(vulkanic_source_fullscreen_screen_uv(texCoord),",
             ),
         );
+    }
+    // Included source helpers can invert the projection inline rather than
+    // naming a screenPos vector. The same source-screen UV rule applies.
+    source = source.replace(
+        "gbufferProjectionInverse * (vec4(texCoord,",
+        "gbufferProjectionInverse * (vec4(vulkanic_source_fullscreen_screen_uv(texCoord),",
+    );
+    // The TAA reprojection helper returns an OpenGL screen UV, while the
+    // history image and the current fullscreen varying use image UVs. Convert
+    // the returned coordinate once so sampling and velocity share a domain.
+    source = source.replace(
+        "prvCoord = Reprojection(viewPos1);",
+        "prvCoord = vulkanic_source_fullscreen_screen_uv(Reprojection(viewPos1));",
+    );
+    // Copied pack noise images retain their decoded texels. Fullscreen source
+    // noise lookups authored from texCoord still require OpenGL's lower-left
+    // screen UV; color/depth target lookups keep the native image UV.
+    for sampler_call in ["texture2D", "texture"] {
+        for suffix in [" *", ")"] {
+            let source_call = format!("{sampler_call}(noisetex, texCoord{suffix}");
+            let converted_call = format!(
+                "{sampler_call}(noisetex, vulkanic_source_fullscreen_screen_uv(texCoord){suffix}"
+            );
+            source = source.replace(&source_call, &converted_call);
+        }
     }
     insert_after_version(
         &source,
@@ -4659,6 +5114,14 @@ fn vertex_semantic_preamble(transforms: SourceTransformSemantics) -> String {
     VERTEX_SEMANTIC_PREAMBLE_TEMPLATE
         .replace("{model_view}", transforms.model_view_uniform())
         .replace("{model_view_expr}", transforms.model_view_expression())
+        .replace(
+            "{hand_projection_field}",
+            if transforms == SourceTransformSemantics::Hand {
+                "mat4 vulkanic_source_hand_projection;"
+            } else {
+                ""
+            },
+        )
         .replace("{projection}", transforms.projection_uniform())
 }
 
@@ -4677,6 +5140,7 @@ layout(set = 0, binding = 0, std430) readonly buffer VulkanicSourceTerrainVertic
 };
 layout(set = 0, binding = 1, std140) uniform VulkanicSourceTerrainLegacyTransforms {
     mat4 vulkanic_source_texture_matrix[2];
+    {hand_projection_field}
 };
 struct VulkanicSourceTerrainInstance {
     mat4 model_transform;
@@ -4726,6 +5190,9 @@ layout(set = 0, binding = 1, std140) uniform VulkanicSourceTexturedMaterialLegac
 // per-frame index upload is required.
 const int vulkanic_source_textured_quad_indices[6] = int[6](0, 1, 2, 2, 3, 0);
 #define vulkanic_source_vertex vulkanic_source_textured_vertices[((gl_VertexIndex / 6) * 4) + vulkanic_source_textured_quad_indices[gl_VertexIndex % 6]]
+// The stored (indexed) vertex id, matching GL's gl_VertexID for an indexed
+// quad draw. Line sources use its parity to pick a segment side.
+#define vulkanic_source_stored_vertex_id (((gl_VertexIndex / 6) * 4) + vulkanic_source_textured_quad_indices[gl_VertexIndex % 6])
 #define vulkanic_source_model_view gbufferModelView
 #define vulkanic_source_normal_matrix transpose(inverse(mat3(vulkanic_source_model_view)))
 #define vulkanic_source_position vulkanic_source_vertex.position
@@ -5507,6 +5974,28 @@ fn derive_source_uniform_contract(
                 }
             }
         }
+        // World fragments convert gl_FragCoord to OpenGL's lower-left origin
+        // with the explicit viewport height, even when the pack itself never
+        // names `viewHeight` (for example a Bayer dither on gl_FragCoord.xy).
+        if std::ptr::eq(source, fragment)
+            && !matches!(
+                transforms,
+                SourceTransformSemantics::Shadow | SourceTransformSemantics::Fullscreen
+            )
+            && glsl_identifiers(source.expanded_source()).contains("gl_FragCoord")
+        {
+            match declarations.get("viewHeight") {
+                Some(existing) if existing != "float viewHeight;" => {
+                    return Err(GalError::invalid_argument(format!(
+                        "world fragment viewHeight must be declared as 'float viewHeight;' rather than '{existing}'"
+                    )));
+                }
+                Some(_) => {}
+                None => {
+                    declarations.insert("viewHeight".to_string(), "float viewHeight;".to_string());
+                }
+            }
+        }
         for (name, declaration) in required_legacy_fog_uniforms(source.expanded_source()) {
             match declarations.get(name) {
                 Some(existing) if existing != declaration => {
@@ -5821,7 +6310,12 @@ fn required_legacy_transform_uniforms(
             },
         ));
     }
-    if referenced.contains("gl_ProjectionMatrix") || referenced.contains("ftransform") {
+    // Hand clip projection lives in the hand-only legacy transform block.
+    // Iris still exposes the world gbufferProjection to source uniforms, so
+    // a legacy built-in must not inject a second scalar declaration here.
+    if transforms != SourceTransformSemantics::Hand
+        && (referenced.contains("gl_ProjectionMatrix") || referenced.contains("ftransform"))
+    {
         requirements.push((
             transforms.projection_uniform(),
             match transforms {
@@ -5875,6 +6369,11 @@ fn required_legacy_fog_uniforms(source: &str) -> Vec<(&'static str, &'static str
 /// whether a scalar declaration is referenced by the already-expanded source.
 /// It deliberately treats identifiers in active preprocessor definitions as
 /// references, which is conservative and avoids dropping macro-fed inputs.
+#[cfg(test)]
+pub(crate) fn glsl_identifiers_for_test(source: &str) -> BTreeSet<String> {
+    glsl_identifiers(source)
+}
+
 fn glsl_identifiers(source: &str) -> BTreeSet<String> {
     let bytes = source.as_bytes();
     let mut identifiers = BTreeSet::new();
@@ -6360,6 +6859,41 @@ mod tests {
     }
 
     #[test]
+    fn world_target_lowering_flips_fetches_lod_and_target_parameters_but_not_pack_images() {
+        let source = concat!(
+            "uniform sampler2D depthtex1; uniform sampler2D gaux4; uniform sampler2D colortex6;\n",
+            "float probe(sampler2D depthtex, vec2 uv) { return texture(depthtex, uv).r + textureLod(depthtex, uv, 0.0).r; }\n",
+            "float mixed(sampler2D any, vec2 uv) { return texture(any, uv).r; }\n",
+            "void main() {\n",
+            "  float a = probe(depthtex1, vec2(0.5));\n",
+            "  float b = mixed(depthtex1, vec2(0.5)) + mixed(gaux4, vec2(0.5));\n",
+            "  vec4 m = texelFetch(colortex6, ivec2(3, 4), 0);\n",
+            "  vec4 n = texture(gaux4, vec2(0.25));\n",
+            "  vec4 l = textureLod(colortex6, vec2(0.25), 1.0);\n",
+            "}\n"
+        )
+        .to_string();
+        let lowered = lower_world_material_fragment_coordinates(
+            source,
+            &TerrainSourceUniformContract {
+                declarations: Vec::new(),
+                fields: Vec::new(),
+                std140_size: 0,
+            },
+            &["gaux4".to_string()],
+        )
+        .unwrap();
+        assert!(lowered.contains("vulkanic_source_fetch_target_colortex6( ivec2(3, 4), 0)"));
+        assert!(lowered.contains("vulkanic_source_sample_target_lod_colortex6( vec2(0.25), 1.0)"));
+        assert!(lowered.contains("vulkanic_source_sample_target_parameter(depthtex, uv)"));
+        assert!(lowered.contains("vulkanic_source_sample_target_parameter_lod(depthtex, uv, 0.0)"));
+        // Mixed call sites and pack-bound images keep their authored addressing.
+        assert!(lowered.contains("return texture(any, uv).r;"));
+        assert!(lowered.contains("vec4 n = texture(gaux4, vec2(0.25));"));
+        assert!(lowered.contains("size.y - 1 - texel.y"));
+    }
+
+    #[test]
     fn selected_source_atlas_probe_reaches_water_style_colorp_sample() {
         let mut lowered = lower_terrain_fragment_surface(&artifact(
             "#version 130\nuniform sampler2D tex; varying vec2 texCoord; void main() { vec4 colorP = texture2D(tex, texCoord); gl_FragData[0] = colorP; gl_FragData[1] = vec4(1.0); }",
@@ -6669,6 +7203,21 @@ mod tests {
         assert!(compare
             .source()
             .contains("vulkanic_source_shadow2D(shadowtex0"));
+    }
+
+    #[test]
+    fn legacy_shadow2d_lod_lowers_to_explicit_lod_comparison() {
+        let lowered = lower_terrain_fragment_surface(&artifact(
+            "#version 130\nuniform sampler2DShadow shadowtex1; varying vec2 texCoord; void main() { float s = shadow2DLod(shadowtex1, vec3(texCoord, 0.5), 0.0).z; gl_FragData[0] = vec4(s); }",
+        ))
+        .unwrap();
+        assert!(lowered
+            .source()
+            .contains("vulkanic_source_shadow2DLod(shadowtex1, vec3(texCoord, 0.5), 0.0)"));
+        assert!(lowered.source().contains(
+            "#define vulkanic_source_shadow2DLod(source_texture, source_coordinates, source_lod) vec4(textureLod(source_texture, source_coordinates, source_lod))"
+        ));
+        assert!(!lowered.source().contains(" shadow2DLod("));
     }
 
     #[test]
@@ -7104,6 +7653,49 @@ mod tests {
     }
 
     #[test]
+    fn fullscreen_history_corner_fetch_uses_source_to_target_row_conversion() {
+        let pack = ShaderPackSource::new(
+            "fullscreen-history-corner",
+            1,
+            vec![
+                ShaderSourceFile::new(
+                    "world0/deferred.vsh",
+                    "#version 130\nuniform sampler2D colortex4;\nuniform float viewWidth;\nuniform float viewHeight;\nout float factor;\nvoid main() { factor = texelFetch(colortex4, ivec2(viewWidth-1, viewHeight-1), 0).r; gl_Position = ftransform(); }",
+                ),
+                ShaderSourceFile::new(
+                    "world0/deferred.fsh",
+                    "#version 130\nin float factor;\n/* DRAWBUFFERS:0 */\nvoid main() { gl_FragData[0] = vec4(factor); }",
+                ),
+                ShaderSourceFile::new(
+                    super::super::terrain_source_resources::TERRAIN_RESOURCE_BINDINGS_PATH,
+                    "colortex0=shader_pack_color:primary\ncolortex4=shader_pack_color:volumetric_factor\n",
+                ),
+            ],
+        )
+        .unwrap();
+        let vertex = preprocess_artifact(PreprocessInput {
+            source: &pack,
+            entry: "world0/deferred.vsh",
+            defines: &[],
+        })
+        .unwrap();
+        let fragment = preprocess_artifact(PreprocessInput {
+            source: &pack,
+            entry: "world0/deferred.fsh",
+            defines: &[],
+        })
+        .unwrap();
+        let bindings = TerrainSourceResourceBindings::from_source(&pack).unwrap();
+        let lowered = lower_fullscreen_source_pair(&vertex, &fragment, &bindings).unwrap();
+        assert!(lowered.vertex().source().contains(
+            "vulkanic_source_fullscreen_history_corner(viewWidth, viewHeight)"
+        ));
+        assert!(lowered.vertex().source().contains(
+            "return ivec2(source_texel.x, int(source_height) - 1 - source_texel.y);"
+        ));
+    }
+
+    #[test]
     fn fullscreen_fragment_coordinates_keep_source_math_and_native_target_addresses() {
         let pack = ShaderPackSource::new(
             "fullscreen-fragment-coordinate-domains",
@@ -7115,7 +7707,7 @@ mod tests {
                 ),
                 ShaderSourceFile::new(
                     "world0/deferred.fsh",
-                    "#version 130\n/* DRAWBUFFERS:0 */\nin vec2 texCoord;\nuniform float viewHeight;\nuniform sampler2D colortex0;\nuniform sampler2D depthtex0;\nvoid main() { ivec2 texelCoord = ivec2(gl_FragCoord.xy); vec2 sourceScreen = gl_FragCoord.xy / vec2(1.0, viewHeight); vec4 screenPos = vec4(texCoord, 0.5, 1.0); vec4 screenPosDH = vec4(texCoord, 0.75, 1.0); vec4 reconstructed = vec4(texCoord, texelFetch(colortex0, texelCoord, 0).r + texelFetch(depthtex0, texelCoord, 0).r, 1.0); gl_FragData[0] = texelFetch(colortex0, texelCoord, 0) + vec4(sourceScreen, 0.0, 0.0) + reconstructed + screenPos + screenPosDH; }",
+                    "#version 130\n/* DRAWBUFFERS:0 */\nin vec2 texCoord;\nuniform float viewHeight;\nuniform sampler2D colortex0;\nuniform sampler2D depthtex0;\nuniform sampler2D noisetex;\nuniform mat4 gbufferProjectionInverse;\nvec2 Reprojection(vec4 p) { return p.xy; }\nvoid main() { ivec2 texelCoord = ivec2(gl_FragCoord.xy); vec2 sourceScreen = gl_FragCoord.xy / vec2(1.0, viewHeight); vec4 screenPos = vec4(texCoord, 0.5, 1.0); vec4 screenPosDH = vec4(texCoord, 0.75, 1.0); vec4 screenPos1 = vec4(texCoord, 0.25, 1.0); vec4 screenPos1DH = vec4(texCoord, 0.125, 1.0); vec4 inlineView = gbufferProjectionInverse * (vec4(texCoord, 0.5, 1.0) * 2.0 - 1.0); vec4 viewPos1 = inlineView; vec2 prvCoord = texCoord; prvCoord = Reprojection(viewPos1); vec4 noise = texture2D(noisetex, texCoord * vec2(1280.0, 720.0) / 128.0); vec4 reconstructed = vec4(texCoord, texelFetch(colortex0, texelCoord, 0).r + texelFetch(depthtex0, texelCoord, 0).r, 1.0); gl_FragData[0] = texelFetch(colortex0, texelCoord, 0) + vec4(sourceScreen, 0.0, 0.0) + reconstructed + inlineView + noise + screenPos + screenPosDH + screenPos1 + screenPos1DH + vec4(prvCoord, 0.0, 0.0); }",
                 ),
                 ShaderSourceFile::new(
                     super::super::terrain_source_resources::TERRAIN_RESOURCE_BINDINGS_PATH,
@@ -7154,6 +7746,21 @@ mod tests {
         ));
         assert!(fragment.contains(
             "vec4 screenPosDH = vec4(vulkanic_source_fullscreen_screen_uv(texCoord), 0.75, 1.0);"
+        ));
+        assert!(fragment.contains(
+            "vec4 screenPos1 = vec4(vulkanic_source_fullscreen_screen_uv(texCoord), 0.25, 1.0);"
+        ));
+        assert!(fragment.contains(
+            "vec4 screenPos1DH = vec4(vulkanic_source_fullscreen_screen_uv(texCoord), 0.125, 1.0);"
+        ));
+        assert!(fragment.contains(
+            "gbufferProjectionInverse * (vec4(vulkanic_source_fullscreen_screen_uv(texCoord), 0.5, 1.0)"
+        ));
+        assert!(fragment.contains(
+            "texture(noisetex, vulkanic_source_fullscreen_screen_uv(texCoord) * vec2(1280.0, 720.0) / 128.0)"
+        ));
+        assert!(fragment.contains(
+            "prvCoord = vulkanic_source_fullscreen_screen_uv(Reprojection(viewPos1));"
         ));
         assert!(
             fragment.find("uniform float viewHeight;")
@@ -7691,7 +8298,7 @@ mod tests {
     }
 
     #[test]
-    fn hand_lowering_composes_pose_before_camera_model_view() {
+    fn hand_lowering_composes_camera_model_view_before_copied_pose() {
         let vertex = artifact(
             "#version 130\nvarying vec2 texCoord; varying vec4 glColor; void main() { texCoord = gl_MultiTexCoord0.xy; glColor = gl_Color; gl_Position = ftransform(); }",
         );
@@ -7702,7 +8309,16 @@ mod tests {
         assert!(lowered
             .vertex()
             .source()
-            .contains("#define vulkanic_source_model_view (vulkanic_source_model_transform * gbufferModelView)"));
+            .contains("#define vulkanic_source_model_view (gbufferModelView * vulkanic_source_model_transform)"));
+        assert!(lowered.vertex().source().contains(
+            "mat4 vulkanic_source_hand_projection;"
+        ));
+        assert!(lowered.vertex().source().contains(
+            "vulkanic_source_hand_projection * vulkanic_source_model_view"
+        ));
+        assert!(!lowered.uniform_contract().declarations.iter().any(|declaration| {
+            declaration.contains("vulkanic_source_hand_projection")
+        }));
     }
 
     #[test]
@@ -7929,7 +8545,7 @@ mod tests {
     }
 
     #[test]
-    fn lowered_distant_horizons_rejects_fragment_coordinates_without_an_explicit_extent() {
+    fn lowered_distant_horizons_supplies_the_extent_for_fragment_coordinates() {
         let pack = ShaderPackSource::new(
             "dh-fragment-coordinate-missing-extent-test",
             1,
@@ -7957,10 +8573,15 @@ mod tests {
             defines: &[],
         })
         .unwrap();
-        let error = lower_distant_horizons_source_pair(&vertex, &fragment)
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("does not declare viewHeight"));
+        // Iris always provides viewHeight; the lowered contract requires it
+        // for the explicit lower-left coordinate conversion.
+        let lowered = lower_distant_horizons_source_pair(&vertex, &fragment).unwrap();
+        assert!(lowered
+            .uniform_contract()
+            .fields()
+            .iter()
+            .any(|field| field.name() == "viewHeight"));
+        assert!(lowered.fragment().source().contains("coordinate.y = viewHeight - coordinate.y;"));
     }
 
     #[test]
@@ -8304,6 +8925,7 @@ mod tests {
                 }],
                 std140_size: 4,
             },
+            &[],
         )
         .unwrap();
 
@@ -8316,15 +8938,17 @@ mod tests {
     }
 
     #[test]
-    fn terrain_fragment_coordinates_without_a_source_extent_are_rejected() {
+    fn terrain_fragment_coordinates_without_a_source_extent_require_view_height() {
         let vertex = artifact("#version 130\nvoid main() { gl_Position = gl_Vertex; }");
         let fragment = artifact(
             "#version 130\nvoid main() { gl_FragData[0] = vec4(gl_FragCoord.xy, 0.0, 1.0); }",
         );
-        let error = lower_terrain_source_pair(&vertex, &fragment)
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("does not declare viewHeight"));
+        let lowered = lower_terrain_source_pair(&vertex, &fragment).unwrap();
+        assert!(lowered
+            .uniform_contract()
+            .fields()
+            .iter()
+            .any(|field| field.name() == "viewHeight"));
     }
 
     #[test]

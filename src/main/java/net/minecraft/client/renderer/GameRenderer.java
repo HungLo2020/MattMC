@@ -960,6 +960,10 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		ProfilerFiller profilerFiller = Profiler.get();
 		boolean gameLoadFinished = this.minecraft.isGameLoadFinished();
 		float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);
+		// The whole-frame route never enters render(), where the copied shader
+		// clock is advanced for OpenGL. Seed it here before world semantics are
+		// captured so source uniforms receive a real frame duration and counter.
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginShaderPackFrame(Util.getNanos(), f);
 		boolean captureTerrainParticleScenario = !System.getProperty("mattmc.dev.rustGalWorldMaterial.terrainParticleScenario", "").isBlank();
 		if (captureTerrainParticleScenario
 			&& this.minecraft.level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel
@@ -1121,7 +1125,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			PoseStack poseStack = new PoseStack();
 			// Whole-frame Vulkan uses the source collector's immutable pack
 			// readiness signal, never Iris's renderer-facing runtime state.
-			areShadersOn = net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderPackSourceReady();
+			areShadersOn = net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive();
 			if (areShadersOn) {
 				poseStack.pushPose();
 				poseStack.last().pose().identity();

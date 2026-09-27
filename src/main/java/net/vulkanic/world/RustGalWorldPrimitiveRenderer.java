@@ -168,6 +168,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static final int STRATUM_WORLD_BLOCK_OUTLINE = 100;
 	public static final int STYLE_NORMAL = 1;
 	public static final int STYLE_HIGH_CONTRAST = 2;
+	/** Mirrors Rust `WORLD_LINE_STYLE_FLAG_TRANSLUCENT_TARGET`. */
+	public static final int STYLE_FLAG_TRANSLUCENT_TARGET = 0x100;
 	public static final int DEPTH_POLICY_DISABLED = 0;
 	public static final int DEPTH_POLICY_TEST_WRITE = 1;
 	public static final int DEPTH_POLICY_TEST_NO_WRITE = 2;
@@ -175,6 +177,8 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** World mesh instance flag: feed Rust's outline mask without regular color output. */
 	public static final int WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY = 1;
 	public static final int WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS = 2;
+	/** Immutable terrain candidate for the Rust-owned shadow pass only. */
+	public static final int WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY = 4;
 	public static final int BORDER_TEXTURE_FORCEFIELD = 1;
 	public static final int MATERIAL_TEXTURE_STONE = 0x21DF896F;
 	public static final int MATERIAL_TEXTURE_DIRT = 0x0B0BBD25;
@@ -304,6 +308,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		Long.getLong("mattmc.vulkan.deterministicTemporalParity.worldTime", 6000L);
 	private static final int DETERMINISTIC_TEMPORAL_FRAME_COUNTER =
 		Integer.getInteger("mattmc.vulkan.deterministicTemporalParity.frameCounter", 0);
+	private static final boolean DETERMINISTIC_TEMPORAL_ADVANCE_FRAME_COUNTER =
+		Boolean.getBoolean("mattmc.vulkan.deterministicTemporalParity.advanceFrameCounter");
 	private static final float DETERMINISTIC_TEMPORAL_FRAME_TIME_COUNTER = Float.parseFloat(
 		System.getProperty("mattmc.vulkan.deterministicTemporalParity.frameTimeCounter", "0.0")
 	);
@@ -345,7 +351,11 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final int MAX_RUST_WEATHER_COLUMNS = MAX_RUST_WORLD_MATERIAL_QUADS;
 	/** Vanilla weather extraction admits only the fancy (10) or fast (5) ring. */
 	private static final int MAX_RUST_WEATHER_RADIUS = 10;
-	private static final int MAX_RUST_WORLD_MESH_INSTANCES = 4_096;
+	// Per-frame bound shared with Rust's WORLD_MAX_FRAME_MESH_INSTANCES and the
+	// FFI batch limit. Shader-pack frames add shadow-only terrain around the
+	// player (Iris renders it within the shadow distance), so a camera-sized
+	// bound overflows at ordinary render distances.
+	private static final int MAX_RUST_WORLD_MESH_INSTANCES = 65_536;
 	private static final int MAX_FIRST_PERSON_SEMANTIC_QUADS = 4_096;
 	private static final int MAX_FIRST_PERSON_SEMANTIC_LAYERS = 64;
 	private static final int MAX_RUST_CLOUD_CELLS = 1_048_576;
@@ -2131,7 +2141,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		synchronized (LOCK) {
 			shaderPackFramePartialTick = partialTick;
 			if (DETERMINISTIC_TEMPORAL_PARITY) {
-				shaderPackFrameCounter = Math.floorMod(DETERMINISTIC_TEMPORAL_FRAME_COUNTER, 720720);
+				shaderPackFrameCounter = DETERMINISTIC_TEMPORAL_ADVANCE_FRAME_COUNTER
+					? (shaderPackFrameCounter + 1) % 720720
+					: Math.floorMod(DETERMINISTIC_TEMPORAL_FRAME_COUNTER, 720720);
 				shaderPackFrameTimeSeconds = DETERMINISTIC_TEMPORAL_FRAME_TIME;
 				shaderPackFrameTimeCounter = DETERMINISTIC_TEMPORAL_FRAME_TIME_COUNTER;
 				shaderPackPreviousFrameStartNanos = frameStartNanos;
@@ -4062,6 +4074,58 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	private static int shadowCasterCaptureInstanceMark = -1;
+	private static int shadowCasterCaptureProducerMark = -1;
+
+	/**
+	 * Starts capturing the next ordinary entity submission as shadow-only
+	 * casters. Iris's shadow pass renders the local player even when the
+	 * camera pass does not; Rust decides admission from the copied pack's
+	 * caster directives.
+	 */
+	public static void beginShadowOnlyEntityCapture() {
+		synchronized (LOCK) {
+			if (shadowCasterCaptureInstanceMark >= 0) {
+				throw new IllegalStateException("shadow-only entity capture is already active");
+			}
+			if (pendingFirstPersonFrame) {
+				throw new IllegalStateException("shadow-only entity capture cannot run inside a first-person frame");
+			}
+			shadowCasterCaptureInstanceMark = PENDING_MESH_INSTANCES.size();
+			shadowCasterCaptureProducerMark = PENDING_MESH_PRODUCERS.size();
+		}
+	}
+
+	/** Ends the capture, converting the produced entity meshes; returns the caster count. */
+	public static int endShadowOnlyEntityCapture() {
+		synchronized (LOCK) {
+			int instanceMark = shadowCasterCaptureInstanceMark;
+			int producerMark = shadowCasterCaptureProducerMark;
+			shadowCasterCaptureInstanceMark = -1;
+			shadowCasterCaptureProducerMark = -1;
+			if (instanceMark < 0 || instanceMark > PENDING_MESH_INSTANCES.size()
+				|| producerMark < 0 || producerMark > PENDING_MESH_PRODUCERS.size()) {
+				throw new IllegalStateException("shadow-only entity capture was not active for this frame");
+			}
+			List<VulkanicGalBridge.WorldMeshInstanceRecord> captured =
+				new ArrayList<>(PENDING_MESH_INSTANCES.subList(instanceMark, PENDING_MESH_INSTANCES.size()));
+			PENDING_MESH_INSTANCES.subList(instanceMark, PENDING_MESH_INSTANCES.size()).clear();
+			// Camera-producer receipts must not include shadow-only work.
+			PENDING_MESH_PRODUCERS.subList(producerMark, PENDING_MESH_PRODUCERS.size()).clear();
+			int casters = 0;
+			for (VulkanicGalBridge.WorldMeshInstanceRecord record : captured) {
+				if (record.stratum() != STRATUM_WORLD_ENTITY_MESH || record.itemFoil() != null
+					|| record.decalFoil() != null || record.blockEntityId() != -1
+					|| (record.flags() & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY) != 0) {
+					continue;
+				}
+				PENDING_MESH_INSTANCES.add(record.asShadowOnlyEntityCaster());
+				casters++;
+			}
+			return casters;
+		}
+	}
+
 	/** Captures the semantic mesh streams before a multi-group model producer. */
 	public static ModelMeshBatchCheckpoint markModelMeshBatch() {
 		synchronized (LOCK) {
@@ -4360,7 +4424,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		final boolean[] emitted = {false};
 		final boolean[] complete = {true};
 		try {
-		modelRoot.visit(modelPose, (partPose, name, index, cube) -> {
+		modelRoot.visitRenderable(modelPose, (partPose, name, index, cube) -> {
 			for (ModelPart.Polygon polygon : cube.polygons) {
 				ModelPart.Vertex[] source = polygon.vertices();
 				if (source.length != 4) {
@@ -10842,7 +10906,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		int depthPolicy, int cullPolicy, boolean cameraSortedQuads
 	) {
 		return enqueueStaticTerrainMeshInstance(meshKey,meshGeneration,transform,viewportWidth,viewportHeight,
-			depthPolicy,cullPolicy,cameraSortedQuads,null);
+			depthPolicy,cullPolicy,cameraSortedQuads,false,null);
 	}
 
 	/**
@@ -10866,10 +10930,25 @@ public final class RustGalWorldPrimitiveRenderer {
 		double cameraX, double cameraY, double cameraZ,
 		int viewportWidth, int viewportHeight, int depthPolicy, int cullPolicy, boolean cameraSortedQuads
 	) {
+		return enqueueStaticTerrainSectionInstance(meshKey, meshGeneration, sectionX, sectionY,
+			sectionZ, cameraX, cameraY, cameraZ, viewportWidth, viewportHeight,
+			depthPolicy, cullPolicy, cameraSortedQuads, false);
+	}
+
+	public static boolean enqueueStaticTerrainSectionInstance(
+		long meshKey, long meshGeneration, int sectionX, int sectionY, int sectionZ,
+		double cameraX, double cameraY, double cameraZ,
+		int viewportWidth, int viewportHeight, int depthPolicy, int cullPolicy,
+		boolean cameraSortedQuads, boolean shadowOnly
+	) {
 		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
 			return false;
 		}
-		int flags = cameraSortedQuads ? WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS : 0;
+		if (shadowOnly && cameraSortedQuads) {
+			throw new IllegalArgumentException("shadow-only terrain cannot use camera-sorted indices");
+		}
+		int flags = (cameraSortedQuads ? WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS : 0)
+			| (shadowOnly ? WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY : 0);
 		synchronized (LOCK) {
 			VulkanicGalBridge.TerrainFrameCamera frameCamera = pendingStaticTerrainCamera;
 			if (frameCamera == null
@@ -10901,7 +10980,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		return enqueueStaticTerrainSectionInstance(
 			meshKey, meshGeneration,
 			new VulkanicGalBridge.TerrainSectionPlacement(sectionX, sectionY, sectionZ),
-			viewportWidth, viewportHeight, depthPolicy, cullPolicy, cameraSortedQuads
+			viewportWidth, viewportHeight, depthPolicy, cullPolicy, cameraSortedQuads, shadowOnly
 		);
 	}
 
@@ -10909,8 +10988,18 @@ public final class RustGalWorldPrimitiveRenderer {
 		long meshKey, long meshGeneration, VulkanicGalBridge.TerrainSectionPlacement terrainPlacement,
 		int viewportWidth, int viewportHeight, int depthPolicy, int cullPolicy, boolean cameraSortedQuads
 	) {
+		return enqueueStaticTerrainSectionInstance(meshKey, meshGeneration, terrainPlacement,
+			viewportWidth, viewportHeight, depthPolicy, cullPolicy, cameraSortedQuads, false);
+	}
+
+	public static boolean enqueueStaticTerrainSectionInstance(
+		long meshKey, long meshGeneration, VulkanicGalBridge.TerrainSectionPlacement terrainPlacement,
+		int viewportWidth, int viewportHeight, int depthPolicy, int cullPolicy,
+		boolean cameraSortedQuads, boolean shadowOnly
+	) {
 		return enqueueStaticTerrainMeshInstance(meshKey, meshGeneration, null, viewportWidth, viewportHeight,
-			depthPolicy, cullPolicy, cameraSortedQuads, Objects.requireNonNull(terrainPlacement, "terrainPlacement"));
+			depthPolicy, cullPolicy, cameraSortedQuads, shadowOnly,
+			Objects.requireNonNull(terrainPlacement, "terrainPlacement"));
 	}
 
 	/**
@@ -10948,6 +11037,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			for (int index = 0; index < count; index++) {
 				VulkanicGalBridge.WorldMeshInstanceRecord active = ACTIVE_STATIC_TERRAIN_INSTANCES.get(meshKeys[index]);
 				if (active == null || active.meshGeneration() != meshGenerations[index]
+					|| (active.flags() & WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY) != 0
 					|| active.viewportWidth() != viewportWidth
 					|| active.viewportHeight() != viewportHeight
 					|| !isWorldMeshInstanceUploadedLocked(active)) {
@@ -10966,8 +11056,20 @@ public final class RustGalWorldPrimitiveRenderer {
 		long meshKey, long meshGeneration, float[] transform, int viewportWidth, int viewportHeight,
 		int depthPolicy, int cullPolicy, boolean cameraSortedQuads, VulkanicGalBridge.TerrainSectionPlacement terrainPlacement
 	) {
+		return enqueueStaticTerrainMeshInstance(meshKey, meshGeneration, transform, viewportWidth,
+			viewportHeight, depthPolicy, cullPolicy, cameraSortedQuads, false, terrainPlacement);
+	}
+
+	public static boolean enqueueStaticTerrainMeshInstance(
+		long meshKey, long meshGeneration, float[] transform, int viewportWidth, int viewportHeight,
+		int depthPolicy, int cullPolicy, boolean cameraSortedQuads, boolean shadowOnly,
+		VulkanicGalBridge.TerrainSectionPlacement terrainPlacement
+	) {
 		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
 			return false;
+		}
+		if (shadowOnly && cameraSortedQuads) {
+			throw new IllegalArgumentException("shadow-only terrain cannot use camera-sorted indices");
 		}
 		if (cullPolicy != CULL_NONE && cullPolicy != CULL_BACK) {
 			throw new IllegalArgumentException("Rust static terrain cull policy is not an explicit semantic enum");
@@ -11004,7 +11106,8 @@ public final class RustGalWorldPrimitiveRenderer {
 				ensureWorldQueueCapacityLocked(
 					PENDING_MESH_INSTANCES.size(), 1, MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance"
 				);
-			int flags = cameraSortedQuads ? WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS : 0;
+			int flags = (cameraSortedQuads ? WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS : 0)
+				| (shadowOnly ? WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY : 0);
 			VulkanicGalBridge.WorldMeshInstanceRecord instance = terrainPlacement == null
 				? new VulkanicGalBridge.WorldMeshInstanceRecord(
 					STRATUM_WORLD_TERRAIN, meshKey, meshGeneration, MESH_SECTION_ALL, depthPolicy,
@@ -11040,7 +11143,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			StaticTerrainVisibilitySet.reconcile(ACTIVE_STATIC_TERRAIN_INSTANCES, visibleMeshKeys);
 			for (int index = PENDING_MESH_INSTANCES.size() - 1; index >= 0; index--) {
 				VulkanicGalBridge.WorldMeshInstanceRecord instance = PENDING_MESH_INSTANCES.get(index);
-				if (instance.stratum() == STRATUM_WORLD_TERRAIN && !visibleMeshKeys.contains(instance.meshKey())) {
+				if (instance.stratum() == STRATUM_WORLD_TERRAIN
+						&& !visibleMeshKeys.contains(instance.meshKey())) {
 					PENDING_MESH_INSTANCES.remove(index);
 					if (index < PENDING_MESH_PRODUCERS.size()) {
 						PENDING_MESH_PRODUCERS.remove(index);
@@ -11613,7 +11717,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		List<Integer> indices = new ArrayList<>();
 		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
 		PoseStack modelPose = new PoseStack();
-		modelRoot.visit(modelPose, (partPose, partPath, cubeIndex, cube) -> {
+		modelRoot.visitRenderable(modelPose, (partPose, partPath, cubeIndex, cube) -> {
 			for (ModelPart.Polygon polygon : cube.polygons) {
 				ensureWorldMeshExtractionCapacity(vertices, indices, sections);
 				if (polygon == null || polygon.vertices().length != 4) {
@@ -11810,7 +11914,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		float[] uvBounds = {Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY,
 			Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY};
 		PoseStack modelPose = new PoseStack();
-		modelRoot.visit(modelPose, (partPose, partPath, cubeIndex, cube) -> {
+		modelRoot.visitRenderable(modelPose, (partPose, partPath, cubeIndex, cube) -> {
 			for (ModelPart.Polygon polygon : cube.polygons) {
 				ensureWorldMeshExtractionCapacity(vertices, indices, sections);
 				if (polygon == null || polygon.vertices().length != 4) {
@@ -11998,7 +12102,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				: reuseRegisteredStaticModelTexture(localModelTextureAsset(textureId, texturePayload)));
 		Map<String, ModelPartMeshBuilder> builders = new LinkedHashMap<>();
 		PoseStack modelPose = new PoseStack();
-		modelRoot.visit(modelPose, (partPose, partPath, cubeIndex, cube) -> {
+		modelRoot.visitRenderable(modelPose, (partPose, partPath, cubeIndex, cube) -> {
 			ModelPartMeshBuilder builder = builders.computeIfAbsent(
 				partPath, ignored -> new ModelPartMeshBuilder(new Matrix4f(partPose.pose()))
 			);
@@ -13038,7 +13142,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			String[] activePath = {null};
 			int[] nextPart = {0};
 			boolean[] mismatch = {false};
-			root.visit(new PoseStack(), (partPose, partPath, cubeIndex, cube) -> {
+			root.visitRenderable(new PoseStack(), (partPose, partPath, cubeIndex, cube) -> {
 				if (mismatch[0] || partPath.equals(activePath[0])) return;
 				activePath[0] = partPath;
 				if (nextPart[0] >= parts.size() || !parts.get(nextPart[0]).partPath().equals(partPath)) {
@@ -13973,7 +14077,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		int viewportWidth,
 		int viewportHeight
 	) {
-		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics") || shadowCasterCaptureInstanceMark >= 0) {
+			// Shadow-only casters are not camera-pass models.
 			return;
 		}
 		if (MODEL_MESH_DIAGNOSTICS.size() >= 512) {
@@ -14062,7 +14167,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		boolean rustQueued,
 		boolean javaDrawn
 	) {
-		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
+		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics") || shadowCasterCaptureInstanceMark >= 0) {
+			// Shadow-only casters are not camera-pass models.
 			return;
 		}
 		synchronized (LOCK) {
@@ -16686,6 +16792,11 @@ public final class RustGalWorldPrimitiveRenderer {
 			return;
 		}
 		boolean highContrast = minecraft.options.highContrastBlockOutline().get();
+		// Vanilla/Iris draw a translucent-layer target's outline after
+		// translucent terrain; carry that semantic with the segments.
+		int placement = ItemBlockRenderTypes.getChunkRenderType(blockState).sortOnUpload()
+			? STYLE_FLAG_TRANSLUCENT_TARGET
+			: 0;
 		Vec3 cameraPos = camera.getPosition();
 			 synchronized (LOCK) {
 				int viewportWidth = pendingViewportWidth;
@@ -16697,10 +16808,10 @@ public final class RustGalWorldPrimitiveRenderer {
 				}
 				ensureOutlineCapacityLocked(shape, highContrast ? 2 : 1);
 				if (highContrast) {
-					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, DEPTH_POLICY_TEST_NO_WRITE, -16777216, 7.0F);
-					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST, DEPTH_POLICY_TEST_WRITE, -11010079, defaultOutlineLineWidth(viewportWidth));
+					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST | placement, DEPTH_POLICY_TEST_NO_WRITE, -16777216, 7.0F);
+					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_HIGH_CONTRAST | placement, DEPTH_POLICY_TEST_WRITE, -11010079, defaultOutlineLineWidth(viewportWidth));
 				} else {
-					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_NORMAL, DEPTH_POLICY_TEST_WRITE, 0x66000000, defaultOutlineLineWidth(viewportWidth));
+					appendShapeEdges(shape, blockPos, cameraPos, viewportWidth, viewportHeight, STYLE_NORMAL | placement, DEPTH_POLICY_TEST_WRITE, 0x66000000, defaultOutlineLineWidth(viewportWidth));
 				}
 			}
 		}

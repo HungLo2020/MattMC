@@ -1277,7 +1277,9 @@ pub(super) fn validate_segment(
             format!("unsupported world primitive stratum {}", segment.stratum),
         ));
     }
-    if segment.style > 2 {
+    // Low byte: outline style; the translucent-target placement flag is the
+    // only admitted modifier bit.
+    if segment.style & !super::WORLD_LINE_STYLE_FLAG_TRANSLUCENT_TARGET > 2 {
         return Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown world primitive style {}", segment.style),

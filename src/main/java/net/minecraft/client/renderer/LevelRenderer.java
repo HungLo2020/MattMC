@@ -142,6 +142,7 @@ import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable, net.irisshaders.iris.shadows.CullingDataCache, LevelRendererExtension {
+	private final java.util.List<net.minecraft.client.renderer.entity.state.EntityRenderState> rustShadowOnlyEntityStates = new java.util.ArrayList<>();
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation TRANSPARENCY_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("transparency");
 	private static final ResourceLocation ENTITY_OUTLINE_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("entity_outline");
@@ -1259,6 +1260,67 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 	}
 
+	/**
+	 * Iris's shadow pass renders the local player even while the first-person
+	 * camera pass does not (`ShadowRenderer` extracts it separately). On the
+	 * Rust shader-pack route, copy that same render state into a separate list;
+	 * Rust admits it only to the shadow pass per the pack's caster directives.
+	 * The camera argument is kept for the call site's extraction phase.
+	 */
+	private void extractRustShadowOnlyPlayer(Camera camera) {
+		this.rustShadowOnlyEntityStates.clear();
+		if (!(net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			|| !net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()) {
+			return;
+		}
+		LocalPlayer player = this.minecraft.player;
+		if (player == null) {
+			return;
+		}
+		// Iris adds the local player to the shadow pass regardless of camera
+		// mode (`shouldRenderPlayer`). Its camera-pass instance is not a
+		// player caster in Rust, so always submit this separate caster; with
+		// `shadowEntities` also enabled the duplicate depth write is harmless.
+		float g = this.minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+		this.rustShadowOnlyEntityStates.add(stripRustShadowOnlySideStreams(this.entityRenderDispatcher.extractEntity(player, g)));
+		if (player.getVehicle() != null) {
+			this.rustShadowOnlyEntityStates.add(
+				stripRustShadowOnlySideStreams(this.entityRenderDispatcher.extractEntity(player.getVehicle(), g)));
+		}
+	}
+
+	private static EntityRenderState stripRustShadowOnlySideStreams(EntityRenderState state) {
+		// Only mesh geometry casts shadows; these streams would otherwise leak
+		// into the camera frame because they are not mesh instances.
+		state.outlineColor = 0;
+		state.displayFireAnimation = false;
+		state.nameTag = null;
+		state.leashStates = null;
+		state.hitboxesRenderState = null;
+		state.serverHitboxesRenderState = null;
+		state.shadowPieces.clear();
+		return state;
+	}
+
+	private void submitRustShadowOnlyEntities(PoseStack poseStack, LevelRenderState levelRenderState,
+			SubmitNodeCollector submitNodeCollector) {
+		if (this.rustShadowOnlyEntityStates.isEmpty()) {
+			return;
+		}
+		Vec3 vec3 = levelRenderState.cameraRenderState.pos;
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginShadowOnlyEntityCapture();
+		try {
+			for (EntityRenderState entityRenderState : this.rustShadowOnlyEntityStates) {
+				this.entityRenderDispatcher.submitSemantic(entityRenderState, levelRenderState.cameraRenderState,
+					entityRenderState.x - vec3.x(), entityRenderState.y - vec3.y(), entityRenderState.z - vec3.z(),
+					poseStack, this.submitNodeStorage);
+			}
+		} finally {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.endShadowOnlyEntityCapture();
+		}
+	}
+
 	private void submitEntities(PoseStack poseStack, LevelRenderState levelRenderState, SubmitNodeCollector submitNodeCollector) {
 		Vec3 vec3 = levelRenderState.cameraRenderState.pos;
 		double d = vec3.x();
@@ -1408,6 +1470,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.extractVisibleEntities(camera, frustum, deltaTracker, this.levelRenderState);
 			this.extractVisibleBlockEntities(camera, deltaTracker.getGameTimeDeltaPartialTick(false), this.levelRenderState);
 		}
+		// Independent of the camera pass (and of capture entity suppression),
+		// exactly like Iris's ShadowRenderer player extraction.
+		this.extractRustShadowOnlyPlayer(camera);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.real-state-extraction");
 		PoseStack poseStack = new PoseStack();
 		boolean selectedSourceCoverage = net.vulkanic.world.RustGalWorldPrimitiveRenderer.requiresSelectedSourceFeatureCoverage();
@@ -1551,6 +1616,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				poseStack,
 				this.submitNodeStorage
 			);
+		}
+		if (modelMeshes) {
+			this.submitRustShadowOnlyEntities(poseStack, this.levelRenderState, this.submitNodeStorage);
 		}
 	}
 

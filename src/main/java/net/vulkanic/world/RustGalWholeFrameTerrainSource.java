@@ -43,6 +43,10 @@ import org.joml.Vector3d;
  */
 public final class RustGalWholeFrameTerrainSource {
 	private static final int MAX_SEMANTIC_MESH_WORKERS = 8;
+	private static final int MAX_SHADOW_HALO_REQUESTS_PER_FRAME = 384;
+	private static final int MAX_SHADOW_SWEEP_COLUMNS_PER_FRAME = 256;
+	private static final int SHADOW_BACKLOG_THRESHOLD = 64;
+	private static final int MAX_BACKLOG_COMPLETED_BUILDS_PER_FRAME = 8;
 	/**
 	 * Publishing a completed section copies its immutable layers into the Rust
 	 * asset registry. Draining every worker at once turns an eight-worker burst
@@ -131,6 +135,12 @@ public final class RustGalWholeFrameTerrainSource {
 	private int[] visibilityBatchIncoming = new int[256];
 	private int[] visibilityBatchOutgoing = new int[256];
 	private int completedBuildsConsumedThisFrame;
+	private boolean workerSeparateAo;
+	/** Distance-ordered (dx, dz) column offsets for the shadow-caster build sweep. */
+	private int[] shadowSweepOffsets = new int[0];
+	private int shadowSweepRadius = -1;
+	private int shadowSweepCursor;
+	private long shadowSweepCameraSection = Long.MIN_VALUE;
     private int buildFrame;
 	private long emptySnapshotBuilds;
 	private long meshlessOutputBuilds;
@@ -145,12 +155,11 @@ public final class RustGalWholeFrameTerrainSource {
         this.level = level;
         if (level != null) {
             this.sectionCache = new ClonedChunkSectionCache(level);
-			// Frozen Sodium's vanilla compact stream bakes ambient occlusion and
-			// directional face shade into RGB. The direct Rust terrain program
-			// consumes that complete semantic colour directly, so its independent
-			// CPU producer must use the same contract rather than leave AO in alpha.
-			// This remains an explicit vanilla policy and does not consult Iris.
-			this.workerBuilder = new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false, semanticMeshWorkerCount());
+			// Keep the compact stride while matching the copied pack's AO policy.
+			// The Rust source shader receives raw RGB plus separate AO when requested;
+			// the direct vanilla shader resolves that alpha on its own route.
+			this.workerSeparateAo = RustGalTerrainRenderer.copiedShaderPackSeparateAo();
+			this.workerBuilder = new ChunkBuilder(level, ChunkMeshFormats.COMPACT, workerSeparateAo, semanticMeshWorkerCount());
 		}
 	}
 
@@ -421,7 +430,33 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visible-list");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.semantic-submit");
-		RustGalTerrainRenderer.enqueueWholeFrameTerrainSections(visibleSections, camera, viewportWidth, viewportHeight);
+		ArrayList<RenderSection> shadowCandidates = new ArrayList<>();
+		if (net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()) {
+			// Iris/Sodium render every built section in the shadow frustum within
+			// render distance, including off-camera casters (e.g. terrain toward
+			// the sun while looking down). The camera portal frontier only builds
+			// camera-visible sections, so sweep the current render window in
+			// distance order, bounded per frame. Rust still owns light-aware
+			// admission of the resulting resident candidates.
+			int haloRequests = this.requestShadowCasterBuilds();
+			if (haloRequests != 0) {
+				wholeFrameSurfaceQueueDrained = false;
+				wholeFrameTerrainQueueDrained = false;
+				this.scheduleBuilds(camera);
+			}
+			// Java supplies only bounded resident immutable section candidates.
+			// Rust derives the active source shadow domain and owns pass selection.
+			for (var entry : this.sections.long2ObjectEntrySet()) {
+				RenderSection section = entry.getValue();
+				if (!visibleKeys.contains(entry.getLongKey())
+					&& section != null && section.isBuilt() && section.getFlags() != 0
+					&& this.isInsideCurrentWindow(section.getChunkX(), section.getChunkZ())) {
+					shadowCandidates.add(section);
+				}
+			}
+		}
+		RustGalTerrainRenderer.enqueueWholeFrameTerrainSections(
+			visibleSections, shadowCandidates, camera, viewportWidth, viewportHeight);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.semantic-submit");
 			if (wholeFrameTerrainQueueDrained) {
 				this.lastVisibilitySignature = visibilitySignature;
@@ -658,6 +693,18 @@ public final class RustGalWholeFrameTerrainSource {
     }
 
 	private void resetForResourceReload() {
+		boolean requestedSeparateAo = RustGalTerrainRenderer.copiedShaderPackSeparateAo();
+		if (this.level != null && requestedSeparateAo != this.workerSeparateAo) {
+			this.workerBuilder.shutdown();
+			// Cancelled jobs from the retired pool cannot deliver another completion.
+			// Do not strand their section keys in the new generation's in-flight set.
+			this.destroyCompletedBuilds();
+			this.inFlight.clear();
+			this.invalidatedInFlight.clear();
+			this.workerSeparateAo = requestedSeparateAo;
+			this.workerBuilder = new ChunkBuilder(this.level, ChunkMeshFormats.COMPACT,
+				requestedSeparateAo, semanticMeshWorkerCount());
+		}
 		// Renderer publication is a separate two-phase transaction. Clear only this
 		// CPU source generation here; the last completed Rust-owned mesh/atlas set
 		// remains drawable until finishResourceReloadIfReady() commits its successor.
@@ -1330,7 +1377,13 @@ public final class RustGalWholeFrameTerrainSource {
 
 	private void drainCompletedBuilds(Frustum frustum) {
 		CompletedBuild completed;
-		while (this.completedBuildsConsumedThisFrame < MAX_COMPLETED_BUILDS_PER_FRAME
+		// A large one-time backlog (the initial shadow-caster sweep of the
+		// render window) drains faster; steady-state gameplay keeps the small
+		// per-frame publish bound that avoids render-thread stalls.
+		int publishLimit = this.pending.size() + this.inFlight.size() > SHADOW_BACKLOG_THRESHOLD
+			? Math.max(MAX_COMPLETED_BUILDS_PER_FRAME, MAX_BACKLOG_COMPLETED_BUILDS_PER_FRAME)
+			: MAX_COMPLETED_BUILDS_PER_FRAME;
+		while (this.completedBuildsConsumedThisFrame < publishLimit
 				&& (completed = this.completedBuilds.poll()) != null) {
 			this.completedBuildsConsumedThisFrame++;
 			long key = completed.sectionPos().asLong();
@@ -1385,6 +1438,78 @@ public final class RustGalWholeFrameTerrainSource {
 				output.destroy();
 			}
 		}
+	}
+
+	private int requestShadowCasterBuilds() {
+		if (this.level == null || this.lastCameraSection == Long.MIN_VALUE) {
+			return 0;
+		}
+		int radius = this.configuredHorizontalRadius();
+		if (radius != this.shadowSweepRadius) {
+			int width = radius * 2 + 1;
+			Integer[] order = new Integer[width * width];
+			for (int index = 0; index < order.length; index++) {
+				order[index] = index;
+			}
+			java.util.Arrays.sort(order, java.util.Comparator.comparingInt((Integer index) -> {
+				int dx = index % width - radius;
+				int dz = index / width - radius;
+				return dx * dx + dz * dz;
+			}));
+			int[] offsets = new int[order.length * 2];
+			for (int index = 0; index < order.length; index++) {
+				offsets[index * 2] = order[index] % width - radius;
+				offsets[index * 2 + 1] = order[index] / width - radius;
+			}
+			this.shadowSweepOffsets = offsets;
+			this.shadowSweepRadius = radius;
+			this.shadowSweepCursor = 0;
+		}
+		if (this.lastCameraSection != this.shadowSweepCameraSection) {
+			this.shadowSweepCameraSection = this.lastCameraSection;
+			this.shadowSweepCursor = 0;
+		}
+		int columns = this.shadowSweepOffsets.length / 2;
+		if (this.shadowSweepCursor >= columns) {
+			return 0;
+		}
+		int centerX = SectionPos.x(this.lastCameraSection);
+		int centerZ = SectionPos.z(this.lastCameraSection);
+		int minY = this.level.getMinSectionY();
+		int maxY = this.level.getMaxSectionY();
+		int requests = 0;
+		int examined = 0;
+		while (this.shadowSweepCursor < columns && examined < MAX_SHADOW_SWEEP_COLUMNS_PER_FRAME) {
+			int x = centerX + this.shadowSweepOffsets[this.shadowSweepCursor * 2];
+			int z = centerZ + this.shadowSweepOffsets[this.shadowSweepCursor * 2 + 1];
+			examined++;
+			if (this.isChunkLoaded(x, z)) {
+				net.minecraft.world.level.chunk.LevelChunk chunk = this.level.getChunk(x, z);
+				net.minecraft.world.level.chunk.LevelChunkSection[] chunkSections = chunk.getSections();
+				for (int y = minY; y <= maxY; y++) {
+					int sectionIndex = this.level.getSectionIndexFromSectionY(y);
+					if (sectionIndex < 0 || sectionIndex >= chunkSections.length
+						|| chunkSections[sectionIndex] == null || chunkSections[sectionIndex].hasOnlyAir()) {
+						// An all-air section can never cast a shadow.
+						continue;
+					}
+					long key = SectionPos.asLong(x, y, z);
+					if (this.sections.containsKey(key) || this.inFlight.contains(key)
+						|| this.unavailableSections.contains(key) || this.queued.contains(key)) {
+						continue;
+					}
+					if (requests >= MAX_SHADOW_HALO_REQUESTS_PER_FRAME) {
+						// Resume this column next frame; completed keys are skipped.
+						return requests;
+					}
+					this.queued.add(key);
+					this.pending.addLast(SectionPos.of(x, y, z));
+					requests++;
+				}
+			}
+			this.shadowSweepCursor++;
+		}
+		return requests;
 	}
 
 	private boolean isInsideCurrentWindow(SectionPos section) {

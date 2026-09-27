@@ -47,7 +47,46 @@ pub struct ShaderPackSource {
     name: String,
     generation: u64,
     files: BTreeMap<String, String>,
+    runtime_semantic_defines: DerivedDefines,
+    runtime_option_selection: DerivedOptionSelection,
 }
+
+/// The saved pack options interpreted the way Iris applies them: a boolean
+/// `#define` option set to `false` removes the pack's define, one set to
+/// `true` enables it, and an option naming a `const` declaration rewrites that
+/// constant instead of becoming a preprocessor define.
+#[derive(Clone, Debug, Default)]
+struct RuntimeOptionSelection {
+    defines: BTreeMap<String, String>,
+    disabled: BTreeSet<String>,
+    constants: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct DerivedOptionSelection(std::sync::OnceLock<GalResult<RuntimeOptionSelection>>);
+
+impl PartialEq for DerivedOptionSelection {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for DerivedOptionSelection {}
+
+/// Source generations are immutable, so their resolved runtime defines are
+/// derived once. Frame planning queries render stages per batch; re-scanning
+/// every pack file for include guards on each query cost hundreds of
+/// milliseconds per frame. The memo is not part of source identity.
+#[derive(Clone, Debug, Default)]
+struct DerivedDefines(std::sync::OnceLock<GalResult<BTreeMap<String, String>>>);
+
+impl PartialEq for DerivedDefines {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for DerivedDefines {}
 
 impl ShaderPackSource {
     pub fn new(
@@ -104,6 +143,8 @@ impl ShaderPackSource {
             name,
             generation,
             files: map,
+            runtime_semantic_defines: DerivedDefines::default(),
+            runtime_option_selection: DerivedOptionSelection::default(),
         })
     }
 
@@ -154,14 +195,95 @@ impl ShaderPackSource {
     /// Callers must rewrite only an emitted matching `const` declaration; these
     /// values are never valid preprocessor definitions.
     pub fn runtime_constant_values(&self) -> GalResult<BTreeMap<String, String>> {
-        self.runtime_define_file(RUNTIME_CONSTANTS_PATH, "constant")
+        let mut constants = self.runtime_define_file(RUNTIME_CONSTANTS_PATH, "constant")?;
+        for (key, value) in &self.runtime_option_selection()?.constants {
+            constants.insert(key.clone(), value.clone());
+        }
+        Ok(constants)
     }
 
+    /// Selected preprocessor options. Boolean options switched off are absent
+    /// here and reported by [`Self::runtime_disabled_option_defines`].
     pub(crate) fn runtime_option_semantic_defines(&self) -> GalResult<BTreeMap<String, String>> {
+        Ok(self.runtime_option_selection()?.defines.clone())
+    }
+
+    /// Boolean `#define` options the user switched off. Preprocessing must
+    /// suppress the pack's own define for these names.
+    pub(crate) fn runtime_disabled_option_defines(&self) -> GalResult<BTreeSet<String>> {
+        Ok(self.runtime_option_selection()?.disabled.clone())
+    }
+
+    fn runtime_option_selection(&self) -> GalResult<&RuntimeOptionSelection> {
+        self.runtime_option_selection
+            .0
+            .get_or_init(|| self.resolve_runtime_option_selection())
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+
+    fn resolve_runtime_option_selection(&self) -> GalResult<RuntimeOptionSelection> {
         let include_guards = self.translation_unit_include_guards();
-        let mut defines = self.runtime_option_defines()?;
-        defines.retain(|key, _| !include_guards.contains(key));
-        Ok(defines)
+        let (define_options, const_options) = self.declared_option_names();
+        let mut selection = RuntimeOptionSelection::default();
+        for (key, value) in self.runtime_option_defines()? {
+            if include_guards.contains(&key) {
+                continue;
+            }
+            if define_options.contains(&key) {
+                match value.as_str() {
+                    "false" => {
+                        selection.disabled.insert(key);
+                    }
+                    "true" => {
+                        selection.defines.insert(key, "1".to_string());
+                    }
+                    _ => {
+                        selection.defines.insert(key, value);
+                    }
+                }
+            } else if const_options.contains(&key) {
+                selection.constants.insert(key, value);
+            } else {
+                selection.defines.insert(key, value);
+            }
+        }
+        Ok(selection)
+    }
+
+    /// Names the pack declares as `#define` options (including commented-out
+    /// `//#define NAME` toggles) and as `const` declarations.
+    fn declared_option_names(&self) -> (BTreeSet<String>, BTreeSet<String>) {
+        fn identifier(text: &str) -> Option<&str> {
+            let end = text
+                .find(|character: char| !(character == '_' || character.is_ascii_alphanumeric()))
+                .unwrap_or(text.len());
+            (end > 0).then(|| &text[..end])
+        }
+        let mut defines = BTreeSet::new();
+        let mut constants = BTreeSet::new();
+        for contents in self.files.values() {
+            for raw in contents.lines() {
+                let line = raw.trim_start();
+                let uncommented = line.strip_prefix("//").map_or(line, str::trim_start);
+                if let Some(rest) = uncommented.strip_prefix('#') {
+                    if let Some(rest) = rest.trim_start().strip_prefix("define") {
+                        if rest.starts_with(char::is_whitespace) {
+                            if let Some(name) = identifier(rest.trim_start()) {
+                                defines.insert(name.to_string());
+                            }
+                        }
+                    }
+                } else if let Some(rest) = line.strip_prefix("const ") {
+                    if let Some((left, _)) = rest.split_once('=') {
+                        if let Some(name) = left.split_whitespace().last().and_then(identifier) {
+                            constants.insert(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        (defines, constants)
     }
 
     pub(crate) fn runtime_environment_semantic_defines(
@@ -170,7 +292,91 @@ impl ShaderPackSource {
         let include_guards = self.translation_unit_include_guards();
         let mut defines = self.runtime_define_file(RUNTIME_ENVIRONMENT_PATH, "environment")?;
         defines.retain(|key, _| !include_guards.contains(key));
+        // Iris adds `IRIS_FEATURE_<FLAG>` to every program environment for
+        // each `iris.features.optional` flag the pack requests and the
+        // renderer supports (ShaderPack.java). Rust advertises only features
+        // it implements, derived from the pack's own selected properties.
+        for feature in self.requested_supported_iris_features(&defines)? {
+            defines
+                .entry(format!("IRIS_FEATURE_{feature}"))
+                .or_insert_with(|| "1".to_string());
+        }
         Ok(defines)
+    }
+
+    /// Iris feature flags Rust implements for shader-pack execution.
+    /// `CUSTOM_IMAGES` is backed by the Rust-owned voxel/flood-fill image
+    /// runtime; packs declaring images it cannot own stay unadmitted.
+    const RUST_SUPPORTED_IRIS_FEATURES: &'static [&'static str] = &["CUSTOM_IMAGES"];
+
+    fn requested_supported_iris_features(
+        &self,
+        base_environment: &BTreeMap<String, String>,
+    ) -> GalResult<Vec<&'static str>> {
+        let Some(properties) = self.get("shaders.properties") else {
+            return Ok(Vec::new());
+        };
+        if !properties.contains("iris.features") {
+            return Ok(Vec::new());
+        }
+        let mut merged = self.runtime_option_semantic_defines()?;
+        for (key, value) in base_environment {
+            merged.entry(key.clone()).or_insert_with(|| value.clone());
+        }
+        // Packs conventionally keep option defaults in a common include that
+        // their properties directives test (Iris evaluates properties with
+        // the pack's option graph). Merge those scalar defaults without
+        // overriding selected options or the transported environment.
+        if self.get("lib/common.glsl").is_some() {
+            let references = merged
+                .iter()
+                .map(|(key, value)| (key.as_str(), value.as_str()))
+                .collect::<Vec<_>>();
+            let common = super::preprocess::preprocess(super::preprocess::PreprocessInput {
+                source: self,
+                entry: "lib/common.glsl",
+                defines: &references,
+            })?;
+            for line in common.lines() {
+                let Some(rest) = line.trim().strip_prefix("#define ") else {
+                    continue;
+                };
+                let definition = rest.split_once("//").map_or(rest, |(value, _)| value).trim();
+                let mut parts = definition.split_whitespace();
+                let (Some(name), Some(value), None) = (parts.next(), parts.next(), parts.next()) else {
+                    continue;
+                };
+                if value.parse::<f64>().is_ok() && !name.contains('(') {
+                    merged
+                        .entry(name.to_string())
+                        .or_insert_with(|| value.to_string());
+                }
+            }
+        }
+        let references = merged
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+            .collect::<Vec<_>>();
+        let expanded = super::preprocess::preprocess(super::preprocess::PreprocessInput {
+            source: self,
+            entry: "shaders.properties",
+            defines: &references,
+        })?;
+        let mut requested = std::collections::BTreeSet::new();
+        for line in expanded.lines() {
+            let line = line.trim();
+            let Some((key, value)) = line.split_once('=') else {
+                continue;
+            };
+            if key.trim() == "iris.features.optional" {
+                requested.extend(value.split_whitespace().map(str::to_ascii_uppercase));
+            }
+        }
+        Ok(Self::RUST_SUPPORTED_IRIS_FEATURES
+            .iter()
+            .copied()
+            .filter(|feature| requested.contains(*feature))
+            .collect())
     }
 
     /// Complete scalar source configuration for deterministic preprocessing.
@@ -178,6 +384,18 @@ impl ShaderPackSource {
     /// on transport, then merge here with duplicate rejection so a source
     /// branch never depends on an implicit precedence rule.
     pub fn runtime_semantic_defines(&self) -> GalResult<BTreeMap<String, String>> {
+        self.runtime_semantic_defines_ref().cloned()
+    }
+
+    fn runtime_semantic_defines_ref(&self) -> GalResult<&BTreeMap<String, String>> {
+        self.runtime_semantic_defines
+            .0
+            .get_or_init(|| self.resolve_runtime_semantic_defines())
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+
+    fn resolve_runtime_semantic_defines(&self) -> GalResult<BTreeMap<String, String>> {
         // Iris's option discovery can surface an include guard from a pack
         // source as an apparent option. A translation-unit guard is not a
         // user-selected semantic configuration value: seeding it before Rust
@@ -185,12 +403,14 @@ impl ShaderPackSource {
         // conventional guard form generically rather than naming a pack or a
         // particular shader feature here.
         let mut defines = self.runtime_option_semantic_defines()?;
+        let disabled = self.runtime_disabled_option_defines()?;
         for (key, value) in self.runtime_environment_semantic_defines()? {
-            if defines.insert(key.clone(), value).is_some() {
-                return Err(GalError::invalid_argument(format!(
-                    "runtime shader-pack define '{key}' is present in both option and environment snapshots"
-                )));
+            // Environment defaults (for example a profile's quality levels)
+            // yield to the options the user saved, as Iris applies them.
+            if disabled.contains(&key) {
+                continue;
             }
+            defines.entry(key).or_insert(value);
         }
         Ok(defines)
     }
@@ -223,9 +443,8 @@ impl ShaderPackSource {
     /// never a borrowed Iris phase object or a backend program property.
     pub fn runtime_semantic_i32(&self, name: &str) -> GalResult<i32> {
         let value = self
-            .runtime_semantic_defines()?
+            .runtime_semantic_defines_ref()?
             .get(name)
-            .cloned()
             .ok_or_else(|| {
                 GalError::unsupported_feature(format!(
                     "shader-pack source generation is missing required semantic define {name}"
@@ -546,6 +765,60 @@ mod tests {
     }
 
     #[test]
+    fn saved_options_apply_like_iris_booleans_constants_and_profile_defaults() {
+        let source = ShaderPackSource::new(
+            "option-kinds",
+            3,
+            vec![
+                ShaderSourceFile::new(
+                    "lib/common.glsl",
+                    "#define WAVES //\n//#define GLOW\n#define QUALITY 2 //[1 2 3]\nconst float shadowDistance = 192.0; //[128.0 192.0]\n",
+                ),
+                ShaderSourceFile::new(
+                    "program.fsh",
+                    "#include \"/lib/common.glsl\"\n#ifdef WAVES\nint waves;\n#endif\n#ifdef GLOW\nint glow;\n#endif\nint q = QUALITY;\n",
+                ),
+                ShaderSourceFile::new(
+                    RUNTIME_OPTIONS_PATH,
+                    "GLOW=true\nQUALITY=3\nWAVES=false\nshadowDistance=128.0\n",
+                ),
+                ShaderSourceFile::new(RUNTIME_ENVIRONMENT_PATH, "IS_IRIS=1\nQUALITY=2\n"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            BTreeMap::from([
+                ("GLOW".to_string(), "1".to_string()),
+                ("QUALITY".to_string(), "3".to_string()),
+            ]),
+            source.runtime_option_semantic_defines().unwrap()
+        );
+        assert_eq!(
+            BTreeSet::from(["WAVES".to_string()]),
+            source.runtime_disabled_option_defines().unwrap()
+        );
+        assert_eq!(
+            Some(&"128.0".to_string()),
+            source.runtime_constant_values().unwrap().get("shadowDistance")
+        );
+        assert_eq!(
+            Some(&"3".to_string()),
+            source.runtime_semantic_defines().unwrap().get("QUALITY")
+        );
+        let expanded = super::super::preprocess::preprocess_artifact_with_runtime_options(
+            &source,
+            "program.fsh",
+            &[],
+        )
+        .unwrap();
+        let text = expanded.expanded_source();
+        assert!(!text.contains("int waves;"), "{text}");
+        assert!(text.contains("int glow;"), "{text}");
+        assert!(text.contains("#define QUALITY 3"), "{text}");
+        assert!(text.contains("const float shadowDistance = 128.0;"), "{text}");
+    }
+
+    #[test]
     fn runtime_option_snapshot_is_canonical_and_rejects_malformed_entries() {
         let source = ShaderPackSource::new(
             "test-pack",
@@ -581,7 +854,7 @@ mod tests {
     }
 
     #[test]
-    fn semantic_snapshot_merges_environment_defines_without_implicit_precedence() {
+    fn semantic_snapshot_merges_environment_defines_with_saved_options_winning() {
         let source = ShaderPackSource::new(
             "test-pack",
             3,
@@ -609,7 +882,12 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(duplicate.runtime_semantic_defines().is_err());
+        // An environment default (such as a profile quality level) yields to
+        // the option the user saved, as Iris applies it.
+        assert_eq!(
+            Some(&"2".to_string()),
+            duplicate.runtime_semantic_defines().unwrap().get("QUALITY")
+        );
     }
 
     #[test]

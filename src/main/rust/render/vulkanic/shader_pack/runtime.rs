@@ -420,6 +420,21 @@ pub(crate) struct TerrainShadowDraw {
     pub shader_resource_set: Option<TerrainShaderResourceSet>,
 }
 
+/// A caster admitted only to the shadow scene. It carries no color pipeline
+/// or color target state, so an off-camera section cannot accidentally enter
+/// the G-buffer merely because its immutable mesh is resident.
+#[derive(Clone, Debug)]
+pub(crate) struct TerrainShadowMeshDraw {
+    pub shadow: TerrainShadowDraw,
+    pub index_buffer: Handle,
+    pub index_offset: u64,
+    pub index_type: IndexType,
+    pub index_count: u32,
+    pub instance_count: u32,
+    pub indexed_indirect: Option<TerrainIndexedIndirect>,
+    pub material_mode: TerrainMaterialPassMode,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct TerrainShaderResourceSet {
     pub set_index: u32,
@@ -583,6 +598,10 @@ pub(crate) struct TerrainRuntimeTargets {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TerrainSourceShadowPassTargets {
     pub shadow_depth_texture: Handle,
+    /// Receives the opaque/cutout shadow depth before translucent casters
+    /// (Iris `shadowtex1`). NULL keeps the legacy single-depth behaviour.
+    pub shadow_depth_opaque_texture: Handle,
+    pub shadow_extent: Extent3d,
     pub shadow_depth_view: Handle,
     pub shadow_color_texture: Handle,
     pub shadow_color_view: Handle,
@@ -597,6 +616,8 @@ impl From<TerrainRuntimeTargets> for TerrainSourceShadowPassTargets {
     fn from(targets: TerrainRuntimeTargets) -> Self {
         Self {
             shadow_depth_texture: targets.shadow_depth_texture,
+            shadow_depth_opaque_texture: Handle::NULL,
+            shadow_extent: Extent3d { width: 0, height: 0, depth: 1 },
             shadow_depth_view: targets.shadow_depth_view,
             shadow_color_texture: targets.shadow_color_texture,
             shadow_color_view: targets.shadow_color_view,
@@ -656,15 +677,16 @@ pub(crate) enum TerrainSourceColorPassPhase {
     /// It shares the named terrain targets but has its own source contract,
     /// so cloud work cannot be relabelled as weather or generic material.
     Clouds,
+    /// `gbuffers_line` block-selection outlines: a separate source-defined
+    /// alpha-over writer that loads the named G-buffer targets.
+    Lines,
     /// `gbuffers_entities` consumes an entity-local material texture and
     /// Rust-resolved entity identity. It loads existing named targets and
     /// never bootstraps or clears terrain output.
     Entities,
     /// `gbuffers_hand` is a distinct first-person writer. It preserves the
-    /// Rust-owned named color generation but clears the private depth domain
-    /// before rendering hands/items, so world-depth occlusion cannot leak
-    /// into first-person composition. This is a semantic pass rule rather
-    /// than an Iris phase or backend state reconstruction.
+    /// Rust-owned named color generation. Ordinary D32 hands load an explicit
+    /// world-depth copy; optical D24S8 hands retain the private clear path.
     Hands,
     /// The first terrain writer is translucent. It must initialize named
     /// color/depth attachments before alpha-over drawing rather than loading
@@ -708,6 +730,7 @@ impl TerrainSourceColorPassPhase {
             Self::TexturedMaterial
             | Self::Weather
             | Self::Clouds
+            | Self::Lines
             | Self::Entities
             | Self::Hands => false,
             Self::Translucent => material_mode == TerrainMaterialPassMode::Translucent,
@@ -718,12 +741,13 @@ impl TerrainSourceColorPassPhase {
     fn depth_before(self) -> TextureUsageState {
         match self {
             Self::Bootstrap | Self::BootstrapAfterSky => TextureUsageState::Undefined,
-            Self::TexturedMaterial | Self::Weather | Self::Clouds | Self::Entities => {
-                TextureUsageState::ShaderRead
-            }
-            // Hands own a fresh private depth attachment.  Its first use is
-            // the explicit clear/load pass, so the semantic predecessor is
-            // Undefined rather than the shared world-depth read state.
+            Self::TexturedMaterial
+            | Self::Weather
+            | Self::Clouds
+            | Self::Lines
+            | Self::Entities => TextureUsageState::ShaderRead,
+            // The optical hand fallback clears its private depth attachment.
+            // The ordinary copied-depth path overrides this predecessor.
             Self::Hands => TextureUsageState::Undefined,
             Self::Translucent => TextureUsageState::ShaderRead,
             Self::TranslucentFirst => TextureUsageState::Undefined,
@@ -744,6 +768,7 @@ impl TerrainSourceColorPassPhase {
             | Self::TexturedMaterial
             | Self::Weather
             | Self::Clouds
+            | Self::Lines
             | Self::Entities
             | Self::Hands
             | Self::Translucent => AttachmentLoadOp::Load,
@@ -758,12 +783,12 @@ impl TerrainSourceColorPassPhase {
             Self::TexturedMaterial
             | Self::Weather
             | Self::Clouds
+            | Self::Lines
             | Self::Entities
             | Self::Translucent => AttachmentLoadOp::Load,
             Self::TranslucentFirst => AttachmentLoadOp::Clear,
-            // First-person depth intentionally begins at the backend-neutral
-            // clear value (1.0) after all world material writers. Color still
-            // loads because hands compose over the completed world image.
+            // Optical hands retain a private clear; ordinary copied-depth
+            // hands override this to Load. Color always loads world output.
             Self::Hands => AttachmentLoadOp::Clear,
         }
     }
@@ -1409,6 +1434,8 @@ pub(crate) struct TerrainSourceShadowDepthInput {
     pub world_generation: u64,
     pub shader_graph_generation: u64,
     pub shadow_depth_view: Handle,
+    /// Pre-translucent shadow depth (`shadowtex1`); NULL aliases the primary.
+    pub shadow_depth_secondary_view: Handle,
 }
 
 /// Rust-internal handoff from a future owned shadow-color target. The input
@@ -1790,6 +1817,7 @@ impl ShaderPackRuntimeExecutor {
     /// combined frame submission. The resource is intentionally unavailable
     /// to selected-source assembly until `confirm_vanilla_lightmap_submission`
     /// observes that submission's success.
+    #[track_caller]
     pub(crate) fn stage_vanilla_lightmap_residency(
         &mut self,
         gal: &mut VulkanicGal,
@@ -1813,9 +1841,15 @@ impl ShaderPackRuntimeExecutor {
             if pending.is_compatible_with(&self.vanilla_lightmap) {
                 return Ok(false);
             }
-            return Err(GalError::invalid_argument(
-                "vanilla lightmap replacement conflicts with a different pending combined submission",
-            ));
+            let pending_binding = pending.binding();
+            return Err(GalError::invalid_argument(format!(
+                "vanilla lightmap replacement conflicts with a different pending combined submission: pending world/lightmap={}/{}, observed world/lightmap={}/{}, stage caller={}",
+                pending_binding.world_generation,
+                pending_binding.lightmap_generation,
+                self.vanilla_lightmap.world_generation(),
+                self.vanilla_lightmap.lightmap_generation(),
+                std::panic::Location::caller(),
+            )));
         }
         let replacement = VanillaLightmapResidency::create(gal, &self.vanilla_lightmap)?;
         if let Err(error) = replacement.append_upload(&self.vanilla_lightmap, ops) {
@@ -3376,11 +3410,15 @@ impl ShaderPackRuntimeExecutor {
     /// by those frontends, and every stage receives the same explicit source
     /// target contract. The world frontend schedules all writers, this chain,
     /// and final output in one Rust-owned submission.
-    pub(crate) fn stage_complete_post_terrain_execution_plans(
+    /// `external_inputs_for_stage` receives each program's source stage path.
+    /// Stages recorded at different frame boundaries can observe different
+    /// semantic resources (for example, Iris deferred stages run before the
+    /// hand writer and must see world depth rather than post-hand depth).
+    pub(crate) fn stage_complete_post_terrain_execution_plans<'a>(
         &self,
         gal: &mut VulkanicGal,
         targets: &ShaderPackColorTargets,
-        external_inputs: &[TerrainSourceOwnedResourceSet],
+        external_inputs_for_stage: impl Fn(&str) -> &'a [TerrainSourceOwnedResourceSet],
         extent: crate::render::vulkanic::resources::Extent3d,
     ) -> GalResult<Vec<FullscreenSourceExecutionPlan>> {
         let manifest = self.source_color_target_manifest()?.ok_or_else(|| {
@@ -3406,7 +3444,9 @@ impl ShaderPackRuntimeExecutor {
                 program,
                 manifest,
                 targets,
-                external_inputs.iter().cloned(),
+                external_inputs_for_stage(&program.source_stage_path)
+                    .iter()
+                    .cloned(),
                 extent,
             ) {
                 Ok(plan) => plans.push(plan),
@@ -5177,7 +5217,11 @@ impl ShaderPackRuntimeExecutor {
             let secondary_combined_sampler =
                 gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
                     label: format!("{label_prefix}.secondary.combined"),
-                    texture_view: input.shadow_depth_view,
+                    texture_view: if input.shadow_depth_secondary_view == Handle::NULL {
+                        input.shadow_depth_view
+                    } else {
+                        input.shadow_depth_secondary_view
+                    },
                     sampler: secondary_sampler,
                 })?;
             created.push(secondary_combined_sampler);
@@ -6466,7 +6510,9 @@ impl ShaderPackRuntimeExecutor {
                 ops,
                 targets.into(),
                 effective_draws,
+                &[],
                 frame.shadow_targets_initialized,
+                false,
             )?;
         } else if isolation == TerrainGraphIsolation::GBufferNoShadow {
             // The deferred graph still samples the explicit shadow-depth
@@ -6478,7 +6524,9 @@ impl ShaderPackRuntimeExecutor {
                 ops,
                 targets.into(),
                 &[],
+                &[],
                 frame.shadow_targets_initialized,
+                false,
             )?;
         }
         self.append_g_buffer_passes(
@@ -6604,6 +6652,55 @@ impl ShaderPackRuntimeExecutor {
         )));
         ops.push(CommandOp::Barrier(texture_barrier(
             targets.main_depth_texture,
+            TextureUsageState::TransferSrc,
+            TextureUsageState::ShaderRead,
+        )));
+        Ok(())
+    }
+
+    /// Captures one current-frame selected-source depth boundary. The
+    /// destination is replaced in this submission before any consumer reads
+    /// it; it is never interpreted as a previous-frame history image.
+    pub(crate) fn append_source_main_depth_snapshot(
+        ops: &mut Vec<CommandOp>,
+        source: Handle,
+        destination: Handle,
+        extent: Extent3d,
+    ) -> GalResult<()> {
+        if source == destination || extent.width == 0 || extent.height == 0 || extent.depth != 1 {
+            return Err(GalError::invalid_argument(
+                "source main depth snapshot requires distinct full-size 2D textures",
+            ));
+        }
+        ops.push(CommandOp::Barrier(texture_barrier(
+            source,
+            TextureUsageState::ShaderRead,
+            TextureUsageState::TransferSrc,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            destination,
+            TextureUsageState::Undefined,
+            TextureUsageState::TransferDst,
+        )));
+        ops.push(CommandOp::CopyTexture(TextureImageCopyRegion {
+            row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+            src_texture: source,
+            src_mip: 0,
+            src_layer: 0,
+            src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            dst_texture: destination,
+            dst_mip: 0,
+            dst_layer: 0,
+            dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+            extent,
+        }));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            destination,
+            TextureUsageState::TransferDst,
+            TextureUsageState::ShaderRead,
+        )));
+        ops.push(CommandOp::Barrier(texture_barrier(
+            source,
             TextureUsageState::TransferSrc,
             TextureUsageState::ShaderRead,
         )));
@@ -6811,6 +6908,21 @@ impl ShaderPackRuntimeExecutor {
     /// Appends the source-derived cloud writer against the same Rust-owned
     /// named targets. The caller owns route selection and transaction
     /// completion; this only records the explicit load-only pass.
+    pub(crate) fn append_line_source_color_pass(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        targets: &TerrainSourceColorPassTargets,
+        draws: &[TexturedMaterialSourceDraw],
+    ) -> GalResult<()> {
+        self.append_source_material_color_pass(
+            ops,
+            targets,
+            draws,
+            TerrainSourceColorPassPhase::Lines,
+            "lines",
+        )
+    }
+
     pub(crate) fn append_cloud_source_color_pass(
         &self,
         ops: &mut Vec<CommandOp>,
@@ -6842,12 +6954,13 @@ impl ShaderPackRuntimeExecutor {
             draws,
             TerrainSourceColorPassPhase::Entities,
             "entity",
+            false,
         )
     }
 
     /// Records the separate Rust-owned `gbuffers_hand` pass. It shares the
-    /// explicit indexed source stream with entity meshes, but its pass phase
-    /// clears a fresh depth domain while loading the completed world colors.
+    /// explicit indexed source stream with entity meshes. Ordinary hands copy
+    /// world depth first so depthtex0 retains terrain and hand depth.
     /// It has no route or presentation ownership outside the source-frame
     /// coordinator.
     pub(crate) fn append_hand_source_color_pass(
@@ -6855,13 +6968,23 @@ impl ShaderPackRuntimeExecutor {
         ops: &mut Vec<CommandOp>,
         targets: &TerrainSourceColorPassTargets,
         draws: &[EntitySourceDraw],
+        world_depth: Option<(Handle, Extent3d)>,
     ) -> GalResult<()> {
+        if let Some((world_texture, extent)) = world_depth {
+            Self::append_source_main_depth_snapshot(
+                ops,
+                world_texture,
+                targets.depth_texture,
+                extent,
+            )?;
+        }
         self.append_indexed_source_color_pass(
             ops,
             targets,
             draws,
             TerrainSourceColorPassPhase::Hands,
             "hand",
+            world_depth.is_some(),
         )
     }
 
@@ -6872,6 +6995,7 @@ impl ShaderPackRuntimeExecutor {
         draws: &[EntitySourceDraw],
         expected_phase: TerrainSourceColorPassPhase,
         writer: &str,
+        hand_depth_loaded: bool,
     ) -> GalResult<()> {
         if matches!(
             std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
@@ -6909,7 +7033,7 @@ impl ShaderPackRuntimeExecutor {
         }
         ops.push(CommandOp::Barrier(texture_barrier(
             targets.depth_texture,
-            targets.phase.depth_before(),
+            if hand_depth_loaded { TextureUsageState::ShaderRead } else { targets.phase.depth_before() },
             TextureUsageState::DepthStencilAttachment,
         )));
         ops.push(CommandOp::BeginPass {
@@ -6937,7 +7061,7 @@ impl ShaderPackRuntimeExecutor {
                 .collect(),
             depth_stencil: Some(PassAttachment {
                 view: targets.depth_view,
-                load_op: targets.phase.depth_load_op(),
+                load_op: if hand_depth_loaded { AttachmentLoadOp::Load } else { targets.phase.depth_load_op() },
                 store_op: AttachmentStoreOp::Store,
                 clear_color: None,
             }),
@@ -7082,8 +7206,18 @@ impl ShaderPackRuntimeExecutor {
         ops: &mut Vec<CommandOp>,
         targets: TerrainSourceShadowPassTargets,
         draws: &[TerrainMeshDraw],
+        shadow_only_draws: &[TerrainShadowMeshDraw],
+        entity_shadow_draws: &[EntitySourceDraw],
     ) -> GalResult<()> {
-        self.append_shadow_depth_pass(ops, targets, draws, targets.initialized)
+        self.append_shadow_depth_pass_with_entities(
+            ops,
+            targets,
+            draws,
+            shadow_only_draws,
+            entity_shadow_draws,
+            targets.initialized,
+            true,
+        )
     }
 
     fn validate_terrain_material_graph(&self) -> GalResult<()> {
@@ -7118,7 +7252,30 @@ impl ShaderPackRuntimeExecutor {
         ops: &mut Vec<CommandOp>,
         targets: TerrainSourceShadowPassTargets,
         draws: &[TerrainMeshDraw],
+        shadow_only_draws: &[TerrainShadowMeshDraw],
         targets_initialized: bool,
+        include_translucent: bool,
+    ) -> GalResult<()> {
+        self.append_shadow_depth_pass_with_entities(
+            ops,
+            targets,
+            draws,
+            shadow_only_draws,
+            &[],
+            targets_initialized,
+            include_translucent,
+        )
+    }
+
+    fn append_shadow_depth_pass_with_entities(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        targets: TerrainSourceShadowPassTargets,
+        draws: &[TerrainMeshDraw],
+        shadow_only_draws: &[TerrainShadowMeshDraw],
+        entity_shadow_draws: &[EntitySourceDraw],
+        targets_initialized: bool,
+        include_translucent: bool,
     ) -> GalResult<()> {
         let pass = self.pass_identity(AttachmentRole::ShadowDepth)?;
         let attachment_before = if targets_initialized {
@@ -7150,10 +7307,12 @@ impl ShaderPackRuntimeExecutor {
                     load_op: AttachmentLoadOp::Clear,
                     store_op: AttachmentStoreOp::Store,
                     clear_color: Some(ClearColor {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 0.0,
+                        // Iris shadowcolor sampling defaults to opaque white
+                        // unless the pack supplies a clear-color directive.
+                        r: 1.0,
+                        g: 1.0,
+                        b: 1.0,
+                        a: 1.0,
                     }),
                 },
                 PassAttachment {
@@ -7161,10 +7320,10 @@ impl ShaderPackRuntimeExecutor {
                     load_op: AttachmentLoadOp::Clear,
                     store_op: AttachmentStoreOp::Store,
                     clear_color: Some(ClearColor {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 0.0,
+                        r: 1.0,
+                        g: 1.0,
+                        b: 1.0,
+                        a: 1.0,
                     }),
                 },
             ],
@@ -7176,31 +7335,121 @@ impl ShaderPackRuntimeExecutor {
             }),
         });
         let mut draw_state = IndexedDrawState::default();
-        for draw in draws.iter().filter(|draw| {
-            draw.material_mode != TerrainMaterialPassMode::Translucent
-                && draw.shadow_participation == TerrainShadowParticipation::Required
-        }) {
-            let shadow = draw.shadow.as_ref().ok_or_else(|| {
-                GalError::backend(format!(
-                    "{} mesh draw missing shadow pipeline",
-                    pass.as_str()
-                ))
-            })?;
-            append_indexed_draw(
-                ops,
-                &mut draw_state,
-                shadow.pipeline,
-                shadow.pipeline_layout,
-                shadow.resource_set,
-                &shadow.resource_set_dynamic_offsets,
-                shadow.shader_resource_set,
-                draw.index_buffer,
-                draw.index_offset,
-                draw.index_type,
-                draw.index_count,
-                draw.instance_count,
-                draw.indexed_indirect,
-            );
+        // Frozen's shadow scene renders solid/cutout terrain before the
+        // translucent terrain group. Preserve that phase order even when the
+        // semantic batch list arrives in a different color-pass order.
+        for translucent_phase in [false, true] {
+            if translucent_phase && targets.shadow_depth_opaque_texture != Handle::NULL {
+                // Iris copies shadowtex0 into shadowtex1 between the opaque and
+                // translucent shadow casters; resume the same targets with load.
+                ops.push(CommandOp::EndPass);
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    targets.shadow_depth_texture,
+                    TextureUsageState::DepthStencilAttachment,
+                    TextureUsageState::ShaderRead,
+                )));
+                Self::append_source_main_depth_snapshot(
+                    ops,
+                    targets.shadow_depth_texture,
+                    targets.shadow_depth_opaque_texture,
+                    targets.shadow_extent,
+                )?;
+                ops.push(CommandOp::Barrier(texture_barrier(
+                    targets.shadow_depth_texture,
+                    TextureUsageState::ShaderRead,
+                    TextureUsageState::DepthStencilAttachment,
+                )));
+                let load = |view| PassAttachment {
+                    view,
+                    load_op: AttachmentLoadOp::Load,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: None,
+                };
+                ops.push(CommandOp::BeginPass {
+                    pass: targets.shadow_pass,
+                    target: targets.shadow_target,
+                    colors: vec![
+                        load(targets.shadow_color_view),
+                        load(targets.shadow_light_shaft_view),
+                    ],
+                    depth_stencil: Some(load(targets.shadow_depth_view)),
+                });
+                draw_state = IndexedDrawState::default();
+            }
+            for draw in draws.iter().filter(|draw| {
+                draw.shadow_participation == TerrainShadowParticipation::Required
+                    && (draw.material_mode == TerrainMaterialPassMode::Translucent)
+                        == translucent_phase
+                    && (include_translucent || !translucent_phase)
+            }) {
+                let shadow = draw.shadow.as_ref().ok_or_else(|| {
+                    GalError::backend(format!(
+                        "{} mesh draw missing shadow pipeline (stratum {} material {:?} indices {} instances {})",
+                        pass.as_str(),
+                        draw.stratum,
+                        draw.material_mode,
+                        draw.index_count,
+                        draw.instance_count
+                    ))
+                })?;
+                append_indexed_draw(
+                    ops,
+                    &mut draw_state,
+                    shadow.pipeline,
+                    shadow.pipeline_layout,
+                    shadow.resource_set,
+                    &shadow.resource_set_dynamic_offsets,
+                    shadow.shader_resource_set,
+                    draw.index_buffer,
+                    draw.index_offset,
+                    draw.index_type,
+                    draw.index_count,
+                    draw.instance_count,
+                    draw.indexed_indirect,
+                );
+            }
+            if !translucent_phase {
+                // Iris renders entity shadow casters after solid/cutout terrain.
+                for draw in entity_shadow_draws {
+                    append_indexed_draw(
+                        ops,
+                        &mut draw_state,
+                        draw.pipeline,
+                        draw.pipeline_layout,
+                        draw.resource_set,
+                        &draw.resource_set_dynamic_offsets,
+                        Some(draw.shader_resource_set),
+                        draw.index_buffer,
+                        draw.index_offset,
+                        draw.index_type,
+                        draw.index_count,
+                        draw.instance_count,
+                        None,
+                    );
+                }
+            }
+            if include_translucent || !translucent_phase {
+                for draw in shadow_only_draws.iter().filter(|draw| {
+                    (draw.material_mode == TerrainMaterialPassMode::Translucent)
+                        == translucent_phase
+                }) {
+                    append_indexed_draw(
+                        ops,
+                        &mut draw_state,
+                        draw.shadow.pipeline,
+                        draw.shadow.pipeline_layout,
+                        draw.shadow.resource_set,
+                        &draw.shadow.resource_set_dynamic_offsets,
+                        draw.shadow.shader_resource_set,
+                        draw.index_buffer,
+                        draw.index_offset,
+                        draw.index_type,
+                        draw.index_count,
+                        draw.instance_count,
+                        draw.indexed_indirect,
+                    );
+                }
+            }
         }
         ops.push(CommandOp::EndPass);
         ops.push(CommandOp::Barrier(texture_barrier(
@@ -8205,6 +8454,68 @@ mod tests {
     }
 
     #[test]
+    fn source_shadow_pass_accepts_an_independent_caster_stream() {
+        let executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(9).unwrap();
+        let caster = TerrainShadowMeshDraw {
+            shadow: TerrainShadowDraw {
+                pipeline: Handle::NULL,
+                pipeline_layout: Handle::NULL,
+                resource_set: Handle::NULL,
+                resource_set_dynamic_offsets: Vec::new().into(),
+                shader_resource_set: None,
+            },
+            index_buffer: Handle::NULL,
+            index_offset: 0,
+            index_type: IndexType::U32,
+            index_count: 3,
+            instance_count: 1,
+            indexed_indirect: None,
+            material_mode: TerrainMaterialPassMode::Opaque,
+        };
+        let mut operations = Vec::new();
+        executor
+            .append_terrain_source_shadow_pass(
+                &mut operations,
+                TerrainSourceShadowPassTargets {
+                    shadow_depth_texture: Handle::NULL,
+                    shadow_depth_opaque_texture: Handle::NULL,
+                    shadow_extent: Extent3d { width: 0, height: 0, depth: 1 },
+                    shadow_depth_view: Handle::NULL,
+                    shadow_color_texture: Handle::NULL,
+                    shadow_color_view: Handle::NULL,
+                    shadow_light_shaft_texture: Handle::NULL,
+                    shadow_light_shaft_view: Handle::NULL,
+                    shadow_target: Handle::NULL,
+                    shadow_pass: Handle::NULL,
+                    initialized: false,
+                },
+                &[],
+                &[caster],
+                &[],
+            )
+            .unwrap();
+        assert!(operations.iter().any(|op| matches!(
+            op,
+            CommandOp::DrawIndexed {
+                indices: 3,
+                instances: 1
+            }
+        )));
+        let white = Some(ClearColor {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            a: 1.0,
+        });
+        assert!(operations.iter().any(|op| matches!(
+            op,
+            CommandOp::BeginPass { colors, .. }
+                if colors.len() == 2
+                    && colors.iter().all(|attachment| attachment.clear_color == white)
+        )));
+    }
+
+    #[test]
     fn runtime_owns_only_generation_coherent_vanilla_lightmap_bytes() {
         let mut executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(9).unwrap();
         let frame = VanillaLightmapFrame {
@@ -8974,6 +9285,7 @@ mod tests {
             world_generation: 4,
             shader_graph_generation: 9,
             shadow_depth_view: view,
+            shadow_depth_secondary_view: Handle::NULL,
         };
 
         let first = executor
@@ -10199,7 +10511,7 @@ mod tests {
             .unwrap()
             .expect("complete source discovery must stage a private target generation");
         let error = executor
-            .stage_complete_post_terrain_execution_plans(&mut gal, &targets, &[], extent)
+            .stage_complete_post_terrain_execution_plans(&mut gal, &targets, |_| &[], extent)
             .unwrap_err();
         assert!(
             error.to_string().contains("semantic")
@@ -10549,7 +10861,7 @@ mod tests {
         };
         let hand_begin = operations.len();
         executor
-            .append_hand_source_color_pass(&mut operations, &hand_targets, &[])
+            .append_hand_source_color_pass(&mut operations, &hand_targets, &[], None)
             .unwrap();
         let hand_operations = &operations[hand_begin..];
         assert!(hand_operations.iter().any(|operation| matches!(
@@ -10568,8 +10880,28 @@ mod tests {
             )),
             "the hand writer must explicitly transition its fresh depth domain"
         );
+        let mut copied_hand_operations = Vec::new();
+        let world_depth = test_handle(HandleKind::Texture, 991);
+        executor
+            .append_hand_source_color_pass(
+                &mut copied_hand_operations,
+                &hand_targets,
+                &[],
+                Some((world_depth, Extent3d { width: 16, height: 16, depth: 1 })),
+            )
+            .unwrap();
+        assert!(copied_hand_operations.iter().any(|operation| matches!(
+            operation,
+            CommandOp::CopyTexture(copy)
+                if copy.src_texture == world_depth && copy.dst_texture == depth_texture
+        )));
+        assert!(copied_hand_operations.iter().any(|operation| matches!(
+            operation,
+            CommandOp::BeginPass { depth_stencil: Some(depth), .. }
+                if depth.load_op == AttachmentLoadOp::Load
+        )), "ordinary hands must retain copied world depth for depthtex0");
         assert!(executor
-            .append_hand_source_color_pass(&mut Vec::new(), &entity_targets, &[])
+            .append_hand_source_color_pass(&mut Vec::new(), &entity_targets, &[], None)
             .is_err());
         let wrong_phase = TerrainSourceColorPassTargets {
             phase: TerrainSourceColorPassPhase::TexturedMaterial,

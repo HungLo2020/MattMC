@@ -11222,6 +11222,7 @@ mod tests {
                             },
                         },
                         color_attachment_before: Vec::new(),
+                        clear_targets_this_pass: None,
                     },
                     &mut ops,
                 )

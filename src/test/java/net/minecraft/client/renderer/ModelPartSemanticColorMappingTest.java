@@ -10,6 +10,23 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ModelPartSemanticColorMappingTest {
+	@Test void renderableVisitHonorsVisibilityAndSkipDrawWithoutDroppingVisibleChildren() {
+		var child = new ModelPart(java.util.Collections.singletonList(null), java.util.Map.of());
+		var root = new ModelPart(java.util.Collections.singletonList(null), java.util.Map.of("sleeve", child));
+		var paths = new java.util.ArrayList<String>();
+		child.visible = false;
+		root.visitRenderable(new PoseStack(), (pose, path, index, cube) -> paths.add(path));
+		assertEquals(java.util.List.of(""), paths);
+		paths.clear();
+		child.visible = true;
+		root.skipDraw = true;
+		root.visitRenderable(new PoseStack(), (pose, path, index, cube) -> paths.add(path));
+		assertEquals(java.util.List.of("/sleeve"), paths);
+		paths.clear();
+		root.visible = false;
+		root.visitRenderable(new PoseStack(), (pose, path, index, cube) -> paths.add(path));
+		assertTrue(paths.isEmpty());
+	}
     private static Integer copiedOrder() {
         return new net.vulkanic.bridge.VulkanicGalBridge.WorldMeshInstanceRecord(67,17,1,0,1,1,0,-1,
             new float[]{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1},128,128,0,0,0,0,-1).modelSubmissionOrder();
@@ -25,14 +42,17 @@ class ModelPartSemanticColorMappingTest {
             api.when(net.vulkanic.VulkanicAPI::isVulkanBackendSelected).thenReturn(true);
             policy.when(()->WorldRenderRoutePolicy.currentModelMeshRoute(true)).thenReturn(WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME);
             var storage=new SubmitNodeStorage();
+            int[] expectedOrder = {0};
+            nativeCalls.when(()->RustGalWorldPrimitiveRenderer.enqueueAtlasGlintModelMesh(
+                model,state,pose.last(),type,sprite,15728880,overlay,-1,0,null)).thenAnswer(call->{
+                    assertEquals(expectedOrder[0],copiedOrder());return true;
+                });
             for(int order:new int[]{-2,0,3}) {
-                nativeCalls.when(()->RustGalWorldPrimitiveRenderer.enqueueAtlasGlintModelMesh(
-                    model,state,pose.last(),type,sprite,15728880,overlay,-1,0,null)).thenAnswer(call->{
-                        assertEquals(order,copiedOrder());return true;
-                    });
+                expectedOrder[0] = order;
                 storage.order(order).submitModelSemantic(model,state,pose,type,15728880,overlay,-1,sprite,0,null);
                 assertNull(copiedOrder());
             }
+            nativeCalls.reset();
             nativeCalls.when(()->RustGalWorldPrimitiveRenderer.enqueueAtlasGlintModelMesh(
                 model,state,pose.last(),type,sprite,15728880,overlay,-1,0,null)).thenThrow(new IllegalStateException("test extraction failure"));
             assertThrows(IllegalStateException.class,()->storage.order(7).submitModelSemantic(

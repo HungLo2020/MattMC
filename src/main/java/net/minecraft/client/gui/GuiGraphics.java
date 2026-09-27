@@ -92,7 +92,11 @@ public class GuiGraphics {
 	private static final int EXTRA_SPACE_AFTER_FIRST_TOOLTIP_LINE = 2;
 	private final Minecraft minecraft;
 	private final Matrix3x2fStack pose;
-	public final GuiGraphics.ScissorStack scissorStack = new GuiGraphics.ScissorStack();
+	// Root scissors are clipped to the GUI frame, as the framebuffer clips them
+	// on OpenGL; the Rust Vulkan GUI requires frame-local clip rectangles.
+	public final GuiGraphics.ScissorStack scissorStack = new GuiGraphics.ScissorStack(
+		() -> new ScreenRectangle(0, 0, this.guiWidth(), this.guiHeight())
+	);
 	private final MaterialSet materials;
 	private final TextureAtlas guiSprites;
 	public final GuiRenderState guiRenderState;
@@ -1227,12 +1231,22 @@ public class GuiGraphics {
 	// VoxelMap: access widener
 	public static class ScissorStack {
 		private final Deque<ScreenRectangle> stack = new ArrayDeque();
+		@Nullable
+		private final java.util.function.Supplier<ScreenRectangle> frameBounds;
 
 		ScissorStack() {
+			this(null);
+		}
+
+		ScissorStack(@Nullable java.util.function.Supplier<ScreenRectangle> frameBounds) {
+			this.frameBounds = frameBounds;
 		}
 
 		public ScreenRectangle push(ScreenRectangle screenRectangle) {
 			ScreenRectangle screenRectangle2 = (ScreenRectangle)this.stack.peekLast();
+			if (screenRectangle2 == null && this.frameBounds != null) {
+				screenRectangle2 = this.frameBounds.get();
+			}
 			if (screenRectangle2 != null) {
 				ScreenRectangle screenRectangle3 = (ScreenRectangle)Objects.requireNonNullElse(screenRectangle.intersection(screenRectangle2), ScreenRectangle.empty());
 				this.stack.addLast(screenRectangle3);

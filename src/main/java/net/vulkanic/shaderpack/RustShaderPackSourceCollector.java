@@ -45,6 +45,47 @@ public final class RustShaderPackSourceCollector {
 	/** Reserved Rust-owned table of canonical Minecraft block-state identities. */
 	public static final String RUNTIME_BLOCK_STATE_IDENTITIES_PATH = "mattmc/runtime-block-states.properties";
 
+	/** CPU meshing policy copied from the pack; no Iris pipeline or GL state is read. */
+	public static boolean copiedSeparateAo(SourceGeneration source) throws IOException {
+		return copiedBooleanDirective(source, "separateAo");
+	}
+
+	public static boolean copiedDisableDirectionalShading(SourceGeneration source) throws IOException {
+		return !source.packName().equals("disabled")
+			&& !source.packName().startsWith("minecraft-resource-pack:")
+			&& !copiedBooleanDirective(source, "oldLighting");
+	}
+
+	/** Whether vanilla's GUI vignette remains enabled under the copied pack. */
+	public static boolean copiedVignetteEnabled(SourceGeneration source) throws IOException {
+		return copiedBooleanDirective(source, "vignette", true);
+	}
+
+	private static boolean copiedBooleanDirective(SourceGeneration source, String directive) throws IOException {
+		return copiedBooleanDirective(source, directive, false);
+	}
+
+	private static boolean copiedBooleanDirective(SourceGeneration source, String directive, boolean defaultValue) throws IOException {
+		boolean found = false;
+		boolean value = false;
+		for (var file : source.files()) {
+			if (!file.path().equals("shaders.properties")) continue;
+			int conditionalDepth = 0;
+			for (String raw : new String(file.contentsUtf8(), StandardCharsets.UTF_8).split("\\R")) {
+				String line = raw.trim();
+				if (line.startsWith("#if ") || line.startsWith("#ifdef ") || line.startsWith("#ifndef ")) conditionalDepth++;
+				else if (line.startsWith("#endif")) conditionalDepth--;
+				if (!line.startsWith(directive) || !line.substring(directive.length()).stripLeading().startsWith("=")) continue;
+				if (conditionalDepth != 0 || found) throw new IOException("ambiguous copied " + directive + " directive");
+				String setting = line.substring(line.indexOf('=') + 1).trim();
+				if (!setting.equals("true") && !setting.equals("false")) throw new IOException("invalid copied " + directive + " directive");
+				value = Boolean.parseBoolean(setting);
+				found = true;
+			}
+		}
+		return found ? value : defaultValue;
+	}
+
 	private RustShaderPackSourceCollector() {
 	}
 
@@ -383,6 +424,22 @@ public final class RustShaderPackSourceCollector {
 		Path config = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
 			.resolve("config").resolve("iris.properties");
 		return configuredPackNameFromProperties(config);
+	}
+
+	/**
+	 * Engine identity defines only (Iris/Minecraft versions and render-stage
+	 * ids), without the pack option defaults. Used to parse pack options for the
+	 * shader-pack screens on the Rust Vulkan route.
+	 */
+	public static Map<String, String> engineEnvironmentDefines() {
+		TreeMap<String, String> defines = new TreeMap<>();
+		wholeFrameEnvironmentDefines().forEach((key, value) -> {
+			if (key.equals("IS_IRIS") || key.equals("IRIS_VERSION") || key.equals("MC_VERSION")
+				|| key.startsWith("MC_RENDER_STAGE_")) {
+				defines.put(key, value);
+			}
+		});
+		return defines;
 	}
 
 	/** Stable source-environment defaults used before any pack-specific Iris option graph exists. */

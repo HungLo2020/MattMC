@@ -13,6 +13,8 @@ use super::terrain_contract::TerrainProgramScope;
 use super::voxel_light_volume::invert_column_major_mat4;
 
 const DEFAULT_SHADOW_DISTANCE: f32 = 160.0;
+const DEFAULT_SHADOW_RESOLUTION: u32 = 1024;
+const MAX_SUPPORTED_SHADOW_RESOLUTION: u32 = 4096;
 const DEFAULT_SHADOW_NEAR_PLANE: f32 = -100.05;
 const DEFAULT_SHADOW_FAR_PLANE: f32 = 156.0;
 const DEFAULT_SHADOW_INTERVAL: f32 = 2.0;
@@ -24,11 +26,28 @@ const DEFAULT_SUN_PATH_ROTATION_DEGREES: f32 = 0.0;
 pub struct ShaderPackShadowPolicy {
     generation: u64,
     distance: f32,
+    resolution: u32,
+    cutout_alpha_cutoff: Option<f32>,
+    render_translucent: bool,
+    caster_selection: Option<ShadowCasterSelection>,
+    voxel_distance: f32,
     near_plane: f32,
     far_plane: f32,
     interval_size: f32,
     sun_path_rotation_degrees: f32,
     supports_end_flash: bool,
+    casters: ShadowCasterDirectives,
+}
+
+/// Iris's non-terrain shadow caster directives (`PackShadowDirectives`),
+/// resolved against the selected pack options. Defaults match Iris:
+/// entities and block entities render, the local player only when entities
+/// are disabled and `shadowPlayer` is set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ShadowCasterDirectives {
+    pub entities: bool,
+    pub player: bool,
+    pub block_entities: bool,
 }
 
 /// One complete ordinary-world shadow uniform set. Matrices use the same
@@ -41,6 +60,136 @@ pub struct ShaderPackShadowUniforms {
     pub projection_inverse: [f32; 16],
 }
 
+/// Frozen's advanced caster frustum derived from copied camera matrices and
+/// the source celestial light. The bounds passed to `intersects` are relative
+/// to the same camera origin as the copied terrain placements.
+pub(crate) struct AdvancedShadowCasterFrustum {
+    planes: Vec<[f32; 4]>,
+    safe_zone: Option<(f32, f32)>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ShadowCasterSelection {
+    Advanced,
+    SafeZone,
+    Unsupported,
+}
+
+impl AdvancedShadowCasterFrustum {
+    pub(crate) fn from_frame(
+        policy: ShaderPackShadowPolicy,
+        time_of_day: f32,
+        projection: [f32; 16],
+        view: [f32; 16],
+    ) -> GalResult<Self> {
+        if !time_of_day.is_finite()
+            || projection.iter().chain(view.iter()).any(|value| !value.is_finite())
+        {
+            return Err(GalError::invalid_argument(
+                "source shadow caster frustum requires finite camera semantics",
+            ));
+        }
+        let celestial = multiply(
+            multiply(rotation_y(-90.0), rotation_z(policy.sun_path_rotation_degrees)),
+            rotation_x(time_of_day * 360.0),
+        );
+        let sign = if source_sun_angle(time_of_day) <= 0.5 { 1.0 } else { -1.0 };
+        let mut light = [celestial[4] * sign, celestial[5] * sign, celestial[6] * sign];
+        let light_length = dot3(light, light).sqrt();
+        if !light_length.is_finite() || light_length == 0.0 {
+            return Err(GalError::invalid_argument("source shadow light vector is degenerate"));
+        }
+        light = light.map(|value| value / light_length);
+        let matrix = multiply(projection, view);
+        let clip = [
+            [-1.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0],
+            [0.0, -1.0, 0.0, 1.0], [0.0, 1.0, 0.0, 1.0],
+            [0.0, 0.0, -1.0, 1.0], [0.0, 0.0, 1.0, 1.0],
+        ];
+        // BaseClippingPlanes normalizes the four coefficients of each plane
+        // after multiplying by transpose(projection * view).
+        let base = clip.map(|vector| {
+            let plane: [f32; 4] = std::array::from_fn(|row| {
+                (0..4).map(|column| matrix[row * 4 + column] * vector[column]).sum()
+            });
+            let length = plane.iter().map(|value| value * value).sum::<f32>().sqrt();
+            plane.map(|value| value / length)
+        });
+        if base.iter().flatten().any(|value| !value.is_finite()) {
+            return Err(GalError::invalid_argument("source shadow camera plane is degenerate"));
+        }
+        let back = base.map(|plane| dot3([plane[0], plane[1], plane[2]], light) > 0.0);
+        let mut planes = Vec::with_capacity(13);
+        for (plane, is_back) in base.iter().zip(back) {
+            if is_back || dot3([plane[0], plane[1], plane[2]], light) == 0.0 {
+                planes.push(*plane);
+            }
+        }
+        const NEIGHBORS: [[usize; 4]; 3] = [
+            [2, 3, 4, 5], [0, 1, 4, 5], [0, 1, 2, 3],
+        ];
+        for (index, back_plane) in base.iter().enumerate() {
+            if !back[index] { continue; }
+            for neighbor in NEIGHBORS[index / 2] {
+                if back[neighbor] { continue; }
+                let front_plane = base[neighbor];
+                let back_normal = [back_plane[0], back_plane[1], back_plane[2]];
+                let front_normal = [front_plane[0], front_plane[1], front_plane[2]];
+                let intersection = cross3(back_normal, front_normal);
+                let length_squared = dot3(intersection, intersection);
+                if !length_squared.is_finite() || length_squared == 0.0 {
+                    return Err(GalError::invalid_argument("source shadow edge plane is degenerate"));
+                }
+                let ixb = cross3(intersection, back_normal);
+                let fxi = cross3(front_normal, intersection);
+                let point: [f32; 3] = std::array::from_fn(|axis| {
+                    (ixb[axis] * -front_plane[3] + fxi[axis] * -back_plane[3]) / length_squared
+                });
+                let normal = cross3(intersection, light);
+                planes.push([normal[0], normal[1], normal[2], -dot3(normal, point)]);
+            }
+        }
+        if planes.len() > 13 || planes.iter().flatten().any(|value| !value.is_finite()) {
+            return Err(GalError::invalid_argument("source shadow caster planes exceed finite bound"));
+        }
+        let safe_zone = match policy.require_supported_caster_selection()? {
+            ShadowCasterSelection::Advanced => None,
+            ShadowCasterSelection::SafeZone => Some((policy.voxel_distance, policy.distance)),
+            ShadowCasterSelection::Unsupported => unreachable!(),
+        };
+        Ok(Self { planes, safe_zone })
+    }
+
+    pub(crate) fn intersects(&self, min: [f32; 3], max: [f32; 3]) -> bool {
+        if let Some((inner, outer)) = self.safe_zone {
+            if (0..3).any(|axis| max[axis] < -outer || min[axis] > outer) {
+                return false;
+            }
+            if (0..3).all(|axis| max[axis] >= -inner && min[axis] <= inner) {
+                return true;
+            }
+        }
+        self.planes.iter().all(|plane| {
+            let furthest: [f32; 3] = std::array::from_fn(|axis| {
+                if plane[axis] < 0.0 { min[axis] } else { max[axis] }
+            });
+            dot3([plane[0], plane[1], plane[2]], furthest) + plane[3] >= 0.0
+        })
+    }
+}
+
+fn dot3(left: [f32; 3], right: [f32; 3]) -> f32 {
+    left.iter().zip(right).map(|(a, b)| a * b).sum()
+}
+
+fn cross3(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
+    [
+        left[1] * right[2] - left[2] * right[1],
+        left[2] * right[0] - left[0] * right[2],
+        left[0] * right[1] - left[1] * right[0],
+    ]
+}
+
 impl ShaderPackShadowPolicy {
     /// Parses the source generation's ordinary-world directives. A missing
     /// common source means this policy is not applicable; it is not a default
@@ -51,10 +200,23 @@ impl ShaderPackShadowPolicy {
         }
         let artifact = preprocess_artifact_with_runtime_options(source, "lib/common.glsl", &[])?;
         let common = artifact.expanded_source();
+        let cutout_alpha_cutoff = source_shadow_alpha_cutoff(source)?;
         let policy = Self {
             generation: source.generation(),
             distance: source_float_constant(&common, "shadowDistance")?
                 .unwrap_or(DEFAULT_SHADOW_DISTANCE),
+            resolution: source_int_constant(&common, "shadowMapResolution")?
+                .unwrap_or(DEFAULT_SHADOW_RESOLUTION),
+            cutout_alpha_cutoff,
+            render_translucent: source_bool_property(source, "shadowTranslucent")?.unwrap_or(true),
+            caster_selection: source_caster_selection(source)?,
+            voxel_distance: source.get("program/gbuffers_terrain.glsl")
+                .map(|_| preprocess_artifact_with_runtime_options(source, "program/gbuffers_terrain.glsl", &[]))
+                .transpose()?
+                .map(|artifact| source_float_constant(&artifact.expanded_source(), "voxelDistance"))
+                .transpose()?
+                .flatten()
+                .unwrap_or(0.0),
             near_plane: source_float_constant(&common, "shadowNearPlane")?
                 .unwrap_or(DEFAULT_SHADOW_NEAR_PLANE),
             far_plane: source_float_constant(&common, "shadowFarPlane")?
@@ -64,6 +226,7 @@ impl ShaderPackShadowPolicy {
             sun_path_rotation_degrees: source_float_constant(&common, "sunPathRotation")?
                 .unwrap_or(DEFAULT_SUN_PATH_ROTATION_DEGREES),
             supports_end_flash: source_bool_property(source, "endFlashShadows")?.unwrap_or(false),
+            casters: source_shadow_caster_directives(source)?,
         };
         policy.validate()?;
         Ok(Some(policy))
@@ -71,6 +234,41 @@ impl ShaderPackShadowPolicy {
 
     pub fn generation(self) -> u64 {
         self.generation
+    }
+
+    /// Square shadow attachment edge requested by the copied, preprocessed pack.
+    pub fn resolution(self) -> u32 {
+        self.resolution
+    }
+
+    /// Source shadow-pass alpha rule for cutout materials. `None` means the
+    /// pack explicitly disabled the test; opaque materials never use it.
+    pub fn cutout_alpha_cutoff(self) -> Option<f32> {
+        self.cutout_alpha_cutoff
+    }
+
+    /// Entity, player, and block-entity shadow caster directives.
+    pub fn casters(self) -> ShadowCasterDirectives {
+        self.casters
+    }
+
+    /// Whether the selected pack admits translucent terrain into its shadow
+    /// pass. Iris defaults this directive to true.
+    pub fn render_translucent(self) -> bool {
+        self.render_translucent
+    }
+
+    /// Admit only resolved light-aware advanced or safe-zone source culling.
+    fn require_supported_caster_selection(self) -> GalResult<ShadowCasterSelection> {
+        match self.caster_selection {
+            Some(mode @ (ShadowCasterSelection::Advanced | ShadowCasterSelection::SafeZone)) => Ok(mode),
+            Some(ShadowCasterSelection::Unsupported) => Err(GalError::unsupported_feature(
+                "source shadow-only selection does not support distance-only shadow.culling",
+            )),
+            None => Err(GalError::unsupported_feature(
+                "source shadow.culling requires resolved runtime property options",
+            )),
+        }
     }
 
     /// Source-defined celestial path rotation shared by the owned shadow and
@@ -156,6 +354,7 @@ impl ShaderPackShadowPolicy {
             ("shadow far plane", self.far_plane),
             ("shadow interval size", self.interval_size),
             ("sun path rotation", self.sun_path_rotation_degrees),
+            ("voxel distance", self.voxel_distance),
         ] {
             if !value.is_finite() {
                 return Err(GalError::invalid_argument(format!(
@@ -168,6 +367,15 @@ impl ShaderPackShadowPolicy {
                 "source shadow distance must be positive",
             ));
         }
+        if self.voxel_distance < 0.0 {
+            return Err(GalError::invalid_argument("source voxel distance must be nonnegative"));
+        }
+        if self.resolution == 0 || self.resolution > MAX_SUPPORTED_SHADOW_RESOLUTION {
+            return Err(GalError::unsupported_feature(format!(
+                "source shadow map resolution {} exceeds supported range 1..={MAX_SUPPORTED_SHADOW_RESOLUTION}",
+                self.resolution
+            )));
+        }
         if (self.near_plane - self.far_plane).abs() <= f32::EPSILON {
             return Err(GalError::invalid_argument(
                 "source shadow near and far planes must differ",
@@ -177,12 +385,87 @@ impl ShaderPackShadowPolicy {
     }
 }
 
+fn source_shadow_alpha_cutoff(source: &ShaderPackSource) -> GalResult<Option<f32>> {
+    let Some(raw_properties) = source.get("shaders.properties") else {
+        return Ok(Some(0.1));
+    };
+    let mut selected = None;
+    let mut conditional_depth = 0usize;
+    for raw_line in raw_properties.lines() {
+        let line = raw_line.trim();
+        if line.starts_with("#if ") || line.starts_with("#if(")
+            || line.starts_with("#ifdef ") || line.starts_with("#ifndef ")
+        {
+            conditional_depth += 1;
+            continue;
+        }
+        if line.starts_with("#endif") {
+            conditional_depth = conditional_depth.saturating_sub(1);
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if key.trim() != "alphaTest.shadow" {
+            continue;
+        }
+        if conditional_depth != 0 {
+            return Err(GalError::unsupported_feature(
+                "conditional alphaTest.shadow requires source option resolution",
+            ));
+        }
+        if selected.replace(value.trim().to_string()).is_some() {
+            return Err(GalError::invalid_argument(
+                "source declares alphaTest.shadow more than once",
+            ));
+        }
+    }
+    let Some(selected) = selected else {
+        return Ok(Some(0.1));
+    };
+    if selected == "off" || selected == "false" {
+        return Ok(None);
+    }
+    let mut parts = selected.split_ascii_whitespace();
+    let (Some("GREATER"), Some(threshold), None) =
+        (parts.next(), parts.next(), parts.next())
+    else {
+        return Err(GalError::unsupported_feature(format!(
+            "source alphaTest.shadow '{selected}' is not modeled"
+        )));
+    };
+    let threshold = threshold.parse::<f32>().map_err(|_| {
+        GalError::invalid_argument("source alphaTest.shadow threshold must be a finite number")
+    })?;
+    if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
+        return Err(GalError::invalid_argument(
+            "source alphaTest.shadow threshold must be in [0, 1]",
+        ));
+    }
+    Ok(Some(threshold))
+}
+
 fn source_bool_property(source: &ShaderPackSource, key: &str) -> GalResult<Option<bool>> {
     let Some(properties) = source.get("shaders.properties") else {
         return Ok(None);
     };
     let mut result = None;
+    let mut conditional_depth = 0usize;
     for (line_number, raw_line) in properties.lines().enumerate() {
+        let directive = raw_line.trim_start();
+        if directive.starts_with("#if ")
+            || directive.starts_with("#if\t")
+            || directive.starts_with("#if(")
+            || directive.starts_with("#ifdef ")
+            || directive.starts_with("#ifndef ")
+        {
+            conditional_depth += 1;
+            continue;
+        }
+        if directive.starts_with("#endif") {
+            conditional_depth = conditional_depth.saturating_sub(1);
+            continue;
+        }
         let line = raw_line
             .split_once('#')
             .map_or(raw_line, |(code, _)| code)
@@ -192,6 +475,11 @@ fn source_bool_property(source: &ShaderPackSource, key: &str) -> GalResult<Optio
         };
         if name.trim() != key {
             continue;
+        }
+        if conditional_depth != 0 {
+            return Err(GalError::unsupported_feature(format!(
+                "conditional shaders.properties {key} requires source option resolution"
+            )));
         }
         if result.is_some() {
             return Err(GalError::invalid_argument(format!(
@@ -210,6 +498,116 @@ fn source_bool_property(source: &ShaderPackSource, key: &str) -> GalResult<Optio
         });
     }
     Ok(result)
+}
+
+fn source_shadow_caster_directives(source: &ShaderPackSource) -> GalResult<ShadowCasterDirectives> {
+    let mut directives = ShadowCasterDirectives {
+        entities: true,
+        player: false,
+        block_entities: true,
+    };
+    let Some((properties, _)) =
+        super::fullscreen_contract::resolved_source_properties(source, TerrainProgramScope::Overworld)?
+    else {
+        return Ok(directives);
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    for raw in properties.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key.trim();
+        let slot = match key {
+            "shadowEntities" => &mut directives.entities,
+            "shadowPlayer" => &mut directives.player,
+            "shadowBlockEntities" => &mut directives.block_entities,
+            _ => continue,
+        };
+        if !seen.insert(key.to_string()) {
+            return Err(GalError::invalid_argument(format!(
+                "active shaders.properties declares {key} more than once"
+            )));
+        }
+        *slot = match value.trim() {
+            "true" => true,
+            "false" => false,
+            other => {
+                return Err(GalError::invalid_argument(format!(
+                    "active shaders.properties {key} must be true or false, got {other}"
+                )))
+            }
+        };
+    }
+    Ok(directives)
+}
+
+fn source_caster_selection(source: &ShaderPackSource) -> GalResult<Option<ShadowCasterSelection>> {
+    if source.get("shaders.properties").is_none() {
+        return Ok(Some(ShadowCasterSelection::Advanced));
+    }
+    let properties = match preprocess_artifact_with_runtime_options(source, "shaders.properties", &[]) {
+        Ok(artifact) => artifact,
+        Err(_) => return Ok(None),
+    };
+    let mut selected = None;
+    for line in properties.expanded_source().lines() {
+        let Some((key, value)) = line.split_once('=') else { continue; };
+        if key.trim() != "shadow.culling" { continue; }
+        let selection = match value.trim() {
+            "true" => ShadowCasterSelection::Advanced,
+            "reversed" | "safe_zone" => ShadowCasterSelection::SafeZone,
+            "false" => ShadowCasterSelection::Unsupported,
+            other => return Err(GalError::invalid_argument(format!(
+                "unsupported active shadow.culling value {other}"
+            ))),
+        };
+        if selected.replace(selection).is_some() {
+            return Err(GalError::invalid_argument(
+                "source declares active shadow.culling more than once",
+            ));
+        }
+    }
+    Ok(Some(selected.unwrap_or(ShadowCasterSelection::Advanced)))
+}
+
+fn source_int_constant(source: &str, name: &str) -> GalResult<Option<u32>> {
+    let declaration = format!("const int {name}");
+    let mut value = None;
+    for (line_number, raw_line) in source.lines().enumerate() {
+        let line = raw_line
+            .split_once("//")
+            .map_or(raw_line, |(code, _)| code)
+            .trim();
+        if !line.starts_with(&declaration) {
+            continue;
+        }
+        let remainder = line[declaration.len()..].trim_start();
+        let Some(expression) = remainder
+            .strip_prefix('=')
+            .and_then(|value| value.trim().strip_suffix(';'))
+        else {
+            return Err(GalError::invalid_argument(format!(
+                "source {name} declaration on line {} must be one integer literal",
+                line_number + 1
+            )));
+        };
+        let parsed = expression.trim().parse::<u32>().map_err(|_| {
+            GalError::invalid_argument(format!(
+                "source {name} declaration on line {} is not an unsigned integer literal",
+                line_number + 1
+            ))
+        })?;
+        if value.replace(parsed).is_some() {
+            return Err(GalError::invalid_argument(format!(
+                "source declares {name} more than once after preprocessing"
+            )));
+        }
+    }
+    Ok(value)
 }
 
 fn source_float_constant(source: &str, name: &str) -> GalResult<Option<f32>> {
@@ -375,6 +773,7 @@ fn multiply(left: [f32; 16], right: [f32; 16]) -> [f32; 16] {
 mod tests {
     use super::*;
     use crate::render::vulkanic::shader_pack::source::ShaderSourceFile;
+    use crate::render::vulkanic::shader_pack::terrain_contract::bundled_complementary_hung_loified_source;
 
     fn source(common: &str) -> ShaderPackSource {
         ShaderPackSource::new(
@@ -405,6 +804,7 @@ mod tests {
             .uniforms(TerrainProgramScope::Overworld, 0.0, [0.0, 0.0, 0.0])
             .unwrap();
         assert_eq!(9, policy.generation());
+        assert_eq!(1024, policy.resolution());
         assert_close(
             uniforms.projection,
             [
@@ -466,6 +866,189 @@ mod tests {
                 .uniforms(TerrainProgramScope::Overworld, 0.0, [0.0, 0.0, 0.0])
                 .unwrap()
                 .model_view
+        );
+    }
+
+    #[test]
+    fn selects_and_bounds_the_preprocessed_shadow_attachment_resolution() {
+        let selected = source(
+            "#define SHADOW_SMOOTHING 4\n#if SHADOW_SMOOTHING >= 3\nconst int shadowMapResolution = 2048;\n#else\nconst int shadowMapResolution = 4096;\n#endif\n",
+        );
+        assert_eq!(
+            2048,
+            ShaderPackShadowPolicy::from_source(&selected)
+                .unwrap()
+                .unwrap()
+                .resolution()
+        );
+        assert!(ShaderPackShadowPolicy::from_source(&source(
+            "const int shadowMapResolution = 8192;\n",
+        ))
+        .is_err());
+    }
+
+    #[test]
+    fn shadow_cutout_alpha_uses_the_selected_pack_override() {
+        let with_property = |property: &str| {
+            ShaderPackSource::new(
+                "shadow-alpha-policy",
+                10,
+                vec![
+                    ShaderSourceFile::new("lib/common.glsl", "const float shadowDistance = 64.0;"),
+                    ShaderSourceFile::new("shaders.properties", property),
+                ],
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            Some(0.1),
+            ShaderPackShadowPolicy::from_source(&source(""))
+                .unwrap()
+                .unwrap()
+                .cutout_alpha_cutoff()
+        );
+        assert_eq!(
+            Some(0.25),
+            ShaderPackShadowPolicy::from_source(&with_property(
+                "alphaTest.shadow=GREATER 0.25\n"
+            ))
+            .unwrap()
+            .unwrap()
+            .cutout_alpha_cutoff()
+        );
+        assert_eq!(
+            None,
+            ShaderPackShadowPolicy::from_source(&with_property("alphaTest.shadow=off\n"))
+                .unwrap()
+                .unwrap()
+                .cutout_alpha_cutoff()
+        );
+        assert!(ShaderPackShadowPolicy::from_source(&with_property("alphaTest.shadow=LESS 0.25\n"))
+            .is_err());
+        assert!(ShaderPackShadowPolicy::from_source(&with_property(
+            "#if SHADOW_QUALITY > 0\nalphaTest.shadow=GREATER 0.25\n#endif\n"
+        ))
+        .is_err());
+    }
+
+    #[test]
+    fn translucent_shadow_directive_defaults_on_and_can_disable_the_phase() {
+        assert!(ShaderPackShadowPolicy::from_source(&source(""))
+            .unwrap()
+            .unwrap()
+            .render_translucent());
+        let disabled = ShaderPackSource::new(
+            "shadow-translucent-policy",
+            11,
+            vec![
+                ShaderSourceFile::new("lib/common.glsl", "const float shadowDistance = 64.0;"),
+                ShaderSourceFile::new("shaders.properties", "shadowTranslucent=false\n"),
+            ],
+        )
+        .unwrap();
+        assert!(!ShaderPackShadowPolicy::from_source(&disabled)
+            .unwrap()
+            .unwrap()
+            .render_translucent());
+        let conditional = ShaderPackSource::new(
+            "conditional-shadow-translucent-policy",
+            12,
+            vec![
+                ShaderSourceFile::new("lib/common.glsl", "const float shadowDistance = 64.0;"),
+                ShaderSourceFile::new(
+                    "shaders.properties",
+                    "#if(SHADOW_QUALITY > 0)\nshadowTranslucent=false\n#endif\n",
+                ),
+            ],
+        )
+        .unwrap();
+        assert!(ShaderPackShadowPolicy::from_source(&conditional).is_err());
+    }
+
+    #[test]
+    fn inactive_shadow_culling_branch_does_not_override_advanced_default() {
+        let source = ShaderPackSource::new(
+            "shadow-culling-options",
+            13,
+            vec![
+                ShaderSourceFile::new("lib/common.glsl", "const float shadowDistance = 192.0;"),
+                ShaderSourceFile::new(
+                    "shaders.properties",
+                    "#if COLORED_LIGHTING > 0\nshadow.culling = reversed\n#endif\n",
+                ),
+                ShaderSourceFile::new("mattmc/runtime-options.properties", "COLORED_LIGHTING=0\n"),
+            ],
+        )
+        .unwrap();
+        ShaderPackShadowPolicy::from_source(&source)
+            .unwrap()
+            .unwrap()
+            .require_supported_caster_selection()
+            .unwrap();
+    }
+
+    #[test]
+    fn active_reversed_shadow_culling_uses_copied_voxel_distance() {
+        let source = ShaderPackSource::new(
+            "shadow-safe-zone-options",
+            14,
+            vec![
+                ShaderSourceFile::new("lib/common.glsl", "const float shadowDistance = 192.0;"),
+                ShaderSourceFile::new("program/gbuffers_terrain.glsl", "const float voxelDistance = 32.0;"),
+                ShaderSourceFile::new("shaders.properties", "#if COLORED_LIGHTING > 0\nshadow.culling = reversed\n#endif\n"),
+                ShaderSourceFile::new("mattmc/runtime-options.properties", "COLORED_LIGHTING=256\n"),
+            ],
+        ).unwrap();
+        let policy = ShaderPackShadowPolicy::from_source(&source).unwrap().unwrap();
+        assert_eq!(policy.require_supported_caster_selection().unwrap(), ShadowCasterSelection::SafeZone);
+        assert_eq!(policy.voxel_distance, 32.0);
+    }
+
+    #[test]
+    fn bundled_selected_pack_uses_its_declared_square_shadow_resolution() {
+        let source = bundled_complementary_hung_loified_source(11).unwrap();
+        assert_eq!(
+            2048,
+            ShaderPackShadowPolicy::from_source(&source)
+                .unwrap()
+                .unwrap()
+                .resolution()
+        );
+    }
+
+    #[test]
+    fn bundled_selected_pack_resolves_conditional_caster_directives() {
+        // Complementary guards these with `#if ENTITY_SHADOWS_DEFINE == -1`
+        // and `PLAYER_SHADOW`; its defaults disable entity and block-entity
+        // casters but keep the local player, exactly as Frozen Iris resolves.
+        let source = bundled_complementary_hung_loified_source(11).unwrap();
+        let casters = ShaderPackShadowPolicy::from_source(&source)
+            .unwrap()
+            .unwrap()
+            .casters();
+        assert_eq!(
+            ShadowCasterDirectives {
+                entities: false,
+                player: true,
+                block_entities: false,
+            },
+            casters
+        );
+    }
+
+    #[test]
+    fn missing_caster_directives_use_iris_defaults() {
+        let policy =
+            ShaderPackShadowPolicy::from_source(&source("const float shadowIntervalSize = 2.0;\n"))
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            ShadowCasterDirectives {
+                entities: true,
+                player: false,
+                block_entities: true,
+            },
+            policy.casters()
         );
     }
 

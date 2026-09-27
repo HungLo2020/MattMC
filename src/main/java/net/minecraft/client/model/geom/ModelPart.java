@@ -148,6 +148,26 @@ public class ModelPart {  // Changed from final to support Citadel's BasicEntity
 		this.visit(poseStack, visitor, "");
 	}
 
+	/** Visits exactly the cubes that {@link #render} would submit. */
+	public void visitRenderable(PoseStack poseStack, ModelPart.Visitor visitor) {
+		this.visitRenderable(poseStack, visitor, "");
+	}
+
+	private void visitRenderable(PoseStack poseStack, ModelPart.Visitor visitor, String path) {
+		if (!this.visible || this.cubes.isEmpty() && this.children.isEmpty()) return;
+		poseStack.pushPose();
+		this.translateAndRotate(poseStack);
+		if (!this.skipDraw) {
+			PoseStack.Pose pose = poseStack.last();
+			for (int index = 0; index < this.cubes.size(); index++) {
+				visitor.visit(pose, path, index, this.cubes.get(index));
+			}
+		}
+		String childPath = path + "/";
+		this.children.forEach((name, child) -> child.visitRenderable(poseStack, visitor, childPath + name));
+		poseStack.popPose();
+	}
+
 	private void visit(PoseStack poseStack, ModelPart.Visitor visitor, String string) {
 		if (!this.cubes.isEmpty() || !this.children.isEmpty()) {
 			poseStack.pushPose();

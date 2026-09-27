@@ -63,10 +63,12 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
-	public void separateAoTerrainColorConsumesAlphaAsAmbientOcclusion() {
+	public void separateAoTerrainColorPreservesRawTintAndAoForSourceShaders() {
 		int compactAbgr = 0x80402010;
 
-		assertEquals(0xff081020, RustGalTerrainRenderer.decodeCompactTerrainColorForRust(compactAbgr, true));
+		assertEquals(0x80102040, RustGalTerrainRenderer.decodeCompactTerrainColorForRust(compactAbgr, true));
+		assertEquals(0x105, RustGalTerrainRenderer.decodeTerrainMaterialBits(0x0005_0000, true));
+		assertEquals(0x05, RustGalTerrainRenderer.decodeTerrainMaterialBits(0x0005_0000, false));
 	}
 
 	@Test
@@ -74,39 +76,6 @@ public class RustGalTerrainRendererLightingContractTest {
 		int compactAbgr = 0xffffffff;
 
 		assertEquals(0xffffffff, RustGalTerrainRenderer.decodeCompactTerrainColorForRust(compactAbgr, true));
-	}
-
-	@Test
-	void rustWholeFrameCompactTerrainUsesFrozenBakedColorContract() throws Exception {
-		String sectionManager = Files.readString(Path.of(
-			"src/main/java/net/sodium/client/render/chunk/RenderSectionManager.java"
-		));
-		String wholeFrameSource = Files.readString(Path.of(
-			"src/main/java/net/vulkanic/world/RustGalWholeFrameTerrainSource.java"
-		));
-		String terrainRenderer = Files.readString(Path.of(
-			"src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java"
-		));
-
-		int rustOwnedBuilder = sectionManager.indexOf("this.builder = rustVulkanOwned");
-		assertTrue(rustOwnedBuilder >= 0);
-		int builderEnd = sectionManager.indexOf(": new ChunkBuilder(level, vertexType);", rustOwnedBuilder);
-		String builderBranch = sectionManager.substring(rustOwnedBuilder, builderEnd);
-		assertTrue(builderBranch.contains("new ChunkBuilder(level, vertexType, false, 1)"),
-			"the direct vanilla Rust route must bake AO and directional face shade into compact RGB");
-		assertTrue(!builderBranch.contains("new ChunkBuilder(level, vertexType, true, 1)"));
-		assertTrue(wholeFrameSource.contains(
-			"new ChunkBuilder(level, ChunkMeshFormats.COMPACT, false, semanticMeshWorkerCount())"
-		), "the independent Rust whole-frame terrain producer must use the same baked-RGB compact contract");
-		assertTrue(!wholeFrameSource.contains(
-			"new ChunkBuilder(level, ChunkMeshFormats.COMPACT, true, semanticMeshWorkerCount())"
-		), "separate-AO compact meshes are incompatible with the direct vanilla Rust terrain consumer");
-
-		int compactLayout = terrainRenderer.indexOf("private static TerrainMeshLayout compact()");
-		assertTrue(compactLayout >= 0);
-		String compactLayoutBody = terrainRenderer.substring(compactLayout,
-			terrainRenderer.indexOf("private static TerrainMeshLayout activeIrisCompatible()", compactLayout));
-		assertTrue(compactLayoutBody.contains("new TerrainMeshLayout(COMPACT_PREFIX_STRIDE, false, 0, 0)"));
 	}
 
 	@Test

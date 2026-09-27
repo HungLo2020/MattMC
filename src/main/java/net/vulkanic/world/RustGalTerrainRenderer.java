@@ -96,6 +96,9 @@ public final class RustGalTerrainRenderer {
 	private static volatile List<TerrainTextureProbe> activeTextureProbes = List.of();
 	/** Must match the Rust whole-frame static-terrain residency bound. */
 	private static final int MAX_SEMANTIC_TERRAIN_SECTIONS = 4096;
+	private static final ChunkSectionLayer[] SHADOW_CANDIDATE_LAYERS = {
+		ChunkSectionLayer.SOLID, ChunkSectionLayer.CUTOUT_MIPPED, ChunkSectionLayer.TRANSLUCENT
+	};
 	/** Primitive-only render-thread scratch; it retains no section or world objects. */
 	private static final ThreadLocal<TerrainSetScratch> TERRAIN_SET_SCRATCH =
 		ThreadLocal.withInitial(TerrainSetScratch::new);
@@ -112,6 +115,28 @@ public final class RustGalTerrainRenderer {
 	 */
 	private static final Map<Long, ArrayDeque<TranslucentExecutionMetadata>> TRANSLUCENT_EXECUTION_METADATA = new ConcurrentHashMap<>();
 	private static volatile long atlasGeneration;
+	private static volatile boolean copiedShaderPackSeparateAo;
+	private static volatile boolean copiedShaderPackDisableDirectionalShading;
+
+	public static boolean copiedShaderPackSeparateAo() {
+		return copiedShaderPackSeparateAo;
+	}
+
+	public static boolean copiedShaderPackDisableDirectionalShading() {
+		return copiedShaderPackDisableDirectionalShading;
+	}
+
+	public static void setCopiedShaderPackTerrainPolicy(boolean separateAo, boolean disableDirectionalShading) {
+		if (copiedShaderPackSeparateAo == separateAo
+			&& copiedShaderPackDisableDirectionalShading == disableDirectionalShading) return;
+		copiedShaderPackSeparateAo = separateAo;
+		copiedShaderPackDisableDirectionalShading = disableDirectionalShading;
+		RustGalWholeFrameTerrainSource.requestResourceReload();
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft.level != null && minecraft.levelRenderer != null) {
+			minecraft.levelRenderer.allChanged();
+		}
+	}
 	private static volatile long registeredAtlasGeneration;
 	private static volatile long publishedWorldMeshAtlasGeneration;
 	private static VulkanicGalBridge.WorldMeshTextureAssetRecord publishedWorldMeshAtlasPayload;
@@ -396,7 +421,7 @@ public final class RustGalTerrainRenderer {
 				skippedRouteBuildOutputs.incrementAndGet();
 				return;
 			}
-			acceptChunkBuildOutput(output, TerrainMeshLayout.compact());
+			acceptChunkBuildOutput(output, TerrainMeshLayout.compact(copiedShaderPackSeparateAo));
 			return;
 		}
 		acceptChunkBuildOutput(output, TerrainMeshLayout.activeIrisCompatible());
@@ -408,7 +433,7 @@ public final class RustGalTerrainRenderer {
 	 * decode time, so selecting Vulkan cannot borrow shader-pack runtime state.
 	 */
 	public static void acceptWholeFrameChunkBuildOutput(ChunkBuildOutput output) {
-		acceptChunkBuildOutput(output, TerrainMeshLayout.compact());
+		acceptChunkBuildOutput(output, TerrainMeshLayout.compact(copiedShaderPackSeparateAo));
 	}
 
 	private static void acceptChunkBuildOutput(ChunkBuildOutput output, TerrainMeshLayout layout) {
@@ -871,6 +896,12 @@ public final class RustGalTerrainRenderer {
 	 */
 	public static void enqueueWholeFrameTerrainSections(Iterable<RenderSection> sections, Camera camera,
 			int viewportWidth, int viewportHeight) {
+		enqueueWholeFrameTerrainSections(sections, List.of(), camera, viewportWidth, viewportHeight);
+	}
+
+	public static void enqueueWholeFrameTerrainSections(Iterable<RenderSection> sections,
+			Iterable<RenderSection> shadowCandidates, Camera camera,
+			int viewportWidth, int viewportHeight) {
 		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
 			|| sections == null || camera == null) {
 			return;
@@ -972,6 +1003,36 @@ public final class RustGalTerrainRenderer {
 				translucentDrawOrder++, visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.translucent-submit");
+		// This is a separate bounded semantic stream. Candidate assets stay
+		// resident, but only Rust may select them into a source shadow pass.
+		if (shadowCandidates != null) {
+			int candidateCount = 0;
+			for (RenderSection section : shadowCandidates) {
+				if (section == null || !section.isBuilt()) continue;
+				if (++candidateCount > MAX_SEMANTIC_TERRAIN_SECTIONS) {
+					throw new IllegalStateException("shadow candidate section bound exceeded");
+				}
+				long sectionPos = section.getPositionAsLong();
+				for (ChunkSectionLayer layer : SHADOW_CANDIDATE_LAYERS) {
+					TerrainSectionAsset asset = sectionAsset(sectionPos, layer);
+					if (asset == null || !visibleMeshKeys.add(asset.meshKey())) continue;
+					RustGalWorldPrimitiveRenderer.enqueueStaticTerrainSectionInstance(
+						asset.meshKey(), asset.meshGeneration(),
+						section.getOriginX(), section.getOriginY(), section.getOriginZ(),
+						camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z(),
+						viewportWidth, viewportHeight, terrainDepthPolicy(layer),
+						RustGalWorldPrimitiveRenderer.CULL_BACK, false, true);
+				}
+				var animatedSprites = section.getAnimatedSprites();
+				if (animatedSprites != null) {
+					for (var sprite : animatedSprites) {
+						RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+							sprite.semanticAnimationResource(), sprite.atlasLocation(),
+							sprite.contents().name());
+					}
+				}
+			}
+		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visibility-reconcile");
 		if (!resourceReloadStaging) {
 			RustGalWorldPrimitiveRenderer.reconcileStaticTerrainVisibility(visibleMeshKeys);
@@ -2234,7 +2295,7 @@ public final class RustGalTerrainRenderer {
 				separateAoVertexCount++;
 				minAo = Math.min(minAo, ao);
 				maxAo = Math.max(maxAo, ao);
-				if (((color >>> 24) & 0xff) != 0xff) {
+				if (((color >>> 24) & 0xff) != ((compactColor >>> 24) & 0xff)) {
 					aoContractValid = false;
 				}
 			}
@@ -2273,7 +2334,7 @@ public final class RustGalTerrainRenderer {
 				v,
 				shaderBlockId,
 				shaderMaterialType,
-				decodeTerrainMaterialBits(lightMaterial),
+				decodeTerrainMaterialBits(lightMaterial, separateAo),
 				color,
 				0,
 				decodeLight(lightMaterial, "swapped-block-sky-light".equals(fault)),
@@ -3602,12 +3663,11 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private record TerrainMeshLayout(int vertexStride, boolean separateAo, int shaderBlockIdOffset, int midBlockOffset) {
-		private static TerrainMeshLayout compact() {
-			// The Rust-owned vanilla producer uses Sodium's compact baked-color
-			// convention: AO and directional face shade are already in RGB.  This
-			// preserves the complete semantic color contract without consulting
-			// Iris or requiring a hidden shader-side lighting stage.
-			return new TerrainMeshLayout(COMPACT_PREFIX_STRIDE, false, 0, 0);
+		private static TerrainMeshLayout compact(boolean separateAo) {
+			// The compact stride is independent of the copied pack's AO policy.
+			// A source pack may request a separate AO alpha for its terrain shader;
+			// the direct vanilla shader consumes it explicitly when present.
+			return new TerrainMeshLayout(COMPACT_PREFIX_STRIDE, separateAo, 0, 0);
 		}
 
 		private static TerrainMeshLayout activeIrisCompatible() {
@@ -3722,6 +3782,10 @@ public final class RustGalTerrainRenderer {
 		return (lightMaterial >>> 16) & 0xff;
 	}
 
+	static int decodeTerrainMaterialBits(int lightMaterial, boolean separateAo) {
+		return decodeTerrainMaterialBits(lightMaterial) | (separateAo ? 0x100 : 0);
+	}
+
 	static int decodeCompactTerrainColorForRust(int compactAbgr, boolean separateAo) {
 		return decodeCompactTerrainColorForRust(compactAbgr, separateAo, false, false);
 	}
@@ -3736,15 +3800,12 @@ public final class RustGalTerrainRenderer {
 			if (invertAo) {
 				alphaOrAo = 255 - alphaOrAo;
 			}
-			red = multiplyColorByte(red, alphaOrAo);
-			green = multiplyColorByte(green, alphaOrAo);
-			blue = multiplyColorByte(blue, alphaOrAo);
 			if (doubleShade) {
 				red = multiplyColorByte(red, alphaOrAo);
 				green = multiplyColorByte(green, alphaOrAo);
 				blue = multiplyColorByte(blue, alphaOrAo);
 			}
-			alpha = 0xff;
+			alpha = alphaOrAo;
 		}
 		return (alpha << 24) | (red << 16) | (green << 8) | blue;
 	}

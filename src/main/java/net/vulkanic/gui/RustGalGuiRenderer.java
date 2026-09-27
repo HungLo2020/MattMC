@@ -932,8 +932,8 @@ public final class RustGalGuiRenderer {
 			0.0F, 0.0F, 0.0F, 1.0F, 1.0F, rectangle.col1(), guiWidth, guiHeight
 		);
 		if (rectangle.scissorArea() != null) {
-			ScreenRectangle scissor = rectangle.scissorArea();
-			request = request.withClip(scissor.left(), scissor.top(), scissor.width(), scissor.height());
+			int[] clip = frameLocalClip(rectangle.scissorArea(), guiWidth, guiHeight);
+			request = request.withClip(clip[0], clip[1], clip[2], clip[3]);
 		}
 		long startedNanos = System.nanoTime();
 		RustGalFrameScheduler.Token token = dynamicLayerOrder == null
@@ -952,6 +952,19 @@ public final class RustGalGuiRenderer {
 			token, GuiRenderStratum.GUI_RECTANGLES, RECTANGLE_PRODUCER, -1, -1.0F, GuiFillDirection.NONE,
 			left, top, width, height, guiWidth, guiHeight
 		));
+	}
+
+	/**
+	 * Intersects a GUI scissor with the frame, as the framebuffer does on
+	 * OpenGL. Returns {left, top, width, height}; an empty result clips all.
+	 */
+	static int[] frameLocalClip(ScreenRectangle scissor, int guiWidth, int guiHeight) {
+		long left = Math.max(0L, scissor.left());
+		long top = Math.max(0L, scissor.top());
+		long right = Math.min((long) guiWidth, (long) scissor.left() + Math.max(0, scissor.width()));
+		long bottom = Math.min((long) guiHeight, (long) scissor.top() + Math.max(0, scissor.height()));
+		if (right <= left || bottom <= top) return new int[] {0, 0, 0, 0};
+		return new int[] {(int) left, (int) top, (int) (right - left), (int) (bottom - top)};
 	}
 
 	@Nullable
@@ -2095,12 +2108,12 @@ public final class RustGalGuiRenderer {
 		else if (blit.pipeline() == RenderPipelines.GUI_NAUSEA_OVERLAY) stratum = GuiRenderStratum.GUI_ADDITIVE_BLIT.order();
 		Matrix3x2f pose = blit.pose();
 		ScreenRectangle scissor = blit.scissorArea();
+		int[] clip = scissor == null ? new int[4] : frameLocalClip(scissor, guiWidth, guiHeight);
 		var request = new VulkanicGalBridge.GuiTiledQuadRecord(
 			stratum, asset.assetId(), new int[] {blit.x0(), blit.y0(), blit.x1(), blit.y1()},
 			blit.tileWidth(), blit.tileHeight(), new float[] {blit.u0(), blit.v0(), blit.u1(), blit.v1()},
 			new float[] {pose.m00(), pose.m01(), pose.m10(), pose.m11(), pose.m20(), pose.m21()},
-			0.0F, blit.color(), guiWidth, guiHeight, 0L, scissor == null ? 0 : 1,
-			scissor == null ? new int[4] : new int[] {scissor.left(), scissor.top(), scissor.width(), scissor.height()});
+			0.0F, blit.color(), guiWidth, guiHeight, 0L, scissor == null ? 0 : 1, clip);
 		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiTiledQuadRequest(
 			request, dynamicLayerId(layerOrder), stratum);
 		RustGalGuiRawImageAssets.stage(asset);

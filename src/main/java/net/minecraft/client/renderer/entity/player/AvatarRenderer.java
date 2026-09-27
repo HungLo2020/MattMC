@@ -294,11 +294,7 @@ public class AvatarRenderer<AvatarlikeEntity extends Avatar & ClientAvatarEntity
 				new net.minecraft.client.model.Model.Simple(modelPart, ignored -> RenderType.entityTranslucent(resourceLocation)),
 				net.minecraft.util.Unit.INSTANCE, poseStack.last(), RenderType.entityTranslucent(resourceLocation), resourceLocation,
 				net.minecraft.resources.ResourceLocation.withDefaultNamespace("player_hand"), i, OverlayTexture.NO_OVERLAY, -1, 0);
-			boolean queuedSleeve = !bl || net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
-				new net.minecraft.client.model.Model.Simple(sleevePart, ignored -> RenderType.entityTranslucent(resourceLocation)),
-				net.minecraft.util.Unit.INSTANCE, poseStack.last(), RenderType.entityTranslucent(resourceLocation), resourceLocation,
-				net.minecraft.resources.ResourceLocation.withDefaultNamespace("player_hand_sleeve"), i, OverlayTexture.NO_OVERLAY, -1, 0);
-			if (!queuedArm || !queuedSleeve) {
+			if (!queuedArm) {
 				throw new IllegalStateException("Rust whole-frame player-hand route rejected the semantic skin mesh");
 			}
 			return;

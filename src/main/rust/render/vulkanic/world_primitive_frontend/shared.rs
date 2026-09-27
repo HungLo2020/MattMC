@@ -53,13 +53,13 @@ pub(super) fn validate_frame_header(frame: &WorldPrimitiveFrame) -> GalResult<()
             ),
         ));
     }
-    if frame.mesh_instances.len() > WORLD_MAX_MESH_INSTANCES {
+    if frame.mesh_instances.len() > WORLD_MAX_FRAME_MESH_INSTANCES {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!(
                 "world mesh instance count {} exceeds maximum {}",
                 frame.mesh_instances.len(),
-                WORLD_MAX_MESH_INSTANCES
+                WORLD_MAX_FRAME_MESH_INSTANCES
             ),
         ));
     }

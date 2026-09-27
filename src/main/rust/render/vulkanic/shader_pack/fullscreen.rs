@@ -23,7 +23,7 @@ use crate::render::vulkanic::resources::{
     TextureFormat, TextureUsage, TextureViewDesc,
 };
 
-use super::lowering::TerrainSourceOpaqueResourceKind;
+use super::lowering::{FullscreenSourceRasterPrimitive, TerrainSourceOpaqueResourceKind};
 use super::programs::{shader_stage_code_for_backend, LoweredFullscreenSourceProgram};
 use super::source_targets::{
     prepare_fullscreen_source_color_resources, resolve_fullscreen_source_color_attachments,
@@ -257,6 +257,9 @@ pub(crate) struct FullscreenSourcePassFrame {
     pub clear_values: ShaderPackColorBootstrapClearValues,
     /// Exact lowered GLSL output-location order of the compiled render target.
     pub color_attachment_before: Vec<TextureUsageState>,
+    /// Per-target first-use clear decision from the source color frame plan.
+    /// None is retained only for isolated direct recorder tests.
+    pub clear_targets_this_pass: Option<Vec<bool>>,
 }
 
 /// Complete Rust-owned execution preparation for one source-derived
@@ -428,8 +431,10 @@ impl FullscreenSourceExecutionPlan {
         }
         frame.color_attachment_before =
             color_frame.attachment_states(&self.prepared.color_targets)?;
+        let clear_mask = color_frame.attachment_clear_mask(&self.prepared.color_targets)?;
+        frame.clear_targets_this_pass = Some(clear_mask.clone());
         self.append_draw(program, frame, operations)?;
-        color_frame.record_pass(&self.prepared.color_targets, &self.prepared.outputs)
+        color_frame.record_pass(&self.prepared.color_targets, &self.prepared.outputs, &clear_mask)
     }
 
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
@@ -1400,7 +1405,14 @@ impl PreparedFullscreenSourcePass {
                 front_face: crate::render::vulkanic::resources::FrontFace::CounterClockwise,
                 provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
                 raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
-                blend: BlendMode::Disabled,
+                // Vanilla's CELESTIAL pipeline uses BlendFunction.OVERLAY:
+                // src.rgb * src.a + dst.rgb. With replacement writes, the
+                // transparent corners of the sun/moon quad erase the sky and
+                // form a visible square after composite tone mapping.
+                blend: match program.raster_primitive {
+                    FullscreenSourceRasterPrimitive::VanillaCelestialQuad => BlendMode::Overlay,
+                    _ => BlendMode::Disabled,
+                },
                 depth_compare: None,
                 depth_write: false,
                 depth_bias: None,
@@ -1569,6 +1581,15 @@ impl PreparedFullscreenSourcePass {
                 self.color_targets.len()
             )));
         }
+        if frame
+            .clear_targets_this_pass
+            .as_ref()
+            .is_some_and(|mask| mask.len() != self.color_targets.len())
+        {
+            return Err(GalError::invalid_argument(
+                "fullscreen source clear mask does not match color targets",
+            ));
+        }
         if frame.texture_transform_before == TextureUsageState::TransferDst
             || frame.scalar_uniform_before == Some(TextureUsageState::TransferDst)
             || frame
@@ -1584,8 +1605,13 @@ impl PreparedFullscreenSourcePass {
             .color_targets
             .iter()
             .zip(frame.color_attachment_before.iter().copied())
-            .map(|(attachment, before)| {
-                if attachment.clear_each_frame {
+            .enumerate()
+            .map(|(index, (attachment, before))| {
+                let clear_this_pass = frame
+                    .clear_targets_this_pass
+                    .as_ref()
+                    .map_or(attachment.clear_each_frame, |mask| mask[index]);
+                if clear_this_pass {
                     return Ok(PassAttachment {
                         view: attachment.view,
                         // `Clear = true` is source-pack frame semantics, not
@@ -1607,7 +1633,7 @@ impl PreparedFullscreenSourcePass {
                         .outputs
                         .iter()
                         .any(|output| output.role == attachment.role);
-                    if !attachment.clear_each_frame && !writes_attachment {
+                    if !clear_this_pass && !writes_attachment {
                         return Err(GalError::invalid_argument(format!(
                             "fullscreen source target '{}' is undefined, is not cleared, and is not written by this pass",
                             role_name(&attachment.role)
@@ -2056,6 +2082,7 @@ mod tests {
                     // The scheduler owns these states; this caller value is
                     // deliberately ignored by the route-facing recorder.
                     color_attachment_before: Vec::new(),
+                    clear_targets_this_pass: None,
                 },
                 &mut operations,
             )
@@ -2615,6 +2642,7 @@ mod tests {
                     },
                 },
                 color_attachment_before: Vec::new(),
+                clear_targets_this_pass: None,
             },
             &mut operations,
         )
@@ -2681,6 +2709,7 @@ mod tests {
                     },
                 },
                 color_attachment_before: vec![TextureUsageState::ShaderRead],
+                clear_targets_this_pass: None,
             },
             &mut operations,
         )
@@ -2735,6 +2764,7 @@ mod tests {
                 scalar_uniform_before: None,
                 clear_values: ShaderPackColorBootstrapClearValues { fog_color },
                 color_attachment_before: vec![TextureUsageState::Undefined],
+                clear_targets_this_pass: None,
             },
             &mut operations,
         )
@@ -2790,6 +2820,7 @@ mod tests {
                     },
                 },
                 color_attachment_before: vec![TextureUsageState::Undefined],
+                clear_targets_this_pass: None,
             },
             &mut operations,
         )
@@ -2846,6 +2877,7 @@ mod tests {
                     },
                 },
                 color_attachment_before: vec![TextureUsageState::Undefined],
+                clear_targets_this_pass: None,
             },
             &mut operations,
         )

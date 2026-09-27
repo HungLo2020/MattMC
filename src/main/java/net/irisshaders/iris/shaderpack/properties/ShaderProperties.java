@@ -312,7 +312,11 @@ public class ShaderProperties {
 			handlePassDirective("blend.", key, value, pass -> {
 				if (pass.contains(".")) {
 
-					if (!IrisRenderSystem.supportsBufferBlending()) {
+					// On the Rust Vulkan route this parse only feeds the options
+					// screen; Rust decides whether the pack's blending is admitted.
+					boolean rustVulkanRoute = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+						|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+					if (!rustVulkanRoute && !IrisRenderSystem.supportsBufferBlending()) {
 						throw new RuntimeException("Buffer blending is not supported on this platform, however it was attempted to be used!");
 					}
 

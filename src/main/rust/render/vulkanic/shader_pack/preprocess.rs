@@ -29,6 +29,10 @@ pub struct PreprocessedShaderSource {
     resolved_paths: Vec<String>,
     expanded_source: String,
     fingerprint: u64,
+    /// Samplers the pack binds to its own images for this world stage
+    /// (`texture.gbuffers.*`). They are not Rust-owned render targets, so
+    /// world-target coordinate lowering must leave them untouched.
+    world_custom_samplers: Vec<String>,
 }
 
 /// Complete, owned normal-terrain source expansion. This is a diagnostic and
@@ -159,7 +163,12 @@ impl PreprocessedShaderSource {
                 &expanded_source,
             ),
             expanded_source,
+            world_custom_samplers: self.world_custom_samplers.clone(),
         })
+    }
+
+    pub(crate) fn world_custom_samplers(&self) -> &[String] {
+        &self.world_custom_samplers
     }
 }
 
@@ -240,6 +249,7 @@ fn preprocess_artifact_with_protected_defines(
         &resolved_paths,
         &out,
     );
+    let world_custom_samplers = world_custom_samplers_for_entry(input.source, &entry);
     Ok(PreprocessedShaderSource {
         pack_name: input.source.name().to_string(),
         source_generation: input.source.generation(),
@@ -248,7 +258,22 @@ fn preprocess_artifact_with_protected_defines(
         resolved_paths: resolved_paths.into_iter().collect(),
         expanded_source: out,
         fingerprint,
+        world_custom_samplers,
     })
+}
+
+fn world_custom_samplers_for_entry(source: &ShaderPackSource, entry: &str) -> Vec<String> {
+    let file = entry.rsplit('/').next().unwrap_or(entry);
+    let world_stage = file.starts_with("gbuffers_")
+        || file.starts_with("dh_")
+        || entry.starts_with("program/gbuffers_")
+        || entry.starts_with("program/dh_");
+    if !world_stage {
+        return Vec::new();
+    }
+    super::assets::TerrainShaderPackAssetBindings::from_source(source)
+        .map(|bindings| bindings.samplers().map(|(name, _)| name.to_string()).collect())
+        .unwrap_or_default()
 }
 
 /// Expands one entry using the source generation's validated runtime option
@@ -266,15 +291,16 @@ pub fn preprocess_artifact_with_runtime_options(
     // that do not transitively include the pack's user-settings file. Typed
     // GLSL `const` options remain separate and are rewritten only after this
     // conditional expansion completes.
+    let disabled_option_defines = source.runtime_disabled_option_defines()?;
     let mut merged = option_defines.clone();
     let environment_defines = source.runtime_environment_semantic_defines()?;
     reject_runtime_stage_selectors("environment", &environment_defines)?;
     for (key, value) in environment_defines {
-        if merged.insert(key.clone(), value).is_some() {
-            return Err(GalError::invalid_argument(format!(
-                "runtime shader-pack define '{key}' is present in both option and environment snapshots"
-            )));
+        // Environment defaults yield to the user's saved options.
+        if disabled_option_defines.contains(&key) {
+            continue;
         }
+        merged.entry(key).or_insert(value);
     }
     for (key, value) in defines {
         validate_define(key, value)?;
@@ -296,7 +322,10 @@ pub fn preprocess_artifact_with_runtime_options(
         .iter()
         .map(|(key, value)| (key.as_str(), value.as_str()))
         .collect::<Vec<_>>();
-    let protected_option_defines = option_defines.into_keys().collect::<BTreeSet<_>>();
+    // Selected options own their names: the pack's own `#define` of a selected
+    // or switched-off option is suppressed, as Iris rewrites that line.
+    let mut protected_option_defines = option_defines.into_keys().collect::<BTreeSet<_>>();
+    protected_option_defines.extend(disabled_option_defines);
     let artifact = preprocess_artifact_with_protected_defines(
         PreprocessInput {
             source,

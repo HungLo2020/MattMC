@@ -16,6 +16,7 @@ use crate::render::vulkanic::world_primitive_frontend::{
     WORLD_MATERIAL_SOURCE_UNSPECIFIED, WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
     WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS, WORLD_MATERIAL_SOURCE_WEATHER,
     WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS, WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY,
+    WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY,
     WORLD_MESH_SECTION_ALL, WORLD_STRATUM_DH_GENERIC,
 };
 #[cfg(test)]
@@ -321,6 +322,7 @@ fn is_world_mesh_stratum(stratum: u32) -> bool {
             | WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY
             | WORLD_STRATUM_MOVING_MESH
             | WORLD_STRATUM_ENTITY_MESH
+            | super::super::world_primitive_frontend::WORLD_STRATUM_ENTITY_SHADOW_CASTER
     )
 }
 
@@ -361,7 +363,11 @@ fn validate_mesh_instance_semantic_identity(
         ));
     }
     super::super::view_layering::validate_flags(
-        instance.flags,
+        if instance.stratum == WORLD_STRATUM_TERRAIN {
+            instance.flags & !WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY
+        } else {
+            instance.flags
+        },
         instance.stratum == WORLD_STRATUM_ENTITY_MESH,
         instance.item_foil_mode == 0
             && instance.block_entity_id == -1
@@ -370,6 +376,7 @@ fn validate_mesh_instance_semantic_identity(
     if instance.flags
         & !(WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY
             | WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS
+            | WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY
             | super::super::view_layering::FLAGS)
         != 0
     {
@@ -389,6 +396,15 @@ fn validate_mesh_instance_semantic_identity(
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!("{label} camera-sorted quads require complete translucent terrain"),
+        ));
+    }
+    if instance.stratum == WORLD_STRATUM_TERRAIN
+        && instance.flags & WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY != 0
+        && instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
+    {
+        return Err(GalError::ffi(
+            StatusCode::InvalidArgument,
+            format!("{label} shadow-only instances require unsorted static terrain"),
         ));
     }
     if instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY != 0

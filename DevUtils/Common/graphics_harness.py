@@ -24,6 +24,7 @@ import subprocess
 import sys
 import threading
 import time
+import zipfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -79,7 +80,9 @@ WORLD_MATERIAL_BLOCK_MARKER_CUTOUT = 0x224A8659
 WORLD_PROFILE_NAMES = ("migration-gate", "stress-diagnostic")
 PISTON_SHELL_SCAN_BUDGET_NANOS = 5_000_000
 FALLING_BLOCK_MIN_CAPTURE_FRAMES = 4
-EXPECTED_SHADER_PACK = "ComplementaryHungLoIfied.zip"
+_DIAGNOSTIC_SHADER_PACK_SOURCE = os.environ.get("MATTMC_CAPTURE_SHADER_PACK_SOURCE", "").strip()
+EXPECTED_SHADER_PACK = (Path(_DIAGNOSTIC_SHADER_PACK_SOURCE).name
+                        if _DIAGNOSTIC_SHADER_PACK_SOURCE else "ComplementaryHungLoIfied.zip")
 PARITY_FIXTURE_SCHEMA = "mattmc-cross-repo-fixture-v2"
 PARITY_CONFIG_SCHEMA = "mattmc-cross-repo-parity-config-v1"
 DEFAULT_PARITY_CAMERA = {
@@ -1184,6 +1187,70 @@ def run_dev_capture_script(root: Path) -> Path:
     return run_dev_capture_entrypoint(root)[1]
 
 
+def stage_canonical_capture_shader_pack(
+    mode: ModeSpec, capture_dir: Path, env: dict[str, str]
+) -> tuple[Path | None, str | None]:
+    """Keep the shared fixture pack intact after runClient's built-in ZIP copy."""
+    if mode.shaders != "on":
+        return None, None
+    fixture_run = env.get("MATTMC_CAPTURE_RUN_SOURCE", "").strip()
+    fixture_pack = Path(fixture_run) / "shaderpacks" / EXPECTED_SHADER_PACK if fixture_run else None
+    source_text = env.get("MATTMC_CAPTURE_SHADER_PACK_SOURCE", "").strip()
+    if fixture_pack is not None and fixture_pack.is_file():
+        source = fixture_pack.resolve()
+    elif source_text:
+        source = Path(source_text).expanduser().resolve()
+    else:
+        raise ValueError("Shader-on capture has no canonical shader pack source")
+    if not source.is_file() or not zipfile.is_zipfile(source):
+        raise ValueError(f"Canonical shader pack is missing or invalid: {source}")
+    expected_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    original_home = Path(env.get("GRADLE_USER_HOME") or Path.home() / ".gradle").expanduser().resolve()
+    isolated_home = capture_dir / "canonical-gradle-home"
+    isolated_home.mkdir(parents=True, exist_ok=False)
+    for name in ("caches", "wrapper", "jdks", "native", "daemon", "notifications", "workers", "build-scan-data"):
+        child = original_home / name
+        if child.exists():
+            (isolated_home / name).symlink_to(child, target_is_directory=child.is_dir())
+    init_dir = isolated_home / "init.d"
+    init_dir.mkdir()
+    original_init_dir = original_home / "init.d"
+    if original_init_dir.is_dir():
+        for child in original_init_dir.iterdir():
+            if child.is_file():
+                (init_dir / child.name).symlink_to(child)
+    (init_dir / "mattmc-canonical-shader-pack.gradle").write_text(
+        """gradle.projectsEvaluated {
+    allprojects {
+        tasks.withType(org.gradle.api.tasks.JavaExec).matching { it.name == 'runClient' }.configureEach { task ->
+            def sourcePath = System.getenv('MATTMC_CAPTURE_SHADER_PACK_SOURCE')
+            def stage = { org.gradle.api.Task executable ->
+                def source = new File(sourcePath)
+                if (!source.isFile()) throw new org.gradle.api.GradleException('Missing canonical shader pack: ' + source)
+                def destination = new File(executable.workingDir, 'shaderpacks/' + source.name)
+                destination.parentFile.mkdirs()
+                java.nio.file.Files.copy(source.toPath(), destination.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                def actual = java.security.MessageDigest.getInstance('SHA-256').digest(java.nio.file.Files.readAllBytes(destination.toPath())).encodeHex().toString()
+                if (actual != System.getenv('MATTMC_CAPTURE_EXPECTED_SHADER_PACK_SHA256')) {
+                    throw new org.gradle.api.GradleException('Canonical shader pack staging mismatch: ' + actual)
+                }
+                println 'CanonicalShaderPackStage sha256=' + actual + ' file=' + destination
+            } as org.gradle.api.Action<org.gradle.api.Task>
+            // Existing doFirst actions copy the repository's built ZIP. Insert
+            // after them and before JavaExec launches the isolated client.
+            task.actions.add(task.actions.size() - 1, stage)
+        }
+    }
+}
+""",
+        encoding="utf-8",
+    )
+    env["GRADLE_USER_HOME"] = str(isolated_home)
+    env["MATTMC_CAPTURE_SHADER_PACK_SOURCE"] = str(source)
+    env["MATTMC_CAPTURE_EXPECTED_SHADER_PACK_SHA256"] = expected_hash
+    return isolated_home, expected_hash
+
+
 def remove_client_arg_option(client_args: str, option: str) -> str:
     if not client_args:
         return ""
@@ -1330,6 +1397,12 @@ def canonical_fixture_id(args: argparse.Namespace) -> str:
             source_id = hashlib.sha256(repr(source_key).encode()).hexdigest()[:12]
             dh_flags += f"-source-{source_id}"
     world_profile = getattr(args, "world_profile", "migration-gate")
+    diagnostic_pack = os.environ.get("MATTMC_CAPTURE_SHADER_PACK_SOURCE", "").strip()
+    if diagnostic_pack:
+        source = Path(diagnostic_pack).resolve()
+        if not source.is_file() or not zipfile.is_zipfile(source):
+            raise SystemExit(f"Diagnostic shader pack is not a ZIP file: {source}")
+        dh_flags += "-pack-" + hashlib.sha256(source.read_bytes()).hexdigest()[:12]
     return f"{world}-{world_profile}-{scenario}-{resource_pack}-{model_scenario}{destroy_stage_suffix}{statue_suffix}-{beacon_scenario}-{text_scenario}-{terrain_particle_scenario}-{weather_scenario}-{cloud_scenario}-{background_scenario}-{dh_flags}-{PARITY_FIXTURE_SCHEMA}".replace("/", "_").replace(" ", "_")
 
 
@@ -1629,18 +1702,27 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
         raise SystemExit(f"Canonical fixture source world is missing: {source_world}")
     fixture_root = artifact_root / ".canonical-fixtures" / canonical_fixture_id(args)
     run_root = fixture_root / "run"
+    frozen_shader = targets.get("frozen", targets["current"]).root / "run" / "shaderpacks" / EXPECTED_SHADER_PACK
+    diagnostic_pack = os.environ.get("MATTMC_CAPTURE_SHADER_PACK_SOURCE", "").strip()
+    shader_source = (Path(diagnostic_pack).resolve() if diagnostic_pack else
+                     frozen_shader if frozen_shader.is_file() else source_run / "shaderpacks")
     if not run_root.exists():
         run_root.mkdir(parents=True, exist_ok=True)
         for name in ("options.txt", "config", "resourcepacks", "assets", "Distant_Horizons_server_data", "voxelmap"):
             copy_optional_tree(source_run / name, run_root / name)
+        if diagnostic_pack:
+            iris_properties = run_root / "config" / "iris.properties"
+            lines = iris_properties.read_text(encoding="utf-8").splitlines() if iris_properties.is_file() else []
+            lines = [line for line in lines if not line.startswith("shaderPack=")]
+            lines.append(f"shaderPack={EXPECTED_SHADER_PACK}")
+            iris_properties.parent.mkdir(parents=True, exist_ok=True)
+            iris_properties.write_text("\n".join(lines) + "\n", encoding="utf-8")
         apply_canonical_graphics_mode(run_root / "options.txt", getattr(args, "graphics_mode", "fancy"))
         # Shader-enabled parity must use byte-identical source inputs. Frozen
         # Java OpenGL is the authoritative baseline, so prefer its selected
         # pack when available; this does not modify Frozen or alter the Rust
         # lowering path, it only prevents Current from staging a different
         # shader archive into an allegedly equivalent fixture.
-        frozen_shader = targets.get("frozen", targets["current"]).root / "run" / "shaderpacks" / EXPECTED_SHADER_PACK
-        shader_source = frozen_shader if frozen_shader.is_file() else source_run / "shaderpacks"
         shader_destination = (
             run_root / "shaderpacks" / EXPECTED_SHADER_PACK
             if shader_source.is_file()
@@ -1674,6 +1756,9 @@ def materialize_canonical_fixture(args: argparse.Namespace, targets: Mapping[str
         "terrain_particle_scenario": getattr(args, "world_material_terrain_particle_scenario", "") or "",
         "graphics_mode": getattr(args, "graphics_mode", "fancy"),
         "shader_pack": EXPECTED_SHADER_PACK,
+        "shader_pack_source": str(shader_source),
+        "shader_pack_sha256": (hashlib.sha256(shader_source.read_bytes()).hexdigest()
+                               if shader_source.is_file() else None),
         "camera": canonical_camera_options(args),
         "source_save_hash": directory_file_hash(source_world, suffixes={".mca"}),
         "canonical_save_hash": directory_file_hash(run_root / "saves" / world, suffixes={".mca"}),
@@ -1956,6 +2041,11 @@ def canonical_fixture_requested(args: argparse.Namespace, modes: Sequence[ModeSp
         getattr(args, "title_screen_transition_capture", False)
     ):
         return False
+    # A one-sided source probe still needs the canonical fixture to stage its
+    # requested shader archive. Otherwise the capture silently runs the live
+    # pack and is not a valid control for the paired source experiment.
+    if _DIAGNOSTIC_SHADER_PACK_SOURCE:
+        return True
     return any(
         bool(getattr(args, name, ""))
         for name in (
@@ -36716,6 +36806,12 @@ def build_capture_command(
                 "-Dmattmc.vulkan.deterministicLightmapParity=true",
                 "-Dmattmc.vulkan.deterministicTemporalParity=true",
                 "-Dmattmc.vulkan.deterministicTemporalParity.frameCounter=0",
+                # Frozen Iris never consumes the pinned counter: its
+                # frameCounter always advances once per frame. A pinned
+                # Current counter freezes shader-pack TAA jitter, so temporal
+                # accumulation cannot converge as it does in Frozen. Advance
+                # from the same origin to share Iris's frame semantics.
+                "-Dmattmc.vulkan.deterministicTemporalParity.advanceFrameCounter=true",
                 "-Dmattmc.vulkan.deterministicTemporalParity.frameTime=0.016666668",
                 "-Dmattmc.vulkan.deterministicTemporalParity.frameTimeCounter=0.0",
                 "-Dmattmc.vulkan.deterministicTemporalParity.partialTick=1.0",
@@ -37237,7 +37333,7 @@ def build_capture_command(
                     f"-Dmattmc.dev.deterministicCameraCapture.metadata={deterministic_metadata}",
                     f"-Dmattmc.dev.deterministicCameraCapture.screenshotDir={deterministic_screenshot_dir}",
                     f"-Dmattmc.dev.deterministicCameraCapture.shaderEnabled={'true' if mode.shaders == 'on' else 'false'}",
-                    "-Dmattmc.dev.deterministicCameraCapture.shaderPack=ComplementaryHungLoIfied.zip",
+                    f"-Dmattmc.dev.deterministicCameraCapture.shaderPack={EXPECTED_SHADER_PACK}",
                     f"-Dmattmc.dev.deterministicCameraCapture.gitCommit={target_git_commit}",
                     f"-Dmattmc.dev.deterministicCameraCapture.world={args.world}",
                     "-Dmattmc.dev.deterministicCameraCapture.stopAfterComplete=true",
@@ -39522,6 +39618,7 @@ def run_mode(
             write_artifact(output_path, artifact)
             emit_matrix_progress(args, row_label, "artifact-finalized", "tracy-capture missing")
             return MatrixResult(mode.name, False, False, False, "tracy-capture is not installed", 127, str(output_path), str(capture_dir), command)
+    canonical_gradle_home, expected_shader_pack_hash = stage_canonical_capture_shader_pack(mode, capture_dir, env)
     stdout_path = artifact_root / mode.name / tool_kind / run_dir / "stdout.log"
     stderr_path = artifact_root / mode.name / tool_kind / run_dir / "stderr.log"
     timed_out = False
@@ -39960,6 +40057,22 @@ def run_mode(
         memory_file.write("\n")
     attach_memory_observation(artifact,memory_receipt,memory_path)
     validation = artifact.get("validation") if isinstance(artifact.get("validation"), dict) else {}
+    if expected_shader_pack_hash:
+        stage_receipts = []
+        for run_log in capture_dir.glob("runClient_*.log"):
+            stage_receipts.extend(re.findall(r"CanonicalShaderPackStage sha256=([0-9a-f]{64})", run_log.read_text(encoding="utf-8", errors="replace")))
+        artifact["capture"]["canonical_shader_pack_sha256"] = expected_shader_pack_hash
+        artifact["capture"]["canonical_shader_pack_stage_receipts"] = stage_receipts
+        if expected_shader_pack_hash not in stage_receipts:
+            success = False
+            artifact["capture"]["success"] = False
+            messages = validation.get("messages")
+            if not isinstance(messages, list):
+                messages = []
+                validation["messages"] = messages
+            messages.append("runClient did not stage the byte-identical canonical shader pack")
+            validation["complete"] = False
+            error = error or "Canonical shader pack staging was not verified"
     if not validation.get("complete"):
         success = False
         artifact["capture"]["success"] = False
@@ -39968,6 +40081,8 @@ def run_mode(
     artifact["capture"]["stderr_path"] = str(stderr_path)
     artifact["capture"]["duration_seconds"] = time.monotonic() - started
     artifact["capture"]["cleanup_killed_processes"] = cleanup_killed_processes
+    if canonical_gradle_home is not None:
+        shutil.rmtree(canonical_gradle_home)
     write_artifact(output_path, artifact)
     if retention_policy is not None:
         try:

@@ -1330,6 +1330,46 @@ impl LoweredTerrainSourceProgram {
         ]
     }
 
+    /// Sodium's shadow cutout pass tests the shader's primary output alpha
+    /// after the pack fragment runs. Keep that material rule in the source
+    /// specialization so opaque shadow geometry retains the original shader.
+    pub fn shadow_shader_module_descriptors(
+        &self,
+        api: BackendApi,
+        alpha_cutoff: Option<f32>,
+    ) -> GalResult<[ShaderModuleDesc; 2]> {
+        let Some(alpha_cutoff) = alpha_cutoff else {
+            return Ok(self.shader_module_descriptors(api));
+        };
+        if !alpha_cutoff.is_finite() || !(0.0..=1.0).contains(&alpha_cutoff) {
+            return Err(GalError::invalid_argument(
+                "shadow cutout alpha threshold must be finite and in [0, 1]",
+            ));
+        }
+        let fragment_source = self
+            .fragment
+            .source
+            .replacen("void main()", "void vulkanic_shadow_cutout_main()", 1);
+        if fragment_source == self.fragment.source {
+            return Err(GalError::unsupported_feature(
+                "shadow cutout source has no main function for the alpha test",
+            ));
+        }
+        let fragment_source = format!(
+            "{fragment_source}\nvoid main() {{\n    vulkanic_shadow_cutout_main();\n    if (!(out_shadow_color.a > {alpha_cutoff:.8})) discard;\n}}\n"
+        );
+        Ok([
+            self.vertex.shader_module_descriptor(api),
+            ShaderModuleDesc {
+                label: self.fragment.label.clone(),
+                stage: ShaderStage::Fragment,
+                code_format: ShaderCodeFormat::Glsl,
+                code: shader_stage_code_for_backend(api, &fragment_source),
+                entry_point: self.fragment.entry_point.clone(),
+            },
+        ])
+    }
+
     /// Returns the source-declared raster semantics only for the independent
     /// translucent stage. Callers must translate this to explicit GAL state;
     /// it never exposes a legacy renderer state object.
@@ -1889,15 +1929,27 @@ impl LoweredHandSourceProgram {
     pub fn pack_legacy_texture_transforms(
         &self,
         transforms: &TerrainSourceTextureTransforms,
+        hand_projection: &[f32; 16],
     ) -> GalResult<Vec<u8>> {
         self.execution_interface.validate()?;
+        if self.execution_interface.legacy_transform_bytes != 192 {
+            return Err(GalError::invalid_argument(
+                "hand source requires two texture matrices and a distinct clip projection",
+            ));
+        }
         transforms.validate()?;
+        if !hand_projection.iter().all(|value| value.is_finite()) {
+            return Err(GalError::invalid_argument(
+                "hand source projection matrix contains a non-finite value",
+            ));
+        }
         let mut bytes =
             Vec::with_capacity(self.execution_interface.legacy_transform_bytes as usize);
         for value in transforms
             .atlas_texture_matrix
             .iter()
             .chain(transforms.lightmap_texture_matrix.iter())
+            .chain(hand_projection.iter())
         {
             bytes.extend_from_slice(&value.to_ne_bytes());
         }
@@ -2771,7 +2823,11 @@ impl TerrainSourceExecutionInterface {
     }
 
     fn from_lowered_hand_pair(lowered: &LoweredHandSourcePair) -> Self {
-        Self::from_uniform_contract(lowered.uniform_contract())
+        let mut interface = Self::from_uniform_contract(lowered.uniform_contract());
+        // Hand clip projection is distinct from the pack's world-camera
+        // gbufferProjection uniform and follows the two texture matrices.
+        interface.legacy_transform_bytes = 3 * 16 * std::mem::size_of::<f32>() as u32;
+        interface
     }
 
     fn from_lowered_translucent_pair(lowered: &LoweredTranslucentTerrainSourcePair) -> Self {
@@ -2822,9 +2878,11 @@ impl TerrainSourceExecutionInterface {
                 )));
             }
         }
-        if self.legacy_transforms != Self::LEGACY_TRANSFORMS || self.legacy_transform_bytes != 128 {
+        if self.legacy_transforms != Self::LEGACY_TRANSFORMS
+            || !matches!(self.legacy_transform_bytes, 128 | 192)
+        {
             return Err(GalError::invalid_argument(
-                "terrain source legacy transforms must use fixed set 0 binding 1 with two std140 mat4 values",
+                "terrain source legacy transforms must use fixed set 0 binding 1 with two or three std140 mat4 values",
             ));
         }
         if self.instance_stream != Self::INSTANCE_STREAM
@@ -3181,6 +3239,24 @@ pub fn prepare_lowered_entity_source_program(
     Ok(program)
 }
 
+/// Prepares the entity-stream shadow caster program. It shares the entity
+/// program ABI (per-draw entity texture, owned indexed stream) but has its own
+/// identity so its shadow-target pipelines never alias `gbuffers_entities`.
+pub fn prepare_lowered_entity_shadow_source_program(
+    contract: &EntityPassContract,
+    lowered: &LoweredEntitySourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredEntitySourceProgram> {
+    let mut program =
+        prepare_lowered_entity_source_program(contract, lowered, opaque_resource_bindings)?;
+    program.identity = ProgramIdentity::new(format!(
+        "vulkanic:shader-pack/{}/entity_shadow_source_gen{}",
+        contract.pack_name.to_ascii_lowercase(),
+        contract.generation
+    ));
+    Ok(program)
+}
+
 fn entity_output_to_terrain_output(output: EntitySourceOutput) -> TerrainPassOutput {
     match output {
         EntitySourceOutput::LitColor => TerrainPassOutput::LitTerrainColor,
@@ -3387,6 +3463,65 @@ pub fn prepare_lowered_weather_source_program(
 /// Prepares the selected vanilla-cloud source without creating a target,
 /// pipeline, or route. The dedicated Rust-owned cloud writer remains a later
 /// transaction that must prove its resources and named targets explicitly.
+/// Prepares the selected block-selection line source on the compact material
+/// stream. It has no sampled base color, so it never passes through the
+/// textured-material primitive packer that requires an atlas binding.
+pub fn prepare_lowered_line_source_program(
+    contract: &super::line_contract::LinePassContract,
+    lowered: &LoweredCloudSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredTexturedMaterialSourceProgram> {
+    if contract.generation == 0
+        || contract.outputs.is_empty()
+        || contract.outputs.len() != contract.output_color_slots.len()
+    {
+        return Err(GalError::invalid_argument(
+            "line source preparation requires a non-zero generation and paired named outputs",
+        ));
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface =
+        TexturedMaterialSourceExecutionInterface::from_uniform_contract(lowered.uniform_contract());
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let named_output_color_slots = contract
+        .outputs
+        .iter()
+        .copied()
+        .zip(contract.output_color_slots.iter().copied())
+        .map(|(output, slot)| (output.terrain_output(), slot))
+        .collect::<Vec<_>>();
+    let program = LoweredTexturedMaterialSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/line_source_gen{}",
+            contract.pack_name.to_ascii_lowercase(),
+            contract.generation
+        )),
+        shader_pack_generation: contract.generation,
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!("{}:lowered-vertex", lowered.vertex().entry_path()),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!("{}:lowered-fragment", lowered.fragment().entry_path()),
+            source: lowered.fragment().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        named_output_color_slots,
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
 pub fn prepare_lowered_cloud_source_program(
     contract: &CloudPassContract,
     lowered: &LoweredCloudSourcePair,
@@ -4741,11 +4876,18 @@ void main() {
     vec2 light_uv = clamp(light_coordinates, vec2(0.0), vec2(255.0 / 240.0))
         * (15.0 / 16.0);
     vec4 light_color = texture(sampler2D(LightmapTexture, LightmapSampler), light_uv);
-    v_color = unpackUnorm4x8(vertex.color_rgba) * instance.color * light_color;
+    vec4 terrain_color = unpackUnorm4x8(vertex.color_rgba);
+    // The copied Sodium separate-AO layout keeps AO in color alpha for Iris.
+    // The direct vanilla path consumes it here, without changing source data.
+    if ((vertex.material & 256u) != 0u) {
+        terrain_color.rgb *= terrain_color.a;
+        terrain_color.a = 1.0;
+    }
+    v_color = terrain_color * instance.color * light_color;
     v_material = instance.material;
     v_animation_region = instance.animation_region;
     v_animation_next_region = instance.animation_next_region;
-    v_terrain_material_bits = vertex.material;
+    v_terrain_material_bits = vertex.material & 255u;
     vec3 fog_position = world.xyz;
     v_fog_distances = vec2(
         length(fog_position),
@@ -8334,7 +8476,7 @@ mod tests {
         assert!(program
             .vertex
             .source
-            .contains("v_color = unpackUnorm4x8(vertex.color_rgba) * instance.color"));
+            .contains("v_color = terrain_color * instance.color * light_color"));
     }
 
     #[test]
@@ -9543,6 +9685,20 @@ void main() {
             program.opaque_resource_bindings.bindings()[0].role()
         );
         assert!(program.required_resources.is_empty());
+        let opaque = program
+            .shadow_shader_module_descriptors(BackendApi::Vulkan, None)
+            .unwrap();
+        let cutout = program
+            .shadow_shader_module_descriptors(BackendApi::Vulkan, Some(0.1))
+            .unwrap();
+        let overridden = program
+            .shadow_shader_module_descriptors(BackendApi::Vulkan, Some(0.25))
+            .unwrap();
+        assert_eq!(opaque[0].code, cutout[0].code);
+        assert!(!String::from_utf8_lossy(&opaque[1].code).contains("out_shadow_color.a >"));
+        assert!(String::from_utf8_lossy(&cutout[1].code).contains("out_shadow_color.a > 0.10000000"));
+        assert!(String::from_utf8_lossy(&overridden[1].code)
+            .contains("out_shadow_color.a > 0.25000000"));
     }
 
     #[test]
@@ -9580,6 +9736,53 @@ void main() {
             program.named_output_color_slots()
         );
         program.execution_resource_layouts().unwrap();
+    }
+
+    #[test]
+    fn bundled_shadow_stages_lower_for_the_entity_mesh_stream() {
+        let source =
+            crate::render::vulkanic::shader_pack::preprocess::complete_bundled_pack_source_for_test(
+            );
+        let stages = crate::render::vulkanic::shader_pack::terrain_contract::shadow_source_stages_for_scope(
+            &source,
+            crate::render::vulkanic::shader_pack::terrain_contract::TerrainProgramScope::Overworld,
+        )
+        .unwrap();
+        let artifacts = preprocess_terrain_sources(&source, &stages).unwrap();
+        let lowered = crate::render::vulkanic::shader_pack::lowering::lower_entity_shadow_source_pair(
+            &artifacts.vertex,
+            &artifacts.fragment,
+        )
+        .unwrap();
+        // Shadow matrices feed the legacy transform, not the camera view.
+        assert!(lowered.vertex().source().contains("shadowModelView * vulkanic_source_model_transform"));
+        assert!(lowered.fragment().source().contains("layout(location = 0) out vec4"));
+        let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
+        let bindings = lowered
+            .opaque_resource_contract()
+            .bind_semantic_roles(&declarations)
+            .unwrap();
+        let contract = crate::render::vulkanic::shader_pack::entity_contract::derive_entity_shadow_contract(
+            &source,
+            crate::render::vulkanic::shader_pack::terrain_contract::TerrainProgramScope::Overworld,
+        )
+        .unwrap();
+        assert_eq!(vec![0, 1], contract.output_color_slots);
+        let program = prepare_lowered_entity_shadow_source_program(&contract, &lowered, &bindings).unwrap();
+        assert!(program.identity.as_str().contains("entity_shadow_source"));
+        let [_, fragment] = program.shader_module_descriptors_with_alpha_cutoff(
+            BackendApi::Vulkan,
+            Some(0.1),
+        );
+        let text = String::from_utf8_lossy(&fragment.code).to_string();
+        assert!(text.contains("VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF 0.1"));
+        assert!(text.contains("vulkanic_entity_shadow_main();"));
+        let prepared = crate::render::vulkanic::shader_pack::entity_contract::prepare_entity_shadow_source_program(
+            &source,
+            crate::render::vulkanic::shader_pack::terrain_contract::TerrainProgramScope::Overworld,
+        )
+        .unwrap();
+        assert_eq!(program.identity, prepared.identity);
     }
 
     #[test]

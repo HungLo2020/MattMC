@@ -73,6 +73,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public static final int WORLD_MESH_TEXTURE_COORDINATE_ORIGIN_MINECRAFT_TOP_LEFT = 1;
 	/** Stable semantic stratum used by Rust for indexed entity/model meshes. */
 	public static final int WORLD_MESH_ENTITY_STRATUM = 67;
+	/** Shadow-only entity caster (local player for an Iris shader pack's shadow pass). */
+	public static final int WORLD_MESH_ENTITY_SHADOW_CASTER_STRATUM = 69;
 	/** Stable semantic stratum for ordinary block-display mesh producers. */
 	public static final int WORLD_MESH_ORDINARY_BLOCK_STRATUM = 71;
 	private static final boolean TRACE_WORLD_MATERIAL_FRAME =
@@ -233,7 +235,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	 * allocation bounded to that same semantic contract. */
 	private static final int MAX_PERSISTENT_WORLD_LOD_INSTANCES = 16_384;
 	/** Must match Rust's bounded whole-frame world-mesh instance slice. */
-	private static final int MAX_PERSISTENT_WORLD_MESH_INSTANCES = 4_096;
+	private static final int MAX_PERSISTENT_WORLD_MESH_INSTANCES = 65_536;
 	/** Must match Rust's bounded whole-frame material-quad slice. */
 	private static final int MAX_PERSISTENT_COMPACT_MATERIAL_QUADS = 65_536;
 	private final IdentityHashMap<List<GuiMeshVertexRecord>, IdentityHashMap<List<Integer>, PackedGuiMeshTopology>>
@@ -5911,6 +5913,23 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		/** Copies the per-instance vanilla UV2 light used by stable model assets. */
+		/**
+		 * Copies an ordinary entity mesh record as a shadow-only caster. Rust
+		 * admits it only to the source shadow pass, per the pack's resolved
+		 * shadow caster directives; view layering, ordering and outline state
+		 * have no shadow-map meaning and are dropped.
+		 */
+		public WorldMeshInstanceRecord asShadowOnlyEntityCaster() {
+			if (stratum != WORLD_MESH_ENTITY_STRATUM || itemFoil != null || decalFoil != null
+				|| terrainPlacement != null || blockEntityId != -1 || (flags & 1) != 0) {
+				throw new IllegalArgumentException("only plain entity meshes can become shadow-only casters");
+			}
+			return new WorldMeshInstanceRecord(WORLD_MESH_ENTITY_SHADOW_CASTER_STRATUM, meshKey, meshGeneration,
+				meshSectionIndex, depthPolicy == 3 ? 1 : depthPolicy, cullPolicy, winding, colorArgb, transform,
+				viewportWidth, viewportHeight, entityId, entityColorArgb, 0, 0, -1, (TerrainSectionPlacement) null,
+				(StandardItemFoilRecord) null, (WorldDecalFoilRecord) null, (Integer) null, packedLight);
+		}
+
 		public WorldMeshInstanceRecord withPackedLight(int light) {
 			return new WorldMeshInstanceRecord(stratum, meshKey, meshGeneration, meshSectionIndex,
 				depthPolicy, cullPolicy, winding, colorArgb, transform, viewportWidth, viewportHeight,
@@ -5933,7 +5952,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			StandardItemFoilRecord itemFoil) {
 			this(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,winding,colorArgb,
 				transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,flags,
-				blockEntityId,terrainPlacement,itemFoil,null,null,0);
+				blockEntityId,terrainPlacement,itemFoil,null,
+				stratum == WORLD_MESH_ENTITY_STRATUM ? activeSemanticModelOrder() : null,0);
 		}
 
 		public WorldMeshInstanceRecord withDecalFoil(WorldDecalFoilRecord decal) {
@@ -6057,13 +6077,19 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			if (meshKey == 0L || meshGeneration == 0L) {
 				throw new IllegalArgumentException("world mesh instance key and generation must be non-zero");
 			}
-			int viewLayerFlags = flags & (WORLD_MESH_VIEW_LAYER_PERSPECTIVE | WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC);
+			// Bit 4 is shadow-only for terrain and perspective layering for
+			// entities; these strata have disjoint semantic contracts.
+			int viewLayerFlags = stratum == 60 ? flags & WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC
+				: flags & (WORLD_MESH_VIEW_LAYER_PERSPECTIVE | WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC);
 			if (viewLayerFlags != 0 && (viewLayerFlags == 12 || (flags & ~12) != 0
 				|| stratum != WORLD_MESH_ENTITY_STRATUM || itemFoil != null || terrainPlacement != null || blockEntityId != -1)) {
 				throw new IllegalArgumentException("view layering requires one projection and an ordinary entity mesh");
 			}
 			if (flags < 0 || (flags & ~15) != 0) {
 				throw new IllegalArgumentException("world mesh instance contains unknown semantic flags");
+			}
+			if (stratum == 60 && (flags & 4) != 0 && (flags & 2) != 0) {
+				throw new IllegalArgumentException("shadow-only terrain requires unsorted static quads");
 			}
 			if ((flags & 2) != 0 && (stratum != 60 || meshSectionIndex != -1 || depthPolicy < 1 || depthPolicy > 2)) {
 				throw new IllegalArgumentException("camera-sorted quads require a complete translucent terrain instance");

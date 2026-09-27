@@ -226,8 +226,8 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 
 		this.shaderPackList = new ShaderPackSelectionList(this, this.minecraft, this.width, this.height, 32, this.height - 58 - 36, 0, this.width);
 
-		if (Iris.getCurrentPack().isPresent() && this.navigation != null) {
-			ShaderPack currentPack = Iris.getCurrentPack().get();
+		if (Iris.getMenuPack().isPresent() && this.navigation != null) {
+			ShaderPack currentPack = Iris.getMenuPack().get();
 
 			this.shaderOptionList = new ShaderPackOptionList(this, this.navigation, currentPack, this.minecraft, this.width, this.height, 32, this.height - 58 - 36, 0, this.width);
 			this.navigation.setActiveOptionList(this.shaderOptionList);
@@ -320,8 +320,8 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 	}
 
 	public void refreshForChangedPack() {
-		if (Iris.getCurrentPack().isPresent()) {
-			ShaderPack currentPack = Iris.getCurrentPack().get();
+		if (Iris.getMenuPack().isPresent()) {
+			ShaderPack currentPack = Iris.getMenuPack().get();
 
 			this.navigation = new NavigationController(currentPack.getMenuContainer());
 
@@ -343,7 +343,7 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 					Component.translatable("options.iris.shaderPackList")
 					: Component.translatable("options.iris.shaderPackSettings")
 			);
-			this.screenSwitchButton.active = optionMenuOpen || (shaderPackList.getTopButtonRow().shadersEnabled && Iris.getCurrentPack().map(p -> !p.getMenuContainer().mainScreen.elements.isEmpty()).orElse(true));
+			this.screenSwitchButton.active = optionMenuOpen || (shaderPackList.getTopButtonRow().shadersEnabled && Iris.getMenuPack().map(p -> !p.getMenuContainer().mainScreen.elements.isEmpty()).orElse(true));
 		}
 	}
 	private static final ResourceLocation BLUR_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("blur");

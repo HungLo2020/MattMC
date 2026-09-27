@@ -671,15 +671,24 @@ pub(crate) fn prepare_source_color_resources(
                     "fullscreen source semantic color target '{name}' is unavailable"
                 ))
             })?;
-            let view = if binding.feedback {
-                target.previous_view.ok_or_else(|| {
-                    GalError::invalid_argument(format!(
-                        "fullscreen source target '{name}' samples its own output but has no previous feedback view"
-                    ))
-                })?
-            } else {
-                target.current_view
-            };
+            // Iris applies a mipmapped minification filter only for a program
+            // that declares `colortexNMipmapEnabled`; every other reader uses
+            // a non-mip filter and therefore sees mip 0 alone. A Vulkan
+            // nearest-mip sampler over the full chain is not equivalent: its
+            // derivative-selected LOD can read stale descendants in divergent
+            // control flow (Complementary's FXAA edge search). Non-mipmapped
+            // bindings therefore sample the explicit base-mip view.
+            let view = match (binding.feedback, binding.mipmapped) {
+                (true, true) => target.previous_view,
+                (true, false) => target.previous_attachment_view.or(target.previous_view),
+                (false, true) => Some(target.current_view),
+                (false, false) => Some(target.current_attachment_view),
+            }
+            .ok_or_else(|| {
+                GalError::invalid_argument(format!(
+                    "fullscreen source target '{name}' samples its own output but has no previous feedback view"
+                ))
+            })?;
             if binding.mipmapped && target.mip_levels < 2 {
                 return Err(GalError::invalid_argument(format!(
                     "fullscreen source target '{name}' requests mip sampling but has no staged mip chain"
@@ -1578,6 +1587,27 @@ impl ShaderPackColorFramePlan {
             .collect()
     }
 
+    /// A pack clear declaration applies on the target's first use in this
+    /// frame. Later source writers must load the color produced earlier in
+    /// the same frame (notably skybasic before celestial and terrain).
+    pub(crate) fn attachment_clear_mask(
+        &self,
+        attachments: &[FullscreenSourceColorAttachment],
+    ) -> GalResult<Vec<bool>> {
+        attachments
+            .iter()
+            .map(|attachment| {
+                let name = attachment.role.shader_pack_color_name().ok_or_else(|| {
+                    GalError::invalid_argument("shader-pack clear attachment is not a named color role")
+                })?;
+                let state = self.targets.get(name).ok_or_else(|| {
+                    GalError::invalid_argument(format!("shader-pack color frame has no target state for '{name}'"))
+                })?;
+                Ok(attachment.clear_each_frame && !state.current_written_this_frame)
+            })
+            .collect()
+    }
+
     /// A source program may sample the current image only after an earlier
     /// pass in this exact frame, or a confirmed previous frame, initialized it.
     /// Feedback samples have their own prior image and never alias current.
@@ -1641,9 +1671,13 @@ impl ShaderPackColorFramePlan {
         &mut self,
         attachments: &[FullscreenSourceColorAttachment],
         outputs: &[FullscreenSourceColorAttachment],
+        clear_mask: &[bool],
     ) -> GalResult<()> {
-        for attachment in attachments {
-            if attachment.clear_each_frame {
+        if clear_mask.len() != attachments.len() {
+            return Err(GalError::invalid_argument("shader-pack clear mask does not match pass attachments"));
+        }
+        for (attachment, clear) in attachments.iter().zip(clear_mask.iter().copied()) {
+            if clear {
                 let state = self.target_state_mut(&attachment.role)?;
                 state.current_initialized = true;
                 state.mipmaps_initialized = false;
@@ -2940,12 +2974,26 @@ mod tests {
                 .unwrap()
         );
         assert!(first.require_sample(&attachment.role, true).is_err());
+        assert_eq!(
+            vec![true],
+            first
+                .attachment_clear_mask(std::slice::from_ref(&attachment))
+                .unwrap()
+        );
         first
             .record_pass(
                 std::slice::from_ref(&attachment),
                 std::slice::from_ref(&attachment),
+                &[true],
             )
             .unwrap();
+        assert_eq!(
+            vec![false],
+            first
+                .attachment_clear_mask(std::slice::from_ref(&attachment))
+                .unwrap(),
+            "a later source pass must load sky or terrain written earlier this frame"
+        );
         let mut operations = Vec::new();
         first
             .append_feedback_copies(&targets, &mut operations)
@@ -3435,8 +3483,13 @@ mod tests {
         )
         .expect("terrain/DH-style source sampling must allocate current named targets");
         let primary = targets.target("primary").unwrap();
+        // The target owns a mip chain for another program, but this binding
+        // did not request mip sampling: like Iris's non-mip minification
+        // filter, it must observe mip 0 only, never a derivative-chosen level.
+        assert_eq!(9, primary.mip_levels);
+        assert_ne!(primary.current_view, primary.current_attachment_view);
         assert_eq!(
-            Some(primary.current_view),
+            Some(primary.current_attachment_view),
             resources.sampled_view_for(TerrainSourceResourceRole::ShaderPackColor(
                 "primary".to_string()
             ))

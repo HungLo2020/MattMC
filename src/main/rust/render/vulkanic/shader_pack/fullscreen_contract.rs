@@ -175,45 +175,14 @@ fn source_program_gates(
     source: &ShaderPackSource,
     scope: TerrainProgramScope,
 ) -> GalResult<SourceProgramGates> {
-    if source.get("shaders.properties").is_none() {
+    let Some((properties, macros)) = resolved_source_properties(source, scope)? else {
         return Ok(SourceProgramGates {
             expressions: BTreeMap::new(),
             option_macros: BTreeMap::new(),
         });
-    }
-    // Shader-pack properties are evaluated by Iris against the resolved pack
-    // option set, not as a standalone file. Reuse the selected scope's final
-    // source to obtain the active scalar macro values first, then feed those
-    // semantic values into the existing source preprocessor. This keeps
-    // `#if`-guarded directives (such as optional post effects) aligned with
-    // the source program that would otherwise be scheduled.
-    let reference_stage = match scope {
-        TerrainProgramScope::Default => "final.fsh",
-        TerrainProgramScope::Overworld => "world0/final.fsh",
-        TerrainProgramScope::Nether => "world-1/final.fsh",
-        TerrainProgramScope::End => "world1/final.fsh",
     };
-    let mut macros = BTreeMap::new();
-    // Complementary and other packs conventionally centralize defaults in a
-    // common include. Program-enable directives are evaluated from selected
-    // options, so include these defaults even when `final` itself does not
-    // reference the common source.
-    if source.get("lib/common.glsl").is_some() {
-        macros.extend(source_program_macro_values(source, "lib/common.glsl")?);
-    }
-    macros.extend(source_program_macro_values(source, reference_stage)?);
-    let runtime_defines = source.runtime_semantic_defines()?;
-    let scalar_defines = macros
-        .iter()
-        .filter(|(name, value)| {
-            !runtime_defines.contains_key(*name) && property_scalar_define(value)
-        })
-        .map(|(name, value)| (name.as_str(), value.as_str()))
-        .collect::<Vec<_>>();
-    let properties =
-        preprocess_artifact_with_runtime_options(source, "shaders.properties", &scalar_defines)?;
     let mut gates = BTreeMap::new();
-    for raw in properties.expanded_source().lines() {
+    for raw in properties.lines() {
         let line = raw.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
@@ -252,6 +221,47 @@ fn source_program_gates(
         expressions: gates,
         option_macros: macros,
     })
+}
+
+/// Returns `shaders.properties` preprocessed against the selected pack's
+/// resolved option macros, plus those macros. Iris evaluates properties with
+/// the pack option set, not as a standalone file, so `#if`-guarded directives
+/// (program gates, shadow caster directives) resolve exactly as the source
+/// programs do. `None` means the pack has no properties file.
+pub(crate) fn resolved_source_properties(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+) -> GalResult<Option<(String, BTreeMap<String, String>)>> {
+    if source.get("shaders.properties").is_none() {
+        return Ok(None);
+    }
+    let reference_stage = match scope {
+        TerrainProgramScope::Default => "final.fsh",
+        TerrainProgramScope::Overworld => "world0/final.fsh",
+        TerrainProgramScope::Nether => "world-1/final.fsh",
+        TerrainProgramScope::End => "world1/final.fsh",
+    };
+    let mut macros = BTreeMap::new();
+    // Complementary and other packs conventionally centralize defaults in a
+    // common include. Directives are evaluated from selected options, so
+    // include these defaults even when `final` itself does not reference it.
+    if source.get("lib/common.glsl").is_some() {
+        macros.extend(source_program_macro_values(source, "lib/common.glsl")?);
+    }
+    if source.get(reference_stage).is_some() {
+        macros.extend(source_program_macro_values(source, reference_stage)?);
+    }
+    let runtime_defines = source.runtime_semantic_defines()?;
+    let scalar_defines = macros
+        .iter()
+        .filter(|(name, value)| {
+            !runtime_defines.contains_key(*name) && property_scalar_define(value)
+        })
+        .map(|(name, value)| (name.as_str(), value.as_str()))
+        .collect::<Vec<_>>();
+    let properties =
+        preprocess_artifact_with_runtime_options(source, "shaders.properties", &scalar_defines)?;
+    Ok(Some((properties.expanded_source().to_string(), macros)))
 }
 
 fn property_scalar_define(value: &str) -> bool {

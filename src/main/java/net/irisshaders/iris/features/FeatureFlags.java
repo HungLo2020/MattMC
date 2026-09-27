@@ -11,15 +11,15 @@ import java.util.function.BooleanSupplier;
 public enum FeatureFlags {
 	SEPARATE_HARDWARE_SAMPLERS(() -> true, () -> true),
 	HIGHER_SHADOWCOLOR(() -> true, () -> true),
-	CUSTOM_IMAGES(() -> true, IrisRenderSystem::supportsImageLoadStore),
-	PER_BUFFER_BLENDING(() -> true, IrisRenderSystem::supportsBufferBlending),
-	COMPUTE_SHADERS(() -> true, IrisRenderSystem::supportsCompute),
-	TESSELLATION_SHADERS(() -> true, IrisRenderSystem::supportsTesselation),
+	CUSTOM_IMAGES(() -> true, () -> rustVulkanRoute() || IrisRenderSystem.supportsImageLoadStore()),
+	PER_BUFFER_BLENDING(() -> true, () -> !rustVulkanRoute() && IrisRenderSystem.supportsBufferBlending()),
+	COMPUTE_SHADERS(() -> true, () -> !rustVulkanRoute() && IrisRenderSystem.supportsCompute()),
+	TESSELLATION_SHADERS(() -> true, () -> !rustVulkanRoute() && IrisRenderSystem.supportsTesselation()),
 	ENTITY_TRANSLUCENT(() -> true, () -> true),
 	REVERSED_CULLING(() -> true, () -> true),
 	BLOCK_EMISSION_ATTRIBUTE(() -> true, () -> true),
 	CAN_DISABLE_WEATHER(() -> true, () -> true),
-	SSBO(() -> true, IrisRenderSystem::supportsSSBO),
+	SSBO(() -> true, () -> !rustVulkanRoute() && IrisRenderSystem.supportsSSBO()),
 	UNKNOWN(() -> false, () -> false);
 
 	private final BooleanSupplier irisRequirement;
@@ -74,6 +74,16 @@ public enum FeatureFlags {
 
 	public String getHumanReadableName() {
 		return StringUtils.capitalize(name().replace("_", " ").toLowerCase());
+	}
+
+	/**
+	 * On the Rust Vulkan route the hardware features are the ones Rust's shader
+	 * runtime implements (matching the IRIS_FEATURE_ defines it provides), not
+	 * a Java GPU capability query.
+	 */
+	private static boolean rustVulkanRoute() {
+		return net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 	}
 
 	public boolean isUsable() {

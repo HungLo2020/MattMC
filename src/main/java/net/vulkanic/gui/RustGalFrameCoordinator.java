@@ -86,7 +86,10 @@ public final class RustGalFrameCoordinator {
 	private static long attemptedShaderPackAssetGeneration;
 	private static long shaderPackAssetUpdateFailures;
 	private static RustShaderPackSourceCollector.SourceGeneration pendingShaderPackSources;
+	private static volatile boolean copiedShaderPackVignetteEnabled = true;
 	private static String pendingShaderPackSourceName = "";
+	/** Set when the user changes the pack, its options, or the shader toggle. */
+	private static volatile boolean shaderPackConfigurationChanged;
 	private static long lastSubmitted;
 	private static long lastRetiredSubmission;
 	/** Bounded diagnostic receipts emitted only after Rust has presented a title frame. */
@@ -1734,6 +1737,27 @@ public final class RustGalFrameCoordinator {
 		}
 	}
 
+	/**
+	 * True when the Rust shader route may execute the staged pack. Like Rust,
+	 * this follows the game configuration (a real pack staged from the Iris
+	 * config); `MATTMC_RUST_SELECTED_SOURCE_EXECUTION` only overrides it for
+	 * testing (`1` forces on, any other value forces off). Shader-only Java
+	 * preparation (shadow casters, shadow terrain, shader view bobbing) must
+	 * use this same switch.
+	 */
+	public static boolean isRustShaderExecutionActive() {
+		if (!isRustShaderPackSourceReady()) {
+			return false;
+		}
+		String override = System.getenv("MATTMC_RUST_SELECTED_SOURCE_EXECUTION");
+		if (override == null) {
+			return true;
+		}
+		String value = override.trim();
+		return value.equals("1") || value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes")
+			|| value.equalsIgnoreCase("on");
+	}
+
 	private static boolean selectedSourceExecutionRequested() {
 		// A deterministic capture can require a native source receipt without
 		// selecting the source route. The Rust frontend alone admits that route;
@@ -2421,6 +2445,25 @@ public final class RustGalFrameCoordinator {
 	 */
 	private static void refreshConfiguredShaderPackSourcesLocked() {
 		var activePack = RustShaderPackSourceCollector.activeConfiguredPackName();
+		if (shaderPackConfigurationChanged) {
+			// The persisted selection changed (pack, options, or the shader
+			// toggle). Recollect even when the key is unchanged or shaders are
+			// now off, so option edits and disabling reach Rust at once.
+			shaderPackConfigurationChanged = false;
+			long sourceGeneration = nextShaderPackSourceGeneration++;
+			try {
+				RustShaderPackSourceCollector.SourceGeneration source =
+					RustShaderPackSourceCollector.collectConfiguredPack(sourceGeneration);
+				stageShaderPackSourcesLocked(source, activePack.orElse(source.packName()));
+				auditMessage("Rust VulkanicGAL shader-pack source restaged after configuration change"
+					+ " generation=" + sourceGeneration
+					+ " pack=" + activePack.orElse("disabled"));
+			} catch (IOException | RuntimeException error) {
+				LOGGER.error("Rust VulkanicGAL shader-pack source collection failed after configuration change;"
+					+ " preserving the prior complete source generation", error);
+			}
+			return;
+		}
 		if (activePack.isEmpty() || activePack.get().equals(pendingShaderPackSourceName)) {
 			return;
 		}
@@ -2447,10 +2490,23 @@ public final class RustGalFrameCoordinator {
 	 * the first frame after pack activation use the same source-ready state as
 	 * the Rust shader executor, without consulting Iris renderer state.
 	 */
+	/**
+	 * Called after the persisted shader configuration changes (pack selection,
+	 * pack options, or the shader toggle). The next semantic frame recollects
+	 * the copied source from disk; no Iris runtime state is consulted.
+	 */
+	public static void requestShaderPackSourceRefresh() {
+		shaderPackConfigurationChanged = true;
+	}
+
 	public static void refreshConfiguredShaderPackSourcesForSemanticFrame() {
 		synchronized (LOCK) {
 			refreshConfiguredShaderPackSourcesLocked();
 		}
+	}
+
+	public static boolean copiedShaderPackVignetteEnabled() {
+		return copiedShaderPackVignetteEnabled;
 	}
 
 	private static void stageShaderPackSourcesLocked(RustShaderPackSourceCollector.SourceGeneration source) {
@@ -2461,6 +2517,19 @@ public final class RustGalFrameCoordinator {
 		RustShaderPackSourceCollector.SourceGeneration source,
 		String selectionKey
 	) {
+		boolean separateAo;
+		boolean disableDirectionalShading;
+		boolean vignetteEnabled;
+		try {
+			separateAo = RustShaderPackSourceCollector.copiedSeparateAo(source);
+			disableDirectionalShading = RustShaderPackSourceCollector.copiedDisableDirectionalShading(source);
+			vignetteEnabled = RustShaderPackSourceCollector.copiedVignetteEnabled(source);
+		} catch (IOException error) {
+			LOGGER.error("Rust VulkanicGAL copied shader pack has ambiguous terrain AO semantics; preserving prior source", error);
+			return;
+		}
+		RustGalTerrainRenderer.setCopiedShaderPackTerrainPolicy(separateAo, disableDirectionalShading);
+		copiedShaderPackVignetteEnabled = vignetteEnabled;
 		pendingShaderPackSources = source;
 		pendingShaderPackSourceName = selectionKey;
 		attemptedShaderPackSourceGeneration = Math.min(

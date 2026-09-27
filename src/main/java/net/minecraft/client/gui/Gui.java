@@ -1518,6 +1518,11 @@ public class Gui {
 
 	private void renderVignette(GuiGraphics guiGraphics, @Nullable Entity entity) {
 		// Iris: Check if vignette should be rendered
+		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+			&& !net.vulkanic.gui.RustGalFrameCoordinator.copiedShaderPackVignetteEnabled()) {
+			return;
+		}
 		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline =
 			 net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
 				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()

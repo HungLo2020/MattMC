@@ -23,7 +23,13 @@ public class IrisDefines {
 	}
 
 	public static ImmutableList<StringPair> createIrisReplacements() {
-		ArrayList<StringPair> s = new ArrayList<>(StandardMacros.createStandardEnvironmentDefines());
+		// On the Rust Vulkan route the caller supplies the Rust engine environment;
+		// the GL standard macros query Java GPU state, which that route forbids.
+		boolean rustVulkanRoute = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+		ArrayList<StringPair> s = rustVulkanRoute
+			? new ArrayList<>()
+			: new ArrayList<>(StandardMacros.createStandardEnvironmentDefines());
 
 		BiomeUniforms.getBiomeMap().forEach((biome, id) -> define(s, "BIOME_" + biome.location().getPath().toUpperCase(Locale.ROOT), String.valueOf(id)));
 

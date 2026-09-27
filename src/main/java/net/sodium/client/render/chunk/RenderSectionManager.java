@@ -156,16 +156,15 @@ public class RenderSectionManager {
         this.level = level;
         // Iris: From MixinRenderSectionManager - use extended vertex format for builder
         this.builder = rustVulkanOwned
-                // The direct vanilla Rust material path consumes the compact
-                // baked-color contract.  It has no shader-pack stage that can
-                // restore separate AO or directional face shade, so retain
-                // Sodium's historical RGB baking here.
+                // Keep the compact vertex layout and copied AO policy aligned
+                // with the independent Rust semantic terrain producer.
                 // The whole-frame semantic producer owns the scalable worker
                 // pool. Keep this compatibility-side manager pool to one worker
                 // so Vulkan does not construct a second set of large native
                 // scratch arenas (the manager still needs its queue for section
                 // lifecycle and sorting notifications).
-                ? new ChunkBuilder(level, vertexType, false, 1)
+                ? new ChunkBuilder(level, vertexType,
+                    RustGalTerrainRenderer.copiedShaderPackSeparateAo(), 1)
                 : new ChunkBuilder(level, vertexType);
 
         this.renderDistance = renderDistance;

@@ -1035,8 +1035,9 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 
 	public float getShade(Direction direction, boolean bl) {
 		// Iris: Maybe disable directional shading (from MixinClientLevel)
-		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading()) {
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			? net.vulkanic.world.RustGalTerrainRenderer.copiedShaderPackDisableDirectionalShading()
+			: net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading()) {
 			bl = false;
 		}
 		

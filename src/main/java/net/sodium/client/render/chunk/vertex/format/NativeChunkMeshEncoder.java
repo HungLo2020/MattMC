@@ -574,7 +574,12 @@ public final class NativeChunkMeshEncoder {
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_PACKED_NORMAL_OFFSET, packedNormal);
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_RENDER_TYPE_OFFSET, renderType & 0xff);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_SHADE_OFFSET, shade ? 1 : 0);
+        // Native meshing must see the same copied pack face-shade policy as
+        // Frozen's chunk builder. The source shader will light these faces.
+        boolean copiedPackDisablesShade = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+                && net.vulkanic.world.RustGalTerrainRenderer.copiedShaderPackDisableDirectionalShading();
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_SHADE_OFFSET,
+                shade && !copiedPackDisablesShade ? 1 : 0);
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_FLAGS_OFFSET, flags);
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_LIGHT_FACE_OFFSET, lightFace);
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_TINT_INDEX_OFFSET, tintIndex);
