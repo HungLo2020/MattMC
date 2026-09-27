@@ -38773,6 +38773,16 @@ def build_capture_command(
         if any(v.startswith(prefix) for v in java_options):
             raise ValueError('explicit equipment ranges conflict with automatic alignment')
         java_options.append(prefix+','.join(f'{a}:{b}' for a,b in ranges))
+    static_pose_sequence = os.environ.get("MATTMC_CAPTURE_STATIC_POSE_SEQUENCE", "").strip()
+    if static_pose_sequence:
+        # Opt-in camera-motion schedule "poses,framesPerPose,yawDelta" for both
+        # clients (temporal/TAA parity); appended last so it wins.
+        poses, frames, yaw = static_pose_sequence.split(",")
+        java_options.extend([
+            f"-Dmattmc.dev.deterministicCameraCapture.poseCount={int(poses)}",
+            f"-Dmattmc.dev.deterministicCameraCapture.framesPerPose={int(frames)}",
+            f"-Dmattmc.dev.deterministicCameraCapture.yawDelta={float(yaw)}",
+        ])
     env["JAVA_TOOL_OPTIONS"] = " ".join(shlex.quote(part) for part in java_options if part).strip()
     if tool_kind == "capture" and getattr(args,"gui_resource_pack_scenario","") in ("block-item-foil", "block-item-foil-moving"):
         if getattr(args,"hotbar_item_fixture","") != "standard-3d-logs" or getattr(args,"gui_item_placement",False):

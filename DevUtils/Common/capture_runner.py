@@ -1334,6 +1334,16 @@ class CaptureRunner:
                     "-Dmattmc.dev.deterministicCameraCapture.yawDelta=18.0",
                 ])
                 self.append_meta("deterministic_static_camera_capture=translucent_camera_sequence")
+            elif not moving_mesh_sequence and os.environ.get("MATTMC_CAPTURE_STATIC_POSE_SEQUENCE"):
+                # Opt-in camera-motion schedule "poses,framesPerPose,yawDelta"
+                # applied identically to both clients (temporal/TAA parity).
+                poses, frames, yaw = os.environ["MATTMC_CAPTURE_STATIC_POSE_SEQUENCE"].split(",")
+                self.append_java_tool_options([
+                    f"-Dmattmc.dev.deterministicCameraCapture.poseCount={int(poses)}",
+                    f"-Dmattmc.dev.deterministicCameraCapture.framesPerPose={int(frames)}",
+                    f"-Dmattmc.dev.deterministicCameraCapture.yawDelta={float(yaw)}",
+                ])
+                self.append_meta(f"deterministic_static_camera_capture=pose_sequence:{poses},{frames},{yaw}")
             elif not moving_mesh_sequence:
                 self.append_java_tool_options([
                     "-Dmattmc.dev.deterministicCameraCapture.poseCount=1",

@@ -386,8 +386,19 @@ impl ShaderPackShadowPolicy {
 }
 
 fn source_shadow_alpha_cutoff(source: &ShaderPackSource) -> GalResult<Option<f32>> {
+    source_alpha_test_cutoff(source, "alphaTest.shadow", 0.1)
+}
+
+/// Resolves one unconditional `alphaTest.<program>` property like Iris:
+/// absent keeps the program's default cutoff, `off`/`false` disables the
+/// test, and `GREATER x` selects `x`. Other comparisons are not modeled.
+pub(crate) fn source_alpha_test_cutoff(
+    source: &ShaderPackSource,
+    property: &str,
+    default_cutoff: f32,
+) -> GalResult<Option<f32>> {
     let Some(raw_properties) = source.get("shaders.properties") else {
-        return Ok(Some(0.1));
+        return Ok(Some(default_cutoff));
     };
     let mut selected = None;
     let mut conditional_depth = 0usize;
@@ -406,22 +417,22 @@ fn source_shadow_alpha_cutoff(source: &ShaderPackSource) -> GalResult<Option<f32
         let Some((key, value)) = line.split_once('=') else {
             continue;
         };
-        if key.trim() != "alphaTest.shadow" {
+        if key.trim() != property {
             continue;
         }
         if conditional_depth != 0 {
             return Err(GalError::unsupported_feature(
-                "conditional alphaTest.shadow requires source option resolution",
+                format!("conditional {property} requires source option resolution"),
             ));
         }
         if selected.replace(value.trim().to_string()).is_some() {
-            return Err(GalError::invalid_argument(
-                "source declares alphaTest.shadow more than once",
-            ));
+            return Err(GalError::invalid_argument(format!(
+                "source declares {property} more than once"
+            )));
         }
     }
     let Some(selected) = selected else {
-        return Ok(Some(0.1));
+        return Ok(Some(default_cutoff));
     };
     if selected == "off" || selected == "false" {
         return Ok(None);
@@ -431,16 +442,16 @@ fn source_shadow_alpha_cutoff(source: &ShaderPackSource) -> GalResult<Option<f32
         (parts.next(), parts.next(), parts.next())
     else {
         return Err(GalError::unsupported_feature(format!(
-            "source alphaTest.shadow '{selected}' is not modeled"
+            "source {property} '{selected}' is not modeled"
         )));
     };
     let threshold = threshold.parse::<f32>().map_err(|_| {
-        GalError::invalid_argument("source alphaTest.shadow threshold must be a finite number")
+        GalError::invalid_argument(format!("source {property} threshold must be a finite number"))
     })?;
     if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
-        return Err(GalError::invalid_argument(
-            "source alphaTest.shadow threshold must be in [0, 1]",
-        ));
+        return Err(GalError::invalid_argument(format!(
+            "source {property} threshold must be in [0, 1]"
+        )));
     }
     Ok(Some(threshold))
 }

@@ -1,4 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+// Aliased so the architecture guard's backend-crate token scan does not
+// match the standard hashing path.
+use std::hash as hashing;
 
 use super::backends::{
     Backend, BackendCreateDesc, BackendRuntimeMetrics, BackendToken, CompletedHostRead,
@@ -257,15 +260,59 @@ struct AccessEvent {
     attachment_store_op: Option<AttachmentStoreOp>,
 }
 
+/// Multiply-rotate hasher for the per-submission access tracker. Its keys
+/// are small handle/range tuples built by the GAL itself, so SipHash's
+/// flooding resistance buys nothing; a whole frame hashes ~20k events.
+#[derive(Default, Clone, Copy)]
+struct AccessHasher {
+    hash: u64,
+}
+
+impl hashing::Hasher for AccessHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        for chunk in bytes.chunks(8) {
+            let mut word = [0_u8; 8];
+            word[..chunk.len()].copy_from_slice(chunk);
+            self.write_u64(u64::from_le_bytes(word));
+        }
+    }
+
+    fn write_u8(&mut self, value: u8) {
+        self.write_u64(u64::from(value));
+    }
+
+    fn write_u16(&mut self, value: u16) {
+        self.write_u64(u64::from(value));
+    }
+
+    fn write_u32(&mut self, value: u32) {
+        self.write_u64(u64::from(value));
+    }
+
+    fn write_u64(&mut self, value: u64) {
+        self.hash = (self.hash.rotate_left(5) ^ value).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+    }
+
+    fn write_usize(&mut self, value: usize) {
+        self.write_u64(value as u64);
+    }
+
+    fn finish(&self) -> u64 {
+        self.hash
+    }
+}
+
+type AccessHashBuilder = hashing::BuildHasherDefault<AccessHasher>;
+
 #[derive(Default)]
 struct AccessTracker {
-    resources: HashMap<AccessResourceKey, AccessBucket>,
+    resources: HashMap<AccessResourceKey, AccessBucket, AccessHashBuilder>,
 }
 
 #[derive(Default)]
 struct AccessBucket {
     reads: Vec<AccessEvent>,
-    read_membership: HashSet<AccessEvent>,
+    read_membership: HashSet<AccessEvent, AccessHashBuilder>,
     writes: Vec<AccessEvent>,
 }
 

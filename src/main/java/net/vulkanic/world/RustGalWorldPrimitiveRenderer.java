@@ -338,7 +338,10 @@ public final class RustGalWorldPrimitiveRenderer {
 	// The coarse frame ABI is bounded independently from Rust's per-draw
 	// shader payload. The frontend splits a large semantic material frame into
 	// compatible draw-sized batches.
-	private static final int MAX_RUST_WORLD_MATERIAL_QUADS = 65_536;
+	// Per-frame material/particle quad bound shared with Rust
+	// WORLD_MAX_MATERIAL_QUADS. Vanilla clouds at the default 128-chunk cloud
+	// range expand to ~100k faces, so a 65,536 bound crashed ordinary settings.
+	private static final int MAX_RUST_WORLD_MATERIAL_QUADS = 262_144;
 	private static final int MAX_ENTITY_FLAME_SUBMITS = 4_096;
 	private static final int MAX_ENTITY_FLAME_QUADS = 16_384;
 	private static final int MAX_ENTITY_SHADOW_SUBMITS = 4_096;
@@ -348,7 +351,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** A generic DH box expands to six bounded world-material quads. */
 	private static final int MAX_DH_GENERIC_BOXES = 10_000;
 	/** Weather expands one bounded material quad per copied rain/snow column. */
-	private static final int MAX_RUST_WEATHER_COLUMNS = MAX_RUST_WORLD_MATERIAL_QUADS;
+	private static final int MAX_RUST_WEATHER_COLUMNS = 65_536;
 	/** Vanilla weather extraction admits only the fancy (10) or fast (5) ring. */
 	private static final int MAX_RUST_WEATHER_RADIUS = 10;
 	// Per-frame bound shared with Rust's WORLD_MAX_FRAME_MESH_INSTANCES and the
@@ -3719,6 +3722,21 @@ public final class RustGalWorldPrimitiveRenderer {
 			return;
 		}
 		Vec3 cameraPos = camera.getPosition();
+		if (net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()) {
+			// With a shader pack, Iris draws vanilla's re-tessellated block model
+			// quads through gbuffers_damagedblock; copy those quads rather than the
+			// outline-shape faces the shader-off crack writer uses.
+			for (BlockBreakingRenderState state : states) {
+				if (state == null || state.blockState == null || state.blockPos == null) {
+					throw new IllegalStateException("Rust whole-frame crack route received incomplete copied break state");
+				}
+				if (state.progress < 0 || state.progress >= 10 || state.blockState.isAir()) {
+					continue;
+				}
+				enqueueCrumblingBlockModel(state.blockState, state.blockPos, cameraPos, state.progress);
+			}
+			return;
+		}
 		synchronized (LOCK) {
 			int viewportWidth = pendingViewportWidth;
 			int viewportHeight = pendingViewportHeight;
@@ -9422,6 +9440,139 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
+	private static void enqueueCrumblingBlockModel(BlockState blockState, BlockPos blockPos, Vec3 cameraPos, int progress) {
+		BlockMeshExtraction extraction = extractCrumblingBlockModelMesh(blockState, blockPos, progress);
+		if (extraction == null) {
+			return;
+		}
+		ResourceLocation textureIdentity = CRACK_STAGE_LOCATIONS[progress];
+		synchronized (LOCK) {
+			ensureBoundedWorldPrimitiveViewportLocked("Rust VulkanicGAL crumbling block requires a seeded bounded world primitive frame");
+			ensureWorldQueueCapacityLocked(PENDING_MESH_INSTANCES.size(), 1, MAX_RUST_WORLD_MESH_INSTANCES, "mesh-instance");
+			ensureMeshAssetLocked(extraction);
+			VulkanicGalBridge.WorldMeshAssetRecord cached = WORLD_MESH_ASSETS.get(extraction.meshKey());
+			float[] transform = new Matrix4f().translation(
+				(float)(blockPos.getX() - cameraPos.x),
+				(float)(blockPos.getY() - cameraPos.y),
+				(float)(blockPos.getZ() - cameraPos.z)
+			).get(new float[16]);
+			PENDING_MESH_INSTANCES.add(new VulkanicGalBridge.WorldMeshInstanceRecord(
+				STRATUM_WORLD_ENTITY_MESH, extraction.meshKey(),
+				cached == null ? extraction.meshGeneration() : cached.meshGeneration(),
+				MESH_SECTION_ALL, DEPTH_POLICY_TEST_NO_WRITE, CULL_BACK, WORLD_WINDING_CCW,
+				0xffffffff, transform, pendingViewportWidth, pendingViewportHeight, 0, 0, 0
+			));
+			PENDING_MESH_PRODUCERS.add(PendingMeshProducer.MODEL);
+			PENDING_MODEL_MESH_SEMANTICS.add(new ModelMeshSemanticIdentity("block-crumbling", textureIdentity));
+			if (PENDING_MODEL_MESH_KEYS.size() >= MAX_RUST_WORLD_MESH_INSTANCES) {
+				PENDING_MODEL_MESH_KEYS.remove(PENDING_MODEL_MESH_KEYS.iterator().next());
+			}
+			PENDING_MODEL_MESH_KEYS.add(extraction.meshKey());
+			recordWorldMeshSubmittedWorkIdentity("block-crumbling", "rust-vulkan-whole-frame:" + textureIdentity);
+		}
+	}
+
+	/**
+	 * Copies vanilla's block-destroy overlay geometry: {@code renderBreakingTexture}
+	 * re-tessellates the block model's quads (including the state's random
+	 * offset) through {@code SheetedDecalTextureGenerator}, which replaces each
+	 * UV with the block-local position rotated by Y pi, X -pi/2 and the nearest
+	 * face rotation, negated. Colour is white; the program draws FULLBRIGHT.
+	 */
+	private static BlockMeshExtraction extractCrumblingBlockModelMesh(BlockState blockState, BlockPos blockPos, int progress) {
+		if (blockState.getRenderShape() != RenderShape.MODEL) {
+			return null;
+		}
+		ResourceLocation textureIdentity = CRACK_STAGE_LOCATIONS[progress];
+		byte[] texturePayload = readTexturePayloadForResource(textureIdentity);
+		if (texturePayload == null) {
+			throw new IllegalStateException("unsupported crumbling texture asset " + textureIdentity);
+		}
+		int textureId = stableTextureId(textureIdentity);
+		BlockStateModel model = Minecraft.getInstance().getBlockRenderer().getBlockModel(blockState);
+		List<BlockModelPart> parts = model.collectParts(RandomSource.create(blockState.getSeed(blockPos)));
+		Vec3 offset = blockState.getOffset(blockPos);
+		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = new ArrayList<>();
+		List<Integer> indices = new ArrayList<>();
+		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
+		List<Direction> faces = new ArrayList<>(List.of(Direction.values()));
+		faces.add(null);
+		for (BlockModelPart part : parts) {
+			for (Direction face : faces) {
+				for (BakedQuad bakedQuad : part.getQuads(face)) {
+					ensureWorldMeshExtractionCapacity(vertices, indices, sections);
+					BakedQuadView quad = (BakedQuadView)(Object)bakedQuad;
+					Direction direction = bakedQuad.direction();
+					Vector3f normal = new Vector3f(direction.getStepX(), direction.getStepY(), direction.getStepZ());
+					int normalPacked = packWorldMeshNormal(normal.x, normal.y, normal.z);
+					int base = vertices.size();
+					int firstIndex = indices.size();
+					for (int i = 0; i < 4; i++) {
+						float x = quad.getX(i) + (float)offset.x;
+						float y = quad.getY(i) + (float)offset.y;
+						float z = quad.getZ(i) + (float)offset.z;
+						if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z)) {
+							throw new IllegalStateException("Rust VulkanicGAL crumbling block contains non-finite baked vertex data");
+						}
+						Vector3f decal = new Vector3f(x, y, z);
+						decal.rotateY((float)Math.PI);
+						decal.rotateX((float)(-Math.PI / 2.0));
+						decal.rotate(direction.getRotation());
+						float u = -decal.x();
+						float v = -decal.y();
+						vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
+							x, y, z, u, v, u, v,
+							0, 1, 0, 0xffffffff, normalPacked, LightTexture.FULL_BRIGHT, 0
+						));
+					}
+					int winding = worldMeshWinding(vertices.get(base), vertices.get(base + 1), vertices.get(base + 2), normal);
+					indices.add(base);
+					indices.add(base + 1);
+					indices.add(base + 2);
+					indices.add(base + 2);
+					indices.add(base + 3);
+					indices.add(base);
+					sections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
+						MATERIAL_ID_MODEL_CRUMBLING, textureId, MATERIAL_MODE_OPAQUE, CULL_BACK, winding, firstIndex, 6
+					));
+				}
+			}
+		}
+		if (vertices.isEmpty() || sections.isEmpty()) {
+			return null;
+		}
+		int indexType = vertices.size() <= 0xffff ? VulkanicGalBridge.INDEX_U16 : VulkanicGalBridge.INDEX_U32;
+		int indexStride = indexType == VulkanicGalBridge.INDEX_U16 ? 2 : 4;
+		byte[] indexBytes = new byte[indices.size() * indexStride];
+		for (int index = 0; index < indices.size(); index++) {
+			int value = indices.get(index);
+			for (int byteIndex = 0; byteIndex < indexStride; byteIndex++) {
+				indexBytes[index * indexStride + byteIndex] = (byte)(value >>> (byteIndex * 8));
+			}
+		}
+		List<VulkanicGalBridge.WorldMeshSectionRecord> byteSections = new ArrayList<>(sections.size());
+		for (VulkanicGalBridge.WorldMeshSectionRecord section : sections) {
+			byteSections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
+				section.materialId(), section.textureId(), section.materialMode(), section.cullPolicy(), section.winding(),
+				Math.multiplyExact(section.indexOffset(), indexStride), section.indexCount()
+			));
+		}
+		// The copied mesh names the broken block (a canonical namespace:path, as
+		// the Rust mesh stream requires); Iris feeds crumbling mc_Entity = -1 and
+		// the damaged-block writer reads no entity identity.
+		String identity = blockState.getBlock().builtInRegistryHolder().key().location().toString();
+		long meshKey = meshContentHash(vertices, indexBytes, byteSections, "block-crumbling/" + identity + "/" + textureIdentity);
+		long meshGeneration = Math.max(1L, worldMeshAssetGeneration + 1L);
+		return new BlockMeshExtraction(
+			meshKey,
+			meshGeneration,
+			new VulkanicGalBridge.WorldMeshAssetRecord(
+				meshKey, meshGeneration, MESH_VERTEX_LAYOUT_V2, indexType, vertices, indexBytes, byteSections, identity
+			),
+			List.of(localModelTextureAsset(textureId, texturePayload))
+		);
+	}
+
 	/**
 	 * Resolves the vanilla entity registry name while the render state is still
 	 * Java semantic data. The returned value is copied into the mesh asset for
@@ -11903,7 +12054,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 		byte[] texturePayload = ownedAtlas ? null : glint
 			? semanticFoilTexture.pngBytes()
-			: crumbling ? readTexturePayload(textureIdentity) : readModelTexturePayload(textureIdentity, sprite);
+			// Crack stages are full texture locations (textures/block/destroy_stage_N.png),
+			// not sprite names, so read the resource stack directly.
+			: crumbling ? readTexturePayloadForResource(textureIdentity) : readModelTexturePayload(textureIdentity, sprite);
 		if (!ownedAtlas && texturePayload == null) {
 			throw new IllegalStateException("unsupported model texture asset " + effectiveTexture);
 		}
@@ -15326,15 +15479,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		// topology is still decided below from the decoded cell bits, but this
 		// conservative bound prevents a pathological radius from consuming large
 		// transient Java memory before the frame-capacity check can reject it.
-		long diameter = (long) radius * 2L + 1L;
-		long candidateCells = diameter * diameter;
-		long worstCaseFaces = candidateCells * 12L;
-		if (worstCaseFaces > MAX_RUST_WORLD_MATERIAL_QUADS) {
-			throw new IllegalStateException(
-				"Rust VulkanicGAL cloud route exceeds bounded material-quad frame capacity before expansion"
-					+ " faces=" + worstCaseFaces + " radius=" + radius
-			);
-		}
+		// Radius is bounded by MAX_RUST_CLOUD_RADIUS above; the actual face count
+		// (not the 12-faces-per-cell worst case) is checked during expansion.
 		synchronized (LOCK) {
 			int viewportWidth = pendingViewportWidth;
 			int viewportHeight = pendingViewportHeight;

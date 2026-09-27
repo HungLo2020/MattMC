@@ -52,6 +52,10 @@ struct CameraHistoryState {
     current_camera_world_position: [f32; 3],
     current_view_matrix: [f32; 16],
     current_projection_matrix: [f32; 16],
+    /// The history returned for `frame_id`. Every source stage of one frame
+    /// (terrain, entities, deferred, composite TAA) must observe the same
+    /// previous-frame camera, however often the frame's uniforms are built.
+    history: TerrainSourceCameraHistory,
 }
 
 /// Rust-owned previous-frame values for source programs. These represent the
@@ -341,39 +345,43 @@ impl TerrainSourceTemporalUniforms {
             ));
         }
         let Some(previous) = self.camera_history else {
+            let history = TerrainSourceCameraHistory {
+                previous_camera_world_position: current_camera_world_position,
+                previous_view_matrix: current_view_matrix,
+                previous_projection_matrix: current_projection_matrix,
+            };
             self.camera_history = Some(CameraHistoryState {
                 key,
                 frame_id,
                 current_camera_world_position,
                 current_view_matrix,
                 current_projection_matrix,
+                history,
             });
-            return Ok(TerrainSourceCameraHistory {
-                previous_camera_world_position: current_camera_world_position,
-                previous_view_matrix: current_view_matrix,
-                previous_projection_matrix: current_projection_matrix,
-            });
+            return Ok(history);
         };
         if previous.key != key || frame_id < previous.frame_id {
+            let history = TerrainSourceCameraHistory {
+                previous_camera_world_position: current_camera_world_position,
+                previous_view_matrix: current_view_matrix,
+                previous_projection_matrix: current_projection_matrix,
+            };
             self.camera_history = Some(CameraHistoryState {
                 key,
                 frame_id,
                 current_camera_world_position,
                 current_view_matrix,
                 current_projection_matrix,
+                history,
             });
-            return Ok(TerrainSourceCameraHistory {
-                previous_camera_world_position: current_camera_world_position,
-                previous_view_matrix: current_view_matrix,
-                previous_projection_matrix: current_projection_matrix,
-            });
+            return Ok(history);
         }
         if frame_id == previous.frame_id {
-            return Ok(TerrainSourceCameraHistory {
-                previous_camera_world_position: previous.current_camera_world_position,
-                previous_view_matrix: previous.current_view_matrix,
-                previous_projection_matrix: previous.current_projection_matrix,
-            });
+            // Later calls in the same frame: the state already holds this
+            // frame's camera, so return the history computed on the first call
+            // (returning `current_*` here made every later stage, including the
+            // composite TAA pass, see an unmoved camera).
+            return Ok(previous.history);
         }
         let history = TerrainSourceCameraHistory {
             previous_camera_world_position: previous.current_camera_world_position,
@@ -386,6 +394,7 @@ impl TerrainSourceTemporalUniforms {
             current_camera_world_position,
             current_view_matrix,
             current_projection_matrix,
+            history,
         });
         Ok(history)
     }
@@ -723,6 +732,13 @@ mod tests {
             .camera_history(KEY, 11, [4.0, 5.0, 6.0], [3.0; 16], [4.0; 16])
             .unwrap();
         assert_eq!([1.0, 2.0, 3.0], next.previous_camera_world_position);
+        assert_eq!([1.0; 16], next.previous_view_matrix);
+        // Later stages of the same frame (deferred/composite TAA) must see the
+        // same previous camera, not this frame's camera.
+        let next_repeated = uniforms
+            .camera_history(KEY, 11, [4.0, 5.0, 6.0], [3.0; 16], [4.0; 16])
+            .unwrap();
+        assert_eq!(next, next_repeated);
         let reset = uniforms
             .camera_history(
                 TerrainSourceTemporalKey {

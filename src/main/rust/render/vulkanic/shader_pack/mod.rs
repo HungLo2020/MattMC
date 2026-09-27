@@ -1,5 +1,6 @@
 pub mod assets;
 pub mod cloud_contract;
+pub mod damaged_block_contract;
 pub mod line_contract;
 pub mod custom_uniform_policy;
 pub mod diagnostics;

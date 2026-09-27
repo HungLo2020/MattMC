@@ -3522,6 +3522,88 @@ pub fn prepare_lowered_line_source_program(
     Ok(program)
 }
 
+/// Prepares the selected `gbuffers_damagedblock` stage for the compact
+/// material stream. Iris applies the program's alpha test to the primary
+/// output after the pack fragment runs; that rule is folded into the
+/// source specialization so the pack's own fragment logic stays intact.
+pub fn prepare_lowered_damaged_block_source_program(
+    contract: &super::damaged_block_contract::DamagedBlockPassContract,
+    lowered: &LoweredCloudSourcePair,
+    opaque_resource_bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> GalResult<LoweredTexturedMaterialSourceProgram> {
+    if contract.generation == 0
+        || contract.outputs.is_empty()
+        || contract.outputs.len() != contract.output_color_slots.len()
+    {
+        return Err(GalError::invalid_argument(
+            "damagedblock source preparation requires a non-zero generation and paired named outputs",
+        ));
+    }
+    lowered.require_backend_neutral_lowering()?;
+    lowered.require_matching_opaque_resource_bindings(opaque_resource_bindings)?;
+    let execution_interface =
+        TexturedMaterialSourceExecutionInterface::from_uniform_contract(lowered.uniform_contract());
+    execution_interface.validate()?;
+    let scalar_uniform_requirements =
+        TerrainSourceUniformRequirements::from_contract(lowered.uniform_contract())?;
+    scalar_uniform_requirements.require_fully_semantic()?;
+    let named_output_color_slots = contract
+        .outputs
+        .iter()
+        .copied()
+        .zip(contract.output_color_slots.iter().copied())
+        .map(|(output, slot)| (output.terrain_output(), slot))
+        .collect::<Vec<_>>();
+    let fragment_source = match contract.alpha_cutoff {
+        None => lowered.fragment().source().to_string(),
+        Some(cutoff) => {
+            if !cutoff.is_finite() || !(0.0..=1.0).contains(&cutoff) {
+                return Err(GalError::invalid_argument(
+                    "damagedblock alpha cutoff must be finite and in [0, 1]",
+                ));
+            }
+            let renamed = lowered
+                .fragment()
+                .source()
+                .replacen("void main()", "void vulkanic_damaged_block_main()", 1);
+            if renamed == lowered.fragment().source() {
+                return Err(GalError::unsupported_feature(
+                    "damagedblock source has no main function for the alpha test",
+                ));
+            }
+            format!(
+                "{renamed}\nvoid main() {{\n    vulkanic_damaged_block_main();\n    if (!(out_cloud_lit_color.a > {cutoff:.8})) discard;\n}}\n"
+            )
+        }
+    };
+    let program = LoweredTexturedMaterialSourceProgram {
+        identity: ProgramIdentity::new(format!(
+            "vulkanic:shader-pack/{}/damagedblock_source_gen{}",
+            contract.pack_name.to_ascii_lowercase(),
+            contract.generation
+        )),
+        shader_pack_generation: contract.generation,
+        vertex: ShaderStageSource {
+            stage: ShaderStageKind::Vertex,
+            label: format!("{}:lowered-vertex", lowered.vertex().entry_path()),
+            source: lowered.vertex().source().to_string(),
+            entry_point: "main".to_string(),
+        },
+        fragment: ShaderStageSource {
+            stage: ShaderStageKind::Fragment,
+            label: format!("{}:lowered-fragment", lowered.fragment().entry_path()),
+            source: fragment_source,
+            entry_point: "main".to_string(),
+        },
+        execution_interface,
+        scalar_uniform_requirements,
+        opaque_resource_bindings: opaque_resource_bindings.clone(),
+        named_output_color_slots,
+    };
+    program.execution_resource_layouts()?;
+    Ok(program)
+}
+
 pub fn prepare_lowered_cloud_source_program(
     contract: &CloudPassContract,
     lowered: &LoweredCloudSourcePair,

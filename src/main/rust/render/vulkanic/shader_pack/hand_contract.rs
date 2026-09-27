@@ -133,6 +133,66 @@ pub fn derive_hand_contract(
     })
 }
 
+/// Discovers the pack's glint program for first-person draws. Iris's hand pass
+/// flushes hand glint with `ShaderKey.GLINT` too, so the same
+/// `gbuffers_armor_glint` source runs with the first-person model view and
+/// projection.
+pub fn derive_hand_glint_contract(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+) -> GalResult<HandPassContract> {
+    let entity = super::entity_contract::derive_entity_glint_contract(source, scope)?;
+    let outputs = entity
+        .outputs
+        .iter()
+        .map(|output| match output {
+            super::entity_contract::EntitySourceOutput::LitColor => Ok(HandSourceOutput::LitColor),
+            super::entity_contract::EntitySourceOutput::MaterialAuxiliary => {
+                Ok(HandSourceOutput::MaterialAuxiliary)
+            }
+            other => Err(GalError::unsupported_feature(format!(
+                "hand glint source output {other:?} is not modeled"
+            ))),
+        })
+        .collect::<GalResult<Vec<_>>>()?;
+    Ok(HandPassContract {
+        pack_name: entity.pack_name,
+        generation: entity.generation,
+        scope,
+        program_path: entity.program_path,
+        stages: entity.stages,
+        inputs: vec![
+            HandSourceInput::MaterialTexture,
+            HandSourceInput::VertexColor,
+            HandSourceInput::FirstPersonModelView,
+            HandSourceInput::FirstPersonProjection,
+            HandSourceInput::CameraAndEnvironment,
+        ],
+        vertex_attributes: Vec::new(),
+        outputs,
+        output_color_slots: entity.output_color_slots,
+    })
+}
+
+/// Derives, lowers, binds, and prepares the first-person glint program.
+pub fn prepare_hand_glint_source_program(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+) -> GalResult<super::programs::LoweredHandSourceProgram> {
+    let contract = derive_hand_glint_contract(source, scope)?;
+    let lowered = lower_hand_source_pair(source, &contract)?;
+    let declarations = TerrainSourceResourceBindings::from_source(source)?;
+    let bindings = bind_hand_source_resources(&lowered, &declarations)?;
+    let mut program =
+        super::programs::prepare_lowered_hand_source_program(&contract, &lowered, &bindings)?;
+    program.identity = super::programs::ProgramIdentity::new(format!(
+        "vulkanic:shader-pack/{}/hand_glint_source_gen{}",
+        contract.pack_name.to_ascii_lowercase(),
+        contract.generation
+    ));
+    Ok(program)
+}
+
 /// Attempts to lower the hand source through the existing owned local-texture
 /// indexed stream. A hand-specific vertex adapter must first account for every
 /// discovered compatibility attribute; otherwise this deliberately returns a

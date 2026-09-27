@@ -237,7 +237,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	/** Must match Rust's bounded whole-frame world-mesh instance slice. */
 	private static final int MAX_PERSISTENT_WORLD_MESH_INSTANCES = 65_536;
 	/** Must match Rust's bounded whole-frame material-quad slice. */
-	private static final int MAX_PERSISTENT_COMPACT_MATERIAL_QUADS = 65_536;
+	private static final int MAX_PERSISTENT_COMPACT_MATERIAL_QUADS = 262_144;
 	private final IdentityHashMap<List<GuiMeshVertexRecord>, IdentityHashMap<List<Integer>, PackedGuiMeshTopology>>
 		persistentGuiMeshTopologies = new IdentityHashMap<>();
 	private int persistentGuiMeshTopologyCount;

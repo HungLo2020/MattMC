@@ -1504,13 +1504,16 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             "DH generic box semantic count exceeds expanded frame bound",
         ));
     }
-    if raw_materials.len() > FFI_MAX_BATCH_ITEMS {
+    // Material quads have their own frame bound (clouds at the default
+    // cloud range exceed the generic 65,536 FFI item bound).
+    let max_material_quads = super::super::world_primitive_frontend::WORLD_MAX_MATERIAL_QUADS;
+    if raw_materials.len() > max_material_quads {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!(
                 "world primitive material quad count {} exceeds max {}",
                 raw_materials.len(),
-                FFI_MAX_BATCH_ITEMS
+                max_material_quads
             ),
         ));
     }
@@ -1524,13 +1527,13 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             ),
         ));
     }
-    if raw_compact_materials.len() > FFI_MAX_BATCH_ITEMS {
+    if raw_compact_materials.len() > max_material_quads {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             format!(
                 "world primitive compact material quad count {} exceeds max {}",
                 raw_compact_materials.len(),
-                FFI_MAX_BATCH_ITEMS
+                max_material_quads
             ),
         ));
     }
@@ -1545,12 +1548,12 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 "world material quad count overflows",
             )
         })?;
-    if material_quad_count > FFI_MAX_BATCH_ITEMS {
+    if material_quad_count > max_material_quads {
         return Err(GalError::ffi(
             StatusCode::LengthOverflow,
             format!(
                 "world material quad count {} exceeds max {}",
-                material_quad_count, FFI_MAX_BATCH_ITEMS
+                material_quad_count, max_material_quads
             ),
         ));
     }
@@ -3383,7 +3386,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                     ));
                     let (mut world_stats, gui_stats) = frontend_result?;
                     whole_frame_trace(&format!(
-                        "whole-frame.gal-profile frame={} validate_ops_nanos={} validate_handles_nanos={} hazard_nanos={} encode_nanos={} queue_nanos={} submit_total_nanos={} ops_before={} ops_after={} hazard_candidates={}",
+                        "whole-frame.gal-profile frame={} validate_ops_nanos={} validate_handles_nanos={} hazard_nanos={} encode_nanos={} queue_nanos={} submit_total_nanos={} ops_before={} ops_after={} hazard_candidates={} hazard_reads={} hazard_writes={} set_binds_removed={}",
                         world_frame_id,
                         world_stats.profile.gal_validate_ops_nanos,
                         world_stats.profile.gal_validate_handles_nanos,
@@ -3394,6 +3397,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         world_stats.profile.gal_command_ops_before_normalize,
                         world_stats.profile.gal_command_ops_after_normalize,
                         world_stats.profile.gal_hazard_candidates_examined,
+                        world_stats.profile.gal_hazard_read_events,
+                        world_stats.profile.gal_hazard_write_events,
+                        world_stats.profile.gal_redundant_resource_set_binds_removed,
                     ));
                     whole_frame_trace(&format!(
                         "whole-frame.graph-profile frame={} validate_nanos={} batching_nanos={} mesh_group_nanos={} resources_nanos={} mesh_assets_nanos={} mesh_resources_nanos={} command_nanos={} stream_pack_nanos={} draw_record_nanos={} mesh_batches={} mesh_instances={}",

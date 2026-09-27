@@ -295,6 +295,94 @@ pub fn derive_entity_shadow_contract(
     })
 }
 
+/// Candidate `gbuffers_armor_glint` entries. Iris draws every vanilla glint
+/// pipeline (item, entity, armor; world and first person) with this program
+/// (`ShaderKey.GLINT`, `ProgramId.ArmorGlint`).
+pub(crate) fn glint_entry_candidates(scope: TerrainProgramScope) -> &'static [&'static str] {
+    match scope {
+        TerrainProgramScope::Default => &["gbuffers_armor_glint.fsh"],
+        TerrainProgramScope::Overworld => {
+            &["world0/gbuffers_armor_glint.fsh", "gbuffers_armor_glint.fsh"]
+        }
+        TerrainProgramScope::Nether => {
+            &["world-1/gbuffers_armor_glint.fsh", "gbuffers_armor_glint.fsh"]
+        }
+        TerrainProgramScope::End => &["world1/gbuffers_armor_glint.fsh", "gbuffers_armor_glint.fsh"],
+    }
+}
+
+/// Discovers the pack's glint program as an entity-stream writer. Iris feeds
+/// glint only position and UV0: `gl_Color` is the colour modulator with the
+/// glint strength in alpha and `gl_TextureMatrix[0]` the animated glint
+/// matrix; the Rust entity stream supplies both per draw. Iris falls back to
+/// `gbuffers_textured`/`basic` when the stage is absent; those fallbacks are
+/// not modeled, so such a pack leaves glint frames unadmitted.
+pub fn derive_entity_glint_contract(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+) -> GalResult<EntityPassContract> {
+    let program_path = glint_entry_candidates(scope)
+        .iter()
+        .copied()
+        .find(|path| source.get(path).is_some())
+        .ok_or_else(|| {
+            GalError::unsupported_feature(format!(
+                "missing armor_glint fragment source for {scope:?}; tried {} (Iris fallback programs are not modeled)",
+                glint_entry_candidates(scope).join(", ")
+            ))
+        })?;
+    let stages = terrain_source_stages(program_path)?;
+    let vertex = preprocess_stage(source, &stages.vertex.path, &stages.vertex.defines)?;
+    let fragment = preprocess_stage(source, &stages.fragment.path, &stages.fragment.defines)?;
+    require_any(&vertex, &["gl_Vertex", "ftransform"])?;
+    let slots = parse_draw_buffers_slots(&fragment)?;
+    let outputs = match slots.as_slice() {
+        [0] => vec![EntitySourceOutput::LitColor],
+        [0, 6] => vec![EntitySourceOutput::LitColor, EntitySourceOutput::MaterialAuxiliary],
+        _ => {
+            return Err(GalError::unsupported_feature(format!(
+                "selected armor_glint source requires unsupported DRAWBUFFERS schema {slots:?}; expected [0] or [0, 6]"
+            )));
+        }
+    };
+    Ok(EntityPassContract {
+        pack_name: source.name().to_string(),
+        generation: source.generation(),
+        scope,
+        program_path: program_path.to_string(),
+        stages,
+        inputs: vec![
+            EntitySourceInput::MaterialTexture,
+            EntitySourceInput::VertexColor,
+            EntitySourceInput::CameraAndEnvironment,
+        ],
+        vertex_attributes: Vec::new(),
+        outputs,
+        output_color_slots: slots,
+        entity_ids: ShaderPackEntityIdMap::from_source(source)?,
+    })
+}
+
+/// Derives, lowers, binds, and prepares the pack's glint program for the
+/// world entity stream.
+pub fn prepare_entity_glint_source_program(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+) -> GalResult<super::programs::LoweredEntitySourceProgram> {
+    let contract = derive_entity_glint_contract(source, scope)?;
+    let lowered = lower_entity_source_pair(source, &contract)?;
+    let declarations = TerrainSourceResourceBindings::from_source(source)?;
+    let bindings = bind_entity_source_resources(&lowered, &declarations)?;
+    let mut program =
+        super::programs::prepare_lowered_entity_source_program(&contract, &lowered, &bindings)?;
+    program.identity = super::programs::ProgramIdentity::new(format!(
+        "vulkanic:shader-pack/{}/entity_glint_source_gen{}",
+        contract.pack_name.to_ascii_lowercase(),
+        contract.generation
+    ));
+    Ok(program)
+}
+
 /// Lowers the paired selected entity source through the common Rust-owned
 /// indexed source stream. This validates only source and semantic resource
 /// shape; it cannot create a program, select a route, or make an entity draw
@@ -618,5 +706,20 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("not canonical"));
+    }
+
+    #[test]
+    fn bundled_armor_glint_lowers_for_world_and_first_person_streams() {
+        let source =
+            crate::render::vulkanic::shader_pack::preprocess::complete_bundled_pack_source_for_test();
+        let entity = prepare_entity_glint_source_program(&source, TerrainProgramScope::Overworld)
+            .unwrap();
+        assert!(entity.identity.as_str().contains("entity_glint_source_gen"));
+        let hand = super::super::hand_contract::prepare_hand_glint_source_program(
+            &source,
+            TerrainProgramScope::Overworld,
+        )
+        .unwrap();
+        assert!(hand.identity.as_str().contains("hand_glint_source_gen"));
     }
 }

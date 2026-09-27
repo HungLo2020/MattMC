@@ -2218,6 +2218,46 @@ pub fn lower_cloud_source_pair(
     })
 }
 
+/// Lowers the selected `gbuffers_damagedblock` pair onto the compact material
+/// stream. Iris draws block-breaking progress with this program through the
+/// fixed-function inputs `ftransform()`, `gl_MultiTexCoord0` and `gl_Color`;
+/// the Rust material stream supplies those from copied camera-relative
+/// crumbling quads, so no terrain-only lanes are required.
+pub fn lower_damaged_block_source_pair(
+    vertex: &PreprocessedShaderSource,
+    fragment: &PreprocessedShaderSource,
+    required_outputs: &[CloudFragmentOutput],
+) -> GalResult<LoweredCloudSourcePair> {
+    let owned_storage_bindings = TerrainSourceResourceBindings::default();
+    let vertex = externalize_owned_semantic_storage_writes(vertex, &owned_storage_bindings)?;
+    let fragment = externalize_owned_semantic_storage_writes(fragment, &owned_storage_bindings)?;
+    let uniform_contract =
+        derive_source_uniform_contract(&vertex, &fragment, SourceTransformSemantics::Cloud)?;
+    let varying_contract = derive_terrain_source_varying_contract(&vertex, &fragment)?;
+    let opaque_resource_contract =
+        derive_terrain_source_opaque_resource_contract(&vertex, &fragment)?;
+    Ok(LoweredCloudSourcePair {
+        vertex: lower_source_vertex_surface_with_contracts(
+            &vertex,
+            &uniform_contract,
+            &varying_contract,
+            &opaque_resource_contract,
+            SourceTransformSemantics::Cloud,
+        )?,
+        fragment: lower_material_stream_fragment_surface_with_contracts(
+            &fragment,
+            &uniform_contract,
+            &varying_contract,
+            &opaque_resource_contract,
+            required_outputs,
+            "damagedblock",
+        )?,
+        uniform_contract,
+        varying_contract,
+        opaque_resource_contract,
+    })
+}
+
 /// Lowers a block-selection line pair (`gbuffers_line`) onto the compact
 /// material stream. Iris injects core-profile inputs for this stage: the
 /// camera-relative `vaPosition`, the segment direction in `vaNormal`, and the
@@ -4532,6 +4572,28 @@ fn lower_fullscreen_source_history_corner(
     )
 }
 
+/// Inserts an image-to-source UV conversion at the top of every
+/// `...Reprojection(vec3 pos...)` helper whose body starts by expanding `pos`
+/// from screen space (`pos = pos * 2.0 - 1.0;`).
+fn convert_reprojection_screen_inputs(source: &str) -> String {
+    const EXPANSION: &str = "pos = pos * 2.0 - 1.0;";
+    let mut out = String::with_capacity(source.len() + 256);
+    let mut rest = source;
+    while let Some(found) = rest.find("Reprojection(vec3 pos") {
+        let Some(open) = rest[found..].find('{').map(|offset| found + offset + 1) else {
+            break;
+        };
+        out.push_str(&rest[..open]);
+        let body = &rest[open..];
+        if body.trim_start().starts_with(EXPANSION) {
+            out.push_str("\n        pos.xy = vulkanic_source_fullscreen_screen_uv(pos.xy);");
+        }
+        rest = body;
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Preserves the source pack's lower-left fragment-space convention in
 /// fullscreen stages without reinterpreting source-target image addresses.
 ///
@@ -4593,13 +4655,29 @@ fn lower_fullscreen_fragment_coordinates(
         "gbufferProjectionInverse * (vec4(texCoord,",
         "gbufferProjectionInverse * (vec4(vulkanic_source_fullscreen_screen_uv(texCoord),",
     );
-    // The TAA reprojection helper returns an OpenGL screen UV, while the
-    // history image and the current fullscreen varying use image UVs. Convert
-    // the returned coordinate once so sampling and velocity share a domain.
-    source = source.replace(
-        "prvCoord = Reprojection(viewPos1);",
-        "prvCoord = vulkanic_source_fullscreen_screen_uv(Reprojection(viewPos1));",
-    );
+    // Reprojection helpers (TAA, temporal reflection filters) return an
+    // OpenGL screen UV that callers use to sample history images and compare
+    // with the image-space `texCoord`. Convert that result once, at the
+    // helper, so every call site shares the image domain. A static camera
+    // hides a missing conversion (the mirror cancels); motion does not.
+    const REPROJECTION_RETURN: &str =
+        "return previousPosition.xy / previousPosition.w * 0.5 + 0.5;";
+    if source.contains(REPROJECTION_RETURN) {
+        source = source.replace(
+            REPROJECTION_RETURN,
+            "return vulkanic_source_fullscreen_screen_uv(previousPosition.xy / previousPosition.w * 0.5 + 0.5);",
+        );
+    } else {
+        // A helper without the canonical return still gets its TAA result
+        // converted at the call site.
+        source = source.replace(
+            "prvCoord = Reprojection(viewPos1);",
+            "prvCoord = vulkanic_source_fullscreen_screen_uv(Reprojection(viewPos1));",
+        );
+    }
+    // Helpers that take an image-space `vec3(texCoord, depth)` and expand it
+    // as an OpenGL screen position convert the incoming UV first.
+    source = convert_reprojection_screen_inputs(&source);
     // Copied pack noise images retain their decoded texels. Fullscreen source
     // noise lookups authored from texCoord still require OpenGL's lower-left
     // screen UV; color/depth target lookups keep the native image UV.
@@ -5125,7 +5203,11 @@ fn vertex_semantic_preamble(transforms: SourceTransformSemantics) -> String {
         .replace("{projection}", transforms.projection_uniform())
 }
 
-const VERTEX_SEMANTIC_PREAMBLE_TEMPLATE: &str = r#"struct VulkanicSourceTerrainVertex {
+// `invariant` makes passes that recompute the same position expression in
+// different pipelines (entity + glint, hand + hand glint) produce bit-identical
+// depth, which vanilla's EQUAL-depth glint relies on.
+const VERTEX_SEMANTIC_PREAMBLE_TEMPLATE: &str = r#"invariant gl_Position;
+struct VulkanicSourceTerrainVertex {
     vec4 position;
     vec4 color;
     vec4 normal_light;
@@ -7693,6 +7775,50 @@ mod tests {
         assert!(lowered.vertex().source().contains(
             "return ivec2(source_texel.x, int(source_height) - 1 - source_texel.y);"
         ));
+    }
+
+    #[test]
+    fn bundled_reprojection_helpers_convert_screen_uvs_exactly_once() {
+        // Complementary's TAA (composite6) and temporal reflection filter
+        // (deferred1) reproject through OpenGL screen UVs. A static camera
+        // hides a missing conversion; camera motion ghosted without one.
+        let pack =
+            crate::render::vulkanic::shader_pack::preprocess::complete_bundled_pack_source_for_test();
+        let bindings = TerrainSourceResourceBindings::from_source(&pack).unwrap();
+        let lower = |stage: &str| {
+            let vertex = super::super::preprocess::preprocess_artifact_with_runtime_options(
+                &pack,
+                &format!("world0/{stage}.vsh"),
+                &[],
+            )
+            .unwrap();
+            let fragment = super::super::preprocess::preprocess_artifact_with_runtime_options(
+                &pack,
+                &format!("world0/{stage}.fsh"),
+                &[],
+            )
+            .unwrap();
+            lower_fullscreen_source_pair(&vertex, &fragment, &bindings)
+                .unwrap()
+                .fragment()
+                .source()
+                .to_string()
+        };
+        let converted_return = "return vulkanic_source_fullscreen_screen_uv(previousPosition.xy / previousPosition.w * 0.5 + 0.5);";
+        let taa = lower("composite6");
+        assert!(taa.contains(converted_return));
+        assert!(taa.contains("prvCoord = Reprojection(viewPos1);"));
+        assert!(!taa.contains("vulkanic_source_fullscreen_screen_uv(Reprojection("));
+        let reflections = lower("deferred1");
+        // `Reprojection` and `SHalfReprojection` return screen UVs.
+        assert_eq!(2, reflections.matches(converted_return).count());
+        assert!(!reflections.contains("return previousPosition.xy / previousPosition.w * 0.5 + 0.5;"));
+        assert_eq!(
+            2,
+            reflections
+                .matches("pos.xy = vulkanic_source_fullscreen_screen_uv(pos.xy);")
+                .count()
+        );
     }
 
     #[test]

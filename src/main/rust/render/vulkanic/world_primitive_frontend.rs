@@ -204,7 +204,8 @@ pub const WORLD_MAX_BORDER_QUADS: usize = 64;
 /// deliberately independent of the per-draw payload capacity below: large
 /// environment producers such as clouds are split by the Rust frontend, not
 /// rejected by the transport solely because they need more than one draw.
-pub const WORLD_MAX_MATERIAL_QUADS: usize = 65_536;
+/// Per-frame material quad bound (clouds at the default range need ~100k).
+pub const WORLD_MAX_MATERIAL_QUADS: usize = 262_144;
 /// One material draw stores its quads in a fixed-size shader-visible payload.
 /// Keep this local execution limit separate from the frame transport bound.
 const WORLD_MAX_MATERIAL_QUADS_PER_BATCH: usize = 4_096;
@@ -241,7 +242,10 @@ pub const WORLD_MAX_MESH_TEXTURE_DECODED_BYTES: usize = 256 * 1024 * 1024;
 /// geometry.  Source preparation is unadmitted until complete; refusing a
 /// new mesh at this boundary keeps native residency bounded without ever
 /// evicting resources that an in-flight command may still reference.
-pub const LOWERED_SOURCE_GEOMETRY_MAX_BYTES: u64 = 512 * 1024 * 1024;
+/// Device-local source geometry. Render distance 10 with a typical pack keeps
+/// ~0.9 GiB resident; the bound leaves room for larger distances while still
+/// rejecting runaway growth.
+pub const LOWERED_SOURCE_GEOMETRY_MAX_BYTES: u64 = 2048 * 1024 * 1024;
 /// Aggregate GPU residency budget for copied local-material textures used by
 /// lowered shader-source writers. Each texture owns both a sampled image and
 /// a completion-gated upload buffer, so the accounting includes both copies.
@@ -1625,6 +1629,18 @@ type SourceUniformPackMemoEntry = (
     Vec<u8>,
     Vec<u8>,
 );
+
+/// Per-frame fast path for the terrain batch loops. The frame's source
+/// programs are validated once when the scope opens, and pack keys are
+/// memoized by (program, resource snapshot) address. Both are sound only
+/// because the scope is closed before those borrowed values can change.
+struct SourceTerrainBatchScope {
+    frame_id: u64,
+    /// Whether the audit-only scalar uniform receipt is enabled, read once.
+    scalar_uniform_receipts: bool,
+    validated_programs: Vec<usize>,
+    pack_keys: Vec<(usize, usize, LoweredSourceTerrainPackKey)>,
+}
 
 /// Byte budget for converted source terrain streams kept across frames.
 const SOURCE_TERRAIN_MESH_CACHE_BYTES: usize = 256 * 1024 * 1024;
@@ -3775,6 +3791,9 @@ struct LoweredSourceTerrainGeometryResources {
     vertex_buffer: Handle,
     index_buffer: Handle,
     byte_size: u64,
+    /// Host-visible source of the first upload into device-local geometry,
+    /// released once the submission carrying that copy is confirmed.
+    staging_buffer: Option<Handle>,
 }
 
 /// Rust-owned set-zero bindings for one immutable geometry stream pair. The
@@ -3842,6 +3861,7 @@ impl SourceMeshResources {
 impl LoweredSourceTerrainGeometryResources {
     fn handles_in_destroy_order(&self) -> Vec<Handle> {
         let mut handles = vec![self.index_buffer, self.vertex_buffer];
+        handles.extend(self.staging_buffer);
         handles.dedup();
         handles
     }
@@ -4048,6 +4068,12 @@ struct SourceTerrainFrameTransaction {
     /// from frame payloads so a discarded frame can return them to the pending
     /// queue; otherwise the cached buffers would be drawn uninitialized.
     geometry_uploads: Vec<(LoweredSourceTerrainDataKey, Vec<CommandOp>)>,
+    /// Frame-stream payload bytes from offset zero, written by one host
+    /// write at submission instead of five ops per draw.
+    stream_staging: Vec<u8>,
+    /// Uniform blocks already staged this frame, as (legacy, scalar,
+    /// legacy offset, scalar offset); equal blocks share one stream copy.
+    shared_uniforms: Vec<(Vec<u8>, Vec<u8>, u64, Option<u64>)>,
 }
 
 struct PendingSourceMaterialTextureUpload {
@@ -4115,6 +4141,30 @@ struct PreparedNamedSourceLineFramePlan {
     targets: TerrainSourceColorPassTargets,
     opaque_draws: Vec<TexturedMaterialSourceDraw>,
     translucent_draws: Vec<TexturedMaterialSourceDraw>,
+}
+
+/// Block-breaking progress through the pack's `gbuffers_damagedblock`. Iris
+/// draws the crumbling buffer after the opaque flush and block outline and
+/// before `beginTranslucents` (hand, depth copies, deferred).
+struct PreparedNamedSourceDamagedBlockFramePlan {
+    targets: TerrainSourceColorPassTargets,
+    draws: Vec<TexturedMaterialSourceDraw>,
+}
+
+/// `gbuffers_armor_glint` over already drawn entity or hand geometry. Iris
+/// flushes world glint after the entity/block-entity sheets and hand glint
+/// inside the hand pass, both with vanilla's GLINT state.
+struct PreparedNamedSourceGlintFramePlan {
+    targets: TerrainSourceColorPassTargets,
+    draws: Vec<EntitySourceDraw>,
+}
+
+/// One run of copied crumbling quads sharing a destroy-stage texture and cull
+/// policy.
+struct SourceDamagedBlockBatch {
+    texture_id: u32,
+    cull_policy: u32,
+    primitives: Vec<TexturedMaterialSourcePrimitive>,
 }
 
 /// One ordered run of block-selection segments sharing pass placement and
@@ -4208,6 +4258,7 @@ enum SourceMaterialWriterKind {
     Weather,
     Clouds,
     Lines,
+    DamagedBlock,
 }
 
 /// Frozen's authoritative frame graph executes translucent terrain, particles,
@@ -4268,6 +4319,9 @@ struct PreparedNamedSourceTerrainFramePlan {
     weather: Option<PreparedNamedSourceWeatherFramePlan>,
     clouds: Option<PreparedNamedSourceCloudFramePlan>,
     lines: Option<PreparedNamedSourceLineFramePlan>,
+    damaged_block: Option<PreparedNamedSourceDamagedBlockFramePlan>,
+    entity_glint: Option<PreparedNamedSourceGlintFramePlan>,
+    hand_glint: Option<PreparedNamedSourceGlintFramePlan>,
     color_targets: ShaderPackColorTargets,
     shadow_targets: Option<TerrainSourceShadowPassTargets>,
     main_depth_history: Option<(TerrainDepthHistoryTargets, TerrainDepthHistoryPlan)>,
@@ -4376,6 +4430,22 @@ impl PreparedNamedSourceTerrainFramePlan {
             self.color_transaction
                 .record_external_outputs(&entity_output_roles)?;
         }
+        if let Some(glint) = self.entity_glint.as_ref() {
+            runtime.append_glint_source_color_pass(
+                operations,
+                &glint.targets,
+                &glint.draws,
+                TerrainSourceColorPassPhase::EntityGlint,
+            )?;
+            let glint_output_roles = glint
+                .targets
+                .color_attachments
+                .iter()
+                .map(|attachment| attachment.role.clone())
+                .collect::<Vec<_>>();
+            self.color_transaction
+                .record_external_outputs(&glint_output_roles)?;
+        }
         // Iris: `renderBlockOutline(.., false)` follows the opaque flush and
         // precedes `beginTranslucents` (hand, depth copies, deferred).
         if let Some(lines) = self.lines.as_ref().filter(|lines| !lines.opaque_draws.is_empty()) {
@@ -4388,6 +4458,23 @@ impl PreparedNamedSourceTerrainFramePlan {
                 .collect::<Vec<_>>();
             self.color_transaction
                 .record_external_outputs(&line_output_roles)?;
+        }
+        // Iris: `renderBlockDestroyAnimation` + crumbling flush follow the
+        // outline and precede `beginTranslucents`.
+        if let Some(damaged) = self.damaged_block.as_ref().filter(|plan| !plan.draws.is_empty()) {
+            runtime.append_damaged_block_source_color_pass(
+                operations,
+                &damaged.targets,
+                &damaged.draws,
+            )?;
+            let damaged_output_roles = damaged
+                .targets
+                .color_attachments
+                .iter()
+                .map(|attachment| attachment.role.clone())
+                .collect::<Vec<_>>();
+            self.color_transaction
+                .record_external_outputs(&damaged_output_roles)?;
         }
         if hands_before_deferred {
             let (targets, history) = self
@@ -4407,6 +4494,14 @@ impl PreparedNamedSourceTerrainFramePlan {
                 &hands.draws,
                 Some((targets.main_depth_texture, history.extent)),
             )?;
+            if let Some(glint) = self.hand_glint.as_ref() {
+                runtime.append_glint_source_color_pass(
+                    operations,
+                    &glint.targets,
+                    &glint.draws,
+                    TerrainSourceColorPassPhase::HandGlint,
+                )?;
+            }
             // The hand draws into a private copy of world depth; publish that
             // merged depth as the main depth so depthtex1, deferred, later
             // world writers, and composites observe the hand exactly as Iris.
@@ -4564,6 +4659,14 @@ impl PreparedNamedSourceTerrainFramePlan {
                 None
             };
             runtime.append_hand_source_color_pass(operations, &hands.targets, &hands.draws, world_depth)?;
+            if let Some(glint) = self.hand_glint.as_ref() {
+                runtime.append_glint_source_color_pass(
+                    operations,
+                    &glint.targets,
+                    &glint.draws,
+                    TerrainSourceColorPassPhase::HandGlint,
+                )?;
+            }
             let hand_output_roles = hands
                 .targets
                 .color_attachments
@@ -5391,6 +5494,36 @@ impl PreparedNamedSourceFramePlan {
 }
 
 impl SourceTerrainFrameTransaction {
+    fn stage_stream_write(&mut self, offset: u64, data: &[u8]) {
+        let start = offset as usize;
+        let end = start + data.len();
+        if self.stream_staging.len() < end {
+            self.stream_staging.resize(end, 0);
+        }
+        self.stream_staging[start..end].copy_from_slice(data);
+    }
+
+    fn stage_stream_parts(
+        &mut self,
+        stream: SourceTerrainFrameStreamAllocation,
+        legacy_texture_transforms: &[u8],
+        scalar_uniforms: &[u8],
+        payload: &[u8],
+    ) {
+        self.stage_stream_write(stream.legacy_transform_offset, legacy_texture_transforms);
+        if let Some(offset) = stream.scalar_uniform_offset {
+            self.stage_stream_write(offset, scalar_uniforms);
+        }
+        self.stage_stream_write(stream.instance_offset, payload);
+    }
+
+    fn shared_uniform_offsets(&self, legacy: &[u8], scalar: &[u8]) -> Option<(u64, Option<u64>)> {
+        self.shared_uniforms
+            .iter()
+            .find(|entry| entry.0 == legacy && entry.1 == scalar)
+            .map(|entry| (entry.2, entry.3))
+    }
+
     fn into_submission_parts(self) -> (Vec<CommandOp>, SourceTerrainFrameSubmission) {
         let mut operations = self
             .geometry_uploads
@@ -5398,6 +5531,23 @@ impl SourceTerrainFrameTransaction {
             .flat_map(|(_, uploads)| uploads.iter().cloned())
             .collect::<Vec<_>>();
         operations.extend(self.operations);
+        if !self.stream_staging.is_empty() {
+            operations.push(CommandOp::Barrier(buffer_barrier(
+                self.stream_buffer,
+                TextureUsageState::ShaderRead,
+                TextureUsageState::TransferDst,
+            )));
+            operations.push(CommandOp::HostWriteBuffer {
+                buffer: self.stream_buffer,
+                offset: 0,
+                data: self.stream_staging,
+            });
+            operations.push(CommandOp::Barrier(buffer_barrier(
+                self.stream_buffer,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            )));
+        }
         (
             operations,
             SourceTerrainFrameSubmission {
@@ -6074,6 +6224,10 @@ pub struct WorldPrimitiveFrontend {
     entity_shadow_program_cache: Option<(u64, LoweredEntitySourceProgram)>,
     /// Per-generation/scope block-selection line program (pack `gbuffers_line`).
     line_source_program_cache: Option<((u64, TerrainProgramScope), LoweredTexturedMaterialSourceProgram)>,
+    damaged_block_source_program_cache:
+        Option<((u64, TerrainProgramScope), LoweredTexturedMaterialSourceProgram)>,
+    entity_glint_source_program_cache: Option<((u64, TerrainProgramScope), LoweredEntitySourceProgram)>,
+    hand_glint_source_program_cache: Option<((u64, TerrainProgramScope), LoweredHandSourceProgram)>,
     /// Receipt evidence for the last prepared `gbuffers_line` writer:
     /// (frame, program identity, segments, opaque draws, translucent draws).
     last_source_line_execution: Option<(u64, String, usize, usize, usize)>,
@@ -6081,7 +6235,8 @@ pub struct WorldPrimitiveFrontend {
     /// preparation only. Colour and shadow writers each resolve every batch
     /// mesh twice; the memo is cleared when that preparation returns so it
     /// never retains a second CPU copy of resident terrain across frames.
-    source_terrain_mesh_frame_memo: Option<BTreeMap<(u64, u64, bool), Arc<SourceTerrainMeshAsset>>>,
+    source_terrain_mesh_frame_memo:
+        Option<std::collections::HashMap<(u64, u64, bool), Arc<SourceTerrainMeshAsset>>>,
     /// Mesh identities whose source terrain conversion has already succeeded.
     /// Mesh generations are immutable content, so frame coverage validation
     /// need not re-derive the (large, deliberately uncached) source stream
@@ -6093,6 +6248,14 @@ pub struct WorldPrimitiveFrontend {
     source_terrain_mesh_cache: SourceTerrainMeshCache,
     /// Per-frame packed uniform bytes, reused for equal uniform inputs.
     source_uniform_pack_memo: Option<(u64, Vec<SourceUniformPackMemoEntry>)>,
+    /// Active only while one frame's terrain batch loops run; see
+    /// `SourceTerrainBatchScope`.
+    source_terrain_batch_scope: Option<SourceTerrainBatchScope>,
+    /// Source geometry staging buffers whose upload submission was confirmed;
+    /// destroyed (completion-deferred by GAL) at the next source frame.
+    retired_source_geometry_staging: Vec<Handle>,
+    /// Frame whose selected-source coverage the armed entry just validated.
+    coverage_validated_frame_id: Option<u64>,
     /// Persistent semantic final-copy bindings for the private source frame.
     /// Entries are keyed by world/pack/source/swapchain-slot compatibility,
     /// never by native or transient target handles.
@@ -6311,6 +6474,9 @@ pub struct WorldPrimitiveFrontend {
     /// resources (G-buffer, depth history, far-depth snapshot) are bound to
     /// one extent, so a resize disarms the route until they are re-confirmed.
     last_source_route_extent: Option<(u32, u32)>,
+    /// Vanilla cloud quads dropped at armed-frame entry because the selected
+    /// pack suppresses them; folded into this frame's cloud evidence.
+    pre_dropped_suppressed_cloud_quads: u64,
     /// The source route is recorded once for bounded audit evidence after it
     /// actually replaces the internal graph. The record is not an ABI field
     /// and cannot be mistaken for Java-side route selection.
@@ -6345,6 +6511,14 @@ pub struct WorldPrimitiveFrontend {
     cached_passes: Vec<CachedPass>,
     cached_color_only_passes: Vec<CachedColorOnlyPass>,
     pending_depth_attachment_retires: u64,
+}
+
+
+fn graphics_audit_enabled() -> bool {
+    matches!(
+        std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref().map(str::trim),
+        Ok("1") | Ok("true") | Ok("TRUE")
+    )
 }
 
 fn whole_frame_phase_trace(phase: &str, frame_id: u64, started: Option<std::time::Instant>) {
@@ -7901,7 +8075,16 @@ impl WorldPrimitiveFrontend {
                 ))
             })?
         };
+        // Special item renderers (tridents, shields, banners, ...) draw the
+        // held stack with copied ModelPart geometry whose identity names the
+        // model part, not the item. Iris resolves `currentRenderedItemId`
+        // from the held stack for those draws too, so only item-model
+        // identities must match exactly.
+        let model_part_geometry = canonical_mesh_identity
+            .split_once(':')
+            .is_some_and(|(_, path)| path.starts_with("model-part/"));
         if !canonical_expected_identity.is_empty()
+            && !model_part_geometry
             && canonical_mesh_identity != canonical_expected_identity
         {
             return Err(GalError::invalid_argument(format!(
@@ -7975,6 +8158,203 @@ impl WorldPrimitiveFrontend {
         }
         let program = super::shader_pack::line_contract::prepare_line_source_program(source, scope)?;
         self.line_source_program_cache = Some(((shader_pack_generation, scope), program.clone()));
+        Ok(program)
+    }
+
+    /// Block-entity crumbling (vanilla's `crumblingBufferSource`) arrives as
+    /// entity mesh instances whose every section carries the crumbling
+    /// material. Iris draws those with `gbuffers_damagedblock`, never with
+    /// the entity program, so the source route routes them to that writer.
+    fn is_crumbling_mesh_instance(&self, instance: &WorldMeshInstanceRequest) -> bool {
+        instance.stratum == WORLD_STRATUM_ENTITY_MESH
+            && self.mesh_assets.get(&instance.mesh_key).is_some_and(|asset| {
+                asset.mesh_generation == instance.mesh_generation
+                    && !asset.sections.is_empty()
+                    && asset
+                        .sections
+                        .iter()
+                        .all(|section| section.material_id == WORLD_MATERIAL_ID_MODEL_CRUMBLING)
+            })
+    }
+
+    /// Copies each crumbling instance's triangles into camera-relative
+    /// material quads (a triangle is the quad `a, b, c, c`). Positions take
+    /// the instance pose; the decal UVs were projected by the Java producer
+    /// exactly like vanilla's `SheetedDecalTextureGenerator`. Iris draws this
+    /// program FULLBRIGHT with a white vertex color.
+    fn source_damaged_block_batches(
+        &mut self,
+        frame: &WorldPrimitiveFrame,
+    ) -> GalResult<Vec<SourceDamagedBlockBatch>> {
+        let mut batches: Vec<SourceDamagedBlockBatch> = Vec::new();
+        for instance in &frame.mesh_instances {
+            if !self.is_crumbling_mesh_instance(instance) {
+                continue;
+            }
+            let transform =
+                super::view_layering::apply_to_model(instance.transform, mesh_view_layering(instance))?;
+            let mesh = self.source_entity_mesh_asset(
+                instance.mesh_key,
+                instance.mesh_generation,
+                instance.packed_light,
+            )?;
+            let vertex_count = mesh.vertex_bytes.len() / TERRAIN_SOURCE_VERTEX_BYTES;
+            let read_f32 = |offset: usize| -> f32 {
+                f32::from_le_bytes(
+                    mesh.vertex_bytes[offset..offset + 4]
+                        .try_into()
+                        .expect("four-byte vertex lane"),
+                )
+            };
+            let section_indices: Vec<usize> = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
+                (0..mesh.sections.len()).collect()
+            } else {
+                vec![instance.mesh_section_index as usize]
+            };
+            for section_index in section_indices {
+                let section = mesh.sections.get(section_index).ok_or_else(|| {
+                    GalError::invalid_argument("crumbling instance selects a missing mesh section")
+                })?;
+                let cull_policy = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
+                    section.cull_policy
+                } else {
+                    instance.cull_policy
+                };
+                let start = usize::try_from(section.index_offset / 4).map_err(|_| {
+                    GalError::invalid_argument("crumbling section index offset exceeds usize")
+                })?;
+                let count = section.index_count as usize;
+                if count % 3 != 0 || (start + count) * 4 > mesh.index_bytes.len() {
+                    return Err(GalError::invalid_argument(
+                        "crumbling section index range is not a whole triangle list",
+                    ));
+                }
+                let mut primitives = Vec::with_capacity(count / 3);
+                for triangle in 0..count / 3 {
+                    let mut positions = [[0.0f32; 3]; 4];
+                    let mut uvs = [[0.0f32; 2]; 4];
+                    for corner in 0..3 {
+                        let at = (start + triangle * 3 + corner) * 4;
+                        let vertex = u32::from_le_bytes(
+                            mesh.index_bytes[at..at + 4].try_into().expect("u32 index"),
+                        ) as usize;
+                        if vertex >= vertex_count {
+                            return Err(GalError::invalid_argument(
+                                "crumbling mesh index references a missing vertex",
+                            ));
+                        }
+                        let base = vertex * TERRAIN_SOURCE_VERTEX_BYTES;
+                        let local = [read_f32(base), read_f32(base + 4), read_f32(base + 8), 1.0];
+                        let placed = transform_column_major_vec4(transform, local);
+                        positions[corner] = [placed[0], placed[1], placed[2]];
+                        // `atlas_uv_lightmap.xy` lane of the fixed record.
+                        uvs[corner] = [read_f32(base + 48), read_f32(base + 52)];
+                    }
+                    positions[3] = positions[2];
+                    uvs[3] = uvs[2];
+                    primitives.push(super::shader_pack::material_contract::stage_textured_material_primitive(
+                        positions,
+                        uvs,
+                        0xFFFF_FFFF,
+                        0x00F0_00F0,
+                        TexturedMaterialTextureCoordinates::LocalTexture,
+                        TexturedMaterialWinding::CounterClockwise,
+                    )?);
+                }
+                match batches.last_mut() {
+                    Some(batch)
+                        if batch.texture_id == section.texture_id
+                            && batch.cull_policy == cull_policy =>
+                    {
+                        batch.primitives.extend(primitives);
+                    }
+                    _ => batches.push(SourceDamagedBlockBatch {
+                        texture_id: section.texture_id,
+                        cull_policy,
+                        primitives,
+                    }),
+                }
+            }
+        }
+        Ok(batches)
+    }
+
+    fn entity_glint_source_program(
+        &mut self,
+        shader_pack_generation: u64,
+        scope: TerrainProgramScope,
+    ) -> GalResult<LoweredEntitySourceProgram> {
+        if let Some((key, program)) = self.entity_glint_source_program_cache.as_ref() {
+            if *key == (shader_pack_generation, scope) {
+                return Ok(program.clone());
+            }
+        }
+        let source = self
+            .shader_pack_sources
+            .active()
+            .filter(|source| source.generation() == shader_pack_generation)
+            .ok_or_else(|| {
+                GalError::invalid_argument(
+                    "glint source program requires the active shader-pack generation",
+                )
+            })?;
+        let program =
+            super::shader_pack::entity_contract::prepare_entity_glint_source_program(source, scope)?;
+        self.entity_glint_source_program_cache =
+            Some(((shader_pack_generation, scope), program.clone()));
+        Ok(program)
+    }
+
+    fn hand_glint_source_program(
+        &mut self,
+        shader_pack_generation: u64,
+        scope: TerrainProgramScope,
+    ) -> GalResult<LoweredHandSourceProgram> {
+        if let Some((key, program)) = self.hand_glint_source_program_cache.as_ref() {
+            if *key == (shader_pack_generation, scope) {
+                return Ok(program.clone());
+            }
+        }
+        let source = self
+            .shader_pack_sources
+            .active()
+            .filter(|source| source.generation() == shader_pack_generation)
+            .ok_or_else(|| {
+                GalError::invalid_argument(
+                    "hand glint source program requires the active shader-pack generation",
+                )
+            })?;
+        let program =
+            super::shader_pack::hand_contract::prepare_hand_glint_source_program(source, scope)?;
+        self.hand_glint_source_program_cache =
+            Some(((shader_pack_generation, scope), program.clone()));
+        Ok(program)
+    }
+
+    fn damaged_block_source_program(
+        &mut self,
+        shader_pack_generation: u64,
+        scope: TerrainProgramScope,
+    ) -> GalResult<LoweredTexturedMaterialSourceProgram> {
+        if let Some((key, program)) = self.damaged_block_source_program_cache.as_ref() {
+            if *key == (shader_pack_generation, scope) {
+                return Ok(program.clone());
+            }
+        }
+        let source = self.shader_pack_sources.active().ok_or_else(|| {
+            GalError::invalid_argument("damagedblock source program requires an active shader pack")
+        })?;
+        if source.generation() != shader_pack_generation {
+            return Err(GalError::invalid_argument(
+                "damagedblock source program generation does not match the active shader pack",
+            ));
+        }
+        let program =
+            super::shader_pack::damaged_block_contract::prepare_damaged_block_source_program(
+                source, scope,
+            )?;
+        self.damaged_block_source_program_cache =
+            Some(((shader_pack_generation, scope), program.clone()));
         Ok(program)
     }
 
@@ -8512,8 +8892,6 @@ impl WorldPrimitiveFrontend {
                         || existing.shader_pack_generation != key.shader_pack_generation
                         || existing.graph_generation != key.graph_generation
                         || existing.extent != key.extent
-                        || existing.depth_texture != key.depth_texture
-                        || existing.depth_view != key.depth_view
                 })
                 .cloned()
                 .collect::<Vec<_>>();
@@ -8667,6 +9045,117 @@ impl WorldPrimitiveFrontend {
     /// color generation already owned by the source frame. Entity output
     /// resolution stays source-contract based; it never inherits terrain
     /// attachments by position or Java/Iris framebuffer state.
+    /// Load-only glint writer targets (`gbuffers_armor_glint` writes only its
+    /// own named outputs). They reuse the depth attachment of the pass whose
+    /// geometry the glint overlays, so the EQUAL depth test matches exactly.
+    fn stage_glint_source_color_pass_targets(
+        &mut self,
+        gal: &mut VulkanicGal,
+        world_generation: u64,
+        shader_pack_generation: u64,
+        graph_generation: u64,
+        extent: Extent3d,
+        color_attachments: Vec<super::shader_pack::source_targets::TerrainSourceColorAttachment>,
+        phase: TerrainSourceColorPassPhase,
+        depth_texture: Handle,
+        depth_view: Handle,
+        depth_format: TextureFormat,
+        clear_values: ShaderPackColorBootstrapClearValues,
+    ) -> GalResult<&TerrainSourceColorPassTargets> {
+        let key = SourceTerrainColorPassTargetKey {
+            world_generation,
+            shader_pack_generation: shader_pack_generation,
+            graph_generation,
+            extent: [extent.width, extent.height, extent.depth],
+            color_attachments: color_attachments
+                .iter()
+                .map(|attachment| SourceTerrainColorAttachmentKey {
+                    output: attachment.output,
+                    source_slot: attachment.source_slot,
+                    texture: attachment.texture,
+                    view: attachment.view,
+                    format: attachment.format,
+                    clear_each_frame: attachment.clear_each_frame,
+                    clear_color_bits: attachment.clear_color_bits,
+                })
+                .collect(),
+            phase,
+            depth_texture,
+            depth_view,
+        };
+        if !self.source_terrain_color_pass_targets.contains_key(&key) {
+            let stale = self
+                .source_terrain_color_pass_targets
+                .keys()
+                .filter(|existing| {
+                    existing.phase == key.phase
+                        || existing.world_generation != key.world_generation
+                        || existing.shader_pack_generation != key.shader_pack_generation
+                        || existing.graph_generation != key.graph_generation
+                        || existing.extent != key.extent
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            for stale_key in stale {
+                if let Some(resources) = self.source_terrain_color_pass_targets.remove(&stale_key) {
+                    self.deferred_mesh_resource_destroys
+                        .push(resources.targets.pass);
+                    self.deferred_mesh_resource_destroys
+                        .push(resources.targets.target);
+                }
+            }
+            let target = gal.create_render_target(RenderTargetDesc {
+                label: format!(
+                    "world-source-{phase:?}.world{world_generation}.pack{}.target",
+                    shader_pack_generation,
+                ),
+                color_views: color_attachments
+                    .iter()
+                    .map(|attachment| attachment.view)
+                    .collect(),
+                depth_stencil_view: Some(depth_view),
+                extent,
+            })?;
+            let pass = match gal.create_render_pass(RenderPassDesc {
+                label: format!(
+                    "world-source-{phase:?}.world{world_generation}.pack{}.pass",
+                    shader_pack_generation,
+                ),
+                target,
+                color_formats: color_attachments
+                    .iter()
+                    .map(|attachment| attachment.format)
+                    .collect(),
+                depth_format: Some(depth_format),
+            }) {
+                Ok(pass) => pass,
+                Err(error) => {
+                    let _ = gal.destroy(target);
+                    return Err(error);
+                }
+            };
+            self.source_terrain_color_pass_targets.insert(
+                key.clone(),
+                SourceTerrainColorPassTargetResources {
+                    targets: TerrainSourceColorPassTargets {
+                        phase,
+                        color_attachments,
+                        clear_values,
+                        depth_texture,
+                        depth_view,
+                        target,
+                        pass,
+                    },
+                },
+            );
+        }
+        Ok(&self
+            .source_terrain_color_pass_targets
+            .get(&key)
+            .expect("entity source target exists after successful staging")
+            .targets)
+    }
+
     fn stage_entity_source_color_pass_targets(
         &mut self,
         gal: &mut VulkanicGal,
@@ -8730,8 +9219,6 @@ impl WorldPrimitiveFrontend {
                         || existing.shader_pack_generation != key.shader_pack_generation
                         || existing.graph_generation != key.graph_generation
                         || existing.extent != key.extent
-                        || existing.depth_texture != key.depth_texture
-                        || existing.depth_view != key.depth_view
                 })
                 .cloned()
                 .collect::<Vec<_>>();
@@ -9044,8 +9531,6 @@ impl WorldPrimitiveFrontend {
                         || existing.shader_pack_generation != key.shader_pack_generation
                         || existing.graph_generation != key.graph_generation
                         || existing.extent != key.extent
-                        || existing.depth_texture != key.depth_texture
-                        || existing.depth_view != key.depth_view
                 })
                 .cloned()
                 .collect::<Vec<_>>();
@@ -9176,8 +9661,6 @@ impl WorldPrimitiveFrontend {
                         || existing.shader_pack_generation != key.shader_pack_generation
                         || existing.graph_generation != key.graph_generation
                         || existing.extent != key.extent
-                        || existing.depth_texture != key.depth_texture
-                        || existing.depth_view != key.depth_view
                 })
                 .cloned()
                 .collect::<Vec<_>>();
@@ -12808,7 +13291,6 @@ impl WorldPrimitiveFrontend {
         mesh_key: u64,
         mesh_generation: u64,
     ) -> GalResult<Arc<SourceTerrainMeshAsset>> {
-        self.ensure_source_mesh_generation("terrain", mesh_key, mesh_generation)?;
         let material_ids = self
             .shader_runtime
             .as_ref()
@@ -12819,8 +13301,11 @@ impl WorldPrimitiveFrontend {
             .as_ref()
             .and_then(|memo| memo.get(&memo_key))
         {
+            // A frame-memo entry was generation-checked when inserted, and
+            // mesh assets do not change while a frame is being planned.
             return Ok(Arc::clone(mesh));
         }
+        self.ensure_source_mesh_generation("terrain", mesh_key, mesh_generation)?;
         // Once a mesh's source geometry is resident on the GPU its converted
         // bytes are never read again (only section metadata is), so the cache
         // keeps a byte-free entry. A slim entry whose geometry has since been
@@ -12937,7 +13422,17 @@ impl WorldPrimitiveFrontend {
         program: &LoweredEntitySourceProgram,
         frame: &WorldPrimitiveFrame,
     ) -> GalResult<Vec<PreparedSourceEntityFrame>> {
-        self.prepare_source_entity_frames_for(program, frame, &frame.mesh_instances, None)
+        self.prepare_source_entity_frames_for(program, frame, &frame.mesh_instances, None, false)
+    }
+
+    /// Glint sections of world entity/item meshes, prepared for the pack's
+    /// `gbuffers_armor_glint` program on the entity stream.
+    fn prepare_source_entity_glint_frames(
+        &mut self,
+        program: &LoweredEntitySourceProgram,
+        frame: &WorldPrimitiveFrame,
+    ) -> GalResult<Vec<PreparedSourceEntityFrame>> {
+        self.prepare_source_entity_frames_for(program, frame, &frame.mesh_instances, None, true)
     }
 
     /// Shared entity-stream frame preparation. Shadow casters pass their own
@@ -12949,6 +13444,7 @@ impl WorldPrimitiveFrontend {
         frame: &WorldPrimitiveFrame,
         instances: &[WorldMeshInstanceRequest],
         render_stage: Option<i32>,
+        glint: bool,
     ) -> GalResult<Vec<PreparedSourceEntityFrame>> {
         program.execution_interface.validate()?;
         // Report source-entity block identity violations before validating or
@@ -12966,8 +13462,12 @@ impl WorldPrimitiveFrontend {
             }
         }
         let mut grouped = BTreeMap::<
-            (u64, u64, u32, u32, u32, u32, u32, u32, i32, u32),
-            (Arc<SourceEntityMeshAsset>, Vec<SourceTerrainInstance>),
+            (u64, u64, u32, u32, u32, u32, u32, u32, i32, u32, Option<(u8, u64, u64, u32)>),
+            (
+                Arc<SourceEntityMeshAsset>,
+                Vec<SourceTerrainInstance>,
+                Option<super::item_foil::StandardItemFoil>,
+            ),
         >::new();
 
         for instance in instances
@@ -12975,6 +13475,10 @@ impl WorldPrimitiveFrontend {
             .filter(|instance| instance.stratum == WORLD_STRATUM_ENTITY_MESH)
         {
             validate_mesh_instance(instance, frame)?;
+            if self.is_crumbling_mesh_instance(instance) {
+                // Drawn by the damaged-block writer, as Iris does.
+                continue;
+            }
             // Vanilla layered overlays (armor, glint) postmultiply
             // ModelViewMat; fold that into the instance transform so the
             // pack's gbufferModelView remains the world view.
@@ -13023,7 +13527,41 @@ impl WorldPrimitiveFrontend {
                         "ordinary source entity draws cannot consume first-person optical stencil sections",
                     ));
                 }
-                let cull_policy = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
+                // Glint sections belong to the separate `gbuffers_armor_glint`
+                // writer; each call prepares exactly one of the two families.
+                if (section.material_mode == WORLD_MATERIAL_MODE_GLINT) != glint {
+                    continue;
+                }
+                let foil = if glint {
+                    Some(instance.item_foil.ok_or_else(|| {
+                        GalError::invalid_argument(
+                            "source glint section has no copied standard foil semantics",
+                        )
+                    })?)
+                } else {
+                    None
+                };
+                // Iris feeds glint `gl_Color = (ColorModulator.rgb,
+                // ColorModulator.a * GlintAlpha)`: white with the strength in
+                // alpha, independent of the base draw's colour.
+                let color_argb = match foil {
+                    Some(foil) => {
+                        ((foil.strength.clamp(0.0, 1.0) * 255.0).round() as u32) << 24 | 0x00FF_FFFF
+                    }
+                    None => instance.color_argb,
+                };
+                let foil_key = foil.map(|foil| {
+                    (
+                        foil.kind as u8,
+                        foil.clock_millis,
+                        foil.speed.to_bits(),
+                        foil.strength.to_bits(),
+                    )
+                });
+                let cull_policy = if glint {
+                    // Vanilla GLINT pipeline: culling disabled.
+                    WORLD_CULL_NONE
+                } else if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
                     section.cull_policy
                 } else {
                     instance.cull_policy
@@ -13039,12 +13577,13 @@ impl WorldPrimitiveFrontend {
                     instance.entity_color_argb,
                     instance.block_entity_id,
                     instance.packed_light,
+                    foil_key,
                 );
                 grouped
                     .entry(key)
-                    .or_insert_with(|| (Arc::clone(&mesh), Vec::new()))
+                    .or_insert_with(|| (Arc::clone(&mesh), Vec::new(), foil))
                     .1
-                    .push((layered_transform, instance.color_argb));
+                    .push((layered_transform, color_argb));
             }
         }
 
@@ -13061,8 +13600,9 @@ impl WorldPrimitiveFrontend {
                 entity_color_argb,
                 block_entity_id,
                 _packed_light,
+                _foil_key,
             ),
-            (mesh, instances),
+            (mesh, instances, foil),
         ) in grouped
         {
             let winding = mesh
@@ -13082,6 +13622,7 @@ impl WorldPrimitiveFrontend {
             // remains separate below.
             let mut uniforms =
                 if render_stage.is_some()
+                    || glint
                     || program
                     .scalar_uniform_requirements
                     .fields()
@@ -13111,9 +13652,8 @@ impl WorldPrimitiveFrontend {
             uniforms.entity_id = Some(semantics.entity_id);
             uniforms.block_entity_id = Some(block_entity_id);
             uniforms.entity_color = Some(semantics.entity_color);
-            let legacy_texture_transforms = program.pack_legacy_texture_transforms(
-                &TerrainSourceTextureTransforms::canonical_minecraft_terrain(),
-            )?;
+            let legacy_texture_transforms = program
+                .pack_legacy_texture_transforms(&source_glint_texture_transforms(foil)?)?;
             let scalar_uniforms = program.pack_scalar_uniforms(&uniforms)?;
             let instance_transforms = pack_source_terrain_instances(&instances)?;
             let expected_instance_bytes = instances
@@ -13193,6 +13733,25 @@ impl WorldPrimitiveFrontend {
         program: &LoweredHandSourceProgram,
         frame: &WorldPrimitiveFrame,
     ) -> GalResult<Vec<PreparedSourceHandFrame>> {
+        self.prepare_source_hand_frames_for(program, frame, false)
+    }
+
+    /// First-person glint sections for the pack's `gbuffers_armor_glint`,
+    /// which Iris's hand pass flushes with `ShaderKey.GLINT`.
+    fn prepare_source_hand_glint_frames(
+        &mut self,
+        program: &LoweredHandSourceProgram,
+        frame: &WorldPrimitiveFrame,
+    ) -> GalResult<Vec<PreparedSourceHandFrame>> {
+        self.prepare_source_hand_frames_for(program, frame, true)
+    }
+
+    fn prepare_source_hand_frames_for(
+        &mut self,
+        program: &LoweredHandSourceProgram,
+        frame: &WorldPrimitiveFrame,
+        glint: bool,
+    ) -> GalResult<Vec<PreparedSourceHandFrame>> {
         program.execution_interface.validate()?;
         if !frame.first_person.enabled {
             if frame.first_person_mesh_instances.is_empty() {
@@ -13241,8 +13800,12 @@ impl WorldPrimitiveFrontend {
         // regrouping all matching assets by key can draw a transparent sleeve
         // before its opaque base arm and hide the latter through depth writes.
         let mut grouped = Vec::<(
-            (FirstPersonHand, u64, u64, u32, u32, u32, u32, u32),
-            (Arc<SourceEntityMeshAsset>, Vec<SourceTerrainInstance>),
+            (FirstPersonHand, u64, u64, u32, u32, u32, u32, u32, Option<(u8, u64, u64, u32)>),
+            (
+                Arc<SourceEntityMeshAsset>,
+                Vec<SourceTerrainInstance>,
+                Option<super::item_foil::StandardItemFoil>,
+            ),
         )>::new();
         let instance_count = frame.first_person_mesh_instances.len();
         for (instance_index, instance) in frame.first_person_mesh_instances.iter().enumerate() {
@@ -13296,7 +13859,35 @@ impl WorldPrimitiveFrontend {
                         mesh.mesh_key, section_index
                     ))
                 })?;
-                let cull_policy = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
+                if (section.material_mode == WORLD_MATERIAL_MODE_GLINT) != glint {
+                    continue;
+                }
+                let foil = if glint {
+                    Some(instance.item_foil.ok_or_else(|| {
+                        GalError::invalid_argument(
+                            "first-person glint section has no copied standard foil semantics",
+                        )
+                    })?)
+                } else {
+                    None
+                };
+                let color_argb = match foil {
+                    Some(foil) => {
+                        ((foil.strength.clamp(0.0, 1.0) * 255.0).round() as u32) << 24 | 0x00FF_FFFF
+                    }
+                    None => instance.color_argb,
+                };
+                let foil_key = foil.map(|foil| {
+                    (
+                        foil.kind as u8,
+                        foil.clock_millis,
+                        foil.speed.to_bits(),
+                        foil.strength.to_bits(),
+                    )
+                });
+                let cull_policy = if glint {
+                    WORLD_CULL_NONE
+                } else if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
                     section.cull_policy
                 } else {
                     instance.cull_policy
@@ -13310,6 +13901,7 @@ impl WorldPrimitiveFrontend {
                     section.material_mode,
                     instance.depth_policy,
                     cull_policy,
+                    foil_key,
                 );
                 // First-person layered overlays use the same ModelViewMat
                 // postmultiply as world entities; keep gbufferModelView intact.
@@ -13323,11 +13915,11 @@ impl WorldPrimitiveFrontend {
                         .expect("checked last group")
                         .1
                         .1
-                        .push((layered_transform, instance.color_argb));
+                        .push((layered_transform, color_argb));
                 } else {
                     grouped.push((
                         key,
-                        (Arc::clone(&mesh), vec![(layered_transform, instance.color_argb)]),
+                        (Arc::clone(&mesh), vec![(layered_transform, color_argb)], foil),
                     ));
                 }
             }
@@ -13335,8 +13927,8 @@ impl WorldPrimitiveFrontend {
 
         let mut prepared = Vec::with_capacity(grouped.len());
         for (
-            (hand, _, _, section_index, texture_id, material_mode, depth_policy, cull_policy),
-            (mesh, instances),
+            (hand, _, _, section_index, texture_id, material_mode, depth_policy, cull_policy, _),
+            (mesh, instances, foil),
         ) in grouped
         {
             let winding = mesh
@@ -13370,7 +13962,7 @@ impl WorldPrimitiveFrontend {
                         )
                     )
                 });
-            let mut uniforms = if requires_owned_hand_uniforms {
+            let mut uniforms = if requires_owned_hand_uniforms || glint {
                 self.source_uniform_frame_for_owned_resources(frame)?
             } else {
                 frame.source_uniform_frame()?
@@ -13406,7 +13998,7 @@ impl WorldPrimitiveFrontend {
                 uniforms.render_stage = Some(self.source_hand_render_stage()?);
             }
             let legacy_texture_transforms = program.pack_legacy_texture_transforms(
-                &TerrainSourceTextureTransforms::canonical_minecraft_terrain(),
+                &source_glint_texture_transforms(foil)?,
                 &frame.first_person.projection_matrix,
             )?;
             let scalar_uniforms = program.pack_scalar_uniforms(&uniforms)?;
@@ -13476,6 +14068,34 @@ impl WorldPrimitiveFrontend {
         )
     }
 
+    fn source_program_prevalidated(&self, frame_id: u64, program: &LoweredTerrainSourceProgram) -> bool {
+        let address = program as *const LoweredTerrainSourceProgram as usize;
+        self.source_terrain_batch_scope.as_ref().is_some_and(|scope| {
+            scope.frame_id == frame_id && scope.validated_programs.contains(&address)
+        })
+    }
+
+    fn open_source_terrain_batch_scope(
+        &mut self,
+        frame_id: u64,
+        programs: &[&LoweredTerrainSourceProgram],
+    ) -> GalResult<()> {
+        self.source_terrain_batch_scope = None;
+        let mut validated_programs = Vec::with_capacity(programs.len());
+        for program in programs {
+            program.execution_interface.validate()?;
+            validated_programs.push(*program as *const LoweredTerrainSourceProgram as usize);
+        }
+        self.source_terrain_batch_scope = Some(SourceTerrainBatchScope {
+            frame_id,
+            scalar_uniform_receipts: std::env::var_os("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE")
+                .is_some(),
+            validated_programs,
+            pack_keys: Vec::new(),
+        });
+        Ok(())
+    }
+
     fn prepare_source_terrain_frame_with_instances(
         &mut self,
         program: &LoweredTerrainSourceProgram,
@@ -13487,7 +14107,9 @@ impl WorldPrimitiveFrontend {
         texture_transforms: &TerrainSourceTextureTransforms,
         uniform_frame: &TerrainSourceUniformFrame,
     ) -> GalResult<PreparedSourceTerrainFrame> {
-        program.execution_interface.validate()?;
+        if !self.source_program_prevalidated(frame_id, program) {
+            program.execution_interface.validate()?;
+        }
         if instances.is_empty() {
             return Err(GalError::invalid_argument(
                 "source terrain frame requires at least one semantic instance transform",
@@ -13565,7 +14187,13 @@ impl WorldPrimitiveFrontend {
                 (legacy, scalar)
             }
         };
-        self.write_selected_source_scalar_uniform_receipt(frame_id, program, &scalar_uniforms);
+        if self
+            .source_terrain_batch_scope
+            .as_ref()
+            .is_none_or(|scope| scope.scalar_uniform_receipts)
+        {
+            self.write_selected_source_scalar_uniform_receipt(frame_id, program, &scalar_uniforms);
+        }
         let instance_transforms = pack_source_terrain_instances(instances)?;
         if instance_transforms.len()
             != instances
@@ -14140,6 +14768,9 @@ impl WorldPrimitiveFrontend {
                 },
                 depth_compare: if shadow_caster.is_some() {
                     depth_compare_for_policy(WORLD_DEPTH_POLICY_TEST_WRITE)?
+                } else if material_mode == WORLD_MATERIAL_MODE_GLINT {
+                    // Vanilla GLINT pipeline: `EQUAL_DEPTH_TEST`, no write.
+                    Some(CompareOp::Equal)
                 } else if material_mode == WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE {
                     None
                 } else {
@@ -14147,6 +14778,7 @@ impl WorldPrimitiveFrontend {
                 },
                 depth_write: shadow_caster.is_some()
                     || (material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT
+                        && material_mode != WORLD_MATERIAL_MODE_GLINT
                         && material_mode != WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
                         && depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE),
                 depth_bias: None,
@@ -14211,6 +14843,7 @@ impl WorldPrimitiveFrontend {
                 WORLD_MATERIAL_MODE_GLINT,
             ],
             "textured material",
+            None,
         )
     }
 
@@ -14235,6 +14868,7 @@ impl WorldPrimitiveFrontend {
             BlendMode::Alpha,
             &[WORLD_MATERIAL_MODE_TRANSLUCENT],
             "weather",
+            None,
         )
     }
 
@@ -14263,6 +14897,7 @@ impl WorldPrimitiveFrontend {
             blend,
             &[WORLD_MATERIAL_MODE_TRANSLUCENT],
             "clouds",
+            None,
         )
     }
 
@@ -14278,6 +14913,7 @@ impl WorldPrimitiveFrontend {
         blend: BlendMode,
         allowed_modes: &[u32],
         writer: &str,
+        depth_bias: Option<DepthBias>,
     ) -> GalResult<LoweredTexturedMaterialSourcePipelineKey> {
         if !allowed_modes.contains(&material_mode) {
             return Err(GalError::unsupported_feature(format!(
@@ -14339,7 +14975,7 @@ impl WorldPrimitiveFrontend {
                 blend,
                 depth_compare: depth_compare_for_policy(depth_policy)?,
                 depth_write: depth_policy == WORLD_DEPTH_POLICY_TEST_WRITE,
-                depth_bias: None,
+                depth_bias,
                 color_formats,
                 depth_format: Some(TextureFormat::Depth32Float),
                 stencil: None,
@@ -14593,6 +15229,26 @@ impl WorldPrimitiveFrontend {
                     BlendMode::Alpha,
                     &[WORLD_MATERIAL_MODE_TRANSLUCENT],
                     "lines",
+                    None,
+                )?,
+            SourceMaterialWriterKind::DamagedBlock => self
+                .ensure_lowered_source_material_pipeline_resources(
+                    gal,
+                    program,
+                    material_mode,
+                    depth_policy,
+                    cull_policy,
+                    winding,
+                    color_formats,
+                    // Vanilla `RenderPipelines.CRUMBLING`: DST_COLOR/SRC_COLOR
+                    // colour, ONE/ZERO alpha; Iris keeps it (no pack blend).
+                    BlendMode::Crumbling,
+                    &[WORLD_MATERIAL_MODE_TRANSLUCENT],
+                    "damagedblock",
+                    Some(DepthBias {
+                        constant_factor: -1.0,
+                        slope_factor: -10.0,
+                    }),
                 )?,
             SourceMaterialWriterKind::Clouds => self
                 .ensure_lowered_cloud_source_pipeline_resources(
@@ -14610,12 +15266,6 @@ impl WorldPrimitiveFrontend {
                     })?,
                 )?,
         };
-        let upload_ops = self.source_terrain_frame_upload_ops_for_parts(
-            stream,
-            prepared.legacy_texture_transforms.clone(),
-            prepared.scalar_uniforms.clone(),
-            prepared.vertex_stream.clone(),
-        );
         let transaction = self
             .pending_source_terrain_frame_transactions
             .entry(prepared.frame_id)
@@ -14626,6 +15276,8 @@ impl WorldPrimitiveFrontend {
                 operations: Vec::new(),
                 source_material_texture_ids: BTreeSet::new(),
                 geometry_uploads: Vec::new(),
+                stream_staging: Vec::new(),
+                shared_uniforms: Vec::new(),
             });
         if transaction.stream_buffer != stream.buffer || transaction.stream_epoch != stream.epoch {
             return Err(GalError::backend(
@@ -14642,7 +15294,12 @@ impl WorldPrimitiveFrontend {
                 .insert(pending.texture_id);
             transaction.operations.extend(pending.operations);
         }
-        transaction.operations.extend(upload_ops);
+        transaction.stage_stream_parts(
+            stream,
+            &prepared.legacy_texture_transforms,
+            &prepared.scalar_uniforms,
+            &prepared.vertex_stream,
+        );
         let resource_set = self
             .lowered_textured_material_source_frame_data_resources
             .get(&frame_key)
@@ -14700,7 +15357,7 @@ impl WorldPrimitiveFrontend {
         texture_transforms: &TerrainSourceTextureTransforms,
         uniform_frame: &TerrainSourceUniformFrame,
     ) -> GalResult<PreparedSourceTerrainFrame> {
-        let (index_type, sections) = {
+        {
             let asset = self.mesh_assets.get(&mesh_key).ok_or_else(|| {
                 GalError::invalid_argument(format!(
                     "source terrain range references unknown mesh key {}",
@@ -14713,9 +15370,16 @@ impl WorldPrimitiveFrontend {
                     mesh_key, mesh_generation, asset.mesh_generation
                 )));
             }
-            (asset.index_type, asset.sections.clone())
-        };
+        }
         let source_mesh = self.source_terrain_mesh_asset(mesh_key, mesh_generation)?;
+        // Borrow (not clone) the ordinary sections; the borrow ends before
+        // the mutable preparation call below.
+        let asset = self
+            .mesh_assets
+            .get(&mesh_key)
+            .expect("mesh asset checked above");
+        let index_type = asset.index_type;
+        let sections = asset.sections.as_slice();
         let (section_indices, index_subrange) = match source_section_indices_for_mesh_range(
             &sections,
             index_type,
@@ -14915,26 +15579,49 @@ impl WorldPrimitiveFrontend {
             "{writer_label}-geometry-{:?}-mesh{}-gen{}",
             key.abi, key.mesh_key, key.mesh_generation
         );
+        // Shader programs read every source vertex each frame, so on Vulkan
+        // the streams live in device-local memory behind a one-shot staging
+        // copy, like ordinary terrain arenas; host-visible memory would put
+        // the whole resident world on the PCIe bus every frame.
+        let device_local = gal.capabilities().api == BackendApi::Vulkan;
         let mut created = Vec::new();
         let result = (|| -> GalResult<LoweredSourceTerrainGeometryResources> {
+            let (memory, upload_usage) = if device_local {
+                (MemoryDomain::DeviceLocal, BufferUsage::TransferDst)
+            } else {
+                (MemoryDomain::Upload, BufferUsage::HostWrite)
+            };
             let vertex_buffer = gal.create_buffer(BufferDesc {
                 label: format!("{label}.vertices"),
                 size: vertex_bytes.len() as u64,
-                memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::Storage, BufferUsage::HostWrite],
+                memory,
+                usages: vec![BufferUsage::Storage, upload_usage],
             })?;
             created.push(vertex_buffer);
             let index_buffer = gal.create_buffer(BufferDesc {
                 label: format!("{label}.indices"),
                 size: index_bytes.len() as u64,
-                memory: MemoryDomain::Upload,
-                usages: vec![BufferUsage::Index, BufferUsage::HostWrite],
+                memory,
+                usages: vec![BufferUsage::Index, upload_usage],
             })?;
             created.push(index_buffer);
+            let staging_buffer = if device_local {
+                let staging = gal.create_buffer(BufferDesc {
+                    label: format!("{label}.staging"),
+                    size: byte_size,
+                    memory: MemoryDomain::Upload,
+                    usages: vec![BufferUsage::TransferSrc, BufferUsage::HostWrite],
+                })?;
+                created.push(staging);
+                Some(staging)
+            } else {
+                None
+            };
             Ok(LoweredSourceTerrainGeometryResources {
                 vertex_buffer,
                 index_buffer,
                 byte_size,
+                staging_buffer,
             })
         })();
         if result.is_err() {
@@ -14943,34 +15630,93 @@ impl WorldPrimitiveFrontend {
             }
         }
         let resources = result?;
-        self.pending_lowered_source_terrain_geometry_uploads.insert(
-            key.clone(),
-            vec![
+        let upload_ops = match resources.staging_buffer {
+            Some(staging) => vec![
                 CommandOp::HostWriteBuffer {
-                    buffer: resources.vertex_buffer,
+                    buffer: staging,
                     offset: 0,
-                    data: vertex_bytes.to_vec(),
+                    data: [vertex_bytes, index_bytes].concat(),
+                },
+                CommandOp::Barrier(buffer_barrier(
+                    staging,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::TransferSrc,
+                )),
+                CommandOp::Barrier(buffer_barrier(
+                    resources.vertex_buffer,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::TransferDst,
+                )),
+                CommandOp::Barrier(buffer_barrier(
+                    resources.index_buffer,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::TransferDst,
+                )),
+                CommandOp::CopyBufferRegion {
+                    src: staging,
+                    src_offset: 0,
+                    dst: resources.vertex_buffer,
+                    dst_offset: 0,
+                    size: vertex_size,
+                },
+                CommandOp::CopyBufferRegion {
+                    src: staging,
+                    src_offset: vertex_size,
+                    dst: resources.index_buffer,
+                    dst_offset: 0,
+                    size: index_size,
                 },
                 CommandOp::Barrier(buffer_barrier(
                     resources.vertex_buffer,
                     TextureUsageState::TransferDst,
                     TextureUsageState::ShaderRead,
                 )),
-                CommandOp::HostWriteBuffer {
-                    buffer: resources.index_buffer,
-                    offset: 0,
-                    data: index_bytes.to_vec(),
-                },
                 CommandOp::Barrier(buffer_barrier(
                     resources.index_buffer,
                     TextureUsageState::TransferDst,
                     TextureUsageState::IndexRead,
                 )),
             ],
-        );
+            None => Self::host_visible_source_geometry_upload_ops(
+                &resources,
+                vertex_bytes,
+                index_bytes,
+            ),
+        };
+        self.pending_lowered_source_terrain_geometry_uploads
+            .insert(key.clone(), upload_ops);
         self.lowered_source_terrain_geometry_resources
             .insert(key.clone(), resources);
         Ok(key)
+    }
+
+    fn host_visible_source_geometry_upload_ops(
+        resources: &LoweredSourceTerrainGeometryResources,
+        vertex_bytes: &[u8],
+        index_bytes: &[u8],
+    ) -> Vec<CommandOp> {
+        vec![
+            CommandOp::HostWriteBuffer {
+                buffer: resources.vertex_buffer,
+                offset: 0,
+                data: vertex_bytes.to_vec(),
+            },
+            CommandOp::Barrier(buffer_barrier(
+                resources.vertex_buffer,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderRead,
+            )),
+            CommandOp::HostWriteBuffer {
+                buffer: resources.index_buffer,
+                offset: 0,
+                data: index_bytes.to_vec(),
+            },
+            CommandOp::Barrier(buffer_barrier(
+                resources.index_buffer,
+                TextureUsageState::TransferDst,
+                TextureUsageState::IndexRead,
+            )),
+        ]
     }
 
     /// Materializes the mutable set-zero resources declared by a fully lowered
@@ -14989,7 +15735,9 @@ impl WorldPrimitiveFrontend {
         SourceTerrainFrameStreamAllocation,
     )> {
         let interface = &program.execution_interface;
-        interface.validate()?;
+        if !self.source_program_prevalidated(prepared.frame_id, program) {
+            interface.validate()?;
+        }
         // Validated once when converted (source_terrain_mesh_asset).
         let geometry_key =
             self.ensure_lowered_source_terrain_geometry_resources(gal, program, prepared)?;
@@ -15012,12 +15760,22 @@ impl WorldPrimitiveFrontend {
                 "source terrain program has no scalar uniform binding but packed scalar data was supplied",
             ));
         }
-        let stream = self.allocate_source_terrain_frame_stream(
+        let shared_uniforms = self
+            .pending_source_terrain_frame_transactions
+            .get(&prepared.frame_id)
+            .and_then(|transaction| {
+                transaction.shared_uniform_offsets(
+                    &prepared.legacy_texture_transforms,
+                    &prepared.scalar_uniforms,
+                )
+            });
+        let stream = self.allocate_source_terrain_frame_stream_sharing_uniforms(
             gal,
             prepared.frame_id,
             u64::from(interface.legacy_transform_bytes),
             u64::from(interface.scalar_uniform_bytes),
             required_instance_bytes,
+            shared_uniforms,
         )?;
         let key = LoweredSourceTerrainFrameDataKey {
             geometry: geometry_key.clone(),
@@ -15106,7 +15864,6 @@ impl WorldPrimitiveFrontend {
             self.lowered_source_terrain_frame_data_resources
                 .insert(key.clone(), result?);
         }
-        let upload_ops = self.source_terrain_frame_upload_ops(stream, prepared);
         let geometry_upload_ops = self
             .pending_lowered_source_terrain_geometry_uploads
             .remove(&geometry_key)
@@ -15121,6 +15878,8 @@ impl WorldPrimitiveFrontend {
                 operations: Vec::new(),
                 source_material_texture_ids: BTreeSet::new(),
                 geometry_uploads: Vec::new(),
+                stream_staging: Vec::new(),
+                shared_uniforms: Vec::new(),
             });
         if transaction.stream_buffer != stream.buffer || transaction.stream_epoch != stream.epoch {
             if !geometry_upload_ops.is_empty() {
@@ -15136,7 +15895,24 @@ impl WorldPrimitiveFrontend {
                 .geometry_uploads
                 .push((geometry_key.clone(), geometry_upload_ops));
         }
-        transaction.operations.extend(upload_ops);
+        if shared_uniforms.is_some() {
+            transaction.stage_stream_write(stream.instance_offset, &prepared.instance_transforms);
+        } else {
+            transaction.stage_stream_parts(
+                stream,
+                &prepared.legacy_texture_transforms,
+                &prepared.scalar_uniforms,
+                &prepared.instance_transforms,
+            );
+            if transaction.shared_uniforms.len() < 64 {
+                transaction.shared_uniforms.push((
+                    prepared.legacy_texture_transforms.clone(),
+                    prepared.scalar_uniforms.clone(),
+                    stream.legacy_transform_offset,
+                    stream.scalar_uniform_offset,
+                ));
+            }
+        }
         Ok((geometry_key, key, stream))
     }
 
@@ -15276,12 +16052,6 @@ impl WorldPrimitiveFrontend {
             self.lowered_source_terrain_frame_data_resources
                 .insert(key.clone(), result?);
         }
-        let upload_ops = self.source_terrain_frame_upload_ops_for_parts(
-            stream,
-            legacy_texture_transforms.to_vec(),
-            scalar_uniforms.to_vec(),
-            instance_transforms.to_vec(),
-        );
         let geometry_upload_ops = self
             .pending_lowered_source_terrain_geometry_uploads
             .remove(&geometry_key)
@@ -15296,6 +16066,8 @@ impl WorldPrimitiveFrontend {
                 operations: Vec::new(),
                 source_material_texture_ids: BTreeSet::new(),
                 geometry_uploads: Vec::new(),
+                stream_staging: Vec::new(),
+                shared_uniforms: Vec::new(),
             });
         if transaction.stream_buffer != stream.buffer || transaction.stream_epoch != stream.epoch {
             if !geometry_upload_ops.is_empty() {
@@ -15324,7 +16096,12 @@ impl WorldPrimitiveFrontend {
                 .geometry_uploads
                 .push((geometry_key.clone(), geometry_upload_ops));
         }
-        transaction.operations.extend(upload_ops);
+        transaction.stage_stream_parts(
+            stream,
+            legacy_texture_transforms,
+            scalar_uniforms,
+            instance_transforms,
+        );
         Ok((geometry_key, key, stream))
     }
 
@@ -15886,6 +16663,15 @@ impl WorldPrimitiveFrontend {
             self.source_material_texture_upload_operations
                 .remove(texture_id);
         }
+        for (key, _) in &transaction.geometry_uploads {
+            if let Some(staging) = self
+                .lowered_source_terrain_geometry_resources
+                .get_mut(key)
+                .and_then(|resources| resources.staging_buffer.take())
+            {
+                self.retired_source_geometry_staging.push(staging);
+            }
+        }
         Ok(())
     }
 
@@ -15929,6 +16715,32 @@ impl WorldPrimitiveFrontend {
         program: &LoweredTerrainSourceProgram,
         resources: &TerrainSourceOwnedResourceSet,
     ) -> GalResult<LoweredSourceTerrainPackKey> {
+        let addresses = (
+            program as *const LoweredTerrainSourceProgram as usize,
+            resources as *const TerrainSourceOwnedResourceSet as usize,
+        );
+        if let Some(scope) = self.source_terrain_batch_scope.as_ref() {
+            if let Some((_, _, key)) = scope
+                .pack_keys
+                .iter()
+                .find(|(program, resources, _)| (*program, *resources) == addresses)
+            {
+                return Ok(key.clone());
+            }
+        }
+        let key = self.ensure_lowered_source_terrain_pack_resources_uncached(gal, program, resources)?;
+        if let Some(scope) = self.source_terrain_batch_scope.as_mut() {
+            scope.pack_keys.push((addresses.0, addresses.1, key.clone()));
+        }
+        Ok(key)
+    }
+
+    fn ensure_lowered_source_terrain_pack_resources_uncached(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &LoweredTerrainSourceProgram,
+        resources: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<LoweredSourceTerrainPackKey> {
         program.require_semantic_resources(resources.availability())?;
         let key = LoweredSourceTerrainPackKey {
             shader_program_identity: program.identity.clone(),
@@ -15953,6 +16765,11 @@ impl WorldPrimitiveFrontend {
             })
             .cloned()
             .collect::<Vec<_>>();
+        if !stale_keys.is_empty() {
+            if let Some(scope) = self.source_terrain_batch_scope.as_mut() {
+                scope.pack_keys.clear();
+            }
+        }
         self.destroy_lowered_source_terrain_pack_resources_for_keys(gal, stale_keys);
         if !lowered_source_pack_residency_allows(self.lowered_source_terrain_pack_resources.len()) {
             return Err(GalError::unsupported_feature(format!(
@@ -16878,7 +17695,11 @@ impl WorldPrimitiveFrontend {
             ));
         }
 
+        for staging in std::mem::take(&mut self.retired_source_geometry_staging) {
+            let _ = gal.destroy(staging);
+        }
         let result = (|| -> GalResult<PreparedNamedSourceTerrainFramePlan> {
+            let mut __plan_seg = std::time::Instant::now();
             let terrain_phase = if source_sky_initializer {
                 TerrainSourceColorPassPhase::BootstrapAfterSky
             } else {
@@ -17037,6 +17858,7 @@ impl WorldPrimitiveFrontend {
                             frame,
                             &entity_shadow_casters,
                             Some(render_stage),
+                            false,
                         )?
                         .into_iter()
                         .filter(|prepared| prepared.material_mode != WORLD_MATERIAL_MODE_GLINT)
@@ -17319,10 +18141,53 @@ impl WorldPrimitiveFrontend {
                     (Some(program), Some(targets), Some(resources), Some(formats))
                 };
 
-            let has_entity_meshes = frame
-                .mesh_instances
-                .iter()
-                .any(|instance| instance.stratum == WORLD_STRATUM_ENTITY_MESH);
+            let damaged_block_batches = self.source_damaged_block_batches(frame)?;
+            let (damaged_program, damaged_targets, damaged_resources, damaged_formats) =
+                if damaged_block_batches.is_empty() {
+                    (None, None, None, None)
+                } else {
+                    let scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?
+                        .ok_or_else(|| {
+                            GalError::unsupported_feature(
+                                "selected source block-breaking progress has no source program scope",
+                            )
+                        })?;
+                    let program = self.damaged_block_source_program(shader_pack_generation, scope)?;
+                    let targets = self
+                        .stage_source_material_color_pass_targets(
+                            gal,
+                            world_generation,
+                            graph_generation,
+                            extent,
+                            &program,
+                            &color_targets,
+                            depth_texture,
+                            depth_view,
+                            clear_values,
+                            TerrainSourceColorPassPhase::DamagedBlock,
+                            "damagedblock",
+                        )?
+                        .clone();
+                    let resources = self
+                        .stage_candidate_source_resources_for_textured_material_program(
+                            gal,
+                            world_generation,
+                            frame.frame_id,
+                            &program,
+                            &color_targets,
+                        )?;
+                    let formats = targets
+                        .color_attachments
+                        .iter()
+                        .map(|attachment| attachment.format)
+                        .collect::<Vec<_>>();
+                    (Some(program), Some(targets), Some(resources), Some(formats))
+                };
+
+            let has_entity_meshes = frame.mesh_instances.iter().any(|instance| {
+                instance.stratum == WORLD_STRATUM_ENTITY_MESH
+                    && !self.is_crumbling_mesh_instance(instance)
+            });
             let (entity_program, entity_targets, entity_resources, entity_formats, entity_frames) =
                 if has_entity_meshes {
                     let program = self
@@ -17528,6 +18393,7 @@ impl WorldPrimitiveFrontend {
                     GalError::invalid_argument("shadow-only source stream reservation overflows")
                 })
             })?;
+            whole_frame_phase_trace("source-plan.setup", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let textured_material_stream_bytes = match textured_material_program.as_ref() {
                 Some(program) => source_material_batch_stream_bytes(
                     program,
@@ -17548,6 +18414,61 @@ impl WorldPrimitiveFrontend {
                 }
                 None => 0,
             };
+            // Glint payloads share the frame stream; prepare them before the
+            // reservation below so it covers them.
+            let glint_scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?;
+            let entity_glint_prepared = if frame.mesh_instances.iter().any(|instance| {
+                instance.stratum == WORLD_STRATUM_ENTITY_MESH && instance.item_foil.is_some()
+            }) {
+                let scope = glint_scope.ok_or_else(|| {
+                    GalError::unsupported_feature("selected source glint has no source program scope")
+                })?;
+                let program = self.entity_glint_source_program(shader_pack_generation, scope)?;
+                let frames = self.prepare_source_entity_glint_frames(&program, frame)?;
+                (!frames.is_empty()).then_some((program, frames))
+            } else {
+                None
+            };
+            let hand_glint_prepared = if hand_program.is_some()
+                && frame
+                    .first_person_mesh_instances
+                    .iter()
+                    .any(|instance| instance.item_foil.is_some())
+            {
+                let scope = glint_scope.ok_or_else(|| {
+                    GalError::unsupported_feature(
+                        "selected source hand glint has no source program scope",
+                    )
+                })?;
+                let program = self.hand_glint_source_program(shader_pack_generation, scope)?;
+                let frames = self.prepare_source_hand_glint_frames(&program, frame)?;
+                (!frames.is_empty()).then_some((program, frames))
+            } else {
+                None
+            };
+            let mut glint_stream_bytes = 0_u64;
+            if let Some((program, frames)) = entity_glint_prepared.as_ref() {
+                for prepared in frames {
+                    let instances = u64::try_from(
+                        prepared.instance_transforms.len() / TERRAIN_SOURCE_INSTANCE_BYTES,
+                    )
+                    .map_err(|_| GalError::invalid_argument("glint instance count exceeds u64"))?;
+                    glint_stream_bytes = glint_stream_bytes
+                        .checked_add(Self::source_entity_frame_stream_payload_bytes(program, instances)?)
+                        .ok_or_else(|| GalError::invalid_argument("glint stream reservation overflows"))?;
+                }
+            }
+            if let Some((program, frames)) = hand_glint_prepared.as_ref() {
+                for prepared in frames {
+                    let instances = u64::try_from(
+                        prepared.instance_transforms.len() / TERRAIN_SOURCE_INSTANCE_BYTES,
+                    )
+                    .map_err(|_| GalError::invalid_argument("glint instance count exceeds u64"))?;
+                    glint_stream_bytes = glint_stream_bytes
+                        .checked_add(Self::source_hand_frame_stream_payload_bytes(program, instances)?)
+                        .ok_or_else(|| GalError::invalid_argument("glint stream reservation overflows"))?;
+                }
+            }
             let entity_stream_bytes = match entity_program.as_ref() {
                 Some(program) => entity_frames.iter().try_fold(0_u64, |total, prepared| {
                     let instance_count = u64::try_from(
@@ -17563,6 +18484,33 @@ impl WorldPrimitiveFrontend {
                             "entity source frame stream reservation overflows",
                         )
                     })
+                })?,
+                None => 0,
+            };
+            let damaged_block_stream_bytes = match damaged_program.as_ref() {
+                Some(program) => damaged_block_batches.iter().try_fold(0_u64, |total, batch| {
+                    u64::try_from(batch.primitives.len())
+                        .ok()
+                        .and_then(|count| count.checked_mul(4))
+                        .and_then(|count| {
+                            count.checked_mul(u64::from(program.execution_interface.vertex_stride))
+                        })
+                        .and_then(|vertices| {
+                            total
+                                .checked_add(u64::from(
+                                    program.execution_interface.legacy_transform_bytes,
+                                ))?
+                                .checked_add(u64::from(
+                                    program.execution_interface.scalar_uniform_bytes,
+                                ))?
+                                .checked_add(vertices)?
+                                .checked_add(3 * WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64)
+                        })
+                        .ok_or_else(|| {
+                            GalError::invalid_argument(
+                                "damagedblock source frame stream reservation overflows",
+                            )
+                        })
                 })?,
                 None => 0,
             };
@@ -17641,6 +18589,8 @@ impl WorldPrimitiveFrontend {
                 .and_then(|bytes| bytes.checked_add(entity_stream_bytes))
                 .and_then(|bytes| bytes.checked_add(hand_stream_bytes))
                 .and_then(|bytes| bytes.checked_add(line_stream_bytes))
+                .and_then(|bytes| bytes.checked_add(damaged_block_stream_bytes))
+                .and_then(|bytes| bytes.checked_add(glint_stream_bytes))
                 .ok_or_else(|| {
                     GalError::invalid_argument("combined source frame stream reservation overflows")
                 })?;
@@ -17649,7 +18599,20 @@ impl WorldPrimitiveFrontend {
                 frame.frame_id,
                 required_stream_bytes,
             )?;
+            whole_frame_phase_trace("source-plan.streams", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let mut draws = Vec::new();
+            // Batches of one pass share their uniform frame; only the render
+            // stage differs by pass, so build each variant once per frame.
+            let mut shadow_uniform_frame = base_uniform_frame.clone();
+            shadow_uniform_frame.render_stage = Some(self.source_shadow_render_stage()?);
+            let mut camera_uniform_frames: Vec<(u32, TerrainSourceUniformFrame)> = Vec::new();
+            let mut scope_programs = vec![&programs.opaque, &programs.cutout, &programs.shadow];
+            scope_programs.extend(translucent_program.as_ref());
+            self.open_source_terrain_batch_scope(frame.frame_id, &scope_programs)?;
+            let source_draw_trace = matches!(
+                std::env::var("MATTMC_RUST_SOURCE_DRAW_TRACE").as_deref(),
+                Ok("1") | Ok("true") | Ok("TRUE")
+            );
             let mut transform_probes = Vec::new();
             for batch in terrain_batches {
                 if !batch.key.g_buffer {
@@ -17688,10 +18651,7 @@ impl WorldPrimitiveFrontend {
                         )));
                 }
             };
-                if matches!(
-                    std::env::var("MATTMC_RUST_SOURCE_DRAW_TRACE").as_deref(),
-                    Ok("1") | Ok("true") | Ok("TRUE")
-                ) {
+                if source_draw_trace {
                     eprintln!(
                         "[MattMC source-draw-trace] frame={} stratum={} material_mode={} program={} instances={} indices={} color_formats={:?}",
                         frame.frame_id,
@@ -17716,9 +18676,20 @@ impl WorldPrimitiveFrontend {
                         )
                     })
                     .collect::<GalResult<Vec<_>>>()?;
-                let mut uniform_frame = base_uniform_frame.clone();
-                uniform_frame.render_stage =
-                    Some(self.source_render_stage_for_material_mode(batch.key.material_mode)?);
+                let uniform_frame = match camera_uniform_frames
+                    .iter()
+                    .find(|(mode, _)| *mode == batch.key.material_mode)
+                {
+                    Some((_, uniform_frame)) => uniform_frame,
+                    None => {
+                        let mut uniform_frame = base_uniform_frame.clone();
+                        uniform_frame.render_stage = Some(
+                            self.source_render_stage_for_material_mode(batch.key.material_mode)?,
+                        );
+                        camera_uniform_frames.push((batch.key.material_mode, uniform_frame));
+                        &camera_uniform_frames.last().expect("just pushed").1
+                    }
+                };
                 let prepared = self.prepare_source_terrain_frame_for_mesh_range(
                     program,
                     frame.frame_id,
@@ -17728,7 +18699,7 @@ impl WorldPrimitiveFrontend {
                     batch.index_count,
                     &instances,
                     &texture_transforms,
-                    &uniform_frame,
+                    uniform_frame,
                 )?;
                 collect_selected_source_terrain_transform_probes(
                     &mut transform_probes,
@@ -17755,8 +18726,6 @@ impl WorldPrimitiveFrontend {
                     terrain_draw.stratum = batch.key.stratum;
                 }
                 if shadow_required {
-                    let mut shadow_uniform_frame = base_uniform_frame.clone();
-                    shadow_uniform_frame.render_stage = Some(self.source_shadow_render_stage()?);
                 let shadow_prepared = self.prepare_source_terrain_frame_for_mesh_range(
                         &programs.shadow,
                         frame.frame_id,
@@ -17796,6 +18765,7 @@ impl WorldPrimitiveFrontend {
                 }
                 draws.extend(terrain_draws);
             }
+            whole_frame_phase_trace("source-plan.terrain-camera", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let mut shadow_only_draws = Vec::new();
             for batch in selected_shadow_batches {
                 if batch.key.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT
@@ -17816,8 +18786,6 @@ impl WorldPrimitiveFrontend {
                         })
                     })
                     .collect::<GalResult<Vec<_>>>()?;
-                let mut shadow_uniform_frame = base_uniform_frame.clone();
-                shadow_uniform_frame.render_stage = Some(self.source_shadow_render_stage()?);
                 let prepared = self.prepare_source_terrain_frame_for_mesh_range(
                     &programs.shadow,
                     frame.frame_id,
@@ -17841,7 +18809,9 @@ impl WorldPrimitiveFrontend {
                     batch.key.winding,
                 )?);
             }
+            self.source_terrain_batch_scope = None;
             self.write_selected_source_terrain_transform_receipt(frame, &transform_probes);
+            whole_frame_phase_trace("source-plan.terrain-shadow-only", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let textured_material = match (
                 textured_material_program.as_ref(),
                 textured_material_targets,
@@ -18086,6 +19056,63 @@ impl WorldPrimitiveFrontend {
                     ));
                 }
             };
+            let damaged_block = match (
+                damaged_program.as_ref(),
+                damaged_targets,
+                damaged_resources.as_ref(),
+                damaged_formats.as_ref(),
+            ) {
+                (None, None, None, None) => None,
+                (Some(program), Some(targets), Some(resources), Some(formats)) => {
+                    let texture_transforms =
+                        self.source_texture_transforms_for_owned_resources()?;
+                    let legacy_texture_transforms =
+                        program.pack_legacy_texture_transforms(&texture_transforms)?;
+                    let scalar_uniforms = program.pack_scalar_uniforms(&base_uniform_frame)?;
+                    let mut draws = Vec::with_capacity(damaged_block_batches.len());
+                    for batch in damaged_block_batches {
+                        let (batch_resources, local_texture, _) = self
+                            .source_resources_with_local_material_texture(
+                                gal,
+                                program.shader_pack_generation,
+                                resources,
+                                batch.texture_id,
+                                frame.frame_id,
+                            )?;
+                        let vertex_stream = pack_textured_material_source_primitives(&batch.primitives)?;
+                        let prepared = PreparedTexturedMaterialSourceFrame {
+                            frame_id: frame.frame_id,
+                            primitives: batch.primitives,
+                            vertex_stream,
+                            legacy_texture_transforms: legacy_texture_transforms.clone(),
+                            scalar_uniforms: scalar_uniforms.clone(),
+                        };
+                        draws.push(self.prepare_lowered_source_material_draw(
+                            gal,
+                            program,
+                            &prepared,
+                            &batch_resources,
+                            Some(local_texture),
+                            WORLD_MATERIAL_MODE_TRANSLUCENT,
+                            // Vanilla crumbling: depth test, no depth write.
+                            WORLD_DEPTH_POLICY_TEST_NO_WRITE,
+                            batch.cull_policy,
+                            WORLD_WINDING_CCW,
+                            formats.clone(),
+                            SourceMaterialWriterKind::DamagedBlock,
+                            None,
+                        )?);
+                    }
+                    self.absorb_pending_source_material_texture_uploads(frame.frame_id)?;
+                    Some(PreparedNamedSourceDamagedBlockFramePlan { targets, draws })
+                }
+                _ => {
+                    return Err(GalError::backend(
+                        "damagedblock source preparation retained an incomplete program/target/resource tuple",
+                    ));
+                }
+            };
+            whole_frame_phase_trace("source-plan.materials-weather-clouds-lines", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let entities = match (
                 entity_program.as_ref(),
                 entity_targets,
@@ -18183,11 +19210,125 @@ impl WorldPrimitiveFrontend {
                     ));
                 }
             };
+            let entity_glint = if let Some((program, frames)) = entity_glint_prepared {
+                {
+                    let color_attachments = self
+                        .shader_runtime
+                        .as_ref()
+                        .ok_or_else(|| GalError::backend("shader runtime vanished before glint staging"))?
+                        .resolve_entity_source_color_outputs(&program, &color_targets)?;
+                    let targets = self
+                        .stage_glint_source_color_pass_targets(
+                            gal,
+                            world_generation,
+                            program.shader_pack_generation,
+                            graph_generation,
+                            extent,
+                            color_attachments,
+                            TerrainSourceColorPassPhase::EntityGlint,
+                            depth_texture,
+                            depth_view,
+                            TextureFormat::Depth32Float,
+                            clear_values,
+                        )?
+                        .clone();
+                    let resources = self.stage_candidate_source_resources_for_entity_program(
+                        gal,
+                        world_generation,
+                        frame.frame_id,
+                        &program,
+                        &color_targets,
+                    )?;
+                    let formats = targets
+                        .color_attachments
+                        .iter()
+                        .map(|attachment| attachment.format)
+                        .collect::<Vec<_>>();
+                    let mut draws = Vec::with_capacity(frames.len());
+                    for prepared in &frames {
+                        draws.push(self.prepare_lowered_source_entity_draw(
+                            gal,
+                            &program,
+                            prepared,
+                            &resources,
+                            formats.clone(),
+                        )?);
+                    }
+                    Some(PreparedNamedSourceGlintFramePlan { targets, draws })
+                }
+            } else {
+                None
+            };
+            let hand_glint_depth = hands.as_ref().map(|hands| {
+                (
+                    hands.targets.depth_texture,
+                    hands.targets.depth_view,
+                    if hands.copies_world_depth {
+                        TextureFormat::Depth32Float
+                    } else {
+                        TextureFormat::Depth24Stencil8
+                    },
+                )
+            });
+            let hand_glint = match (hand_glint_depth, hand_glint_prepared) {
+                (Some((hand_depth_texture, hand_depth_view, hand_depth_format)), Some((program, frames))) => {
+                    {
+                        let color_attachments = self
+                            .shader_runtime
+                            .as_ref()
+                            .ok_or_else(|| {
+                                GalError::backend("shader runtime vanished before hand glint staging")
+                            })?
+                            .resolve_hand_source_color_outputs(&program, &color_targets)?;
+                        let targets = self
+                            .stage_glint_source_color_pass_targets(
+                                gal,
+                                world_generation,
+                                program.shader_pack_generation,
+                                graph_generation,
+                                extent,
+                                color_attachments,
+                                TerrainSourceColorPassPhase::HandGlint,
+                                hand_depth_texture,
+                                hand_depth_view,
+                                hand_depth_format,
+                                clear_values,
+                            )?
+                            .clone();
+                        let resources = self.stage_candidate_source_resources_for_hand_program(
+                            gal,
+                            world_generation,
+                            frame.frame_id,
+                            &program,
+                            &color_targets,
+                        )?;
+                        let formats = targets
+                            .color_attachments
+                            .iter()
+                            .map(|attachment| attachment.format)
+                            .collect::<Vec<_>>();
+                        let mut draws = Vec::with_capacity(frames.len());
+                        for prepared in &frames {
+                            draws.push(self.prepare_lowered_source_hand_draw(
+                                gal,
+                                &program,
+                                prepared,
+                                &resources,
+                                formats.clone(),
+                                hand_depth_format,
+                            )?);
+                        }
+                        Some(PreparedNamedSourceGlintFramePlan { targets, draws })
+                    }
+                }
+                _ => None,
+            };
             // Celestial and other source fullscreen consumers can request a
             // copied local material after the indexed writers have prepared
             // their draws. Fold those uploads into the same frame transaction
             // before taking it, preserving upload-before-draw ordering.
             self.absorb_pending_source_material_texture_uploads(frame.frame_id)?;
+            whole_frame_phase_trace("source-plan.entities-hands", frame.frame_id, Some(__plan_seg)); __plan_seg = std::time::Instant::now();
             let terrain = match self.take_source_terrain_frame_transaction(frame.frame_id) {
                 Ok(transaction) => PreparedLoweredSourceTerrainFramePlan {
                     frame_id: frame.frame_id,
@@ -18222,6 +19363,9 @@ impl WorldPrimitiveFrontend {
                 weather,
                 clouds,
                 lines,
+                damaged_block,
+                entity_glint,
+                hand_glint,
                 color_targets,
                 shadow_targets: has_shadow_casters.then_some(shadow_targets),
                 main_depth_history: None,
@@ -18232,6 +19376,7 @@ impl WorldPrimitiveFrontend {
                 bootstrap_operations,
             })
         })();
+        self.source_terrain_batch_scope = None;
         if result.is_err() {
             self.discard_source_terrain_frame_transaction(gal, frame.frame_id);
             self.shader_runtime
@@ -20385,7 +21530,7 @@ impl WorldPrimitiveFrontend {
         } else {
             false
         };
-        self.source_terrain_mesh_frame_memo = Some(BTreeMap::new());
+        self.source_terrain_mesh_frame_memo = Some(std::collections::HashMap::new());
         let terrain = self.prepare_named_source_terrain_frame_plan(
             gal,
             programs,
@@ -21915,6 +23060,30 @@ impl WorldPrimitiveFrontend {
                 )));
             }
         }
+        if frame
+            .mesh_instances
+            .iter()
+            .any(|instance| self.is_crumbling_mesh_instance(instance))
+        {
+            // Block-breaking progress needs the pack's own damagedblock writer;
+            // a pack without one stays unadmitted for this frame.
+            let scope = terrain_program_scope_for_sky_type(frame.background.sky_type)?
+                .ok_or_else(|| {
+                    GalError::unsupported_feature(
+                        "selected source block-breaking progress has no source program scope",
+                    )
+                })?;
+            let generation = self
+                .shader_pack_sources
+                .active()
+                .map(|source| source.generation())
+                .ok_or_else(|| {
+                    GalError::unsupported_feature(
+                        "selected source block-breaking progress has no active shader pack",
+                    )
+                })?;
+            self.damaged_block_source_program(generation, scope)?;
+        }
         let textured_batches = source_textured_material_batches(frame)?;
         require_particle_group_semantics(frame)?;
         let weather_batches = source_weather_material_batches(frame)?;
@@ -22236,6 +23405,9 @@ impl WorldPrimitiveFrontend {
     /// delegate that mesh to the ordinary graph or Java.
     fn validate_source_meshes_for_frame(&mut self, frame: &WorldPrimitiveFrame) -> GalResult<()> {
         let mut seen = BTreeSet::new();
+        // The translucent writer's availability is frame-invariant; resolve it
+        // at most once instead of per translucent mesh.
+        let mut translucent_stage_status: Option<Option<String>> = None;
         for instance in &frame.mesh_instances {
             validate_mesh_instance(instance, frame)?;
             if instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY != 0 {
@@ -22312,17 +23484,23 @@ impl WorldPrimitiveFrontend {
                 })
                 .unwrap_or_default();
             if !translucent_sections.is_empty() {
-                let stage_status = match self.shader_runtime.as_ref() {
-                    Some(runtime) => {
-                        match runtime.prepared_lowered_translucent_terrain_source_program() {
-                            Ok(Some(_)) => continue,
-                            Ok(None) => {
-                                "translucent source contract has not been discovered".to_string()
+                let stage_status = translucent_stage_status.get_or_insert_with(|| {
+                    match self.shader_runtime.as_ref() {
+                        Some(runtime) => {
+                            match runtime.prepared_lowered_translucent_terrain_source_program() {
+                                Ok(Some(_)) => None,
+                                Ok(None) => Some(
+                                    "translucent source contract has not been discovered"
+                                        .to_string(),
+                                ),
+                                Err(reason) => Some(reason.to_string()),
                             }
-                            Err(reason) => reason.to_string(),
                         }
+                        None => Some("shader runtime is unavailable".to_string()),
                     }
-                    None => "shader runtime is unavailable".to_string(),
+                });
+                let Some(stage_status) = stage_status else {
+                    continue;
                 };
                 return Err(GalError::unsupported_feature(format!(
                     "selected source terrain mesh {} generation {} has unsupported translucent section ranges {:?}; {stage_status}",
@@ -22354,6 +23532,41 @@ impl WorldPrimitiveFrontend {
             ));
         }
         self.last_source_route_extent = Some(extent);
+    }
+
+    /// Admits an armed frame before any source work is recorded. A frame the
+    /// shader route cannot cover (a producer or resource it does not model yet)
+    /// disarms the route and is drawn by the vanilla Rust route instead, with
+    /// the reason reported; it must never fail the whole frame. Packs that draw
+    /// their own clouds drop vanilla cloud faces here, before validation.
+    #[cfg(not(test))]
+    fn admit_armed_source_frame(&mut self, mut frame: WorldPrimitiveFrame) -> WorldPrimitiveFrame {
+        if !self.runtime_source_execution_is_armed() {
+            return frame;
+        }
+        self.pre_dropped_suppressed_cloud_quads = 0;
+        if self
+            .shader_runtime
+            .as_ref()
+            .is_some_and(ShaderPackRuntimeExecutor::suppresses_vanilla_cloud_faces)
+        {
+            let before = frame.material_quads.len();
+            frame
+                .material_quads
+                .retain(|quad| quad.source_program != WORLD_MATERIAL_SOURCE_CLOUDS);
+            self.pre_dropped_suppressed_cloud_quads = (before - frame.material_quads.len()) as u64;
+        }
+        match self.validate_selected_source_frame_coverage(&frame) {
+            Ok(()) => self.coverage_validated_frame_id = Some(frame.frame_id),
+            Err(error) => {
+                self.source_execution_armed = false;
+                self.coverage_validated_frame_id = None;
+                self.candidate_source_asset_error = Some(format!(
+                    "selected-source current-frame coverage is incomplete: {error}"
+                ));
+            }
+        }
+        frame
     }
 
     #[cfg(not(test))]
@@ -22633,8 +23846,15 @@ impl WorldPrimitiveFrontend {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        let mut fabulous_slot_counts: BTreeMap<MaterialResourceKey, usize> = BTreeMap::new();
         for batch in &batches {
             self.ensure_material_resources(gal, batch.key)?;
+            *fabulous_slot_counts.entry(batch.key).or_insert(0) += 1;
+        }
+        // A key split into several 4,096-quad batches (for example clouds at
+        // the default cloud range) needs one data slot per batch.
+        for (key, count) in fabulous_slot_counts {
+            self.ensure_material_resource_slots(gal, key, count)?;
         }
         let (mesh_stream_payload, mesh_stream_offsets, hand_stream_offsets, mesh_stream_buffer) =
             if world_mesh_batches.is_empty() {
@@ -23743,6 +24963,8 @@ impl WorldPrimitiveFrontend {
                 .map(|(stats, _)| stats);
         }
         self.disarm_source_route_on_extent_change(&frame);
+        #[cfg(not(test))]
+        let frame = self.admit_armed_source_frame(frame);
         #[cfg(not(test))]
         self.report_shader_route_outcome(&frame);
         #[cfg(not(test))]
@@ -25083,6 +26305,8 @@ impl WorldPrimitiveFrontend {
         gui_tiled_quads: Vec<GuiTiledQuadRequest>,
     ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)> {
         self.disarm_source_route_on_extent_change(&frame);
+        #[cfg(not(test))]
+        let frame = self.admit_armed_source_frame(frame);
         #[cfg(not(test))]
         self.report_shader_route_outcome(&frame);
         super::gui_frontend::preflight_tiled_affine_count(
@@ -26597,7 +27821,7 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         generation: u64,
         frame_target: Handle,
-        frame: WorldPrimitiveFrame,
+        mut frame: WorldPrimitiveFrame,
         append_gui: F,
     ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)>
     where
@@ -26609,6 +27833,24 @@ impl WorldPrimitiveFrontend {
         ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)>,
     {
         let started = std::time::Instant::now();
+        let admitted = self.coverage_validated_frame_id == Some(frame.frame_id);
+        // A pack that draws its own clouds suppresses vanilla cloud faces.
+        // Drop them before per-quad validation and packing (at the default
+        // cloud range there are ~100k), keeping their count as evidence.
+        if !admitted {
+            self.pre_dropped_suppressed_cloud_quads = 0;
+        }
+        if self
+            .shader_runtime
+            .as_ref()
+            .is_some_and(ShaderPackRuntimeExecutor::suppresses_vanilla_cloud_faces)
+        {
+            let before = frame.material_quads.len();
+            frame
+                .material_quads
+                .retain(|quad| quad.source_program != WORLD_MATERIAL_SOURCE_CLOUDS);
+            self.pre_dropped_suppressed_cloud_quads += (before - frame.material_quads.len()) as u64;
+        }
         self.write_runtime_source_execution_attempt(&frame, "entered", started.elapsed());
         self.prepare_runtime_source_snapshot(gal, generation, frame_target, &frame)?;
         self.write_runtime_source_execution_attempt(&frame, "snapshot-prepared", started.elapsed());
@@ -26616,7 +27858,11 @@ impl WorldPrimitiveFrontend {
         // the current frame after its exact source snapshot exists: a newly
         // active vanilla producer or DH layer must become an explicit failure
         // rather than disappearing from the selected source submission.
-        if let Err(error) = self.validate_selected_source_frame_coverage(&frame) {
+        if let Err(error) = if admitted {
+            Ok(())
+        } else {
+            self.validate_selected_source_frame_coverage(&frame)
+        } {
             self.source_execution_armed = false;
             self.candidate_source_asset_error = Some(format!(
                 "selected-source current-frame coverage is incomplete: {error}"
@@ -26640,11 +27886,16 @@ impl WorldPrimitiveFrontend {
         // resources created solely by the discarded snapshot release their
         // backing allocations before they can overlap the selected ABI.
         self.flush_deferred_mesh_resource_destroys(gal);
+        // The post-submit reports are audit-only; copying a whole world frame
+        // (every mesh instance and material quad) just to feed them cost a
+        // large memcpy per frame, so keep a copy only when auditing.
+        let audit_frame = graphics_audit_enabled().then(|| frame.clone());
+        self.coverage_validated_frame_id = Some(frame.frame_id);
         let (stats, gui_stats) = self.submit_complete_named_source_frame(
             gal,
             generation,
             frame_target,
-            frame.clone(),
+            frame,
             append_gui,
         )?;
         // A successful selected submission has just validated and executed
@@ -26652,10 +27903,12 @@ impl WorldPrimitiveFrontend {
         // eligible for the next frame; the planner still rebuilds and checks
         // its exact resources before any later selected submission.
         self.source_execution_armed = self.candidate_source_missing_resource_roles.is_empty();
-        self.write_runtime_source_execution_attempt(&frame, "submitted", started.elapsed());
-        self.report_runtime_source_execution(&frame, &stats, &gui_stats);
-        self.write_runtime_source_execution_latest(&frame, &stats, &gui_stats);
-        self.write_runtime_source_execution_attempt(&frame, "reported", started.elapsed());
+        if let Some(frame) = audit_frame.as_ref() {
+            self.write_runtime_source_execution_attempt(frame, "submitted", started.elapsed());
+            self.report_runtime_source_execution(frame, &stats, &gui_stats);
+            self.write_runtime_source_execution_latest(frame, &stats, &gui_stats);
+            self.write_runtime_source_execution_attempt(frame, "reported", started.elapsed());
+        }
         Ok((stats, gui_stats))
     }
 
@@ -28318,7 +29571,11 @@ impl WorldPrimitiveFrontend {
         let validate_started = std::time::Instant::now();
         validate_frame(&frame)?;
         let entity_outline_plan = outline::prepare_entity_outline_post_effect(&frame)?;
-        self.validate_selected_source_frame_coverage(&frame)?;
+        // The armed entry validates this exact frame's coverage just before
+        // handing it here; other entries still validate it themselves.
+        if self.coverage_validated_frame_id.take() != Some(frame.frame_id) {
+            self.validate_selected_source_frame_coverage(&frame)?;
+        }
         profile.world_validate_frame_nanos = elapsed_nanos_u64(validate_started);
         let program_lookup_started = std::time::Instant::now();
         let color_format = gal.pass_target_color_format(frame_target)?;
@@ -28468,12 +29725,15 @@ impl WorldPrimitiveFrontend {
             &batches,
             &plan.terrain.terrain.draws,
         )?;
+        // Glint sections are drawn by the `gbuffers_armor_glint` writer and
+        // crumbling instances by the damaged-block writer; both count.
         let (source_entity_instance_count, source_entity_draw_count, source_entity_index_count) =
             plan.terrain
                 .entities
-                .as_ref()
-                .map_or((0u64, 0u64, 0u64), |entities| {
-                    entities.draws.iter().fold((0, 0, 0), |coverage, draw| {
+                .iter()
+                .flat_map(|entities| entities.draws.iter())
+                .chain(plan.terrain.entity_glint.iter().flat_map(|glint| glint.draws.iter()))
+                .fold((0u64, 0u64, 0u64), |coverage, draw| {
                         (
                             coverage.0.saturating_add(u64::from(draw.instance_count)),
                             coverage.1.saturating_add(1),
@@ -28481,14 +29741,14 @@ impl WorldPrimitiveFrontend {
                                 u64::from(draw.index_count) * u64::from(draw.instance_count),
                             ),
                         )
-                    })
-                });
+                    });
         let expected_source_entity_instance_count = frame
             .mesh_instances
             .iter()
             .filter(|instance| {
                 instance.stratum == WORLD_STRATUM_ENTITY_MESH
                     && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
+                    && !self.is_crumbling_mesh_instance(instance)
             })
             .count() as u64;
         require_source_entity_writer_coverage(
@@ -28500,9 +29760,10 @@ impl WorldPrimitiveFrontend {
         let (source_hand_instance_count, source_hand_draw_count, source_hand_index_count) = plan
             .terrain
             .hands
-            .as_ref()
-            .map_or((0_u64, 0_u64, 0_u64), |hands| {
-                hands.draws.iter().fold((0, 0, 0), |coverage, draw| {
+            .iter()
+            .flat_map(|hands| hands.draws.iter())
+            .chain(plan.terrain.hand_glint.iter().flat_map(|glint| glint.draws.iter()))
+            .fold((0_u64, 0_u64, 0_u64), |coverage, draw| {
                     (
                         coverage.0.saturating_add(u64::from(draw.instance_count)),
                         coverage.1.saturating_add(1),
@@ -28510,8 +29771,7 @@ impl WorldPrimitiveFrontend {
                             u64::from(draw.index_count) * u64::from(draw.instance_count),
                         ),
                     )
-                })
-            });
+                });
         require_source_hand_writer_coverage(
             frame.first_person_mesh_instances.len() as u64,
             source_hand_instance_count,
@@ -28571,12 +29831,14 @@ impl WorldPrimitiveFrontend {
         )?;
         require_source_material_writer_coverage("weather", source_weather_coverage)?;
         require_source_material_writer_coverage("cloud", source_cloud_coverage)?;
+        let pre_dropped_clouds = std::mem::take(&mut self.pre_dropped_suppressed_cloud_quads);
         let source_cloud_suppressed_quad_count = if clouds_suppressed {
-            source_material_writer_coverage(&cloud_batches, None)?.quads
+            source_material_writer_coverage(&cloud_batches, None)?.quads + pre_dropped_clouds
         } else {
             0
         };
-        let source_cloud_fullscreen_stage_count = if clouds_suppressed && !cloud_batches.is_empty()
+        let suppressed_clouds_present = !cloud_batches.is_empty() || pre_dropped_clouds > 0;
+        let source_cloud_fullscreen_stage_count = if clouds_suppressed && suppressed_clouds_present
         {
             plan.fullscreen_consumers
                 .iter()
@@ -28595,7 +29857,7 @@ impl WorldPrimitiveFrontend {
             0
         };
         if clouds_suppressed
-            && !cloud_batches.is_empty()
+            && suppressed_clouds_present
             && source_cloud_fullscreen_stage_count == 0
         {
             plan.discard(self, gal);
@@ -36797,9 +38059,35 @@ impl WorldPrimitiveFrontend {
         scalar_bytes: u64,
         instance_bytes: u64,
     ) -> GalResult<SourceTerrainFrameStreamAllocation> {
+        self.allocate_source_terrain_frame_stream_sharing_uniforms(
+            gal,
+            frame_id,
+            legacy_bytes,
+            scalar_bytes,
+            instance_bytes,
+            None,
+        )
+    }
+
+    /// `shared_uniforms` names this frame's already-staged (legacy, scalar)
+    /// offsets for identical uniform bytes; only instance data is allocated.
+    fn allocate_source_terrain_frame_stream_sharing_uniforms(
+        &mut self,
+        gal: &mut VulkanicGal,
+        frame_id: u64,
+        legacy_bytes: u64,
+        scalar_bytes: u64,
+        instance_bytes: u64,
+        shared_uniforms: Option<(u64, Option<u64>)>,
+    ) -> GalResult<SourceTerrainFrameStreamAllocation> {
         if legacy_bytes == 0 || instance_bytes == 0 {
             return Err(GalError::invalid_argument(
                 "source terrain frame stream requires non-empty legacy and instance payloads",
+            ));
+        }
+        if shared_uniforms.is_some_and(|(_, scalar)| scalar.is_some() != (scalar_bytes != 0)) {
+            return Err(GalError::invalid_argument(
+                "shared source uniforms do not match the requested scalar layout",
             ));
         }
         let align = WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64;
@@ -36807,12 +38095,16 @@ impl WorldPrimitiveFrontend {
         let scalar_offset = (scalar_bytes != 0).then_some(align_up_u64(legacy_bytes, align)?);
         let instance_base = scalar_offset
             .unwrap_or_else(|| align_up_u64(legacy_bytes, align).expect("validated alignment"));
-        let instance_offset = align_up_u64(
-            instance_base.checked_add(scalar_bytes).ok_or_else(|| {
-                GalError::invalid_argument("source terrain frame stream scalar range overflow")
-            })?,
-            align,
-        )?;
+        let instance_offset = if shared_uniforms.is_some() {
+            0
+        } else {
+            align_up_u64(
+                instance_base.checked_add(scalar_bytes).ok_or_else(|| {
+                    GalError::invalid_argument("source terrain frame stream scalar range overflow")
+                })?,
+                align,
+            )?
+        };
         let required = instance_offset.checked_add(instance_bytes).ok_or_else(|| {
             GalError::invalid_argument("source terrain frame stream range overflow")
         })?;
@@ -36824,7 +38116,6 @@ impl WorldPrimitiveFrontend {
                 required_capacity, LOWERED_SOURCE_FRAME_STREAM_MAX_BYTES
             )));
         }
-        let completed = gal.poll_completed();
         let existing = self
             .source_terrain_frame_stream_slots
             .iter()
@@ -36837,14 +38128,13 @@ impl WorldPrimitiveFrontend {
             .position(|slot| slot.frame_id.is_none())
         {
             index
-        } else if let Some(index) = self
-            .source_terrain_frame_stream_slots
-            .iter()
-            .position(|slot| {
+        } else if let Some(index) = {
+            let completed = gal.poll_completed();
+            self.source_terrain_frame_stream_slots.iter().position(|slot| {
                 slot.submission
                     .is_some_and(|submission| submission <= completed)
             })
-        {
+        } {
             index
         } else if self.source_terrain_frame_stream_slots.len()
             < SOURCE_TERRAIN_FRAME_STREAM_SLOT_COUNT
@@ -36879,6 +38169,11 @@ impl WorldPrimitiveFrontend {
         };
         let previous_frame_id = self.source_terrain_frame_stream_slots[slot_index].frame_id;
         let same_frame = previous_frame_id == Some(frame_id);
+        if shared_uniforms.is_some() && !same_frame {
+            return Err(GalError::invalid_argument(
+                "shared source uniforms must come from the same frame stream slot",
+            ));
+        }
         if !same_frame {
             if let Some(previous_frame_id) = previous_frame_id {
                 if self
@@ -36903,10 +38198,20 @@ impl WorldPrimitiveFrontend {
         if !same_frame
             && required_capacity > self.source_terrain_frame_stream_slots[slot_index].capacity
         {
+            // Grow geometrically. Replacing a slot destroys every resource set
+            // bound to its buffer; growing to the exact size made a streaming
+            // world rebuild ~1,500 sets per frame as its payload crept upward.
+            let grown_capacity = align_up_u64(
+                required_capacity
+                    .max(self.source_terrain_frame_stream_slots[slot_index].capacity.saturating_mul(2)),
+                align,
+            )?
+            .min(LOWERED_SOURCE_FRAME_STREAM_MAX_BYTES)
+            .max(required_capacity);
             let old = self.source_terrain_frame_stream_slots[slot_index].buffer;
             let buffer = gal.create_buffer(BufferDesc {
                 label: format!("source-terrain-frame-stream-slot{slot_index}"),
-                size: required_capacity,
+                size: grown_capacity,
                 memory: MemoryDomain::Upload,
                 usages: vec![
                     BufferUsage::Uniform,
@@ -36918,7 +38223,7 @@ impl WorldPrimitiveFrontend {
             let _ = gal.destroy(old);
             let slot = &mut self.source_terrain_frame_stream_slots[slot_index];
             slot.buffer = buffer;
-            slot.capacity = required_capacity;
+            slot.capacity = grown_capacity;
         }
         let slot = &mut self.source_terrain_frame_stream_slots[slot_index];
         if !same_frame {
@@ -36944,11 +38249,18 @@ impl WorldPrimitiveFrontend {
             )));
         }
         slot.cursor = allocation_end;
+        let (legacy_transform_offset, scalar_uniform_offset) = match shared_uniforms {
+            Some(shared) => shared,
+            None => (
+                base_offset + legacy_offset,
+                scalar_offset.map(|offset| base_offset + offset),
+            ),
+        };
         Ok(SourceTerrainFrameStreamAllocation {
             buffer: slot.buffer,
             epoch: slot.epoch,
-            legacy_transform_offset: base_offset + legacy_offset,
-            scalar_uniform_offset: scalar_offset.map(|offset| base_offset + offset),
+            legacy_transform_offset,
+            scalar_uniform_offset,
             instance_offset: base_offset + instance_offset,
         })
     }
@@ -37263,6 +38575,18 @@ impl WorldPrimitiveFrontend {
             )));
         }
         let texture_generation = self.source_local_texture_generation(texture_id)?;
+        // Destroy-stage decals use world-projected UVs and repeat, like the
+        // vanilla crumbling texture; every other local material clamps.
+        let local_address = if self.mesh_assets.values().any(|asset| {
+            asset.sections.iter().any(|section| {
+                section.texture_id == texture_id
+                    && section.material_id == WORLD_MATERIAL_ID_MODEL_CRUMBLING
+            })
+        }) {
+            SamplerAddressMode::Repeat
+        } else {
+            SamplerAddressMode::ClampToEdge
+        };
         let label =
             format!("source-textured-material.texture{texture_id}.generation{texture_generation}",);
         let mut created = Vec::new();
@@ -37301,9 +38625,9 @@ impl WorldPrimitiveFrontend {
                 min_filter: SamplerFilter::Nearest,
                 mag_filter: SamplerFilter::Nearest,
                 mip_filter: mesh_texture_mip_filter(texture_id),
-                address_u: SamplerAddressMode::ClampToEdge,
-                address_v: SamplerAddressMode::ClampToEdge,
-                address_w: SamplerAddressMode::ClampToEdge,
+                address_u: local_address,
+                address_v: local_address,
+                address_w: local_address,
                 comparison: None,
             })?;
             created.push(sampler);
@@ -43458,6 +44782,25 @@ fn source_textured_material_batches(
     )
 }
 
+/// Texture matrix 0 for an entity-stream draw: identity, or vanilla's
+/// animated glint matrix (`RenderStateShard.setupGlintTexturing`), which Iris
+/// exposes to `gbuffers_armor_glint` as `gl_TextureMatrix[0]`.
+fn source_glint_texture_transforms(
+    foil: Option<super::item_foil::StandardItemFoil>,
+) -> GalResult<TerrainSourceTextureTransforms> {
+    let mut transforms = TerrainSourceTextureTransforms::canonical_minecraft_terrain();
+    if let Some(foil) = foil {
+        let [c0, c1, t] = foil.texture_transform()?;
+        transforms.atlas_texture_matrix = [
+            c0[0], c0[1], 0.0, 0.0, //
+            c1[0], c1[1], 0.0, 0.0, //
+            0.0, 0.0, 1.0, 0.0, //
+            t[0], t[1], 0.0, 1.0,
+        ];
+    }
+    Ok(transforms)
+}
+
 /// Local-textured source writers share this material blend contract. Both
 /// translucent modes blend surviving pixels; translucent-cutout also discards
 /// pixels below its separate source alpha threshold.
@@ -43465,9 +44808,11 @@ fn source_textured_material_blend(material_mode: u32) -> GalResult<BlendMode> {
     match material_mode {
         WORLD_MATERIAL_MODE_OPAQUE
         | WORLD_MATERIAL_MODE_CUTOUT
-        | WORLD_MATERIAL_MODE_GLINT
         | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
         | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST => Ok(BlendMode::Disabled),
+        // Vanilla `BlendFunction.GLINT` (SRC_COLOR, ONE / ZERO, ONE); Iris
+        // keeps it for `gbuffers_armor_glint` (no pack or program override).
+        WORLD_MATERIAL_MODE_GLINT => Ok(BlendMode::Glint),
         WORLD_MATERIAL_MODE_TRANSLUCENT | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT => {
             Ok(BlendMode::Alpha)
         }
@@ -43483,9 +44828,9 @@ fn source_textured_material_blend(material_mode: u32) -> GalResult<BlendMode> {
 /// fixed-function alpha-test state.
 fn source_entity_alpha_cutoff(material_mode: u32) -> GalResult<Option<f32>> {
     match material_mode {
-        WORLD_MATERIAL_MODE_OPAQUE
-        | WORLD_MATERIAL_MODE_TRANSLUCENT
-        | WORLD_MATERIAL_MODE_GLINT => Ok(None),
+        WORLD_MATERIAL_MODE_OPAQUE | WORLD_MATERIAL_MODE_TRANSLUCENT => Ok(None),
+        // Iris `ShaderKey.GLINT` uses `AlphaTests.NON_ZERO_ALPHA`.
+        WORLD_MATERIAL_MODE_GLINT => Ok(Some(0.0001)),
         WORLD_MATERIAL_MODE_CUTOUT
         | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
         | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
@@ -58125,11 +59470,12 @@ mod tests {
             .get(&source_frame.frame_id)
             .expect("entity set-zero preparation must join the owned frame transaction");
         assert_eq!(stream.buffer, transaction.stream_buffer);
-        assert!(transaction.operations.iter().any(|operation| matches!(
-            operation,
-            CommandOp::HostWriteBuffer { buffer, offset, .. }
-                if *buffer == stream.buffer && *offset == stream.instance_offset
-        )));
+        // Frame payloads are staged and leave as one stream write at submission.
+        let instance_start = stream.instance_offset as usize;
+        assert_eq!(
+            &transaction.stream_staging[instance_start..instance_start + draw.instance_transforms.len()],
+            draw.instance_transforms.as_slice(),
+        );
         // The first geometry upload travels with the frame; discarding that
         // frame must return it to the queue, or the cached buffers would be
         // drawn uninitialized by the next accepted source frame.
@@ -65166,6 +66512,9 @@ mod tests {
             weather: None,
             clouds: None,
             lines: None,
+            damaged_block: None,
+            entity_glint: None,
+            hand_glint: None,
             color_targets: staged_targets.clone(),
             shadow_targets: None,
             main_depth_history: None,
@@ -69218,6 +70567,17 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("does not match copied item identity"));
+        // Special item renderers draw the held stack with ModelPart geometry.
+        assert_eq!(
+            45_032,
+            frontend
+                .source_hand_current_item_id(
+                    &source_frame,
+                    FirstPersonHand::Main,
+                    "minecraft:model-part/direct-texture/part/2f706f6c65",
+                )
+                .unwrap()
+        );
     }
 
     #[test]

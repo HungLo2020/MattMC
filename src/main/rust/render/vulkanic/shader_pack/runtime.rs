@@ -680,6 +680,16 @@ pub(crate) enum TerrainSourceColorPassPhase {
     /// `gbuffers_line` block-selection outlines: a separate source-defined
     /// alpha-over writer that loads the named G-buffer targets.
     Lines,
+    /// `gbuffers_damagedblock` block-breaking progress: a separate
+    /// source-defined multiply writer that loads the named G-buffer targets
+    /// after the opaque/entity writers and before deferred.
+    DamagedBlock,
+    /// `gbuffers_armor_glint` over world entity/item geometry: load-only,
+    /// EQUAL depth against the entity pass's depth.
+    EntityGlint,
+    /// `gbuffers_armor_glint` over first-person geometry, against the hand
+    /// pass's private depth.
+    HandGlint,
     /// `gbuffers_entities` consumes an entity-local material texture and
     /// Rust-resolved entity identity. It loads existing named targets and
     /// never bootstraps or clears terrain output.
@@ -731,6 +741,9 @@ impl TerrainSourceColorPassPhase {
             | Self::Weather
             | Self::Clouds
             | Self::Lines
+            | Self::DamagedBlock
+            | Self::EntityGlint
+            | Self::HandGlint
             | Self::Entities
             | Self::Hands => false,
             Self::Translucent => material_mode == TerrainMaterialPassMode::Translucent,
@@ -745,6 +758,9 @@ impl TerrainSourceColorPassPhase {
             | Self::Weather
             | Self::Clouds
             | Self::Lines
+            | Self::DamagedBlock
+            | Self::EntityGlint
+            | Self::HandGlint
             | Self::Entities => TextureUsageState::ShaderRead,
             // The optical hand fallback clears its private depth attachment.
             // The ordinary copied-depth path overrides this predecessor.
@@ -769,6 +785,9 @@ impl TerrainSourceColorPassPhase {
             | Self::Weather
             | Self::Clouds
             | Self::Lines
+            | Self::DamagedBlock
+            | Self::EntityGlint
+            | Self::HandGlint
             | Self::Entities
             | Self::Hands
             | Self::Translucent => AttachmentLoadOp::Load,
@@ -784,6 +803,9 @@ impl TerrainSourceColorPassPhase {
             | Self::Weather
             | Self::Clouds
             | Self::Lines
+            | Self::DamagedBlock
+            | Self::EntityGlint
+            | Self::HandGlint
             | Self::Entities
             | Self::Translucent => AttachmentLoadOp::Load,
             Self::TranslucentFirst => AttachmentLoadOp::Clear,
@@ -1342,10 +1364,39 @@ fn fullscreen_stage_raster_primitive(
     }
 }
 
+/// Prepared lowered programs are pure functions of the discovered source
+/// candidate, but preparing one re-derives its contract and interface; the
+/// frontend asks for them several times per frame.
+#[derive(Debug, Default)]
+struct PreparedSourceProgramMemos {
+    terrain: std::cell::RefCell<Vec<(u64, u8, LoweredTerrainSourceProgram)>>,
+    entity: std::cell::RefCell<Option<(u64, LoweredEntitySourceProgram)>>,
+    hand: std::cell::RefCell<Option<(u64, LoweredHandSourceProgram)>>,
+}
+
+fn memoized_source_program<T: Clone>(
+    cell: &std::cell::RefCell<Option<(u64, T)>>,
+    epoch: u64,
+    build: impl FnOnce() -> GalResult<Option<T>>,
+) -> GalResult<Option<T>> {
+    if let Some((built_epoch, program)) = cell.borrow().as_ref() {
+        if *built_epoch == epoch {
+            return Ok(Some(program.clone()));
+        }
+    }
+    let built = build()?;
+    *cell.borrow_mut() = built.as_ref().map(|program| (epoch, program.clone()));
+    Ok(built)
+}
+
 #[derive(Debug)]
 pub(crate) struct ShaderPackRuntimeExecutor {
     plan: ShaderPackRuntimePlan,
     source_candidate: TerrainSourceCandidateState,
+    /// Advances on every `source_candidate` replacement; prepared program
+    /// memos below are valid only for the epoch that built them.
+    source_candidate_epoch: u64,
+    prepared_program_memos: PreparedSourceProgramMemos,
     /// Discovery expands a whole pack and lowers several independent source
     /// families. Keep that work generation-and-scope keyed: source discovery
     /// is immutable until either input changes and must not recur on every
@@ -1753,6 +1804,8 @@ impl ShaderPackRuntimeExecutor {
         Ok(Self {
             plan,
             source_candidate: TerrainSourceCandidateState::Unavailable,
+            source_candidate_epoch: 0,
+            prepared_program_memos: PreparedSourceProgramMemos::default(),
             source_candidate_scope: None,
             distant_horizons_source_candidate: DistantHorizonsSourceCandidateState::Unavailable,
             distant_horizons_source_candidate_scope: None,
@@ -3473,6 +3526,7 @@ impl ShaderPackRuntimeExecutor {
             return;
         }
         if source.is_empty() {
+            self.source_candidate_epoch += 1;
             self.source_candidate = TerrainSourceCandidateState::Disabled {
                 generation: source.generation(),
                 pack_name: source.name().to_string(),
@@ -4070,6 +4124,7 @@ impl ShaderPackRuntimeExecutor {
                     ) {
                         (Ok(materials), Ok(emission)) => (Some(materials), Some(emission)),
                         (Err(error), _) | (_, Err(error)) => {
+                            self.source_candidate_epoch += 1;
                             self.source_candidate = TerrainSourceCandidateState::Rejected {
                                 generation: source.generation(),
                                 pack_name: source.name().to_string(),
@@ -4167,6 +4222,7 @@ impl ShaderPackRuntimeExecutor {
                 reason: error.to_string(),
             },
         };
+        self.source_candidate_epoch += 1;
         self.source_candidate = candidate;
         self.source_candidate_scope = Some(scope);
     }
@@ -5690,6 +5746,14 @@ impl ShaderPackRuntimeExecutor {
     pub(crate) fn prepared_lowered_entity_source_program(
         &self,
     ) -> GalResult<Option<LoweredEntitySourceProgram>> {
+        memoized_source_program(&self.prepared_program_memos.entity, self.source_candidate_epoch, || {
+            self.prepared_lowered_entity_source_program_uncached()
+        })
+    }
+
+    fn prepared_lowered_entity_source_program_uncached(
+        &self,
+    ) -> GalResult<Option<LoweredEntitySourceProgram>> {
         match &self.source_candidate {
             TerrainSourceCandidateState::Unavailable
             | TerrainSourceCandidateState::Disabled { .. }
@@ -5726,6 +5790,14 @@ impl ShaderPackRuntimeExecutor {
     pub(crate) fn prepared_lowered_hand_source_program(
         &self,
     ) -> GalResult<Option<LoweredHandSourceProgram>> {
+        memoized_source_program(&self.prepared_program_memos.hand, self.source_candidate_epoch, || {
+            self.prepared_lowered_hand_source_program_uncached()
+        })
+    }
+
+    fn prepared_lowered_hand_source_program_uncached(
+        &self,
+    ) -> GalResult<Option<LoweredHandSourceProgram>> {
         match &self.source_candidate {
             TerrainSourceCandidateState::Unavailable
             | TerrainSourceCandidateState::Disabled { .. }
@@ -5759,6 +5831,44 @@ impl ShaderPackRuntimeExecutor {
     /// retained during discovery. This cannot compile a backend program,
     /// allocate a resource layout, select a route, or issue a draw.
     pub(crate) fn prepared_lowered_terrain_source_program(
+        &self,
+        kind: TerrainMaterialProgramKind,
+    ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
+        let slot = match kind {
+            TerrainMaterialProgramKind::Opaque => 0,
+            TerrainMaterialProgramKind::Cutout => 1,
+            TerrainMaterialProgramKind::Translucent => 2,
+        };
+        self.memoized_terrain_program(slot, || {
+            self.prepared_lowered_terrain_source_program_uncached(kind)
+        })
+    }
+
+    fn memoized_terrain_program(
+        &self,
+        slot: u8,
+        build: impl FnOnce() -> GalResult<Option<LoweredTerrainSourceProgram>>,
+    ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
+        let epoch = self.source_candidate_epoch;
+        if let Some((_, _, program)) = self
+            .prepared_program_memos
+            .terrain
+            .borrow()
+            .iter()
+            .find(|(built_epoch, built_slot, _)| *built_epoch == epoch && *built_slot == slot)
+        {
+            return Ok(Some(program.clone()));
+        }
+        let built = build()?;
+        let mut memos = self.prepared_program_memos.terrain.borrow_mut();
+        memos.retain(|(built_epoch, built_slot, _)| *built_epoch == epoch && *built_slot != slot);
+        if let Some(program) = built.as_ref() {
+            memos.push((epoch, slot, program.clone()));
+        }
+        Ok(built)
+    }
+
+    fn prepared_lowered_terrain_source_program_uncached(
         &self,
         kind: TerrainMaterialProgramKind,
     ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
@@ -5828,6 +5938,14 @@ impl ShaderPackRuntimeExecutor {
     pub(crate) fn prepared_lowered_translucent_terrain_source_program(
         &self,
     ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
+        self.memoized_terrain_program(3, || {
+            self.prepared_lowered_translucent_terrain_source_program_uncached()
+        })
+    }
+
+    fn prepared_lowered_translucent_terrain_source_program_uncached(
+        &self,
+    ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
         match &self.source_candidate {
             TerrainSourceCandidateState::Unavailable
             | TerrainSourceCandidateState::Disabled { .. }
@@ -5866,6 +5984,14 @@ impl ShaderPackRuntimeExecutor {
     /// This still cannot select source execution: callers must separately
     /// provide a matching shadow attachment/output contract and resource set.
     pub(crate) fn prepared_lowered_shadow_source_program(
+        &self,
+    ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
+        self.memoized_terrain_program(4, || {
+            self.prepared_lowered_shadow_source_program_uncached()
+        })
+    }
+
+    fn prepared_lowered_shadow_source_program_uncached(
         &self,
     ) -> GalResult<Option<LoweredTerrainSourceProgram>> {
         match &self.source_candidate {
@@ -6923,6 +7049,21 @@ impl ShaderPackRuntimeExecutor {
         )
     }
 
+    pub(crate) fn append_damaged_block_source_color_pass(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        targets: &TerrainSourceColorPassTargets,
+        draws: &[TexturedMaterialSourceDraw],
+    ) -> GalResult<()> {
+        self.append_source_material_color_pass(
+            ops,
+            targets,
+            draws,
+            TerrainSourceColorPassPhase::DamagedBlock,
+            "damagedblock",
+        )
+    }
+
     pub(crate) fn append_cloud_source_color_pass(
         &self,
         ops: &mut Vec<CommandOp>,
@@ -6986,6 +7127,22 @@ impl ShaderPackRuntimeExecutor {
             "hand",
             world_depth.is_some(),
         )
+    }
+
+    pub(crate) fn append_glint_source_color_pass(
+        &self,
+        ops: &mut Vec<CommandOp>,
+        targets: &TerrainSourceColorPassTargets,
+        draws: &[EntitySourceDraw],
+        phase: TerrainSourceColorPassPhase,
+    ) -> GalResult<()> {
+        if !matches!(
+            phase,
+            TerrainSourceColorPassPhase::EntityGlint | TerrainSourceColorPassPhase::HandGlint
+        ) {
+            return Err(GalError::invalid_argument("glint source pass requires a glint phase"));
+        }
+        self.append_indexed_source_color_pass(ops, targets, draws, phase, "glint", false)
     }
 
     fn append_indexed_source_color_pass(
