@@ -43,33 +43,16 @@ energy swirl unadmitted (Iris: gbuffers_entities, ENTITIES_CUTOUT, pipeline's
 additive blend + texture matrix); no Iris program fallback chains;
 `texture2D(sampler2DShadow, vec2)` rejected; edited water sources unadmitted.
 
-**Glint via `gbuffers_armor_glint` (2026-09-27).** Iris draws every glint
-(item/entity/armor, world and hand) with `ShaderKey.GLINT`: position+UV only,
-`gl_Color=(1,1,1,glintStrength)`, `gl_TextureMatrix[0]`=vanilla glint matrix,
-GLINT blend, EQUAL depth, no write/cull, alpha>0.0001. Glint sections now leave
-the entity/hand writers (were drawn opaque: purple trident) for entity- and
-hand-stream lowerings of armor_glint (`EntityGlint`/`HandGlint` load-only
-passes on the entity / private hand depth; frames prepared before the stream
-reservation). `invariant gl_Position` in the source vertex preamble fixed EQUAL
-streaks. Held trident pair 7.25/10.49/6.45 -> **2.336/2.033/2.434**, 0 VUIDs. Also fixed:
-trident in hand crashed (model-part hand identity vs item identity); colour-pass
-target cache evicted other phases by depth texture (hand/entity ping-pong
-recreating targets every frame). Special (decal) foil glint now uses per-pose
-SheetedDecal UVs (derived glint mesh, retired when unused). Entity/hand alpha
-tests now run on output 0 after `main`, as Iris appends them (Complementary
-skips `color *= glColor` for alpha-0 texels, which wrote depth and let the glint
-cover the whole item quad). Held enchanted clock 3.50/2.96/4.46 -> 2.95/2.21/3.76;
-held gun 2.38/1.96/2.53 -> 2.09/1.64/2.07; cow 2.11/1.66/2.07, banner 2.22/1.86/2.27.
-Harness notes: chicken/horse scenes differ on Frozen (missing/rotated mob); the
-spawner scenario's shader-route evidence rule never matches (route executes).
-**Camera-motion smear (2026-09-27).** `camera_history` returned previous =
-current for every call after the first in a frame, so composite TAA and the
-deferred1 reflection filter saw no motion and blended stale history at the wrong
-pixels (smear while turning; static captures hide it). Same-frame calls now
-return the stored history. The `...Reprojection(vec3 pos)` helpers also convert
-image-UV input once. Motion pair (`MATTMC_CAPTURE_STATIC_POSE_SEQUENCE=4,2,18`)
-sharpness 135 vs 256 -> 173 vs 183; left-pose arm residual is harness timing
-(Frozen captures 2 frames after a turn, Current ~10: mid-sway vs settled arm).
+**Glint (09-27):** Iris draws every glint with `ShaderKey.GLINT` (position+UV,
+`gl_Color=(1,1,1,glintStrength)`, glint texture matrix, GLINT blend, EQUAL depth,
+no write/cull, alpha>0.0001) via `EntityGlint`/`HandGlint` load-only passes;
+`invariant gl_Position` fixed EQUAL streaks (trident 7.25 -> 2.34). Decal foil
+glint uses per-pose SheetedDecal UVs. Entity/hand alpha tests run on output 0
+after `main`, as Iris appends them (clock 3.50 -> 2.95). Harness: chicken/horse
+differ on Frozen (mob pose); the spawner evidence rule never matches.
+**Camera-motion smear (09-27):** same-frame `camera_history` calls returned
+previous = current, so TAA/reflection filters saw no motion; fixed (motion pair
+sharpness 135 vs 256 -> 173 vs 183; arm residual is harness timing).
 **Held items / hand passes (2026-09-27).** Crash on hotbar switch fixed:
 `currentRenderedItemId` now resolves from the drawn mesh (vanilla draws the old
 stack during the equip animation), as Iris does. Block items resolve the pack's
@@ -101,6 +84,16 @@ writer-declared shadow roles are staged even if terrain samples none). Vanilla's
 skybasic), skipped by the textured writer. Deferred water gap: underwater pair
 152.5,60,499.5,180,10 is 131.8/152.9/168.7 (Frozen near-black water fog).
 Sweeps (hotbar, block-entity/mob models): 0 fallbacks; fixed XP orbs, End portals.
+**Block edits (09-28):** placed/broken blocks could stay invisible (both routes;
+more often with shaders): an edited section invalidated while its build was in
+flight was re-dispatched into the in-flight gate and dropped, and edits waited
+behind the whole streaming backlog. Invalidations now stay parked until the
+worker completes and enter the pending queue first. Place/remove stress (8
+alternations right after a teleport, shaders on/off): all correct. **Iris
+screen button labels:** `SmoothedFloat` GUI fades used the Iris shader timer,
+which Java does not advance on the Rust route (alpha stuck at 0); the shader
+screen's transitions now use wall-clock deltas. Pre-existing Java failures:
+`CloudSemanticAdmissionTest`/`NativeParticleCollectionTest` (stale source-text asserts).
 **Perf (RD10, 2026-09-27/28):** ~33 -> ~50 fps, frontend 23.9 -> 12.9 ms (static
 camera). Source route reuses identity-keyed static/shadow batch plans (batching
 4.0 -> 0.3 ms); terrain coverage validation memoized (3.3 -> 0.4 ms); source

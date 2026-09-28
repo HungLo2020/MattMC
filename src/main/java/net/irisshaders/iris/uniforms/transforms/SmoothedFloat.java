@@ -38,6 +38,20 @@ public class SmoothedFloat implements FloatSupplier {
 	 * with.
 	 */
 	private boolean hasInitialValue;
+	/**
+	 * GUI transitions measure their own wall-clock frame delta. The shader
+	 * uniform timer is Rust-owned on the Vulkan route and is not advanced by
+	 * Java there, which would freeze a GUI fade at its initial value.
+	 */
+	private boolean wallClock;
+	private long lastUpdateNanos = -1L;
+
+	/** A GUI-only transition smoothed by wall-clock time between its own updates. */
+	public static SmoothedFloat wallClock(float halfLifeUp, float halfLifeDown, FloatSupplier unsmoothed, FrameUpdateNotifier updateNotifier) {
+		SmoothedFloat smoothed = new SmoothedFloat(halfLifeUp, halfLifeDown, unsmoothed, updateNotifier);
+		smoothed.wallClock = true;
+		return smoothed;
+	}
 
 	/**
 	 * Creates a new SmoothedFloat with a given half life.
@@ -86,6 +100,9 @@ public class SmoothedFloat implements FloatSupplier {
 	 * Takes one value from the unsmoothed value sequence, and smooths it into our accumulator
 	 */
 	private void update() {
+		long nowNanos = System.nanoTime();
+		float wallDelta = lastUpdateNanos < 0L ? 0.0f : (nowNanos - lastUpdateNanos) / 1.0E9F;
+		lastUpdateNanos = nowNanos;
 		if (!hasInitialValue) {
 			// There is no smoothing on the first value.
 			// This is not an optimal approach to choosing the initial value:
@@ -105,7 +122,7 @@ public class SmoothedFloat implements FloatSupplier {
 		float newValue = unsmoothed.getAsFloat();
 
 		// 𝚫t
-		float lastFrameTime = SystemTimeUniforms.TIMER.getLastFrameTime();
+		float lastFrameTime = wallClock ? wallDelta : SystemTimeUniforms.TIMER.getLastFrameTime();
 
 		// Compute the smoothing factor based on our
 		// α = 1 - e^(-𝚫t/τ) = 1 - e^(-k𝚫t)

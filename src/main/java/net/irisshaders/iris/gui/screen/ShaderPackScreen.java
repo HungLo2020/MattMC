@@ -75,7 +75,7 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 	private boolean dropChanges = false;
 	private MutableComponent developmentComponent;
 	private boolean guiHidden = false;
-	public final SmoothedFloat blurTransition = new SmoothedFloat(2, 2, () -> {
+	public final SmoothedFloat blurTransition = SmoothedFloat.wallClock(2, 2, () -> {
 		if (guiHidden) {
 			return 0.0f;
 		} else if (this.optionMenuOpen) {
@@ -87,7 +87,7 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 	private float guiButtonHoverTimer = 0.0f;
 	private Button openFolderButton;
 	private float backgroundInit = 0.0f;
-	public final SmoothedFloat listTransition = new SmoothedFloat(1, 1, () -> {
+	public final SmoothedFloat listTransition = SmoothedFloat.wallClock(1, 1, () -> {
 		if (guiHidden || this.optionMenuOpen) {
 			return 0.0f;
 		} else {
@@ -95,7 +95,7 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 		}
 	}, notifier);
 
-	public final SmoothedFloat buttonTransition = new SmoothedFloat(1, 1, () -> {
+	public final SmoothedFloat buttonTransition = SmoothedFloat.wallClock(1, 1, () -> {
 		if (guiHidden) {
 			return 0.0f;
 		} else {

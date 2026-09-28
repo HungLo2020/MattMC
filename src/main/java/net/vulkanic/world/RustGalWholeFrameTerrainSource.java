@@ -931,6 +931,13 @@ public final class RustGalWholeFrameTerrainSource {
 				iterator.remove();
 				continue;
 			}
+			if (this.inFlight.contains(key)) {
+				// The superseded build is still meshing. A second dispatch now would be
+				// refused by scheduleBuild's in-flight gate and the stale result then
+				// discarded, losing the edit. Keep the invalidation parked until that
+				// worker completes; the next frame admits the replacement.
+				continue;
+			}
 			this.unavailableSections.remove(key);
 			// `queued` is the ownership gate for the pending CPU build. Calling
 			// admitSection after claiming that gate drops the work: its own enqueue
@@ -939,7 +946,10 @@ public final class RustGalWholeFrameTerrainSource {
 			// Loaded resident sections enter the same pending deque regardless of a
 			// transient raw-frustum result. Their accumulated portal inputs are
 			// applied when the immutable build result becomes resident.
-			this.pending.addLast(section);
+			// An edit to an already-resident section is urgent (Sodium schedules
+			// block updates as important rebuilds): it must not wait behind the
+			// streaming backlog, or placed/broken blocks stay invisible for seconds.
+			this.pending.addFirst(section);
 			this.recordPortalBuildLifecycle(key, "invalidated-enqueued");
 			iterator.remove();
 		}
@@ -1342,6 +1352,11 @@ public final class RustGalWholeFrameTerrainSource {
 	private void scheduleBuild(SectionPos sectionPos, Camera camera) {
 		long key = sectionPos.asLong();
 		if (!this.inFlight.add(key)) {
+			// A duplicate pending entry met the section's running build. If that
+			// build is already stale, re-park the rebuild instead of dropping it.
+			if (this.invalidatedInFlight.contains(key)) {
+				this.invalidatedPending.add(key);
+			}
 			return;
 		}
 		this.recordPortalBuildLifecycle(key, "dispatched");
