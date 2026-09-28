@@ -28,7 +28,11 @@ class WorldItemFoilEncodingTest {
             var value = layered(WORLD_MESH_ENTITY_STRATUM, flags);
             assertEquals(flags, value.flags());
             assertArrayEquals(instance(WORLD_MESH_ENTITY_STRATUM).transform(), value.transform());
-            assertThrows(IllegalArgumentException.class, () -> layered(60, flags));
+            // Terrain reuses bit 4 as its shadow-only flag; only the
+            // orthographic layering bit has no terrain meaning.
+            if (flags == WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC) {
+                assertThrows(IllegalArgumentException.class, () -> layered(60, flags));
+            }
             assertThrows(IllegalArgumentException.class, () -> value.withItemFoil(
                 new StandardItemFoilRecord(0,0,0.5F,StandardFoilKind.ARMOR)));
         }
@@ -50,7 +54,7 @@ class WorldItemFoilEncodingTest {
 
     @Test void exportedNativeLayoutCarriesExactAndCanonicalAbsentFields() throws Exception {
         try (var bridge = VulkanicGalBridge.create("rust-vulkan"); var arena = Arena.ofConfined()) {
-			assertEquals(65, ABI_VERSION);
+			assertEquals(66, ABI_VERSION);
             var layout = Struct.WORLD_MESH_INSTANCE_RECORD;
             var item = arena.allocate(layout.byteSize(), 8);
             var encode = VulkanicGalBridge.class.getDeclaredMethod("encodeWorldItemFoil", MemorySegment.class, StandardItemFoilRecord.class);

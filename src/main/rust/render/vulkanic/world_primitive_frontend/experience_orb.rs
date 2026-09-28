@@ -104,7 +104,10 @@ impl ExperienceOrbPlacement {
             cull_policy: WORLD_CULL_BACK,
             winding: WORLD_WINDING_CCW,
             color_argb: 0xffffffff,
-            entity_id: self.entity_id,
+            // The copied value is vanilla's runtime entity number, not a
+            // shader-pack entity ID; the selected source resolves orbs from
+            // `minecraft:experience_orb` and rejects any Java-supplied ID.
+            entity_id: 0,
             entity_color_argb: 0,
             packed_light: 0,
             outline_color_argb: 0,
@@ -225,7 +228,7 @@ mod tests {
         }
         assert_eq!(instance.depth_policy, WORLD_DEPTH_POLICY_TEST_WRITE);
         assert_eq!(instance.stratum, WORLD_STRATUM_ENTITY_MESH);
-        assert_eq!(instance.entity_id, 42);
+        assert_eq!(instance.entity_id, 0);
         assert_eq!(instance.entity_color_argb, 0);
         assert_eq!(instance.block_entity_id, -1);
     }

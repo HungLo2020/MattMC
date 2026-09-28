@@ -934,6 +934,11 @@ impl VoxelLightVolumeCache {
         self.descriptor.as_ref()
     }
 
+    #[cfg(test)]
+    pub(crate) fn field(&self, kind: VoxelLightVolumeKind) -> Option<&Vec<u8>> {
+        self.fields.get(&kind)
+    }
+
     pub fn replace_descriptor(&mut self, descriptor: VoxelLightVolumeDescriptor) -> GalResult<()> {
         descriptor.validate()?;
         if let Some(active) = &self.descriptor {

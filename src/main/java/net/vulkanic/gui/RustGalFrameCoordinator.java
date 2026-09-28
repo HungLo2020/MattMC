@@ -47,6 +47,21 @@ public final class RustGalFrameCoordinator {
 	private static final Object LOCK = new Object();
 	private static final GuiAtlasReferencePublication GUI_ATLAS_REFERENCES = new GuiAtlasReferencePublication();
 	private static VulkanicGalBridge bridge;
+	private static volatile java.util.function.Consumer<VulkanicGalBridge.CapturedFrame> pendingScreenshot;
+
+	/** Requests a readback of the next completed frame (user screenshot). */
+	public static void requestScreenshot(java.util.function.Consumer<VulkanicGalBridge.CapturedFrame> consumer) {
+		pendingScreenshot = consumer;
+	}
+
+	private static void serviceScreenshotRequest(long frameTarget, int width, int height) {
+		java.util.function.Consumer<VulkanicGalBridge.CapturedFrame> consumer = pendingScreenshot;
+		if (consumer == null || frameTarget == 0L) {
+			return;
+		}
+		pendingScreenshot = null;
+		consumer.accept(bridge.captureFrameTarget(frameTarget, width, height));
+	}
 	/**
 	 * The bridge owns a native graphics context for its entire lifetime.  These
 	 * modes must never be interchanged: doing so would let a whole-frame Vulkan
@@ -538,6 +553,7 @@ public final class RustGalFrameCoordinator {
 				GraphicsFrameBenchmark.beginPhase("rust-gal.world-primitives.ffi.present");
 				long presentStarted = System.nanoTime();
 				recordFixedOperation(Operation.FRAME_PRESENT, VulkanicGalBridge.Struct.FRAME_PRESENT.byteSize());
+				serviceScreenshotRequest(frame.frameTarget(), window.getWidth(), window.getHeight());
 				bridge.presentFrame(frameId, correlationId, submissionId);
 				METRICS.framePresentNanos += elapsedSince(presentStarted);
 				GraphicsFrameBenchmark.endPhase("rust-gal.world-primitives.ffi.present");
@@ -1105,45 +1121,58 @@ public final class RustGalFrameCoordinator {
 				// ran on the Rust route.
 				RustGalWorldPrimitiveRenderer.requireAcceptedParticleTextures(primitiveFrame.materialQuads());
 				RustGalWorldPrimitiveRenderer.requireAcceptedSemanticParticleTextures(primitiveFrame.particleQuads());
-				wholeFrameResult = bridge.submitWholeFrameWithAffineGuiAndWorldTextAndFirstPerson(
-					generation,
-					frameId,
-					correlationId,
-					frame.frameTarget(),
-					frameGuiWidth,
-					frameGuiHeight,
-					primitiveFrame.viewportWidth() <= 0 ? window.getWidth() : primitiveFrame.viewportWidth(),
-					primitiveFrame.viewportHeight() <= 0 ? window.getHeight() : primitiveFrame.viewportHeight(),
-					primitiveFrame.viewMatrix(),
-					primitiveFrame.projectionMatrix(),
-					primitiveFrame.background(),
-					primitiveFrame.segments(),
-					primitiveFrame.crackQuads(),
-					primitiveFrame.borderQuads(),
-					primitiveFrame.materialQuads(),
-					primitiveFrame.meshInstances(),
-					primitiveFrame.voxelVolumeFrame(),
-					primitiveFrame.shaderEnvironmentFrame(),
-					primitiveFrame.lodInstances(),
-					primitiveFrame.lodRenderFrame(),
-					primitiveFrame.featureCoverage(),
-					spriteRequests,
-					affineQuadRequests,
-					meshBatchRequests,
-					RustGalWorldPrimitiveRenderer.encodeWorldTextQuads(primitiveFrame.textQuads()),
-					primitiveFrame.firstPersonFrame(),
-					primitiveFrame.firstPersonMeshInstances(),
-					guiBlurBeforeStratum,
-					guiBlurRadius,
-					postEffectId,
-					guiProjection,
-					tiledQuadRequests,
-					engineGlobals,
-					primitiveFrame.particleQuads(),
-					primitiveFrame.orbInstances(),
-					primitiveFrame.distantHorizonsGenericBoxes(),
-					primitiveFrame.terrainFrameCamera()
-				);
+				// A shader-route failure disarms that route in Rust and is reported as
+				// retryable: resubmit this frame once, drawn by the vanilla Rust route.
+				for (int submitAttempt = 0; ; submitAttempt++) {
+					try {
+						wholeFrameResult = bridge.submitWholeFrameWithAffineGuiAndWorldTextAndFirstPerson(
+							generation,
+							frameId,
+							correlationId,
+							frame.frameTarget(),
+							frameGuiWidth,
+							frameGuiHeight,
+							primitiveFrame.viewportWidth() <= 0 ? window.getWidth() : primitiveFrame.viewportWidth(),
+							primitiveFrame.viewportHeight() <= 0 ? window.getHeight() : primitiveFrame.viewportHeight(),
+							primitiveFrame.viewMatrix(),
+							primitiveFrame.projectionMatrix(),
+							primitiveFrame.background(),
+							primitiveFrame.segments(),
+							primitiveFrame.crackQuads(),
+							primitiveFrame.borderQuads(),
+							primitiveFrame.materialQuads(),
+							primitiveFrame.meshInstances(),
+							primitiveFrame.voxelVolumeFrame(),
+							primitiveFrame.shaderEnvironmentFrame(),
+							primitiveFrame.lodInstances(),
+							primitiveFrame.lodRenderFrame(),
+							primitiveFrame.featureCoverage(),
+							spriteRequests,
+							affineQuadRequests,
+							meshBatchRequests,
+							RustGalWorldPrimitiveRenderer.encodeWorldTextQuads(primitiveFrame.textQuads()),
+							primitiveFrame.firstPersonFrame(),
+							primitiveFrame.firstPersonMeshInstances(),
+							guiBlurBeforeStratum,
+							guiBlurRadius,
+							postEffectId,
+							guiProjection,
+							tiledQuadRequests,
+							engineGlobals,
+							primitiveFrame.particleQuads(),
+							primitiveFrame.orbInstances(),
+							primitiveFrame.distantHorizonsGenericBoxes(),
+							primitiveFrame.terrainFrameCamera()
+						);
+						break;
+					} catch (IllegalStateException failure) {
+						if (submitAttempt == 0 && failure.getMessage() != null
+							&& failure.getMessage().contains("retryable selected-source failure")) {
+							continue;
+						}
+						throw failure;
+					}
+				}
 				if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 					auditMessage("Rust GUI whole-frame result mesh items=" + wholeFrameResult.guiMeshItemCount()
 						+ " batches=" + wholeFrameResult.guiMeshBatchCount()
@@ -1308,6 +1337,7 @@ public final class RustGalFrameCoordinator {
 			GraphicsFrameBenchmark.beginPhase("rust-gal.gui-frame.ffi.present");
 			presentStarted = System.nanoTime();
 			recordFixedOperation(Operation.FRAME_PRESENT, VulkanicGalBridge.Struct.FRAME_PRESENT.byteSize());
+			serviceScreenshotRequest(frame.frameTarget(), window.getWidth(), window.getHeight());
 			VulkanicGalBridge.PresentedFrame presented = bridge.presentFrame(frameId, correlationId, submissionId);
 			// Publish this successful submission's semantic execution evidence
 			// before a final-output capture can acknowledge its presented image.

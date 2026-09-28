@@ -4742,6 +4742,36 @@ public final class RustGalWorldPrimitiveRenderer {
 		return true;
 	}
 
+	/**
+	 * Render-thread scope naming the stack an item layer draws. Iris sets
+	 * `currentRenderedItemId` from it (block items: the default state's
+	 * block material; others: the item model). Rust resolves the id from the
+	 * copied identity; the scope never carries Iris state.
+	 */
+	private static String pendingRenderedItemIdentity;
+
+	public static String beginRenderedItem(net.minecraft.world.item.Item item, ResourceLocation modelId) {
+		String previous = pendingRenderedItemIdentity;
+		ResourceLocation identity = null;
+		if (item instanceof net.minecraft.world.item.BlockItem && !(item instanceof net.minecraft.world.item.SolidBucketItem)) {
+			identity = BuiltInRegistries.ITEM.getKey(item);
+		} else if (item != null) {
+			identity = modelId != null ? modelId : BuiltInRegistries.ITEM.getKey(item);
+		}
+		pendingRenderedItemIdentity = identity == null ? null : identity.getNamespace() + "/" + identity.getPath();
+		return previous;
+	}
+
+	public static void endRenderedItem(String previous) {
+		pendingRenderedItemIdentity = previous;
+	}
+
+	/** Canonical identity `minecraft:item_entity/ground[/<ns>/<path>]`. */
+	private static String renderedItemMeshIdentity() {
+		String item = pendingRenderedItemIdentity;
+		return item == null ? "minecraft:item_entity/ground" : "minecraft:item_entity/ground/" + item;
+	}
+
 	/** Begins a bounded semantic identity scope for a special first-person item renderer. */
 	public static void beginFirstPersonSemanticItem(ItemStack itemStack) {
 		if (itemStack == null || itemStack.isEmpty()) {
@@ -8379,7 +8409,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		GraphicsFrameBenchmark.beginPhase("world.item-entity.java-extraction");
 		BlockMeshExtraction extraction;
 		try {
-			extraction = extractItemQuadMesh(quads, tintLayers, packedLight, semantics, "minecraft:item_entity/ground");
+			extraction = extractItemQuadMesh(quads, tintLayers, packedLight, semantics, renderedItemMeshIdentity());
 		} finally {
 			GraphicsFrameBenchmark.endPhase("world.item-entity.java-extraction");
 		}
@@ -12609,14 +12639,39 @@ public final class RustGalWorldPrimitiveRenderer {
 		return dot >= 0.0F ? WORLD_WINDING_CCW : WORLD_WINDING_CW;
 	}
 
-	private static int packWorldMeshNormal(float x, float y, float z) {
-		float length = (float)Math.sqrt(x * x + y * y + z * z);
-		if (length <= 0.00001F) {
+	/**
+	 * Copies Iris `HandRenderer.isHandTranslucent` per hand: the player's
+	 * current held stack is a block item whose default state uses the
+	 * translucent chunk layer. Rust draws that whole hand in the late
+	 * translucent-hand pass of a selected shader pack; vanilla ignores it.
+	 */
+	private static int firstPersonTranslucentHandMask() {
+		net.minecraft.client.player.LocalPlayer player = Minecraft.getInstance().player;
+		if (player == null) {
 			return 0;
 		}
-		int ix = Math.round(x / length * 127.0F) & 0xff;
-		int iy = Math.round(y / length * 127.0F) & 0xff;
-		int iz = Math.round(z / length * 127.0F) & 0xff;
+		int mask = 0;
+		if (isTranslucentBlockItem(player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND))) mask |= 1;
+		if (isTranslucentBlockItem(player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND))) mask |= 2;
+		return mask;
+	}
+
+	private static boolean isTranslucentBlockItem(ItemStack stack) {
+		return stack.getItem() instanceof net.minecraft.world.item.BlockItem blockItem
+			&& net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockItem.getBlock().defaultBlockState())
+				== net.minecraft.client.renderer.chunk.ChunkSectionLayer.TRANSLUCENT;
+	}
+
+	private static int packWorldMeshNormal(float x, float y, float z) {
+		// Scale-independent: small first-person item faces (cross products of
+		// sub-millimetre edges) still have a direction; only zero has none.
+		double length = Math.sqrt((double)x * x + (double)y * y + (double)z * z);
+		if (!(length > 0.0) || !Double.isFinite(length)) {
+			return 0;
+		}
+		int ix = (int)Math.round(x / length * 127.0) & 0xff;
+		int iy = (int)Math.round(y / length * 127.0) & 0xff;
+		int iz = (int)Math.round(z / length * 127.0) & 0xff;
 		return ix | iy << 8 | iz << 16;
 	}
 
@@ -18514,7 +18569,8 @@ public final class RustGalWorldPrimitiveRenderer {
 					true,
 					admittedFirstPersonMainHandInstanceCount,
 					PENDING_FIRST_PERSON_PROJECTION,
-					PENDING_FIRST_PERSON_MODEL_VIEW
+					PENDING_FIRST_PERSON_MODEL_VIEW,
+					firstPersonTranslucentHandMask()
 				)
 				: VulkanicGalBridge.WorldFirstPersonFrameRecord.disabled();
 			// These admitted lists are frame-local and are never mutated after this

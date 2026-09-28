@@ -6535,7 +6535,7 @@ public final class DeterministicCameraCapture {
 			}
 		}
 		return !REQUIRE_RUST_ITEM_ENTITY_SOURCE_CAPTURE
-			|| json.contains("\"entity_identity\":\"minecraft:item_entity/ground\"");
+			|| json.contains("\"entity_identity\":\"minecraft:item_entity/ground");
 	}
 
 	/**
@@ -12418,7 +12418,8 @@ if ("horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) co
 		Minecraft minecraft = Minecraft.getInstance();
 		return isWallSkullModelScenario() && minecraft.level != null && modelMeshSetupPosition != null
 			? minecraft.level.getBlockState(modelMeshSetupPosition)
-				.getValue(net.minecraft.world.level.block.WallSkullBlock.FACING).getName()
+				.getOptionalValue(net.minecraft.world.level.block.WallSkullBlock.FACING)
+				.map(direction -> direction.getName()).orElse("unavailable")
 			: "not-applicable";
 	}
 
@@ -12432,8 +12433,10 @@ if ("horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) co
 	private static String modelMeshSkullType() {
 		Minecraft minecraft = Minecraft.getInstance();
 		if (!isSkullModelScenario() || minecraft.level == null || modelMeshSetupPosition == null) return "not-applicable";
-		return ((net.minecraft.world.level.block.AbstractSkullBlock)minecraft.level
-			.getBlockState(modelMeshSetupPosition).getBlock()).getType().getSerializedName();
+		// The metadata can be written before the scenario block is in place.
+		return minecraft.level.getBlockState(modelMeshSetupPosition).getBlock()
+				instanceof net.minecraft.world.level.block.AbstractSkullBlock skull
+			? skull.getType().getSerializedName() : "unavailable";
 	}
 
 	private static float modelMeshSkullAnimation() {
@@ -12449,7 +12452,7 @@ if ("horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) co
 		Minecraft minecraft = Minecraft.getInstance();
 		return isSkullModelScenario() && minecraft.level != null && modelMeshSetupPosition != null
 			&& minecraft.level.getBlockState(modelMeshSetupPosition)
-				.getValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED);
+				.getOptionalValue(net.minecraft.world.level.block.AbstractSkullBlock.POWERED).orElse(false);
 	}
 
 	private static String modelMeshSkullProfileName() {

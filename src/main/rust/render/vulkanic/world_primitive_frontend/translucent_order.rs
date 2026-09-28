@@ -3,12 +3,18 @@
 //! backend state. One cache per mesh generation bounds retained sort state.
 
 use super::*;
-use crate::render::chunk::translucent::semantic::SemanticTranslucentGeometry;
+use crate::render::chunk::translucent::semantic::{
+    SemanticOrderRegion, SemanticTranslucentGeometry,
+};
 
 pub(super) struct CachedOrder {
     geometry: SemanticTranslucentGeometry,
     quads: Vec<(u32, u64)>,
     camera: Option<[f32; 3]>,
+    /// Plane-arrangement cell of the camera `order` was sorted for, when that
+    /// order came from the topological sort: the order holds for any camera
+    /// in the same cell (Sodium likewise re-sorts only on plane crossings).
+    region: Option<SemanticOrderRegion>,
     order: Vec<usize>,
     stable_camera_frames: u8,
     direct_template: Option<CachedDirectBatches>,
@@ -18,6 +24,10 @@ struct CachedDirectBatches {
     instance: MeshBatchInstanceKey,
     color_format: ColorFormat,
     raster_y_direction: RasterYDirection,
+    g_buffer: bool,
+    /// Whether the batches address the caller's sorted index stream (`indices`)
+    /// or the immutable mesh index buffer directly.
+    sorted: bool,
     batches: Vec<MeshBatch>,
     indices: Vec<u8>,
 }
@@ -117,6 +127,7 @@ fn prepare(asset: &MeshAssetStore) -> GalResult<CachedOrder> {
         geometry,
         quads,
         camera: None,
+        region: None,
         order: Vec::new(),
         stable_camera_frames: 0,
         direct_template: None,
@@ -145,40 +156,53 @@ pub(super) fn append_batches(
     }
     let cache = retained.as_mut().unwrap();
     if cache.camera != Some(camera) {
-        let order = cache
-            .geometry
-            .order(camera)
-            .ok_or_else(|| GalError::invalid_argument("invalid translucent camera ordering"))?;
-        cache.order = order;
-        cache.camera = Some(camera);
-        cache.stable_camera_frames = 0;
-        cache.direct_template = None;
+        let region = cache.geometry.order_region(camera);
+        if region.is_some() && region == cache.region {
+            // Same plane-arrangement cell: the sort would return this order.
+            cache.camera = Some(camera);
+            cache.stable_camera_frames = cache.stable_camera_frames.saturating_add(1);
+        } else {
+            let (order, topological) = cache
+                .geometry
+                .order_with_topology(camera)
+                .ok_or_else(|| GalError::invalid_argument("invalid translucent camera ordering"))?;
+            cache.order = order;
+            cache.camera = Some(camera);
+            cache.region = region.filter(|_| topological);
+            cache.stable_camera_frames = 0;
+            cache.direct_template = None;
+        }
     } else {
         cache.stable_camera_frames = cache.stable_camera_frames.saturating_add(1);
     }
-    // Immutable terrain topology and an unchanged camera produce the same
+    // Immutable terrain topology and an unchanged order produce the same
     // material runs and index order. Keep a bounded template with the asset;
     // only the frame's instance index and stream offset need rebinding.
-    let direct_key = (cache.stable_camera_frames > 0 && !g_buffer && sorted_indices.is_some())
+    let sorted = sorted_indices.is_some();
+    let direct_key = (cache.stable_camera_frames > 0 && (!g_buffer || !sorted))
         .then(|| mesh_batch_instance_key(instance));
-    if let (Some(key), Some(template), Some(bytes)) = (
-        direct_key.as_ref(),
-        cache.direct_template.as_ref(),
-        sorted_indices.as_mut(),
-    ) {
+    if let (Some(key), Some(template)) = (direct_key.as_ref(), cache.direct_template.as_ref()) {
         if template.instance == *key
             && template.color_format == color_format
             && template.raster_y_direction == raster_y_direction
+            && template.g_buffer == g_buffer
+            && template.sorted == sorted
         {
-            let base = (bytes.len() + 3) & !3;
-            bytes.resize(base, 0);
-            bytes.extend_from_slice(&template.indices);
+            let base = match sorted_indices.as_mut() {
+                Some(bytes) => {
+                    let base = (bytes.len() + 3) & !3;
+                    bytes.resize(base, 0);
+                    bytes.extend_from_slice(&template.indices);
+                    base as u64
+                }
+                None => 0,
+            };
             for batch in &template.batches {
                 let mut rebound = batch.clone();
                 rebound.indices.clear();
                 rebound.indices.push(instance_index);
                 rebound.sorted_index_offset =
-                    batch.sorted_index_offset.map(|offset| offset + base as u64);
+                    batch.sorted_index_offset.map(|offset| offset + base);
                 batches.push(rebound);
             }
             return Ok(());
@@ -253,24 +277,31 @@ pub(super) fn append_batches(
             });
         }
     }
-    if let (Some(key), Some(start), Some(bytes)) =
-        (direct_key, index_start, sorted_indices.as_ref())
-    {
-        if bytes.len() < start || batches.len() == batch_start {
+    if let Some(key) = direct_key {
+        if batches.len() == batch_start {
             return Ok(());
         }
+        let (start, indices) = match (index_start, sorted_indices.as_ref()) {
+            (Some(start), Some(bytes)) => {
+                if bytes.len() < start {
+                    return Ok(());
+                }
+                (start as u64, bytes[start..].to_vec())
+            }
+            _ => (0, Vec::new()),
+        };
         let mut cached_batches = batches[batch_start..].to_vec();
         for batch in &mut cached_batches {
-            batch.sorted_index_offset = batch
-                .sorted_index_offset
-                .map(|offset| offset - start as u64);
+            batch.sorted_index_offset = batch.sorted_index_offset.map(|offset| offset - start);
         }
         cache.direct_template = Some(CachedDirectBatches {
             instance: key,
             color_format,
             raster_y_direction,
+            g_buffer,
+            sorted,
             batches: cached_batches,
-            indices: bytes[start..].to_vec(),
+            indices,
         });
     }
     Ok(())

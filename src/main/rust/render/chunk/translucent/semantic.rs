@@ -4,7 +4,23 @@
 
 use super::*;
 
-pub(crate) struct SemanticTranslucentGeometry(NativeTranslucentSectionGeometry);
+pub(crate) struct SemanticTranslucentGeometry(
+    NativeTranslucentSectionGeometry,
+    /// Per axis, every coordinate the topological sort compares a camera axis
+    /// against (quad extents, aligned separator distances and aligned quad
+    /// planes), sorted by `total_cmp` and deduplicated.
+    [Vec<f32>; 3],
+);
+
+/// The cell of the sort's plane arrangement containing a camera: the open
+/// interval per axis between consecutive breakpoints, plus the side of every
+/// unaligned quad plane. Every camera comparison of the topological sort has
+/// the same outcome throughout one cell, so its order is identical there.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SemanticOrderRegion {
+    intervals: [usize; 3],
+    unaligned_sides: Vec<bool>,
+}
 
 impl SemanticTranslucentGeometry {
     pub(crate) fn new(positions: &[[[f32; 3]; 4]]) -> Option<Self> {
@@ -38,10 +54,84 @@ impl SemanticTranslucentGeometry {
             quads.push(build_quad_info(&record));
         }
         let aligned_separator_distances = build_aligned_separator_distances(&quads);
-        Some(Self(NativeTranslucentSectionGeometry {
-            quads,
-            aligned_separator_distances,
-        }))
+        let mut breakpoints: [Vec<f32>; 3] = Default::default();
+        for direction in 0..FACING_DIRECTIONS {
+            let axis = direction % 3;
+            let sign = facing_sign(direction as i32) as f32;
+            breakpoints[axis].extend(quads.iter().map(|quad| quad.extents[direction]));
+            breakpoints[axis].extend(
+                aligned_separator_distances[direction]
+                    .iter()
+                    .map(|distance| distance * sign),
+            );
+        }
+        for quad in &quads {
+            if is_aligned(quad.topo_facing) {
+                let direction = quad.topo_facing as usize;
+                let sign = facing_sign(quad.topo_facing) as f32;
+                breakpoints[direction % 3].push(quad.accurate_dot_product * sign);
+            }
+        }
+        for axis in &mut breakpoints {
+            axis.sort_by(f32::total_cmp);
+            axis.dedup_by(|a, b| a.total_cmp(b).is_eq());
+        }
+        Some(Self(
+            NativeTranslucentSectionGeometry {
+                quads,
+                aligned_separator_distances,
+            },
+            breakpoints,
+        ))
+    }
+
+    /// The camera's cell (see `SemanticOrderRegion`), or `None` when it lies
+    /// exactly on a breakpoint or is not finite (the order must be recomputed).
+    pub(crate) fn order_region(&self, camera: [f32; 3]) -> Option<SemanticOrderRegion> {
+        if !camera.iter().all(|value| value.is_finite()) {
+            return None;
+        }
+        let mut intervals = [0; 3];
+        for axis in 0..3 {
+            match self.1[axis].binary_search_by(|value| value.total_cmp(&camera[axis])) {
+                Ok(_) => return None,
+                Err(interval) => intervals[axis] = interval,
+            }
+        }
+        let unaligned_sides = self
+            .0
+            .quads
+            .iter()
+            .filter(|quad| !is_aligned(quad.topo_facing))
+            .map(|quad| {
+                point_outside_half_space(
+                    quad.accurate_dot_product,
+                    dynamic_accurate_normal(quad),
+                    camera[0],
+                    camera[1],
+                    camera[2],
+                )
+            })
+            .collect();
+        Some(SemanticOrderRegion {
+            intervals,
+            unaligned_sides,
+        })
+    }
+
+    /// `order`, also reporting whether the topological sort produced it (a
+    /// cycle falls back to the distance sort, which varies continuously with
+    /// the camera and is therefore not region-stable).
+    pub(crate) fn order_with_topology(&self, camera: [f32; 3]) -> Option<(Vec<usize>, bool)> {
+        if !camera.iter().all(|value| value.is_finite()) {
+            return None;
+        }
+        if let Some(order) =
+            dynamic_topo_graph_sort(&self.0, (camera[0], camera[1], camera[2]), false)
+        {
+            return Some((order.into_iter().map(|i| i as usize).collect(), true));
+        }
+        self.order(camera).map(|order| (order, false))
     }
 
     pub(crate) fn order(&self, camera: [f32; 3]) -> Option<Vec<usize>> {
@@ -85,6 +175,65 @@ mod tests {
             p.reverse();
         }
         p
+    }
+
+    /// Within one `order_region` cell every topological order is identical,
+    /// so reusing a cached order there is exact. Random water-like sections
+    /// mix axis-aligned faces (all six directions) with slanted quads.
+    #[test]
+    fn topological_order_is_constant_within_an_order_region() {
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f32 / (1u64 << 53) as f32
+        };
+        let mut compared = 0;
+        for _ in 0..40 {
+            let mut quads = Vec::new();
+            for _ in 0..(3 + (next() * 10.0) as usize) {
+                let base = [
+                    (next() * 6.0).floor(),
+                    (next() * 4.0).floor(),
+                    (next() * 6.0).floor(),
+                ];
+                let size = 0.25 + next() * 1.5;
+                let quad = match (next() * 7.0) as usize {
+                    0 => [[0., 0., 0.], [size, 0., 0.], [size, size, 0.], [0., size, 0.]],
+                    1 => [[0., 0., 0.], [0., size, 0.], [size, size, 0.], [size, 0., 0.]],
+                    2 => [[0., 0., 0.], [0., 0., size], [0., size, size], [0., size, 0.]],
+                    3 => [[0., 0., 0.], [0., size, 0.], [0., size, size], [0., 0., size]],
+                    4 => [[0., 0., 0.], [0., 0., size], [size, 0., size], [size, 0., 0.]],
+                    5 => [[0., 0., 0.], [size, 0., 0.], [size, 0., size], [0., 0., size]],
+                    _ => [[0., 0., 0.], [size, 0., 0.], [size, size, size], [0., size, size]],
+                };
+                quads.push(quad.map(|corner| [0, 1, 2].map(|axis| corner[axis] + base[axis])));
+            }
+            let geometry = SemanticTranslucentGeometry::new(&quads).unwrap();
+            let mut by_region: Vec<(SemanticOrderRegion, Vec<usize>)> = Vec::new();
+            for _ in 0..300 {
+                let camera = [
+                    next() * 12.0 - 3.0,
+                    next() * 10.0 - 3.0,
+                    next() * 12.0 - 3.0,
+                ];
+                let Some(region) = geometry.order_region(camera) else {
+                    continue;
+                };
+                let Some((order, true)) = geometry.order_with_topology(camera) else {
+                    continue;
+                };
+                match by_region.iter().find(|(known, _)| *known == region) {
+                    Some((_, known_order)) => {
+                        compared += 1;
+                        assert_eq!(known_order, &order, "camera {camera:?}");
+                    }
+                    None => by_region.push((region, order)),
+                }
+            }
+        }
+        assert!(compared > 500, "only {compared} same-region comparisons");
     }
 
     #[test]

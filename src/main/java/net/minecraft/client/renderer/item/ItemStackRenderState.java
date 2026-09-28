@@ -237,8 +237,14 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 
 	/** Explicit semantic item submission used by Rust-owned extraction callsites. */
 	public void submitSemantic(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, int k) {
-		for (int l = 0; l < this.activeLayerCount; l++) {
-			this.layers[l].submit(poseStack, submitNodeCollector, i, j, k);
+		String previous = net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginRenderedItem(
+			this.iris_displayStack, this.iris_displayModelId);
+		try {
+			for (int l = 0; l < this.activeLayerCount; l++) {
+				this.layers[l].submit(poseStack, submitNodeCollector, i, j, k);
+			}
+		} finally {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.endRenderedItem(previous);
 		}
 	}
 

@@ -436,6 +436,22 @@ pub enum GuiMeshLightingMode {
     FrontModel,
     /// Ordinary entity preview lighting (Lighting.ENTITY_IN_UI).
     EntityPreview,
+    /// Oversized special-renderer items (Frozen OversizedItemRenderer):
+    /// entity materials lit by ITEMS_3D in its (f, -f, f) PIP normal space,
+    /// the same light space as ordinary inventory models.
+    OversizedItem,
+    /// Oversized items whose model does not use block light: ITEMS_FLAT.
+    OversizedItemFlat,
+}
+
+impl GuiMeshLightingMode {
+    /// Entity-material item layers: entity preview or oversized item lights.
+    pub fn is_entity_material_lighting(self) -> bool {
+        matches!(
+            self,
+            Self::EntityPreview | Self::OversizedItem | Self::OversizedItemFlat
+        )
+    }
 }
 
 /// One copied model vertex with the stable vanilla signed-i8 normal encoding.
@@ -2092,7 +2108,9 @@ fn frame_uniform_bytes(
     let lighting_policy = match lighting_mode {
         GuiMeshLightingMode::InventoryBlock
         | GuiMeshLightingMode::FrontModel
-        | GuiMeshLightingMode::EntityPreview => 2.0,
+        | GuiMeshLightingMode::EntityPreview
+        | GuiMeshLightingMode::OversizedItem
+        | GuiMeshLightingMode::OversizedItemFlat => 2.0,
         GuiMeshLightingMode::Block => 1.0,
         GuiMeshLightingMode::Flat => 0.0,
     };
@@ -2115,7 +2133,10 @@ fn frame_uniform_bytes(
         }
         return bytes;
     }
-    if lighting_mode == GuiMeshLightingMode::FrontModel {
+    if matches!(
+        lighting_mode,
+        GuiMeshLightingMode::FrontModel | GuiMeshLightingMode::OversizedItemFlat
+    ) {
         // Frozen Lighting.ITEMS_FLAT: rotationY(-pi/8).rotateX(3pi/4).
         // Normals already include the item atlas's Y reflection; the light
         // directions themselves do not. No borrowed Lighting UBO/state.
@@ -2140,7 +2161,12 @@ fn frame_uniform_bytes(
     // scale(k, -k, k) normals. ITEMS_3D_UPRIGHT belongs to the separate
     // PIP convention, not ordinary inventory icons. Keep the light-space
     // selection explicit; never infer it from a backend or borrowed UBO.
-    let light_y_sign = if lighting_mode == GuiMeshLightingMode::InventoryBlock {
+    // Oversized items carry normals in Frozen's complete PIP pose
+    // scale(f,f,-f)*scale(1,-1,-1): the same (k,-k,k) space as the atlas.
+    let light_y_sign = if matches!(
+        lighting_mode,
+        GuiMeshLightingMode::InventoryBlock | GuiMeshLightingMode::OversizedItem
+    ) {
         -1.0
     } else {
         1.0
@@ -2653,7 +2679,7 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
         GuiMeshMaterialMode::EntityCutoutNoCull
             | GuiMeshMaterialMode::EntityTranslucentNoCull
             | GuiMeshMaterialMode::EntityDecalCutoutNoCull
-    ) && (batch.lighting_mode != GuiMeshLightingMode::EntityPreview
+    ) && (!batch.lighting_mode.is_entity_material_lighting()
         || (batch.alpha_cutoff - 0.1).abs() > f32::EPSILON
         || batch.item_raster_scale != 0
         || batch.item_foil.is_some())
@@ -2974,7 +3000,7 @@ fn prepare_draw(batch: &GuiMeshBatchRequest) -> GalResult<GuiMeshPreparedDraw> {
             }
             if (batch.lighting_mode == GuiMeshLightingMode::InventoryBlock
                 && batch.block_item_raster.is_none())
-                || batch.lighting_mode == GuiMeshLightingMode::EntityPreview
+                || batch.lighting_mode.is_entity_material_lighting()
             {
                 normal = packed_normal;
             }
@@ -3590,6 +3616,20 @@ mod tests {
         assert!(std::str::from_utf8(GUI_MESH_VERTEX_SHADER_VULKAN)
             .unwrap()
             .contains(decode));
+    }
+
+    #[test]
+    fn oversized_item_lighting_uses_inventory_items_3d_directions() {
+        let oversized = frame_uniform_bytes([64.0, 64.0], 0.1, GuiMeshLightingMode::OversizedItem);
+        let inventory = frame_uniform_bytes([64.0, 64.0], 0.1, GuiMeshLightingMode::InventoryBlock);
+        assert_eq!(oversized, inventory);
+        assert!(GuiMeshLightingMode::OversizedItem.is_entity_material_lighting());
+        assert!(!GuiMeshLightingMode::InventoryBlock.is_entity_material_lighting());
+        assert_eq!(
+            frame_uniform_bytes([64.0, 64.0], 0.1, GuiMeshLightingMode::OversizedItemFlat)[16..],
+            frame_uniform_bytes([64.0, 64.0], 0.1, GuiMeshLightingMode::FrontModel)[16..]
+        );
+        assert!(GuiMeshLightingMode::OversizedItemFlat.is_entity_material_lighting());
     }
 
     #[test]
@@ -5312,6 +5352,21 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn item_layer_gaps_are_compacted_in_order_but_duplicates_still_fail() {
+        let mut first = batch();
+        first.sequence = 7;
+        first.layer_index = 1;
+        let mut second = first.clone();
+        second.layer_index = 3;
+        let mut batches = vec![second, first];
+        crate::render::vulkanic::ffi::gui::compact_gui_mesh_item_layers(&mut batches);
+        assert_eq!(vec![1, 0], batches.iter().map(|b| b.layer_index).collect::<Vec<_>>());
+        validate_batches(&batches).unwrap();
+        let duplicate = vec![batches[1].clone(), batches[1].clone()];
+        assert!(validate_batches(&duplicate).is_err());
     }
 
     #[test]

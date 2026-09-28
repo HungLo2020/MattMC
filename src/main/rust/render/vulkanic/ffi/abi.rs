@@ -73,7 +73,7 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v53 adds immutable orb appearance assets, lowered to geometry only in Rust.
 /// v54 adds semantic orb placement to the ordered entity mesh stream.
 /// v58 adds explicit equal-depth/write semantics for entity mesh layers.
-pub const FFI_ABI_VERSION: u32 = 65;
+pub const FFI_ABI_VERSION: u32 = 66;
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 pub const FFI_ABI_NAME: &str = "MattMC VulkanicGAL Java-Rust batch ABI";
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
@@ -1623,6 +1623,10 @@ pub struct FfiWorldFirstPersonFrame {
     pub projection_matrix: [f32; 16],
     /// Appended in ABI v23 to preserve every pre-existing field offset.
     pub model_view_matrix: [f32; 16],
+    /// Appended in ABI v66. Bit 0: main hand, bit 1: off hand. A hand whose
+    /// copied held stack is a translucent-layer block item draws in the late
+    /// translucent-hand pass (Iris `HandRenderer.isHandTranslucent`).
+    pub translucent_hand_mask: u32,
 }
 
 /// One copied, backend-neutral world-text glyph quad. The atlas asset is a

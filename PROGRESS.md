@@ -20,42 +20,28 @@ The selected ZIP is `run/shaderpacks/ComplementaryHungLoIfied.zip`, SHA-256
 `cb4343913a0d...`. Mask transient chat at x<1000,y=570..609 for RGB MAE.
 Retained pairs: `artifacts/graphics-captures/goal3-source-2026-09-25/`.
 The harness stages a byte-identical pack per client and verifies its SHA-256
-receipt (pairs without it are not evidence). Diagnostic ZIPs go through
-`MATTMC_CAPTURE_SHADER_PACK_SOURCE` (outside the repo).
+receipt (pairs without it are not evidence). Always stage packs (canonical or
+diagnostic) via `MATTMC_CAPTURE_SHADER_PACK_SOURCE` (outside the repo).
 
-- Shadow terrain draws unculled on both; shadow maps and ray-projected depth
-  agree, so add no Rust shadow-sampling/depth offset.
+- Shadow terrain unculled on both; shadow/ray depth agree: add no depth offset.
 
 ## Validation and history
 
-Rain lightmap residency owned by the source frame's confirm/discard boundary;
-celestial quads draw only via the pre-terrain sky writer.
-**Mip semantics (2026-09-25).** Only programs declaring
-`colortexNMipmapEnabled` sample mips (others see the base-mip view); harness
-passes `advanceFrameCounter=true`. Overhead clouds **1.547/1.607/2.284**.
-**Night/rain gap: deferred by the user (2026-09-25) — noted, ignore for now,
-keep working; not reclassified as a Frozen bug.** Night 5.465/6.781/10.829,
-rain 8.137/9.337/8.826: night volumetric fog brighter/bluer; passes with any
-constant ray dither, Frozen's spatial-dither result depends on neighbouring
-pixels. Do not add a Current workaround.
-**Iris hand order (2026-09-25).** Non-DH Depth32 hands: depthtex2 snapshot ->
-hand pass -> hand depth into main depth -> depthtex1 -> deferred ->
-translucents (DH/D24S8 keep legacy order); validation **0 errors**.
-Vanilla entity-shadow decals omitted when the pack owns a shadow pass; caster
-directives resolve option-aware (Complementary: entities=false, player=true).
+Celestial quads: pre-terrain sky writer only. Only programs declaring
+`colortexNMipmapEnabled` sample mips.
+**Night/rain gap: deferred by the user (2026-09-25); not a Frozen bug.** Night
+5.47/6.78/10.83, rain 8.14/9.34/8.83 (night fog brighter/bluer; dither).
+**Iris hand order (09-25).** Non-DH Depth32 hands: depthtex2 snapshot -> hand
+pass -> hand depth into main depth -> depthtex1 -> deferred -> translucents.
+Entity-shadow decals omitted when the pack owns a shadow pass.
 **Shadow map orientation + casters (2026-09-25).** Source shadow pipelines use
-`RasterYDirection::Down` (shadow consumers are matrix-addressed; a `final`
-`texCoord` readback hides this flip, use `gl_FragCoord` in a world stage).
-Java sweeps the whole render window for off-camera casters (bounded 384
-builds/256 columns per frame). Layered overlays fold VIEW_OFFSET_Z_LAYERING into
-the instance transform (`view_layering::apply_to_model`). Look-down residual
-is timing confounds: composite dither=0.5 plus `WAVING_SPEED 0` passes
-(**4.955/4.519/3.449**).
-Other gaps: energy swirl unadmittable; no Iris program fallback chains;
-`texture2D(sampler2DShadow, vec2)` accepted by NVIDIA GL but rejected here;
-the translucent contract requires exact source expressions (e.g. the colortex3
-`gl_FragData[1]` line), so edited water sources are unadmitted.
-Always stage the canonical pack via `MATTMC_CAPTURE_SHADER_PACK_SOURCE`.
+`RasterYDirection::Down` (use `gl_FragCoord` in a world stage to check it). Java
+sweeps the render window for off-camera casters (384 builds/256 columns per
+frame). Layered overlays fold VIEW_OFFSET_Z_LAYERING into the instance transform.
+Look-down residual is timing (dither 0.5 + `WAVING_SPEED 0`: 4.96/4.52/3.45). Gaps:
+energy swirl unadmitted (Iris: gbuffers_entities, ENTITIES_CUTOUT, pipeline's
+additive blend + texture matrix); no Iris program fallback chains;
+`texture2D(sampler2DShadow, vec2)` rejected; edited water sources unadmitted.
 
 **Glint via `gbuffers_armor_glint` (2026-09-27).** Iris draws every glint
 (item/entity/armor, world and hand) with `ShaderKey.GLINT`: position+UV only,
@@ -68,10 +54,14 @@ reservation). `invariant gl_Position` in the source vertex preamble fixed EQUAL
 streaks. Held trident pair 7.25/10.49/6.45 -> **2.336/2.033/2.434**, 0 VUIDs. Also fixed:
 trident in hand crashed (model-part hand identity vs item identity); colour-pass
 target cache evicted other phases by depth texture (hand/entity ping-pong
-recreating targets every frame). Gap: world item entities get
-`currentRenderedItemId=-1` (Iris sets the item's ID; Complementary shades a
-dropped diamond as gem) — dropped-foil pair 2.95/2.82/3.13. Decal (special)
-foil still uses mesh UVs (vanilla projects them).
+recreating targets every frame). Special (decal) foil glint now uses per-pose
+SheetedDecal UVs (derived glint mesh, retired when unused). Entity/hand alpha
+tests now run on output 0 after `main`, as Iris appends them (Complementary
+skips `color *= glColor` for alpha-0 texels, which wrote depth and let the glint
+cover the whole item quad). Held enchanted clock 3.50/2.96/4.46 -> 2.95/2.21/3.76;
+held gun 2.38/1.96/2.53 -> 2.09/1.64/2.07; cow 2.11/1.66/2.07, banner 2.22/1.86/2.27.
+Harness notes: chicken/horse scenes differ on Frozen (missing/rotated mob); the
+spawner scenario's shader-route evidence rule never matches (route executes).
 **Camera-motion smear (2026-09-27).** `camera_history` returned previous =
 current for every call after the first in a frame, so composite TAA and the
 deferred1 reflection filter saw no motion and blended stale history at the wrong
@@ -80,11 +70,77 @@ return the stored history. The `...Reprojection(vec3 pos)` helpers also convert
 image-UV input once. Motion pair (`MATTMC_CAPTURE_STATIC_POSE_SEQUENCE=4,2,18`)
 sharpness 135 vs 256 -> 173 vs 183; left-pose arm residual is harness timing
 (Frozen captures 2 frames after a turn, Current ~10: mid-sway vs settled arm).
-**Entity shadow casters (2026-09-26).** Iris shadows the first-person player:
-Java extracts player/vehicle (stratum 69) while a source is ready; Rust admits
-them only to the lowered entity `shadow` stage per caster directives. Cow
-**2.352/2.015/2.544**; its `missing_semantic_entity_identity` is a harness issue.
-**Block outline via `gbuffers_line` (2026-09-26).** Iris draws the selection
+**Held items / hand passes (2026-09-27).** Crash on hotbar switch fixed:
+`currentRenderedItemId` now resolves from the drawn mesh (vanilla draws the old
+stack during the equip animation), as Iris does. Block items resolve the pack's
+block material of the default state (`mattmc/runtime-block-items.properties`,
+0 when unmatched); `heldItemId` keeps item.properties. Iris `isHandTranslucent`
+(ABI 66 `translucent_hand_mask`): that whole hand draws in a late pass after
+weather, before composite, into main depth. Degenerate/sub-mm quads (TaCZ gun
+faces) no longer reject the frame (scale-independent normals, second-triangle
+fallback); producer-authored TaCZ hand normals were worse (2.0 -> 3.6 MAE).
+Source local materials honour copied `.mcmeta` sampling (glint blur/clamp).
+Pairs: gun 2.38/1.96/2.53, held pane 2.35/1.82/2.11, day+stairs 2.28/1.83/2.15. Gaps: gun muzzle/stock-edge shading; `gbuffers_hand_water`
+packs unadmitted. Gun hotbar icon fixed: it was composited under the hotbar
+sprite (raw phase order, not `dynamicLayerOrder/Id`); the raster now uses
+Frozen's PIP pose scale(f,f,-f)*scale(1,-1,-1) and new GUI lighting modes
+6/7 (OversizedItemRenderer ITEMS_3D / ITEMS_FLAT by `usesBlockLight`).
+Shader-off gun pair 0.41/0.70/0.80 -> 0.14/0.25/0.24 (one barrel-top px row
+differs). TACZ GUI capture cache is skipped while its animation is active; a
+selected-slot icon offset in shader-on pairs is wall-clock TACZ animation timing
+(first-person poses match). World item layers carry `minecraft:item_entity/ground/<ns>/<path>`
+(`ItemStackRenderState.submitSemantic`); other entity draws get 0 (Iris resets).
+Gap: dropped flat foil item under clamp-glint fixture: washed on Frozen, opaque here.
+**Crash robustness (2026-09-27).** A failed armed submission within 60 frames
+of (re)arming disarms and redraws that frame on the vanilla Rust route; later
+failures disarm and return `retryable selected-source failure` (Java resubmits
+once); a missing DH depth snapshot after a world change disarms in admission.
+GUI item layers are compacted, not rejected. Dimension tour: 0 crashes/VUIDs
+(program identities carry a dimension tag, shadow identity a content hash;
+writer-declared shadow roles are staged even if terrain samples none). Vanilla's below-horizon dark disc is sky geometry (Iris:
+skybasic), skipped by the textured writer. Deferred water gap: underwater pair
+152.5,60,499.5,180,10 is 131.8/152.9/168.7 (Frozen near-black water fog).
+Sweeps (hotbar, block-entity/mob models): 0 fallbacks; fixed XP orbs, End portals.
+**Perf (RD10, 2026-09-27/28):** ~33 -> ~50 fps, frontend 23.9 -> 12.9 ms (static
+camera). Source route reuses identity-keyed static/shadow batch plans (batching
+4.0 -> 0.3 ms); terrain coverage validation memoized (3.3 -> 0.4 ms); source
+terrain geometry lives in shared 128 MiB pages (indices rebased at upload,
+completion-gated release) and is multi-drawn (1280-byte instance blocks via
+`firstInstance`, per-slot indirect buffers; GAL 15k -> 4k ops). A/B:
+`MATTMC_RUST_DISABLE_SOURCE_TERRAIN_MULTIDRAW` / `_PAGES`. Left: plan ~8.5 ms,
+Java ~7 ms, fullscreen plan re-creation 1.3 ms. **Walking** (tour, 6 blocks/s):
+frontend 45 -> 35 ms. Camera-sorted translucency reuses its topological order
+while the camera stays in one cell of the sort's plane arrangement (per-axis
+extent/separator breakpoints + slanted-plane sides; exact, property-tested;
+Sodium re-sorts on plane crossings) plus cached batches: 5.4 -> 0.65 ms; batch
+keys use the GAL's Fx-style hasher (shadow plan 4.6 -> 3.6 ms). Left while
+moving: shadow-only plan misses every frame, source plan ~14 ms, voxels ~7 ms.
+**Teleport/validation/voxels (2026-09-28).** Temporary tour (6 teleports, F2
+shots, 40 s walk; validation on): 0 VUIDs, no fallback after arming. Fixed: F2
+capture after frame finalization restores PRESENT_SRC; the named route updates
+colored-light voxels every frame (were frozen after arming; sampled volumes
+bracketed in ShaderRead); an uninitialized volume uploads a cleared field like
+Iris (was a post-teleport vanilla flash); all stream slots in flight waits for
+the oldest; a stale pending lightmap is discarded at frame entry, and the armed
+route's provisional assembly (ops dropped) no longer promotes a never-uploaded
+lightmap (UNDEFINED on the next vanilla fallback; injected failures 1/5 ->
+0/35); lightmap changes release only pack sets keyed on `Lightmap`. Occupancy is
+exact-incremental (randomized equivalence test vs full rebuild): reused mesh
+snapshots, volume culling, memoized mesh list, per-box patches for same-cell
+changes (one transfer scope each: GAL texture hazards are per subresource),
+in-place shift on cell crossings. 230 ms/frame while chunks load -> 0.5 ms
+static, walking p50 3.9/p95 20 ms. Gap: the per-asset voxel vertex cache keeps
+pack material ids until the asset reloads. Final pairs: day 2.24/1.81/2.14,
+glass 6.65/5.64/4.42, down 6.95/7.70/6.74, off 0.19/0.36/0.35, gun 2.13/1.68/2.10,
+pane 2.34/1.82/2.10, 0 VUIDs; Rust suite 1877. Entity/hand source normals are
+Iris's in-level BufferBuilder face normal (diagonal cross, authored side; the
+vertex stage flips it under a mirroring pose): cow 2.09/1.64/2.06, gun
+2.11/1.66/2.09, banner 2.22/1.87/2.27. Gun gap left: muzzle cap/front sight px.
+TaCZ fire/reload/aim harness (validation on): 0 fallbacks/VUIDs; the 50 ms muzzle
+flash (translucent textured quad) is not tick-capturable, so its shading parity
+(Iris: inside the hand pass) is unverified. Springfield display JSON has `//`
+comments; a strict Gson parse drops its `reload_empty` sound (data, not render).
+**Casters / outline (2026-09-26).** Player/vehicle casters: entity `shadow` stage only. Iris draws the selection
 box with the pack's `gbuffers_line` into colortex0/6 after the opaque flush
 (translucent-layer targets after translucent terrain). `line_contract` lowers
 Iris-injected `vaPosition`/`vaNormal`/`modelViewMatrix`/`projectionMatrix` onto
@@ -93,50 +149,24 @@ vertex id for `gl_VertexID` parity), own `Lines` phase; the post-final overlay
 runs only when no source line writer consumed the segments. Outline crop MAE
 **0.42/0.70/0.51** (pose 146.5,66,530.5,105,60); translucent-phase outline
 occluded by glass like Frozen's.
-**Block breaking via `gbuffers_damagedblock` (2026-09-27).** Iris draws all
-crumbling (block-entity crumbling buffer and `renderBlockDestroyAnimation`)
+**Block breaking via `gbuffers_damagedblock` (2026-09-27).** Crumbling draws
 with the pack's damagedblock program after the outline, before
-`beginTranslucents`, with vanilla CRUMBLING state (DST_COLOR/SRC_COLOR blend,
-depth test no write, bias -1/-10, back cull) and `alphaTest.gbuffers_damagedblock`
-(default 0.1). New `damaged_block_contract` + material-stream writer
-(`DamagedBlock` phase); crumbling entity meshes leave the entity writer; terrain
-cracks in the shader route copy vanilla's model quads with SheetedDecal UVs (Java
-`extractCrumblingBlockModelMesh`), shader-off keeps the crack-quad writer. Fixed:
-block-entity crumbling crashed on Vulkan (destroy-stage path read as a sprite
-name; shader-off too); an armed route meeting an uncoverable frame crashed the
-game — it now disarms and draws that frame with the vanilla Rust route
-(`admit_armed_source_frame`). Evidence: oak-sign-breaking stage 6 pair
-2.542/2.228/2.779 (plain sign 2.263/1.896/2.421; crack darkening 0.850 vs Frozen
-0.858), 0 VUIDs; shader-off pair 0.18. Terrain crack has no Frozen fixture
-(Frozen harness only breaks block entities; cannot edit Frozen): Current-only
-check draws the multiply crack in the G-buffer. Skull-breaking fixture fails in
-Current's harness (reads a skull property from stone), not rendering.
-**Translucent/water fixes (2026-09-26).** (1) Camera-sorted (DYNAMIC) runs
-map to one translucent section sub-range (`index_subrange`) instead of
-aborting. (2) Source translucent terrain now writes depth (vanilla
-TRANSLUCENT does; red-line diagnostic showed Frozen's glass occluding back
-outline edges), so depthtex0 carries water/glass. (3) Discarded source frames
-re-queue first-use geometry uploads (`geometry_uploads` on the transaction).
-(4) Sorted-index updates retire cached source geometry. (5) Source terrain
-uses Iris XHFP semantics: diagonal face normal for all 4 vertices, tangent
-from triangle (0,1,2) retrying (2,3,0) — a flipped tangent frame drew a large
-dark triangle over water. (6) World-target lowering: world stages flip every
-source-space target access once (texture, textureLod, integer texelFetch, and
-`sampler2D` function parameters whose call sites all pass targets), skip
-pack-bound images (`texture.gbuffers.gaux4` is a PNG, was sampled mirrored),
-now also for textured/weather/cloud/line fragments; `viewHeight` is added to
-the contract when a world fragment reads gl_FragCoord. Complementary's SSR
-passes `depthtex1` as a parameter: Current reflected mirrored underwater kelp.
-Water pose 152.5,66,499.5,180,25: 16.6 -> 9.74/10.78/9.20; shader-off 0.60.
+`beginTranslucents` (vanilla CRUMBLING state, bias -1/-10, alphaTest default
+0.1); terrain cracks copy vanilla model quads with SheetedDecal UVs. An armed
+route meeting an uncoverable frame disarms (`admit_armed_source_frame`).
+Sign-breaking pair 2.542/2.228/2.779, 0 VUIDs (terrain cracks Current-only).
+**Translucent/water fixes (2026-09-26).** DYNAMIC sorted runs map to one
+`index_subrange`; source translucent terrain writes depth; discarded frames
+re-queue first-use uploads; sorted-index updates retire cached geometry; Iris
+XHFP normals/tangents (flipped tangent drew a dark triangle over water); world
+stages flip every target access once (incl. `sampler2D` params; pack PNGs not
+flipped). Water pose 152.5,66,499.5,180,25: 16.6 -> 9.74/10.78/9.20.
 **Colored light + shadowtex1 (2026-09-26).** `IRIS_FEATURE_<X>` is defined
 for pack-requested `iris.features.optional` flags Rust supports
 (`CUSTOM_IMAGES`), so the floodfill block light compiles in. `shadowtex1` is
 now Iris's pre-translucent shadow depth copy (split shadow pass, own texture),
-not an alias of shadowtex0: underwater receivers take the caustic path.
-No-water control 5.82/9.54/9.98 -> **4.65/6.40/7.18**; day
-**2.357/2.097/2.502**, glass 7.38/6.47/4.85, look-down 9.06 -> **7.18/7.71/7.11**;
-suite **1855**. Water pair now 10.79/13.10/10.62: Current's water surface is
-brighter. **Suspected Frozen behavior — awaiting user decision:** isolated
+not an alias of shadowtex0: underwater receivers take the caustic path. Water
+pair 10.79/13.10/10.62 (Current's water brighter). **Suspected Frozen behavior:** isolated
 pre-color, SSR/sky reflection and fresnel all match at 1/4 scale, but on Frozen
 the `color` read in gbuffers_water `main` just before the reflection mix is
 0.77x its value one statement earlier. That happens only when GetReflection's
@@ -144,46 +174,16 @@ arithmetic-only Step 3 (GetSky/GGX, no texture reads/discard/writes to `main`
 locals) is compiled in; renaming parameters or using a temporary for the
 swizzled `inout` changes nothing. Rust keeps `color` unchanged. Deterministic
 across repeats. Diagnostic ZIPs in the session scratchpad. **User: water gap deferred (2026-09-26).**
-**Shader menu on Vulkan (2026-09-26).** The Sodium "Shader Packs" page was
-gated off for Rust Vulkan (Goal 1 leftover); now shown. On Vulkan `Iris.reload`
-parses a CPU-only menu pack (`Iris.getMenuPack`, engine-only env defines,
-FeatureFlags report Rust features, no GPU queries), persists `<pack>.txt`, and
-asks the coordinator to restage (also on disable/option-only changes). Rust
-applies saved options like Iris: boolean false suppresses the pack's `#define`,
-`const` options rewrite constants, env/profile defaults yield to saved options.
-Shader-on day 2.394/2.108/2.504, shader-off pair 0.041/0.047/0.039; suite 1856.
-Follow-ups: `IrisDefines` skips GL macros on Vulkan (Apply crashed); GUI
-scissors clip to the frame at the `ScissorStack` root (DH settings crashed with
-`tile clip must be frame-local`); verified by scripted Vulkan smoke, crash
-reproduced without the clamp, video menu pixel-identical. **Shader execution follows config (2026-09-26):** Rust/Java run the
-selected pack whenever Iris config enables one; `MATTMC_RUST_SELECTED_SOURCE_EXECUTION`
-is only an override (1 on, else off). Frame mesh-instance bound 4096 -> 65536
-(FFI bound; per-batch GPU stream stays 4096). stderr `[MattMC shaders] shader
-route active|vanilla fallback: <reason>` on change. **Perf at RD 10
-(2026-09-26), measured on the release Rust profile `RunDev.py` uses** (dev
-profile is opt-level 0 and ~10x slower; do not profile it): 13 fps -> 21 fps,
-frontend 70 -> 38 ms. Fixes: one staged frame-stream write per frame instead
-of 5 ops/draw (36k -> 18k GAL ops); equal per-program uniform blocks share one
-stream copy; per-frame batch scope validates programs once and memoizes pack
-keys; prepared source programs memoized by candidate epoch (translucent one
-was rebuilt per translucent mesh); no per-frame `WorldPrimitiveFrame` clone
-(audit-only); no duplicate coverage check; fast hasher in GAL hazard tracker;
-geometric stream-slot growth (was ~1,500 set creations/frame). **Crash fixed:**
-source geometry is ~0.9 GiB at RD 10 and hit the 512 MiB cap (release reaches
-full load); now device-local with a one-shot staging copy (was host-visible),
-cap 2 GiB. Still ~7,100 per-section draws/frame (shadow-only 2,200); next:
-shadow-only prep, GAL submit (~11 ms), compact 128 B source vertex. Pairs
-unchanged (2026-09-27, after camera-history fix): day 2.395/2.111/2.507, glass
-7.50/6.45/4.57, down 7.21/7.74/7.12, shader-off 0.14/0.23/0.24; suite 1861. F2 screenshot throws (Goal 1 gap).
-Resize disarms/re-arms the route; foil draws in the G-buffer translucent phase. Vulkan clouds at range 128:
-crash fixed (bounds 262,144 quads, Fabulous slot growth); shader packs that
-draw their own clouds drop vanilla cloud quads before validation.
+**Shader menu (09-26):** works on Vulkan (`Iris.reload` parses a CPU-only menu
+pack, persists `<pack>.txt`; Rust applies saved options). The selected pack runs
+whenever Iris config enables one (`MATTMC_RUST_SELECTED_SOURCE_EXECUTION` only
+overrides); stderr reports `[MattMC shaders] shader route active|vanilla fallback`.
+Source geometry (~0.9 GiB at RD 10) is device-local with staged uploads, cap 2 GiB
+(profile only the release Rust profile). F2 screenshots: Rust copies the completed
+frame target before present; Java only encodes the PNG. Resize re-arms the route.
 
-Frozen `IrisRenderingPipeline.beginTranslucents()` runs deferred fullscreen
-stages after opaque depth copy and before translucent world writers. Rust's
-shader-only source plan now inserts deferred stages at that matching boundary.
-The combined DH route retains its old ordering until Goal 4 can split its
-opaque/translucent writers. Recheck shader-off vanilla/DH after any shared
+Deferred stages run at Iris's `beginTranslucents` boundary (DH route keeps its
+old order until Goal 4). Recheck shader-off vanilla/DH after any shared
 resource or scheduling change. Do not claim Goal 3 complete until its remaining
 source coverage and clean Vulkan run are verified.
 

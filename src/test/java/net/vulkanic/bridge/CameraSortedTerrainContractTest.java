@@ -16,7 +16,8 @@ class CameraSortedTerrainContractTest {
         assertThrows(IllegalArgumentException.class, () -> instance(60, 0, 2, 2));
         assertEquals(2, instance(60, -1, 1, 2).flags());
         assertThrows(IllegalArgumentException.class, () -> instance(60, -1, 0, 2));
-        assertThrows(IllegalArgumentException.class, () -> instance(60, -1, 2, 4));
+        // Bit 4 is terrain's shadow-only flag; bit 8 has no terrain meaning.
+        assertThrows(IllegalArgumentException.class, () -> instance(60, -1, 2, 8));
         assertEquals(0, instance(60, -1, 1, 0).flags());
     }
 }

@@ -573,7 +573,12 @@ public final class RustGalGuiItemRenderer {
 		int bottom,
 		@Nullable Integer dynamicLayerOrder
 	) {
-		boolean cacheEligible = !item.itemStackRenderState().isAnimated() && !foil;
+		// GUI submission samples the global TACZ main/shoot/aim animation state
+		// (the equipped gun animates in its slot too). Only an idle pose is static.
+		net.minecraft.client.tacz.TaczGlock17AnimationController.Snapshot animation =
+			net.minecraft.client.tacz.TaczGlock17AnimationController.snapshot(net.minecraft.world.item.ItemStack.EMPTY);
+		boolean cacheEligible = !item.itemStackRenderState().isAnimated() && !foil
+			&& animation.animations().isEmpty() && animation.aimProgress() == 0.0F;
 		int guiScale = Math.max(1, Minecraft.getInstance().getWindow().getGuiScale());
 		TaczGuiCachedCapture cached = cacheEligible
 			? findTaczGuiCapture(renderer.gunId(), guiScale, right - left, bottom - top, selected.transform().pose()) : null;
@@ -591,7 +596,8 @@ public final class RustGalGuiItemRenderer {
 		}
 		List<TaczGuiQuadCapture.PreparedBatch> prepared = cached == null ? null : cached.prepared();
 		if (cached == null && cacheEligible && !capture.batches.isEmpty()) {
-			prepared = capture.prepareStatic(guiScale, right - left, bottom - top);
+			prepared = capture.prepareStatic(guiScale, right - left, bottom - top,
+				item.x() + 8.0F - (left + right) / 2.0F, item.y() + 8.0F - (top + bottom) / 2.0F);
 			if (!prepared.isEmpty()) {
 				cacheTaczGuiCapture(renderer.gunId(), guiScale, selected.transform().pose(), right - left, bottom - top, capture, prepared);
 			}
@@ -694,19 +700,22 @@ public final class RustGalGuiItemRenderer {
 
 		private int totalQuads() { return batches.stream().mapToInt(batch -> batch.vertices.length / 12).sum(); }
 
-		private List<PreparedBatch> prepareStatic(int guiScale, int pixelWidth, int pixelHeight) {
-			return prepareBatches(guiScale, pixelWidth, pixelHeight, null, 0xffffffff);
+		private List<PreparedBatch> prepareStatic(int guiScale, int pixelWidth, int pixelHeight, float originX, float originY) {
+			return prepareBatches(guiScale, pixelWidth, pixelHeight, originX, originY, null, 0xffffffff);
 		}
 
 		private List<PreparedBatch> prepareBatches(
-			int guiScale, int pixelWidth, int pixelHeight,
+			int guiScale, int pixelWidth, int pixelHeight, float originX, float originY,
 			@Nullable RustGalGuiRawImageAssets.Asset glintAsset, int glintColor
 		) {
 			if (batches.isEmpty()) return List.of();
 			int width = Math.max(2, pixelWidth * guiScale + 2);
 			int height = Math.max(2, pixelHeight * guiScale + 2);
-			Matrix4f transform = new Matrix4f().translate(width / 2.0F, height / 2.0F, 0.0F)
-				.scale(guiScale * 16.0F, guiScale * 16.0F, -guiScale * 16.0F);
+			// Frozen's OversizedItemRenderer centres the picture on the oversized
+			// bounds, then moves the model origin to the slot centre. Its pose is
+			// the PIP scale(f, f, -f) followed by scale(1, -1, -1).
+			Matrix4f transform = new Matrix4f().translate(width / 2.0F + originX * guiScale, height / 2.0F + originY * guiScale, 0.0F)
+				.scale(guiScale * 16.0F, -guiScale * 16.0F, guiScale * 16.0F);
 			org.joml.Matrix3f normalTransform = new org.joml.Matrix3f(transform).invert().transpose();
 			List<PreparedBatch> prepared = new ArrayList<>(batches.size() * (glintAsset == null ? 1 : 2));
 			TaczGuiPackedStaging staging = TACZ_GUI_STAGING.get();
@@ -792,23 +801,32 @@ public final class RustGalGuiItemRenderer {
 				glintColor = ARGB.color(strength, 255, 255, 255);
 			}
 			List<PreparedBatch> prepared = preparedOverride == null
-				? prepareBatches(guiScale, right - left, bottom - top, glintAsset, glintColor) : preparedOverride;
+				? prepareBatches(guiScale, right - left, bottom - top,
+					item.x() + 8.0F - (left + right) / 2.0F, item.y() + 8.0F - (top + bottom) / 2.0F, glintAsset, glintColor)
+				: preparedOverride;
 			if (prepared.isEmpty()) return List.of();
 			int width = Math.max(2, (right - left) * guiScale + 2);
 			int height = Math.max(2, (bottom - top) * guiScale + 2);
-			int layerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder;
+			// Same semantic item layer as every other GUI item route; a raw phase
+			// order would place the gun below the hotbar/slot sprites.
+			int layerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order()
+				: RustGalGuiRenderer.dynamicLayerOrder(dynamicLayerOrder);
 			float[] guiPose = new float[] {
 				item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()
 			};
 			float[] identity = identity();
 			RustGalFrameScheduler.Token token = RustGalFrameCoordinator.reserveGuiMeshItemRequest(
-				GuiRenderStratum.GUI_ITEM.id(), layerOrder);
+				dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.id() : RustGalGuiRenderer.dynamicLayerId(dynamicLayerOrder),
+				layerOrder);
+			// Frozen OversizedItemRenderer: ITEMS_3D only for block-lit models.
+			int lightingMode = item.itemStackRenderState().usesBlockLight()
+				? VulkanicGalBridge.GUI_MESH_LIGHTING_OVERSIZED_ITEM : VulkanicGalBridge.GUI_MESH_LIGHTING_OVERSIZED_ITEM_FLAT;
 			List<VulkanicGalBridge.GuiMeshBatchRecord> records = new ArrayList<>(prepared.size());
 			for (PreparedBatch batch : prepared) {
 				if (!batch.glint()) {
 					records.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(layerOrder, records.size(),
 						VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL,
-						VulkanicGalBridge.GUI_MESH_LIGHTING_ENTITY_PREVIEW, batch.asset().assetId(), token.sequence(), 0.1F,
+						lightingMode, batch.asset().assetId(), token.sequence(), 0.1F,
 						identity, guiPose, left, top, right, bottom, guiWidth, guiHeight, width, height, 1,
 						0, 0, 0, 0, 0, batch.vertices(), batch.indices(), null, 0, null, null, null));
 				} else {

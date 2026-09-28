@@ -1451,6 +1451,7 @@ mod tests {
             super::MeshAssetStore {
                 translucent_order: Default::default(),
                 section_ranges_cache: Default::default(),
+                texture_animation_signature_cache: Default::default(),
                 mesh_generation: 1,
                 index_generation: 1,
                 vertex_layout_version: 0,
@@ -1460,6 +1461,8 @@ mod tests {
                 entity_identity: String::new(),
                 terrain_voxel_vertices: None,
                 terrain_voxel_indices: None,
+                terrain_voxel_translucent_indices: None,
+                terrain_voxel_model_bounds: None,
                 index_bytes: Vec::new(),
                 index_type: IndexType::U16,
                 sections: vec![
@@ -1937,6 +1940,7 @@ mod tests {
                 decal_normals: None,
                 translucent_order: Default::default(),
                 section_ranges_cache: Default::default(),
+                texture_animation_signature_cache: Default::default(),
                 mesh_generation: asset.mesh_generation,
                 index_generation: 1,
                 vertex_layout_version: asset.vertex_layout_version,
@@ -1945,6 +1949,8 @@ mod tests {
                 entity_identity: String::new(),
                 terrain_voxel_vertices: None,
                 terrain_voxel_indices: None,
+                terrain_voxel_translucent_indices: None,
+                terrain_voxel_model_bounds: None,
                 index_bytes: asset.index_bytes.clone(),
                 index_type: asset.index_type,
                 sections: asset.sections.clone(),

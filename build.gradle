@@ -946,6 +946,12 @@ tasks.register('runClient', JavaExec) {
         '--accessToken', '0',
         '--gameDir', runGameDir.absolutePath
     ]
+    // Optional extra client arguments for scripted dev runs, e.g.
+    // -PmattmcRunArgs="--quickPlaySingleplayer Origin".
+    def extraRunArgs = providers.gradleProperty('mattmcRunArgs').getOrNull()
+    if (extraRunArgs) {
+        args(extraRunArgs.trim().split(/\s+/) as List)
+    }
     
     doFirst {
         workingDir.mkdirs()

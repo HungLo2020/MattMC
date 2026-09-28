@@ -26,6 +26,10 @@ pub const RUNTIME_ENVIRONMENT_PATH: &str = "mattmc/runtime-environment.propertie
 /// against the pack's own `block.properties` rules and never reads Iris's
 /// material map or renderer state.
 pub const RUNTIME_BLOCK_STATE_IDENTITIES_PATH: &str = "mattmc/runtime-block-states.properties";
+/// Reserved immutable block-item table: `item.<item identity>=<raw default
+/// block-state id>`. Rust resolves each state through the table above and the
+/// pack's `block.properties`, as Iris does for a drawn block item.
+pub const RUNTIME_BLOCK_ITEM_STATES_PATH: &str = "mattmc/runtime-block-items.properties";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ShaderSourceFile {

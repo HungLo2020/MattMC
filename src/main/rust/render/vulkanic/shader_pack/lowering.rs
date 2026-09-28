@@ -2056,30 +2056,30 @@ fn apply_selected_source_hand_vertex_probe(
     )
 }
 
-/// Minecraft's entity-cutout pipeline applies its alpha test before a
-/// transparent texel can update the G-buffer.  Shader packs commonly leave
-/// that to the legacy render pipeline instead of spelling `discard` in
-/// `gbuffers_entities`.  The Rust-owned writer has no legacy fixed-function
-/// alpha-test stage, so retain one explicit, source-local hook for the
-/// material-mode specialization to provide.  Translucent and opaque variants
-/// leave the hook disabled.
+/// Iris appends the program's alpha test to the end of `main` on output 0
+/// (`if (!(iris_FragData0.a > iris_currentAlphaTest)) discard;`), so it also
+/// catches texels a pack never modulates (Complementary skips `color *=
+/// glColor` for alpha 0 and still writes them). The Rust-owned writer has no
+/// legacy fixed-function stage, so wrap the pack's `main` and apply the same
+/// output test when the material-mode specialization defines a cutoff. A
+/// program without an output 0 keeps no alpha test, as in Iris.
 fn install_entity_alpha_cutout_hook(fragment: &mut LoweredTerrainFragmentSource) -> GalResult<()> {
-    const ANCHOR: &str = "color *= glColor;";
-    const HOOK: &str = concat!(
-        "color *= glColor;\n",
-        "    if (color.a <= VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF) discard;"
-    );
-    if !fragment.source.contains(ANCHOR) {
+    if !fragment.outputs.contains(&TerrainFragmentOutput::LitColor) {
+        return Ok(());
+    }
+    let wrapped = fragment
+        .source
+        .replacen("void main()", "void vulkanic_source_entity_main()", 1);
+    if wrapped == fragment.source {
         return Err(GalError::unsupported_feature(format!(
-            "entity fragment '{}' has no color-modulation anchor for explicit cutout semantics",
+            "entity fragment '{}' has no main function for its alpha test",
             fragment.entry_path
         )));
     }
-    fragment.source = fragment.source.replacen(ANCHOR, HOOK, 1);
-    fragment.source = insert_after_version(
-        &fragment.source,
-        "#ifndef VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF\n#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF -1.0\n#endif\n",
-    )?;
+    fragment.source = format!(
+        "{wrapped}\nvoid main() {{\n    vulkanic_source_entity_main();\n#ifdef VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF\n    if (!({}.a > VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF)) discard;\n#endif\n}}\n",
+        TerrainFragmentOutput::LitColor.semantic_name()
+    );
     Ok(())
 }
 
@@ -5238,7 +5238,9 @@ layout(set = 0, binding = 3, std430) readonly buffer VulkanicSourceTerrainInstan
 #define vulkanic_source_normal_matrix transpose(inverse(mat3(vulkanic_source_model_view)))
 #define vulkanic_source_position vulkanic_source_vertex.position
 #define vulkanic_source_vertex_color (vulkanic_source_vertex.color * vulkanic_source_instance.color_modulation)
-#define vulkanic_source_normal vulkanic_source_vertex.normal_light.xyz
+// Stored normals are model-space face normals. Iris computes them from the
+// pose-transformed positions, which flips them under a mirroring pose.
+#define vulkanic_source_normal (vulkanic_source_vertex.normal_light.xyz * (determinant(mat3(vulkanic_source_model_transform)) < 0.0 ? -1.0 : 1.0))
 #define vulkanic_source_atlas_uv vec4(vulkanic_source_vertex.atlas_uv_lightmap.xy, 0.0, 1.0)
 #define vulkanic_source_lightmap_uv vec4(vulkanic_source_vertex.atlas_uv_lightmap.zw, 0.0, 1.0)
 #define vulkanic_source_entity vulkanic_source_vertex.entity
@@ -8406,21 +8408,26 @@ mod tests {
     }
 
     #[test]
-    fn entity_lowering_installs_an_explicit_cutout_hook_after_color_modulation() {
+    fn entity_lowering_applies_the_alpha_test_to_output_zero_after_main_like_iris() {
         let vertex = artifact(
             "#version 130\nvarying vec2 texCoord; varying vec4 glColor; void main() { texCoord = gl_MultiTexCoord0.xy; glColor = gl_Color; gl_Position = ftransform(); }",
         );
+        // Complementary-style: alpha-0 texels skip modulation but are written.
         let fragment = artifact(
-            "#version 130\nvarying vec2 texCoord; varying vec4 glColor; uniform sampler2D tex; void main() { vec4 color = texture2D(tex, texCoord); color *= glColor; gl_FragData[0] = color; gl_FragData[1] = color; }",
+            "#version 130\nvarying vec2 texCoord; varying vec4 glColor; uniform sampler2D tex; void main() { vec4 color = texture2D(tex, texCoord); if (color.a > 0.00001) { color *= glColor; } gl_FragData[0] = color; gl_FragData[1] = color; }",
         );
         let lowered = lower_entity_source_pair(&vertex, &fragment).unwrap();
         let source = lowered.fragment().source();
-        let modulation = source.find("color *= glColor;").unwrap();
-        let discard = source
-            .find("if (color.a <= VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF) discard;")
+        let body = source.find("void vulkanic_source_entity_main()").unwrap();
+        let entry = source.rfind("void main() {").unwrap();
+        let test = source
+            .find("if (!(out_terrain_lit_color.a > VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF)) discard;")
             .unwrap();
-        assert!(modulation < discard);
-        assert!(source.contains("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF -1.0"));
+        assert!(body < entry && entry < test);
+        assert!(source[entry..].contains("vulkanic_source_entity_main();"));
+        // Without a material cutoff define the test compiles out entirely.
+        assert!(source.contains("#ifdef VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF"));
+        assert!(!source.contains("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF"));
     }
 
     #[test]

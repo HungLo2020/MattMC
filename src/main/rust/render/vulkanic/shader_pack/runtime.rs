@@ -1397,6 +1397,11 @@ pub(crate) struct ShaderPackRuntimeExecutor {
     /// memos below are valid only for the epoch that built them.
     source_candidate_epoch: u64,
     prepared_program_memos: PreparedSourceProgramMemos,
+    /// Semantic roles declared by writer programs outside the terrain/DH
+    /// candidate (textured materials, weather, clouds, ...), for the epoch
+    /// that prepared them. A dimension whose terrain program samples no
+    /// shadow map can still ship a writer that declares one.
+    writer_required_roles: std::cell::RefCell<(u64, BTreeSet<TerrainSourceResourceRole>)>,
     /// Discovery expands a whole pack and lowers several independent source
     /// families. Keep that work generation-and-scope keyed: source discovery
     /// is immutable until either input changes and must not recur on every
@@ -1414,6 +1419,11 @@ pub(crate) struct ShaderPackRuntimeExecutor {
     /// staged replacement until the exact combined submission has succeeded.
     vanilla_lightmap_residency: Option<VanillaLightmapResidency>,
     pending_vanilla_lightmap_residency: Option<VanillaLightmapResidency>,
+    /// Whether the pending lightmap's upload is in operations that will be
+    /// submitted. A caller that stages into operations it then drops clears
+    /// this, so the next consumer records the upload again and an unrecorded
+    /// pending lightmap is never promoted to the confirmed residency.
+    pending_vanilla_lightmap_upload_recorded: bool,
     /// Replaced lightmaps stay alive until their pass-owned resource sets are
     /// retired.  A confirmed frame can still have consumers in the frontend;
     /// destroying the image view here would violate GAL dependency ordering.
@@ -1806,12 +1816,14 @@ impl ShaderPackRuntimeExecutor {
             source_candidate: TerrainSourceCandidateState::Unavailable,
             source_candidate_epoch: 0,
             prepared_program_memos: PreparedSourceProgramMemos::default(),
+            writer_required_roles: Default::default(),
             source_candidate_scope: None,
             distant_horizons_source_candidate: DistantHorizonsSourceCandidateState::Unavailable,
             distant_horizons_source_candidate_scope: None,
             vanilla_lightmap: VanillaLightmapCache::default(),
             vanilla_lightmap_residency: None,
             pending_vanilla_lightmap_residency: None,
+            pending_vanilla_lightmap_upload_recorded: false,
             retired_vanilla_lightmap_residencies: Vec::new(),
             terrain_occupancy: None,
             terrain_colored_light: None,
@@ -1892,7 +1904,12 @@ impl ShaderPackRuntimeExecutor {
             // valid for that exact submission, so a compatible request is a
             // no-op; only a changed generation would need another transaction.
             if pending.is_compatible_with(&self.vanilla_lightmap) {
-                return Ok(false);
+                if self.pending_vanilla_lightmap_upload_recorded {
+                    return Ok(false);
+                }
+                pending.append_upload(&self.vanilla_lightmap, ops)?;
+                self.pending_vanilla_lightmap_upload_recorded = true;
+                return Ok(true);
             }
             let pending_binding = pending.binding();
             return Err(GalError::invalid_argument(format!(
@@ -1910,7 +1927,15 @@ impl ShaderPackRuntimeExecutor {
             return Err(error);
         }
         self.pending_vanilla_lightmap_residency = Some(replacement);
+        self.pending_vanilla_lightmap_upload_recorded = true;
         Ok(true)
+    }
+
+    /// The caller dropped the operations holding the pending lightmap
+    /// upload (e.g. a provisional frame assembly). The residency stays
+    /// pending for this frame's consumers, which must record the upload again.
+    pub(crate) fn forget_recorded_vanilla_lightmap_upload(&mut self) {
+        self.pending_vanilla_lightmap_upload_recorded = false;
     }
 
     pub(crate) fn has_pending_vanilla_lightmap_submission(&self) -> bool {
@@ -1924,6 +1949,13 @@ impl ShaderPackRuntimeExecutor {
         let Some(replacement) = self.pending_vanilla_lightmap_residency.take() else {
             return Ok(());
         };
+        if !std::mem::take(&mut self.pending_vanilla_lightmap_upload_recorded) {
+            // Never uploaded by a submitted command list: promoting it would
+            // let a later consumer sample an undefined image. Retire it with
+            // the replaced generations once frontend consumers are released.
+            self.retired_vanilla_lightmap_residencies.push(replacement);
+            return Ok(());
+        }
         if let Some(previous) = self.vanilla_lightmap_residency.replace(replacement) {
             self.retired_vanilla_lightmap_residencies.push(previous);
         }
@@ -4744,6 +4776,21 @@ impl ShaderPackRuntimeExecutor {
         plans
     }
 
+    /// Records the roles a prepared writer program binds. Returns whether a
+    /// role was new, so the caller can let the next frame stage it.
+    pub(crate) fn note_writer_required_roles(
+        &self,
+        roles: impl IntoIterator<Item = TerrainSourceResourceRole>,
+    ) -> bool {
+        let mut noted = self.writer_required_roles.borrow_mut();
+        if noted.0 != self.source_candidate_epoch {
+            *noted = (self.source_candidate_epoch, BTreeSet::new());
+        }
+        let before = noted.1.len();
+        noted.1.extend(roles);
+        noted.1.len() != before
+    }
+
     fn source_required_resource_roles(&self) -> BTreeSet<TerrainSourceResourceRole> {
         self.source_required_resource_roles_for_frame(true)
     }
@@ -4768,6 +4815,19 @@ impl ShaderPackRuntimeExecutor {
         } = &self.source_candidate
         {
             roles.extend(shadow.owned_storage_roles().iter().cloned());
+        }
+        let noted = self.writer_required_roles.borrow();
+        if noted.0 == self.source_candidate_epoch {
+            // Only roles a candidate producer can supply are added; writer
+            // outputs (colour targets) are staged per writer, not here.
+            roles.extend(noted.1.iter().cloned().filter(|role| {
+                matches!(
+                    role,
+                    TerrainSourceResourceRole::ShadowDepthPrimary
+                        | TerrainSourceResourceRole::ShadowDepthSecondary
+                        | TerrainSourceResourceRole::ShadowDepthRaw
+                )
+            }));
         }
         roles
     }
@@ -6540,6 +6600,18 @@ impl ShaderPackRuntimeExecutor {
             }
         }
         Ok(())
+    }
+
+    /// Private voxel volumes that rest in storage layout between submissions
+    /// but are sampled by source passes (colored light / occupancy).
+    pub(crate) fn private_terrain_storage_volume_textures(&self) -> Vec<Handle> {
+        if let Some(colored_light) = self.terrain_colored_light.as_ref() {
+            colored_light.storage_volume_textures()
+        } else if let Some(occupancy) = self.terrain_occupancy.as_ref() {
+            occupancy.storage_volume_textures()
+        } else {
+            Vec::new()
+        }
     }
 
     pub(crate) fn has_pending_private_terrain_occupancy_submission(&self) -> bool {
@@ -8705,6 +8777,70 @@ mod tests {
             executor.observe_vanilla_lightmap(3, Some(frame)).unwrap()
         );
         assert!(executor.observe_vanilla_lightmap(0, Some(frame)).is_err());
+    }
+
+    #[test]
+    fn dropped_lightmap_upload_is_rerecorded_and_never_promoted_unrecorded() {
+        let mut executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(9).unwrap();
+        let frame = VanillaLightmapFrame {
+            generation: 4,
+            inputs: super::super::lightmap::VanillaLightmapInputs {
+                ambient_light_factor: 0.0,
+                sky_factor: 1.0,
+                block_factor: 1.5,
+                night_vision_factor: 0.0,
+                darkness_scale: 0.0,
+                darken_world_factor: 0.0,
+                brightness_factor: 0.0,
+                sky_light_color: [1.0; 3],
+                ambient_color: [1.0; 3],
+            },
+        };
+        executor.observe_vanilla_lightmap(3, Some(frame)).unwrap();
+        let mut gal = gal();
+        let copies = |ops: &[CommandOp]| {
+            ops.iter()
+                .filter(|op| matches!(op, CommandOp::CopyBufferToTexture(_)))
+                .count()
+        };
+
+        // A provisional assembly stages, then drops its operations.
+        let mut dropped = Vec::new();
+        assert!(executor
+            .stage_vanilla_lightmap_residency(&mut gal, &mut dropped)
+            .unwrap());
+        assert_eq!(1, copies(&dropped));
+        executor.forget_recorded_vanilla_lightmap_upload();
+        // Nothing records it again: confirmation must not promote an image
+        // that no submitted command list uploaded.
+        executor
+            .confirm_vanilla_lightmap_submission(&mut gal)
+            .unwrap();
+        assert!(!executor.has_pending_vanilla_lightmap_submission());
+        assert!(executor.vanilla_lightmap_binding(false).is_none());
+        executor.retire_replaced_vanilla_lightmaps(&mut gal).unwrap();
+
+        // Same shape, but a later consumer re-records the upload once.
+        let mut dropped = Vec::new();
+        executor
+            .stage_vanilla_lightmap_residency(&mut gal, &mut dropped)
+            .unwrap();
+        executor.forget_recorded_vanilla_lightmap_upload();
+        let pending = executor.vanilla_lightmap_binding(true).unwrap();
+        let mut submitted = Vec::new();
+        assert!(executor
+            .stage_vanilla_lightmap_residency(&mut gal, &mut submitted)
+            .unwrap());
+        assert_eq!(1, copies(&submitted));
+        let mut same_submission = Vec::new();
+        assert!(!executor
+            .stage_vanilla_lightmap_residency(&mut gal, &mut same_submission)
+            .unwrap());
+        assert!(same_submission.is_empty());
+        executor
+            .confirm_vanilla_lightmap_submission(&mut gal)
+            .unwrap();
+        assert_eq!(Some(pending), executor.vanilla_lightmap_binding(false));
     }
 
     #[test]

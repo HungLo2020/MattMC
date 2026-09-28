@@ -30,10 +30,7 @@ public class Screenshot {
 	}
 
 	public static void grab(File file, @Nullable String string, RenderTarget renderTarget, int i, Consumer<Component> consumer) {
-		takeScreenshot(
-			renderTarget,
-			i,
-			nativeImage -> {
+		Consumer<NativeImage> saver = nativeImage -> {
 				File file2 = new File(file, "screenshots");
 				file2.mkdir();
 				File file3;
@@ -76,8 +73,32 @@ public class Screenshot {
 							}
 						}
 					);
+		};
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+			// The presented image is Rust-owned: Rust copies the completed frame
+			// before presenting it and hands back RGBA bytes to encode here.
+			if (i != 1) {
+				consumer.accept(Component.translatable("screenshot.failure", "scaled capture is not supported on the Rust Vulkan renderer"));
+				return;
 			}
-		);
+			net.vulkanic.gui.RustGalFrameCoordinator.requestScreenshot(frame -> {
+				NativeImage nativeImage = new NativeImage(frame.width(), frame.height(), false);
+				byte[] rgba = frame.rgba();
+				for (int y = 0; y < frame.height(); y++) {
+					for (int x = 0; x < frame.width(); x++) {
+						int index = (y * frame.width() + x) * 4;
+						nativeImage.setPixelABGR(x, y, 0xFF000000
+							| (rgba[index + 2] & 0xFF) << 16
+							| (rgba[index + 1] & 0xFF) << 8
+							| (rgba[index] & 0xFF));
+					}
+				}
+				saver.accept(nativeImage);
+			});
+			return;
+		}
+		takeScreenshot(renderTarget, i, saver);
 	}
 
 	public static void takeScreenshot(RenderTarget renderTarget, Consumer<NativeImage> consumer) {

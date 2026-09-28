@@ -543,6 +543,8 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             3 => GuiMeshLightingMode::InventoryBlock,
             4 => GuiMeshLightingMode::FrontModel,
             5 => GuiMeshLightingMode::EntityPreview,
+            6 => GuiMeshLightingMode::OversizedItem,
+            7 => GuiMeshLightingMode::OversizedItemFlat,
             other => {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,
@@ -644,8 +646,30 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
         validate_gui_mesh_batch(&request)?;
         owned.push(request);
     }
+    compact_gui_mesh_item_layers(&mut owned);
     validate_gui_mesh_batches(&owned)?;
     Ok(owned)
+}
+
+/// An item whose producer skipped a layer that emitted no quads (seen while
+/// the client reloads a dimension) still has a well-defined layer order.
+/// Renumber each item's unique layer indices densely from zero in that order
+/// rather than rejecting the whole frame; duplicates remain an error.
+pub(crate) fn compact_gui_mesh_item_layers(batches: &mut [crate::render::vulkanic::gui_mesh_frontend::GuiMeshBatchRequest]) {
+    let mut layers = std::collections::BTreeMap::<(u32, u64), std::collections::BTreeSet<u32>>::new();
+    for batch in batches.iter() {
+        layers
+            .entry((batch.stratum, batch.sequence))
+            .or_default()
+            .insert(batch.layer_index);
+    }
+    for batch in batches.iter_mut() {
+        if let Some(group) = layers.get(&(batch.stratum, batch.sequence)) {
+            if let Some(rank) = group.iter().position(|layer| *layer == batch.layer_index) {
+                batch.layer_index = rank as u32;
+            }
+        }
+    }
 }
 
 fn validate_gui_request_sequences(

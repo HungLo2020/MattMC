@@ -696,6 +696,10 @@ pub struct TerrainOccupancyVoxelizer {
     initialized: bool,
     pending_upload: Option<VoxelLightVolumeUpdate>,
     pending_occupancy: Option<Vec<u8>>,
+    /// Region patches of an in-place update (unchanged camera cell). They
+    /// replace `pending_upload`/`pending_occupancy` for small changes so the
+    /// whole field is neither copied nor re-uploaded.
+    pending_patches: Vec<VoxelLightVolumeUpdate>,
 }
 
 /// Private explicit GAL residency for occupancy. It is not connected to any
@@ -733,7 +737,12 @@ struct TerrainOccupancyMeshSnapshot {
     /// Complementary's `UpdateVoxelMap` is a vertex-stage image store. Keep
     /// the referenced indexed vertices rather than approximating the source
     /// with a CPU triangle-volume rasterizer.
-    samples: Vec<TerrainVoxelSample>,
+    samples: Arc<Vec<TerrainVoxelSample>>,
+    /// Inclusive min/max world block (floored sample block centre) over every
+    /// finite sample. Incremental voxel updates use it to find the meshes a
+    /// dirty region depends on; it is derived from `samples` and adds no
+    /// semantics of its own.
+    world_bounds: Option<[[i32; 3]; 2]>,
     /// Immutable, Rust-owned source arrays identify an unchanged source mesh
     /// before transforming it into voxel samples. The runtime retains these
     /// only as an ownership-safe cache key; no Java or backend buffer is
@@ -759,7 +768,7 @@ fn snapshot_difference(
             incoming.samples.len()
         );
     }
-    for (index, (previous, next)) in existing.samples.iter().zip(&incoming.samples).enumerate() {
+    for (index, (previous, next)) in existing.samples.iter().zip(incoming.samples.iter()).enumerate() {
         if previous.vertex_position != next.vertex_position {
             return format!("sample[{index}].vertex-position");
         }
@@ -807,7 +816,7 @@ fn snapshot_difference_excluding_transform(
             incoming.samples.len()
         ));
     }
-    for (index, (previous, next)) in existing.samples.iter().zip(&incoming.samples).enumerate() {
+    for (index, (previous, next)) in existing.samples.iter().zip(incoming.samples.iter()).enumerate() {
         if previous.vertex_position != next.vertex_position {
             return Some(format!("sample[{index}].vertex-position"));
         }
@@ -849,6 +858,9 @@ pub struct TerrainOccupancyRuntime {
     /// Mapping-aware updates stage a cloned voxelizer so rejected submissions
     /// can restore the previous complete world-to-volume interpretation.
     pending_voxelizer_rollback: Option<TerrainOccupancyVoxelizer>,
+    /// In-place patch updates keep the voxelizer and only need its previous
+    /// (same-cell) mapping restored when the submission is rejected.
+    pending_mapping_rollback: Option<VoxelLightVolumeMapping>,
 }
 
 /// Private, Rust-owned occupancy plus colored-light preparation. It combines
@@ -933,6 +945,16 @@ struct TerrainVoxelLightSamplingResources {
 }
 
 impl TerrainOccupancyRuntime {
+    /// The occupancy field rests in `ShaderStorageRead` (GENERAL) between
+    /// submissions; returns it when it holds data a pass may sample.
+    pub(crate) fn storage_volume_textures(&self) -> Vec<Handle> {
+        if self.is_initialized() || self.has_pending_submission() {
+            vec![self.resources.texture]
+        } else {
+            Vec::new()
+        }
+    }
+
     pub fn create(
         gal: &mut VulkanicGal,
         descriptor: VoxelLightVolumeDescriptor,
@@ -953,6 +975,7 @@ impl TerrainOccupancyRuntime {
             meshes: BTreeMap::new(),
             pending_meshes: None,
             pending_voxelizer_rollback: None,
+            pending_mapping_rollback: None,
         })
     }
 
@@ -1039,8 +1062,10 @@ impl TerrainOccupancyRuntime {
     /// Stages a complete copied terrain snapshot against one explicit
     /// camera-relative mapping. This remains private runtime preparation: it
     /// neither selects a source program nor creates a Java/FFI transport.
-    /// Crossing a camera cell rebuilds the semantic field while retaining the
-    /// owned D3 allocation; fractional motion updates only the mapping.
+    /// Crossing a camera cell shifts the confirmed field and recomputes only
+    /// the exposed and changed cells (see `update_incremental`) while
+    /// retaining the owned D3 allocation; fractional motion updates only the
+    /// mapping.
     pub(crate) fn append_terrain_source_snapshot_for_mapping(
         &mut self,
         mapping: VoxelLightVolumeMapping,
@@ -1054,29 +1079,121 @@ impl TerrainOccupancyRuntime {
         }
         let meshes = meshes.into_iter().collect::<Vec<_>>();
         let source_meshes_match = self.confirmed_terrain_source_meshes_match(&meshes)?;
+        if source_meshes_match && mapping == self.voxelizer.descriptor().mapping {
+            // Nothing changed: skip staging a copy of the whole field.
+            return Ok(TerrainOccupancyUpdateStats::default());
+        }
 
-        // Work on a copy so an invalid mesh or failed command append cannot
-        // change the live volume's world-to-cell interpretation.
-        let mut staged_voxelizer = self.voxelizer.clone();
-        let revoxelization_required = staged_voxelizer.update_mapping(mapping)?;
-        if source_meshes_match && !revoxelization_required {
+        let previous_mapping = self.voxelizer.descriptor().mapping;
+        let cell_changed = mapping.camera_cell != previous_mapping.camera_cell;
+        if source_meshes_match && !cell_changed {
             // The mapping may have changed fractionally, but voxel occupancy
             // is cell-addressed. Preserve the same complete D3 field and
             // update only the semantic mapping; do not rebuild the CPU field
             // or enqueue another upload for an unchanged terrain snapshot.
-            self.resources
-                .validate_mapping(staged_voxelizer.descriptor())?;
-            self.resources
-                .update_mapping(staged_voxelizer.descriptor())?;
-            self.voxelizer = staged_voxelizer;
+            self.voxelizer.update_mapping(mapping)?;
+            let descriptor = self.voxelizer.descriptor().clone();
+            if let Err(error) = self
+                .resources
+                .validate_mapping(&descriptor)
+                .and_then(|()| self.resources.update_mapping(&descriptor))
+            {
+                let _ = self.voxelizer.update_mapping(previous_mapping);
+                return Err(error);
+            }
             return Ok(TerrainOccupancyUpdateStats::default());
         }
-        let candidate = terrain_voxel_source_snapshot(meshes)?;
-        self.validate_snapshot_generations(&candidate)?;
-        let samples = candidate
-            .values()
-            .flat_map(|mesh| mesh.samples.iter().copied());
-        let stats = staged_voxelizer.update_from_samples(samples)?;
+        let (candidate, dirty) = self.incremental_source_candidate(&meshes)?;
+        if !cell_changed && self.voxelizer.is_initialized() && self.resources.initialized {
+            // Same camera cell: patch only the changed boxes in place, without
+            // copying or re-uploading the whole field.
+            self.voxelizer.update_mapping(mapping)?;
+            let descriptor = self.voxelizer.descriptor().clone();
+            let staged = self
+                .voxelizer
+                .stage_patches(&candidate, &dirty)
+                .and_then(|stats| {
+                    self.resources.validate_mapping(&descriptor)?;
+                    let recorded = self.voxelizer.pending_patches().is_empty()
+                        || self
+                            .resources
+                            .append_patch_uploads(self.voxelizer.pending_patches(), operations)?;
+                    Ok(recorded.then_some(stats))
+                });
+            match staged {
+                Ok(Some(stats)) => {
+                    self.resources.update_mapping(&descriptor)?;
+                    if self.voxelizer.pending_patches().is_empty() {
+                        self.meshes = candidate;
+                    } else {
+                        self.pending_mapping_rollback = Some(previous_mapping);
+                        self.pending_meshes = Some(candidate);
+                        self.upload_pending = true;
+                    }
+                    return Ok(stats);
+                }
+                // Patches exceed the upload buffer: use the whole-field path.
+                Ok(None) => {
+                    self.voxelizer.discard_pending_upload();
+                    self.voxelizer.restore_mapping(previous_mapping);
+                }
+                Err(error) => {
+                    self.voxelizer.discard_pending_upload();
+                    self.voxelizer.restore_mapping(previous_mapping);
+                    return Err(error);
+                }
+            }
+        }
+
+        // Complementary re-voxelizes every frame on the GPU. The exact CPU
+        // equivalent only recomputes cells that can differ: cells of changed
+        // meshes and, after a camera-cell move, the newly exposed slabs of a
+        // shifted field (staged in place; a rejected submission restores the
+        // previous mapping and keeps the confirmed field).
+        if self.voxelizer.can_shift_to(&mapping) && self.resources.initialized {
+            let staged = self
+                .voxelizer
+                .update_incremental(mapping, &candidate, &dirty)
+                .and_then(|stats| {
+                    let descriptor = self.voxelizer.descriptor().clone();
+                    self.resources.validate_mapping(&descriptor)?;
+                    let uploaded = match self.voxelizer.pending_upload() {
+                        Some(update) => {
+                            self.resources.append_upload(update, operations)?;
+                            true
+                        }
+                        None => false,
+                    };
+                    self.resources.update_mapping(&descriptor)?;
+                    Ok((stats, uploaded))
+                });
+            return match staged {
+                Ok((stats, uploaded)) => {
+                    if uploaded {
+                        self.pending_mapping_rollback = Some(previous_mapping);
+                        self.pending_meshes = Some(candidate);
+                        self.upload_pending = true;
+                    } else {
+                        self.meshes = candidate;
+                    }
+                    Ok(stats)
+                }
+                Err(error) => {
+                    if self.resources.upload_pending {
+                        self.resources.discard_pending_submission();
+                    }
+                    self.voxelizer.discard_pending_upload();
+                    self.voxelizer.restore_mapping(previous_mapping);
+                    Err(error)
+                }
+            };
+        }
+
+        // Work on a copy so an invalid mesh or failed command append cannot
+        // change the live volume's world-to-cell interpretation.
+        let mut staged_voxelizer = self.voxelizer.clone();
+        staged_voxelizer.update_mapping(mapping)?;
+        let stats = staged_voxelizer.rebuild_from_meshes(&candidate)?;
         self.resources
             .validate_mapping(staged_voxelizer.descriptor())?;
         let Some(update) = staged_voxelizer.pending_upload() else {
@@ -1187,6 +1304,7 @@ impl TerrainOccupancyRuntime {
             GalError::invalid_argument("terrain occupancy pending mesh set is missing")
         })?;
         self.pending_voxelizer_rollback = None;
+        self.pending_mapping_rollback = None;
         self.upload_pending = false;
         Ok(())
     }
@@ -1200,7 +1318,11 @@ impl TerrainOccupancyRuntime {
                 self.voxelizer = previous;
             } else {
                 self.voxelizer.discard_pending_upload();
+                if let Some(mapping) = self.pending_mapping_rollback.take() {
+                    self.voxelizer.restore_mapping(mapping);
+                }
             }
+            self.pending_mapping_rollback = None;
             self.pending_meshes = None;
             self.upload_pending = false;
         }
@@ -1246,6 +1368,55 @@ impl TerrainOccupancyRuntime {
         Ok(stats)
     }
 
+    /// Builds the complete candidate set, reusing the confirmed snapshot of
+    /// every mesh whose immutable source arrays are unchanged. Returns the
+    /// world boxes (half-open) whose cells may differ from the confirmed set.
+    fn incremental_source_candidate(
+        &self,
+        meshes: &[TerrainVoxelSourceMesh],
+    ) -> GalResult<(BTreeMap<u64, TerrainOccupancyMeshSnapshot>, Vec<[[i32; 3]; 2]>)> {
+        let mut candidate = BTreeMap::new();
+        let mut rebuilt = BTreeMap::new();
+        let mut dirty = Vec::new();
+        let half_open = |bounds: [[i32; 3]; 2]| {
+            [bounds[0], bounds[1].map(|value| value.saturating_add(1))]
+        };
+        for mesh in meshes {
+            let existing = self.meshes.get(&mesh.mesh_key);
+            let reusable = existing.filter(|existing| {
+                existing.mesh_generation == mesh.mesh_generation
+                    && existing.source_identity.as_ref().is_some_and(|identity| {
+                        identity.transform == mesh.transform
+                            && Arc::ptr_eq(&identity.vertices, &mesh.vertices)
+                            && Arc::ptr_eq(&identity.indices, &mesh.indices)
+                    })
+            });
+            let entry = match reusable {
+                Some(existing) => existing.clone(),
+                None => {
+                    let entry = terrain_voxel_source_entry(mesh)?;
+                    dirty.extend(existing.and_then(|existing| existing.world_bounds).map(half_open));
+                    dirty.extend(entry.world_bounds.map(half_open));
+                    rebuilt.insert(mesh.mesh_key, entry.clone());
+                    entry
+                }
+            };
+            if candidate.insert(mesh.mesh_key, entry).is_some() {
+                return Err(GalError::invalid_argument(format!(
+                    "terrain voxel source snapshot contains duplicate mesh key {}",
+                    mesh.mesh_key
+                )));
+            }
+        }
+        self.validate_snapshot_generations(&rebuilt)?;
+        for (mesh_key, removed) in &self.meshes {
+            if !candidate.contains_key(mesh_key) {
+                dirty.extend(removed.world_bounds.map(half_open));
+            }
+        }
+        Ok((candidate, dirty))
+    }
+
     fn validate_snapshot_generations(
         &self,
         candidate: &BTreeMap<u64, TerrainOccupancyMeshSnapshot>,
@@ -1279,7 +1450,7 @@ impl TerrainOccupancyRuntime {
         if !self.is_initialized() || meshes.len() != self.meshes.len() {
             return Ok(false);
         }
-        let mut seen = BTreeMap::new();
+        let mut seen = std::collections::HashMap::with_capacity(meshes.len());
         for mesh in meshes {
             if mesh.mesh_key == 0 || mesh.mesh_generation == 0 {
                 return Err(GalError::invalid_argument(
@@ -1628,6 +1799,22 @@ impl TerrainVoxelLightSamplingResources {
 }
 
 impl TerrainColoredLightRuntime {
+    /// Occupancy and flood-fill fields rest in `ShaderStorageRead` (GENERAL)
+    /// for the Rust-owned compute. Returns those holding data (confirmed or
+    /// written earlier in the current submission) that a pass may sample.
+    pub(crate) fn storage_volume_textures(&self) -> Vec<Handle> {
+        let mut textures = self.occupancy.storage_volume_textures();
+        for (field, texture) in [
+            (VoxelLightVolumeKind::FloodFillEven, self.flood_fill.even_texture),
+            (VoxelLightVolumeKind::FloodFillOdd, self.flood_fill.odd_texture),
+        ] {
+            if self.compute.field_written_or_initialized(field) {
+                textures.push(texture);
+            }
+        }
+        textures
+    }
+
     pub fn create(
         gal: &mut VulkanicGal,
         descriptor: VoxelLightVolumeDescriptor,
@@ -2087,40 +2274,69 @@ fn static_terrain_mesh_entry(
     )))
 }
 
+/// Floored block-centre bounds of the finite samples (non-finite samples are
+/// rejected when voxelized, so they never contribute a cell).
+fn sample_world_bounds(samples: &[TerrainVoxelSample]) -> Option<[[i32; 3]; 2]> {
+    let mut bounds: Option<[[i32; 3]; 2]> = None;
+    for sample in samples {
+        let Ok(center) = sample.world_block_center() else {
+            continue;
+        };
+        if center.iter().any(|value| !value.is_finite()) {
+            continue;
+        }
+        let point = center.map(|value| value.floor() as i32);
+        bounds = Some(match bounds {
+            None => [point, point],
+            Some([min, max]) => [
+                [0, 1, 2].map(|axis| min[axis].min(point[axis])),
+                [0, 1, 2].map(|axis| max[axis].max(point[axis])),
+            ],
+        });
+    }
+    bounds
+}
+
+fn terrain_voxel_source_entry(
+    mesh: &TerrainVoxelSourceMesh,
+) -> GalResult<TerrainOccupancyMeshSnapshot> {
+    if mesh.mesh_key == 0 || mesh.mesh_generation == 0 {
+        return Err(GalError::invalid_argument(
+            "terrain voxel source mesh key and generation must be non-zero",
+        ));
+    }
+    if mesh.transform.iter().any(|value| !value.is_finite()) {
+        return Err(GalError::invalid_argument(
+            "terrain voxel source mesh transform is not finite",
+        ));
+    }
+    let source_identity = TerrainOccupancySourceIdentity {
+        vertices: Arc::clone(&mesh.vertices),
+        indices: Arc::clone(&mesh.indices),
+        transform: mesh.transform,
+    };
+    indexed_terrain_snapshot(
+        mesh.mesh_generation,
+        mesh.vertices
+            .iter()
+            .map(|vertex| TerrainVoxelSample {
+                vertex_position: vertex.position,
+                mid_block_packed: vertex.mid_block_packed,
+                shader_material_id: vertex.shader_material_id,
+                model_transform: mesh.transform,
+            })
+            .collect(),
+        mesh.indices.as_ref().clone(),
+        Some(source_identity),
+    )
+}
+
 fn terrain_voxel_source_snapshot(
     meshes: impl IntoIterator<Item = TerrainVoxelSourceMesh>,
 ) -> GalResult<BTreeMap<u64, TerrainOccupancyMeshSnapshot>> {
     let mut snapshot = BTreeMap::new();
     for mesh in meshes {
-        if mesh.mesh_key == 0 || mesh.mesh_generation == 0 {
-            return Err(GalError::invalid_argument(
-                "terrain voxel source mesh key and generation must be non-zero",
-            ));
-        }
-        if mesh.transform.iter().any(|value| !value.is_finite()) {
-            return Err(GalError::invalid_argument(
-                "terrain voxel source mesh transform is not finite",
-            ));
-        }
-        let source_identity = TerrainOccupancySourceIdentity {
-            vertices: Arc::clone(&mesh.vertices),
-            indices: Arc::clone(&mesh.indices),
-            transform: mesh.transform,
-        };
-        let entry = indexed_terrain_snapshot(
-            mesh.mesh_generation,
-            mesh.vertices
-                .iter()
-                .map(|vertex| TerrainVoxelSample {
-                    vertex_position: vertex.position,
-                    mid_block_packed: vertex.mid_block_packed,
-                    shader_material_id: vertex.shader_material_id,
-                    model_transform: mesh.transform,
-                })
-                .collect(),
-            mesh.indices.as_ref().clone(),
-            Some(source_identity),
-        )?;
+        let entry = terrain_voxel_source_entry(&mesh)?;
         if snapshot.insert(mesh.mesh_key, entry).is_some() {
             return Err(GalError::invalid_argument(format!(
                 "terrain voxel source snapshot contains duplicate mesh key {}",
@@ -2190,13 +2406,16 @@ fn indexed_terrain_snapshot(
         };
         *reference = true;
     }
+    let samples: Vec<TerrainVoxelSample> = vertices
+        .into_iter()
+        .zip(referenced)
+        .filter_map(|(sample, referenced)| referenced.then_some(sample))
+        .collect();
+    let world_bounds = sample_world_bounds(&samples);
     Ok(TerrainOccupancyMeshSnapshot {
         mesh_generation,
-        samples: vertices
-            .into_iter()
-            .zip(referenced)
-            .filter_map(|(sample, referenced)| referenced.then_some(sample))
-            .collect(),
+        samples: Arc::new(samples),
+        world_bounds,
         source_identity,
     })
 }
@@ -2887,6 +3106,14 @@ impl TerrainFloodFillComputeResources {
         self.mark_field_initialized(flood_fill_output_field_for_frame(frame_counter))?;
         self.confirmed_frame_mapping = self.pending_frame_mapping.take();
         Ok(())
+    }
+
+    fn field_written_or_initialized(&self, field: VoxelLightVolumeKind) -> bool {
+        self.field_initialized(field)
+            || self.pending_initialization.is_some()
+            || self
+                .pending_propagation
+                .is_some_and(|frame| flood_fill_output_field_for_frame(frame) == field)
     }
 
     fn field_initialized(&self, field: VoxelLightVolumeKind) -> bool {
@@ -3636,6 +3863,96 @@ impl TerrainOccupancyGpuResources {
         Ok(())
     }
 
+    /// Uploads several region patches of an initialized field in one
+    /// transfer, packed into the upload buffer. Returns `Ok(false)` without
+    /// recording anything when they do not fit (the caller then falls back
+    /// to a single whole-field upload).
+    pub(crate) fn append_patch_uploads(
+        &mut self,
+        patches: &[VoxelLightVolumeUpdate],
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<bool> {
+        if self.upload_pending {
+            return Err(GalError::invalid_argument(
+                "terrain occupancy GPU upload is already awaiting submission confirmation",
+            ));
+        }
+        if !self.initialized {
+            return Err(GalError::invalid_argument(
+                "terrain occupancy patch uploads require an initialized texture",
+            ));
+        }
+        let capacity = self.descriptor.extent.byte_len(
+            super::voxel_light_volume::VoxelLightVolumeFormat::OccupancyR8Uint,
+        );
+        let mut offsets = Vec::with_capacity(patches.len());
+        let mut cursor = 0_u64;
+        for patch in patches {
+            patch.validate(&self.descriptor)?;
+            if patch.kind != VoxelLightVolumeKind::Occupancy {
+                return Err(GalError::invalid_argument(
+                    "occupancy residency accepts only occupancy updates",
+                ));
+            }
+            offsets.push(cursor);
+            cursor = (cursor + patch.texels.len() as u64 + 15) & !15;
+        }
+        if cursor > capacity {
+            return Ok(false);
+        }
+        for (patch, offset) in patches.iter().zip(&offsets) {
+            operations.push(CommandOp::HostWriteBuffer {
+                buffer: self.upload_buffer,
+                offset: *offset,
+                data: patch.texels.clone(),
+            });
+        }
+        operations.push(CommandOp::Barrier(resource_barrier(
+            self.upload_buffer,
+            None,
+            TextureUsageState::TransferDst,
+            TextureUsageState::TransferSrc,
+        )));
+        // GAL tracks texture hazards per subresource, so every patch copy is
+        // its own transfer-write scope, bracketed by real state transitions.
+        for (patch, offset) in patches.iter().zip(&offsets) {
+            let region = patch.region;
+            operations.push(CommandOp::Barrier(resource_barrier(
+                self.texture,
+                None,
+                TextureUsageState::ShaderStorageRead,
+                TextureUsageState::TransferDst,
+            )));
+            operations.push(CommandOp::CopyBufferToTexture(BufferImageCopyRegion {
+                buffer: self.upload_buffer,
+                buffer_offset: *offset,
+                bytes_per_row: region.extent.width,
+                rows_per_image: region.extent.height,
+                texture: self.texture,
+                texture_mip: 0,
+                texture_layer: 0,
+                texture_origin: TextureOrigin3d {
+                    x: region.x,
+                    y: region.y,
+                    z: region.z,
+                },
+                extent: Extent3d {
+                    width: region.extent.width,
+                    height: region.extent.height,
+                    depth: region.extent.depth,
+                },
+            }));
+            operations.push(CommandOp::Barrier(resource_barrier(
+                self.texture,
+                None,
+                TextureUsageState::TransferDst,
+                TextureUsageState::ShaderStorageRead,
+            )));
+        }
+        self.upload_pending = true;
+        Ok(true)
+    }
+
     pub fn confirm_submission(&mut self) -> GalResult<()> {
         if !self.upload_pending {
             return Err(GalError::invalid_argument(
@@ -3687,6 +4004,7 @@ impl TerrainOccupancyVoxelizer {
             initialized: false,
             pending_upload: None,
             pending_occupancy: None,
+            pending_patches: Vec::new(),
         })
     }
 
@@ -3699,7 +4017,7 @@ impl TerrainOccupancyVoxelizer {
     }
 
     pub fn is_initialized(&self) -> bool {
-        self.initialized && self.pending_upload.is_none()
+        self.initialized && self.pending_upload.is_none() && self.pending_patches.is_empty()
     }
 
     pub fn replace_descriptor(&mut self, descriptor: VoxelLightVolumeDescriptor) -> GalResult<()> {
@@ -3723,6 +4041,7 @@ impl TerrainOccupancyVoxelizer {
         self.initialized = false;
         self.pending_upload = None;
         self.pending_occupancy = None;
+        self.pending_patches.clear();
         Ok(())
     }
 
@@ -3730,7 +4049,7 @@ impl TerrainOccupancyVoxelizer {
     /// leaves occupied cells intact; crossing an integer camera cell makes the
     /// field incomplete until a full source snapshot re-voxelizes it.
     pub fn update_mapping(&mut self, mapping: VoxelLightVolumeMapping) -> GalResult<bool> {
-        if self.pending_upload.is_some() {
+        if self.pending_upload.is_some() || !self.pending_patches.is_empty() {
             return Err(GalError::invalid_argument(
                 "cannot update terrain occupancy mapping while an upload is pending",
             ));
@@ -3757,6 +4076,7 @@ impl TerrainOccupancyVoxelizer {
             self.initialized = false;
             self.pending_upload = None;
             self.pending_occupancy = None;
+            self.pending_patches.clear();
         }
     }
 
@@ -3770,6 +4090,24 @@ impl TerrainOccupancyVoxelizer {
     /// Commits the exact pending payload only after the caller has accepted
     /// the submission that contains its upload operations.
     pub fn confirm_pending_upload(&mut self) -> GalResult<()> {
+        if self.pending_upload.is_none() && !self.pending_patches.is_empty() {
+            for patch in std::mem::take(&mut self.pending_patches) {
+                let region = patch.region;
+                let width = self.descriptor.extent.width;
+                let height = self.descriptor.extent.height;
+                let row = region.extent.width as usize;
+                for z in 0..region.extent.depth {
+                    for y in 0..region.extent.height {
+                        let start = voxel_index(width, height, [region.x, region.y + y, region.z + z])?;
+                        let source = ((z * region.extent.height + y) * region.extent.width) as usize;
+                        self.occupancy[start..start + row]
+                            .copy_from_slice(&patch.texels[source..source + row]);
+                    }
+                }
+                self.cache.apply_update(patch)?;
+            }
+            return Ok(());
+        }
         let update = self.pending_upload.take().ok_or_else(|| {
             GalError::invalid_argument("no terrain occupancy upload is pending confirmation")
         })?;
@@ -3787,6 +4125,300 @@ impl TerrainOccupancyVoxelizer {
     pub fn discard_pending_upload(&mut self) {
         self.pending_upload = None;
         self.pending_occupancy = None;
+        self.pending_patches.clear();
+    }
+
+    /// Reinstates a previous mapping after a rejected in-place update. The
+    /// confirmed field was never modified, so unlike `update_mapping` this
+    /// never clears it, even across a camera-cell change.
+    fn restore_mapping(&mut self, mapping: VoxelLightVolumeMapping) {
+        self.descriptor.mapping = mapping;
+        let _ = self.cache.update_mapping(mapping);
+    }
+
+    pub(crate) fn pending_patches(&self) -> &[VoxelLightVolumeUpdate] {
+        &self.pending_patches
+    }
+
+    /// In-place form of `update_incremental` for an unchanged camera cell:
+    /// each dirty world box is recomputed into its own buffer (same last-writer
+    /// order as a full rebuild) and staged as a patch only when it differs
+    /// from the confirmed field.
+    fn stage_patches(
+        &mut self,
+        meshes: &BTreeMap<u64, TerrainOccupancyMeshSnapshot>,
+        dirty: &[[[i32; 3]; 2]],
+    ) -> GalResult<TerrainOccupancyUpdateStats> {
+        if !self.is_initialized() {
+            return Err(GalError::invalid_argument(
+                "terrain occupancy patches require a confirmed field without a pending upload",
+            ));
+        }
+        let range = [
+            self.descriptor.mapping.valid_world_min,
+            self.descriptor.mapping.valid_world_max_exclusive,
+        ];
+        let mut stats = TerrainOccupancyUpdateStats::default();
+        let mut bounds: Option<[[u32; 3]; 2]> = None;
+        // Patches become separate copies into one texture within a single
+        // transfer phase, so they must not overlap.
+        let regions = disjoint_world_boxes(
+            dirty
+                .iter()
+                .filter_map(|dirty| intersect_world_boxes(*dirty, range))
+                .collect(),
+        );
+        for region in regions {
+            let size = [0, 1, 2].map(|axis| (region[1][axis] - region[0][axis]) as u32);
+            let local = [0, 1, 2].map(|axis| (region[0][axis] - range[0][axis]) as u32);
+            let mut values = vec![0_u8; (size[0] * size[1] * size[2]) as usize];
+            for mesh in meshes.values() {
+                let Some(mesh_bounds) = mesh.world_bounds else {
+                    continue;
+                };
+                if (0..3).any(|axis| {
+                    mesh_bounds[1][axis] < region[0][axis] || mesh_bounds[0][axis] >= region[1][axis]
+                }) {
+                    continue;
+                }
+                for sample in mesh.samples.iter() {
+                    stats.input_samples = stats.input_samples.saturating_add(1);
+                    let Some(value) = self.materials.occupancy_value(sample.shader_material_id)
+                    else {
+                        stats.skipped_non_solid_samples =
+                            stats.skipped_non_solid_samples.saturating_add(1);
+                        continue;
+                    };
+                    let center = sample.world_block_center()?;
+                    if center.iter().any(|value| !value.is_finite()) {
+                        continue;
+                    }
+                    let point = center.map(|value| value.floor() as i32);
+                    if (0..3).any(|axis| point[axis] < region[0][axis] || point[axis] >= region[1][axis]) {
+                        continue;
+                    }
+                    let offset = [0, 1, 2].map(|axis| (point[axis] - region[0][axis]) as u32);
+                    values[((offset[2] * size[1] + offset[1]) * size[0] + offset[0]) as usize] = value;
+                    stats.emitted_samples = stats.emitted_samples.saturating_add(1);
+                }
+            }
+            let mut changed = 0_u32;
+            let width = self.descriptor.extent.width;
+            let height = self.descriptor.extent.height;
+            for z in 0..size[2] {
+                for y in 0..size[1] {
+                    let start = voxel_index(width, height, [local[0], local[1] + y, local[2] + z])?;
+                    let source = ((z * size[1] + y) * size[0]) as usize;
+                    let row = size[0] as usize;
+                    changed += self.occupancy[start..start + row]
+                        .iter()
+                        .zip(&values[source..source + row])
+                        .filter(|(old, new)| old != new)
+                        .count() as u32;
+                }
+            }
+            if changed == 0 {
+                continue;
+            }
+            stats.changed_voxels = stats.changed_voxels.saturating_add(changed);
+            stats.uploaded_bytes = stats.uploaded_bytes.saturating_add(values.len() as u32);
+            let end = [0, 1, 2].map(|axis| local[axis] + size[axis]);
+            bounds = Some(match bounds {
+                None => [local, end],
+                Some([min, max]) => [
+                    [0, 1, 2].map(|axis| min[axis].min(local[axis])),
+                    [0, 1, 2].map(|axis| max[axis].max(end[axis])),
+                ],
+            });
+            let update = VoxelLightVolumeUpdate {
+                identity: self.descriptor.identity.clone(),
+                shader_pack_generation: self.descriptor.shader_pack_generation,
+                world_generation: self.descriptor.world_generation,
+                resource_generation: self.descriptor.resource_generation,
+                kind: VoxelLightVolumeKind::Occupancy,
+                region: VoxelLightVolumeRegion {
+                    x: local[0],
+                    y: local[1],
+                    z: local[2],
+                    extent: super::voxel_light_volume::VoxelLightVolumeExtent {
+                        width: size[0],
+                        height: size[1],
+                        depth: size[2],
+                    },
+                },
+                texels: values,
+            };
+            update.validate(&self.descriptor)?;
+            self.pending_patches.push(update);
+        }
+        stats.updated_region = bounds.map(|[min, max]| VoxelLightVolumeRegion {
+            x: min[0],
+            y: min[1],
+            z: min[2],
+            extent: super::voxel_light_volume::VoxelLightVolumeExtent {
+                width: max[0] - min[0],
+                height: max[1] - min[1],
+                depth: max[2] - min[2],
+            },
+        });
+        Ok(stats)
+    }
+
+    /// Whether `mapping` only translates the camera cell of a confirmed field,
+    /// so the field can be shifted rather than re-voxelized.
+    fn can_shift_to(&self, mapping: &VoxelLightVolumeMapping) -> bool {
+        let current = &self.descriptor.mapping;
+        self.initialized
+            && self.pending_upload.is_none()
+            && self.pending_patches.is_empty()
+            && mapping.scene_to_volume_scale == current.scene_to_volume_scale
+            && mapping.sample_normal_offset == current.sample_normal_offset
+            && (0..3).all(|axis| {
+                mapping.valid_world_max_exclusive[axis] - mapping.valid_world_min[axis]
+                    == current.valid_world_max_exclusive[axis] - current.valid_world_min[axis]
+            })
+    }
+
+    /// Exact incremental form of `update_from_samples` over every sample of
+    /// `meshes` (in key order): the confirmed field is shifted to `mapping`,
+    /// then the newly exposed cells and every `dirty` world box are cleared
+    /// and recomputed from all meshes that touch them, in the same order, so
+    /// each recomputed cell keeps the full rebuild's last-writer value.
+    fn update_incremental(
+        &mut self,
+        mapping: VoxelLightVolumeMapping,
+        meshes: &BTreeMap<u64, TerrainOccupancyMeshSnapshot>,
+        dirty: &[[[i32; 3]; 2]],
+    ) -> GalResult<TerrainOccupancyUpdateStats> {
+        if self.pending_upload.is_some() {
+            return Err(GalError::invalid_argument(
+                "terrain occupancy upload is already pending submission confirmation",
+            ));
+        }
+        mapping.validate(self.descriptor.extent)?;
+        let old = [
+            self.descriptor.mapping.valid_world_min,
+            self.descriptor.mapping.valid_world_max_exclusive,
+        ];
+        let new = [mapping.valid_world_min, mapping.valid_world_max_exclusive];
+        let mut next = vec![0; self.occupancy.len()];
+        if let Some(overlap) = intersect_world_boxes(old, new) {
+            let row = usize::try_from(overlap[1][0] - overlap[0][0]).unwrap_or(0);
+            for z in overlap[0][2]..overlap[1][2] {
+                for y in overlap[0][1]..overlap[1][1] {
+                    let from = self.world_cell_index(old[0], [overlap[0][0], y, z])?;
+                    let to = self.world_cell_index(new[0], [overlap[0][0], y, z])?;
+                    next[to..to + row].copy_from_slice(&self.occupancy[from..from + row]);
+                }
+            }
+        }
+        let mut boxes = subtract_world_box(new, old);
+        boxes.extend(dirty.iter().filter_map(|dirty| intersect_world_boxes(*dirty, new)));
+        let mut stats = TerrainOccupancyUpdateStats::default();
+        for region in &boxes {
+            self.recompute_world_box(&mut next, new[0], *region, meshes, &mut stats)?;
+        }
+        let shifted = old != new;
+        self.descriptor.mapping = mapping;
+        self.cache.update_mapping(mapping)?;
+        if shifted {
+            // Every resident texel moved: upload the whole field without
+            // scanning 2x the volume for a bounding region.
+            let update = VoxelLightVolumeUpdate {
+                identity: self.descriptor.identity.clone(),
+                shader_pack_generation: self.descriptor.shader_pack_generation,
+                world_generation: self.descriptor.world_generation,
+                resource_generation: self.descriptor.resource_generation,
+                kind: VoxelLightVolumeKind::Occupancy,
+                region: VoxelLightVolumeRegion::whole(self.descriptor.extent),
+                texels: next.clone(),
+            };
+            update.validate(&self.descriptor)?;
+            stats.uploaded_bytes = u32::try_from(next.len()).unwrap_or(u32::MAX);
+            stats.updated_region = Some(update.region);
+            self.pending_upload = Some(update);
+            self.pending_occupancy = Some(next);
+            return Ok(stats);
+        }
+        self.stage_update(next, stats)
+    }
+
+    /// Full rebuild over `meshes` for the current mapping. Meshes wholly
+    /// outside the volume are skipped; their samples could only be counted as
+    /// out of bounds, so the field equals `update_from_samples` over all.
+    fn rebuild_from_meshes(
+        &mut self,
+        meshes: &BTreeMap<u64, TerrainOccupancyMeshSnapshot>,
+    ) -> GalResult<TerrainOccupancyUpdateStats> {
+        if self.pending_upload.is_some() {
+            return Err(GalError::invalid_argument(
+                "terrain occupancy upload is already pending submission confirmation",
+            ));
+        }
+        let range = [
+            self.descriptor.mapping.valid_world_min,
+            self.descriptor.mapping.valid_world_max_exclusive,
+        ];
+        let mut next = vec![0; self.occupancy.len()];
+        let mut stats = TerrainOccupancyUpdateStats::default();
+        self.recompute_world_box(&mut next, range[0], range, meshes, &mut stats)?;
+        self.stage_update(next, stats)
+    }
+
+    fn recompute_world_box(
+        &self,
+        next: &mut [u8],
+        volume_min: [i32; 3],
+        region: [[i32; 3]; 2],
+        meshes: &BTreeMap<u64, TerrainOccupancyMeshSnapshot>,
+        stats: &mut TerrainOccupancyUpdateStats,
+    ) -> GalResult<()> {
+        let row = usize::try_from(region[1][0] - region[0][0]).unwrap_or(0);
+        for z in region[0][2]..region[1][2] {
+            for y in region[0][1]..region[1][1] {
+                let start = self.world_cell_index(volume_min, [region[0][0], y, z])?;
+                next[start..start + row].fill(0);
+            }
+        }
+        for mesh in meshes.values() {
+            let Some(bounds) = mesh.world_bounds else {
+                continue;
+            };
+            if (0..3).any(|axis| bounds[1][axis] < region[0][axis] || bounds[0][axis] >= region[1][axis]) {
+                continue;
+            }
+            for sample in mesh.samples.iter() {
+                stats.input_samples = stats.input_samples.saturating_add(1);
+                let Some(value) = self.materials.occupancy_value(sample.shader_material_id) else {
+                    stats.skipped_non_solid_samples = stats.skipped_non_solid_samples.saturating_add(1);
+                    continue;
+                };
+                let center = sample.world_block_center()?;
+                if center.iter().any(|value| !value.is_finite()) {
+                    continue;
+                }
+                let point = center.map(|value| value.floor() as i32);
+                if (0..3).any(|axis| point[axis] < region[0][axis] || point[axis] >= region[1][axis]) {
+                    continue;
+                }
+                let index = self.world_cell_index(volume_min, point)?;
+                next[index] = value;
+                stats.emitted_samples = stats.emitted_samples.saturating_add(1);
+            }
+        }
+        Ok(())
+    }
+
+    fn world_cell_index(&self, volume_min: [i32; 3], world: [i32; 3]) -> GalResult<usize> {
+        let local = [0, 1, 2].map(|axis| world[axis] - volume_min[axis]);
+        if local.iter().any(|value| *value < 0) {
+            return Err(GalError::invalid_argument("terrain voxel cell is below the volume"));
+        }
+        voxel_index(
+            self.descriptor.extent.width,
+            self.descriptor.extent.height,
+            local.map(|value| value as u32),
+        )
     }
 
     pub fn update_from_samples<I>(&mut self, samples: I) -> GalResult<TerrainOccupancyUpdateStats>
@@ -3844,13 +4476,14 @@ impl TerrainOccupancyVoxelizer {
             self.descriptor.extent.height,
             self.descriptor.extent.depth,
         );
-        let Some(region) = changed else {
-            return Ok(stats);
-        };
-        let update_region = if self.initialized {
-            region
-        } else {
-            VoxelLightVolumeRegion::whole(self.descriptor.extent)
+        // Iris clears the voxel image at creation, so a pack always samples
+        // a defined (possibly empty) field. An uninitialized volume therefore
+        // uploads its whole field even when no terrain is loaded yet (e.g.
+        // right after a teleport), instead of staying unavailable.
+        let update_region = match (changed, self.initialized) {
+            (Some(region), true) => region,
+            (None, true) => return Ok(stats),
+            (_, false) => VoxelLightVolumeRegion::whole(self.descriptor.extent),
         };
         let texels = copy_region_bytes(
             &next,
@@ -3941,6 +4574,61 @@ fn transform_point(matrix: [f32; 16], point: [f32; 3]) -> GalResult<[f32; 3]> {
         ));
     }
     Ok([x / w, y / w, z / w])
+}
+
+/// Intersection of two half-open world boxes, if non-empty.
+fn intersect_world_boxes(a: [[i32; 3]; 2], b: [[i32; 3]; 2]) -> Option<[[i32; 3]; 2]> {
+    let min = [0, 1, 2].map(|axis| a[0][axis].max(b[0][axis]));
+    let max = [0, 1, 2].map(|axis| a[1][axis].min(b[1][axis]));
+    (0..3).all(|axis| min[axis] < max[axis]).then_some([min, max])
+}
+
+/// Merges intersecting half-open boxes into their bounding boxes until the
+/// set is pairwise disjoint (touching boxes stay separate).
+fn disjoint_world_boxes(mut boxes: Vec<[[i32; 3]; 2]>) -> Vec<[[i32; 3]; 2]> {
+    let mut merged = true;
+    while merged {
+        merged = false;
+        'outer: for i in 0..boxes.len() {
+            for j in i + 1..boxes.len() {
+                if intersect_world_boxes(boxes[i], boxes[j]).is_some() {
+                    let other = boxes.swap_remove(j);
+                    let current = boxes[i];
+                    boxes[i] = [
+                        [0, 1, 2].map(|axis| current[0][axis].min(other[0][axis])),
+                        [0, 1, 2].map(|axis| current[1][axis].max(other[1][axis])),
+                    ];
+                    merged = true;
+                    break 'outer;
+                }
+            }
+        }
+    }
+    boxes
+}
+
+/// Half-open boxes covering `a` minus `b` (at most six, disjoint).
+fn subtract_world_box(a: [[i32; 3]; 2], b: [[i32; 3]; 2]) -> Vec<[[i32; 3]; 2]> {
+    let Some(inner) = intersect_world_boxes(a, b) else {
+        return vec![a];
+    };
+    let mut result = Vec::new();
+    let mut rest = a;
+    for axis in 0..3 {
+        if rest[0][axis] < inner[0][axis] {
+            let mut slab = rest;
+            slab[1][axis] = inner[0][axis];
+            result.push(slab);
+            rest[0][axis] = inner[0][axis];
+        }
+        if inner[1][axis] < rest[1][axis] {
+            let mut slab = rest;
+            slab[0][axis] = inner[1][axis];
+            result.push(slab);
+            rest[1][axis] = inner[1][axis];
+        }
+    }
+    result
 }
 
 fn voxel_index(width: u32, height: u32, voxel: [u32; 3]) -> GalResult<usize> {
@@ -4216,7 +4904,18 @@ mod tests {
             .update_from_samples([sample([0.0, 0.0, 0.0], 32_000)])
             .unwrap();
         assert_eq!(1, stats.skipped_non_solid_samples);
-        assert!(stats.updated_region.is_none());
+        // An uninitialized volume still publishes its (empty) whole field.
+        assert_eq!(
+            Some(VoxelLightVolumeRegion::whole(descriptor().extent)),
+            stats.updated_region
+        );
+        assert!(voxelizer
+            .pending_upload()
+            .expect("empty initial occupancy field")
+            .texels
+            .iter()
+            .all(|texel| *texel == 0));
+        voxelizer.confirm_pending_upload().unwrap();
         let stats = voxelizer
             .update_from_samples([
                 sample([0.0, 0.0, 0.0], 30_008),
@@ -4250,7 +4949,9 @@ mod tests {
         )
         .unwrap();
         assert_eq!(3, snapshot.samples.len());
-        let stats = voxelizer.update_from_samples(snapshot.samples).unwrap();
+        let stats = voxelizer
+            .update_from_samples(snapshot.samples.iter().copied())
+            .unwrap();
         assert_eq!(3, stats.changed_voxels);
         let interior =
             voxel_index(descriptor.extent.width, descriptor.extent.height, [5, 2, 5]).unwrap();
@@ -4967,6 +5668,8 @@ mod tests {
         let moved_stats = runtime
             .append_terrain_source_snapshot_for_mapping(moved, [source], &mut moved_ops)
             .unwrap();
+        // The confirmed field is shifted in place; every resident texel moves,
+        // so the whole field is uploaded.
         assert_eq!(
             Some(VoxelLightVolumeRegion::whole(descriptor.extent)),
             moved_stats.updated_region
@@ -4981,6 +5684,225 @@ mod tests {
         );
         assert!(runtime.is_initialized());
         assert_eq!([1, 0, 0], runtime.descriptor().mapping.camera_cell);
+        let mut moved_descriptor = descriptor.clone();
+        moved_descriptor.mapping = moved;
+        let mut fresh = new_voxelizer(moved_descriptor);
+        fresh
+            .update_from_samples([sample([0.0, 0.0, 0.0], 30_008)])
+            .unwrap();
+        assert_eq!(
+            fresh.pending_occupancy.as_ref().unwrap(),
+            &runtime.voxelizer.occupancy
+        );
+    }
+
+    #[test]
+    fn occupancy_patches_upload_disjoint_regions_in_one_submission() {
+        let descriptor = descriptor();
+        let mut gal = VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false);
+        let mut runtime =
+            TerrainOccupancyRuntime::create(&mut gal, descriptor.clone(), materials()).unwrap();
+        let mesh = |key: u64, generation: u64, position: [f32; 3], material: i32| {
+            TerrainVoxelSourceMesh {
+                mesh_key: key,
+                mesh_generation: generation,
+                vertices: Arc::new(vec![TerrainVoxelSourceVertex {
+                    position,
+                    mid_block_packed: 0,
+                    shader_material_id: material,
+                }]),
+                indices: Arc::new(vec![0, 0, 0]),
+                translucent_indices: Arc::new(Vec::new()),
+                transform: identity_transform(),
+            }
+        };
+        let apply = |runtime: &mut TerrainOccupancyRuntime,
+                     gal: &mut VulkanicGal,
+                     meshes: Vec<TerrainVoxelSourceMesh>| {
+            let mut ops = Vec::new();
+            let stats = runtime
+                .append_terrain_source_snapshot_for_mapping(descriptor.mapping, meshes, &mut ops)
+                .unwrap();
+            let copies = ops
+                .iter()
+                .filter(|op| matches!(op, CommandOp::CopyBufferToTexture(_)))
+                .count();
+            submit_runtime_update(gal, runtime, "occupancy-disjoint-patches", ops);
+            (stats, copies)
+        };
+        apply(
+            &mut runtime,
+            &mut gal,
+            vec![
+                mesh(1, 1, [-3.5, 0.5, -3.5], 30_008),
+                mesh(2, 1, [2.5, 0.5, 2.5], 30_008),
+            ],
+        );
+        // Both far-apart meshes change in one frame: two patches, one
+        // submission (each copy needs its own transfer-write scope).
+        let (stats, copies) = apply(
+            &mut runtime,
+            &mut gal,
+            vec![
+                mesh(1, 2, [-3.5, 0.5, -3.5], 30_012),
+                mesh(2, 2, [2.5, 0.5, 2.5], 30_004),
+            ],
+        );
+        assert_eq!(2, copies);
+        assert_eq!(2, stats.changed_voxels);
+        let mut fresh = new_voxelizer(descriptor.clone());
+        fresh
+            .update_from_samples([
+                sample([-3.5, 0.5, -3.5], 30_012),
+                sample([2.5, 0.5, 2.5], 30_004),
+            ])
+            .unwrap();
+        assert_eq!(
+            fresh.pending_occupancy.as_ref().unwrap(),
+            &runtime.voxelizer.occupancy
+        );
+    }
+
+    /// Incremental voxel updates (field shift + dirty-region recompute) must
+    /// equal a from-scratch voxelization of the same mesh set and mapping
+    /// after every camera move and mesh add/replace/remove.
+    #[test]
+    fn incremental_occupancy_matches_full_rebuild_across_moves_and_mesh_changes() {
+        let descriptor = descriptor();
+        let mut gal = VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false);
+        let mut runtime =
+            TerrainOccupancyRuntime::create(&mut gal, descriptor.clone(), materials()).unwrap();
+        let mut state = 0x2545_f491_4f6c_dd1d_u64;
+        let mut next = move |bound: u64| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state % bound
+        };
+        let materials_ids = [30_008, 30_012, 30_004, 32_000];
+        let mut meshes: BTreeMap<u64, TerrainVoxelSourceMesh> = BTreeMap::new();
+        let mut generation = 1;
+        let mut make_mesh = |key: u64, next: &mut dyn FnMut(u64) -> u64| {
+            generation += 1;
+            // Meshes cluster in 4-block "sections" so neighbours and
+            // overlapping writers (same cell, different material) occur.
+            let origin = [
+                next(6) as i32 * 4 - 12,
+                next(3) as i32 * 2 - 3,
+                next(6) as i32 * 4 - 12,
+            ];
+            let count = 1 + next(12) as usize;
+            let vertices = (0..count)
+                .map(|_| TerrainVoxelSourceVertex {
+                    position: [
+                        (origin[0] + next(4) as i32) as f32 + 0.5,
+                        (origin[1] + next(2) as i32) as f32 + 0.5,
+                        (origin[2] + next(4) as i32) as f32 + 0.5,
+                    ],
+                    mid_block_packed: 0,
+                    shader_material_id: materials_ids[next(4) as usize],
+                })
+                .collect::<Vec<_>>();
+            let indices = (0..count as u32)
+                .flat_map(|index| [index, index, index])
+                .collect::<Vec<_>>();
+            TerrainVoxelSourceMesh {
+                mesh_key: key,
+                mesh_generation: generation,
+                vertices: Arc::new(vertices),
+                indices: Arc::new(indices),
+                translucent_indices: Arc::new(Vec::new()),
+                transform: identity_transform(),
+            }
+        };
+        let mut camera = [0_i32; 3];
+        for step in 0..160 {
+            for _ in 0..1 + next(3) {
+            match next(4) {
+                0 => {
+                    let key = 1 + next(24);
+                    let mesh = make_mesh(key, &mut next);
+                    meshes.insert(key, mesh);
+                }
+                1 => {
+                    if let Some(key) = meshes.keys().nth(next(meshes.len().max(1) as u64) as usize).copied() {
+                        meshes.remove(&key);
+                    }
+                }
+                2 => {
+                    // Same cells, new materials: the old and new bounds of one
+                    // mesh overlap, as do neighbouring dirty boxes.
+                    if let Some(key) = meshes.keys().nth(next(meshes.len().max(1) as u64) as usize).copied() {
+                        let previous = meshes[&key].clone();
+                        let vertices = previous
+                            .vertices
+                            .iter()
+                            .map(|vertex| TerrainVoxelSourceVertex {
+                                shader_material_id: materials_ids[next(4) as usize],
+                                ..*vertex
+                            })
+                            .collect::<Vec<_>>();
+                        meshes.insert(
+                            key,
+                            TerrainVoxelSourceMesh {
+                                mesh_generation: 1_000_000 + step as u64,
+                                vertices: Arc::new(vertices),
+                                ..previous
+                            },
+                        );
+                    }
+                }
+                _ => {}
+            }
+            }
+            if next(2) == 0 {
+                let axis = next(3) as usize;
+                let delta = [-1, 1, -3, 5, 9][next(5) as usize];
+                // Wrap inside the populated region so moves keep exposing
+                // cells that unchanged meshes occupy.
+                let radius = if axis == 1 { 3 } else { 10 };
+                camera[axis] =
+                    (camera[axis] + delta + radius).rem_euclid(2 * radius) - radius;
+            }
+            let mapping =
+                VoxelLightVolumeMapping::complementary(descriptor.extent, camera, [0.5, 0.25, 0.75])
+                    .unwrap();
+            let mut ops = Vec::new();
+            runtime
+                .append_terrain_source_snapshot_for_mapping(
+                    mapping,
+                    meshes.values().cloned(),
+                    &mut ops,
+                )
+                .unwrap();
+            if runtime.upload_pending {
+                submit_runtime_update(&mut gal, &mut runtime, "incremental-equivalence", ops);
+            }
+            let mut expected_descriptor = descriptor.clone();
+            expected_descriptor.mapping = mapping;
+            let mut fresh = new_voxelizer(expected_descriptor);
+            let samples = terrain_voxel_source_snapshot(meshes.values().cloned())
+                .unwrap()
+                .into_values()
+                .flat_map(|mesh| mesh.samples.as_ref().clone())
+                .collect::<Vec<_>>();
+            fresh.update_from_samples(samples).unwrap();
+            let expected = fresh
+                .pending_occupancy
+                .clone()
+                .unwrap_or_else(|| vec![0; fresh.occupancy.len()]);
+            assert_eq!(
+                expected, runtime.voxelizer.occupancy,
+                "step {step}: camera {camera:?}, {} meshes",
+                meshes.len()
+            );
+            // The semantic cache mirrors the confirmed field (patches included).
+            assert_eq!(
+                Some(&runtime.voxelizer.occupancy),
+                runtime.voxelizer.cache.field(VoxelLightVolumeKind::Occupancy),
+                "step {step}: cache mirror diverged"
+            );
+        }
     }
 
     #[test]
@@ -5016,13 +5938,15 @@ mod tests {
             initial_ops,
         );
         let previous_mapping = runtime.descriptor().mapping;
+        let previous_field = runtime.voxelizer.occupancy.clone();
+        assert!(previous_field.iter().any(|texel| *texel != 0));
 
         let moved =
             VoxelLightVolumeMapping::complementary(descriptor.extent, [1, 0, 0], [0.0, 0.0, 0.0])
                 .unwrap();
         let mut moved_ops = Vec::new();
         runtime
-            .append_terrain_source_snapshot_for_mapping(moved, [source], &mut moved_ops)
+            .append_terrain_source_snapshot_for_mapping(moved, [source.clone()], &mut moved_ops)
             .unwrap();
         let list = gal
             .create_command_list(CommandListDesc {
@@ -5041,6 +5965,24 @@ mod tests {
         assert_eq!(previous_mapping, runtime.descriptor().mapping);
         assert!(runtime.is_initialized());
         assert_eq!(1, runtime.mesh_snapshot_count());
+        // The in-place shift never touched the confirmed field.
+        assert_eq!(previous_field, runtime.voxelizer.occupancy);
+        // And a retried move still produces the exact shifted field.
+        let mut retry_ops = Vec::new();
+        runtime
+            .append_terrain_source_snapshot_for_mapping(moved, [source], &mut retry_ops)
+            .unwrap();
+        submit_runtime_update(&mut gal, &mut runtime, "occupancy-rollback-retry", retry_ops);
+        let mut moved_descriptor = descriptor.clone();
+        moved_descriptor.mapping = moved;
+        let mut fresh = new_voxelizer(moved_descriptor);
+        fresh
+            .update_from_samples([sample([0.0, 0.0, 0.0], 30_008)])
+            .unwrap();
+        assert_eq!(
+            fresh.pending_occupancy.as_ref().unwrap(),
+            &runtime.voxelizer.occupancy
+        );
     }
 
     #[test]
@@ -5493,7 +6435,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_source_snapshot_never_dispatches_flood_fill_before_occupancy_exists() {
+    fn empty_source_snapshot_seeds_a_cleared_field_like_iris() {
         let descriptor = descriptor();
         let source = bundled_complementary_hung_loified_source(1).unwrap();
         let contract = derive_complementary_terrain_contract(&source).unwrap();
@@ -5513,9 +6455,12 @@ mod tests {
                 &mut first_ops,
             )
             .unwrap();
+        // Iris creates the voxel image cleared, so the first frame seeds the
+        // flood-fill from an empty occupancy field instead of waiting for
+        // terrain (e.g. right after a teleport, before chunks load).
         assert!(first_ops
             .iter()
-            .all(|operation| !matches!(operation, CommandOp::Dispatch { .. })));
+            .any(|operation| matches!(operation, CommandOp::Dispatch { .. })));
         let list = gal
             .create_command_list(CommandListDesc {
                 label: "colored-light.empty-source.prepare".to_owned(),
@@ -5543,7 +6488,8 @@ mod tests {
             .iter()
             .all(|operation| !matches!(operation, CommandOp::Dispatch { .. })));
         assert!(!runtime.has_pending_submission());
-        assert!(runtime.readiness().is_err());
+        assert!(runtime.is_ready_for_frame(0));
+        assert!(runtime.is_ready_for_frame(1));
     }
 
     #[test]

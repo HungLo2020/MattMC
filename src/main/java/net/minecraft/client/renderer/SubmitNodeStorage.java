@@ -146,6 +146,15 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public boolean submitEndPortal(PoseStack poseStack, boolean[] faces, float offsetDown, float offsetUp, float gameTime, int lightCoords) {
+		return this.order(0).submitEndPortal(poseStack, faces, offsetDown, offsetUp, gameTime, lightCoords);
+	}
+	@Override
+	public boolean submitEndPortalSemantic(PoseStack poseStack, boolean[] faces, float offsetDown, float offsetUp, float gameTime, int lightCoords) {
+		return this.order(0).submitEndPortalSemantic(poseStack, faces, offsetDown, offsetUp, gameTime, lightCoords);
+	}
+
+	@Override
 	public boolean submitOpticalTexturedQuads(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int[] colors, int lightCoords, int materialMode) {
 		return this.order(0).submitOpticalTexturedQuads(poseStack, renderType, textureIdentity, vertices, uvs, colors, lightCoords, materialMode);
 	}

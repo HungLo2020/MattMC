@@ -9,6 +9,50 @@ use crate::render::vulkanic::resources::{
 };
 
 use super::cloud_contract::{CloudBlend, CloudPassContract};
+use super::terrain_contract::TerrainProgramScope as IdentityScope;
+
+/// Dimension tag for program identities. Every lowered-program cache (layouts,
+/// pipelines, pack resources) keys on identity, and a pack's Nether/End
+/// programs share their overworld program's kind name; without the tag a
+/// dimension change reused the overworld layout and pipelines.
+fn scope_identity_tag(scope: IdentityScope) -> &'static str {
+    match scope {
+        IdentityScope::Default | IdentityScope::Overworld => "",
+        IdentityScope::Nether => "_nether",
+        IdentityScope::End => "_end",
+    }
+}
+
+/// The shadow constructor has no dimension scope; tag non-overworld variants
+/// by their actual lowered source and bindings so per-dimension shadow
+/// programs never share a cached layout or pipeline.
+fn shadow_program_identity_tag(
+    lowered: &LoweredShadowSourcePair,
+    bindings: &TerrainSourceOpaqueResourceBindingPlan,
+) -> String {
+    let tag = program_path_identity_tag(lowered.fragment().entry_path());
+    // Deterministic FNV-1a: the identity keys process-lifetime caches.
+    let mut value: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in lowered
+        .fragment()
+        .source()
+        .bytes()
+        .chain(format!("{bindings:?}").into_bytes())
+    {
+        value = (value ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{tag}_{value:016x}")
+}
+
+fn program_path_identity_tag(path: &str) -> &'static str {
+    if path.starts_with("world-1/") {
+        "_nether"
+    } else if path.starts_with("world1/") {
+        "_end"
+    } else {
+        ""
+    }
+}
 use super::distant_horizons_contract::{DistantHorizonsPassContract, DistantHorizonsPassKind};
 use super::entity_contract::{EntityPassContract, EntitySourceDrawSemantics, EntitySourceOutput};
 use super::hand_contract::{HandPassContract, HandSourceOutput};
@@ -3140,10 +3184,11 @@ pub fn prepare_lowered_terrain_source_program(
         .collect::<GalResult<Vec<_>>>()?;
     let program = LoweredTerrainSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/terrain_{}_source_gen{}",
+            "vulkanic:shader-pack/{}/terrain_{}_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
             suffix,
-            contract.generation
+            contract.generation,
+            program_path_identity_tag(&contract.program_path)
         )),
         material_kind: Some(kind),
         shader_pack_generation: contract.generation,
@@ -3211,9 +3256,10 @@ pub fn prepare_lowered_entity_source_program(
         .collect::<Vec<_>>();
     let program = LoweredEntitySourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/entity_source_gen{}",
+            "vulkanic:shader-pack/{}/entity_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
-            contract.generation
+            contract.generation,
+            scope_identity_tag(contract.scope)
         )),
         shader_pack_generation: contract.generation,
         entity_id_generation: contract.entity_id_generation(),
@@ -3250,9 +3296,10 @@ pub fn prepare_lowered_entity_shadow_source_program(
     let mut program =
         prepare_lowered_entity_source_program(contract, lowered, opaque_resource_bindings)?;
     program.identity = ProgramIdentity::new(format!(
-        "vulkanic:shader-pack/{}/entity_shadow_source_gen{}",
+        "vulkanic:shader-pack/{}/entity_shadow_source_gen{}{}",
         contract.pack_name.to_ascii_lowercase(),
-        contract.generation
+        contract.generation,
+            scope_identity_tag(contract.scope)
     ));
     Ok(program)
 }
@@ -3300,9 +3347,10 @@ pub fn prepare_lowered_hand_source_program(
         .collect::<Vec<_>>();
     let program = LoweredHandSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/hand_source_gen{}",
+            "vulkanic:shader-pack/{}/hand_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
-            contract.generation
+            contract.generation,
+            scope_identity_tag(contract.scope)
         )),
         shader_pack_generation: contract.generation,
         hand_contract: contract.clone(),
@@ -3383,9 +3431,10 @@ pub fn prepare_lowered_textured_material_source_program(
     }
     let program = LoweredTexturedMaterialSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/textured_material_source_gen{}",
+            "vulkanic:shader-pack/{}/textured_material_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
-            contract.generation
+            contract.generation,
+            scope_identity_tag(contract.scope)
         )),
         shader_pack_generation: contract.generation,
         vertex: ShaderStageSource {
@@ -3432,9 +3481,10 @@ pub fn prepare_lowered_weather_source_program(
     scalar_uniform_requirements.require_fully_semantic()?;
     let program = LoweredWeatherSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/weather_source_gen{}",
+            "vulkanic:shader-pack/{}/weather_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
-            contract.generation
+            contract.generation,
+            scope_identity_tag(contract.scope)
         )),
         shader_pack_generation: contract.generation,
         vertex: ShaderStageSource {
@@ -3496,9 +3546,10 @@ pub fn prepare_lowered_line_source_program(
         .collect::<Vec<_>>();
     let program = LoweredTexturedMaterialSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/line_source_gen{}",
+            "vulkanic:shader-pack/{}/line_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
-            contract.generation
+            contract.generation,
+            scope_identity_tag(contract.scope)
         )),
         shader_pack_generation: contract.generation,
         vertex: ShaderStageSource {
@@ -3578,9 +3629,10 @@ pub fn prepare_lowered_damaged_block_source_program(
     };
     let program = LoweredTexturedMaterialSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/damagedblock_source_gen{}",
+            "vulkanic:shader-pack/{}/damagedblock_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
-            contract.generation
+            contract.generation,
+            scope_identity_tag(contract.scope)
         )),
         shader_pack_generation: contract.generation,
         vertex: ShaderStageSource {
@@ -3647,9 +3699,10 @@ pub fn prepare_lowered_cloud_source_program(
     }
     let program = LoweredCloudSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/cloud_source_gen{}",
+            "vulkanic:shader-pack/{}/cloud_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
-            contract.generation
+            contract.generation,
+            scope_identity_tag(contract.scope)
         )),
         shader_pack_generation: contract.generation,
         vertex: ShaderStageSource {
@@ -3727,9 +3780,10 @@ pub fn prepare_lowered_translucent_terrain_source_program(
         .collect::<GalResult<Vec<_>>>()?;
     let program = LoweredTerrainSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/terrain_translucent_source_gen{}",
+            "vulkanic:shader-pack/{}/terrain_translucent_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
-            contract.generation
+            contract.generation,
+            program_path_identity_tag(&contract.program_path)
         )),
         material_kind: Some(TerrainMaterialProgramKind::Translucent),
         shader_pack_generation: contract.generation,
@@ -3806,13 +3860,14 @@ pub fn prepare_lowered_distant_horizons_source_program(
     scalar_uniform_requirements.require_fully_semantic()?;
     let program = LoweredDistantHorizonsSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/distant_horizons_{}_source_gen{}",
+            "vulkanic:shader-pack/{}/distant_horizons_{}_source_gen{}{}",
             contract.pack_name.to_ascii_lowercase(),
             match contract.pass_kind {
                 DistantHorizonsPassKind::Opaque => "opaque",
                 DistantHorizonsPassKind::Translucent => "translucent",
             },
-            contract.generation
+            contract.generation,
+            scope_identity_tag(contract.scope)
         )),
         shader_pack_generation: contract.generation,
         pass_kind: contract.pass_kind,
@@ -4049,9 +4104,10 @@ pub fn prepare_lowered_shadow_source_program(
     scalar_uniform_requirements.require_fully_semantic()?;
     let program = LoweredTerrainSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/shadow_source_gen{}",
+            "vulkanic:shader-pack/{}/shadow_source_gen{}{}",
             pack_name.to_ascii_lowercase(),
-            shader_pack_generation
+            shader_pack_generation,
+            shadow_program_identity_tag(lowered, opaque_resource_bindings)
         )),
         material_kind: None,
         shader_pack_generation,
@@ -8973,7 +9029,9 @@ mod tests {
             program.shader_module_descriptors_with_alpha_cutoff(BackendApi::Vulkan, None);
         let opaque =
             String::from_utf8(opaque_descriptors.into_iter().nth(1).unwrap().code).unwrap();
-        assert!(opaque.contains("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF -1.0"));
+        // No cutoff define: the output alpha test compiles out (Iris ALWAYS).
+        assert!(!opaque.contains("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF"));
+        assert!(opaque.contains("#ifdef VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF"));
         let layouts = program.execution_resource_layouts().unwrap();
         assert_eq!(
             vec![0, 1, 2, 3],
@@ -9734,10 +9792,12 @@ void main() {
         )
         .unwrap();
 
-        assert_eq!(
-            "vulkanic:shader-pack/lowered-shadow-source-test/shadow_source_gen10",
-            program.identity.as_str()
-        );
+        // Shadow identities carry a deterministic content tag so dimension
+        // variants of the shadow program never share cached layouts.
+        assert!(program
+            .identity
+            .as_str()
+            .starts_with("vulkanic:shader-pack/lowered-shadow-source-test/shadow_source_gen10_"));
         assert!(program.vertex.source.contains("shadowModelView"));
         assert!(program.vertex.source.contains("shadowProjection"));
         assert!(program.fragment.source.contains("out_shadow_color"));

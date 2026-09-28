@@ -44,6 +44,7 @@ public final class RustShaderPackSourceCollector {
 	public static final String RUNTIME_ENVIRONMENT_PATH = "mattmc/runtime-environment.properties";
 	/** Reserved Rust-owned table of canonical Minecraft block-state identities. */
 	public static final String RUNTIME_BLOCK_STATE_IDENTITIES_PATH = "mattmc/runtime-block-states.properties";
+	public static final String RUNTIME_BLOCK_ITEM_STATES_PATH = "mattmc/runtime-block-items.properties";
 
 	/** CPU meshing policy copied from the pack; no Iris pipeline or GL state is read. */
 	public static boolean copiedSeparateAo(SourceGeneration source) throws IOException {
@@ -761,7 +762,45 @@ public final class RustShaderPackSourceCollector {
 		if (contents.length > MAX_FILE_BYTES) {
 			throw new IOException("shader-pack runtime block-state payload exceeds " + MAX_FILE_BYTES + " bytes");
 		}
-		return appendReservedProperties(source, RUNTIME_BLOCK_STATE_IDENTITIES_PATH, contents, "block-state identity");
+		return withRuntimeBlockItemStateSnapshot(
+			appendReservedProperties(source, RUNTIME_BLOCK_STATE_IDENTITIES_PATH, contents, "block-state identity")
+		);
+	}
+
+	/**
+	 * Copies each block item's default block-state raw id, keyed by its item
+	 * and default item-model identities. Iris shades a drawn block item with
+	 * the pack's block material for that default state (`currentRenderedItemId`);
+	 * Rust resolves the id through the state table above and the pack's own
+	 * `block.properties`. Solid buckets are excluded as in Iris.
+	 */
+	private static SourceGeneration withRuntimeBlockItemStateSnapshot(SourceGeneration source) throws IOException {
+		java.util.TreeMap<String, Integer> states = new java.util.TreeMap<>();
+		for (net.minecraft.world.item.Item item : BuiltInRegistries.ITEM) {
+			if (!(item instanceof net.minecraft.world.item.BlockItem blockItem)
+				|| item instanceof net.minecraft.world.item.SolidBucketItem) {
+				continue;
+			}
+			int rawStateId = Block.getId(blockItem.getBlock().defaultBlockState());
+			if (rawStateId < 0) {
+				throw new IOException("Minecraft block item has no raw default state identity: " + item);
+			}
+			states.putIfAbsent(BuiltInRegistries.ITEM.getKey(item).toString(), rawStateId);
+			net.minecraft.resources.ResourceLocation model =
+				item.components().get(net.minecraft.core.component.DataComponents.ITEM_MODEL);
+			if (model != null) {
+				states.putIfAbsent(model.toString(), rawStateId);
+			}
+		}
+		StringBuilder properties = new StringBuilder();
+		for (var entry : states.entrySet()) {
+			properties.append("item.").append(entry.getKey()).append('=').append(entry.getValue()).append('\n');
+		}
+		byte[] contents = properties.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+		if (contents.length > MAX_FILE_BYTES) {
+			throw new IOException("shader-pack runtime block-item payload exceeds " + MAX_FILE_BYTES + " bytes");
+		}
+		return appendReservedProperties(source, RUNTIME_BLOCK_ITEM_STATES_PATH, contents, "block-item state");
 	}
 
 	private static <T extends Comparable<T>> String propertyValueName(BlockState state, Property<T> property) {

@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use crate::render::vulkanic::error::{GalError, GalResult};
 
-use super::source::ShaderPackSource;
+use super::source::{ShaderPackSource, RUNTIME_BLOCK_ITEM_STATES_PATH};
 
 pub const ITEM_ID_MAP_PATH: &str = "item.properties";
 pub const UNMAPPED_ITEM_ID: i32 = -1;
@@ -19,6 +19,9 @@ pub const UNMAPPED_ITEM_ID: i32 = -1;
 pub struct ShaderPackItemIdMap {
     generation: u64,
     ids: BTreeMap<String, i32>,
+    /// Drawn block items: item identity -> the pack's block material for the
+    /// item's default block state (Iris `currentRenderedItemId`).
+    block_item_ids: BTreeMap<String, i32>,
 }
 
 impl ShaderPackItemIdMap {
@@ -28,6 +31,7 @@ impl ShaderPackItemIdMap {
             return Ok(Self {
                 generation: source.generation(),
                 ids,
+                block_item_ids: BTreeMap::new(),
             });
         };
 
@@ -80,6 +84,7 @@ impl ShaderPackItemIdMap {
         Ok(Self {
             generation: source.generation(),
             ids,
+            block_item_ids: block_item_ids(source)?,
         })
     }
 
@@ -107,6 +112,24 @@ impl ShaderPackItemIdMap {
             .unwrap_or(UNMAPPED_ITEM_ID))
     }
 
+    /// Resolves the drawn item's `currentRenderedItemId`. Iris uses the
+    /// pack's block material of a block item's default state (0 when no
+    /// `block.properties` rule matches) and `item.properties` otherwise.
+    pub fn resolve_rendered(&self, resource_location: &str) -> GalResult<i32> {
+        if resource_location.is_empty() {
+            return Ok(UNMAPPED_ITEM_ID);
+        }
+        let canonical = canonical_resource_location(resource_location).map_err(|reason| {
+            GalError::invalid_argument(format!(
+                "rendered item semantic identity has {reason}: {resource_location}"
+            ))
+        })?;
+        match self.block_item_ids.get(&canonical) {
+            Some(id) => Ok(*id),
+            None => self.resolve(&canonical),
+        }
+    }
+
     /// Resolves an optional copied gameplay identity. Empty hands are a
     /// semantic absence, matching Iris's unmapped `-1` behavior without
     /// requiring a fabricated `minecraft:air` model identity.
@@ -116,6 +139,55 @@ impl ShaderPackItemIdMap {
         }
         self.resolve(resource_location)
     }
+}
+
+/// Iris resolves drawn block items only when the pack declares both
+/// `item.properties` and `block.properties`.
+fn block_item_ids(source: &ShaderPackSource) -> GalResult<BTreeMap<String, i32>> {
+    let mut ids = BTreeMap::new();
+    let Some(snapshot) = source.get(RUNTIME_BLOCK_ITEM_STATES_PATH) else {
+        return Ok(ids);
+    };
+    if source.get("block.properties").is_none() {
+        return Ok(ids);
+    }
+    // Block-rule support is gated by the terrain contract, which leaves a
+    // pack it cannot resolve unadmitted; do not fail generation load here.
+    let Ok(state_materials) = super::terrain_contract::runtime_block_state_material_ids(source)
+    else {
+        return Ok(ids);
+    };
+    let Some(state_materials) = state_materials else {
+        return Err(GalError::invalid_argument(
+            "runtime block-item table requires the runtime block-state table",
+        ));
+    };
+    for (line_number, raw_line) in snapshot.lines().enumerate() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let parsed = line
+            .strip_prefix("item.")
+            .and_then(|entry| entry.split_once('='))
+            .and_then(|(identity, state)| {
+                Some((canonical_resource_location(identity).ok()?, state.parse::<i32>().ok()?))
+            });
+        let Some((identity, state_id)) = parsed else {
+            return Err(GalError::invalid_argument(format!(
+                "runtime block-item line {} is malformed",
+                line_number + 1
+            )));
+        };
+        let material = *state_materials.get(&state_id).ok_or_else(|| {
+            GalError::invalid_argument(format!(
+                "runtime block-item line {} names unknown block state {state_id}",
+                line_number + 1
+            ))
+        })?;
+        ids.insert(identity, if material < 0 { 0 } else { material });
+    }
+    Ok(ids)
 }
 
 pub(crate) fn canonical_resource_location(value: &str) -> Result<String, &'static str> {
@@ -147,6 +219,34 @@ mod tests {
 
     fn source(files: Vec<ShaderSourceFile>) -> ShaderPackSource {
         ShaderPackSource::new("item-id-test", 9, files).unwrap()
+    }
+
+    #[test]
+    fn drawn_block_items_resolve_their_default_state_block_material() {
+        use crate::render::vulkanic::shader_pack::source::RUNTIME_BLOCK_STATE_IDENTITIES_PATH;
+        let map = ShaderPackItemIdMap::from_source(&source(vec![
+            ShaderSourceFile::new(ITEM_ID_MAP_PATH, "item.45032=lava_bucket\n"),
+            ShaderSourceFile::new(
+                "block.properties",
+                "block.10020=minecraft:gray_stained_glass_pane\n",
+            ),
+            ShaderSourceFile::new(
+                RUNTIME_BLOCK_STATE_IDENTITIES_PATH,
+                "state.7=minecraft:gray_stained_glass_pane|east=false\nstate.9=minecraft:dirt\n",
+            ),
+            ShaderSourceFile::new(
+                RUNTIME_BLOCK_ITEM_STATES_PATH,
+                "item.minecraft:gray_stained_glass_pane=7\nitem.minecraft:dirt=9\n",
+            ),
+        ]))
+        .unwrap();
+        assert_eq!(10020, map.resolve_rendered("minecraft:gray_stained_glass_pane").unwrap());
+        // Iris: getOrDefault(defaultState, 0) for an unmatched block item.
+        assert_eq!(0, map.resolve_rendered("minecraft:dirt").unwrap());
+        assert_eq!(45032, map.resolve_rendered("minecraft:lava_bucket").unwrap());
+        assert_eq!(UNMAPPED_ITEM_ID, map.resolve_rendered("minecraft:player/skin").unwrap());
+        // heldItemId keeps Iris's item-map semantics for the same item.
+        assert_eq!(UNMAPPED_ITEM_ID, map.resolve("minecraft:gray_stained_glass_pane").unwrap());
     }
 
     #[test]

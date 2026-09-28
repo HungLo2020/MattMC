@@ -2471,7 +2471,7 @@ fn decode_world_first_person_frame(
     request: FfiWorldFirstPersonFrame,
 ) -> GalResult<WorldFirstPersonFrame> {
     validate_item_size::<FfiWorldFirstPersonFrame>(request.byte_size, "world first-person frame")?;
-    if request.enabled > 1 || request.clear_depth_before > 1 {
+    if request.enabled > 1 || request.clear_depth_before > 1 || request.translucent_hand_mask > 3 {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
             "world first-person frame has invalid flags",
@@ -2479,6 +2479,7 @@ fn decode_world_first_person_frame(
     }
     if request.enabled == 0 {
         if request.clear_depth_before != 0
+            || request.translucent_hand_mask != 0
             || request.projection_matrix.iter().any(|value| *value != 0.0)
             || request.model_view_matrix.iter().any(|value| *value != 0.0)
         {
@@ -2523,6 +2524,7 @@ fn decode_world_first_person_frame(
         main_hand_instance_count: request.main_hand_instance_count,
         projection_matrix: request.projection_matrix,
         model_view_matrix: request.model_view_matrix,
+        translucent_hand_mask: request.translucent_hand_mask as u8,
     })
 }
 
@@ -3766,4 +3768,33 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_lod_update_assets(
             }
         }
     })
+}
+
+#[cfg(test)]
+mod first_person_decode_tests {
+    use super::*;
+
+    fn frame(enabled: bool, translucent_hand_mask: u32) -> FfiWorldFirstPersonFrame {
+        let identity = [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        FfiWorldFirstPersonFrame {
+            byte_size: std::mem::size_of::<FfiWorldFirstPersonFrame>() as u32,
+            enabled: u32::from(enabled),
+            clear_depth_before: u32::from(enabled),
+            main_hand_instance_count: 0,
+            projection_matrix: if enabled { identity } else { [0.0; 16] },
+            model_view_matrix: if enabled { identity } else { [0.0; 16] },
+            translucent_hand_mask,
+        }
+    }
+
+    #[test]
+    fn translucent_hand_mask_names_only_enabled_hands() {
+        let decoded = decode_world_first_person_frame(frame(true, 2)).unwrap();
+        assert_eq!(2, decoded.translucent_hand_mask);
+        assert!(decode_world_first_person_frame(frame(true, 4)).is_err());
+        assert!(decode_world_first_person_frame(frame(false, 1)).is_err());
+        assert_eq!(0, decode_world_first_person_frame(frame(false, 0)).unwrap().translucent_hand_mask);
+    }
 }

@@ -1936,9 +1936,32 @@ impl SubmissionLowerer {
                         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                         &[copy],
                     );
-                    state
-                        .frame_target_layouts
-                        .insert(*src, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
+                    if old_layout == vk::ImageLayout::PRESENT_SRC_KHR {
+                        // A capture of an already presentation-ready frame
+                        // (e.g. a screenshot after the frame submission) runs
+                        // in its own submission with no pending present; give
+                        // the image back in the layout presentation expects.
+                        let restore = vk::ImageMemoryBarrier2::default()
+                            .src_stage_mask(vk::PipelineStageFlags2::COPY)
+                            .src_access_mask(vk::AccessFlags2::TRANSFER_READ)
+                            .dst_stage_mask(vk::PipelineStageFlags2::NONE)
+                            .old_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+                            .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+                            .image(frame.image)
+                            .subresource_range(source_range);
+                        self.context.device.cmd_pipeline_barrier2(
+                            command_buffer,
+                            &vk::DependencyInfo::default()
+                                .image_memory_barriers(std::slice::from_ref(&restore)),
+                        );
+                        state
+                            .frame_target_layouts
+                            .insert(*src, vk::ImageLayout::PRESENT_SRC_KHR);
+                    } else {
+                        state
+                            .frame_target_layouts
+                            .insert(*src, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
+                    }
                 }
                 CommandOp::CopyTextureToFrameTarget { src, dst, extent } => {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-to-frame-target");

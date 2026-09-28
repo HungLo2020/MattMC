@@ -1455,7 +1455,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 clear_depth_before,
                 main_hand_instance_count,
                 projection_matrix,
-                model_view_matrix
+                model_view_matrix,
+                translucent_hand_mask
             ]
         ),
         101 => layout!(

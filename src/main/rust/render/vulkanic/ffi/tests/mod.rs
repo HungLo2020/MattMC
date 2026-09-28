@@ -151,7 +151,8 @@ fn experience_orb_frame_transport_lowers_placement_and_preserves_mesh_order() {
     assert_eq!(instance.depth_policy, WORLD_DEPTH_POLICY_TEST_WRITE);
     assert_eq!(instance.stratum, WORLD_STRATUM_ENTITY_MESH);
     assert_eq!(instance.cull_policy, WORLD_CULL_BACK);
-    assert_eq!(instance.entity_id, 42);
+    // Vanilla's runtime entity number is not a shader-pack entity ID.
+    assert_eq!(instance.entity_id, 0);
     assert_eq!(instance.transform[0], 0.3);
     assert!((instance.transform[13] + 0.6).abs() < 1e-6);
     orbs[0].entity_transform[12] = 999.0;
@@ -1178,10 +1179,14 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
 
     let first_person =
         super::layout::layout_for_struct(98).expect("world first-person frame layout");
-    assert_eq!(6, first_person.field_count);
+    assert_eq!(7, first_person.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWorldFirstPersonFrame, projection_matrix) as u32,
         first_person.field_offsets[4]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWorldFirstPersonFrame, translucent_hand_mask) as u32,
+        first_person.field_offsets[6]
     );
     assert_eq!(
         std::mem::offset_of!(FfiWorldFirstPersonFrame, model_view_matrix) as u32,
@@ -2061,6 +2066,7 @@ fn whole_frame_request(
             main_hand_instance_count: 0,
             projection_matrix: [0.0; 16],
             model_view_matrix: [0.0; 16],
+            translucent_hand_mask: 0,
         },
         world_first_person_mesh_instances: FfiSlice {
             ptr: std::ptr::null(),
@@ -3146,6 +3152,7 @@ fn model_submission_order_transport_preserves_signed_values_and_rejects_invalid_
                     main_hand_instance_count: 1,
                     projection_matrix: identity,
                     model_view_matrix: identity,
+                    translucent_hand_mask: 0,
                 };
                 request.world_first_person_mesh_instances = FfiSlice {
                     ptr: &source,
@@ -3217,6 +3224,7 @@ fn equal_depth_model_policy_survives_world_and_hand_ffi_without_relaxing_scope()
         main_hand_instance_count: 1,
         projection_matrix: identity,
         model_view_matrix: identity,
+        translucent_hand_mask: 0,
     };
     instances[0].entity_id = 0;
     instances[0].block_entity_id = -1;
@@ -3358,6 +3366,7 @@ fn whole_frame_first_person_transport_copies_projection_and_rejects_malformed_de
         main_hand_instance_count: 0,
         projection_matrix: projection,
         model_view_matrix: model_view,
+        translucent_hand_mask: 0,
     };
     let (_, _, frame, _) = unsafe {
         decode_whole_frame_submit(&request, test_vulkan_capabilities())
@@ -3405,6 +3414,7 @@ fn whole_frame_first_person_mesh_stream_is_copied_and_requires_its_own_domain() 
         main_hand_instance_count: 0,
         projection_matrix: projection,
         model_view_matrix: projection,
+        translucent_hand_mask: 0,
     };
     let mut hands = vec![FfiWorldMeshInstanceRecord {
         model_submission_order_mode: 0,
@@ -3555,6 +3565,7 @@ fn world_and_hand_decal_foil_transport_copies_context_and_rejects_malformed_requ
                 main_hand_instance_count: 1,
                 projection_matrix: source.transform,
                 model_view_matrix: source.transform,
+                translucent_hand_mask: 0,
             };
         } else {
             request.world_mesh_instances = FfiSlice {
@@ -3649,6 +3660,7 @@ fn world_and_hand_view_layering_transport_preserves_flags_and_rejects_conflicts(
         main_hand_instance_count: 1,
         projection_matrix: source.transform,
         model_view_matrix: source.transform,
+        translucent_hand_mask: 0,
     };
     for flags in [4, 8] {
         source.flags = flags;
@@ -3696,6 +3708,7 @@ fn world_and_hand_standard_foil_transport_copies_and_rejects_noncanonical_payloa
         main_hand_instance_count: 1,
         projection_matrix: source.transform,
         model_view_matrix: source.transform,
+        translucent_hand_mask: 0,
     };
     let (_, _, frame, _) =
         unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();

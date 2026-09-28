@@ -104,7 +104,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			| (tintRgb & 0xff) << 19;
 	}
 
-	public static final int ABI_VERSION = 65;
+	public static final int ABI_VERSION = 66;
 	public static final int WORLD_MESH_VIEW_LAYER_PERSPECTIVE = 4;
 	public static final int WORLD_MESH_VIEW_LAYER_ORTHOGRAPHIC = 8;
 
@@ -222,6 +222,10 @@ public final class VulkanicGalBridge implements AutoCloseable {
 	public static final int GUI_MESH_LIGHTING_INVENTORY_BLOCK = 3;
 	public static final int GUI_MESH_LIGHTING_FRONT_MODEL = 4;
 	public static final int GUI_MESH_LIGHTING_ENTITY_PREVIEW = 5;
+	/** Oversized special items: entity materials lit by ITEMS_3D (Frozen OversizedItemRenderer). */
+	public static final int GUI_MESH_LIGHTING_OVERSIZED_ITEM = 6;
+	/** Oversized special items whose model does not use block light (ITEMS_FLAT). */
+	public static final int GUI_MESH_LIGHTING_OVERSIZED_ITEM_FLAT = 7;
 
 	// Long-lived context requests use the context arena; large frame payloads
 	// are serialized in a per-submit confined arena and released immediately
@@ -569,6 +573,27 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			Struct.FRAME_RESIZE_RESULT.getInt(result, 3),
 			result.get(ValueLayout.JAVA_INT, resultExtent),
 			result.get(ValueLayout.JAVA_INT, resultExtent + 4));
+	}
+
+	/** RGBA8 copy of a completed frame target, rows in the target's order. */
+	public record CapturedFrame(int width, int height, byte[] rgba) {}
+
+	/**
+	 * Reads back one completed frame target before it is presented (user
+	 * screenshot). Rust records and waits for the copy; Java only receives
+	 * bytes, never a backend image.
+	 */
+	public CapturedFrame captureFrameTarget(long frameTarget, int width, int height) {
+		long capacity = Math.multiplyExact(Math.multiplyExact((long)Math.max(width, 1), Math.max(height, 1)), 4L);
+		try (Arena captureArena = Arena.ofConfined()) {
+			MemorySegment bytes = captureArena.allocate(capacity);
+			MemorySegment meta = captureArena.allocate(ValueLayout.JAVA_LONG, 3);
+			checkStatus(Native.frameCapture(contextId, frameTarget, bytes, capacity, meta), "frame capture");
+			int capturedWidth = (int) meta.getAtIndex(ValueLayout.JAVA_LONG, 0);
+			int capturedHeight = (int) meta.getAtIndex(ValueLayout.JAVA_LONG, 1);
+			long length = meta.getAtIndex(ValueLayout.JAVA_LONG, 2);
+			return new CapturedFrame(capturedWidth, capturedHeight, bytes.asSlice(0, length).toArray(ValueLayout.JAVA_BYTE));
+		}
 	}
 
 	public PresentedFrame presentFrame(long frameId, long correlationId, long waitSubmissionId) {
@@ -2268,6 +2293,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		long firstPersonModelViewOffset = Struct.WORLD_FIRST_PERSON_FRAME.offset(5);
 		float[] firstPersonModelView = firstPersonFrame.modelViewMatrix();
 		MemorySegment.copy(firstPersonModelView, 0, firstPerson, ValueLayout.JAVA_FLOAT, firstPersonModelViewOffset, 16);
+		Struct.WORLD_FIRST_PERSON_FRAME.setInt(firstPerson, 6, firstPersonFrame.translucentHandMask());
 		Abi.writeSlice(request, Struct.WHOLE_FRAME_SUBMIT, 30, firstPersonMeshInstanceArray, firstPersonMeshInstances.size());
 		Struct.WHOLE_FRAME_SUBMIT.setInt(request, 31, guiBlurBeforeStratum);
 		Struct.WHOLE_FRAME_SUBMIT.setInt(request, 32, guiBlurRadius);
@@ -5364,8 +5390,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			if ((materialMode == GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL
 				|| materialMode == GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL
 				|| materialMode == GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL)
-				&& (lightingMode != GUI_MESH_LIGHTING_ENTITY_PREVIEW || alphaCutoff != 0.1F
-					|| itemRasterScale != 0 || itemFoil != null))
+				&& (lightingMode != GUI_MESH_LIGHTING_ENTITY_PREVIEW && lightingMode != GUI_MESH_LIGHTING_OVERSIZED_ITEM
+					&& lightingMode != GUI_MESH_LIGHTING_OVERSIZED_ITEM_FLAT || alphaCutoff != 0.1F || itemRasterScale != 0 || itemFoil != null))
 				throw new IllegalArgumentException("entity-preview material requires native preview lighting and cutout semantics");
 			if (materialMode == GUI_MESH_MATERIAL_MODEL_OVERLAY && (itemRasterScale == 0
 				|| lightingMode != GUI_MESH_LIGHTING_FRONT_MODEL || alphaCutoff != 0.0F || itemFoil != null))
@@ -5393,7 +5419,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			if (assetId == 0L || layerIndex < 0 || (materialMode != 1 && materialMode != 2 && materialMode != 3 && materialMode != 4 && materialMode != GUI_MESH_MATERIAL_PANORAMA && materialMode != GUI_MESH_MATERIAL_MODEL_OVERLAY
 				&& materialMode != GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL && materialMode != GUI_MESH_MATERIAL_ENTITY_TRANSLUCENT_NO_CULL
 				&& materialMode != GUI_MESH_MATERIAL_ENTITY_DECAL_CUTOUT_NO_CULL)
-				|| (lightingMode != 1 && lightingMode != 2 && lightingMode != GUI_MESH_LIGHTING_INVENTORY_BLOCK && lightingMode != GUI_MESH_LIGHTING_FRONT_MODEL && lightingMode != GUI_MESH_LIGHTING_ENTITY_PREVIEW) || !Float.isFinite(alphaCutoff)
+				|| (lightingMode != 1 && lightingMode != 2 && lightingMode != GUI_MESH_LIGHTING_INVENTORY_BLOCK && lightingMode != GUI_MESH_LIGHTING_FRONT_MODEL && lightingMode != GUI_MESH_LIGHTING_ENTITY_PREVIEW
+				&& lightingMode != GUI_MESH_LIGHTING_OVERSIZED_ITEM && lightingMode != GUI_MESH_LIGHTING_OVERSIZED_ITEM_FLAT) || !Float.isFinite(alphaCutoff)
 				|| guiWidth <= 0 || guiHeight <= 0 || (itemRasterScale == 0 && blockItemRaster == null && (renderWidth <= guardPixels * 2 || renderHeight <= guardPixels * 2))
 				|| left >= right || top >= bottom) throw new IllegalArgumentException("invalid semantic GUI mesh batch");
 			if (clipMode == 0) {
@@ -6289,9 +6316,13 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		boolean clearDepthBefore,
 		int mainHandInstanceCount,
 		float[] projectionMatrix,
-		float[] modelViewMatrix
+		float[] modelViewMatrix,
+		int translucentHandMask
 	) {
 		public WorldFirstPersonFrameRecord {
+			if ((translucentHandMask & ~3) != 0 || (!enabled && translucentHandMask != 0)) {
+				throw new IllegalArgumentException("first-person translucent-hand mask must name only enabled hands");
+			}
 			Objects.requireNonNull(projectionMatrix, "projectionMatrix");
 			Objects.requireNonNull(modelViewMatrix, "modelViewMatrix");
 			if (projectionMatrix.length != 16) {
@@ -6328,7 +6359,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		}
 
 		public static WorldFirstPersonFrameRecord disabled() {
-			return new WorldFirstPersonFrameRecord(false, false, 0, new float[16], new float[16]);
+			return new WorldFirstPersonFrameRecord(false, false, 0, new float[16], new float[16], 0);
 		}
 	}
 
@@ -6709,6 +6740,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle FRAME_ACQUIRE = downcall("mattmc_vulkanic_gal_frame_acquire", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle FRAME_RESIZE = downcall("mattmc_vulkanic_gal_frame_resize", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle FRAME_PRESENT = downcall("mattmc_vulkanic_gal_frame_present", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle FRAME_CAPTURE = downcall("mattmc_vulkanic_gal_frame_capture", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle FRAME_CANCEL = downcall("mattmc_vulkanic_gal_frame_cancel", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle FRAME_SHUTDOWN = downcall("mattmc_vulkanic_gal_frame_shutdown", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle GUI_SUBMIT_FRAME = downcall("mattmc_vulkanic_gal_gui_submit_frame", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
@@ -6845,6 +6877,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return (int) FRAME_RESIZE.invokeExact(contextId, request, result);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to resize Rust VulkanicGAL frame", throwable);
+			}
+		}
+
+		static int frameCapture(long contextId, long frameTarget, MemorySegment bytes, long capacity, MemorySegment meta) {
+			try {
+				return (int) FRAME_CAPTURE.invokeExact(contextId, frameTarget, bytes, capacity, meta);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to capture Rust VulkanicGAL frame", throwable);
 			}
 		}
 

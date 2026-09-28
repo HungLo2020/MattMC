@@ -152,9 +152,18 @@ pub fn stage_textured_material_primitive_with_vertex_modulation(
 
     let first_edge = subtract(positions[1], positions[0]);
     let second_edge = subtract(positions[3], positions[0]);
-    let mut normal = normalize(cross(first_edge, second_edge)).ok_or_else(|| {
-        GalError::invalid_argument("textured material quad has zero-area geometric normal")
-    })?;
+    // A quad whose corner at vertex 0 collapsed (a triangle authored as a
+    // quad) still has a face through its opposite corner. A quad with no
+    // area at all rasterizes nothing, as in OpenGL, so any unit normal is
+    // unobservable; rejecting it would drop the whole shader frame.
+    let mut normal = normalize(cross(first_edge, second_edge))
+        .or_else(|| {
+            normalize(cross(
+                subtract(positions[3], positions[2]),
+                subtract(positions[1], positions[2]),
+            ))
+        })
+        .unwrap_or([0.0, 0.0, 1.0]);
     if winding == TexturedMaterialWinding::Clockwise {
         normal = [-normal[0], -normal[1], -normal[2]];
     }
@@ -293,20 +302,22 @@ fn cross(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
     ]
 }
 
+/// Scale-independent: small but valid faces (first-person Bedrock item
+/// details are sub-millimetre in camera space) keep their direction; only an
+/// exactly collapsed or non-finite vector has none.
 fn normalize(value: [f32; 3]) -> Option<[f32; 3]> {
-    let length_squared = value
-        .iter()
-        .map(|component| component * component)
-        .sum::<f32>();
-    if !length_squared.is_finite() || length_squared <= f32::EPSILON {
+    let largest = value.iter().fold(0.0f32, |largest, component| largest.max(component.abs()));
+    if !largest.is_finite() || largest == 0.0 {
         return None;
     }
-    let inverse_length = length_squared.sqrt().recip();
-    Some([
-        value[0] * inverse_length,
-        value[1] * inverse_length,
-        value[2] * inverse_length,
-    ])
+    let scaled = value.map(|component| component / largest);
+    let inverse_length = scaled
+        .iter()
+        .map(|component| component * component)
+        .sum::<f32>()
+        .sqrt()
+        .recip();
+    Some(scaled.map(|component| component * inverse_length))
 }
 
 /// Immutable source-pack discovery result. It deliberately holds no compiled
@@ -777,17 +788,30 @@ mod tests {
     }
 
     #[test]
-    fn rejects_degenerate_or_non_finite_source_material_quad_data() {
-        let degenerate = stage_textured_material_primitive(
-            [[0.0, 0.0, 0.0]; 4],
-            [[0.0, 0.0]; 4],
-            0,
-            0,
-            TexturedMaterialTextureCoordinates::LocalTexture,
-            TexturedMaterialWinding::CounterClockwise,
-        )
-        .unwrap_err();
-        assert!(degenerate.to_string().contains("zero-area"));
+    fn stages_small_or_zero_area_quads_and_rejects_non_finite_data() {
+        let stage = |positions| {
+            stage_textured_material_primitive(
+                positions,
+                [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+                0,
+                0,
+                TexturedMaterialTextureCoordinates::LocalTexture,
+                TexturedMaterialWinding::CounterClockwise,
+            )
+            .unwrap()
+            .vertices[0]
+                .geometric_normal
+        };
+        // Zero area rasterizes nothing; staging must not drop the frame.
+        assert_eq!([0.0, 0.0, 1.0], stage([[0.0, 0.0, 0.0]; 4]));
+        // Sub-millimetre first-person item faces keep their true normal.
+        let tiny = 1.0e-4;
+        let normal = stage([[0.0, 0.0, 0.0], [tiny, 0.0, 0.0], [tiny, 0.0, tiny], [0.0, 0.0, tiny]]);
+        assert!((normal[1] + 1.0).abs() < 1.0e-6, "{normal:?}");
+        // A triangle authored as a quad (vertex 1 == vertex 0) uses the
+        // opposite corner.
+        let normal = stage([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]]);
+        assert!((normal[2] - 1.0).abs() < 1.0e-6, "{normal:?}");
 
         let non_finite = stage_textured_material_primitive(
             [

@@ -6225,10 +6225,10 @@ impl GuiFrontend {
             validate_mesh_item_layers(item_layers)?;
             let entity_preview = item_layers
                 .iter()
-                .all(|draw| draw.lighting_mode == GuiMeshLightingMode::EntityPreview);
+                .all(|draw| draw.lighting_mode.is_entity_material_lighting());
             if item_layers
                 .iter()
-                .any(|draw| draw.lighting_mode == GuiMeshLightingMode::EntityPreview)
+                .any(|draw| draw.lighting_mode.is_entity_material_lighting())
                 && !entity_preview
             {
                 return Err(GalError::ffi(

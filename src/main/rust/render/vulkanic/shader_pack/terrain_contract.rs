@@ -1219,6 +1219,14 @@ fn terrain_material_identity_resolution(
     Ok((material_ids, runtime_block_state_material_ids))
 }
 
+/// Raw block-state id -> pack material id (-1 when no rule matches), or
+/// `None` when the source carries no runtime block-state snapshot.
+pub(crate) fn runtime_block_state_material_ids(
+    source: &ShaderPackSource,
+) -> GalResult<Option<BTreeMap<i32, i32>>> {
+    Ok(terrain_material_identity_resolution(source)?.1)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct BlockMaterialRule {
     material_id: i32,

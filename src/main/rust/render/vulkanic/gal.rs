@@ -263,8 +263,9 @@ struct AccessEvent {
 /// Multiply-rotate hasher for the per-submission access tracker. Its keys
 /// are small handle/range tuples built by the GAL itself, so SipHash's
 /// flooding resistance buys nothing; a whole frame hashes ~20k events.
+/// Also used for other Rust-built, non-adversarial per-frame keys.
 #[derive(Default, Clone, Copy)]
-struct AccessHasher {
+pub(crate) struct AccessHasher {
     hash: u64,
 }
 
@@ -302,7 +303,7 @@ impl hashing::Hasher for AccessHasher {
     }
 }
 
-type AccessHashBuilder = hashing::BuildHasherDefault<AccessHasher>;
+pub(crate) type AccessHashBuilder = hashing::BuildHasherDefault<AccessHasher>;
 
 #[derive(Default)]
 struct AccessTracker {
@@ -1415,8 +1416,8 @@ impl VulkanicGal {
                 return self.validation_error(GalError::resource(
                     StatusCode::InvalidArgument,
                     format!(
-                        "binding {} is not declared by resource layout",
-                        binding.binding
+                        "binding {} is not declared by resource layout (set '{}')",
+                        binding.binding, desc.label
                     ),
                 ));
             };
@@ -2413,13 +2414,26 @@ impl VulkanicGal {
         binding: &ResourceBinding,
         offsets: &[u64],
     ) -> GalResult<()> {
+        match self.check_resource_binding_buffer_range(binding, offsets) {
+            Err(error) if error.code == StatusCode::InvalidArgument => self.validation_error(error),
+            other => other,
+        }
+    }
+
+    /// Pure range check shared by resource-set creation and bind validation;
+    /// callers route a failure through `validation_error`.
+    fn check_resource_binding_buffer_range(
+        &self,
+        binding: &ResourceBinding,
+        offsets: &[u64],
+    ) -> GalResult<()> {
         if binding.buffer_range.is_some()
             && !matches!(
                 binding.kind,
                 ResourceBindingKind::UniformBuffer | ResourceBindingKind::StorageBuffer
             )
         {
-            return self.validation_error(GalError::resource(
+            return Err(GalError::resource(
                 StatusCode::InvalidArgument,
                 format!(
                     "binding {} buffer range is only valid for buffer bindings",
@@ -2439,20 +2453,17 @@ impl VulkanicGal {
             record.desc.size.saturating_sub(max_default_offset)
         });
         if range == 0 {
-            return self.validation_error(GalError::resource(
+            return Err(GalError::resource(
                 StatusCode::InvalidArgument,
                 format!("binding {} buffer range must be non-zero", binding.binding),
             ));
         }
+        let uniform_alignment = self.capabilities().limits.uniform_buffer_offset_alignment.max(1);
         for offset in offsets {
             if binding.kind == ResourceBindingKind::UniformBuffer {
-                let alignment = self
-                    .capabilities()
-                    .limits
-                    .uniform_buffer_offset_alignment
-                    .max(1);
+                let alignment = uniform_alignment;
                 if offset % alignment != 0 {
-                    return self.validation_error(GalError::resource(
+                    return Err(GalError::resource(
                         StatusCode::InvalidArgument,
                         format!(
                             "binding {} uniform buffer offset {} is not aligned to {} bytes",
@@ -2462,13 +2473,13 @@ impl VulkanicGal {
                 }
             }
             let Some(end) = offset.checked_add(range) else {
-                return self.validation_error(GalError::resource(
+                return Err(GalError::resource(
                     StatusCode::InvalidArgument,
                     format!("binding {} dynamic buffer range overflows", binding.binding),
                 ));
             };
             if end > record.desc.size {
-                return self.validation_error(GalError::resource(
+                return Err(GalError::resource(
                     StatusCode::InvalidArgument,
                     format!(
                         "binding {} dynamic buffer range is outside the buffer",
@@ -2675,7 +2686,7 @@ impl VulkanicGal {
                             "resource set layout is not compatible with pipeline layout",
                         ));
                     }
-                    let set_bindings = set_record.desc.bindings.clone();
+                    let set_bindings = &set_record.desc.bindings;
                     let expected_dynamic_offsets: usize = set_bindings
                         .iter()
                         .map(|binding| binding.dynamic_offsets.len())
@@ -2692,8 +2703,11 @@ impl VulkanicGal {
                             ),
                         ));
                     }
+                    // Borrow the set's bindings; the pure checker needs no
+                    // mutable GAL state, so no per-bind clone is required.
                     let mut offset_index = 0usize;
-                    for binding in &set_bindings {
+                    let mut range_error = None;
+                    for binding in set_bindings {
                         let count = binding.dynamic_offsets.len();
                         if count == 0 {
                             continue;
@@ -2706,7 +2720,16 @@ impl VulkanicGal {
                             offset_index = end;
                             slice
                         };
-                        self.validate_resource_binding_buffer_range(binding, offsets)?;
+                        if let Err(error) = self.check_resource_binding_buffer_range(binding, offsets) {
+                            range_error = Some(error);
+                            break;
+                        }
+                    }
+                    if let Some(error) = range_error {
+                        return match error.code {
+                            StatusCode::InvalidArgument => self.validation_error(error),
+                            _ => Err(error),
+                        };
                     }
                 }
                 CommandOp::SetVertexBuffer { buffer, .. } => {
