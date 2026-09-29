@@ -23163,6 +23163,13 @@ impl WorldPrimitiveFrontend {
                     instance.mesh_key, asset.vertex_layout_version
                 )));
             }
+            // Meshes uploaded while shaders were off keep no semantic source
+            // input. Enabling shaders mid-session rebuilds them; until their
+            // new generation arrives they are simply not voxelized, and source
+            // admission rejects the frame (see coverage validation).
+            if !matches!(asset.source_input, Some(SourceMeshSemanticInput::Terrain(_))) {
+                continue;
+            }
             let transform = Self::world_transform_from_camera_relative(
                 instance.transform,
                 camera_world_position,
@@ -24437,6 +24444,21 @@ impl WorldPrimitiveFrontend {
         &mut self,
         frame: &WorldPrimitiveFrame,
     ) -> GalResult<()> {
+        if let Some((mesh_key, stratum, identity)) =
+            frame.mesh_instances.iter().find_map(|instance| {
+                self.mesh_assets.get(&instance.mesh_key).and_then(|asset| {
+                    (source_mesh_layout_has_shader_semantics(asset.vertex_layout_version)
+                        && asset.source_input.is_none())
+                    .then(|| (instance.mesh_key, instance.stratum, asset.entity_identity.clone()))
+                })
+            })
+        {
+            // Uploaded while shaders were off; the rebuild requested when the
+            // source route activated will resend it with source semantics.
+            return Err(GalError::unsupported_feature(format!(
+                "visible mesh {mesh_key} (stratum {stratum}, identity '{identity}') has no retained source semantics yet"
+            )));
+        }
         if frame_has_distant_horizons_generic_objects(frame) {
             // Iris draws DH generic objects (LOD clouds, beacon beams) with the
             // pack's dh_generic/dh_terrain program; Rust draws them in the
@@ -32690,6 +32712,7 @@ impl WorldPrimitiveFrontend {
     /// material contracts; unknown source layers remain explicit failures.
     fn ensure_exact_atlas_pass_resources(
         &mut self,
+        gal: &mut VulkanicGal,
         color_format: TextureFormat,
         layer: u32,
         deferred: bool,
@@ -32751,7 +32774,7 @@ impl WorldPrimitiveFrontend {
             }
             Ok(())
         } else {
-            resources.set_color_format(color_format)
+            resources.set_color_format(gal, color_format)
         }
     }
 
@@ -32960,9 +32983,11 @@ impl WorldPrimitiveFrontend {
         }
         if !deferred {
             self.lod_forward_opaque_pass_resources.begin_frame();
-            self.lod_transparent_pass_resources.begin_frame();
-            self.lod_water_pass_resources.begin_frame();
         }
+        // Transparent/water owners serve both routes and may pack per-frame
+        // uniforms in either; reset their per-frame slots every frame.
+        self.lod_transparent_pass_resources.begin_frame();
+        self.lod_water_pass_resources.begin_frame();
         // Deferred DH alpha still lands in the graph's one-color translucent
         // attachment. Keep its exact-atlas owners on that attachment format;
         // the acquired target format is only valid for the direct forward
@@ -32978,12 +33003,14 @@ impl WorldPrimitiveFrontend {
         };
         if !deferred {
             self.lod_forward_opaque_pass_resources
-                .set_color_format(lod_color_format)?;
-            self.lod_transparent_pass_resources
-                .set_color_format(lod_color_format)?;
-            self.lod_water_pass_resources
-                .set_color_format(lod_color_format)?;
+                .set_color_format(gal, lod_color_format)?;
         }
+        // Transparent and water owners serve both routes; bind them to this
+        // route's attachment format (rebuilding after a shader toggle).
+        self.lod_transparent_pass_resources
+            .set_color_format(gal, lod_color_format)?;
+        self.lod_water_pass_resources
+            .set_color_format(gal, lod_color_format)?;
         // The outer whole-frame builder normally stages this residency in its
         // pre-graph operations. Keep the draw boundary self-sufficient as
         // well: candidate/resource preparation may run between that staging
@@ -33235,7 +33262,7 @@ impl WorldPrimitiveFrontend {
                 if deferred && draw.layer == WORLD_LOD_LAYER_OPAQUE {
                     continue;
                 }
-                self.ensure_exact_atlas_pass_resources(lod_color_format, draw.layer, deferred)?;
+                self.ensure_exact_atlas_pass_resources(gal, lod_color_format, draw.layer, deferred)?;
             }
         }
         let exact_source_segments = exact_draws
@@ -33847,10 +33874,10 @@ impl WorldPrimitiveFrontend {
         if !deferred {
             self.lod_forward_opaque_pass_resources
                 .flush_packed_uniforms(ops);
-            self.lod_transparent_pass_resources
-                .flush_packed_uniforms(ops);
-            self.lod_water_pass_resources.flush_packed_uniforms(ops);
         }
+        self.lod_transparent_pass_resources
+            .flush_packed_uniforms(ops);
+        self.lod_water_pass_resources.flush_packed_uniforms(ops);
         Ok(draws)
     }
 

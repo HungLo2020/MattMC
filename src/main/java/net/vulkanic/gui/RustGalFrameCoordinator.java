@@ -731,6 +731,7 @@ public final class RustGalFrameCoordinator {
 
 	/** Lock-free view of {@link #isRustShaderPackSourceReady()} for producer threads. */
 	private static volatile boolean shaderPackSourceActive;
+	private static boolean shaderPackSemanticRebuildPending;
 
 	public static boolean shaderPackSourceActive() {
 		return shaderPackSourceActive;
@@ -2578,9 +2579,15 @@ public final class RustGalFrameCoordinator {
 		copiedShaderPackVignetteEnabled = vignetteEnabled;
 		pendingShaderPackSources = source;
 		pendingShaderPackSourceName = selectionKey;
+		boolean wasShaderPackSourceActive = shaderPackSourceActive;
 		shaderPackSourceActive = !"disabled".equals(source.packName())
 			&& !source.packName().startsWith("minecraft-resource-pack:")
 			&& !source.files().isEmpty();
+		if (shaderPackSourceActive && !wasShaderPackSourceActive) {
+			// Meshes published while shaders were off carry no retained source
+			// semantics in Rust. Resend them once Rust has accepted this source.
+			shaderPackSemanticRebuildPending = true;
+		}
 		attemptedShaderPackSourceGeneration = Math.min(
 			attemptedShaderPackSourceGeneration,
 			uploadedShaderPackSourceGeneration
@@ -2611,6 +2618,13 @@ public final class RustGalFrameCoordinator {
 					)
 				);
 				uploadedShaderPackSourceGeneration = generation;
+				if (shaderPackSemanticRebuildPending) {
+					shaderPackSemanticRebuildPending = false;
+					Minecraft minecraft = Minecraft.getInstance();
+					if (minecraft.level != null && minecraft.levelRenderer != null) {
+						minecraft.levelRenderer.allChanged();
+					}
+				}
 				auditMessage("Rust VulkanicGAL shader-pack source update accepted generation="
 					+ uploadedShaderPackSourceGeneration
 					+ " pack=" + pendingShaderPackSources.packName()

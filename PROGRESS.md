@@ -37,13 +37,16 @@ instead sees `shadowtex0` 0x0. Current binds both correctly (vlFactor 0).
 while cached set-ones bound it; set-ones keyed on ColoredVoxel*/Puddle roles are
 released first. **Memory:** r32 pair Frozen 8.7 vs Current 8.8 GB at 98 s.
 **r32 land pairs:** night 0.66/0.83/0.61, rain 1.99/2.00/2.05, 0 VUIDs.
-**DH generic objects (09-29, user crash):** harness disables them unless
-`MATTMC_CAPTURE_DH_GENERIC=true`. Iris: `dh_generic`->`dh_terrain`, alpha blend.
-Rust: boxes (+DH material in flags bits 8-15) expand to the DH source stream,
-grouped by sub-block fraction, drawn with `dh_terrain` (blend variant sharing base
-layouts). Unadmitted: generic material quads / no LODs; warmup frame omits them.
-Pairs generic on: land 4.88/4.95/3.09, up 2.71/2.86/2.76 (2241 boxes), 0 VUIDs. Real
-config (`run/` copy at `~/.cache/mattmc-claude/realrun`): route active, no crash.
+**DH generic objects (09-29):** harness disables them unless `MATTMC_CAPTURE_DH_
+GENERIC=true`. Boxes (+material in flags bits 8-15) expand to the DH source stream
+(grouped by sub-block fraction), drawn by `dh_terrain` with alpha blend, like Iris.
+Unadmitted: generic material quads / no LODs; the warmup frame omits them.
+Pairs generic on: land 4.88/4.95/3.09, up 2.71/2.86/2.76 (2241 boxes), 0 VUIDs.
+**Shader toggle (09-29):** DH forward/exact-atlas owners rebuild on format change;
+transparent/water packed slots reset+flush in both modes; meshes cached while
+shaders were off no longer panic (unadmitted; Java calls allChanged once Rust accepts
+the source). OPEN: after enabling shaders mid-session one mesh family is never
+resent (route stays unadmitted). Real-config copy: `~/.cache/mattmc-claude/realrun`.
 No prompt-doc edits, commits, pushes, or Frozen changes; <=200 lines. Java: semantics.
 
 ## Current gate (2026-09-25)
@@ -190,11 +193,7 @@ frame target before present; Java only encodes the PNG. Resize re-arms the route
 
 ## Retained architecture
 
-Rust separates shadow-only terrain candidates from camera-color draws; the CPU
-halo and source-derived shadow frustum admit off-camera casters only to the
-shadow pass (Sodium's 64-block cylinder). The shadow target uses the pack's 2048-square
-extent and Iris's opaque-white shadow-color clear. Keep one Rust-owned
-frame/presenter, immutable asset validation, indirect terrain submission,
-source queue settling, and static fragment specialization intact.
-Goal 1 vanilla and Goal 2 DH remain regression baselines (recheck shader-off
-vanilla/DH after shared resource/scheduling changes). No commit or push.
+Shadow-only casters (halo + source frustum) feed only the shadow pass; 2048^2 shadow
+target, Iris white shadow-color clear. Keep one Rust frame/presenter, immutable asset
+validation, indirect terrain submission, static fragment specialization. Goals 1-2
+remain regression baselines (recheck after shared changes). No commit or push.

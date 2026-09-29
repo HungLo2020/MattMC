@@ -2647,16 +2647,21 @@ impl WorldLodPassResources {
         })
     }
 
-    fn set_forward_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
+    fn set_forward_color_format(
+        &mut self,
+        gal: &mut VulkanicGal,
+        format: TextureFormat,
+    ) -> GalResult<()> {
         if self.deferred && self.pass == WorldLodPassClass::Opaque {
             return Err(GalError::invalid_argument(
                 "deferred DH pass cannot be rebound to a forward color format",
             ));
         }
         if self.pipeline.is_some() && self.color_format != Some(format) {
-            return Err(GalError::invalid_argument(
-                "forward DH pass color format changed after pipeline creation",
-            ));
+            // Toggling shaders moves the transparent/water owners between the
+            // forward frame target and the HDR G-buffer. Rebuild every
+            // format-bound object; GAL retires in-flight ones after use.
+            self.destroy(gal);
         }
         if self.pipeline.is_none() {
             // Transparent and water owners can also serve deferred draws;
@@ -3169,8 +3174,12 @@ impl WorldLodForwardOpaquePassResources {
         self.inner.flush_packed_uniforms(ops);
     }
 
-    pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
-        self.inner.set_forward_color_format(format)
+    pub(crate) fn set_color_format(
+        &mut self,
+        gal: &mut VulkanicGal,
+        format: TextureFormat,
+    ) -> GalResult<()> {
+        self.inner.set_forward_color_format(gal, format)
     }
 
     pub(crate) fn stage_draw(
@@ -3248,9 +3257,13 @@ impl WorldLodTransparentPassResources {
         self.inner_up.flush_packed_uniforms(ops);
     }
 
-    pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
-        self.inner_side.set_forward_color_format(format)?;
-        self.inner_up.set_forward_color_format(format)
+    pub(crate) fn set_color_format(
+        &mut self,
+        gal: &mut VulkanicGal,
+        format: TextureFormat,
+    ) -> GalResult<()> {
+        self.inner_side.set_forward_color_format(gal, format)?;
+        self.inner_up.set_forward_color_format(gal, format)
     }
 
     pub(crate) fn stage_draw(
@@ -3363,8 +3376,12 @@ impl WorldLodWaterPassResources {
         self.inner.flush_packed_uniforms(ops);
     }
 
-    pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
-        self.inner.set_forward_color_format(format)
+    pub(crate) fn set_color_format(
+        &mut self,
+        gal: &mut VulkanicGal,
+        format: TextureFormat,
+    ) -> GalResult<()> {
+        self.inner.set_forward_color_format(gal, format)
     }
 
     pub(crate) fn stage_draw(
@@ -3631,16 +3648,20 @@ impl WorldLodExactAtlasPassResources {
         }
     }
 
-    pub(crate) fn set_color_format(&mut self, format: TextureFormat) -> GalResult<()> {
+    pub(crate) fn set_color_format(
+        &mut self,
+        gal: &mut VulkanicGal,
+        format: TextureFormat,
+    ) -> GalResult<()> {
         if self.deferred {
             return Err(GalError::invalid_argument(
                 "deferred exact-atlas pass cannot change target format",
             ));
         }
         if self.pipeline.is_some() && self.color_format != Some(format) {
-            return Err(GalError::invalid_argument(
-                "forward exact-atlas target format changed after pipeline creation",
-            ));
+            // A frame-target format change (shader toggle, swapchain
+            // recreation) rebuilds the format-bound pipeline and sets.
+            self.destroy(gal);
         }
         self.color_format = Some(format);
         Ok(())
@@ -10575,7 +10596,7 @@ mod tests {
         };
         let (lightmap, lightmap_handles) = lightmap_binding(&mut gal);
         let mut pass = WorldLodForwardOpaquePassResources::default();
-        pass.set_color_format(TextureFormat::Rgba8Unorm).unwrap();
+        pass.set_color_format(&mut gal, TextureFormat::Rgba8Unorm).unwrap();
         pass.inner.use_packed_uniforms = true;
         pass.begin_frame();
         let mut ops = Vec::new();
@@ -10736,7 +10757,7 @@ mod tests {
         let (lightmap, lightmap_handles) = lightmap_binding(&mut gal);
         let mut pass_resources = WorldLodTransparentPassResources::default();
         pass_resources
-            .set_color_format(TextureFormat::Bgra8Unorm)
+            .set_color_format(&mut gal, TextureFormat::Bgra8Unorm)
             .unwrap();
         let mut ops = Vec::new();
         for layer in [
@@ -10754,6 +10775,18 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(2, pass_resources.inner_up.draws.len());
+        // A shader toggle rebinds this owner to the HDR G-buffer format: the
+        // format-bound pipeline and draw sets are rebuilt rather than failing.
+        assert!(pass_resources.inner_up.pipeline.is_some());
+        pass_resources
+            .set_color_format(&mut gal, TextureFormat::Rgba16Float)
+            .unwrap();
+        assert!(pass_resources.inner_up.pipeline.is_none());
+        assert!(pass_resources.inner_up.draws.is_empty());
+        assert_eq!(
+            Some(TextureFormat::Rgba16Float),
+            pass_resources.inner_up.color_format
+        );
         pass_resources.destroy(&mut gal);
         for handle in lightmap_handles {
             gal.destroy(handle).unwrap();
