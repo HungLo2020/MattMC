@@ -524,7 +524,14 @@ public final class DistantHorizonsSemanticCollector {
 	 * only duplicates memory and CPU work.
 	 */
 	private static boolean materialProvenancePublicationRequired() {
-		return exactAtlasCoverageRequested() || selectedSourceExecutionRequested();
+		if (Boolean.getBoolean(EXACT_MATERIAL_TOPOLOGY_PROPERTY)) {
+			return true;
+		}
+		// A selected shader pack shades DH's reduced-color stream (Iris); the
+		// per-face exact-material sidecar has no consumer there, and resolving it
+		// (positional biome tint for every face) stalled each column publication.
+		return exactAtlasCoverageRequested()
+			&& !net.vulkanic.gui.RustGalFrameCoordinator.shaderPackSourceActive();
 	}
 
 	/** True only for the backend-owned whole-frame route. Diagnostic capture by
@@ -549,8 +556,16 @@ public final class DistantHorizonsSemanticCollector {
 	 * of treating every Rust-owned DH frame as an exact-atlas frame.
 	 */
 	public static boolean usesExactMaterialTopologyBuild() {
-		return usesRustWholeFrameSemanticBuild() && selectedSourceExecutionRequested();
+		// Iris shader packs consume DH's own reduced-color/material-id stream on
+		// DH's greedy topology (Frozen), exactly as ordinary gameplay with a
+		// selected pack does here. The exact split is an explicit diagnostic
+		// build only; the selected-source harness flag must not change geometry.
+		return usesRustWholeFrameSemanticBuild() && Boolean.getBoolean(EXACT_MATERIAL_TOPOLOGY_PROPERTY);
 	}
+
+	/** Opt-in exact-material DH topology for exact-atlas source diagnostics. */
+	public static final String EXACT_MATERIAL_TOPOLOGY_PROPERTY =
+		"mattmc.dev.rustGalDistantHorizons.exactMaterialTopology";
 
 	/** Whether copied CPU geometry exists for this real DH quadtree section.
 	 * This is quadtree bookkeeping only: it stops DH from indefinitely queuing
@@ -2713,7 +2728,8 @@ public final class DistantHorizonsSemanticCollector {
 				.append(",\"segment\":").append(instance.segmentIndex())
 				.append(",\"vertices\":").append(segment.vertices().size())
 				.append(",\"semanticHash\":\"")
-				.append(Long.toUnsignedString(semanticPayloadHash(segment), 16))
+				.append(Long.toUnsignedString(cachedSemanticPayloadHash(
+					instance.columnKey(), instance.columnGeneration(), instance.segmentIndex(), segment), 16))
 				.append("\"}");
 		}
 		json.append("]}");
@@ -2759,6 +2775,28 @@ public final class DistantHorizonsSemanticCollector {
 			if (compactIndex-- == 0) return buffer;
 		}
 		return null;
+	}
+
+	private record SemanticHashKey(long columnKey, long columnGeneration, int segmentIndex) {}
+
+	/** Segment payloads are immutable per column generation; hash each once. */
+	private static final Map<SemanticHashKey, Long> SEMANTIC_PAYLOAD_HASHES =
+		new LinkedHashMap<>(256, 0.75F, true) {
+			@Override
+			protected boolean removeEldestEntry(Map.Entry<SemanticHashKey, Long> eldest) {
+				return size() > 8192;
+			}
+		};
+
+	private static long cachedSemanticPayloadHash(
+		long columnKey, long columnGeneration, int segmentIndex, LodBufferSnapshot segment
+	) {
+		synchronized (SEMANTIC_PAYLOAD_HASHES) {
+			return SEMANTIC_PAYLOAD_HASHES.computeIfAbsent(
+				new SemanticHashKey(columnKey, columnGeneration, segmentIndex),
+				key -> semanticPayloadHash(segment)
+			);
+		}
 	}
 
 	private static long semanticPayloadHash(LodBufferSnapshot segment) {

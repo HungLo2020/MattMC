@@ -187,7 +187,7 @@ public class RustGalTerrainRendererLightingContractTest {
 	}
 
 	@Test
-	public void wholeFrameShaderEnvironmentUsesBlockDistanceForDistantHorizonsFog() throws Exception {
+	public void wholeFrameShaderEnvironmentMirrorsIrisDistantHorizonsRenderDistance() throws Exception {
 		String source = java.nio.file.Files.readString(java.nio.file.Path.of(
 			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"
 		));
@@ -195,9 +195,12 @@ public class RustGalTerrainRendererLightingContractTest {
 		int nextMethod = source.indexOf("\n\tprivate static", method + 1);
 		String body = source.substring(method, nextMethod < 0 ? source.length() : nextMethod);
 
+		// Iris DHCompat: DH radius in blocks while DH rendering is enabled,
+		// else the effective vanilla distance in chunks. Never the larger of both.
 		assertTrue(body.contains("DhApi.Delayed.configs.graphics().chunkRenderDistance().getValue() * 16"));
-		assertTrue(body.contains("options.getEffectiveRenderDistance() * 16"));
-		assertTrue(body.contains("Math.max(vanillaRenderDistance, distantHorizonsRenderDistance)"));
+		assertTrue(body.contains("DhApi.Delayed.configs.graphics().renderingEnabled().getValue()"));
+		assertTrue(body.contains("return Minecraft.getInstance().options.getEffectiveRenderDistance();"));
+		assertFalse(body.contains("Math.max("));
 		assertTrue(!source.contains("DHCompat.getRenderDistance()"));
 	}
 

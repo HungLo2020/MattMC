@@ -134,7 +134,7 @@ public final class RustShaderPackSourceCollector {
 					withRuntimeBlockStateIdentitySnapshot(withActiveVanillaPostEffectResources(source)),
 					readWholeFramePackOptions(shaderpacks, packName)
 				),
-				wholeFrameEnvironmentDefines()
+				wholeFrameEnvironmentDefines(collectedDistantHorizonsDefine = distantHorizonsRenderingEnabled())
 			);
 		}
 		return IrisShaderPackCompatibilityCollector.collectConfiguredPack(generation);
@@ -445,11 +445,35 @@ public final class RustShaderPackSourceCollector {
 
 	/** Stable source-environment defaults used before any pack-specific Iris option graph exists. */
 	static Map<String, String> wholeFrameEnvironmentDefines() {
-		// DH execution is intentionally unavailable on the vanilla Rust Vulkan
-		// route.  Do not let a copied shader source opt into its DH branches just
-		// because the mod happens to be installed; that would create a hidden
-		// dependency on an unadmitted renderer family.
+		// Engine identity only; the collected pack snapshot adds DISTANT_HORIZONS
+		// separately from the live DH rendering state (see collectConfiguredPack).
 		return wholeFrameEnvironmentDefines(false);
+	}
+
+	/** The DISTANT_HORIZONS state of the most recently collected pack snapshot. */
+	private static volatile boolean collectedDistantHorizonsDefine;
+
+	/**
+	 * Iris (StandardMacros) defines DISTANT_HORIZONS for every program while DH
+	 * rendering is enabled, and rebuilds the pipeline when that changes. The
+	 * Rust route mirrors it: the define follows DH's own rendering setting on
+	 * the Rust-owned DH route, read as copied configuration, never Iris state.
+	 */
+	public static boolean distantHorizonsRenderingEnabled() {
+		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan()) {
+			return false;
+		}
+		try {
+			return com.seibel.distanthorizons.api.DhApi.Delayed.configs != null
+				&& com.seibel.distanthorizons.api.DhApi.Delayed.configs.graphics().renderingEnabled().getValue();
+		} catch (LinkageError absent) {
+			return false;
+		}
+	}
+
+	/** True when the collected snapshot's DISTANT_HORIZONS define no longer matches DH's state. */
+	public static boolean distantHorizonsDefineStale() {
+		return collectedDistantHorizonsDefine != distantHorizonsRenderingEnabled();
 	}
 
 	/**

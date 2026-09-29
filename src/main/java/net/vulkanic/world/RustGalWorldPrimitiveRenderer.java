@@ -2895,31 +2895,25 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	/**
-	 * Complementary's {@code dhRenderDistance} uniform is measured in blocks.
+	 * The shader-pack {@code dhRenderDistance} uniform.
 	 *
-	 * <p>The whole-frame Rust route intentionally does not initialize Iris's
-	 * Distant Horizons renderer, so Iris's compatibility helper would fall back
-	 * to Minecraft's chunk-count setting here. Read the public DH configuration
-	 * as gameplay semantic state instead; no Iris renderer state crosses the
-	 * boundary. The vanilla fallback is also converted to blocks so the uniform
-	 * keeps one unit regardless of DH configuration readiness.</p>
+	 * <p>The whole-frame Rust route does not initialize Iris's DH renderer, so
+	 * this reads the public DH configuration as gameplay semantic state; no Iris
+	 * renderer state crosses the boundary.</p>
 	 */
 	private static int shaderPackDistantHorizonsRenderDistance() {
-		int vanillaRenderDistance = Math.max(0, Minecraft.getInstance().options.getEffectiveRenderDistance() * 16);
-		if (DhApi.Delayed.configs != null) {
-			// Complementary reuses this scalar for its normal-world border fog as
-			// well as its DH branch.  DH's configured radius may be deliberately
-			// smaller than the vanilla view distance (the migration fixture uses
-			// that configuration), which otherwise saturates border fog across the
-			// entire near-terrain image.  Preserve the larger gameplay-visible
-			// radius while keeping the value in block units and independent of any
-			// Iris renderer state.
-			int distantHorizonsRenderDistance = Math.max(0,
-				DhApi.Delayed.configs.graphics().chunkRenderDistance().getValue() * 16);
-			return Math.max(vanillaRenderDistance, distantHorizonsRenderDistance);
+		// Mirror Iris's DHCompat.getRenderDistance exactly, the Frozen baseline:
+		// DH's configured radius in blocks while DH rendering is enabled, else
+		// Minecraft's effective render distance (in chunks, as Iris returns it).
+		// Packs such as Complementary use this for their border fog whenever
+		// DISTANT_HORIZONS is defined, including near-terrain programs.
+		if (DhApi.Delayed.configs == null
+			|| !DhApi.Delayed.configs.graphics().renderingEnabled().getValue()) {
+			return Minecraft.getInstance().options.getEffectiveRenderDistance();
 		}
-		return vanillaRenderDistance;
+		return DhApi.Delayed.configs.graphics().chunkRenderDistance().getValue() * 16;
 	}
+
 
 	/**
 	 * Copies the game renderer's semantic fog range after vanilla has prepared

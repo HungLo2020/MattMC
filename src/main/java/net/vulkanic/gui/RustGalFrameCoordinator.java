@@ -729,6 +729,13 @@ public final class RustGalFrameCoordinator {
 		}
 	}
 
+	/** Lock-free view of {@link #isRustShaderPackSourceReady()} for producer threads. */
+	private static volatile boolean shaderPackSourceActive;
+
+	public static boolean shaderPackSourceActive() {
+		return shaderPackSourceActive;
+	}
+
 	/** True only when a non-disabled shader-pack source snapshot is staged for Rust. */
 	public static boolean isRustShaderPackSourceReady() {
 		synchronized (LOCK) {
@@ -2479,6 +2486,11 @@ public final class RustGalFrameCoordinator {
 	 */
 	private static void refreshConfiguredShaderPackSourcesLocked() {
 		var activePack = RustShaderPackSourceCollector.activeConfiguredPackName();
+		if (activePack.isPresent() && RustShaderPackSourceCollector.distantHorizonsDefineStale()) {
+			// DH rendering was toggled: like Iris, rebuild the pack source with
+			// the matching DISTANT_HORIZONS environment.
+			shaderPackConfigurationChanged = true;
+		}
 		if (shaderPackConfigurationChanged) {
 			// The persisted selection changed (pack, options, or the shader
 			// toggle). Recollect even when the key is unchanged or shaders are
@@ -2566,6 +2578,9 @@ public final class RustGalFrameCoordinator {
 		copiedShaderPackVignetteEnabled = vignetteEnabled;
 		pendingShaderPackSources = source;
 		pendingShaderPackSourceName = selectionKey;
+		shaderPackSourceActive = !"disabled".equals(source.packName())
+			&& !source.packName().startsWith("minecraft-resource-pack:")
+			&& !source.files().isEmpty();
 		attemptedShaderPackSourceGeneration = Math.min(
 			attemptedShaderPackSourceGeneration,
 			uploadedShaderPackSourceGeneration

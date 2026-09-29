@@ -4550,6 +4550,9 @@ struct WorldLodSourceProgramKey {
     color_format: TextureFormat,
     cull_mode: u32,
     front_face: FrontFace,
+    /// DH generic objects (clouds, beacon beams) run the opaque `dh_terrain`
+    /// source program with DH's generic-renderer alpha blend enabled.
+    alpha_blend: bool,
 }
 
 impl WorldLodSourceProgramKey {
@@ -4567,6 +4570,7 @@ impl WorldLodSourceProgramKey {
             // experiment silently ineffective.
             cull_mode: selected_source_raster_probe_cull_mode()? as u32,
             front_face: selected_source_raster_probe_front_face(world_lod_source_front_face(api))?,
+            alpha_blend: false,
         })
     }
 }
@@ -4595,10 +4599,18 @@ struct WorldLodSourcePipelineResources {
     pack_resources_layout: Handle,
     pipeline_layout: Handle,
     pipeline: Handle,
+    /// A generic-blend variant shares the base pipeline's modules and
+    /// layouts (pack sets must bind the identical layout) and owns only its
+    /// pipeline object.
+    shares_base_layouts: bool,
 }
 
 impl WorldLodSourcePipelineResources {
     fn destroy(self, gal: &mut VulkanicGal) {
+        if self.shares_base_layouts {
+            let _ = gal.destroy(self.pipeline);
+            return;
+        }
         for handle in [
             self.pipeline,
             self.pipeline_layout,
@@ -4751,6 +4763,11 @@ fn exact_atlas_source_pipeline_key(
 pub(crate) struct WorldLodSourcePassResources {
     pipelines: BTreeMap<WorldLodSourceProgramKey, WorldLodSourcePipelineResources>,
     draws: BTreeMap<WorldLodSourceDrawKey, WorldLodSourceDrawResources>,
+    /// Per-frame DH generic-box draws. They bind the frontend's transient
+    /// generic geometry buffers, never column assets, so column
+    /// reconciliation leaves them alone; `retire_generic_draws` releases them
+    /// before those buffers are replaced.
+    generic_draws: BTreeMap<WorldLodSourceDrawKey, WorldLodSourceDrawResources>,
     pack_resources: BTreeMap<WorldLodSourcePackKey, Handle>,
     targets: BTreeMap<WorldLodSourceTargetKey, WorldLodSourceTargetResources>,
 }
@@ -5211,14 +5228,58 @@ impl WorldLodSourcePassResources {
         source_uniforms: &TerrainSourceUniformFrame,
         ops: &mut Vec<CommandOp>,
     ) -> GalResult<WorldLodPreparedSourceDraw> {
+        self.stage_draw_inner(
+            gal, program, color_format, draw, column_frame, source_uniforms, ops, false,
+        )
+    }
+
+    /// Stages one DH generic-object range (Iris `dh_generic`, falling back to
+    /// `dh_terrain`) with DH's generic alpha blend.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn stage_generic_draw(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &LoweredDistantHorizonsSourceProgram,
+        color_format: TextureFormat,
+        draw: WorldLodGpuDraw,
+        column_frame: WorldLodDrawUniform,
+        source_uniforms: &TerrainSourceUniformFrame,
+        ops: &mut Vec<CommandOp>,
+    ) -> GalResult<WorldLodPreparedSourceDraw> {
+        self.stage_draw_inner(
+            gal, program, color_format, draw, column_frame, source_uniforms, ops, true,
+        )
+    }
+
+    /// Releases every generic-box draw set before its geometry buffers are
+    /// replaced or dropped.
+    pub(crate) fn retire_generic_draws(&mut self, gal: &mut VulkanicGal) {
+        for (_, resources) in std::mem::take(&mut self.generic_draws) {
+            resources.destroy(gal);
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn stage_draw_inner(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &LoweredDistantHorizonsSourceProgram,
+        color_format: TextureFormat,
+        draw: WorldLodGpuDraw,
+        column_frame: WorldLodDrawUniform,
+        source_uniforms: &TerrainSourceUniformFrame,
+        ops: &mut Vec<CommandOp>,
+        alpha_blend: bool,
+    ) -> GalResult<WorldLodPreparedSourceDraw> {
         program.execution_interface.validate()?;
         if draw.index_count == 0 || draw.index_count % 3 != 0 {
             return Err(GalError::invalid_argument(
                 "source-derived Distant Horizons draw requires triangle-aligned indices",
             ));
         }
-        let key =
+        let mut key =
             WorldLodSourceProgramKey::from_program(program, color_format, gal.capabilities().api)?;
+        key.alpha_blend = alpha_blend;
         self.ensure_pipeline(gal, program, &key)?;
         let scalar_uniforms = program.pack_scalar_uniforms(source_uniforms)?;
         if program.execution_interface.scalar_uniforms.is_none() && !scalar_uniforms.is_empty() {
@@ -5230,7 +5291,12 @@ impl WorldLodSourcePassResources {
             program: key.clone(),
             draw: WorldLodDrawResourceKey::from_draw(draw),
         };
-        let created_draw_resources = !self.draws.contains_key(&draw_key);
+        let created_draw_resources = !if alpha_blend {
+            &self.generic_draws
+        } else {
+            &self.draws
+        }
+        .contains_key(&draw_key);
         if created_draw_resources {
             let pipeline = self
                 .pipelines
@@ -5323,11 +5389,18 @@ impl WorldLodSourcePassResources {
                     let _ = gal.destroy(handle);
                 }
             }
-            self.draws.insert(draw_key.clone(), result?);
+            if alpha_blend {
+                self.generic_draws.insert(draw_key.clone(), result?);
+            } else {
+                self.draws.insert(draw_key.clone(), result?);
+            }
         }
-        let resources = self
-            .draws
-            .get(&draw_key)
+        let resources = if alpha_blend {
+            &self.generic_draws
+        } else {
+            &self.draws
+        }
+        .get(&draw_key)
             .expect("source DH draw resources exist after successful staging");
         append_source_uniform_upload(
             ops,
@@ -5477,6 +5550,7 @@ impl WorldLodSourcePassResources {
         for (_, resources) in std::mem::take(&mut self.draws) {
             resources.destroy(gal);
         }
+        self.retire_generic_draws(gal);
         for (_, set) in std::mem::take(&mut self.pack_resources) {
             let _ = gal.destroy(set);
         }
@@ -5484,7 +5558,11 @@ impl WorldLodSourcePassResources {
             let _ = gal.destroy(resources.pass);
             let _ = gal.destroy(resources.target);
         }
-        for (_, resources) in std::mem::take(&mut self.pipelines) {
+        // Generic-blend variants borrow their base layouts: destroy them first.
+        let (shared, owned): (Vec<_>, Vec<_>) = std::mem::take(&mut self.pipelines)
+            .into_values()
+            .partition(|resources| resources.shares_base_layouts);
+        for resources in shared.into_iter().chain(owned) {
             resources.destroy(gal);
         }
     }
@@ -5496,6 +5574,59 @@ impl WorldLodSourcePassResources {
         key: &WorldLodSourceProgramKey,
     ) -> GalResult<()> {
         if self.pipelines.contains_key(key) {
+            return Ok(());
+        }
+        if key.alpha_blend {
+            let base_key = WorldLodSourceProgramKey {
+                alpha_blend: false,
+                ..key.clone()
+            };
+            self.ensure_pipeline(gal, program, &base_key)?;
+            let base = self
+                .pipelines
+                .get(&base_key)
+                .expect("base source DH pipeline exists after successful initialization");
+            let pipeline = gal.create_graphics_pipeline(GraphicsPipelineDesc {
+                label: format!(
+                    "world-lod-source-{}-gen{}-generic.pipeline",
+                    key.identity.replace(':', "-"),
+                    key.shader_pack_generation
+                ),
+                layout: base.pipeline_layout,
+                vertex_shader: base.vertex_shader,
+                fragment_shader: base.fragment_shader,
+                topology: PrimitiveTopology::Triangles,
+                cull_mode: match key.cull_mode {
+                    value if value == CullMode::None as u32 => CullMode::None,
+                    value if value == CullMode::Front as u32 => CullMode::Front,
+                    value if value == CullMode::Back as u32 => CullMode::Back,
+                    _ => {
+                        unreachable!("source DH pipeline cache key only permits a valid cull mode")
+                    }
+                },
+                front_face: key.front_face,
+                provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
+                raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
+                // DH's GenericObjectRenderer: SRC_ALPHA/ONE_MINUS_SRC_ALPHA
+                // (alpha ONE/ONE_MINUS_SRC_ALPHA), depth test and write on.
+                blend: BlendMode::Alpha,
+                depth_compare: Some(CompareOp::LessOrEqual),
+                depth_write: true,
+                depth_bias: None,
+                color_formats: vec![key.color_format],
+                depth_format: Some(TextureFormat::Depth32Float),
+                stencil: None,
+            })?;
+            let shared = WorldLodSourcePipelineResources {
+                vertex_shader: base.vertex_shader,
+                fragment_shader: base.fragment_shader,
+                source_data_layout: base.source_data_layout,
+                pack_resources_layout: base.pack_resources_layout,
+                pipeline_layout: base.pipeline_layout,
+                pipeline,
+                shares_base_layouts: true,
+            };
+            self.pipelines.insert(key.clone(), shared);
             return Ok(());
         }
         let layouts = program.execution_resource_layouts()?;
@@ -5568,6 +5699,7 @@ impl WorldLodSourcePassResources {
                 pack_resources_layout,
                 pipeline_layout,
                 pipeline,
+                shares_base_layouts: false,
             })
         })();
         if result.is_err() {

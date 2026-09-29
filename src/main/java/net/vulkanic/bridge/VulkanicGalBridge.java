@@ -3984,9 +3984,12 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		int colorArgb, int packedLight,
 		float northShading, float southShading, float eastShading,
 		float westShading, float topShading, float bottomShading,
-		boolean ssaoEnabled
+		boolean ssaoEnabled, int material
 	) {
 		public WorldDistantHorizonsGenericBoxRecord {
+			if (material < 0 || material > 0xff) {
+				throw new IllegalArgumentException("DH generic box material index must fit one byte");
+			}
 			if (!Float.isFinite(minX) || !Float.isFinite(minY) || !Float.isFinite(minZ)
 				|| !Float.isFinite(maxX) || !Float.isFinite(maxY) || !Float.isFinite(maxZ)
 				|| minX > maxX || minY > maxY || minZ > maxZ
@@ -4034,7 +4037,8 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			var box = Objects.requireNonNull(boxes.get(i), "DH generic box");
 			MemorySegment item = Abi.item(records, layout, i);
 			layout.setInt(item, 0, layout.byteSize());
-			layout.setInt(item, 1, box.ssaoEnabled() ? 1 : 0);
+			// Bit 0: SSAO request; bits 8-15: DH EDhApiBlockMaterial index (Iris aMaterial).
+			layout.setInt(item, 1, (box.ssaoEnabled() ? 1 : 0) | (box.material() << 8));
 			long minOffset = layout.offset(2);
 			long maxOffset = layout.offset(3);
 			item.set(ValueLayout.JAVA_FLOAT, minOffset, box.minX());

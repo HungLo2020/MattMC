@@ -2,13 +2,49 @@
 
 ## Active objective
 
-**Goal 3 — Iris shader packs on Rust Vulkan.** Run the selected non-DH pack
-through one Rust-owned Vulkan frame and compare against Frozen Java OpenGL.
-Goal 4 (DH+Iris) has not begun. Do not edit `docs/RUST-MIGRATION-PROMPTS.md`,
-commit, push, or change Frozen source/behavior. Keep this document under 200
-lines. Java supplies bounded immutable render semantics and copied pack/config
-source; Rust owns preprocessing, lowering, resources, passes, synchronization,
-submission, and presentation. Preserve shader-off vanilla and DH.
+**Goal 4 — Iris + Distant Horizons together (started 2026-09-28).** Goal 3
+(non-DH pack) notes below remain the regression baseline. Frozen repo:
+`../MattMC_JavaPerfTesting/MattMC`. DH pair: `Capture.py --mode current/frozen
+-shaders-on --rust-selected-source-execution --world-distant-horizons-real-world
+--world-distant-horizons-opaque`, `MATTMC_CAPTURE_DH_RADIUS_OVERRIDE` (default 8).
+**Fixture:** Frozen's DH reads only DB formats 1-2 (Origin's is Current's 4), so
+use a shared Frozen-generated DB: Frozen `runClient -x test -PmattmcRunGameDir=
+<copy> --args=--quickPlaySingleplayer=Origin` (OpenGL options, DB removed) until
+it stops growing, then `MATTMC_CAPTURE_RUN_SOURCE=<dir>` (scratch `g4src`).
+Iris parity fixes: `dhRenderDistance` = DH radius*16 while DH renders, else vanilla
+chunks (was max); `DISTANT_HORIZONS` in the copied environment for every program
+while DH renders (recollected on toggle); selected-source flag no longer forces DH
+exact-material topology/provenance (opt-in `...rustGalDistantHorizons.
+exactMaterialTopology`); DH programs get the vanilla `far` (was DH distance: the
+pack's smoothstep(far*.5, far*.7) fade discarded all DH); DH depth cleared each
+frame (loaded last frame's depth: only edges passed); fullscreen `dhProjection`
+= Iris DHCompat (gbuffer fov, DH near, far (blocks+512)*sqrt2); DH voxels only via
+a pack `dh_shadow` with `dhShadow.enabled`. Frame order (Frozen LevelRenderer):
+sky -> DH opaque -> vanilla opaque -> ... -> deferred (beginTranslucents) -> DH
+translucent -> vanilla translucent -> composites (was DH after all terrain and
+deferred after water: VL-cloud discard removed all water). Pairs: r4 day
+1.63/1.61/2.28; r32 land (150.5,100,530.5,0,5, shared DB) 19 -> 4.38/4.46/2.89;
+0 VUIDs. Open: DH hill band ~9 levels brighter on Current (not vlFactor: forcing 1
+is far brighter). Goal 3 regressions unchanged after the toggle fix. DH-off frames (0 LODs,
+define removed) admit normally.
+**Suspected Frozen bug (09-29; user: note it, ignore, move on).** Look-down r32 pair
+(150.5,100,530.5,105,80) MAE 15/18/33: Frozen hazes near terrain. Probe pack
+(scratch `diag-vl`) shows Frozen `composite` sees `textureSize(shadowcolor1)=0`
+with DH (reads (0,0,0,1) -> SALS heights 15 -> vlFactor pinned 1 -> DH VL not
+suppressed); `final` sees the real 2048^2 map. Without DH, Frozen composite
+instead sees `shadowtex0` 0x0. Current binds both correctly (vlFactor 0).
+**DH toggle crash fixed (09-29):** pack recollection replaced the voxel volume
+while cached set-ones bound it; set-ones keyed on ColoredVoxel*/Puddle roles are
+released first. **Memory:** r32 pair Frozen 8.7 vs Current 8.8 GB at 98 s.
+**r32 land pairs:** night 0.66/0.83/0.61, rain 1.99/2.00/2.05, 0 VUIDs.
+**DH generic objects (09-29, user crash):** harness disables them unless
+`MATTMC_CAPTURE_DH_GENERIC=true`. Iris: `dh_generic`->`dh_terrain`, alpha blend.
+Rust: boxes (+DH material in flags bits 8-15) expand to the DH source stream,
+grouped by sub-block fraction, drawn with `dh_terrain` (blend variant sharing base
+layouts). Unadmitted: generic material quads / no LODs; warmup frame omits them.
+Pairs generic on: land 4.88/4.95/3.09, up 2.71/2.86/2.76 (2241 boxes), 0 VUIDs. Real
+config (`run/` copy at `~/.cache/mattmc-claude/realrun`): route active, no crash.
+No prompt-doc edits, commits, pushes, or Frozen changes; <=200 lines. Java: semantics.
 
 ## Current gate (2026-09-25)
 
@@ -63,8 +99,7 @@ weather, before composite, into main depth. Degenerate/sub-mm quads (TaCZ gun
 faces) no longer reject the frame (scale-independent normals, second-triangle
 fallback); producer-authored TaCZ hand normals were worse (2.0 -> 3.6 MAE).
 Source local materials honour copied `.mcmeta` sampling (glint blur/clamp).
-Pairs: gun 2.38/1.96/2.53, held pane 2.35/1.82/2.11, day+stairs 2.28/1.83/2.15. Gaps: gun muzzle/stock-edge shading; `gbuffers_hand_water`
-packs unadmitted. Gun hotbar icon fixed: it was composited under the hotbar
+Gaps: gun muzzle/stock-edge shading; `gbuffers_hand_water` packs unadmitted. Gun hotbar icon fixed: it was composited under the hotbar
 sprite (raw phase order, not `dynamicLayerOrder/Id`); the raster now uses
 Frozen's PIP pose scale(f,f,-f)*scale(1,-1,-1) and new GUI lighting modes
 6/7 (OversizedItemRenderer ITEMS_3D / ITEMS_FLAT by `usesBlockLight`).
@@ -90,66 +125,36 @@ flight was re-dispatched into the in-flight gate and dropped, and edits waited
 behind the whole streaming backlog. Invalidations now stay parked until the
 worker completes and enter the pending queue first. Place/remove stress (8
 alternations right after a teleport, shaders on/off): all correct. **Iris
-screen button labels:** `SmoothedFloat` GUI fades used the Iris shader timer,
-which Java does not advance on the Rust route (alpha stuck at 0); the shader
-screen's transitions now use wall-clock deltas. Pre-existing Java failures:
+screen button labels:** `SmoothedFloat` fades now use wall-clock deltas (the
+Iris shader timer never advances on the Rust route). Pre-existing Java failures:
 `CloudSemanticAdmissionTest`/`NativeParticleCollectionTest` (stale source-text asserts).
-**Perf (2026-09-27/28).** Perf matrix `--profile performance --workload-profile
-settled-static|moving-camera --world Origin`. Static: shader-on 31 -> 48.1 fps
-(Frozen 205; native 24 -> 13.3 ms, Java ~7 ms), shader-off 166 -> 176 fps
-(Frozen 355). Moving: shader-off 296 vs Frozen 422 (70%), shader-on 34 vs 286.
-Done: shared 128 MiB source geometry pages + multidraw (A/B env
-`MATTMC_RUST_DISABLE_SOURCE_TERRAIN_MULTIDRAW` / `_PAGES`); identity-keyed
-batch plans (named route plans terrain only; mesh updates drop only plans
-naming that key); plane-arrangement-cell translucent order reuse (exact,
-property-tested); terrain coverage memo keyed on its own mesh keys (the global
-asset generation changes every frame via entity models; 4.5 -> 0.3 ms);
-memoized prepared programs (entity writer checked once per frame; cloud/
-weather/textured/DH memos by candidate epoch; fullscreen chain shared as
-`Arc`); `FullscreenPipelineCache` keeps view-independent fullscreen layouts/
-shaders/pipelines across frames (exact stage+binding match; target/pass stay
-per frame; 1.5 -> 0.16 ms); uniform-frame and local-material memos; no frame
-clone of instance streams for the provisional snapshot. Java: primitive
-residency maps, per-section solid/cutout/translucent asset rows, shadow loop
-skips camera-visible sections, retained static instances cap 24576 (4096
-evicted every frame), primitive readiness sort and checkpoint snapshots.
-Left (shader-on, ~12 ms plan): ~1k entity draws ~4.5 ms, terrain+shadow draws
-~3.6 ms, GAL submit 2.2 ms, Java extraction 3.4 ms + flush 1.4 ms. 100 fps
-would need pipelining Java with Rust or persistent recorded plans.
-**Teleport/validation/voxels (2026-09-28).** Temporary tour (6 teleports, F2
-shots, 40 s walk; validation on): 0 VUIDs, no fallback after arming. Fixed: F2
-capture after frame finalization restores PRESENT_SRC; the named route updates
-colored-light voxels every frame (were frozen after arming; sampled volumes
-bracketed in ShaderRead); an uninitialized volume uploads a cleared field like
-Iris (was a post-teleport vanilla flash); all stream slots in flight waits for
-the oldest; a stale pending lightmap is discarded at frame entry, and the armed
-route's provisional assembly (ops dropped) no longer promotes a never-uploaded
-lightmap (UNDEFINED on the next vanilla fallback; injected failures 1/5 ->
-0/35); lightmap changes release only pack sets keyed on `Lightmap`. Occupancy is
-exact-incremental (randomized equivalence test vs full rebuild): reused mesh
-snapshots, volume culling, memoized mesh list, per-box patches for same-cell
-changes (one transfer scope each: GAL texture hazards are per subresource),
-in-place shift on cell crossings. 230 ms/frame while chunks load -> 0.5 ms
-static, walking p50 3.9/p95 20 ms. Gap: the per-asset voxel vertex cache keeps
+**Perf (09-27/28).** Matrix `--profile performance --workload-profile settled-static|
+moving-camera --world Origin`. Static on 31->48 fps (Frozen 205), off 166->176
+(Frozen 355); moving off 296 vs 422, on 34 vs 286. Done: geometry pages+multidraw
+(`MATTMC_RUST_DISABLE_SOURCE_TERRAIN_MULTIDRAW`/`_PAGES`), identity-keyed terrain
+batch plans, translucent-order cell reuse, coverage memo keyed on own meshes,
+memoized programs (epoch), `FullscreenPipelineCache`, primitive Java residency
+maps/section asset rows. Left: entities ~4.5 ms, terrain+shadow ~3.6, GAL 2.2,
+Java ~5; 100 fps needs Java/Rust pipelining or persistent recorded plans.
+**Teleport/validation/voxels (2026-09-28).** Tour (6 teleports, F2, 40 s walk,
+validation on): 0 VUIDs, no post-arm fallback. Fixed: F2 restores PRESENT_SRC;
+colored-light voxels update every frame (sampled volumes in ShaderRead); an
+uninitialized volume uploads a cleared field like Iris; full stream slots wait
+for the oldest; stale pending lightmaps are discarded at frame entry and never
+promoted unuploaded (injected failures 1/5 -> 0/35). Occupancy is exact-
+incremental (randomized equivalence test): per-box patches, in-place shift on
+cell crossings; 230 ms/frame while loading -> 0.5 ms static, walking p50 3.9/p95 20 ms. Gap: the per-asset voxel vertex cache keeps
 pack material ids until the asset reloads. Pairs after the perf pass: day 2.26/1.82/2.12,
 glass 6.67/5.61/4.42, down 6.83/7.54/6.60, off 0.13/0.22/0.22, gun 2.07/1.63/2.07,
 pane 2.32/1.81/2.10, 0 VUIDs; Rust suite 1877. Entity/hand source normals are
 Iris's in-level BufferBuilder face normal (diagonal cross, authored side; the
 vertex stage flips it under a mirroring pose): cow 2.09/1.64/2.06, gun
-2.11/1.66/2.09, banner 2.22/1.87/2.27. Gun gap left: muzzle cap/front sight px.
-TaCZ fire/reload/aim harness (validation on): 0 fallbacks/VUIDs; the 50 ms muzzle
-flash (translucent textured quad) is not tick-capturable, so its shading parity
-(Iris: inside the hand pass) is unverified. Springfield display JSON has `//`
-comments; a strict Gson parse drops its `reload_empty` sound (data, not render).
-**Casters / outline (2026-09-26).** Player/vehicle casters: entity `shadow` stage only. Iris draws the selection
-box with the pack's `gbuffers_line` into colortex0/6 after the opaque flush
-(translucent-layer targets after translucent terrain). `line_contract` lowers
-Iris-injected `vaPosition`/`vaNormal`/`modelViewMatrix`/`projectionMatrix` onto
-the material stream (segments as vanilla `Mode.LINES` quads s,s,e,e; stored
-vertex id for `gl_VertexID` parity), own `Lines` phase; the post-final overlay
-runs only when no source line writer consumed the segments. Outline crop MAE
-**0.42/0.70/0.51** (pose 146.5,66,530.5,105,60); translucent-phase outline
-occluded by glass like Frozen's.
+2.11/1.66/2.09, banner 2.22/1.87/2.27. Gun gap: muzzle cap/front sight px. TaCZ
+fire/reload/aim: 0 fallbacks/VUIDs; 50 ms muzzle flash shading unverified.
+**Casters / outline (09-26).** Player/vehicle casters: entity `shadow` stage only.
+Selection box: pack `gbuffers_line` into colortex0/6 after the opaque flush
+(`line_contract` lowers Iris-injected va*/matrix inputs; LINES quads s,s,e,e;
+own `Lines` phase). Outline crop MAE 0.42/0.70/0.51 (146.5,66,530.5,105,60).
 **Block breaking via `gbuffers_damagedblock` (2026-09-27).** Crumbling draws
 with the pack's damagedblock program after the outline, before
 `beginTranslucents` (vanilla CRUMBLING state, bias -1/-10, alphaTest default
@@ -183,10 +188,6 @@ Source geometry (~0.9 GiB at RD 10) is device-local with staged uploads, cap 2 G
 (profile only the release Rust profile). F2 screenshots: Rust copies the completed
 frame target before present; Java only encodes the PNG. Resize re-arms the route.
 
-Deferred stages run at Iris's `beginTranslucents` (DH keeps its order until Goal 4).
-Recheck shader-off vanilla/DH after shared resource/scheduling changes. Goal 3 is
-not complete until remaining source coverage and a clean Vulkan run are verified.
-
 ## Retained architecture
 
 Rust separates shadow-only terrain candidates from camera-color draws; the CPU
@@ -195,4 +196,5 @@ shadow pass (Sodium's 64-block cylinder). The shadow target uses the pack's 2048
 extent and Iris's opaque-white shadow-color clear. Keep one Rust-owned
 frame/presenter, immutable asset validation, indirect terrain submission,
 source queue settling, and static fragment specialization intact.
-Goal 1 vanilla and Goal 2 DH remain regression baselines. No commit or push.
+Goal 1 vanilla and Goal 2 DH remain regression baselines (recheck shader-off
+vanilla/DH after shared resource/scheduling changes). No commit or push.

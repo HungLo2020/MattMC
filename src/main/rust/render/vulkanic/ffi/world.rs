@@ -38,7 +38,8 @@ fn decode_dh_generic_box_semantics(
                 record.byte_size,
                 "DH generic box",
             )?;
-            if record.flags & !1 != 0
+            // Bit 0: SSAO request; bits 8-15: DH block material index.
+            if record.flags & !0xff01 != 0
                 || record
                     .min
                     .iter()
@@ -62,6 +63,7 @@ fn decode_dh_generic_box_semantics(
                 packed_light: record.packed_light,
                 shading: record.shading,
                 ssao_enabled: record.flags & 1 != 0,
+                material: (record.flags >> 8) & 0xff,
             })
         })
         .collect()

@@ -3513,11 +3513,11 @@ impl ShaderPackRuntimeExecutor {
     /// Stages the complete Distant Horizons-mode fullscreen chain against the
     /// shared named-color target generation. The target model stays common;
     /// only source-derived control flow differs from normal-world execution.
-    pub(crate) fn stage_distant_horizons_complete_post_terrain_execution_plans(
+    pub(crate) fn stage_distant_horizons_complete_post_terrain_execution_plans<'a>(
         &self,
         gal: &mut VulkanicGal,
         targets: &ShaderPackColorTargets,
-        external_inputs: &[TerrainSourceOwnedResourceSet],
+        external_inputs_for_stage: impl Fn(&str) -> &'a [TerrainSourceOwnedResourceSet],
         extent: crate::render::vulkanic::resources::Extent3d,
     ) -> GalResult<Vec<FullscreenSourceExecutionPlan>> {
         let manifest = self.source_color_target_manifest()?.ok_or_else(|| {
@@ -3543,7 +3543,9 @@ impl ShaderPackRuntimeExecutor {
                 program,
                 manifest,
                 targets,
-                external_inputs.iter().cloned(),
+                external_inputs_for_stage(&program.source_stage_path)
+                    .iter()
+                    .cloned(),
                 extent,
                 Some((&self.fullscreen_pipeline_cache, self.fullscreen_pipeline_epochs())),
             ) {
@@ -6519,6 +6521,28 @@ impl ShaderPackRuntimeExecutor {
     /// resource identity excludes camera fraction and shadow transform, which
     /// are content updates to the same owned image; changing any generation
     /// replaces the image atomically.
+    /// Whether preparing `descriptor` (or dropping the puddle requirement)
+    /// would destroy the installed puddle runtime, so callers can first
+    /// release pack sets that bind it.
+    pub(crate) fn candidate_puddle_runtime_retires(
+        &self,
+        descriptor: Option<PuddleOccupancyDescriptor>,
+    ) -> bool {
+        let Some(installed) = self.terrain_puddle.as_ref() else {
+            return false;
+        };
+        match descriptor {
+            Some(descriptor)
+                if self.candidate_source_requires_resource(
+                    TerrainSourceResourceRole::PuddleOccupancy,
+                ) =>
+            {
+                !installed.resource_compatible_with(descriptor)
+            }
+            _ => true,
+        }
+    }
+
     pub(crate) fn ensure_candidate_puddle_runtime(
         &mut self,
         gal: &mut VulkanicGal,

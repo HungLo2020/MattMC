@@ -2651,6 +2651,8 @@ pub struct WorldDistantHorizonsGenericBoxRequest {
     pub packed_light: u32,
     pub shading: [f32; 6],
     pub ssao_enabled: bool,
+    /// DH `EDhApiBlockMaterial` index; Iris feeds it to `dhMaterialId`.
+    pub material: u32,
 }
 
 impl WorldPrimitiveFrame {
@@ -2869,13 +2871,10 @@ fn apply_distant_horizons_source_matrices(
     Ok(())
 }
 
-/// Applies the source-defined Distant Horizons projection pair to a shared
-/// post-terrain source pass. Fullscreen consumers keep the normal gbuffer
-/// matrices for ordinary terrain pixels, but `dhProjection` and
-/// `dhProjectionInverse` must remain the exact copied DH pair used when the
-/// depth image was written. Iris's DH program path assigns both uniform pairs
-/// from the same DH projection; synthesizing another far plane here made a
-/// `dhDepthTex` sample reconstruct in a different distance space.
+/// Applies Iris's Distant Horizons projection pair to a shared post-terrain
+/// source pass. Fullscreen consumers keep the normal gbuffer matrices for
+/// ordinary terrain pixels; `dhProjection`/`dhProjectionInverse` follow Iris's
+/// fullscreen definition (see below), not DH's own geometry-pass pair.
 fn apply_distant_horizons_fullscreen_projection(
     uniforms: &mut TerrainSourceUniformFrame,
     frame: &WorldLodRenderFrame,
@@ -2899,8 +2898,40 @@ fn apply_distant_horizons_fullscreen_projection(
             "Distant Horizons fullscreen projection inverse does not reconstruct identity (max residual {inverse_residual:.6})"
         )));
     }
-    uniforms.distant_projection = Some(frame.projection_matrix);
-    uniforms.distant_projection_inverse = Some(frame.projection_inverse_matrix);
+    // Iris (MatrixUniforms / DHCompat.getProjection) gives fullscreen
+    // stages `perspective(gbuffer fov, gbuffer aspect, DH near, Iris far)`,
+    // with Iris's far plane `(DH block distance + 512) * sqrt(2)`, rather
+    // than the pair DH rendered its depth with. Frozen's deferred stages
+    // reconstruct DH distance in that space; reproduce it exactly.
+    let normal = uniforms.projection_matrix.ok_or_else(|| {
+        GalError::invalid_argument(
+            "Distant Horizons fullscreen projection requires the gbuffer projection",
+        )
+    })?;
+    let dh_blocks = uniforms.distant_horizons_render_distance.ok_or_else(|| {
+        GalError::invalid_argument(
+            "Distant Horizons fullscreen projection requires the DH render distance",
+        )
+    })?;
+    let dh = frame.projection_matrix;
+    let near = dh[14] / (dh[10] - 1.0);
+    let far = ((dh_blocks as f64 + 512.0) * std::f64::consts::SQRT_2) as f32;
+    if !near.is_finite() || near <= 0.0 || !far.is_finite() || far <= near {
+        return Err(GalError::invalid_argument(format!(
+            "Distant Horizons fullscreen clip planes are invalid (near {near}, far {far})"
+        )));
+    }
+    let mut projection = [0.0_f32; 16];
+    projection[0] = normal[0];
+    projection[5] = normal[5];
+    projection[10] = (far + near) / (near - far);
+    projection[11] = -1.0;
+    projection[14] = 2.0 * far * near / (near - far);
+    uniforms.distant_projection_inverse = Some(invert_column_major_mat4(
+        projection,
+        "Iris Distant Horizons fullscreen projection",
+    )?);
+    uniforms.distant_projection = Some(projection);
     Ok(())
 }
 
@@ -4713,13 +4744,15 @@ impl PreparedNamedSourceTerrainFramePlan {
     /// caller receives both confirmation tokens only after every operation is
     /// recorded, preventing a source stream slot or feedback image from
     /// advancing independently.
-    fn into_submission_parts<F>(
+    fn into_submission_parts<F, O, T>(
         mut self,
         runtime: &ShaderPackRuntimeExecutor,
         pre_terrain_sky_capture: Option<&SelectedSourceOutputCapture>,
         operations: &mut Vec<CommandOp>,
         hands_before_deferred: bool,
+        mut append_before_opaque_terrain: O,
         mut append_before_translucents: F,
+        mut append_before_translucent_terrain: T,
     ) -> GalResult<(
         Option<SourceTerrainFrameSubmission>,
         ShaderPackSourceColorFrameTransaction,
@@ -4727,6 +4760,8 @@ impl PreparedNamedSourceTerrainFramePlan {
     )>
     where
         F: FnMut(&mut ShaderPackSourceColorFrameTransaction, &mut Vec<CommandOp>) -> GalResult<()>,
+        O: FnMut(&mut ShaderPackSourceColorFrameTransaction, &mut Vec<CommandOp>) -> GalResult<()>,
+        T: FnMut(&mut ShaderPackSourceColorFrameTransaction, &mut Vec<CommandOp>) -> GalResult<()>,
     {
         // Iris `beginTranslucents()` runs `beginHand()` (pre-hand depthtex2
         // copy), then `HandRenderer.renderSolid` into the main depth, then the
@@ -4775,6 +4810,10 @@ impl PreparedNamedSourceTerrainFramePlan {
                 "named source terrain draws require an explicit Rust-owned shadow target",
             ));
         }
+        // Iris + DH (Frozen LevelRenderer): DH draws its opaque LODs from
+        // prepareChunkRenders, after the sky and immediately before vanilla
+        // opaque terrain, which then paints over DH wherever it draws.
+        append_before_opaque_terrain(&mut self.color_transaction, operations)?;
         // The source terrain pass is the writer of the current opaque depth.
         runtime.append_terrain_source_color_pass(operations, &self.targets, &draws)?;
         if let Some(entities) = self.entities {
@@ -4910,6 +4949,9 @@ impl PreparedNamedSourceTerrainFramePlan {
                 // translucent water or glass merely because the Rust
                 // transaction was assembled in a convenient producer order.
                 VanillaPostTerrainSourceWriter::TranslucentTerrain => {
+                    // Iris + DH: DH renders its deferred translucent LODs
+                    // (`dh_water`) right before vanilla's translucent layer.
+                    append_before_translucent_terrain(&mut self.color_transaction, operations)?;
                     if let Some(translucent_targets) = self.translucent_targets.as_ref() {
                         runtime.append_terrain_source_color_pass(
                             operations,
@@ -5115,7 +5157,12 @@ struct PreparedNamedSourceDistantHorizonsFramePlan {
     /// ranges retain their own semantic layer/order in the copied stream.
     translucent_draws: Vec<lod::WorldLodPreparedSourceDraw>,
     translucent_pack_resources: Option<Handle>,
+    /// DH generic boxes drawn with the opaque `dh_terrain` program and DH's
+    /// generic alpha blend, right after the opaque LODs.
+    generic_draws: Vec<lod::WorldLodPreparedSourceDraw>,
     upload_operations: Vec<CommandOp>,
+    /// Whether this frame's DH depth attachment was already cleared.
+    depth_cleared: bool,
 }
 
 /// Bounded graphics-audit selector for comparing the two real copied DH
@@ -5338,80 +5385,106 @@ impl PreparedNamedSourceDistantHorizonsFramePlan {
     /// Appends all opaque DH draws after normal terrain has populated the
     /// shared named colors. The caller retains the color transaction and must
     /// finish it only after every later source writer has been appended.
-    fn append_after_terrain(
-        self,
+    /// DH opaque LODs (`dh_terrain`): drawn after the sky and right before
+    /// vanilla opaque terrain (Frozen `prepareChunkRenders`), so vanilla paints
+    /// over them and the deferred chain samples the completed DH depth.
+    fn append_opaque(
+        &mut self,
         color_transaction: &mut ShaderPackSourceColorFrameTransaction,
         fog_color: ClearColor,
         operations: &mut Vec<CommandOp>,
-    ) -> GalResult<NamedSourceDistantHorizonsSubmission> {
-        let Self {
-            submission,
-            ref target,
-            depth_targets,
-            draws,
-            pack_resources,
-            exact_atlas_draws,
-            translucent_draws,
-            translucent_pack_resources,
-            upload_operations,
-        } = self;
-        operations.extend(upload_operations);
+    ) -> GalResult<()> {
+        operations.extend(std::mem::take(&mut self.upload_operations));
         // The distinct DH depth snapshot represents the completed opaque
         // phase. Copying it after each section makes later source stages
         // observe an arbitrary prefix of the visible far terrain and also
         // reuses the snapshot destination before it is re-established as a
         // transfer target. Batch compatible opaque writers and snapshot once
         // after the complete opaque phase.
-        let opaque_draw_count = draws.len() + exact_atlas_draws.len();
+        let opaque_draw_count =
+            self.draws.len() + self.exact_atlas_draws.len() + self.generic_draws.len();
         if opaque_draw_count != 0 {
             let mut opaque_draws = Vec::with_capacity(opaque_draw_count);
-            opaque_draws.extend(draws.iter().copied().map(|draw| (draw, pack_resources)));
-            opaque_draws.extend(exact_atlas_draws.iter().copied());
+            opaque_draws.extend(
+                self.draws.iter().copied().map(|draw| (draw, self.pack_resources)),
+            );
+            opaque_draws.extend(self.exact_atlas_draws.iter().copied());
+            // DH's GenericObjectRenderer runs right after the opaque LODs.
+            opaque_draws.extend(
+                self.generic_draws.iter().copied().map(|draw| (draw, self.pack_resources)),
+            );
+            // DH clears its own depth buffer every frame. Loading the previous
+            // frame's depth made this frame's identical LOD geometry fail its
+            // depth test almost everywhere (only silhouette edges survived).
             lod::WorldLodSourcePassResources::append_opaque_batch(
-                &target,
+                &self.target,
                 &opaque_draws,
                 fog_color,
                 false,
                 TextureUsageState::ShaderRead,
-                TextureUsageState::ShaderRead,
+                TextureUsageState::Undefined,
                 None,
                 operations,
             )?;
-            depth_targets.append_opaque_depth_snapshot(operations);
-        }
-        let has_translucent_draws = !translucent_draws.is_empty();
-        if opaque_draw_count == 0 && has_translucent_draws {
-            depth_targets
-                .append_empty_opaque_depth_snapshot(TextureUsageState::Undefined, operations)?;
-        }
-        if has_translucent_draws {
-            let translucent_pack_resources = translucent_pack_resources.ok_or_else(|| {
-                GalError::backend(
-                    "prepared Distant Horizons translucent draws have no prepared source resource set",
-                )
-            })?;
-            for draw in translucent_draws {
-                lod::WorldLodSourcePassResources::append_draw(
-                    &target,
-                    draw,
-                    translucent_pack_resources,
-                    fog_color,
-                    false,
-                    TextureUsageState::ShaderRead,
-                    TextureUsageState::ShaderRead,
-                    Some(TextureUsageState::ShaderRead),
-                    operations,
-                )?;
-            }
-        }
-        if opaque_draw_count != 0 || has_translucent_draws {
+            self.depth_cleared = true;
+            self.depth_targets.append_opaque_depth_snapshot(operations);
             color_transaction.record_external_outputs(&[
                 TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
             ])?;
+        } else if !self.translucent_draws.is_empty() {
+            self.depth_targets
+                .append_empty_opaque_depth_snapshot(TextureUsageState::Undefined, operations)?;
         }
-        Ok(NamedSourceDistantHorizonsSubmission {
-            targets: submission,
-        })
+        Ok(())
+    }
+
+    /// DH translucent LODs (`dh_water`): drawn after the deferred chain and
+    /// right before vanilla translucent terrain (DH's TRANSLUCENT layer hook).
+    fn append_translucent(
+        &mut self,
+        color_transaction: &mut ShaderPackSourceColorFrameTransaction,
+        fog_color: ClearColor,
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<()> {
+        if self.translucent_draws.is_empty() {
+            return Ok(());
+        }
+        let translucent_pack_resources = self.translucent_pack_resources.ok_or_else(|| {
+            GalError::backend(
+                "prepared Distant Horizons translucent draws have no prepared source resource set",
+            )
+        })?;
+        for draw in std::mem::take(&mut self.translucent_draws) {
+            // Without opaque DH work this frame, the first translucent draw
+            // starts from a cleared DH depth rather than last frame's.
+            let depth_before = if self.depth_cleared {
+                TextureUsageState::ShaderRead
+            } else {
+                TextureUsageState::Undefined
+            };
+            self.depth_cleared = true;
+            lod::WorldLodSourcePassResources::append_draw(
+                &self.target,
+                draw,
+                translucent_pack_resources,
+                fog_color,
+                false,
+                TextureUsageState::ShaderRead,
+                depth_before,
+                Some(TextureUsageState::ShaderRead),
+                operations,
+            )?;
+        }
+        color_transaction.record_external_outputs(&[
+            TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+        ])?;
+        Ok(())
+    }
+
+    fn into_submission(self) -> NamedSourceDistantHorizonsSubmission {
+        NamedSourceDistantHorizonsSubmission {
+            targets: self.submission,
+        }
     }
 }
 
@@ -5584,6 +5657,7 @@ impl NamedSourceFrameSubmission {
             .discard(final_output, gal);
         if distant_horizons.is_some() {
             frontend.lod_source_targets.discard_submission(gal);
+            frontend.discard_distant_horizons_generic_source_buffers(gal);
             frontend.pending_distant_horizons_source_targets = None;
             frontend.lod_gpu_residency.discard_submission(gal);
             frontend.lod_textured_gpu_residency.discard_submission(gal);
@@ -5637,16 +5711,22 @@ impl PreparedNamedSourceFramePlan {
                 "complete source frame reached recording without a staged final-output plan",
             )
         })?;
-        // DH still has a combined near/far recording path. Keep its existing
-        // phase until the DH opaque and translucent writers can be separated;
-        // the ordinary selected-pack frame follows Iris's deferred boundary.
-        let deferred_before_translucents = distant_horizons.is_none();
+        // Every frame follows Iris's order: DH opaque right before vanilla
+        // opaque terrain, deferred at `beginTranslucents`, DH translucents
+        // right before vanilla translucent terrain, then the composite chain.
+        let deferred_before_translucents = true;
+        let distant_horizons_target = distant_horizons.as_ref().map(|plan| plan.target.target);
+        let distant_horizons = std::cell::RefCell::new(distant_horizons);
         let (terrain, mut color_transaction, mut pre_terrain_sky) =
             match terrain.into_submission_parts(
                 runtime,
                 pre_terrain_sky_capture,
                 operations,
                 deferred_before_translucents,
+                |transaction, operations| match distant_horizons.borrow_mut().as_mut() {
+                    Some(plan) => plan.append_opaque(transaction, fog_color, operations),
+                    None => Ok(()),
+                },
                 |transaction, operations| {
                     if deferred_before_translucents {
                         for consumer in fullscreen_consumers.iter().filter(|consumer| {
@@ -5663,6 +5743,10 @@ impl PreparedNamedSourceFramePlan {
                     }
                     Ok(())
                 },
+                |transaction, operations| match distant_horizons.borrow_mut().as_mut() {
+                    Some(plan) => plan.append_translucent(transaction, fog_color, operations),
+                    None => Ok(()),
+                },
             ) {
                 Ok(parts) => parts,
                 Err(error) => {
@@ -5671,6 +5755,7 @@ impl PreparedNamedSourceFramePlan {
                     return Err(error);
                 }
             };
+        let distant_horizons = distant_horizons.into_inner();
         if let Some(capture) = terrain_primary_capture {
             if let Err(error) = capture.append_ops(
                 // The source terrain transaction closes its named outputs in
@@ -5705,24 +5790,7 @@ impl PreparedNamedSourceFramePlan {
                 return Err(error);
             }
         }
-        let distant_horizons_target = distant_horizons.as_ref().map(|plan| plan.target.target);
-        let distant_horizons = match distant_horizons {
-            Some(plan) => {
-                match plan.append_after_terrain(&mut color_transaction, fog_color, operations) {
-                    Ok(submission) => Some(submission),
-                    Err(error) => {
-                        destroy_named_source_fullscreen_consumers(
-                            gal,
-                            std::mem::take(&mut pre_terrain_sky),
-                        );
-                        destroy_named_source_fullscreen_consumers(gal, fullscreen_consumers);
-                        final_output_cache.discard(final_output, gal);
-                        return Err(error);
-                    }
-                }
-            }
-            None => None,
-        };
+        let distant_horizons = distant_horizons.map(PreparedNamedSourceDistantHorizonsFramePlan::into_submission);
         if let Some(capture) = distant_horizons_primary_capture {
             if let Err(error) = capture.append_ops(
                 TextureUsageState::ShaderRead,
@@ -5868,6 +5936,7 @@ impl PreparedNamedSourceFramePlan {
         }
         if distant_horizons.is_some() {
             frontend.lod_source_targets.discard_submission(gal);
+            frontend.discard_distant_horizons_generic_source_buffers(gal);
             frontend.pending_distant_horizons_source_targets = None;
             frontend.lod_gpu_residency.discard_submission(gal);
             frontend.lod_textured_gpu_residency.discard_submission(gal);
@@ -6632,6 +6701,9 @@ pub struct WorldPrimitiveFrontend {
     /// a route by itself: pack-resource sets, named targets, consumers, and
     /// the combined submission transaction remain separately explicit.
     lod_source_pass_resources: lod::WorldLodSourcePassResources,
+    /// Current DH generic-box geometry for the selected-source DH pass.
+    dh_generic_source_buffers: Option<DistantHorizonsGenericSourceBuffers>,
+    dh_generic_source_generation: u64,
     /// Private two-phase ownership for the distinct DH depth stream used by
     /// a future source-derived shader-pack pass. This is deliberately kept
     /// apart from the ordinary terrain G-buffer depth attachments: DH source
@@ -6676,6 +6748,8 @@ pub struct WorldPrimitiveFrontend {
     /// Exact identity of the last frame whose terrain meshes all validated;
     /// an identical next frame skips re-validating each terrain mesh.
     source_terrain_validation_memo: Option<SourceTerrainValidationMemo>,
+    /// (source generation, scope) -> whether DH joins the pack's shadow pass.
+    distant_horizons_shadow_pass_memo: std::cell::Cell<Option<((u64, TerrainProgramScope), bool)>>,
     /// `source_uniform_frame_for_owned_resources` result for one frame id:
     /// every input is fixed within a frame, and entity groups, terrain passes
     /// and fullscreen stages each asked for it again (~1k times per frame).
@@ -8383,19 +8457,9 @@ impl WorldPrimitiveFrontend {
         }
         let mut uniforms = self.source_uniform_frame_for_owned_resources(frame)?;
         apply_distant_horizons_source_matrices(&mut uniforms, &frame.lod_render_frame)?;
-        // The DH source shader uses `far` for its own LOD alpha fade. The
-        // copied vanilla frame far plane describes near-terrain projection
-        // and can be much larger (for example 2048 vs DH's 96 blocks), which
-        // makes every DH fragment fail its source alpha admission before it
-        // can write color or depth. Keep this semantic override local to the
-        // DH source program; normal terrain and fullscreen stages retain the
-        // vanilla far plane.
-        if frame.shader_environment.distant_horizons_render_distance <= 0 {
-            return Err(GalError::invalid_argument(
-                "Distant Horizons source uniforms require a positive render distance",
-            ));
-        }
-        uniforms.far_plane = Some(frame.shader_environment.distant_horizons_render_distance as f32);
+        // Iris gives DH programs the same `far` as every other program (the
+        // vanilla render distance in blocks); packs fade DH in against it
+        // (Complementary: smoothstep(far * 0.5, far * 0.7) dithered discard).
         Ok(uniforms)
     }
 
@@ -10328,6 +10392,14 @@ impl WorldPrimitiveFrontend {
                     "source test requested colored-light preparation without a source volume requirement",
                 )
             })?;
+        if !self
+            .shader_runtime
+            .as_ref()
+            .expect("shader runtime checked before source preparation")
+            .candidate_colored_light_runtime_compatible(&preparation.descriptor)
+        {
+            self.release_voxel_volume_dependent_source_pack_resources(gal);
+        }
         self.shader_runtime
             .as_mut()
             .expect("shader runtime checked before source preparation")
@@ -10448,6 +10520,7 @@ impl WorldPrimitiveFrontend {
         let replaced = if runtime_compatible {
             false
         } else {
+            self.release_voxel_volume_dependent_source_pack_resources(gal);
             let preparation = self
                 .shader_runtime
                 .as_ref()
@@ -10479,7 +10552,16 @@ impl WorldPrimitiveFrontend {
             false,
             source_frame_includes_distant_horizons(frame),
         )?;
-        let puddle_replaced = match self.candidate_puddle_descriptor_for_frame(frame)? {
+        let puddle_descriptor = self.candidate_puddle_descriptor_for_frame(frame)?;
+        if self
+            .shader_runtime
+            .as_ref()
+            .expect("shader runtime is installed before puddle preparation")
+            .candidate_puddle_runtime_retires(puddle_descriptor)
+        {
+            self.release_voxel_volume_dependent_source_pack_resources(gal);
+        }
+        let puddle_replaced = match puddle_descriptor {
             Some(descriptor) => self
                 .shader_runtime
                 .as_mut()
@@ -11911,6 +11993,11 @@ impl WorldPrimitiveFrontend {
     }
 
     fn clear_candidate_colored_light_runtime(&mut self, gal: &mut VulkanicGal) -> GalResult<()> {
+        if self.shader_runtime.as_ref().is_some_and(|runtime| {
+            runtime.has_private_terrain_occupancy()
+        }) {
+            self.release_voxel_volume_dependent_source_pack_resources(gal);
+        }
         if let Some(runtime) = self.shader_runtime.as_mut() {
             // Test-only/private callers may install a colored-light runtime
             // directly without making it a discovered source candidate. Do
@@ -21094,6 +21181,14 @@ impl WorldPrimitiveFrontend {
                     &mut upload_operations,
                 )?);
             }
+            let generic_draws = self.stage_distant_horizons_generic_source_draws(
+                gal,
+                frame,
+                &program,
+                target.primary_color_format,
+                &source_uniforms,
+                &mut upload_operations,
+            )?;
             self.write_selected_source_distant_horizons_material_receipt(
                 frame,
                 &program,
@@ -21174,7 +21269,9 @@ impl WorldPrimitiveFrontend {
                 exact_atlas_draws,
                 translucent_draws,
                 translucent_pack_resources,
+                generic_draws,
                 upload_operations,
+                depth_cleared: false,
             })
         })();
         if result.is_err() {
@@ -21182,6 +21279,7 @@ impl WorldPrimitiveFrontend {
             // the shared color generation and decides whether normal terrain
             // can continue or the complete source frame must be discarded.
             self.lod_source_targets.discard_submission(gal);
+            self.discard_distant_horizons_generic_source_buffers(gal);
             self.pending_distant_horizons_source_targets = None;
             self.lod_gpu_residency.discard_submission(gal);
         }
@@ -22421,7 +22519,10 @@ impl WorldPrimitiveFrontend {
             runtime.stage_distant_horizons_complete_post_terrain_execution_plans(
                 gal,
                 color_targets,
-                &external_inputs,
+                |stage_path| match deferred_external_inputs.as_deref() {
+                    Some(inputs) if is_deferred_source_stage(stage_path) => inputs,
+                    _ => external_inputs.as_slice(),
+                },
                 color_targets.identity.extent,
             )?
         } else {
@@ -22835,8 +22936,7 @@ impl WorldPrimitiveFrontend {
         // the deferred chain and merged into main depth (Iris order), so every
         // fullscreen consumer samples ordinary main depth. The separate
         // post-hand view remains only for the legacy late-hand ordering.
-        let hands_merged_into_main_depth = distant_horizons.is_none()
-            && terrain
+        let hands_merged_into_main_depth = terrain
                 .hands
                 .as_ref()
                 .is_some_and(|hands| hands.copies_world_depth);
@@ -22869,7 +22969,6 @@ impl WorldPrimitiveFrontend {
         // run before that hand writer, so they must not sample its post-hand
         // view (undefined on its first frame and stale afterwards).
         let deferred_main_depth_resources = (terrain.hands.is_some()
-            && distant_horizons.is_none()
             && !hands_merged_into_main_depth)
         .then(|| main_depth_resources.clone());
         let mut frame_resources = vec![main_depth_resources];
@@ -23153,6 +23252,56 @@ impl WorldPrimitiveFrontend {
         Ok(result)
     }
 
+    /// Whether Iris would render DH geometry into this scope's shadow pass:
+    /// the pack has a `dh_shadow` program and does not set
+    /// `dhShadow.enabled=false` (IrisRenderingPipeline: `orElse(true)`).
+    fn source_distant_horizons_shadow_pass_enabled(
+        &self,
+        scope: TerrainProgramScope,
+    ) -> GalResult<bool> {
+        let Some(source) = self.shader_pack_sources.active() else {
+            return Ok(false);
+        };
+        let memo_key = (source.generation(), scope);
+        if let Some((key, enabled)) = self.distant_horizons_shadow_pass_memo.get() {
+            if key == memo_key {
+                return Ok(enabled);
+            }
+        }
+        let enabled = Self::resolve_distant_horizons_shadow_pass(source, scope)?;
+        self.distant_horizons_shadow_pass_memo.set(Some((memo_key, enabled)));
+        Ok(enabled)
+    }
+
+    fn resolve_distant_horizons_shadow_pass(
+        source: &super::shader_pack::source::ShaderPackSource,
+        scope: TerrainProgramScope,
+    ) -> GalResult<bool> {
+        let candidates: &[&str] = match scope {
+            TerrainProgramScope::Default => &["dh_shadow.vsh"],
+            TerrainProgramScope::Overworld => &["world0/dh_shadow.vsh", "dh_shadow.vsh"],
+            TerrainProgramScope::Nether => &["world-1/dh_shadow.vsh", "dh_shadow.vsh"],
+            TerrainProgramScope::End => &["world1/dh_shadow.vsh", "dh_shadow.vsh"],
+        };
+        if !candidates.iter().any(|path| source.get(path).is_some()) {
+            return Ok(false);
+        }
+        let Some((properties, _)) =
+            super::shader_pack::fullscreen_contract::resolved_source_properties(source, scope)?
+        else {
+            return Ok(true);
+        };
+        let mut enabled = true;
+        for line in properties.lines() {
+            if let Some((key, value)) = line.trim().split_once('=') {
+                if key.trim() == "dhShadow.enabled" {
+                    enabled = value.trim() != "false";
+                }
+            }
+        }
+        Ok(enabled)
+    }
+
     /// Converts only generation-bound, per-quad DH material provenance into
     /// the compact semantic geometry consumed by the shared occupancy path.
     /// DH's coarse category is intentionally never used as a substitute for a
@@ -23163,6 +23312,16 @@ impl WorldPrimitiveFrontend {
         frame: &WorldPrimitiveFrame,
     ) -> GalResult<Vec<TerrainVoxelSourceMesh>> {
         if !frame.lod_render_frame.rust_route_selected() || frame.lod_instances.is_empty() {
+            return Ok(Vec::new());
+        }
+        // Packs voxelize from their shadow pass. Iris draws DH geometry there
+        // only through the pack's own `dh_shadow` program with
+        // `dhShadow.enabled` (default true); otherwise DH never reaches the
+        // voxel images (Complementary disables it under DISTANT_HORIZONS).
+        let Some(scope) = terrain_program_scope_for_sky_type(frame.background.sky_type)? else {
+            return Ok(Vec::new());
+        };
+        if !self.source_distant_horizons_shadow_pass_enabled(scope)? {
             return Ok(Vec::new());
         }
         let Some(runtime) = self.shader_runtime.as_ref() else {
@@ -24278,6 +24437,27 @@ impl WorldPrimitiveFrontend {
         &mut self,
         frame: &WorldPrimitiveFrame,
     ) -> GalResult<()> {
+        if frame_has_distant_horizons_generic_objects(frame) {
+            // Iris draws DH generic objects (LOD clouds, beacon beams) with the
+            // pack's dh_generic/dh_terrain program; Rust draws them in the
+            // selected-source DH pass. That pass exists only with DH LODs, and
+            // only the compact box stream is expressible there.
+            if frame
+                .material_quads
+                .iter()
+                .any(|quad| is_distant_horizons_generic_stratum(quad.stratum))
+            {
+                return Err(GalError::unsupported_feature(
+                    "selected source frame contains DH generic material quads without a source writer",
+                ));
+            }
+            if !source_frame_includes_distant_horizons(frame) {
+                return Err(GalError::unsupported_feature(
+                    "selected source frame has DH generic objects but no DH LOD pass yet",
+                ));
+            }
+            distant_horizons_generic_source_geometry(&frame.dh_generic_boxes)?;
+        }
         let unsupported_families = frame.feature_coverage.unsupported_families();
         if !unsupported_families.is_empty() {
             let families = unsupported_families
@@ -34506,21 +34686,27 @@ impl WorldPrimitiveFrontend {
             }
         };
         let material_batches: &[MaterialBatch] = material_batch_plan.as_slice();
-        let distant_horizons_generic_batches = distant_horizons_generic_material_batches(
-            &frame,
-            material_color_format,
-            raster_y_direction,
-        );
-        let distant_horizons_box_batches =
-            distant_horizons_generic_box_batches(&frame, material_color_format, raster_y_direction);
-        if use_g_buffer_mesh_path
-            && (!distant_horizons_generic_batches.is_empty()
-                || !distant_horizons_box_batches.is_empty())
-        {
-            return Err(GalError::unsupported_feature(
-                "DH generic objects require their private direct target; selected-source lowering is not admitted yet",
-            ));
-        }
+        // On the G-buffer path DH generic objects belong to the selected-source
+        // DH pass (`dh_terrain`, as Iris draws them); the private direct
+        // target is not part of that frame. A not-yet-armed warmup frame has
+        // no source DH pass and omits them for that single arming frame.
+        let (distant_horizons_generic_batches, distant_horizons_box_batches) =
+            if use_g_buffer_mesh_path {
+                (Vec::new(), Vec::new())
+            } else {
+                (
+                    distant_horizons_generic_material_batches(
+                        &frame,
+                        material_color_format,
+                        raster_y_direction,
+                    ),
+                    distant_horizons_generic_box_batches(
+                        &frame,
+                        material_color_format,
+                        raster_y_direction,
+                    ),
+                )
+            };
         let mesh_group_started = std::time::Instant::now();
         let mut mesh_identity_scratch = std::mem::take(&mut self.mesh_batch_identity_scratch);
         mesh_identity_scratch.clear();
@@ -41913,6 +42099,7 @@ impl WorldPrimitiveFrontend {
         self.lod_vanilla_snapshot_initialized = false;
         self.pending_lod_vanilla_snapshot_written = false;
         self.lod_source_pass_resources.destroy(gal);
+        self.discard_distant_horizons_generic_source_buffers(gal);
         self.lod_source_targets.destroy(gal);
         self.pending_distant_horizons_source_targets = None;
         self.pending_candidate_source_distant_depth = None;
@@ -42253,30 +42440,209 @@ impl WorldPrimitiveFrontend {
     /// replaces or drops a lightmap generation. Packs that never sample the
     /// lightmap keep their sets, instead of rebuilding every pack set each
     /// time the lightmap changes (nearly every frame).
-    fn release_lightmap_dependent_source_pack_resources(&mut self, gal: &mut VulkanicGal) {
-        let binds_lightmap = |generations: &[(TerrainSourceResourceRole, u64)]| {
-            generations
+    /// Stages DH generic boxes (LOD clouds, beacon beams) as `dh_terrain`
+    /// source draws, as Iris does when a pack has no `dh_generic` program.
+    /// They are appended right after the opaque DH LODs (DH's
+    /// GenericObjectRenderer order) with DH's generic alpha blend.
+    fn stage_distant_horizons_generic_source_draws(
+        &mut self,
+        gal: &mut VulkanicGal,
+        frame: &WorldPrimitiveFrame,
+        program: &LoweredDistantHorizonsSourceProgram,
+        color_format: TextureFormat,
+        source_uniforms: &TerrainSourceUniformFrame,
+        operations: &mut Vec<CommandOp>,
+    ) -> GalResult<Vec<lod::WorldLodPreparedSourceDraw>> {
+        if frame.dh_generic_boxes.is_empty() {
+            return Ok(Vec::new());
+        }
+        let geometry = distant_horizons_generic_source_geometry(&frame.dh_generic_boxes)?;
+        if geometry.indices.is_empty() {
+            return Ok(Vec::new());
+        }
+        let current = self.dh_generic_source_buffers.as_ref().is_some_and(|buffers| {
+            buffers.vertices == geometry.vertices && buffers.indices == geometry.indices
+        });
+        if !current {
+            self.discard_distant_horizons_generic_source_buffers(gal);
+            self.dh_generic_source_generation += 1;
+            let generation = self.dh_generic_source_generation;
+            let vertex_bytes = geometry
+                .vertices
                 .iter()
-                .any(|(role, _)| *role == TerrainSourceResourceRole::Lightmap)
+                .flatten()
+                .flat_map(|word| word.to_le_bytes())
+                .collect::<Vec<u8>>();
+            let index_bytes = geometry
+                .indices
+                .iter()
+                .flat_map(|index| index.to_le_bytes())
+                .collect::<Vec<u8>>();
+            let vertex_buffer = gal.create_buffer(BufferDesc {
+                label: format!("dh-generic-source-gen{generation}.vertices"),
+                size: vertex_bytes.len() as u64,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::Storage, BufferUsage::HostWrite],
+            })?;
+            let index_buffer = match gal.create_buffer(BufferDesc {
+                label: format!("dh-generic-source-gen{generation}.indices"),
+                size: index_bytes.len() as u64,
+                memory: MemoryDomain::Upload,
+                usages: vec![BufferUsage::Index, BufferUsage::HostWrite],
+            }) {
+                Ok(handle) => handle,
+                Err(error) => {
+                    let _ = gal.destroy(vertex_buffer);
+                    return Err(error);
+                }
+            };
+            operations.extend([
+                CommandOp::HostWriteBuffer {
+                    buffer: vertex_buffer,
+                    offset: 0,
+                    data: vertex_bytes,
+                },
+                CommandOp::Barrier(buffer_barrier(
+                    vertex_buffer,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::ShaderRead,
+                )),
+                CommandOp::HostWriteBuffer {
+                    buffer: index_buffer,
+                    offset: 0,
+                    data: index_bytes,
+                },
+                CommandOp::Barrier(buffer_barrier(
+                    index_buffer,
+                    TextureUsageState::TransferDst,
+                    TextureUsageState::IndexRead,
+                )),
+            ]);
+            self.dh_generic_source_buffers = Some(DistantHorizonsGenericSourceBuffers {
+                generation,
+                vertices: geometry.vertices.clone(),
+                indices: geometry.indices.clone(),
+                vertex_buffer,
+                index_buffer,
+            });
+        }
+        let buffers = self
+            .dh_generic_source_buffers
+            .as_ref()
+            .expect("generic DH source buffers exist after staging");
+        let (vertex_buffer, index_buffer, generation) =
+            (buffers.vertex_buffer, buffers.index_buffer, buffers.generation);
+        let mut draws = Vec::with_capacity(geometry.ranges.len());
+        for (segment, range) in geometry.ranges.iter().enumerate() {
+            let draw = lod::WorldLodGpuDraw {
+                column_key: u64::MAX,
+                column_generation: generation,
+                origin: [0; 3],
+                layer: 0,
+                segment_index: segment as u32,
+                order: 0,
+                vertex_buffer,
+                vertex_base: range.vertex_base,
+                index_buffer,
+                index_offset: u64::from(range.first_index) * 4,
+                index_type: IndexType::U32,
+                index_count: range.index_count,
+            };
+            let mut uniforms = lod::WorldLodDrawUniform::from_semantics_with_camera(
+                &frame.lod_render_frame,
+                draw,
+                [0.0; 3],
+            )?
+            .with_fog(
+                frame.shader_environment.fog_parameter_color,
+                [
+                    frame.shader_environment.fog_environmental_start,
+                    frame.shader_environment.fog_environmental_end,
+                    frame.shader_environment.fog_render_distance_start,
+                    frame.shader_environment.fog_render_distance_end,
+                ],
+            );
+            // Box corners are camera-relative; the range's shared sub-block
+            // fraction is the model offset of its i16 local positions.
+            uniforms.model_offset_and_reserved = [
+                range.model_offset[0],
+                range.model_offset[1],
+                range.model_offset[2],
+                range.vertex_base as f32,
+            ];
+            draws.push(self.lod_source_pass_resources.stage_generic_draw(
+                gal,
+                program,
+                color_format,
+                draw,
+                uniforms,
+                source_uniforms,
+                operations,
+            )?);
+        }
+        Ok(draws)
+    }
+
+    /// Drops the generic-box geometry (and the draw sets binding it). Used
+    /// when its content changes and when a frame that would have uploaded it
+    /// is discarded, so never-uploaded buffers are not reused.
+    fn discard_distant_horizons_generic_source_buffers(&mut self, gal: &mut VulkanicGal) {
+        self.lod_source_pass_resources.retire_generic_draws(gal);
+        if let Some(previous) = self.dh_generic_source_buffers.take() {
+            let _ = gal.destroy(previous.vertex_buffer);
+            let _ = gal.destroy(previous.index_buffer);
+        }
+    }
+
+    fn release_lightmap_dependent_source_pack_resources(&mut self, gal: &mut VulkanicGal) {
+        self.release_role_dependent_source_pack_resources(gal, |role| {
+            *role == TerrainSourceResourceRole::Lightmap
+        });
+    }
+
+    /// Destroys source set-one consumers that bind a colored-light or puddle
+    /// volume role before the runtime replaces or drops that volume. Cached
+    /// pack sets are otherwise retired lazily when a replacement set is
+    /// requested, which is after the volume samplers they reference would be
+    /// destroyed (a toggle that re-sizes the volume, such as enabling DH).
+    fn release_voxel_volume_dependent_source_pack_resources(&mut self, gal: &mut VulkanicGal) {
+        self.release_role_dependent_source_pack_resources(gal, |role| {
+            matches!(
+                role,
+                TerrainSourceResourceRole::ColoredVoxelOccupancy
+                    | TerrainSourceResourceRole::ColoredVoxelLightCurrent
+                    | TerrainSourceResourceRole::ColoredVoxelLightPrevious
+                    | TerrainSourceResourceRole::PuddleOccupancy
+            )
+        });
+    }
+
+    fn release_role_dependent_source_pack_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        binds_role: impl Fn(&TerrainSourceResourceRole) -> bool,
+    ) {
+        let binds = |generations: &[(TerrainSourceResourceRole, u64)]| {
+            generations.iter().any(|(role, _)| binds_role(role))
         };
         let terrain = self
             .lowered_source_terrain_pack_resources
             .keys()
-            .filter(|key| binds_lightmap(&key.resource_generations))
+            .filter(|key| binds(&key.resource_generations))
             .cloned()
             .collect();
         self.destroy_lowered_source_terrain_pack_resources_for_keys(gal, terrain);
         let textured = self
             .lowered_textured_material_source_pack_resources
             .keys()
-            .filter(|key| binds_lightmap(&key.resource_generations))
+            .filter(|key| binds(&key.resource_generations))
             .cloned()
             .collect();
         self.destroy_lowered_textured_material_source_pack_resources_for_keys(gal, textured);
         let entity: Vec<_> = self
             .lowered_entity_source_pack_resources
             .keys()
-            .filter(|key| binds_lightmap(&key.resource_generations))
+            .filter(|key| binds(&key.resource_generations))
             .cloned()
             .collect();
         for key in entity {
@@ -50646,6 +51012,142 @@ fn shader_shadow_params(enabled: bool) -> [f32; 4] {
 /// also required by vanilla for copied lightmap/fog inputs, so its `enabled`
 /// bit cannot select shader-pack composition. Until the selected source graph
 /// is fully armed, keep terrain on the direct Rust vanilla pass.
+/// One DH generic-object range for the selected `dh_terrain` program. Boxes
+/// sharing a sub-block camera fraction share one model offset, so their
+/// corners stay exact in the DH source stream's i16 local positions.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct DistantHorizonsGenericSourceRange {
+    model_offset: [f32; 3],
+    vertex_base: u32,
+    /// First index of this range, in indices (u32).
+    first_index: u32,
+    index_count: u32,
+}
+
+/// DH generic boxes expanded into the DH source vertex stream (one `uvec4`
+/// per vertex: i16 xyz, RGBA8 color, sky/block light, DH material, normal).
+/// Mirrors Iris's `DHGenericTransformer`: unshaded box color, per-face
+/// normals, the group's block/sky light, and the box's DH material.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct DistantHorizonsGenericSourceGeometry {
+    vertices: Vec<[u32; 4]>,
+    indices: Vec<u32>,
+    ranges: Vec<DistantHorizonsGenericSourceRange>,
+}
+
+fn distant_horizons_generic_source_geometry(
+    boxes: &[WorldDistantHorizonsGenericBoxRequest],
+) -> GalResult<DistantHorizonsGenericSourceGeometry> {
+    const FRACTION_SCALE: f32 = 65536.0;
+    let mut geometry = DistantHorizonsGenericSourceGeometry::default();
+    // DH draws SSAO groups before non-SSAO groups; keep that order.
+    for ssao in [true, false] {
+        let mut bucket_order = Vec::<[i32; 3]>::new();
+        let mut buckets = HashMap::<[i32; 3], ([f32; 3], Vec<usize>)>::new();
+        for (index, item) in boxes.iter().enumerate() {
+            if item.ssao_enabled != ssao {
+                continue;
+            }
+            let fraction = item.min.map(|value| value - value.floor());
+            for axis in 0..3 {
+                let local_max = item.max[axis] - fraction[axis];
+                if (local_max - local_max.round()).abs() > 1.0e-3
+                    || item.min[axis].round().abs() > 32767.0
+                    || local_max.round().abs() > 32767.0
+                {
+                    return Err(GalError::unsupported_feature(
+                        "DH generic box is not representable in the DH source vertex stream",
+                    ));
+                }
+            }
+            let key = fraction.map(|value| (value * FRACTION_SCALE).round() as i32);
+            buckets
+                .entry(key)
+                .or_insert_with(|| {
+                    bucket_order.push(key);
+                    (fraction, Vec::new())
+                })
+                .1
+                .push(index);
+        }
+        for key in bucket_order {
+            let (fraction, members) = &buckets[&key];
+            let vertex_base = geometry.vertices.len() as u32;
+            let first_index = geometry.indices.len() as u32;
+            for &index in members {
+                let item = &boxes[index];
+                let a = [0, 1, 2].map(|axis| (item.min[axis] - fraction[axis]).round() as i32);
+                let b = [0, 1, 2].map(|axis| (item.max[axis] - fraction[axis]).round() as i32);
+                let argb = item.color_argb;
+                let color = ((argb >> 16) & 0xff)
+                    | (((argb >> 8) & 0xff) << 8)
+                    | ((argb & 0xff) << 16)
+                    | (((argb >> 24) & 0xff) << 24);
+                let block = (item.packed_light >> 4) & 0xf;
+                let sky = (item.packed_light >> 20) & 0xf;
+                let material = item.material & 0xff;
+                // Counter-clockwise from outside (the DH source front face).
+                let faces: [(u32, [[i32; 3]; 4]); 6] = [
+                    (0, [[a[0], a[1], a[2]], [b[0], a[1], a[2]], [b[0], a[1], b[2]], [a[0], a[1], b[2]]]),
+                    (1, [[a[0], b[1], a[2]], [a[0], b[1], b[2]], [b[0], b[1], b[2]], [b[0], b[1], a[2]]]),
+                    (2, [[b[0], a[1], a[2]], [a[0], a[1], a[2]], [a[0], b[1], a[2]], [b[0], b[1], a[2]]]),
+                    (3, [[a[0], a[1], b[2]], [b[0], a[1], b[2]], [b[0], b[1], b[2]], [a[0], b[1], b[2]]]),
+                    (4, [[a[0], a[1], a[2]], [a[0], a[1], b[2]], [a[0], b[1], b[2]], [a[0], b[1], a[2]]]),
+                    (5, [[b[0], a[1], b[2]], [b[0], a[1], a[2]], [b[0], b[1], a[2]], [b[0], b[1], b[2]]]),
+                ];
+                for (normal, corners) in faces {
+                    let local = geometry.vertices.len() as u32 - vertex_base;
+                    for corner in corners {
+                        let [x, y, z] = corner.map(|value| u32::from(value as i16 as u16));
+                        geometry.vertices.push([
+                            x | (y << 16),
+                            z,
+                            color,
+                            sky | (block << 8) | (material << 16) | (normal << 24),
+                        ]);
+                    }
+                    geometry.indices.extend_from_slice(&[
+                        local,
+                        local + 1,
+                        local + 2,
+                        local + 2,
+                        local + 3,
+                        local,
+                    ]);
+                }
+            }
+            geometry.ranges.push(DistantHorizonsGenericSourceRange {
+                model_offset: *fraction,
+                vertex_base,
+                first_index,
+                index_count: geometry.indices.len() as u32 - first_index,
+            });
+        }
+    }
+    Ok(geometry)
+}
+
+/// Transient GPU copy of the current generic-box geometry. Replaced (never
+/// rewritten in place) whenever its content changes, so an in-flight frame
+/// keeps reading its own buffers until GAL retires them.
+struct DistantHorizonsGenericSourceBuffers {
+    generation: u64,
+    vertices: Vec<[u32; 4]>,
+    indices: Vec<u32>,
+    vertex_buffer: Handle,
+    index_buffer: Handle,
+}
+
+/// DH generic objects (clouds, beacon beams) arrive both as generic-stratum
+/// material quads and as instanced boxes.
+fn frame_has_distant_horizons_generic_objects(frame: &WorldPrimitiveFrame) -> bool {
+    !frame.dh_generic_boxes.is_empty()
+        || frame
+            .material_quads
+            .iter()
+            .any(|quad| is_distant_horizons_generic_stratum(quad.stratum))
+}
+
 fn uses_shader_g_buffer_mesh_path(
     frame: &WorldPrimitiveFrame,
     clear_background: bool,
@@ -59163,7 +59665,7 @@ mod tests {
     }
 
     #[test]
-    fn distant_horizons_fullscreen_projection_preserves_dh_depth_space() {
+    fn distant_horizons_fullscreen_projection_follows_iris_dh_compat_projection() {
         let normal_view = [
             1.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 4.0, 5.0, 6.0, 1.0,
         ];
@@ -59195,6 +59697,7 @@ mod tests {
             distant_model_view: Some(normal_view),
             distant_projection: Some(normal_projection),
             distant_projection_inverse: Some(normal_projection),
+            distant_horizons_render_distance: Some(256),
             ..TerrainSourceUniformFrame::default()
         };
 
@@ -59205,14 +59708,17 @@ mod tests {
         assert_eq!(Some(normal_projection), uniforms.projection_matrix);
         assert_eq!(Some(normal_projection), uniforms.projection_matrix_inverse);
         assert_eq!(Some(normal_view), uniforms.distant_model_view);
-        assert_eq!(
-            Some(lod_frame.projection_matrix),
-            uniforms.distant_projection
-        );
-        assert_eq!(
-            Some(lod_frame.projection_inverse_matrix),
-            uniforms.distant_projection_inverse
-        );
+        // Iris: gbuffer fov/aspect, DH near (3.0 here), far (256+512)*sqrt(2).
+        let projection = uniforms.distant_projection.unwrap();
+        let (near, far) = (3.0_f32, 768.0_f32 * std::f32::consts::SQRT_2);
+        assert_eq!(projection[0], normal_projection[0]);
+        assert_eq!(projection[5], normal_projection[5]);
+        assert!((projection[10] - (far + near) / (near - far)).abs() < 1e-4);
+        assert!((projection[14] - 2.0 * far * near / (near - far)).abs() < 1e-3);
+        assert_eq!(projection[11], -1.0);
+        let inverse = uniforms.distant_projection_inverse.unwrap();
+        let identity = matrix4_column_major_multiply(projection, inverse);
+        assert!(matrix4_max_abs_difference(identity, matrix4_identity()) < 1e-4);
     }
 
     #[test]
@@ -59361,8 +59867,8 @@ mod tests {
         source.shader_environment = WorldShaderEnvironmentFrame {
             enabled: true,
             world_generation: 1,
-            far_plane: 256.0,
-            distant_horizons_render_distance: 256,
+            far_plane: 160.0,
+            distant_horizons_render_distance: 512,
             ..WorldShaderEnvironmentFrame::default()
         };
         source.voxel_volume = WorldVoxelVolumeFrame {
@@ -59438,9 +59944,9 @@ mod tests {
             distant.distant_projection
         );
         assert_eq!(
-            Some(source.shader_environment.distant_horizons_render_distance as f32),
+            Some(source.shader_environment.far_plane),
             distant.far_plane,
-            "DH source alpha fading must use the DH render distance, not near-terrain far"
+            "Iris gives DH programs the vanilla `far`; packs fade DH in against it"
         );
     }
 
@@ -62475,6 +62981,107 @@ mod tests {
         assert_eq!(vec![1, 4], batches[1].indices);
         assert_eq!(WORLD_MATERIAL_MODE_CUTOUT, batches[1].key.material_mode);
         assert_eq!(WORLD_DEPTH_POLICY_DISABLED, batches[2].key.depth_policy);
+    }
+
+    fn generic_box(min: [f32; 3], max: [f32; 3], ssao: bool) -> WorldDistantHorizonsGenericBoxRequest {
+        WorldDistantHorizonsGenericBoxRequest {
+            min,
+            max,
+            color_argb: 0x80C0_A060,
+            // LightTexture.pack(block = 7, sky = 12)
+            packed_light: (7 << 4) | (12 << 20),
+            shading: [1.0; 6],
+            ssao_enabled: ssao,
+            material: 15,
+        }
+    }
+
+    fn generic_vertex_position(vertex: [u32; 4]) -> [i32; 3] {
+        [
+            i32::from(vertex[0] as u16 as i16),
+            i32::from((vertex[0] >> 16) as u16 as i16),
+            i32::from(vertex[1] as u16 as i16),
+        ]
+    }
+
+    #[test]
+    fn distant_horizons_generic_boxes_expand_to_exact_dh_source_vertices() {
+        let geometry = distant_horizons_generic_source_geometry(&[generic_box(
+            [-2.25, 10.25, 3.25],
+            [1.75, 14.25, 4.25],
+            false,
+        )])
+        .unwrap();
+        assert_eq!(1, geometry.ranges.len());
+        assert_eq!(24, geometry.vertices.len());
+        assert_eq!(36, geometry.indices.len());
+        let range = geometry.ranges[0];
+        assert_eq!([0.75, 0.25, 0.25], range.model_offset);
+        for vertex in &geometry.vertices {
+            let position = generic_vertex_position(*vertex);
+            for axis in 0..3 {
+                let world = position[axis] as f32 + range.model_offset[axis];
+                let (min, max) = ([-2.25, 10.25, 3.25][axis], [1.75, 14.25, 4.25][axis]);
+                assert!(world == min || world == max, "corner {world} on axis {axis}");
+            }
+            // RGBA8 from ARGB 0x80C0A060, light (sky 12, block 7), material 15.
+            assert_eq!(0x8060_A0C0, vertex[2]);
+            assert_eq!(12 | (7 << 8) | (15 << 16), vertex[3] & 0x00ff_ffff);
+        }
+        // Every face is counter-clockwise from outside (the DH front face).
+        let normals = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]];
+        for face in 0..6 {
+            let corner = |index: usize| generic_vertex_position(geometry.vertices[face * 4 + index]);
+            let (p0, p1, p2) = (corner(0), corner(1), corner(2));
+            let e1 = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
+            let e2 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
+            let cross = [
+                e1[1] * e2[2] - e1[2] * e2[1],
+                e1[2] * e2[0] - e1[0] * e2[2],
+                e1[0] * e2[1] - e1[1] * e2[0],
+            ];
+            let normal = normals[face];
+            assert!(
+                (0..3).map(|axis| cross[axis] * normal[axis]).sum::<i32>() > 0,
+                "face {face} winding"
+            );
+            assert_eq!(face as u32, geometry.vertices[face * 4][3] >> 24);
+        }
+    }
+
+    #[test]
+    fn distant_horizons_generic_ranges_group_by_fraction_with_ssao_first() {
+        let geometry = distant_horizons_generic_source_geometry(&[
+            generic_box([0.5, 0.0, 0.0], [1.5, 1.0, 1.0], false),
+            generic_box([0.25, 0.0, 0.0], [1.25, 1.0, 1.0], true),
+            generic_box([2.5, 0.0, 0.0], [3.5, 1.0, 1.0], false),
+        ])
+        .unwrap();
+        assert_eq!(2, geometry.ranges.len());
+        assert_eq!([0.25, 0.0, 0.0], geometry.ranges[0].model_offset);
+        assert_eq!(36, geometry.ranges[0].index_count);
+        assert_eq!([0.5, 0.0, 0.0], geometry.ranges[1].model_offset);
+        assert_eq!(72, geometry.ranges[1].index_count);
+        assert_eq!(24, geometry.ranges[1].vertex_base);
+        assert_eq!(36, geometry.ranges[1].first_index);
+        // Indices are range-local; the draw uniform supplies the vertex base.
+        assert!(geometry.indices[36..].iter().all(|index| *index < 48));
+    }
+
+    #[test]
+    fn distant_horizons_generic_boxes_outside_the_source_stream_are_unadmitted() {
+        assert!(distant_horizons_generic_source_geometry(&[generic_box(
+            [0.25, 0.0, 0.0],
+            [1.5, 1.0, 1.0],
+            false
+        )])
+        .is_err());
+        assert!(distant_horizons_generic_source_geometry(&[generic_box(
+            [40000.0, 0.0, 0.0],
+            [40001.0, 1.0, 1.0],
+            false
+        )])
+        .is_err());
     }
 
     #[test]
@@ -68881,6 +69488,8 @@ mod tests {
             bootstrap_operations: Vec::new(),
         };
         let mut deferred_boundary = None;
+        let mut before_opaque = None;
+        let mut before_translucent = None;
         let (source_submission, mut color_transaction, pre_terrain_sky) = named_source_frame
             .into_submission_parts(
                 frontend
@@ -68891,12 +69500,24 @@ mod tests {
                 &mut operations,
                 true,
                 |_, operations| {
+                    before_opaque = Some(operations.len());
+                    Ok(())
+                },
+                |_, operations| {
                     deferred_boundary = Some(operations.len());
+                    Ok(())
+                },
+                |_, operations| {
+                    before_translucent = Some(operations.len());
                     Ok(())
                 },
             )
             .unwrap();
         let deferred_boundary = deferred_boundary.expect("deferred boundary must execute");
+        // Iris + DH: DH opaque right before the vanilla opaque pass, deferred
+        // at beginTranslucents, DH translucents right before vanilla translucents.
+        let before_opaque = before_opaque.expect("DH opaque hook must execute");
+        let before_translucent = before_translucent.expect("DH translucent hook must execute");
         let pass_positions = operations
             .iter()
             .enumerate()
@@ -68908,6 +69529,8 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(pass_positions[1] < deferred_boundary);
         assert!(deferred_boundary < pass_positions[2]);
+        assert!(before_opaque <= pass_positions[1]);
+        assert!(deferred_boundary <= before_translucent && before_translucent <= pass_positions[2]);
         assert!(pre_terrain_sky.is_empty());
         color_transaction.finish(&mut operations).unwrap();
         assert!(operations.iter().any(|operation| {
