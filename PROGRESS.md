@@ -27,42 +27,40 @@ deferred after water: VL-cloud discard removed all water). Pairs: r4 day
 0 VUIDs. Open: DH hill band ~9 levels brighter on Current (not vlFactor: forcing 1
 is far brighter). Goal 3 regressions unchanged after the toggle fix. DH-off frames (0 LODs,
 define removed) admit normally.
-**Suspected Frozen bug (09-29; user: note it, ignore, move on).** Look-down r32 pair
-(150.5,100,530.5,105,80) MAE 15/18/33: Frozen hazes near terrain. Probe pack
-(scratch `diag-vl`) shows Frozen `composite` sees `textureSize(shadowcolor1)=0`
-with DH (reads (0,0,0,1) -> SALS heights 15 -> vlFactor pinned 1 -> DH VL not
-suppressed); `final` sees the real 2048^2 map. Without DH, Frozen composite
-instead sees `shadowtex0` 0x0. Current binds both correctly (vlFactor 0).
-**DH toggle crash fixed (09-29):** pack recollection replaced the voxel volume
-while cached set-ones bound it; set-ones keyed on ColoredVoxel*/Puddle roles are
-released first. **Memory:** r32 pair Frozen 8.7 vs Current 8.8 GB at 98 s.
-**r32 land pairs:** night 0.66/0.83/0.61, rain 1.99/2.00/2.05, 0 VUIDs.
-**DH generic objects (09-29):** harness disables them unless `MATTMC_CAPTURE_DH_
-GENERIC=true`. Boxes (+material in flags bits 8-15) expand to the DH source stream
-(grouped by sub-block fraction), drawn by `dh_terrain` with alpha blend, like Iris.
-Unadmitted: generic material quads / no LODs; the warmup frame omits them.
-Pairs generic on: land 4.88/4.95/3.09, up 2.71/2.86/2.76 (2241 boxes), 0 VUIDs.
-**Shader toggle (09-29):** DH forward/exact-atlas owners rebuild on format change;
-transparent/water packed slots reset+flush in both modes; meshes cached while
-shaders were off no longer panic (unadmitted; Java calls allChanged once Rust accepts
-the source). OPEN: after enabling shaders mid-session one mesh family is never
-resent (route stays unadmitted). Real-config copy: `~/.cache/mattmc-claude/realrun`.
+**Suspected Frozen bug (user: note, ignore).** Look-down r32 (150.5,100,530.5,105,80)
+MAE 15/18/33: Frozen `composite` sees `textureSize(shadowcolor1)=0` with DH (no DH:
+`shadowtex0` 0x0) -> vlFactor pinned 1 -> haze; `final` binds the real maps.
+**DH toggle crash fixed:** voxel volume replacement releases its set-ones first.
+Memory r32 pair Frozen 8.7 vs Current 8.8 GB; night 0.66/0.83/0.61, rain 1.99/2.00/2.05.
+**DH generic objects:** harness disables them unless `MATTMC_CAPTURE_DH_GENERIC=
+true`. Boxes (+material, flags 8-15) expand to the DH source stream, drawn by
+`dh_terrain` with alpha blend like Iris. Unadmitted: generic quads / no LODs.
+Generic-on pairs: land 4.88/4.95/3.09, up 2.71/2.86/2.76 (2241 boxes), 0 VUIDs.
+**Shader toggle:** DH forward owners rebuild on format change; transparent/water
+packed slots reset+flush in both modes; meshes cached with shaders off stay
+unadmitted; Java calls allChanged + resends entity meshes once Rust accepts the
+source (re-arms in 1-2 frames). Real-config copy `~/.cache/mattmc-claude/realrun`
+via scratch `realtest.sh` (kills its client). **Perf (RD10, DH r128, shaders):**
+247->107 ms. Root cause: material wrapper keyed on mesh_asset_generation (now
+view+sampler) retired every pack/DH set per mesh update; lightmap/voxel changes
+release DH set-one only. Plus shared
+DH scalar block + column-frame ring; generic boxes grouped by DH group ordinal
+(flags 16-31), anchored at the first box. Encoder: env switches cached, pipeline
+pass-kind memo (encode 27->14 ms). Voxel list memo applies with DH sans dh_shadow.
+Left: hazard 10, entities 15-18, setup 11-14, occupancy 8-10 while streaming.
+Regressions after perf: day 2.38/2.10/2.50, glass 7.48/6.41/4.55, down 7.11/7.64/
+7.06, off 0.14/0.24/0.23, gun 2.18, pane 2.37, DH generic 4.73/4.83/2.98, 0 VUIDs.
+Day vs 09-27 (same Frozen image, diff 0.18) unchanged 2.53 mean; earlier 2.27 runs
+used a different Frozen fixture state (Frozen-vs-Frozen 14). Timing bisect: none.
 No prompt-doc edits, commits, pushes, or Frozen changes; <=200 lines. Java: semantics.
 
 ## Current gate (2026-09-25)
 
-The canonical pair uses `Origin`, 1280x720, camera
-`150.5,100,530.5,105,10`, render/simulation distance 4, DH disabled, and one
-two-mode `DevUtils/Audit/Capture.py` invocation with Current Rust Vulkan
-shader-on, Frozen OpenGL shader-on, and `--rust-selected-source-execution`.
-The selected ZIP is `run/shaderpacks/ComplementaryHungLoIfied.zip`, SHA-256
-`cb4343913a0d...`. Mask transient chat at x<1000,y=570..609 for RGB MAE.
-Retained pairs: `artifacts/graphics-captures/goal3-source-2026-09-25/`.
-The harness stages a byte-identical pack per client and verifies its SHA-256
-receipt (pairs without it are not evidence). Always stage packs (canonical or
-diagnostic) via `MATTMC_CAPTURE_SHADER_PACK_SOURCE` (outside the repo).
-
-- Shadow terrain unculled on both; shadow/ray depth agree: add no depth offset.
+Canonical pair: `Origin`, 1280x720, camera `150.5,100,530.5,105,10`, RD 4, DH off,
+one two-mode `Capture.py` run (Current Rust Vulkan + Frozen OpenGL shaders-on,
+`--rust-selected-source-execution`), pack `run/shaderpacks/ComplementaryHungLoIfied
+.zip` (SHA-256 `cb4343913a0d...`) staged via `MATTMC_CAPTURE_SHADER_PACK_SOURCE`
+(harness verifies the receipt). Mask chat x<1000,y=570..609. Shadow terrain unculled.
 
 ## Validation and history
 

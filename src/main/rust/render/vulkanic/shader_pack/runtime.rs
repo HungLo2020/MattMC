@@ -1548,15 +1548,22 @@ struct TerrainSourceMaterialTextureResources {
     shader_pack_generation: u64,
     world_generation: u64,
     mesh_asset_generation: u64,
+    texture_view: Handle,
+    sampler: Handle,
     combined_sampler: Handle,
 }
 
 impl TerrainSourceMaterialTextureResources {
+    /// The wrapper pairs one texture view with one sampler; it stays valid
+    /// while both handles do (GAL handles are unique per creation). Keying it
+    /// on the mesh-asset generation replaced it — and retired every pack
+    /// set-one and DH source draw set — on each streamed mesh update.
     fn compatible_with(&self, input: &TerrainSourceMaterialTextureInput) -> bool {
         self.role == input.role
             && self.shader_pack_generation == input.shader_pack_generation
             && self.world_generation == input.world_generation
-            && self.mesh_asset_generation == input.mesh_asset_generation
+            && self.texture_view == input.texture_view
+            && self.sampler == input.sampler
     }
 
     fn semantic_resource_set(&self) -> GalResult<TerrainSourceOwnedResourceSet> {
@@ -5288,6 +5295,8 @@ impl ShaderPackRuntimeExecutor {
             shader_pack_generation: input.shader_pack_generation,
             world_generation: input.world_generation,
             mesh_asset_generation: input.mesh_asset_generation,
+            texture_view: input.texture_view,
+            sampler: input.sampler,
             combined_sampler,
         };
         if let Some(previous) = self

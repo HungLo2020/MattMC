@@ -507,7 +507,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 						(float)(box.maxPos.z + origin.z - camPos.z),
 						box.color.getRGB(), LightTexture.pack(boxGroup.blockLight, boxGroup.skyLight),
 						shading.north, shading.south, shading.east, shading.west, shading.top, shading.bottom,
-						boxGroup.ssaoEnabled, box.material & 0xff
+						boxGroup.ssaoEnabled, box.material & 0xff, (activeGroups - 1) & 0xffff
 					));
 					if (boxGroup.ssaoEnabled)
 					{

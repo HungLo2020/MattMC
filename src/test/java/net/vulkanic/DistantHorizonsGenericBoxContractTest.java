@@ -17,7 +17,7 @@ class DistantHorizonsGenericBoxContractTest {
         var box = new VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord(
             -1.0f, -2.0f, -3.0f, 4.0f, 5.0f, 6.0f,
             0x80A0B0C0, 0x00F000F0,
-            0.8f, 0.9f, 0.6f, 0.7f, 1.0f, 0.5f, true, 15);
+            0.8f, 0.9f, 0.6f, 0.7f, 1.0f, 0.5f, true, 15, 3);
 
         assertEquals(15, box.material());
         assertEquals(-1.0f, box.minX());

@@ -38,8 +38,9 @@ fn decode_dh_generic_box_semantics(
                 record.byte_size,
                 "DH generic box",
             )?;
-            // Bit 0: SSAO request; bits 8-15: DH block material index.
-            if record.flags & !0xff01 != 0
+            // Bit 0: SSAO request; bits 8-15: DH block material index;
+            // bits 16-31: the box's render-group ordinal this frame.
+            if record.flags & 0xfe != 0
                 || record
                     .min
                     .iter()
@@ -64,6 +65,7 @@ fn decode_dh_generic_box_semantics(
                 shading: record.shading,
                 ssao_enabled: record.flags & 1 != 0,
                 material: (record.flags >> 8) & 0xff,
+                group: record.flags >> 16,
             })
         })
         .collect()

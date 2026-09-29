@@ -846,6 +846,18 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * Capacity is checked against the expanded bound before any record is added,
 	 * keeping route rejection atomic without constructing Java face arrays.
 	 */
+	/**
+	 * Resends every retained world-mesh record (entity/model/dynamic meshes)
+	 * at its current generation. Rust keeps source-shader semantics only for
+	 * meshes uploaded while a shader source is active, so enabling shaders
+	 * mid-session must republish the meshes cached while they were off.
+	 */
+	public static void resendRetainedWorldMeshAssets() {
+		synchronized (LOCK) {
+			DIRTY_WORLD_MESH_ASSETS.addAll(WORLD_MESH_ASSETS.keySet());
+		}
+	}
+
 	public static int enqueueDistantHorizonsGenericBoxes(
 		List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> boxes
 	) {

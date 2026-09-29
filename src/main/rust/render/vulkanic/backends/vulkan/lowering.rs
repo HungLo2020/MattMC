@@ -287,7 +287,7 @@ impl SubmissionLowerer {
         objects: &VulkanObjects,
         batch: &ValidatedSubmissionBatch,
     ) -> GalResult<()> {
-        let trace_submissions = std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some();
+        let trace_submissions = trace_submissions_enabled();
         if trace_submissions {
             println!(
                 "vulkan.encode.batch label={} lists={}",
@@ -649,7 +649,7 @@ impl SubmissionLowerer {
             self.in_flight.len() <= MAX_IN_FLIGHT_SUBMISSIONS,
             "Vulkan lowerer exceeded its bounded in-flight submission window"
         );
-        if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
+        if trace_submissions_enabled() {
             println!(
                 "vulkan.submission.ownership id={} pending={} in_flight={} live_command_buffers={} allocated={} freed={}",
                 id.0,
@@ -1167,7 +1167,7 @@ impl SubmissionLowerer {
                     };
                 let texture = objects.texture(texture_handle)?;
                 let range = barrier.subresources.unwrap_or(view_range);
-                if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some()
+                if trace_submissions_enabled()
                     && texture.label.contains("source-final-output")
                 {
                     println!(
@@ -1260,7 +1260,7 @@ impl SubmissionLowerer {
                     colors,
                     depth_stencil,
                 } => {
-                    if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
+                    if trace_submissions_enabled() {
                         println!(
                             "vulkan.begin-pass target=0x{:016x} colors={} depth={}",
                             target.raw(),
@@ -1552,12 +1552,17 @@ impl SubmissionLowerer {
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline.pipeline.pipeline,
                     );
-                    self.switch_pipeline_statistics_pass(
-                        command_buffer,
-                        state,
-                        pipeline_statistics_pipeline_kind(&pipeline.label),
-                    );
-                    if let Some(pipeline_timestamp_pass) = timestamp_pipeline_kind(&pipeline.label)
+                    let (statistics_kind, timestamp_kind) = *state
+                        .pipeline_pass_kinds
+                        .entry(*handle)
+                        .or_insert_with(|| {
+                            (
+                                pipeline_statistics_pipeline_kind(&pipeline.label),
+                                timestamp_pipeline_kind(&pipeline.label),
+                            )
+                        });
+                    self.switch_pipeline_statistics_pass(command_buffer, state, statistics_kind);
+                    if let Some(pipeline_timestamp_pass) = timestamp_kind
                     {
                         self.switch_timestamp_pass(
                             command_buffer,
@@ -1594,7 +1599,7 @@ impl SubmissionLowerer {
                     set,
                     dynamic_offsets,
                 } => {
-                    if std::env::var_os("MATTMC_TRACE_ENTITY_TEXTURE_OPS").is_some() {
+                    if trace_entity_texture_ops_enabled() {
                         eprintln!(
                             "vulkan.bind-resource-set layout={:?} set_index={} set={:?} dynamic_offsets={:?}",
                             pipeline_layout,
@@ -1781,7 +1786,7 @@ impl SubmissionLowerer {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-buffer-to-texture");
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
-                    if std::env::var_os("MATTMC_TRACE_ENTITY_TEXTURE_OPS").is_some() {
+                    if trace_entity_texture_ops_enabled() {
                         eprintln!(
                             "vulkan.copy-buffer-to-texture buffer={:?} texture={:?} label={} offset={} row={} rows={} extent={}x{}x{}",
                             region.buffer,
@@ -2555,6 +2560,12 @@ fn gpu_timestamps_enabled() -> bool {
 }
 
 fn pipeline_statistics_mode() -> PipelineStatisticsMode {
+    // Launch-time diagnostic switch; read once (it is queried per bind).
+    static MODE: std::sync::OnceLock<PipelineStatisticsMode> = std::sync::OnceLock::new();
+    *MODE.get_or_init(pipeline_statistics_mode_from_env)
+}
+
+fn pipeline_statistics_mode_from_env() -> PipelineStatisticsMode {
     let enabled = |name: &str| {
         matches!(
             std::env::var(name).ok().as_deref(),
@@ -3239,6 +3250,12 @@ mod timestamp_tests {
 
 #[derive(Default)]
 struct EncodingState {
+    /// Per-submission memo of each bound pipeline's diagnostic pass
+    /// classification (derived from its label), so a bind does not rescan it.
+    pipeline_pass_kinds: std::collections::HashMap<
+        crate::render::vulkanic::handles::Handle,
+        (Option<PipelineStatisticsPassKind>, Option<TimestampPassKind>),
+    >,
     pass_extent: Option<crate::render::vulkanic::resources::Extent3d>,
     raster_y_direction: Option<crate::render::vulkanic::resources::RasterYDirection>,
     in_pass: bool,
@@ -3643,7 +3660,7 @@ fn wait_timeline(context: &VulkanContext, id: SubmissionId) -> GalResult<()> {
 }
 
 fn stdout_trace(message: &str) {
-    if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
+    if trace_submissions_enabled() {
         println!("{message}");
     }
 }
@@ -3689,3 +3706,16 @@ fn command_op_kind(op: &CommandOp) -> &'static str {
         CommandOp::TrackSubmission(_) => "TrackSubmission",
     }
 }
+
+/// Diagnostic switches read on the per-op encode path. They are process-wide
+/// launch settings, so read the environment once instead of per command.
+fn trace_submissions_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some())
+}
+
+fn trace_entity_texture_ops_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_ENTITY_TEXTURE_OPS").is_some())
+}
+

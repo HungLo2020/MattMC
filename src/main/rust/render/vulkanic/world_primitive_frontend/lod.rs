@@ -4645,8 +4645,20 @@ impl WorldLodSourcePipelineResources {
     }
 }
 
+/// Per-program ring of DH column-frame blocks for one frame: every draw of
+/// the program binds this buffer at its own dynamic offset, and the frame's
+/// blocks are uploaded with one host write.
+struct WorldLodSourceColumnFrameRing {
+    buffer: Handle,
+    stride: u64,
+    capacity: u32,
+    next: u32,
+    bytes: Vec<u8>,
+}
+
 struct WorldLodSourceDrawResources {
-    column_frame_buffer: Handle,
+    /// Ring-backed draws own no per-draw frame buffer.
+    column_frame_buffer: Option<Handle>,
     scalar_uniform_buffer: Option<Handle>,
     source_data_set: Handle,
 }
@@ -4657,7 +4669,9 @@ impl WorldLodSourceDrawResources {
         if let Some(buffer) = self.scalar_uniform_buffer {
             let _ = gal.destroy(buffer);
         }
-        let _ = gal.destroy(self.column_frame_buffer);
+        if let Some(buffer) = self.column_frame_buffer {
+            let _ = gal.destroy(buffer);
+        }
     }
 }
 
@@ -4789,6 +4803,18 @@ pub(crate) struct WorldLodSourcePassResources {
     /// reconciliation leaves them alone; `retire_generic_draws` releases them
     /// before those buffers are replaced.
     generic_draws: BTreeMap<WorldLodSourceDrawKey, WorldLodSourceDrawResources>,
+    /// One scalar-uniform buffer per source program (shared by its generic
+    /// blend variant): the pack's scalar block is identical for every DH draw
+    /// of a program in a frame, as Iris sets it once per program.
+    scalar_buffers: BTreeMap<WorldLodSourceProgramKey, Handle>,
+    /// Programs whose scalar block was already written this frame.
+    scalar_written_this_frame: BTreeSet<WorldLodSourceProgramKey>,
+    column_frame_rings: BTreeMap<WorldLodSourceProgramKey, WorldLodSourceColumnFrameRing>,
+    /// Per-frame memo of the last program's pipeline key (the key reads the
+    /// raster probe and clones the program identity) and of the programs
+    /// whose execution interface was already validated this frame.
+    key_memo: Option<(usize, u64, TextureFormat, WorldLodSourceProgramKey)>,
+    validated_this_frame: BTreeSet<WorldLodSourceProgramKey>,
     pack_resources: BTreeMap<WorldLodSourcePackKey, Handle>,
     targets: BTreeMap<WorldLodSourceTargetKey, WorldLodSourceTargetResources>,
 }
@@ -5272,6 +5298,115 @@ impl WorldLodSourcePassResources {
         )
     }
 
+    /// Releases only the set-one pack bindings (lightmap, voxel volumes,
+    /// named targets, ...). Draw sets, pipelines, and per-frame rings bind
+    /// none of those, so a lightmap or volume change keeps them.
+    pub(crate) fn release_pack_resources(&mut self, gal: &mut VulkanicGal) {
+        for (_, set) in std::mem::take(&mut self.pack_resources) {
+            let _ = gal.destroy(set);
+        }
+    }
+
+    /// Starts one source frame: each program's shared scalar block is written
+    /// once, by its first staged draw.
+    pub(crate) fn begin_source_frame(&mut self) {
+        self.scalar_written_this_frame.clear();
+        self.key_memo = None;
+        self.validated_this_frame.clear();
+        for ring in self.column_frame_rings.values_mut() {
+            ring.next = 0;
+            ring.bytes.clear();
+        }
+    }
+
+    /// Ensures `program` can stage `count` draws this frame before any of
+    /// them is staged (growing the ring retires the sets bound to it).
+    pub(crate) fn reserve_column_frames(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &LoweredDistantHorizonsSourceProgram,
+        color_format: TextureFormat,
+        count: usize,
+    ) -> GalResult<()> {
+        let key =
+            WorldLodSourceProgramKey::from_program(program, color_format, gal.capabilities().api)?;
+        self.ensure_column_frame_capacity(gal, program, &key, count)
+    }
+
+    fn ensure_column_frame_capacity(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &LoweredDistantHorizonsSourceProgram,
+        scalar_key: &WorldLodSourceProgramKey,
+        count: usize,
+    ) -> GalResult<()> {
+        let count = u32::try_from(count.max(1))
+            .map_err(|_| GalError::invalid_argument("DH source draw count exceeds u32"))?;
+        if let Some(ring) = self.column_frame_rings.get(scalar_key) {
+            if ring.capacity >= count {
+                return Ok(());
+            }
+            if ring.next != 0 {
+                return Err(GalError::invalid_argument(
+                    "DH source column-frame ring cannot grow after draws were staged this frame",
+                ));
+            }
+        }
+        // Retire every draw set bound to the ring being replaced.
+        let bound = |key: &WorldLodSourceDrawKey| {
+            WorldLodSourceProgramKey {
+                alpha_blend: false,
+                ..key.program.clone()
+            } == *scalar_key
+        };
+        for map in [&mut self.draws, &mut self.generic_draws] {
+            let stale = map.keys().filter(|key| bound(key)).cloned().collect::<Vec<_>>();
+            for key in stale {
+                if let Some(resources) = map.remove(&key) {
+                    resources.destroy(gal);
+                }
+            }
+        }
+        if let Some(previous) = self.column_frame_rings.remove(scalar_key) {
+            let _ = gal.destroy(previous.buffer);
+        }
+        let alignment = gal.capabilities().limits.uniform_buffer_offset_alignment.max(1);
+        let block = u64::from(program.execution_interface.column_frame_bytes);
+        let stride = block.div_ceil(alignment) * alignment;
+        let capacity = count.next_power_of_two().max(64);
+        let buffer = gal.create_buffer(BufferDesc {
+            label: format!(
+                "world-lod-source-{}-gen{}.column-frames",
+                scalar_key.identity.replace(':', "-"),
+                scalar_key.shader_pack_generation
+            ),
+            size: stride * u64::from(capacity),
+            memory: MemoryDomain::Upload,
+            usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
+        })?;
+        self.column_frame_rings.insert(
+            scalar_key.clone(),
+            WorldLodSourceColumnFrameRing {
+                buffer,
+                stride,
+                capacity,
+                next: 0,
+                bytes: Vec::new(),
+            },
+        );
+        Ok(())
+    }
+
+    /// Uploads every program's column-frame blocks staged this frame.
+    pub(crate) fn flush_source_frame(&mut self, ops: &mut Vec<CommandOp>) {
+        for ring in self.column_frame_rings.values_mut() {
+            if ring.bytes.is_empty() {
+                continue;
+            }
+            append_source_uniform_upload(ops, ring.buffer, std::mem::take(&mut ring.bytes));
+        }
+    }
+
     /// Releases every generic-box draw set before its geometry buffers are
     /// replaced or dropped.
     pub(crate) fn retire_generic_draws(&mut self, gal: &mut VulkanicGal) {
@@ -5292,22 +5427,97 @@ impl WorldLodSourcePassResources {
         ops: &mut Vec<CommandOp>,
         alpha_blend: bool,
     ) -> GalResult<WorldLodPreparedSourceDraw> {
-        program.execution_interface.validate()?;
         if draw.index_count == 0 || draw.index_count % 3 != 0 {
             return Err(GalError::invalid_argument(
                 "source-derived Distant Horizons draw requires triangle-aligned indices",
             ));
         }
-        let mut key =
-            WorldLodSourceProgramKey::from_program(program, color_format, gal.capabilities().api)?;
+        let program_address = program as *const LoweredDistantHorizonsSourceProgram as usize;
+        let base_key = match &self.key_memo {
+            Some((address, generation, format, key))
+                if *address == program_address
+                    && *generation == program.shader_pack_generation
+                    && *format == color_format =>
+            {
+                key.clone()
+            }
+            _ => {
+                let key = WorldLodSourceProgramKey::from_program(
+                    program,
+                    color_format,
+                    gal.capabilities().api,
+                )?;
+                self.key_memo = Some((
+                    program_address,
+                    program.shader_pack_generation,
+                    color_format,
+                    key.clone(),
+                ));
+                key
+            }
+        };
+        if !self.validated_this_frame.contains(&base_key) {
+            program.execution_interface.validate()?;
+            self.validated_this_frame.insert(base_key.clone());
+        }
+        let mut key = base_key;
         key.alpha_blend = alpha_blend;
         self.ensure_pipeline(gal, program, &key)?;
-        let scalar_uniforms = program.pack_scalar_uniforms(source_uniforms)?;
-        if program.execution_interface.scalar_uniforms.is_none() && !scalar_uniforms.is_empty() {
-            return Err(GalError::invalid_argument(
-                "source-derived Distant Horizons program has no scalar binding but received scalar bytes",
-            ));
-        }
+        let scalar_key = WorldLodSourceProgramKey {
+            alpha_blend: false,
+            ..key.clone()
+        };
+        let shared_scalar_buffer = if program.execution_interface.scalar_uniforms.is_some() {
+            let buffer = match self.scalar_buffers.get(&scalar_key) {
+                Some(buffer) => *buffer,
+                None => {
+                    let buffer = gal.create_buffer(BufferDesc {
+                        label: format!(
+                            "world-lod-source-{}-gen{}.scalars",
+                            scalar_key.identity.replace(':', "-"),
+                            scalar_key.shader_pack_generation
+                        ),
+                        size: u64::from(program.execution_interface.scalar_uniform_bytes),
+                        memory: MemoryDomain::Upload,
+                        usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
+                    })?;
+                    self.scalar_buffers.insert(scalar_key.clone(), buffer);
+                    buffer
+                }
+            };
+            if self.scalar_written_this_frame.insert(scalar_key.clone()) {
+                append_source_uniform_upload(ops, buffer, program.pack_scalar_uniforms(source_uniforms)?);
+            }
+            Some(buffer)
+        } else {
+            if !program.pack_scalar_uniforms(source_uniforms)?.is_empty() {
+                return Err(GalError::invalid_argument(
+                    "source-derived Distant Horizons program has no scalar binding but received scalar bytes",
+                ));
+            }
+            None
+        };
+        // Claim this draw's column-frame slot (the ring grows only before
+        // any draw of this program was staged this frame).
+        let needed = self
+            .column_frame_rings
+            .get(&scalar_key)
+            .map_or(1, |ring| ring.next as usize + 1);
+        self.ensure_column_frame_capacity(gal, program, &scalar_key, needed)?;
+        let (column_frame_ring_buffer, column_frame_offset) = {
+            let ring = self
+                .column_frame_rings
+                .get_mut(&scalar_key)
+                .expect("column-frame ring exists after capacity check");
+            let offset = u64::from(ring.next) * ring.stride;
+            ring.bytes.resize(offset as usize, 0);
+            ring.bytes.extend_from_slice(column_frame.pack_source_std140().as_slice());
+            ring.bytes.resize((offset + ring.stride) as usize, 0);
+            ring.next += 1;
+            (ring.buffer, offset)
+        };
+        let column_frame_offset = u32::try_from(column_frame_offset)
+            .map_err(|_| GalError::invalid_argument("DH column-frame offset exceeds u32"))?;
         let draw_key = WorldLodSourceDrawKey {
             program: key.clone(),
             draw: WorldLodDrawResourceKey::from_draw(draw),
@@ -5325,32 +5535,9 @@ impl WorldLodSourcePassResources {
                 .expect("source DH pipeline exists after successful initialization");
             let mut created = Vec::new();
             let result = (|| -> GalResult<WorldLodSourceDrawResources> {
-                let column_frame_buffer = gal.create_buffer(BufferDesc {
-                    label: format!(
-                        "world-lod-source-column{}-gen{}-segment{}.frame",
-                        draw.column_key, draw.column_generation, draw.segment_index
-                    ),
-                    size: u64::from(program.execution_interface.column_frame_bytes),
-                    memory: MemoryDomain::Upload,
-                    usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
-                })?;
-                created.push(column_frame_buffer);
-                let scalar_uniform_buffer = if program.execution_interface.scalar_uniforms.is_some()
-                {
-                    let buffer = gal.create_buffer(BufferDesc {
-                        label: format!(
-                            "world-lod-source-column{}-gen{}-segment{}.scalars",
-                            draw.column_key, draw.column_generation, draw.segment_index
-                        ),
-                        size: u64::from(program.execution_interface.scalar_uniform_bytes),
-                        memory: MemoryDomain::Upload,
-                        usages: vec![BufferUsage::Uniform, BufferUsage::HostWrite],
-                    })?;
-                    created.push(buffer);
-                    Some(buffer)
-                } else {
-                    None
-                };
+                let column_frame_buffer: Option<Handle> = None;
+                // Draw sets bind the program's shared scalar buffer.
+                let scalar_uniform_buffer: Option<Handle> = None;
                 let mut bindings = vec![
                     ResourceBinding {
                         binding: program.execution_interface.vertex_stream.binding,
@@ -5364,7 +5551,7 @@ impl WorldLodSourcePassResources {
                     ResourceBinding {
                         binding: program.execution_interface.column_frame.binding,
                         array_index: 0,
-                        resource: column_frame_buffer,
+                        resource: column_frame_ring_buffer,
                         kind: ResourceBindingKind::UniformBuffer,
                         access: AccessFlags::READ,
                         dynamic_offsets: vec![0],
@@ -5375,7 +5562,7 @@ impl WorldLodSourcePassResources {
                 ];
                 if let (Some(binding), Some(buffer)) = (
                     program.execution_interface.scalar_uniforms,
-                    scalar_uniform_buffer,
+                    shared_scalar_buffer,
                 ) {
                     bindings.push(ResourceBinding {
                         binding: binding.binding,
@@ -5423,14 +5610,7 @@ impl WorldLodSourcePassResources {
         }
         .get(&draw_key)
             .expect("source DH draw resources exist after successful staging");
-        append_source_uniform_upload(
-            ops,
-            resources.column_frame_buffer,
-            column_frame.pack_source_std140().to_vec(),
-        );
-        if let Some(buffer) = resources.scalar_uniform_buffer {
-            append_source_uniform_upload(ops, buffer, scalar_uniforms);
-        }
+
         let pipeline = self
             .pipelines
             .get(&key)
@@ -5439,7 +5619,7 @@ impl WorldLodSourcePassResources {
             pipeline: pipeline.pipeline,
             pipeline_layout: pipeline.pipeline_layout,
             source_data_set: resources.source_data_set,
-            source_data_dynamic_offsets: [0, 0],
+            source_data_dynamic_offsets: [column_frame_offset, 0],
             source_data_dynamic_offset_count: if program
                 .execution_interface
                 .scalar_uniforms
@@ -5572,6 +5752,14 @@ impl WorldLodSourcePassResources {
             resources.destroy(gal);
         }
         self.retire_generic_draws(gal);
+        // Draw sets bound these; they are gone now.
+        for (_, buffer) in std::mem::take(&mut self.scalar_buffers) {
+            let _ = gal.destroy(buffer);
+        }
+        for (_, ring) in std::mem::take(&mut self.column_frame_rings) {
+            let _ = gal.destroy(ring.buffer);
+        }
+        self.scalar_written_this_frame.clear();
         for (_, set) in std::mem::take(&mut self.pack_resources) {
             let _ = gal.destroy(set);
         }
@@ -10143,6 +10331,9 @@ mod tests {
         let program = lowered_source_program();
         let mut source_resources = WorldLodSourcePassResources::default();
         let mut ops = Vec::new();
+        // One source frame: the scalar block is written by the first draw and
+        // the frame's column blocks by one flush.
+        source_resources.begin_source_frame();
         let prepared = source_resources
             .stage_draw(
                 &mut gal,
@@ -10154,6 +10345,7 @@ mod tests {
                 &mut ops,
             )
             .unwrap();
+        source_resources.flush_source_frame(&mut ops);
 
         assert_eq!(Some(HandleKind::GraphicsPipeline), prepared.pipeline.kind());
         assert_eq!(
@@ -10185,6 +10377,7 @@ mod tests {
             .all(|op| !format!("{op:?}").contains("material-id")));
 
         let mut cached_ops = Vec::new();
+        source_resources.begin_source_frame();
         let cached = source_resources
             .stage_draw(
                 &mut gal,
@@ -10196,6 +10389,7 @@ mod tests {
                 &mut cached_ops,
             )
             .unwrap();
+        source_resources.flush_source_frame(&mut cached_ops);
         assert_eq!(prepared.pipeline, cached.pipeline);
         assert_eq!(prepared.source_data_set, cached.source_data_set);
         assert_eq!(
@@ -11584,3 +11778,4 @@ mod tests {
         assert!(invalid_extent.validate().is_err());
     }
 }
+

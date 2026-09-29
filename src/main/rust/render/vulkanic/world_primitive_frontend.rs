@@ -2653,6 +2653,9 @@ pub struct WorldDistantHorizonsGenericBoxRequest {
     pub ssao_enabled: bool,
     /// DH `EDhApiBlockMaterial` index; Iris feeds it to `dhMaterialId`.
     pub material: u32,
+    /// Render-group ordinal within this frame: boxes of one group share its
+    /// origin, so one source range (and model offset) per group is exact.
+    pub group: u32,
 }
 
 impl WorldPrimitiveFrame {
@@ -20745,6 +20748,7 @@ impl WorldPrimitiveFrontend {
                         "Rust Distant Horizons source plan has no admitted opaque program",
                     )
                 })?;
+            self.lod_source_pass_resources.begin_source_frame();
             let resources = self.candidate_source_resources_for_distant_horizons_program(
                 gal,
                 frame.shader_environment.world_generation,
@@ -21137,6 +21141,17 @@ impl WorldPrimitiveFrontend {
                     exact_atlas_draws.push((prepared, pack_resources));
                 }
             }
+            let generic_geometry = if frame.dh_generic_boxes.is_empty() {
+                DistantHorizonsGenericSourceGeometry::default()
+            } else {
+                distant_horizons_generic_source_geometry(&frame.dh_generic_boxes)?
+            };
+            self.lod_source_pass_resources.reserve_column_frames(
+                gal,
+                &program,
+                target.primary_color_format,
+                plan.opaque_draws.len() + generic_geometry.ranges.len(),
+            )?;
             let mut draws = Vec::with_capacity(plan.opaque_draws.len());
             // Keep the semantic draw records alongside the private prepared
             // commands for the audit receipt below. This is intentionally
@@ -21184,6 +21199,7 @@ impl WorldPrimitiveFrontend {
             let generic_draws = self.stage_distant_horizons_generic_source_draws(
                 gal,
                 frame,
+                generic_geometry,
                 &program,
                 target.primary_color_format,
                 &source_uniforms,
@@ -21244,6 +21260,12 @@ impl WorldPrimitiveFrontend {
                             target.primary_color_format,
                             &translucent_resources,
                         )?;
+                    self.lod_source_pass_resources.reserve_column_frames(
+                        gal,
+                        &translucent_program,
+                        target.primary_color_format,
+                        late_translucent_draws.len(),
+                    )?;
                     let mut translucent_draws = Vec::with_capacity(late_translucent_draws.len());
                     for (draw, uniforms) in late_translucent_draws {
                         translucent_draws.push(self.lod_source_pass_resources.stage_draw(
@@ -21260,6 +21282,8 @@ impl WorldPrimitiveFrontend {
                 } else {
                     (Vec::new(), None)
                 };
+            self.lod_source_pass_resources
+                .flush_source_frame(&mut upload_operations);
             Ok(PreparedNamedSourceDistantHorizonsFramePlan {
                 submission: staged.submission,
                 target,
@@ -23075,8 +23099,15 @@ impl WorldPrimitiveFrontend {
         // The list depends only on the terrain instances' identities and
         // (canonical) world transforms plus the cull box; reuse it while those
         // are unchanged. DH meshes carry their own per-frame provenance.
-        let memoizable =
-            !frame.lod_render_frame.rust_route_selected() || frame.lod_instances.is_empty();
+        // DH meshes join the list only through a pack `dh_shadow` program;
+        // without one (e.g. Complementary) the list is terrain-only.
+        let distant_horizons_voxelized = frame.lod_render_frame.rust_route_selected()
+            && !frame.lod_instances.is_empty()
+            && match terrain_program_scope_for_sky_type(frame.background.sky_type)? {
+                Some(scope) => self.source_distant_horizons_shadow_pass_enabled(scope)?,
+                None => false,
+            };
+        let memoizable = !distant_horizons_voxelized;
         let instances = if memoizable {
             let mut instances = Vec::with_capacity(frame.mesh_instances.len());
             for instance in frame
@@ -42475,15 +42506,12 @@ impl WorldPrimitiveFrontend {
         &mut self,
         gal: &mut VulkanicGal,
         frame: &WorldPrimitiveFrame,
+        geometry: DistantHorizonsGenericSourceGeometry,
         program: &LoweredDistantHorizonsSourceProgram,
         color_format: TextureFormat,
         source_uniforms: &TerrainSourceUniformFrame,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<Vec<lod::WorldLodPreparedSourceDraw>> {
-        if frame.dh_generic_boxes.is_empty() {
-            return Ok(Vec::new());
-        }
-        let geometry = distant_horizons_generic_source_geometry(&frame.dh_generic_boxes)?;
         if geometry.indices.is_empty() {
             return Ok(Vec::new());
         }
@@ -42680,7 +42708,7 @@ impl WorldPrimitiveFrontend {
             }
         }
         self.lod_exact_atlas_source_pass_resources.destroy(gal);
-        self.lod_source_pass_resources.destroy(gal);
+        self.lod_source_pass_resources.release_pack_resources(gal);
     }
 
     fn destroy_lowered_source_terrain_pack_resources(&mut self, gal: &mut VulkanicGal) {
@@ -51065,12 +51093,11 @@ struct DistantHorizonsGenericSourceGeometry {
 fn distant_horizons_generic_source_geometry(
     boxes: &[WorldDistantHorizonsGenericBoxRequest],
 ) -> GalResult<DistantHorizonsGenericSourceGeometry> {
-    const FRACTION_SCALE: f32 = 65536.0;
     let mut geometry = DistantHorizonsGenericSourceGeometry::default();
     // DH draws SSAO groups before non-SSAO groups; keep that order.
     for ssao in [true, false] {
-        let mut bucket_order = Vec::<[i32; 3]>::new();
-        let mut buckets = HashMap::<[i32; 3], ([f32; 3], Vec<usize>)>::new();
+        let mut bucket_order = Vec::<u32>::new();
+        let mut buckets = HashMap::<u32, ([f32; 3], Vec<usize>)>::new();
         for (index, item) in boxes.iter().enumerate() {
             if item.ssao_enabled != ssao {
                 continue;
@@ -51078,33 +51105,50 @@ fn distant_horizons_generic_source_geometry(
             let fraction = item.min.map(|value| value - value.floor());
             for axis in 0..3 {
                 let local_max = item.max[axis] - fraction[axis];
-                if (local_max - local_max.round()).abs() > 1.0e-3
-                    || item.min[axis].round().abs() > 32767.0
-                    || local_max.round().abs() > 32767.0
-                {
+                if (local_max - local_max.round()).abs() > 1.0e-3 {
                     return Err(GalError::unsupported_feature(
                         "DH generic box is not representable in the DH source vertex stream",
                     ));
                 }
             }
-            let key = fraction.map(|value| (value * FRACTION_SCALE).round() as i32);
-            buckets
-                .entry(key)
-                .or_insert_with(|| {
-                    bucket_order.push(key);
-                    (fraction, Vec::new())
-                })
-                .1
-                .push(index);
+            let bucket = buckets.entry(item.group).or_insert_with(|| {
+                bucket_order.push(item.group);
+                (fraction, Vec::new())
+            });
+            // One group shares one origin, hence one sub-block fraction.
+            if (0..3).any(|axis| {
+                let delta = (fraction[axis] - bucket.0[axis]).abs();
+                delta > 1.0e-3 && delta < 1.0 - 1.0e-3
+            }) {
+                return Err(GalError::unsupported_feature(
+                    "DH generic box group has inconsistent sub-block offsets",
+                ));
+            }
+            bucket.1.push(index);
         }
         for key in bucket_order {
             let (fraction, members) = &buckets[&key];
+            // Anchor the range at its first box: a moving group (drifting
+            // clouds, a moving camera) then keeps identical local vertices and
+            // only its model offset changes, so geometry is not re-uploaded.
+            let anchor = boxes[members[0]]
+                .min
+                .map(|value| value.floor() as i32);
             let vertex_base = geometry.vertices.len() as u32;
             let first_index = geometry.indices.len() as u32;
             for &index in members {
                 let item = &boxes[index];
-                let a = [0, 1, 2].map(|axis| (item.min[axis] - fraction[axis]).round() as i32);
-                let b = [0, 1, 2].map(|axis| (item.max[axis] - fraction[axis]).round() as i32);
+                let a = [0, 1, 2].map(|axis| {
+                    (item.min[axis] - fraction[axis]).round() as i32 - anchor[axis]
+                });
+                let b = [0, 1, 2].map(|axis| {
+                    (item.max[axis] - fraction[axis]).round() as i32 - anchor[axis]
+                });
+                if a.iter().chain(b.iter()).any(|value| value.abs() > 32767) {
+                    return Err(GalError::unsupported_feature(
+                        "DH generic box range exceeds the DH source vertex stream",
+                    ));
+                }
                 let argb = item.color_argb;
                 let color = ((argb >> 16) & 0xff)
                     | (((argb >> 8) & 0xff) << 8)
@@ -51144,7 +51188,7 @@ fn distant_horizons_generic_source_geometry(
                 }
             }
             geometry.ranges.push(DistantHorizonsGenericSourceRange {
-                model_offset: *fraction,
+                model_offset: [0, 1, 2].map(|axis| anchor[axis] as f32 + fraction[axis]),
                 vertex_base,
                 first_index,
                 index_count: geometry.indices.len() as u32 - first_index,
@@ -63020,6 +63064,7 @@ mod tests {
             shading: [1.0; 6],
             ssao_enabled: ssao,
             material: 15,
+            group: 0,
         }
     }
 
@@ -63043,7 +63088,7 @@ mod tests {
         assert_eq!(24, geometry.vertices.len());
         assert_eq!(36, geometry.indices.len());
         let range = geometry.ranges[0];
-        assert_eq!([0.75, 0.25, 0.25], range.model_offset);
+        assert_eq!([-2.25, 10.25, 3.25], range.model_offset);
         for vertex in &geometry.vertices {
             let position = generic_vertex_position(*vertex);
             for axis in 0..3 {
@@ -63078,10 +63123,14 @@ mod tests {
 
     #[test]
     fn distant_horizons_generic_ranges_group_by_fraction_with_ssao_first() {
+        let in_group = |mut item: WorldDistantHorizonsGenericBoxRequest, group| {
+            item.group = group;
+            item
+        };
         let geometry = distant_horizons_generic_source_geometry(&[
-            generic_box([0.5, 0.0, 0.0], [1.5, 1.0, 1.0], false),
-            generic_box([0.25, 0.0, 0.0], [1.25, 1.0, 1.0], true),
-            generic_box([2.5, 0.0, 0.0], [3.5, 1.0, 1.0], false),
+            in_group(generic_box([0.5, 0.0, 0.0], [1.5, 1.0, 1.0], false), 1),
+            in_group(generic_box([0.25, 0.0, 0.0], [1.25, 1.0, 1.0], true), 2),
+            in_group(generic_box([2.5, 0.0, 0.0], [3.5, 1.0, 1.0], false), 1),
         ])
         .unwrap();
         assert_eq!(2, geometry.ranges.len());
@@ -63103,12 +63152,26 @@ mod tests {
             false
         )])
         .is_err());
-        assert!(distant_horizons_generic_source_geometry(&[generic_box(
-            [40000.0, 0.0, 0.0],
-            [40001.0, 1.0, 1.0],
-            false
-        )])
+        assert!(distant_horizons_generic_source_geometry(&[
+            generic_box([0.0, 0.0, 0.0], [1.0, 1.0, 1.0], false),
+            generic_box([40000.0, 0.0, 0.0], [40001.0, 1.0, 1.0], false),
+        ])
         .is_err());
+    }
+
+    #[test]
+    fn distant_horizons_generic_geometry_is_stable_while_a_group_moves() {
+        let at = |offset: f32| {
+            distant_horizons_generic_source_geometry(&[
+                generic_box([offset, 64.0, 2.0], [offset + 12.0, 68.0, 14.0], false),
+                generic_box([offset + 12.0, 64.0, 2.0], [offset + 24.0, 68.0, 14.0], false),
+            ])
+            .unwrap()
+        };
+        let (a, b) = (at(-10.4), at(-7.9));
+        assert_eq!(a.vertices, b.vertices);
+        assert_eq!(a.indices, b.indices);
+        assert_ne!(a.ranges[0].model_offset, b.ranges[0].model_offset);
     }
 
     #[test]

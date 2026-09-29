@@ -2620,6 +2620,7 @@ public final class RustGalFrameCoordinator {
 				uploadedShaderPackSourceGeneration = generation;
 				if (shaderPackSemanticRebuildPending) {
 					shaderPackSemanticRebuildPending = false;
+					RustGalWorldPrimitiveRenderer.resendRetainedWorldMeshAssets();
 					Minecraft minecraft = Minecraft.getInstance();
 					if (minecraft.level != null && minecraft.levelRenderer != null) {
 						minecraft.levelRenderer.allChanged();
