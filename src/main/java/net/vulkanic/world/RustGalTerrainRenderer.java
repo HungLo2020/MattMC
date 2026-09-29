@@ -85,6 +85,13 @@ public final class RustGalTerrainRenderer {
 	private static final String STATIC_TERRAIN_SCENARIO_PROPERTY = "mattmc.dev.rustGalStaticTerrain.scenario";
 	private static final String FAULT_PROPERTY = "mattmc.dev.rustGalStaticTerrain.fault";
 	private static final Map<LayerKey, TerrainSectionAsset> SECTION_ASSETS = new ConcurrentHashMap<>();
+	/**
+	 * Per-section mirror of {@link #SECTION_ASSETS} for the solid, cutout, and
+	 * translucent layers, indexed by {@link #rowSlot}. Frame traversal resolves
+	 * all three layers with one lookup. Rows are immutable; every write
+	 * re-reads the authoritative layer entry, so concurrent writers converge.
+	 */
+	private static final ConcurrentHashMap<Long, TerrainSectionAsset[]> SECTION_ASSET_ROWS = new ConcurrentHashMap<>();
 	/** Direct semantic identity lookup for post-submit receipts and sort metadata. */
 	private static final Map<Long, TerrainAssetIdentity> SECTION_ASSETS_BY_MESH_KEY = new ConcurrentHashMap<>();
 	/** Replacement generation built off-screen while the published atlas remains live. */
@@ -1013,8 +1020,13 @@ public final class RustGalTerrainRenderer {
 					throw new IllegalStateException("shadow candidate section bound exceeded");
 				}
 				long sectionPos = section.getPositionAsLong();
+				// A camera-visible section already contributed every layer asset
+				// from this frame's snapshot, so none can be a new shadow key.
+				boolean alreadyVisible = scratch.seenPositions.contains(sectionPos);
+				TerrainSectionAsset[] row = alreadyVisible ? null : sectionAssetRow(sectionPos);
 				for (ChunkSectionLayer layer : SHADOW_CANDIDATE_LAYERS) {
-					TerrainSectionAsset asset = sectionAsset(sectionPos, layer);
+					if (row == null) break;
+					TerrainSectionAsset asset = row[rowSlot(layer)];
 					if (asset == null || !visibleMeshKeys.add(asset.meshKey())) continue;
 					RustGalWorldPrimitiveRenderer.enqueueStaticTerrainSectionInstance(
 						asset.meshKey(), asset.meshGeneration(),
@@ -1077,9 +1089,10 @@ public final class RustGalTerrainRenderer {
 		long dynamicTranslucentSections = 0L;
 		for (RenderSection section : sections) {
 			long sectionPos = section.getPositionAsLong();
-			TerrainSectionAsset solid = sectionAsset(sectionPos, ChunkSectionLayer.SOLID);
-			TerrainSectionAsset cutout = sectionAsset(sectionPos, ChunkSectionLayer.CUTOUT_MIPPED);
-			TerrainSectionAsset translucent = sectionAsset(sectionPos, ChunkSectionLayer.TRANSLUCENT);
+			TerrainSectionAsset[] row = sectionAssetRow(sectionPos);
+			TerrainSectionAsset solid = row == null ? null : row[0];
+			TerrainSectionAsset cutout = row == null ? null : row[1];
+			TerrainSectionAsset translucent = row == null ? null : row[2];
 			if (solid != null) {
 				solidIndices += solid.indexCount();
 			}
@@ -1116,9 +1129,10 @@ public final class RustGalTerrainRenderer {
 				continue;
 			}
 			long sectionPos = section.getPositionAsLong();
-			TerrainSectionAsset solid = sectionAsset(sectionPos, ChunkSectionLayer.SOLID);
-			TerrainSectionAsset cutout = sectionAsset(sectionPos, ChunkSectionLayer.CUTOUT_MIPPED);
-			TerrainSectionAsset translucent = sectionAsset(sectionPos, ChunkSectionLayer.TRANSLUCENT);
+			TerrainSectionAsset[] row = sectionAssetRow(sectionPos);
+			TerrainSectionAsset solid = row == null ? null : row[0];
+			TerrainSectionAsset cutout = row == null ? null : row[1];
+			TerrainSectionAsset translucent = row == null ? null : row[2];
 			solidAssets.add(solid);
 			cutoutAssets.add(cutout);
 			if (solid != null) {
@@ -1256,6 +1270,7 @@ public final class RustGalTerrainRenderer {
 		}
 		TerrainSectionAsset released = asset.releaseCpuPayload();
 		if (SECTION_ASSETS.replace(layerKey, asset, released)) {
+			mirrorSectionAssetRow(layerKey);
 			SECTION_ASSETS_BY_MESH_KEY.replace(meshKey, identity, new TerrainAssetIdentity(layerKey, released));
 		}
 	}
@@ -4181,6 +4196,10 @@ public final class RustGalTerrainRenderer {
 			rebuildMeshKeyIdentityIndex(replacement);
 			SECTION_ASSETS.clear();
 			SECTION_ASSETS.putAll(replacement);
+			SECTION_ASSET_ROWS.clear();
+			for (LayerKey key : replacement.keySet()) {
+				mirrorSectionAssetRow(key);
+			}
 			RESOURCE_RELOAD_SECTION_ASSETS.clear();
 			resourceReloadStaging = false;
 			for (TerrainSectionAsset asset : previous) {
@@ -4209,6 +4228,7 @@ public final class RustGalTerrainRenderer {
 				+ asset.meshKey() + " existing=" + collision.layerKey() + " replacement=" + layerKey);
 		}
 		TerrainSectionAsset replaced = SECTION_ASSETS.put(layerKey, asset);
+		mirrorSectionAssetRow(layerKey);
 		if (replaced != null && replaced.meshKey() != asset.meshKey()) {
 			SECTION_ASSETS_BY_MESH_KEY.computeIfPresent(replaced.meshKey(), (meshKey, previous) ->
 				previous.layerKey().equals(layerKey) ? null : previous
@@ -4234,6 +4254,7 @@ public final class RustGalTerrainRenderer {
 	private static void removeLayer(long sectionPos, ChunkSectionLayer layer, String reason) {
 		LayerKey layerKey = new LayerKey(sectionPos, layer);
 		TerrainSectionAsset removed = SECTION_ASSETS.remove(layerKey);
+		mirrorSectionAssetRow(layerKey);
 		if (removed != null) {
 			SECTION_ASSETS_BY_MESH_KEY.computeIfPresent(removed.meshKey(), (meshKey, identity) ->
 				identity.layerKey().equals(layerKey) && identity.asset().meshGeneration() == removed.meshGeneration()
@@ -4965,7 +4986,38 @@ public final class RustGalTerrainRenderer {
 		}
 	}
 
+	private static int rowSlot(ChunkSectionLayer layer) {
+		return switch (layer) {
+			case SOLID -> 0;
+			case CUTOUT_MIPPED -> 1;
+			case TRANSLUCENT -> 2;
+			default -> -1;
+		};
+	}
+
+	private static void mirrorSectionAssetRow(LayerKey layerKey) {
+		int slot = rowSlot(layerKey.layer());
+		if (slot < 0) {
+			return;
+		}
+		SECTION_ASSET_ROWS.compute(layerKey.sectionPos(), (sectionPos, row) -> {
+			TerrainSectionAsset[] next = row == null ? new TerrainSectionAsset[3] : row.clone();
+			next[slot] = SECTION_ASSETS.get(layerKey);
+			return next[0] == null && next[1] == null && next[2] == null ? null : next;
+		});
+	}
+
+	/** Solid, cutout, and translucent assets of one section (slots per {@link #rowSlot}); null if none. */
+	private static TerrainSectionAsset[] sectionAssetRow(long sectionPos) {
+		return SECTION_ASSET_ROWS.get(sectionPos);
+	}
+
 	private static TerrainSectionAsset sectionAsset(long sectionPos, ChunkSectionLayer layer) {
+		int slot = rowSlot(layer);
+		if (slot >= 0) {
+			TerrainSectionAsset[] row = SECTION_ASSET_ROWS.get(sectionPos);
+			return row == null ? null : row[slot];
+		}
 		LayerLookup lookup = SECTION_ASSET_LOOKUP.get();
 		lookup.set(sectionPos, layer);
 		return SECTION_ASSETS.get(lookup);

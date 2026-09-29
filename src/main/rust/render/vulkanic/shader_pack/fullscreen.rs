@@ -231,6 +231,88 @@ pub(crate) struct CompiledFullscreenSourcePass {
     pub vertex_shader: Handle,
     pub fragment_shader: Handle,
     pub pipeline: Handle,
+    /// When set, the layouts, shaders, and pipeline above are owned by a
+    /// [`FullscreenPipelineCache`] entry and outlive this frame's pass.
+    shared: Option<std::sync::Arc<FullscreenPipelineObjects>>,
+}
+
+/// View-independent GAL objects for one compiled fullscreen source stage.
+/// They depend only on the lowered program and its color formats, so one
+/// set serves every frame; the render target and pass (which reference the
+/// frame's color views) remain per-plan.
+#[derive(Debug)]
+pub(crate) struct FullscreenPipelineObjects {
+    source_data_layout: Handle,
+    pack_resources_layout: Handle,
+    pipeline_layout: Handle,
+    vertex_shader: Handle,
+    fragment_shader: Handle,
+    pipeline: Handle,
+}
+
+impl FullscreenPipelineObjects {
+    fn destroy(self, gal: &mut VulkanicGal) {
+        for handle in [
+            self.pipeline,
+            self.vertex_shader,
+            self.fragment_shader,
+            self.pipeline_layout,
+            self.source_data_layout,
+            self.pack_resources_layout,
+        ] {
+            let _ = gal.destroy(handle);
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct FullscreenPipelineKey {
+    program_identity: String,
+    shader_pack_generation: u64,
+    source_stage_path: String,
+    color_formats: Vec<TextureFormat>,
+    celestial_blend: bool,
+}
+
+/// One cached pipeline together with the exact compile inputs it was built
+/// from; a hit requires identical shader stages and resource layouts.
+#[derive(Debug)]
+struct CachedFullscreenPipeline {
+    vertex: super::programs::ShaderStageSource,
+    fragment: super::programs::ShaderStageSource,
+    source_data_bindings: Vec<crate::render::vulkanic::resources::ResourceBindingDesc>,
+    pack_resources_bindings: Vec<crate::render::vulkanic::resources::ResourceBindingDesc>,
+    objects: std::sync::Arc<FullscreenPipelineObjects>,
+}
+
+/// Retains compiled fullscreen pipelines across frames. Entries are valid
+/// only for the source-candidate epochs that lowered their programs; any
+/// epoch change drops them all. An entry still referenced by a live plan is
+/// destroyed by that plan's last owner.
+#[derive(Debug, Default)]
+pub(crate) struct FullscreenPipelineCache {
+    epochs: std::cell::Cell<Option<(u64, u64)>>,
+    entries: std::cell::RefCell<
+        std::collections::HashMap<FullscreenPipelineKey, Vec<CachedFullscreenPipeline>>,
+    >,
+}
+
+const FULLSCREEN_PIPELINE_CACHE_ENTRIES: usize = 128;
+
+impl FullscreenPipelineCache {
+    fn release_all(&self, gal: &mut VulkanicGal) {
+        let entries = std::mem::take(&mut *self.entries.borrow_mut());
+        for cached in entries.into_values().flatten() {
+            if let Ok(objects) = std::sync::Arc::try_unwrap(cached.objects) {
+                objects.destroy(gal);
+            }
+        }
+    }
+
+    pub(crate) fn destroy(&self, gal: &mut VulkanicGal) {
+        self.release_all(gal);
+        self.epochs.set(None);
+    }
 }
 
 /// Resource sets and owned buffers required by one compiled source pass.
@@ -344,6 +426,7 @@ impl FullscreenSourceExecutionPlan {
         &self.prepared.outputs
     }
 
+    #[cfg(test)]
     pub(crate) fn stage(
         gal: &mut VulkanicGal,
         program: &LoweredFullscreenSourceProgram,
@@ -351,6 +434,19 @@ impl FullscreenSourceExecutionPlan {
         targets: &ShaderPackColorTargets,
         external_inputs: impl IntoIterator<Item = TerrainSourceOwnedResourceSet>,
         extent: crate::render::vulkanic::resources::Extent3d,
+    ) -> GalResult<Self> {
+        Self::stage_cached(gal, program, manifest, targets, external_inputs, extent, None)
+    }
+
+    /// As [`Self::stage`], reusing compiled pipeline objects from `cache`.
+    pub(crate) fn stage_cached(
+        gal: &mut VulkanicGal,
+        program: &LoweredFullscreenSourceProgram,
+        manifest: &ShaderPackColorTargetManifest,
+        targets: &ShaderPackColorTargets,
+        external_inputs: impl IntoIterator<Item = TerrainSourceOwnedResourceSet>,
+        extent: crate::render::vulkanic::resources::Extent3d,
+        cache: Option<(&FullscreenPipelineCache, (u64, u64))>,
     ) -> GalResult<Self> {
         if targets.identity.extent != extent {
             return Err(GalError::invalid_argument(format!(
@@ -365,7 +461,7 @@ impl FullscreenSourceExecutionPlan {
             targets,
             external_inputs,
         )?;
-        let compiled = match prepared.compile(gal, program, extent) {
+        let compiled = match prepared.compile_cached(gal, program, extent, cache) {
             Ok(compiled) => compiled,
             Err(error) => {
                 prepared.destroy(gal);
@@ -1324,11 +1420,24 @@ impl PreparedFullscreenSourcePass {
     /// Compiles an explicit backend-neutral fullscreen pass from this already
     /// validated semantic contract. It owns no frame target and issues no
     /// draw, so compiling cannot alter route selection or presentation.
+    #[cfg(test)]
     pub(crate) fn compile(
         &self,
         gal: &mut VulkanicGal,
         program: &LoweredFullscreenSourceProgram,
         extent: crate::render::vulkanic::resources::Extent3d,
+    ) -> GalResult<CompiledFullscreenSourcePass> {
+        self.compile_cached(gal, program, extent, None)
+    }
+
+    /// As [`Self::compile`], reusing view-independent pipeline objects from
+    /// `cache` (valid for the given source-candidate epochs) when present.
+    pub(crate) fn compile_cached(
+        &self,
+        gal: &mut VulkanicGal,
+        program: &LoweredFullscreenSourceProgram,
+        extent: crate::render::vulkanic::resources::Extent3d,
+        cache: Option<(&FullscreenPipelineCache, (u64, u64))>,
     ) -> GalResult<CompiledFullscreenSourcePass> {
         if self.program_identity != program.identity.as_str()
             || self.inputs.availability().shader_pack_generation() != program.shader_pack_generation
@@ -1359,6 +1468,76 @@ impl PreparedFullscreenSourcePass {
             ));
         }
         let label = format!("fullscreen-source.{}", self.program_identity);
+        let celestial_blend = matches!(
+            program.raster_primitive,
+            FullscreenSourceRasterPrimitive::VanillaCelestialQuad
+        );
+        let cache_key = cache.map(|(cache, epochs)| {
+            if cache.epochs.get() != Some(epochs) {
+                cache.release_all(gal);
+                cache.epochs.set(Some(epochs));
+            }
+            (
+                cache,
+                FullscreenPipelineKey {
+                    program_identity: program.identity.as_str().to_string(),
+                    shader_pack_generation: program.shader_pack_generation,
+                    source_stage_path: program.source_stage_path.clone(),
+                    color_formats: color_formats.clone(),
+                    celestial_blend,
+                },
+            )
+        });
+        if let Some((cache, key)) = cache_key.as_ref() {
+            let cached = cache.entries.borrow().get(key).and_then(|candidates| {
+                candidates
+                    .iter()
+                    .find(|cached| {
+                        cached.vertex == program.vertex
+                            && cached.fragment == program.fragment
+                            && cached.source_data_bindings == layouts.source_data.bindings
+                            && cached.pack_resources_bindings == layouts.pack_resources.bindings
+                    })
+                    .map(|cached| std::sync::Arc::clone(&cached.objects))
+            });
+            if let Some(shared) = cached {
+                let target = gal.create_render_target(RenderTargetDesc {
+                    label: format!("{label}.target"),
+                    color_views,
+                    depth_stencil_view: None,
+                    extent,
+                })?;
+                let pass = match gal.create_render_pass(RenderPassDesc {
+                    label: format!("{label}.pass"),
+                    target,
+                    color_formats,
+                    depth_format: None,
+                }) {
+                    Ok(pass) => pass,
+                    Err(error) => {
+                        let _ = gal.destroy(target);
+                        return Err(error);
+                    }
+                };
+                return Ok(CompiledFullscreenSourcePass {
+                    target,
+                    pass,
+                    source_data_layout: shared.source_data_layout,
+                    pack_resources_layout: shared.pack_resources_layout,
+                    pipeline_layout: shared.pipeline_layout,
+                    vertex_shader: shared.vertex_shader,
+                    fragment_shader: shared.fragment_shader,
+                    pipeline: shared.pipeline,
+                    shared: Some(shared),
+                });
+            }
+        }
+        let cached_bindings = cache_key.as_ref().map(|_| {
+            (
+                layouts.source_data.bindings.clone(),
+                layouts.pack_resources.bindings.clone(),
+            )
+        });
         let mut created = Vec::new();
         let result = (|| -> GalResult<CompiledFullscreenSourcePass> {
             let source_data_layout = gal.create_resource_layout(ResourceLayoutDesc {
@@ -1409,9 +1588,10 @@ impl PreparedFullscreenSourcePass {
                 // src.rgb * src.a + dst.rgb. With replacement writes, the
                 // transparent corners of the sun/moon quad erase the sky and
                 // form a visible square after composite tone mapping.
-                blend: match program.raster_primitive {
-                    FullscreenSourceRasterPrimitive::VanillaCelestialQuad => BlendMode::Overlay,
-                    _ => BlendMode::Disabled,
+                blend: if celestial_blend {
+                    BlendMode::Overlay
+                } else {
+                    BlendMode::Disabled
                 },
                 depth_compare: None,
                 depth_write: false,
@@ -1430,6 +1610,7 @@ impl PreparedFullscreenSourcePass {
                 vertex_shader,
                 fragment_shader,
                 pipeline,
+                shared: None,
             })
         })();
         if result.is_err() {
@@ -1437,7 +1618,32 @@ impl PreparedFullscreenSourcePass {
                 let _ = gal.destroy(handle);
             }
         }
-        result
+        let mut compiled = result?;
+        if let (Some((cache, key)), Some((source_data_bindings, pack_resources_bindings))) =
+            (cache_key, cached_bindings)
+        {
+            let shared = std::sync::Arc::new(FullscreenPipelineObjects {
+                source_data_layout: compiled.source_data_layout,
+                pack_resources_layout: compiled.pack_resources_layout,
+                pipeline_layout: compiled.pipeline_layout,
+                vertex_shader: compiled.vertex_shader,
+                fragment_shader: compiled.fragment_shader,
+                pipeline: compiled.pipeline,
+            });
+            let cached_count: usize = cache.entries.borrow().values().map(Vec::len).sum();
+            if cached_count >= FULLSCREEN_PIPELINE_CACHE_ENTRIES {
+                cache.release_all(gal);
+            }
+            cache.entries.borrow_mut().entry(key).or_default().push(CachedFullscreenPipeline {
+                vertex: program.vertex.clone(),
+                fragment: program.fragment.clone(),
+                source_data_bindings,
+                pack_resources_bindings,
+                objects: std::sync::Arc::clone(&shared),
+            });
+            compiled.shared = Some(shared);
+        }
+        Ok(compiled)
     }
 
     /// Materializes the two explicit descriptor/resource sets required for
@@ -1745,6 +1951,14 @@ impl PreparedFullscreenSourcePass {
 
 impl CompiledFullscreenSourcePass {
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
+        if let Some(shared) = self.shared {
+            let _ = gal.destroy(self.pass);
+            let _ = gal.destroy(self.target);
+            if let Ok(objects) = std::sync::Arc::try_unwrap(shared) {
+                objects.destroy(gal);
+            }
+            return;
+        }
         for handle in [
             self.pipeline,
             self.pass,

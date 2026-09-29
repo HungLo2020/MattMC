@@ -1372,6 +1372,18 @@ struct PreparedSourceProgramMemos {
     terrain: std::cell::RefCell<Vec<(u64, u8, LoweredTerrainSourceProgram)>>,
     entity: std::cell::RefCell<Option<(u64, LoweredEntitySourceProgram)>>,
     hand: std::cell::RefCell<Option<(u64, LoweredHandSourceProgram)>>,
+    cloud: std::cell::RefCell<Option<(u64, LoweredCloudSourceProgram)>>,
+    distant_horizons: std::cell::RefCell<Option<(u64, LoweredDistantHorizonsSourceProgram)>>,
+    distant_horizons_translucent:
+        std::cell::RefCell<Option<(u64, LoweredDistantHorizonsSourceProgram)>>,
+    weather: std::cell::RefCell<Option<(u64, LoweredWeatherSourceProgram)>>,
+    textured_material: std::cell::RefCell<Option<(u64, LoweredTexturedMaterialSourceProgram)>>,
+    /// Post-terrain fullscreen chains, keyed by (terrain candidate epoch,
+    /// DH candidate epoch, DH chain). Shared so a frame never deep-copies
+    /// every stage's lowered source text.
+    fullscreen: std::cell::RefCell<
+        Option<((u64, u64, bool), Vec<std::sync::Arc<LoweredFullscreenSourceProgram>>)>,
+    >,
 }
 
 fn memoized_source_program<T: Clone>(
@@ -1408,6 +1420,10 @@ pub(crate) struct ShaderPackRuntimeExecutor {
     /// render frame while the selected route is preparing its owned resources.
     source_candidate_scope: Option<TerrainProgramScope>,
     distant_horizons_source_candidate: DistantHorizonsSourceCandidateState,
+    /// Advances on every `distant_horizons_source_candidate` replacement.
+    distant_horizons_source_candidate_epoch: u64,
+    /// Compiled fullscreen pipelines reused across frames for these epochs.
+    fullscreen_pipeline_cache: super::fullscreen::FullscreenPipelineCache,
     /// The DH source pair is discovered independently, but has the same
     /// immutable-input rule as ordinary terrain discovery.
     distant_horizons_source_candidate_scope: Option<TerrainProgramScope>,
@@ -1819,6 +1835,8 @@ impl ShaderPackRuntimeExecutor {
             writer_required_roles: Default::default(),
             source_candidate_scope: None,
             distant_horizons_source_candidate: DistantHorizonsSourceCandidateState::Unavailable,
+            distant_horizons_source_candidate_epoch: 0,
+            fullscreen_pipeline_cache: Default::default(),
             distant_horizons_source_candidate_scope: None,
             vanilla_lightmap: VanillaLightmapCache::default(),
             vanilla_lightmap_residency: None,
@@ -2118,6 +2136,7 @@ impl ShaderPackRuntimeExecutor {
         if self.distant_horizons_source_candidate_matches(source, scope) {
             return;
         }
+        self.distant_horizons_source_candidate_epoch += 1;
         if source.is_empty() {
             self.distant_horizons_source_candidate =
                 DistantHorizonsSourceCandidateState::Disabled {
@@ -3010,6 +3029,16 @@ impl ShaderPackRuntimeExecutor {
     pub(crate) fn prepared_lowered_distant_horizons_source_program(
         &self,
     ) -> GalResult<Option<LoweredDistantHorizonsSourceProgram>> {
+        memoized_source_program(
+            &self.prepared_program_memos.distant_horizons,
+            self.distant_horizons_source_candidate_epoch,
+            || self.prepared_lowered_distant_horizons_source_program_uncached(),
+        )
+    }
+
+    fn prepared_lowered_distant_horizons_source_program_uncached(
+        &self,
+    ) -> GalResult<Option<LoweredDistantHorizonsSourceProgram>> {
         match &self.distant_horizons_source_candidate {
             DistantHorizonsSourceCandidateState::Unavailable
             | DistantHorizonsSourceCandidateState::Disabled { .. }
@@ -3068,6 +3097,16 @@ impl ShaderPackRuntimeExecutor {
     /// preparation artifact: callers still need a dedicated late source pass
     /// with the owned depth-history resource required by the contract.
     pub(crate) fn prepared_lowered_distant_horizons_translucent_source_program(
+        &self,
+    ) -> GalResult<Option<LoweredDistantHorizonsSourceProgram>> {
+        memoized_source_program(
+            &self.prepared_program_memos.distant_horizons_translucent,
+            self.distant_horizons_source_candidate_epoch,
+            || self.prepared_lowered_distant_horizons_translucent_source_program_uncached(),
+        )
+    }
+
+    fn prepared_lowered_distant_horizons_translucent_source_program_uncached(
         &self,
     ) -> GalResult<Option<LoweredDistantHorizonsSourceProgram>> {
         match &self.distant_horizons_source_candidate {
@@ -3300,13 +3339,14 @@ impl ShaderPackRuntimeExecutor {
                 "source sky initializer and named color targets have different shader-pack generations",
             ));
         }
-        FullscreenSourceExecutionPlan::stage(
+        FullscreenSourceExecutionPlan::stage_cached(
             gal,
             program,
             manifest,
             targets,
             external_inputs.iter().cloned(),
             extent,
+            Some((&self.fullscreen_pipeline_cache, self.fullscreen_pipeline_epochs())),
         )
         .map(Some)
     }
@@ -3335,13 +3375,14 @@ impl ShaderPackRuntimeExecutor {
                 "source celestial writer and named color targets have different shader-pack generations",
             ));
         }
-        FullscreenSourceExecutionPlan::stage(
+        FullscreenSourceExecutionPlan::stage_cached(
             gal,
             program,
             manifest,
             targets,
             external_inputs.iter().cloned(),
             extent,
+            Some((&self.fullscreen_pipeline_cache, self.fullscreen_pipeline_epochs())),
         )
         .map(Some)
     }
@@ -3352,6 +3393,34 @@ impl ShaderPackRuntimeExecutor {
     /// the first preprocessing, lowering, or semantic-resource failure keeps
     /// the entire eventual source route unavailable instead of allowing a
     /// partial composite chain to look complete.
+    /// The post-terrain fullscreen chain (DH or ordinary) as shared owners,
+    /// memoized for the candidate epochs that prepared it.
+    pub(crate) fn shared_post_terrain_fullscreen_programs(
+        &self,
+        distant_horizons: bool,
+    ) -> GalResult<Vec<std::sync::Arc<LoweredFullscreenSourceProgram>>> {
+        let key = (
+            self.source_candidate_epoch,
+            self.distant_horizons_source_candidate_epoch,
+            distant_horizons,
+        );
+        if let Some((built, programs)) = self.prepared_program_memos.fullscreen.borrow().as_ref() {
+            if *built == key {
+                return Ok(programs.clone());
+            }
+        }
+        let programs = if distant_horizons {
+            self.prepared_lowered_distant_horizons_post_terrain_fullscreen_programs()?
+        } else {
+            self.prepared_lowered_post_terrain_fullscreen_programs()?
+        }
+        .into_iter()
+        .map(|program| std::sync::Arc::new(program.clone()))
+        .collect::<Vec<_>>();
+        *self.prepared_program_memos.fullscreen.borrow_mut() = Some((key, programs.clone()));
+        Ok(programs)
+    }
+
     pub(crate) fn prepared_lowered_post_terrain_fullscreen_programs(
         &self,
     ) -> GalResult<Vec<&LoweredFullscreenSourceProgram>> {
@@ -3420,13 +3489,14 @@ impl ShaderPackRuntimeExecutor {
         let programs = self.prepared_lowered_distant_horizons_depth_consumers()?;
         let mut plans = Vec::with_capacity(programs.len());
         for program in programs {
-            match FullscreenSourceExecutionPlan::stage(
+            match FullscreenSourceExecutionPlan::stage_cached(
                 gal,
                 program,
                 manifest,
                 targets,
                 external_inputs.iter().cloned(),
                 extent,
+                Some((&self.fullscreen_pipeline_cache, self.fullscreen_pipeline_epochs())),
             ) {
                 Ok(plan) => plans.push(plan),
                 Err(error) => {
@@ -3468,13 +3538,14 @@ impl ShaderPackRuntimeExecutor {
         }
         let mut plans = Vec::with_capacity(programs.len());
         for program in programs {
-            match FullscreenSourceExecutionPlan::stage(
+            match FullscreenSourceExecutionPlan::stage_cached(
                 gal,
                 program,
                 manifest,
                 targets,
                 external_inputs.iter().cloned(),
                 extent,
+                Some((&self.fullscreen_pipeline_cache, self.fullscreen_pipeline_epochs())),
             ) {
                 Ok(plan) => plans.push(plan),
                 Err(error) => {
@@ -3524,7 +3595,7 @@ impl ShaderPackRuntimeExecutor {
         }
         let mut plans = Vec::with_capacity(programs.len());
         for program in programs {
-            match FullscreenSourceExecutionPlan::stage(
+            match FullscreenSourceExecutionPlan::stage_cached(
                 gal,
                 program,
                 manifest,
@@ -3533,6 +3604,7 @@ impl ShaderPackRuntimeExecutor {
                     .iter()
                     .cloned(),
                 extent,
+                Some((&self.fullscreen_pipeline_cache, self.fullscreen_pipeline_epochs())),
             ) {
                 Ok(plan) => plans.push(plan),
                 Err(error) => {
@@ -4498,6 +4570,14 @@ impl ShaderPackRuntimeExecutor {
     pub(crate) fn prepared_lowered_cloud_source_program(
         &self,
     ) -> GalResult<Option<LoweredCloudSourceProgram>> {
+        memoized_source_program(&self.prepared_program_memos.cloud, self.source_candidate_epoch, || {
+            self.prepared_lowered_cloud_source_program_uncached()
+        })
+    }
+
+    fn prepared_lowered_cloud_source_program_uncached(
+        &self,
+    ) -> GalResult<Option<LoweredCloudSourceProgram>> {
         match &self.source_candidate {
             TerrainSourceCandidateState::Unavailable
             | TerrainSourceCandidateState::Disabled { .. }
@@ -4553,6 +4633,14 @@ impl ShaderPackRuntimeExecutor {
     pub(crate) fn prepared_lowered_weather_source_program(
         &self,
     ) -> GalResult<Option<LoweredWeatherSourceProgram>> {
+        memoized_source_program(&self.prepared_program_memos.weather, self.source_candidate_epoch, || {
+            self.prepared_lowered_weather_source_program_uncached()
+        })
+    }
+
+    fn prepared_lowered_weather_source_program_uncached(
+        &self,
+    ) -> GalResult<Option<LoweredWeatherSourceProgram>> {
         match &self.source_candidate {
             TerrainSourceCandidateState::Unavailable
             | TerrainSourceCandidateState::Disabled { .. }
@@ -4585,6 +4673,14 @@ impl ShaderPackRuntimeExecutor {
     /// named target writer, and per-frame resource coherence before any draw
     /// can execute.
     pub(crate) fn prepared_lowered_textured_material_source_program(
+        &self,
+    ) -> GalResult<Option<LoweredTexturedMaterialSourceProgram>> {
+        memoized_source_program(&self.prepared_program_memos.textured_material, self.source_candidate_epoch, || {
+            self.prepared_lowered_textured_material_source_program_uncached()
+        })
+    }
+
+    fn prepared_lowered_textured_material_source_program_uncached(
         &self,
     ) -> GalResult<Option<LoweredTexturedMaterialSourceProgram>> {
         match &self.source_candidate {
@@ -6639,7 +6735,12 @@ impl ShaderPackRuntimeExecutor {
         }
     }
 
+    fn fullscreen_pipeline_epochs(&self) -> (u64, u64) {
+        (self.source_candidate_epoch, self.distant_horizons_source_candidate_epoch)
+    }
+
     pub(crate) fn destroy(mut self, gal: &mut VulkanicGal) -> GalResult<()> {
+        self.fullscreen_pipeline_cache.destroy(gal);
         self.discard_vanilla_lightmap_submission(gal);
         if let Some(resources) = self.vanilla_lightmap_residency.take() {
             resources.destroy(gal)?;

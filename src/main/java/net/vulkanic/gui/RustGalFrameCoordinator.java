@@ -1849,22 +1849,26 @@ public final class RustGalFrameCoordinator {
 		if (frame == null || frame.meshInstances().isEmpty()) {
 			return;
 		}
-		List<Long> terrainKeys = new ArrayList<>();
-		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : frame.meshInstances()) {
+		// Primitive keys: sorting thousands of boxed Longs every frame was a
+		// measurable render-thread cost. The order and fingerprint are unchanged.
+		List<VulkanicGalBridge.WorldMeshInstanceRecord> instances = frame.meshInstances();
+		long[] terrainKeys = new long[instances.size()];
+		int terrainKeyCount = 0;
+		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : instances) {
 			if (instance.stratum() == RustGalWorldPrimitiveRenderer.STRATUM_WORLD_TERRAIN) {
-				terrainKeys.add(instance.meshKey() ^ Long.rotateLeft(instance.meshGeneration(), 17));
+				terrainKeys[terrainKeyCount++] = instance.meshKey() ^ Long.rotateLeft(instance.meshGeneration(), 17);
 			}
 		}
-		if (terrainKeys.isEmpty()) {
+		if (terrainKeyCount == 0) {
 			return;
 		}
-		terrainKeys.sort(Long::compare);
+		java.util.Arrays.sort(terrainKeys, 0, terrainKeyCount);
 		long fingerprint = 0xcbf29ce484222325L;
-		for (long key : terrainKeys) {
-			fingerprint ^= key;
+		for (int index = 0; index < terrainKeyCount; index++) {
+			fingerprint ^= terrainKeys[index];
 			fingerprint *= 0x100000001b3L;
 		}
-		String identity = "rust-vulkan-whole-frame:terrain:count=" + terrainKeys.size()
+		String identity = "rust-vulkan-whole-frame:terrain:count=" + terrainKeyCount
 			+ ":fingerprint=" + Long.toUnsignedString(fingerprint);
 		// Whole-frame terrain can complete before the deterministic capture hook
 		// has initialized for the first playable frame.  Associate the receipt

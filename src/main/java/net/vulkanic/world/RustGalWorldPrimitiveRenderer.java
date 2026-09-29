@@ -496,7 +496,10 @@ public final class RustGalWorldPrimitiveRenderer {
 	 */
 	private static final Map<Long, VulkanicGalBridge.WorldMeshInstanceRecord> ACTIVE_STATIC_TERRAIN_INSTANCES = new LinkedHashMap<>();
 	private static final LongOpenHashSet NEWLY_ADMITTED_STATIC_TERRAIN_KEYS = new LongOpenHashSet();
-	private static final int MAX_ACTIVE_STATIC_TERRAIN_INSTANCES = 4096;
+	// Visible sections plus the bounded shadow-candidate stream (each up to
+	// 4096 sections x 3 layers) are retained together. A smaller cap evicted
+	// live instances every frame and forced their records to be rebuilt.
+	private static final int MAX_ACTIVE_STATIC_TERRAIN_INSTANCES = 2 * 4096 * 3;
 	private static VulkanicGalBridge.TerrainFrameCamera pendingStaticTerrainCamera;
 	// First-person items have an explicit camera-space projection/depth domain.
 	// They never join ordinary entity meshes, even though both reuse the same
@@ -551,14 +554,18 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * vertex and index payload must not remain in the Java registry for every
 	 * visible chunk for the rest of a stationary camera session.
 	 */
-	private static final Map<Long, StaticTerrainMeshResidency> STATIC_TERRAIN_MESH_RESIDENCY = new LinkedHashMap<>();
+	// Primitive-keyed: these residency maps are only probed by key (never
+	// iterated), several times per terrain instance per frame.
+	private static final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<StaticTerrainMeshResidency> STATIC_TERRAIN_MESH_RESIDENCY =
+		new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
 	/**
 	 * Exact static-terrain dependency snapshot owned by the generation Rust has
 	 * accepted. Registration may already contain a newer pending generation;
 	 * keep this separate so that replacement cannot invalidate the last drawable
 	 * generation before the combined asset transaction succeeds.
 	 */
-	private static final Map<Long, StaticTerrainMeshResidency> ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY = new LinkedHashMap<>();
+	private static final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<StaticTerrainMeshResidency> ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY =
+		new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
 	private static final Map<Long, VulkanicGalBridge.WorldMeshSortedIndexRecord> WORLD_MESH_SORTED_INDICES = new LinkedHashMap<>();
 	private static final Set<Long> DIRTY_WORLD_MESH_SORTED_INDICES = new LinkedHashSet<>();
 	/** Explicit Rust resource retirements awaiting the next immutable mesh update. */
@@ -579,9 +586,11 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static long paintingAtlasFrameSequence = -1L;
 	private static long paintingAtlasFrameGeneration = -1L;
 	private static final Set<Integer> DIRTY_WORLD_MESH_TEXTURES = new LinkedHashSet<>();
-	private static final Map<Long, Long> UPLOADED_WORLD_MESH_GENERATIONS = new LinkedHashMap<>();
+	private static final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Long> UPLOADED_WORLD_MESH_GENERATIONS =
+		new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
 	/** Texture identity to its own accepted native upload generation (not the latest batch). */
-	private static final Map<Integer, Long> UPLOADED_WORLD_MESH_TEXTURES = new LinkedHashMap<>();
+	private static final it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<Long> UPLOADED_WORLD_MESH_TEXTURES =
+		new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>();
 	private static final AtlasAnimationPublications ATLAS_ANIMATION_PUBLICATIONS = new AtlasAnimationPublications();
 	private static long worldMeshAssetGeneration;
 	private static long uploadedWorldMeshAssetGeneration;
@@ -1722,9 +1731,9 @@ public final class RustGalWorldPrimitiveRenderer {
 					nextWorldMeshUploadGeneration = uploadGeneration;
 					uploadedWorldMeshAssetGeneration = uploadGeneration;
 					ORB_SEMANTICS.accepted(dirtyOrbs);
-					for (var orb : dirtyOrbs) UPLOADED_WORLD_MESH_GENERATIONS.put(orb.meshKey(), orb.meshGeneration());
+					for (var orb : dirtyOrbs) UPLOADED_WORLD_MESH_GENERATIONS.put(orb.meshKey(), Long.valueOf(orb.meshGeneration()));
 					for (VulkanicGalBridge.WorldMeshAssetRecord mesh : dirtyMeshes) {
-						UPLOADED_WORLD_MESH_GENERATIONS.put(mesh.meshKey(), mesh.meshGeneration());
+						UPLOADED_WORLD_MESH_GENERATIONS.put(mesh.meshKey(), Long.valueOf(mesh.meshGeneration()));
 						StaticTerrainMeshResidency terrainResidency = STATIC_TERRAIN_MESH_RESIDENCY.get(mesh.meshKey());
 						if (terrainResidency != null && terrainResidency.meshGeneration() == mesh.meshGeneration()) {
 							ACKNOWLEDGED_STATIC_TERRAIN_RESIDENCY.put(mesh.meshKey(), terrainResidency.copy());
@@ -1739,7 +1748,7 @@ public final class RustGalWorldPrimitiveRenderer {
 						PENDING_WORLD_MESH_RETIREMENTS.remove(retirement.meshKey(), retirement.meshGeneration());
 					}
 					for (VulkanicGalBridge.WorldMeshTextureAssetRecord texture : dirtyTextures) {
-						UPLOADED_WORLD_MESH_TEXTURES.put(texture.textureId(), uploadGeneration);
+						UPLOADED_WORLD_MESH_TEXTURES.put(texture.textureId(), Long.valueOf(uploadGeneration));
 						DIRTY_WORLD_MESH_TEXTURES.remove(texture.textureId());
 						ATLAS_ANIMATION_PUBLICATIONS.textureAccepted(uploadGeneration, texture);
 					}
@@ -4147,11 +4156,18 @@ public final class RustGalWorldPrimitiveRenderer {
 	/** Captures the semantic mesh streams before a multi-group model producer. */
 	public static ModelMeshBatchCheckpoint markModelMeshBatch() {
 		synchronized (LOCK) {
+			// Primitive snapshots (never mutated once published): an immutable
+			// boxed copy of the whole registry was a per-entity frame cost.
 			if (checkpointWorldMeshAssetKeys == null) {
-				checkpointWorldMeshAssetKeys = Set.copyOf(WORLD_MESH_ASSETS.keySet());
+				LongOpenHashSet keys = new LongOpenHashSet(WORLD_MESH_ASSETS.size());
+				for (Long key : WORLD_MESH_ASSETS.keySet()) keys.add(key.longValue());
+				checkpointWorldMeshAssetKeys = keys;
 			}
 			if (checkpointWorldMeshTextureKeys == null) {
-				checkpointWorldMeshTextureKeys = Set.copyOf(WORLD_MESH_TEXTURES.keySet());
+				it.unimi.dsi.fastutil.ints.IntOpenHashSet keys =
+					new it.unimi.dsi.fastutil.ints.IntOpenHashSet(WORLD_MESH_TEXTURES.size());
+				for (Integer key : WORLD_MESH_TEXTURES.keySet()) keys.add(key.intValue());
+				checkpointWorldMeshTextureKeys = keys;
 			}
 			return new ModelMeshBatchCheckpoint(
 				PENDING_MESH_INSTANCES.size(),

@@ -5210,7 +5210,7 @@ fn describe_distant_horizons_translucent_source_status(
 /// paired here so later confirmation can retire Rust-owned pipeline/resources
 /// only after the same one combined source submission succeeds.
 struct PreparedNamedSourceFullscreenConsumer {
-    program: LoweredFullscreenSourceProgram,
+    program: Arc<LoweredFullscreenSourceProgram>,
     plan: FullscreenSourceExecutionPlan,
     frame: FullscreenSourcePassFrame,
 }
@@ -6456,6 +6456,21 @@ struct DistantHorizonsVoxelSourceCacheEntry {
     mesh: TerrainVoxelSourceMesh,
 }
 
+struct LocalMaterialMemoGroup {
+    program: ProgramIdentity,
+    shader_pack_generation: u64,
+    base: TerrainSourceOwnedResourceSet,
+    entries: HashMap<(u32, u64), (TerrainSourceOwnedResourceSet, (u32, u64), Handle)>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct SourceUniformFrameMemoKey {
+    frame_id: u64,
+    world_generation: u64,
+    frame_time_bits: u32,
+    view_bits: [u32; 16],
+}
+
 struct TerrainVoxelSourceMemo {
     runtime_generation: Option<u64>,
     cull: Option<[[i32; 3]; 2]>,
@@ -6661,6 +6676,13 @@ pub struct WorldPrimitiveFrontend {
     /// Exact identity of the last frame whose terrain meshes all validated;
     /// an identical next frame skips re-validating each terrain mesh.
     source_terrain_validation_memo: Option<SourceTerrainValidationMemo>,
+    /// `source_uniform_frame_for_owned_resources` result for one frame id:
+    /// every input is fixed within a frame, and entity groups, terrain passes
+    /// and fullscreen stages each asked for it again (~1k times per frame).
+    source_uniform_frame_memo: Option<(SourceUniformFrameMemoKey, TerrainSourceUniformFrame)>,
+    /// Per-frame memo of `source_resources_for_local_material`: every entity
+    /// draw rebuilt the same merged availability/resource sets per texture.
+    local_material_resource_memo: Option<(u64, Vec<LocalMaterialMemoGroup>)>,
     /// Last voxel source mesh list, keyed by the exact terrain instances
     /// (key, generation, world transform bits) and cull box it was built for.
     terrain_voxel_source_memo: Option<TerrainVoxelSourceMemo>,
@@ -8001,6 +8023,26 @@ impl WorldPrimitiveFrontend {
     /// frontend. The source contract sees only the atlas extent; it never sees
     /// the Java asset record or a backend texture identity.
     pub(crate) fn source_uniform_frame_for_owned_resources(
+        &mut self,
+        frame: &WorldPrimitiveFrame,
+    ) -> GalResult<TerrainSourceUniformFrame> {
+        let key = SourceUniformFrameMemoKey {
+            frame_id: frame.frame_id,
+            world_generation: frame.shader_environment.world_generation,
+            frame_time_bits: frame.shader_environment.frame_time_seconds.to_bits(),
+            view_bits: frame.view_matrix.map(f32::to_bits),
+        };
+        if let Some((memo_key, uniforms)) = self.source_uniform_frame_memo.as_ref() {
+            if *memo_key == key {
+                return Ok(uniforms.clone());
+            }
+        }
+        let uniforms = self.compute_source_uniform_frame_for_owned_resources(frame)?;
+        self.source_uniform_frame_memo = Some((key, uniforms.clone()));
+        Ok(uniforms)
+    }
+
+    fn compute_source_uniform_frame_for_owned_resources(
         &mut self,
         frame: &WorldPrimitiveFrame,
     ) -> GalResult<TerrainSourceUniformFrame> {
@@ -13635,18 +13677,39 @@ impl WorldPrimitiveFrontend {
         // off-screen animated-model keys while the visible topology is
         // unchanged. Invalidate only plans that name one of the retired
         // keys, preserving the bounded cache for the still-live scene.
-        if !incoming_mesh_keys.is_empty()
-            || !replaced_texture_ids.is_empty()
-            || !decoded_sorted_indices.is_empty()
-        {
+        // A plan depends only on the meshes it names (plans key every
+        // instance's mesh key and generation), so a mesh or sorted-index
+        // payload invalidates just the plans naming that key; animated models
+        // re-upload every frame and must not flush the static terrain plans.
+        // Texture replacement can reclassify any section, so it flushes all.
+        if !replaced_texture_ids.is_empty() {
             self.mesh_batch_plan_cache.clear();
-        } else if !retirement_keys.is_empty() {
-            self.mesh_batch_plan_cache.retain(|entry| {
-                !entry
-                    .key
-                    .instances
+            self.source_terrain_validation_memo = None;
+        } else if !incoming_mesh_keys.is_empty()
+            || !decoded_sorted_indices.is_empty()
+            || !retirement_keys.is_empty()
+        {
+            let sorted_keys: BTreeSet<u64> = decoded_sorted_indices
+                .iter()
+                .map(|update| update.mesh_key)
+                .collect();
+            // Terrain coverage validation depends only on the assets of the
+            // meshes it validated (the same rule as the batch plans).
+            if self.source_terrain_validation_memo.as_ref().is_some_and(|memo| {
+                incoming_mesh_keys
                     .iter()
-                    .any(|instance| retirement_keys.contains(&instance.mesh_key))
+                    .chain(sorted_keys.iter())
+                    .chain(retirement_keys.iter())
+                    .any(|mesh_key| memo.mesh_keys.contains(mesh_key))
+            }) {
+                self.source_terrain_validation_memo = None;
+            }
+            self.mesh_batch_plan_cache.retain(|entry| {
+                !entry.key.instances.iter().any(|instance| {
+                    incoming_mesh_keys.contains(&instance.mesh_key)
+                        || sorted_keys.contains(&instance.mesh_key)
+                        || retirement_keys.contains(&instance.mesh_key)
+                })
             });
         }
         // Mesh generations are content identities. An update can replace a
@@ -14107,7 +14170,9 @@ impl WorldPrimitiveFrontend {
             } else {
                 mesh
             };
-            mesh.validate()?;
+            // Both entity source asset constructors validate the immutable
+            // (Arc-owned) asset; re-scanning its indices per instance was a
+            // hot-path cost with ~1k entity draws per frame.
             let section_indices = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
                 (0..mesh.sections.len())
                     .map(|index| {
@@ -14463,7 +14528,9 @@ impl WorldPrimitiveFrontend {
             } else {
                 mesh
             };
-            mesh.validate()?;
+            // Both entity source asset constructors validate the immutable
+            // (Arc-owned) asset; re-scanning its indices per instance was a
+            // hot-path cost with ~1k entity draws per frame.
             let section_indices = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
                 (0..mesh.sections.len())
                     .map(|index| {
@@ -15172,6 +15239,16 @@ impl WorldPrimitiveFrontend {
         }
         let texture_generation = self.source_local_texture_generation(texture_id)?;
         self.ensure_source_local_material_texture_resources(gal, texture_id, frame_id)?;
+        if let Some(hit) = self.local_material_memo_lookup(
+            program.identity(),
+            program.shader_pack_generation(),
+            base_resources,
+            texture_id,
+            texture_generation,
+            frame_id,
+        ) {
+            return Ok(hit);
+        }
         let key = LoweredTexturedMaterialSourceLocalTextureKey {
             shader_pack_generation: program.shader_pack_generation(),
             world_generation: base_resources.availability().world_generation(),
@@ -15241,7 +15318,88 @@ impl WorldPrimitiveFrontend {
         let resources =
             TerrainSourceOwnedResourceSet::merge([&base_without_local_texture, &local_resources])?;
         program.require_semantic_resources(resources.availability())?;
+        self.local_material_memo_store(
+            program.identity(),
+            program.shader_pack_generation(),
+            base_resources,
+            texture_id,
+            key.texture_generation,
+            frame_id,
+            (resources.clone(), (texture_id, key.texture_generation), combined_sampler),
+        );
         Ok((resources, (texture_id, key.texture_generation)))
+    }
+
+    fn local_material_memo_lookup(
+        &self,
+        program: &ProgramIdentity,
+        shader_pack_generation: u64,
+        base: &TerrainSourceOwnedResourceSet,
+        texture_id: u32,
+        texture_generation: u64,
+        frame_id: u64,
+    ) -> Option<(TerrainSourceOwnedResourceSet, (u32, u64))> {
+        let (memo_frame, groups) = self.local_material_resource_memo.as_ref()?;
+        if *memo_frame != frame_id {
+            return None;
+        }
+        let group = groups.iter().find(|group| {
+            group.shader_pack_generation == shader_pack_generation
+                && &group.program == program
+                && &group.base == base
+        })?;
+        let (resources, local_texture, combined_sampler) =
+            group.entries.get(&(texture_id, texture_generation))?;
+        // The combined sampler must still be the live cached one.
+        let live = self
+            .lowered_textured_material_source_local_texture_resources
+            .get(&LoweredTexturedMaterialSourceLocalTextureKey {
+                shader_pack_generation,
+                world_generation: base.availability().world_generation(),
+                texture_id,
+                texture_generation,
+            })
+            .map(|resources| resources.combined_sampler);
+        (live == Some(*combined_sampler)).then(|| (resources.clone(), *local_texture))
+    }
+
+    fn local_material_memo_store(
+        &mut self,
+        program: &ProgramIdentity,
+        shader_pack_generation: u64,
+        base: &TerrainSourceOwnedResourceSet,
+        texture_id: u32,
+        texture_generation: u64,
+        frame_id: u64,
+        value: (TerrainSourceOwnedResourceSet, (u32, u64), Handle),
+    ) {
+        if self
+            .local_material_resource_memo
+            .as_ref()
+            .is_none_or(|(memo_frame, _)| *memo_frame != frame_id)
+        {
+            self.local_material_resource_memo = Some((frame_id, Vec::new()));
+        }
+        let (_, groups) = self.local_material_resource_memo.as_mut().expect("just set");
+        let index = match groups.iter().position(|group| {
+            group.shader_pack_generation == shader_pack_generation
+                && &group.program == program
+                && &group.base == base
+        }) {
+            Some(index) => index,
+            None => {
+                groups.push(LocalMaterialMemoGroup {
+                    program: program.clone(),
+                    shader_pack_generation,
+                    base: base.clone(),
+                    entries: HashMap::new(),
+                });
+                groups.len() - 1
+            }
+        };
+        groups[index]
+            .entries
+            .insert((texture_id, texture_generation), value);
     }
 
     /// Creates a local-textured source program's set-one bindings from a complete
@@ -16885,7 +17043,7 @@ impl WorldPrimitiveFrontend {
     )> {
         let interface = program.execution_interface();
         interface.validate()?;
-        mesh.validate()?;
+        // `mesh` is an immutable asset validated by its constructor.
         let geometry_key =
             self.ensure_lowered_local_source_geometry_resources(gal, program, mesh)?;
         let required_instance_bytes = u64::try_from(instance_transforms.len()).map_err(|_| {
@@ -21914,7 +22072,7 @@ impl WorldPrimitiveFrontend {
     fn write_selected_source_fullscreen_chain_receipt(
         &self,
         frame: &WorldPrimitiveFrame,
-        programs: &[LoweredFullscreenSourceProgram],
+        programs: &[Arc<LoweredFullscreenSourceProgram>],
     ) {
         if !self.source_execution_enabled()
             || !matches!(
@@ -22016,7 +22174,7 @@ impl WorldPrimitiveFrontend {
     fn write_selected_source_fullscreen_probe_receipt(
         &self,
         frame: &WorldPrimitiveFrame,
-        programs: &[LoweredFullscreenSourceProgram],
+        programs: &[Arc<LoweredFullscreenSourceProgram>],
     ) {
         let Ok(mode) = std::env::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE") else {
             return;
@@ -22212,14 +22370,7 @@ impl WorldPrimitiveFrontend {
             let runtime = self.shader_runtime.as_ref().ok_or_else(|| {
                 GalError::backend("shader runtime vanished before complete fullscreen staging")
             })?;
-            if source_uses_distant_horizons {
-                runtime.prepared_lowered_distant_horizons_post_terrain_fullscreen_programs()?
-            } else {
-                runtime.prepared_lowered_post_terrain_fullscreen_programs()?
-            }
-            .into_iter()
-            .cloned()
-            .collect::<Vec<_>>()
+            runtime.shared_post_terrain_fullscreen_programs(source_uses_distant_horizons)?
         };
         self.write_selected_source_fullscreen_chain_receipt(frame, &programs);
         self.write_selected_source_fullscreen_probe_receipt(frame, &programs);
@@ -22390,7 +22541,7 @@ impl WorldPrimitiveFrontend {
             clear_targets_this_pass: None,
         };
         Ok(Some(PreparedNamedSourceFullscreenConsumer {
-            program,
+            program: Arc::new(program),
             plan,
             frame,
         }))
@@ -22503,7 +22654,7 @@ impl WorldPrimitiveFrontend {
                     color_attachment_before: Vec::new(),
                     clear_targets_this_pass: None,
                 },
-                program: program.clone(),
+                program: Arc::new(program.clone()),
                 plan,
             });
         }
@@ -24584,8 +24735,7 @@ impl WorldPrimitiveFrontend {
             .map(|instance| (instance.stratum, instance.mesh_key, instance.mesh_generation))
             .collect::<Vec<_>>();
         let terrain_memo_hit = self.source_terrain_validation_memo.as_ref().is_some_and(|memo| {
-            memo.mesh_asset_generation == self.mesh_asset_generation
-                && memo.material_ids == material_ids
+            memo.material_ids == material_ids
                 && memo.pack_generation == pack_generation
                 && memo.identities == identities
                 && (!memo.any_translucent
@@ -24601,6 +24751,7 @@ impl WorldPrimitiveFrontend {
         // The translucent writer's availability is frame-invariant; resolve it
         // at most once instead of per translucent mesh.
         let mut translucent_stage_status: Option<Option<String>> = None;
+        let mut entity_writer_checked = false;
         for instance in &frame.mesh_instances {
             validate_mesh_instance(instance, frame)?;
             if instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY != 0 {
@@ -24632,18 +24783,23 @@ impl WorldPrimitiveFrontend {
                 continue;
             }
             if instance.stratum == WORLD_STRATUM_ENTITY_MESH {
-                let runtime = self.shader_runtime.as_ref().ok_or_else(|| {
-                    GalError::unsupported_feature(
-                        "selected source frame has entity work but no Rust shader runtime",
-                    )
-                })?;
-                runtime
-                    .prepared_lowered_entity_source_program()?
-                    .ok_or_else(|| {
+                // The writer's availability is frame-invariant (and resolving
+                // it clones the prepared program); check it once per frame.
+                if !entity_writer_checked {
+                    let runtime = self.shader_runtime.as_ref().ok_or_else(|| {
                         GalError::unsupported_feature(
-                            "selected source frame has entity meshes but no lowered gbuffers_entities writer",
+                            "selected source frame has entity work but no Rust shader runtime",
                         )
                     })?;
+                    runtime
+                        .prepared_lowered_entity_source_program()?
+                        .ok_or_else(|| {
+                            GalError::unsupported_feature(
+                                "selected source frame has entity meshes but no lowered gbuffers_entities writer",
+                            )
+                        })?;
+                    entity_writer_checked = true;
+                }
                 let mesh = self.source_entity_mesh_asset(
                     instance.mesh_key,
                     instance.mesh_generation,
@@ -24711,7 +24867,7 @@ impl WorldPrimitiveFrontend {
         }
         if !terrain_memo_hit {
             self.source_terrain_validation_memo = Some(SourceTerrainValidationMemo {
-                mesh_asset_generation: self.mesh_asset_generation,
+                mesh_keys: identities.iter().map(|(_, mesh_key, _)| *mesh_key).collect(),
                 material_ids,
                 pack_generation,
                 identities,
@@ -29014,14 +29170,30 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         generation: u64,
         frame_target: Handle,
-        frame: &WorldPrimitiveFrame,
+        frame: &mut WorldPrimitiveFrame,
     ) -> GalResult<()> {
         // The selected route reached this method only after a prior complete
         // transaction armed it. The provisional assembly below intentionally
         // lacks the frame's merged DH depth/color roles, so retain that arm
         // until the same transaction performs its final role validation.
         let preserve_source_execution_arm = self.source_execution_armed;
-        let mut snapshot = frame.clone();
+        // Clone without the per-instance streams (cleared below anyway):
+        // copying thousands of mesh instances only to drop them was a
+        // measurable per-frame cost.
+        let mut snapshot = {
+            let mesh_instances = std::mem::take(&mut frame.mesh_instances);
+            let first_person_mesh_instances =
+                std::mem::take(&mut frame.first_person_mesh_instances);
+            let lod_instances = std::mem::take(&mut frame.lod_instances);
+            let dh_generic_boxes = std::mem::take(&mut frame.dh_generic_boxes);
+            let snapshot = frame.clone();
+            frame.mesh_instances = mesh_instances;
+            frame.first_person_mesh_instances = first_person_mesh_instances;
+            frame.lod_instances = lod_instances;
+            frame.dh_generic_boxes = dh_generic_boxes;
+            snapshot
+        };
+        let frame: &WorldPrimitiveFrame = frame;
         // This provisional graph owns no presentation and is discarded. Its
         // only purpose is to refresh target/resource semantics before the
         // actual selected-source planner consumes `frame` below. Do not make
@@ -29221,7 +29393,7 @@ impl WorldPrimitiveFrontend {
             self.pre_dropped_suppressed_cloud_quads += (before - frame.material_quads.len()) as u64;
         }
         self.write_runtime_source_execution_attempt(&frame, "entered", started.elapsed());
-        self.prepare_runtime_source_snapshot(gal, generation, frame_target, &frame)?;
+        self.prepare_runtime_source_snapshot(gal, generation, frame_target, &mut frame)?;
         self.write_runtime_source_execution_attempt(&frame, "snapshot-prepared", started.elapsed());
         // Route arming was established by a prior confirmed frame. Recheck
         // the current frame after its exact source snapshot exists: a newly
@@ -31009,10 +31181,13 @@ impl WorldPrimitiveFrontend {
         // the vanilla route; only camera-sorted index order is rebuilt.
         let mut mesh_identities = std::mem::take(&mut self.mesh_batch_identity_scratch);
         mesh_identities.clear();
-        mesh_identities.extend(frame.mesh_instances.iter().map(mesh_batch_instance_key));
+        // Only source-terrain batches are consumed here (entities, glint and
+        // hands have their own writers), so key and build terrain-only plans.
+        mesh_identities.extend(frame.mesh_instances.iter().map(terrain_batch_instance_key));
         let has_camera_sorted_meshes = frame.mesh_instances.iter().any(|instance| {
             instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
                 && MeshBatchSelection::All.includes(instance)
+                && is_source_terrain_mesh_stratum(instance.stratum)
         });
         let static_batches = self.cached_mesh_batch_plan(
             &frame,
@@ -31025,6 +31200,7 @@ impl WorldPrimitiveFrontend {
                 MeshBatchSelection::All
             },
             &mesh_identities,
+            true,
         );
         let shadow_batches = self.cached_mesh_batch_plan(
             &frame,
@@ -31033,20 +31209,21 @@ impl WorldPrimitiveFrontend {
             true,
             MeshBatchSelection::ShadowOnly,
             &mesh_identities,
+            true,
         );
         self.mesh_batch_identity_scratch = mesh_identities;
         let (static_batches, shadow_batches) = (static_batches?, shadow_batches?);
         let batches: Arc<Vec<MeshBatch>> = if has_camera_sorted_meshes {
             let mut combined = Vec::with_capacity(static_batches.len() + 64);
             combined.extend(static_batches.iter().cloned());
-            combined.extend(mesh_batches_selected(
+            combined.extend(mesh_batches_filtered(
                 &frame,
                 self,
                 color_format,
                 RasterYDirection::Up,
                 true,
-                false,
                 MeshBatchSelection::CameraSorted,
+                true,
             )?);
             sort_mesh_batches(&mut combined, &frame);
             Arc::new(combined)
@@ -34370,6 +34547,7 @@ impl WorldPrimitiveFrontend {
                 MeshBatchSelection::All
             },
             &mesh_identity_scratch,
+            false,
         )?;
         self.mesh_batch_identity_scratch = mesh_identity_scratch;
         let mut sorted_index_payload = Vec::new();
@@ -40467,6 +40645,13 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         update: WorldMeshSortedIndexUpdate,
     ) -> GalResult<()> {
+        if self
+            .source_terrain_validation_memo
+            .as_ref()
+            .is_some_and(|memo| memo.mesh_keys.contains(&update.mesh_key))
+        {
+            self.source_terrain_validation_memo = None;
+        }
         let asset = self.mesh_assets.get_mut(&update.mesh_key).ok_or_else(|| {
             GalError::invalid_argument(format!(
                 "world mesh sorted index update references unknown mesh key {}",
@@ -45918,7 +46103,10 @@ struct MeshBatchInstanceKey {
 /// writer status, which is re-resolved every frame (`any_translucent`).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct SourceTerrainValidationMemo {
-    mesh_asset_generation: u64,
+    /// Mesh keys the memo validated. Mesh updates drop the memo only when
+    /// they touch one of these keys: animated entity models re-upload every
+    /// frame and must not force the static terrain set to re-validate.
+    mesh_keys: std::collections::HashSet<u64>,
     material_ids: bool,
     pack_generation: Option<u64>,
     identities: Vec<(u32, u64, u64)>,
@@ -45932,6 +46120,9 @@ struct MeshBatchPlanKey {
     g_buffer: bool,
     allow_optical: bool,
     selection: MeshBatchSelection,
+    /// Only source-terrain strata are batched; other instances are masked in
+    /// `instances` so their per-frame churn does not invalidate the plan.
+    terrain_only: bool,
     instances: Vec<MeshBatchInstanceKey>,
 }
 
@@ -47498,20 +47689,21 @@ impl WorldPrimitiveFrontend {
         g_buffer: bool,
         selection: MeshBatchSelection,
         identities: &[MeshBatchInstanceKey],
+        terrain_only: bool,
     ) -> GalResult<Arc<Vec<MeshBatch>>> {
         let camera_dependent = frame.mesh_instances.iter().any(|instance| {
             instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
                 && selection.includes(instance)
         });
         if camera_dependent {
-            return Ok(Arc::new(mesh_batches_selected(
+            return Ok(Arc::new(mesh_batches_filtered(
                 frame,
                 self,
                 color_format,
                 raster_y_direction,
                 g_buffer,
-                false,
                 selection,
+                terrain_only,
             )?));
         }
         if let Some(entry) = self.mesh_batch_plan_cache.iter().find(|entry| {
@@ -47520,18 +47712,19 @@ impl WorldPrimitiveFrontend {
                 && entry.key.g_buffer == g_buffer
                 && !entry.key.allow_optical
                 && entry.key.selection == selection
+                && entry.key.terrain_only == terrain_only
                 && entry.key.instances == identities
         }) {
             return Ok(Arc::clone(&entry.batches));
         }
-        let batches = Arc::new(mesh_batches_selected(
+        let batches = Arc::new(mesh_batches_filtered(
             frame,
             self,
             color_format,
             raster_y_direction,
             g_buffer,
-            false,
             selection,
+            terrain_only,
         )?);
         const MAX_MESH_BATCH_PLAN_CACHE: usize = 4;
         if self.mesh_batch_plan_cache.len() >= MAX_MESH_BATCH_PLAN_CACHE {
@@ -47544,6 +47737,7 @@ impl WorldPrimitiveFrontend {
                 g_buffer,
                 allow_optical: false,
                 selection,
+                terrain_only,
                 instances: identities.to_vec(),
             },
             batches: Arc::clone(&batches),
@@ -47655,6 +47849,31 @@ fn per_section_terrain_animation_disabled() -> bool {
     })
 }
 
+/// Terrain-only variant used by the selected-source route, which draws other
+/// strata through their own writers: skipping them is output-identical for
+/// its terrain batches and keeps entity churn out of the cached plans.
+fn mesh_batches_filtered(
+    frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+    g_buffer: bool,
+    selection: MeshBatchSelection,
+    terrain_only: bool,
+) -> GalResult<Vec<MeshBatch>> {
+    mesh_batches_core(
+        frame,
+        frontend,
+        color_format,
+        raster_y_direction,
+        g_buffer,
+        false,
+        selection,
+        None,
+        terrain_only,
+    )
+}
+
 fn mesh_batches_selected_with_sorted_indices(
     frame: &WorldPrimitiveFrame,
     frontend: &WorldPrimitiveFrontend,
@@ -47663,7 +47882,31 @@ fn mesh_batches_selected_with_sorted_indices(
     g_buffer: bool,
     allow_optical: bool,
     selection: MeshBatchSelection,
+    sorted_indices: Option<&mut Vec<u8>>,
+) -> GalResult<Vec<MeshBatch>> {
+    mesh_batches_core(
+        frame,
+        frontend,
+        color_format,
+        raster_y_direction,
+        g_buffer,
+        allow_optical,
+        selection,
+        sorted_indices,
+        false,
+    )
+}
+
+fn mesh_batches_core(
+    frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+    g_buffer: bool,
+    allow_optical: bool,
+    selection: MeshBatchSelection,
     mut sorted_indices: Option<&mut Vec<u8>>,
+    terrain_only: bool,
 ) -> GalResult<Vec<MeshBatch>> {
     // Preserve first-seen batch order for deterministic submission, but use a
     // hash index for membership.  The previous ordered tree made terrain
@@ -47681,6 +47924,9 @@ fn mesh_batches_selected_with_sorted_indices(
     >::with_capacity_and_hasher(frame.mesh_instances.len(), Default::default());
     for (index, instance) in frame.mesh_instances.iter().enumerate() {
         if !selection.includes(instance) {
+            continue;
+        }
+        if terrain_only && !is_source_terrain_mesh_stratum(instance.stratum) {
             continue;
         }
         if instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY != 0 {
@@ -47845,11 +48091,35 @@ fn mesh_batch_plan_key(
         g_buffer,
         allow_optical,
         selection: MeshBatchSelection::All,
+        terrain_only: false,
         instances: frame
             .mesh_instances
             .iter()
             .map(mesh_batch_instance_key)
             .collect(),
+    }
+}
+
+/// Identity used by terrain-only batch plans: non-terrain instances keep their
+/// position (batches store instance indices) but not their churning identity.
+fn terrain_batch_instance_key(instance: &WorldMeshInstanceRequest) -> MeshBatchInstanceKey {
+    if is_source_terrain_mesh_stratum(instance.stratum) {
+        mesh_batch_instance_key(instance)
+    } else {
+        MeshBatchInstanceKey {
+            stratum: u32::MAX,
+            mesh_key: 0,
+            mesh_generation: 0,
+            mesh_section_index: 0,
+            depth_policy: 0,
+            cull_policy: 0,
+            winding: 0,
+            flags: 0,
+            terrain_visible_facing_mask: 0,
+            model_submission_order: None,
+            standard_foil_kind: None,
+            has_decal_foil: false,
+        }
     }
 }
 
@@ -56327,7 +56597,7 @@ mod tests {
         // because its resource roles are refreshed for a new frame.
         frontend.source_execution_armed = true;
         frontend
-            .prepare_runtime_source_snapshot(&mut gal, 1, target, &frame)
+            .prepare_runtime_source_snapshot(&mut gal, 1, target, &mut frame)
             .expect("native source conformance must retain the exact frame-scoped source snapshot");
         assert!(frontend.source_execution_armed);
         assert!(
@@ -63947,6 +64217,7 @@ mod tests {
                     true,
                     selection,
                     &identities,
+                    false,
                 )
                 .unwrap()
         };

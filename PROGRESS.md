@@ -94,20 +94,28 @@ screen button labels:** `SmoothedFloat` GUI fades used the Iris shader timer,
 which Java does not advance on the Rust route (alpha stuck at 0); the shader
 screen's transitions now use wall-clock deltas. Pre-existing Java failures:
 `CloudSemanticAdmissionTest`/`NativeParticleCollectionTest` (stale source-text asserts).
-**Perf (RD10, 2026-09-27/28):** ~33 -> ~50 fps, frontend 23.9 -> 12.9 ms (static
-camera). Source route reuses identity-keyed static/shadow batch plans (batching
-4.0 -> 0.3 ms); terrain coverage validation memoized (3.3 -> 0.4 ms); source
-terrain geometry lives in shared 128 MiB pages (indices rebased at upload,
-completion-gated release) and is multi-drawn (1280-byte instance blocks via
-`firstInstance`, per-slot indirect buffers; GAL 15k -> 4k ops). A/B:
-`MATTMC_RUST_DISABLE_SOURCE_TERRAIN_MULTIDRAW` / `_PAGES`. Left: plan ~8.5 ms,
-Java ~7 ms, fullscreen plan re-creation 1.3 ms. **Walking** (tour, 6 blocks/s):
-frontend 45 -> 35 ms. Camera-sorted translucency reuses its topological order
-while the camera stays in one cell of the sort's plane arrangement (per-axis
-extent/separator breakpoints + slanted-plane sides; exact, property-tested;
-Sodium re-sorts on plane crossings) plus cached batches: 5.4 -> 0.65 ms; batch
-keys use the GAL's Fx-style hasher (shadow plan 4.6 -> 3.6 ms). Left while
-moving: shadow-only plan misses every frame, source plan ~14 ms, voxels ~7 ms.
+**Perf (2026-09-27/28).** Perf matrix `--profile performance --workload-profile
+settled-static|moving-camera --world Origin`. Static: shader-on 31 -> 48.1 fps
+(Frozen 205; native 24 -> 13.3 ms, Java ~7 ms), shader-off 166 -> 176 fps
+(Frozen 355). Moving: shader-off 296 vs Frozen 422 (70%), shader-on 34 vs 286.
+Done: shared 128 MiB source geometry pages + multidraw (A/B env
+`MATTMC_RUST_DISABLE_SOURCE_TERRAIN_MULTIDRAW` / `_PAGES`); identity-keyed
+batch plans (named route plans terrain only; mesh updates drop only plans
+naming that key); plane-arrangement-cell translucent order reuse (exact,
+property-tested); terrain coverage memo keyed on its own mesh keys (the global
+asset generation changes every frame via entity models; 4.5 -> 0.3 ms);
+memoized prepared programs (entity writer checked once per frame; cloud/
+weather/textured/DH memos by candidate epoch; fullscreen chain shared as
+`Arc`); `FullscreenPipelineCache` keeps view-independent fullscreen layouts/
+shaders/pipelines across frames (exact stage+binding match; target/pass stay
+per frame; 1.5 -> 0.16 ms); uniform-frame and local-material memos; no frame
+clone of instance streams for the provisional snapshot. Java: primitive
+residency maps, per-section solid/cutout/translucent asset rows, shadow loop
+skips camera-visible sections, retained static instances cap 24576 (4096
+evicted every frame), primitive readiness sort and checkpoint snapshots.
+Left (shader-on, ~12 ms plan): ~1k entity draws ~4.5 ms, terrain+shadow draws
+~3.6 ms, GAL submit 2.2 ms, Java extraction 3.4 ms + flush 1.4 ms. 100 fps
+would need pipelining Java with Rust or persistent recorded plans.
 **Teleport/validation/voxels (2026-09-28).** Temporary tour (6 teleports, F2
 shots, 40 s walk; validation on): 0 VUIDs, no fallback after arming. Fixed: F2
 capture after frame finalization restores PRESENT_SRC; the named route updates
@@ -123,9 +131,9 @@ snapshots, volume culling, memoized mesh list, per-box patches for same-cell
 changes (one transfer scope each: GAL texture hazards are per subresource),
 in-place shift on cell crossings. 230 ms/frame while chunks load -> 0.5 ms
 static, walking p50 3.9/p95 20 ms. Gap: the per-asset voxel vertex cache keeps
-pack material ids until the asset reloads. Final pairs: day 2.24/1.81/2.14,
-glass 6.65/5.64/4.42, down 6.95/7.70/6.74, off 0.19/0.36/0.35, gun 2.13/1.68/2.10,
-pane 2.34/1.82/2.10, 0 VUIDs; Rust suite 1877. Entity/hand source normals are
+pack material ids until the asset reloads. Pairs after the perf pass: day 2.26/1.82/2.12,
+glass 6.67/5.61/4.42, down 6.83/7.54/6.60, off 0.13/0.22/0.22, gun 2.07/1.63/2.07,
+pane 2.32/1.81/2.10, 0 VUIDs; Rust suite 1877. Entity/hand source normals are
 Iris's in-level BufferBuilder face normal (diagonal cross, authored side; the
 vertex stage flips it under a mirroring pose): cow 2.09/1.64/2.06, gun
 2.11/1.66/2.09, banner 2.22/1.87/2.27. Gun gap left: muzzle cap/front sight px.
@@ -175,17 +183,15 @@ Source geometry (~0.9 GiB at RD 10) is device-local with staged uploads, cap 2 G
 (profile only the release Rust profile). F2 screenshots: Rust copies the completed
 frame target before present; Java only encodes the PNG. Resize re-arms the route.
 
-Deferred stages run at Iris's `beginTranslucents` boundary (DH route keeps its
-old order until Goal 4). Recheck shader-off vanilla/DH after any shared
-resource or scheduling change. Do not claim Goal 3 complete until its remaining
-source coverage and clean Vulkan run are verified.
+Deferred stages run at Iris's `beginTranslucents` (DH keeps its order until Goal 4).
+Recheck shader-off vanilla/DH after shared resource/scheduling changes. Goal 3 is
+not complete until remaining source coverage and a clean Vulkan run are verified.
 
 ## Retained architecture
 
-Rust separates shadow-only terrain candidates from camera-color draws. The
-bounded one-section CPU halo and source-derived advanced shadow frustum admit
-off-camera casters only to the shadow pass. Candidate admission applies
-Sodium's 64-block cylinder. The shadow target uses the pack's 2048-square
+Rust separates shadow-only terrain candidates from camera-color draws; the CPU
+halo and source-derived shadow frustum admit off-camera casters only to the
+shadow pass (Sodium's 64-block cylinder). The shadow target uses the pack's 2048-square
 extent and Iris's opaque-white shadow-color clear. Keep one Rust-owned
 frame/presenter, immutable asset validation, indirect terrain submission,
 source queue settling, and static fragment specialization intact.

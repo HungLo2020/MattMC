@@ -104,11 +104,12 @@ pub(crate) const DISTANT_HORIZONS_EXACT_ATLAS_SOURCE_VERTEX_BYTES: usize = 56;
 pub(crate) const DISTANT_HORIZONS_SOURCE_COLUMN_FRAME_BYTES: usize = 128;
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct ProgramIdentity(String);
+/// Shared so per-draw cache keys clone it without allocating.
+pub struct ProgramIdentity(std::sync::Arc<str>);
 
 impl ProgramIdentity {
     pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
+        Self(std::sync::Arc::from(value.into()))
     }
 
     pub fn as_str(&self) -> &str {
