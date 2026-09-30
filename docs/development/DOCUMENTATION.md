@@ -5,12 +5,41 @@ and follow the relevant section indexes before changing a subsystem. The
 repository's [README Agents section](https://github.com/HungLo2020/MattMC/blob/master/README.md#agents) holds the shared
 agent instructions; `AGENTS.md` links to that same file.
 
+## Audience and placement
+
+- `docs/development/` is for information developers need or find useful when
+  building, changing, testing, profiling, or debugging the project.
+- Organize developer topics into relevant system and subsystem directories,
+  such as `development/world/levelgen/`, `development/rendering/`, and
+  `development/tooling/`. Put shared testing procedures in `development/testing/`
+  and subsystem-specific verification beside that subsystem's guidance.
+  Keep the development root for its index and shared orientation or conventions.
+- Everything outside `docs/development/` in the documentation tree is for
+  players: gameplay, setup and use, troubleshooting, and player-facing changes.
+  Explain what players can do and what affects their experience.
+- When reorganizing existing pages, move developer material into the appropriate
+  development subdirectory and update the directory indexes, incoming links,
+  and wiki navigation together.
+
+## Write for usefulness
+
+- Help the reader complete a task or make a decision. Prioritize working commands,
+  prerequisites, design reasons, important constraints, common pitfalls, and
+  troubleshooting steps relevant to that topic.
+- Link to source code for implementation details. Avoid class-by-class inventories
+  and prose that merely repeats what functions do.
+- Keep each page short, focused, and easy to scan. Use brief explanations and
+  small examples; remove repetition, filler, and exhaustive implementation history.
+- Lead with what the reader needs now. Put necessary deep reference material or
+  detailed measurement evidence in a separate, clearly labeled page or artifact
+  and link to it. Preserve essential correctness constraints and verification limits.
+
 ## Maintain pages with the implementation
 
 - Update the relevant architecture, development, testing, and gameplay pages
   when behavior, commands, ownership, or file locations change.
 - Document a topic once and link to it from related pages. Keep the README's
-  agent guidance short and put detailed procedures here in `docs/`.
+  agent guidance short and put developer procedures under `docs/development/`.
 - Label proposed work and historical measurements. Do not present an old
   benchmark or acceptance result as verification of a newer implementation.
 - Repair incoming links when moving or removing a page. Preserve established

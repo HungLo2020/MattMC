@@ -40,6 +40,11 @@ nav:
   - Home: index.md
   - Gameplay: gameplay/Gameplay.md
   - Testing: testing/home.md
-  - Development: development/home.md
+  - Development:
+      - Overview: development/home.md
+      - Tooling: development/tooling/index.md
+      - World:
+          - Overview: development/world/index.md
+          - World Generation: development/world/levelgen/index.md
   - Changelog: changelog/CHANGELOG.md
   - Changes: changes/changes.md

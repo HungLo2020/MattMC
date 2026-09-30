@@ -1,12 +1,14 @@
 # Development Docs
 
-Start here for development-focused project notes and workflows.
+Practical guidance for building, changing, testing, and debugging MattMC.
+Developer topics belong in relevant system and subsystem subdirectories here;
+documentation elsewhere in `docs/` is for players.
 
-- [Developer Tips and Tools](DEV-TIPS-TOOLS.md)
+Keep guidance short and useful: explain workflows, constraints, and troubleshooting,
+and link to source for implementation details. Follow the
+[documentation maintenance guide](DOCUMENTATION.md) when adding or updating pages.
+
 - [Project Architecture](PROJECT-ARCHITECTURE.md)
 - [Documentation Maintenance](DOCUMENTATION.md)
-- [Shared Agent Skills](AGENT-SKILLS.md)
-- [Rust Noise](RUST-NOISE.md)
-- [Rust Density](RUST-DENSITY.md)
-- [Rust Surface](RUST-SURFACE.md)
-- [Rust World-Generation Organization](RUST-WORLDGEN-ORGANIZATION.md)
+- [Developer Tooling](tooling/index.md)
+- [World Systems](world/index.md)

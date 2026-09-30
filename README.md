@@ -31,6 +31,12 @@ May need to launch with "code --disable-gpu" on linux. stupid.
   and read the relevant development, testing, and feature documentation.
 - Update affected documentation alongside code changes. Keep documented
   behavior, architecture, commands, and file paths accurate.
+- Put developer documentation in `docs/development/`, organized into relevant
+  system and subsystem subdirectories. Documentation elsewhere in `docs/` is
+  for players; write it for that audience.
+- Make developer docs practical: explain how to work on a subsystem, its important
+  constraints, useful commands, and troubleshooting. Link to code for implementation
+  details instead of restating it. Keep pages short, focused, and easy to scan.
 - Preserve the documentation/wiki hierarchy. Every documentation directory
   must have one clearly identified index linking to every other Markdown
   file directly inside it and to each immediate child documentation directory's index.
