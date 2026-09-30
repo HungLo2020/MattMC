@@ -15,6 +15,7 @@ use crate::render::vulkanic::commands::{
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
 use crate::render::vulkanic::metrics::elapsed_nanos_u64;
+use crate::render::vulkanic::resources::{GpuProfileTag, GPU_PROFILE_SCOPE_COUNT};
 use crate::render::vulkanic::sync::SubmissionId;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -35,14 +36,7 @@ pub(super) struct VulkanLoweringMetrics {
     pub(super) wait_count: u64,
     pub(super) device_wait_idle_count: u64,
     pub(super) gpu_timestamp_status: u64,
-    pub(super) gpu_shadow_depth_nanos: u64,
-    pub(super) gpu_terrain_opaque_nanos: u64,
-    pub(super) gpu_terrain_cutout_nanos: u64,
-    pub(super) gpu_deferred_lighting_nanos: u64,
-    pub(super) gpu_composite0_nanos: u64,
-    pub(super) gpu_composite1_nanos: u64,
-    pub(super) gpu_final_output_nanos: u64,
-    pub(super) gpu_distant_horizons_opaque_nanos: u64,
+    pub(super) gpu_scope_nanos: [u64; GPU_PROFILE_SCOPE_COUNT],
     pub(super) gpu_frame_total_nanos: u64,
 }
 
@@ -57,6 +51,8 @@ pub(super) struct SubmissionLowerer {
     next_timestamp_set: u32,
     pipeline_statistics_pool: Option<vk::QueryPool>,
     next_pipeline_statistics_set: u32,
+    /// Frontend names for statistics scopes, used only in diagnostic output.
+    statistics_scope_names: fn(u8) -> &'static str,
     live_command_buffers: HashSet<vk::CommandBuffer>,
     recycled_command_buffers: Vec<vk::CommandBuffer>,
     // Swapchain acquisition signals bounded binary semaphores. A semaphore is
@@ -74,7 +70,8 @@ pub(super) struct SubmissionLowerer {
 }
 
 const GPU_TIMESTAMP_SET_COUNT: u32 = 8;
-const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 20;
+// Frame start/end plus a start/end pair per profiling scope.
+const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 2 + 2 * GPU_PROFILE_SCOPE_COUNT as u32;
 const PIPELINE_STATISTICS_SET_COUNT: u32 = 8;
 const PIPELINE_STATISTICS_PASS_QUERY_COUNT: u32 = 12;
 const PIPELINE_STATISTICS_QUERIES_PER_SET: u32 = PIPELINE_STATISTICS_PASS_QUERY_COUNT;
@@ -90,28 +87,19 @@ const MAX_IN_FLIGHT_SUBMISSIONS: usize = 8;
 // so full-frame attachment captures cannot grow process memory linearly.
 const MAX_COMPLETED_HOST_READ_BYTES: usize = 64 * 1024 * 1024;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum GpuTimestampQuery {
-    FrameStart = 0,
-    ShadowDepthStart = 1,
-    ShadowDepthEnd = 2,
-    TerrainOpaqueStart = 3,
-    TerrainOpaqueEnd = 4,
-    TerrainCutoutStart = 5,
-    TerrainCutoutEnd = 6,
-    DeferredLightingStart = 7,
-    DeferredLightingEnd = 8,
-    Composite0Start = 9,
-    Composite0End = 10,
-    Composite1Start = 11,
-    Composite1End = 12,
-    FinalOutputStart = 13,
-    FinalOutputEnd = 14,
-    DistantHorizonsOpaqueStart = 15,
-    DistantHorizonsOpaqueEnd = 16,
-    DistantHorizonsTransparentSharedStart = 17,
-    DistantHorizonsTransparentSharedEnd = 18,
-    FrameEnd = 19,
+const FRAME_START_QUERY: u32 = 0;
+const FRAME_END_QUERY: u32 = 1;
+
+fn scope_start_query(scope: u8) -> u32 {
+    2 + 2 * u32::from(scope)
+}
+
+fn scope_end_query(scope: u8) -> u32 {
+    3 + 2 * u32::from(scope)
+}
+
+fn unnamed_profile_scope(_scope: u8) -> &'static str {
+    "unnamed"
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -145,105 +133,26 @@ enum PipelineStatisticsMode {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct GpuTimestampResult {
     status: u64,
-    shadow_depth_nanos: u64,
-    terrain_opaque_nanos: u64,
-    terrain_cutout_nanos: u64,
-    deferred_lighting_nanos: u64,
-    composite0_nanos: u64,
-    composite1_nanos: u64,
-    final_output_nanos: u64,
-    distant_horizons_opaque_nanos: u64,
-    distant_horizons_transparent_shared_nanos: u64,
+    scope_nanos: [u64; GPU_PROFILE_SCOPE_COUNT],
     frame_total_nanos: u64,
 }
 
+/// The open GPU timing span: its frontend scope, and whether binding an
+/// untimed pipeline closes it before the pass ends.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum TimestampPassKind {
-    ShadowDepth,
-    TerrainOpaque,
-    TerrainCutout,
-    DeferredLighting,
-    Composite0,
-    Composite1,
-    FinalOutput,
-    DistantHorizonsOpaque,
-    DistantHorizonsTransparentShared,
+struct TimingSpan {
+    scope: u8,
+    ends_at_untimed_pipeline: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PipelineStatisticsPassKind {
-    Timestamped(TimestampPassKind),
-    DistantHorizonsTransparentSide,
-    DistantHorizonsTransparentUp,
-    DistantHorizonsWater,
-}
-
-impl TimestampPassKind {
-    fn start_query(self) -> GpuTimestampQuery {
-        match self {
-            Self::ShadowDepth => GpuTimestampQuery::ShadowDepthStart,
-            Self::TerrainOpaque => GpuTimestampQuery::TerrainOpaqueStart,
-            Self::TerrainCutout => GpuTimestampQuery::TerrainCutoutStart,
-            Self::DeferredLighting => GpuTimestampQuery::DeferredLightingStart,
-            Self::Composite0 => GpuTimestampQuery::Composite0Start,
-            Self::Composite1 => GpuTimestampQuery::Composite1Start,
-            Self::FinalOutput => GpuTimestampQuery::FinalOutputStart,
-            Self::DistantHorizonsOpaque => GpuTimestampQuery::DistantHorizonsOpaqueStart,
-            Self::DistantHorizonsTransparentShared =>
-                GpuTimestampQuery::DistantHorizonsTransparentSharedStart,
-        }
-    }
-
-    fn end_query(self) -> GpuTimestampQuery {
-        match self {
-            Self::ShadowDepth => GpuTimestampQuery::ShadowDepthEnd,
-            Self::TerrainOpaque => GpuTimestampQuery::TerrainOpaqueEnd,
-            Self::TerrainCutout => GpuTimestampQuery::TerrainCutoutEnd,
-            Self::DeferredLighting => GpuTimestampQuery::DeferredLightingEnd,
-            Self::Composite0 => GpuTimestampQuery::Composite0End,
-            Self::Composite1 => GpuTimestampQuery::Composite1End,
-            Self::FinalOutput => GpuTimestampQuery::FinalOutputEnd,
-            Self::DistantHorizonsOpaque => GpuTimestampQuery::DistantHorizonsOpaqueEnd,
-            Self::DistantHorizonsTransparentShared =>
-                GpuTimestampQuery::DistantHorizonsTransparentSharedEnd,
-        }
-    }
-}
-
-fn pipeline_statistics_kind_code(kind: PipelineStatisticsPassKind) -> u8 {
-    match kind {
-        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::ShadowDepth) => 0,
-        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::TerrainOpaque) => 1,
-        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::TerrainCutout) => 2,
-        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::DeferredLighting) => 3,
-        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::Composite0) => 4,
-        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::Composite1) => 5,
-        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::FinalOutput) => 6,
-        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::DistantHorizonsOpaque) => 7,
-        PipelineStatisticsPassKind::Timestamped(TimestampPassKind::DistantHorizonsTransparentShared) => 11,
-        PipelineStatisticsPassKind::DistantHorizonsTransparentSide => 8,
-        PipelineStatisticsPassKind::DistantHorizonsTransparentUp => 9,
-        PipelineStatisticsPassKind::DistantHorizonsWater => 10,
-    }
-}
-
-fn pipeline_statistics_kind_name(code: u8) -> &'static str {
-    match code {
-        0 => "shadow-depth",
-        1 => "terrain-opaque",
-        2 => "terrain-cutout",
-        3 => "deferred-lighting",
-        4 => "composite-0",
-        5 => "composite-1",
-        6 => "final-output",
-        7 => "distant-horizons-opaque",
-        8 => "distant-horizons-transparent-side",
-        // The no-shader Frozen-compatible route deliberately reuses this
-        // pipeline for side, up, and water buckets under one raster policy.
-        9 => "distant-horizons-transparent-up-or-shared",
-        10 => "distant-horizons-water",
-        11 => "distant-horizons-transparent-shared-timestamped",
-        _ => "unknown",
+impl TimingSpan {
+    fn from_tag(tag: GpuProfileTag) -> Option<Self> {
+        tag.timing_scope
+            .filter(|scope| usize::from(*scope) < GPU_PROFILE_SCOPE_COUNT)
+            .map(|scope| Self {
+                scope,
+                ends_at_untimed_pipeline: tag.timing_ends_at_untimed_pipeline,
+            })
     }
 }
 
@@ -273,6 +182,7 @@ impl SubmissionLowerer {
             next_timestamp_set: 0,
             pipeline_statistics_pool,
             next_pipeline_statistics_set: 0,
+            statistics_scope_names: unnamed_profile_scope,
             live_command_buffers: HashSet::new(),
             recycled_command_buffers: Vec::new(),
             acquire_semaphores: Vec::new(),
@@ -374,7 +284,7 @@ impl SubmissionLowerer {
                             self.write_timestamp(
                                 command_buffer,
                                 &state,
-                                GpuTimestampQuery::FrameStart,
+                                FRAME_START_QUERY,
                                 vk::PipelineStageFlags::TOP_OF_PIPE,
                             );
                         }
@@ -504,7 +414,7 @@ impl SubmissionLowerer {
                             self.write_timestamp(
                                 command_buffer,
                                 &state,
-                                GpuTimestampQuery::FrameEnd,
+                                FRAME_END_QUERY,
                                 vk::PipelineStageFlags::BOTTOM_OF_PIPE,
                             )
                         };
@@ -954,7 +864,7 @@ impl SubmissionLowerer {
         &self,
         command_buffer: vk::CommandBuffer,
         state: &EncodingState,
-        query: GpuTimestampQuery,
+        query: u32,
         stage: vk::PipelineStageFlags,
     ) {
         let Some(pool) = self.timestamp_pool else {
@@ -968,7 +878,7 @@ impl SubmissionLowerer {
                 command_buffer,
                 stage,
                 pool,
-                state.timestamp_set.base_query + query as u32,
+                state.timestamp_set.base_query + query,
             );
         }
     }
@@ -977,9 +887,9 @@ impl SubmissionLowerer {
         &self,
         command_buffer: vk::CommandBuffer,
         state: &mut EncodingState,
-        next: Option<TimestampPassKind>,
+        next: Option<TimingSpan>,
     ) {
-        if state.current_timestamp_pass == next {
+        if state.current_timestamp_pass.map(|span| span.scope) == next.map(|span| span.scope) {
             return;
         }
         if let Some(current) = state.current_timestamp_pass {
@@ -987,7 +897,7 @@ impl SubmissionLowerer {
                 self.write_timestamp(
                     command_buffer,
                     state,
-                    current.end_query(),
+                    scope_end_query(current.scope),
                     vk::PipelineStageFlags::BOTTOM_OF_PIPE,
                 );
             }
@@ -998,7 +908,7 @@ impl SubmissionLowerer {
                 self.write_timestamp(
                     command_buffer,
                     state,
-                    next.start_query(),
+                    scope_start_query(next.scope),
                     vk::PipelineStageFlags::TOP_OF_PIPE,
                 );
             }
@@ -1009,7 +919,7 @@ impl SubmissionLowerer {
         &self,
         command_buffer: vk::CommandBuffer,
         state: &mut EncodingState,
-        next: Option<PipelineStatisticsPassKind>,
+        next: Option<u8>,
     ) {
         if pipeline_statistics_mode() == PipelineStatisticsMode::Disabled
             || state.current_pipeline_statistics_kind == next
@@ -1027,7 +937,7 @@ impl SubmissionLowerer {
             );
         }
         state.current_pipeline_statistics_kind = None;
-        let Some(pass_kind) = next else {
+        let Some(scope) = next else {
             return;
         };
         let (Some(pool), true) = (
@@ -1043,8 +953,7 @@ impl SubmissionLowerer {
         }
         let slot = state.pipeline_statistics_set.pass_query_count as u32;
         state.pipeline_statistics_set.pass_query_count += 1;
-        state.pipeline_statistics_set.pass_kinds[slot as usize] =
-            pipeline_statistics_kind_code(pass_kind);
+        state.pipeline_statistics_set.pass_kinds[slot as usize] = scope;
         self.context.device.cmd_begin_query(
             command_buffer,
             pool,
@@ -1052,7 +961,7 @@ impl SubmissionLowerer {
             vk::QueryControlFlags::empty(),
         );
         state.current_pipeline_statistics_pass = Some(slot);
-        state.current_pipeline_statistics_kind = Some(pass_kind);
+        state.current_pipeline_statistics_kind = Some(scope);
     }
 
     fn allocate_command_buffer(&mut self) -> GalResult<vk::CommandBuffer> {
@@ -1174,11 +1083,11 @@ impl SubmissionLowerer {
                     };
                 let texture = objects.texture(texture_handle)?;
                 let range = barrier.subresources.unwrap_or(view_range);
-                if trace_submissions_enabled()
-                    && texture.label.contains("source-final-output")
+                if trace_barrier_label_filter()
+                    .is_some_and(|filter| texture.label.contains(filter))
                 {
                     println!(
-                        "vulkan.barrier source-final-output resource=0x{:016x} texture=0x{:016x} label={} before={:?} after={:?} mip={}..{} layer={}..{}",
+                        "vulkan.barrier resource=0x{:016x} texture=0x{:016x} label={} before={:?} after={:?} mip={}..{} layer={}..{}",
                         barrier.resource.raw(),
                         texture_handle.raw(),
                         sanitize_label(&texture.label),
@@ -1276,12 +1185,16 @@ impl SubmissionLowerer {
                         );
                     }
                     let pass_object = objects.render_pass(*pass)?;
-                    let timestamp_pass = timestamp_pass_kind(&pass_object.label);
-                    if let Some(pass_kind) = timestamp_pass {
+                    let timestamp_pass = TimingSpan::from_tag(pass_object.profile_tag);
+                    let pass_statistics_scope = pass_object
+                        .profile_tag
+                        .statistics_scope
+                        .filter(|scope| usize::from(*scope) < GPU_PROFILE_SCOPE_COUNT);
+                    if let Some(span) = timestamp_pass {
                         self.write_timestamp(
                             command_buffer,
                             state,
-                            pass_kind.start_query(),
+                            scope_start_query(span.scope),
                             vk::PipelineStageFlags::TOP_OF_PIPE,
                         );
                     }
@@ -1491,7 +1404,7 @@ impl SubmissionLowerer {
                     self.switch_pipeline_statistics_pass(
                         command_buffer,
                         state,
-                        timestamp_pass.map(PipelineStatisticsPassKind::Timestamped),
+                        pass_statistics_scope,
                     );
                     state.in_pass = true;
                     state.provoking_vertex = None;
@@ -1500,11 +1413,11 @@ impl SubmissionLowerer {
                 CommandOp::EndPass => {
                     self.switch_pipeline_statistics_pass(command_buffer, state, None);
                     self.context.device.cmd_end_rendering(command_buffer);
-                    if let Some(pass_kind) = state.current_timestamp_pass {
+                    if let Some(span) = state.current_timestamp_pass {
                         self.write_timestamp(
                             command_buffer,
                             state,
-                            pass_kind.end_query(),
+                            scope_end_query(span.scope),
                             vk::PipelineStageFlags::BOTTOM_OF_PIPE,
                         );
                     }
@@ -1559,30 +1472,22 @@ impl SubmissionLowerer {
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline.pipeline.pipeline,
                     );
-                    let (statistics_kind, timestamp_kind) = *state
-                        .pipeline_pass_kinds
-                        .entry(*handle)
-                        .or_insert_with(|| {
-                            (
-                                pipeline_statistics_pipeline_kind(&pipeline.label),
-                                timestamp_pipeline_kind(&pipeline.label),
-                            )
-                        });
-                    self.switch_pipeline_statistics_pass(command_buffer, state, statistics_kind);
-                    if let Some(pipeline_timestamp_pass) = timestamp_kind
+                    let tag = pipeline.profile_tag;
+                    self.switch_pipeline_statistics_pass(
+                        command_buffer,
+                        state,
+                        tag.statistics_scope
+                            .filter(|scope| usize::from(*scope) < GPU_PROFILE_SCOPE_COUNT),
+                    );
+                    if let Some(span) = TimingSpan::from_tag(tag) {
+                        self.switch_timestamp_pass(command_buffer, state, Some(span));
+                    } else if state
+                        .current_timestamp_pass
+                        .is_some_and(|span| span.ends_at_untimed_pipeline)
                     {
-                        self.switch_timestamp_pass(
-                            command_buffer,
-                            state,
-                            Some(pipeline_timestamp_pass),
-                        );
-                    } else if state.current_timestamp_pass
-                        == Some(TimestampPassKind::DistantHorizonsOpaque)
-                    {
-                        // The dedicated DH query measures only the contiguous
-                        // opaque pipeline span. Transparent/water pipelines are
-                        // intentionally unclassified and must close that span
-                        // rather than inheriting its timestamp until EndPass.
+                        // A pipeline-scoped span measures only its contiguous
+                        // pipelines; an untimed pipeline closes it rather than
+                        // inheriting its timestamp until EndPass.
                         self.switch_timestamp_pass(command_buffer, state, None);
                     }
                     state.graphics_pipeline = Some(*handle);
@@ -1606,7 +1511,7 @@ impl SubmissionLowerer {
                     set,
                     dynamic_offsets,
                 } => {
-                    if trace_entity_texture_ops_enabled() {
+                    if trace_resource_binding_ops_enabled() {
                         eprintln!(
                             "vulkan.bind-resource-set layout={:?} set_index={} set={:?} dynamic_offsets={:?}",
                             pipeline_layout,
@@ -1793,7 +1698,7 @@ impl SubmissionLowerer {
                     let _zone = trace::Zone::new("vulkan.lowering.copy-buffer-to-texture");
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
-                    if trace_entity_texture_ops_enabled() {
+                    if trace_resource_binding_ops_enabled() {
                         eprintln!(
                             "vulkan.copy-buffer-to-texture buffer={:?} texture={:?} label={} offset={} row={} rows={} extent={}x{}x{}",
                             region.buffer,
@@ -2365,23 +2270,16 @@ impl SubmissionLowerer {
             // the same retired frame again while newer GPU work is in flight.
             result.status = complete.id.0;
             if matches!(
-                std::env::var("MATTMC_RUST_VULKAN_DH_PASS_TIMESTAMPS").as_deref(),
+                std::env::var("MATTMC_RUST_VULKAN_SCOPE_TIMESTAMPS").as_deref(),
                 Ok("1" | "true" | "TRUE")
             ) {
                 println!(
-                    "vulkan.dh-pass-timestamps submission={} opaque_nanos={} transparent_shared_nanos={} frame_total_nanos={}",
+                    "vulkan.scope-timestamps submission={} scope_nanos={:?} frame_total_nanos={} timestamp_period={} values={values:?} ready={ready:?}",
                     complete.id.0,
-                    result.distant_horizons_opaque_nanos,
-                    result.distant_horizons_transparent_shared_nanos,
+                    result.scope_nanos,
                     result.frame_total_nanos,
+                    self.context.timestamp_period,
                 );
-                if result.distant_horizons_opaque_nanos > 0 {
-                    println!(
-                        "vulkan.gpu-query-values submission={} timestamp_period={} values={values:?} ready={ready:?}",
-                        complete.id.0,
-                        self.context.timestamp_period,
-                    );
-                }
             }
         }
         self.apply_gpu_timestamp_result(result);
@@ -2408,7 +2306,7 @@ impl SubmissionLowerer {
         for slot in 0..complete.pipeline_statistics_set.pass_query_count as usize {
             let query = complete.pipeline_statistics_set.base_query + slot as u32;
             let kind =
-                pipeline_statistics_kind_name(complete.pipeline_statistics_set.pass_kinds[slot]);
+                (self.statistics_scope_names)(complete.pipeline_statistics_set.pass_kinds[slot]);
             match self.read_pipeline_statistics_values(pool, query) {
                 Ok(values) if aggregate => {
                     for (total, value) in totals.values.iter_mut().zip(values.values) {
@@ -2469,15 +2367,12 @@ impl SubmissionLowerer {
 
     fn apply_gpu_timestamp_result(&mut self, result: GpuTimestampResult) {
         self.metrics.gpu_timestamp_status = result.status;
-        self.metrics.gpu_shadow_depth_nanos = result.shadow_depth_nanos;
-        self.metrics.gpu_terrain_opaque_nanos = result.terrain_opaque_nanos;
-        self.metrics.gpu_terrain_cutout_nanos = result.terrain_cutout_nanos;
-        self.metrics.gpu_deferred_lighting_nanos = result.deferred_lighting_nanos;
-        self.metrics.gpu_composite0_nanos = result.composite0_nanos;
-        self.metrics.gpu_composite1_nanos = result.composite1_nanos;
-        self.metrics.gpu_final_output_nanos = result.final_output_nanos;
-        self.metrics.gpu_distant_horizons_opaque_nanos = result.distant_horizons_opaque_nanos;
+        self.metrics.gpu_scope_nanos = result.scope_nanos;
         self.metrics.gpu_frame_total_nanos = result.frame_total_nanos;
+    }
+
+    pub(super) fn set_statistics_scope_names(&mut self, names: fn(u8) -> &'static str) {
+        self.statistics_scope_names = names;
     }
 }
 
@@ -2598,178 +2493,35 @@ fn pipeline_statistics_mode_from_env() -> PipelineStatisticsMode {
     }
 }
 
-fn timestamp_pass_kind(label: &str) -> Option<TimestampPassKind> {
-    let label = label.trim();
-    if label.contains("shadow_depth") || label.contains("shadow-pass") {
-        Some(TimestampPassKind::ShadowDepth)
-    } else if label.contains("terrain_opaque") {
-        Some(TimestampPassKind::TerrainOpaque)
-    } else if label.contains("terrain_cutout") {
-        Some(TimestampPassKind::TerrainCutout)
-    } else if label.contains("deferred_lighting") || label.contains("deferred-lighting-pass") {
-        Some(TimestampPassKind::DeferredLighting)
-    } else if label.contains("composite_0") || label.contains("composite-0-pass") {
-        Some(TimestampPassKind::Composite0)
-    } else if label.contains("composite_1") || label.contains("composite-1-pass") {
-        Some(TimestampPassKind::Composite1)
-    } else if label.contains("final_output") || label.contains("final-output-pass") {
-        Some(TimestampPassKind::FinalOutput)
-    } else {
-        None
-    }
-}
-
-fn timestamp_pipeline_kind(label: &str) -> Option<TimestampPassKind> {
-    let label = label.trim();
-    if label.contains("world-lod-forward-opaque") {
-        Some(TimestampPassKind::DistantHorizonsOpaque)
-    } else if label.contains("world-lod-transparent-up") {
-        Some(TimestampPassKind::DistantHorizonsTransparentShared)
-    } else if label.contains("shadow_depth") || label.contains("shadow-pipeline") {
-        Some(TimestampPassKind::ShadowDepth)
-    } else if label.contains("terrain_opaque")
-        || (label.contains("world-mesh-gbuffer") && label.contains("-mode1-"))
-    {
-        Some(TimestampPassKind::TerrainOpaque)
-    } else if label.contains("terrain_cutout")
-        || (label.contains("world-mesh-gbuffer") && label.contains("-mode2-"))
-    {
-        Some(TimestampPassKind::TerrainCutout)
-    } else if label.contains("deferred_lighting") || label.contains("deferred-lighting.pipeline") {
-        Some(TimestampPassKind::DeferredLighting)
-    } else if label.contains("composite_0") || label.contains("composite-0.pipeline") {
-        Some(TimestampPassKind::Composite0)
-    } else if label.contains("composite_1") || label.contains("composite-1.pipeline") {
-        Some(TimestampPassKind::Composite1)
-    } else if label.contains("final_output") || label.contains("final-output.pipeline") {
-        Some(TimestampPassKind::FinalOutput)
-    } else {
-        None
-    }
-}
-
-fn pipeline_statistics_pipeline_kind(label: &str) -> Option<PipelineStatisticsPassKind> {
-    if label.contains("world-lod-transparent-side") {
-        Some(PipelineStatisticsPassKind::DistantHorizonsTransparentSide)
-    } else if label.contains("world-lod-transparent-up") {
-        Some(PipelineStatisticsPassKind::DistantHorizonsTransparentUp)
-    } else if label.contains("world-lod-water-surface") {
-        Some(PipelineStatisticsPassKind::DistantHorizonsWater)
-    } else {
-        timestamp_pipeline_kind(label).map(PipelineStatisticsPassKind::Timestamped)
-    }
-}
 
 fn decode_gpu_timestamp_result(
     values: &[u64],
     ready: &[bool],
     timestamp_period: f32,
 ) -> GpuTimestampResult {
-    fn delta(values: &[u64], start: GpuTimestampQuery, end: GpuTimestampQuery, period: f32) -> u64 {
-        let Some(start) = values.get(start as usize).copied() else {
+    let ready_delta = |start: u32, end: u32| -> u64 {
+        let (start, end) = (start as usize, end as usize);
+        if !(ready.get(start).copied().unwrap_or(false) && ready.get(end).copied().unwrap_or(false)) {
             return 0;
-        };
-        let Some(end) = values.get(end as usize).copied() else {
+        }
+        let (Some(start), Some(end)) = (values.get(start).copied(), values.get(end).copied()) else {
             return 0;
         };
         if end <= start {
             return 0;
         }
-        ((end - start) as f64 * f64::from(period)).min(u64::MAX as f64) as u64
-    }
-    fn pair_ready(ready: &[bool], start: GpuTimestampQuery, end: GpuTimestampQuery) -> bool {
-        ready.get(start as usize).copied().unwrap_or(false)
-            && ready.get(end as usize).copied().unwrap_or(false)
-    }
-    fn ready_delta(
-        values: &[u64],
-        ready: &[bool],
-        start: GpuTimestampQuery,
-        end: GpuTimestampQuery,
-        period: f32,
-    ) -> u64 {
-        if pair_ready(ready, start, end) {
-            delta(values, start, end, period)
-        } else {
-            0
-        }
-    }
-
-    let frame_total = ready_delta(
-        values,
-        ready,
-        GpuTimestampQuery::FrameStart,
-        GpuTimestampQuery::FrameEnd,
-        timestamp_period,
-    );
-    let result = GpuTimestampResult {
-        status: u64::from(frame_total > 0),
-        shadow_depth_nanos: ready_delta(
-            values,
-            ready,
-            GpuTimestampQuery::ShadowDepthStart,
-            GpuTimestampQuery::ShadowDepthEnd,
-            timestamp_period,
-        ),
-        terrain_opaque_nanos: ready_delta(
-            values,
-            ready,
-            GpuTimestampQuery::TerrainOpaqueStart,
-            GpuTimestampQuery::TerrainOpaqueEnd,
-            timestamp_period,
-        ),
-        terrain_cutout_nanos: ready_delta(
-            values,
-            ready,
-            GpuTimestampQuery::TerrainCutoutStart,
-            GpuTimestampQuery::TerrainCutoutEnd,
-            timestamp_period,
-        ),
-        deferred_lighting_nanos: ready_delta(
-            values,
-            ready,
-            GpuTimestampQuery::DeferredLightingStart,
-            GpuTimestampQuery::DeferredLightingEnd,
-            timestamp_period,
-        ),
-        composite0_nanos: ready_delta(
-            values,
-            ready,
-            GpuTimestampQuery::Composite0Start,
-            GpuTimestampQuery::Composite0End,
-            timestamp_period,
-        ),
-        composite1_nanos: ready_delta(
-            values,
-            ready,
-            GpuTimestampQuery::Composite1Start,
-            GpuTimestampQuery::Composite1End,
-            timestamp_period,
-        ),
-        final_output_nanos: ready_delta(
-            values,
-            ready,
-            GpuTimestampQuery::FinalOutputStart,
-            GpuTimestampQuery::FinalOutputEnd,
-            timestamp_period,
-        ),
-        distant_horizons_opaque_nanos: ready_delta(
-            values,
-            ready,
-            GpuTimestampQuery::DistantHorizonsOpaqueStart,
-            GpuTimestampQuery::DistantHorizonsOpaqueEnd,
-            timestamp_period,
-        ),
-        distant_horizons_transparent_shared_nanos: ready_delta(
-            values,
-            ready,
-            GpuTimestampQuery::DistantHorizonsTransparentSharedStart,
-            GpuTimestampQuery::DistantHorizonsTransparentSharedEnd,
-            timestamp_period,
-        ),
-        frame_total_nanos: frame_total,
+        ((end - start) as f64 * f64::from(timestamp_period)).min(u64::MAX as f64) as u64
     };
-    result
+    let frame_total = ready_delta(FRAME_START_QUERY, FRAME_END_QUERY);
+    let mut scope_nanos = [0_u64; GPU_PROFILE_SCOPE_COUNT];
+    for (scope, nanos) in scope_nanos.iter_mut().enumerate() {
+        *nanos = ready_delta(scope_start_query(scope as u8), scope_end_query(scope as u8));
+    }
+    GpuTimestampResult {
+        status: u64::from(frame_total > 0),
+        scope_nanos,
+        frame_total_nanos: frame_total,
+    }
 }
 
 #[cfg(test)]
@@ -2982,110 +2734,29 @@ mod timestamp_tests {
     }
 
     #[test]
-    fn timestamp_pass_labels_classify_shader_graph_passes() {
-        assert_eq!(
-            Some(TimestampPassKind::ShadowDepth),
-            timestamp_pass_kind("vulkanic:pass/shadow_depth")
-        );
-        assert_eq!(
-            Some(TimestampPassKind::TerrainOpaque),
-            timestamp_pass_kind("vulkanic:pass/terrain_opaque")
-        );
-        assert_eq!(
-            Some(TimestampPassKind::FinalOutput),
-            timestamp_pass_kind("vulkanic:pass/final_output")
-        );
-        assert_eq!(None, timestamp_pass_kind("minecraft.world.clear"));
-    }
-
-    #[test]
-    fn timestamp_labels_classify_actual_runtime_resource_names() {
-        assert_eq!(
-            Some(TimestampPassKind::ShadowDepth),
-            timestamp_pass_kind("world-gbuffer.shadow-pass")
-        );
-        assert_eq!(
-            Some(TimestampPassKind::DeferredLighting),
-            timestamp_pass_kind("world-gbuffer.deferred-lighting-pass")
-        );
-        assert_eq!(
-            Some(TimestampPassKind::Composite0),
-            timestamp_pipeline_kind("world-gbuffer.composite-0.pipeline")
-        );
-        assert_eq!(
-            Some(TimestampPassKind::TerrainOpaque),
-            timestamp_pipeline_kind("world-mesh-gbuffer-stratum4-sand-gen7-section0-texture3-mode1-depth2-cull1.pipeline")
-        );
-        assert_eq!(
-            Some(TimestampPassKind::TerrainCutout),
-            timestamp_pipeline_kind("world-mesh-gbuffer-stratum4-leaves-gen7-section0-texture9-mode2-depth2-cull1.pipeline")
-        );
-        assert_eq!(
-            Some(TimestampPassKind::DistantHorizonsOpaque),
-            timestamp_pipeline_kind("world-lod-forward-opaque.offscreen.pipeline")
-        );
-        assert_eq!(
-            Some(TimestampPassKind::DistantHorizonsOpaque),
-            timestamp_pipeline_kind("world-lod-forward-opaque.pipeline")
-        );
-        for (label, kind, code) in [
-            (
-                "world-lod-transparent-side.pipeline",
-                PipelineStatisticsPassKind::DistantHorizonsTransparentSide,
-                8,
-            ),
-            (
-                "world-lod-transparent-up.pipeline",
-                PipelineStatisticsPassKind::DistantHorizonsTransparentUp,
-                9,
-            ),
-            (
-                "world-lod-water-surface.pipeline",
-                PipelineStatisticsPassKind::DistantHorizonsWater,
-                10,
-            ),
-        ] {
-            assert_eq!(
-                if label.contains("transparent-up") {
-                    Some(TimestampPassKind::DistantHorizonsTransparentShared)
-                } else {
-                    None
-                },
-                timestamp_pipeline_kind(label)
-            );
-            assert_eq!(Some(kind), pipeline_statistics_pipeline_kind(label));
-            assert_ne!("unknown", pipeline_statistics_kind_name(code));
-            assert_eq!(code, pipeline_statistics_kind_code(kind));
-        }
-    }
-
-    #[test]
-    fn gpu_timestamp_decoder_reports_nanos_without_waiting_policy() {
+    fn gpu_timestamp_decoder_reports_scope_nanos_without_waiting_policy() {
         let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
         let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
-        values[GpuTimestampQuery::FrameStart as usize] = 10;
-        values[GpuTimestampQuery::ShadowDepthStart as usize] = 12;
-        values[GpuTimestampQuery::ShadowDepthEnd as usize] = 18;
-        values[GpuTimestampQuery::DistantHorizonsOpaqueStart as usize] = 19;
-        values[GpuTimestampQuery::DistantHorizonsOpaqueEnd as usize] = 27;
-        values[GpuTimestampQuery::DistantHorizonsTransparentSharedStart as usize] = 27;
-        values[GpuTimestampQuery::DistantHorizonsTransparentSharedEnd as usize] = 29;
-        values[GpuTimestampQuery::FrameEnd as usize] = 30;
-        ready[GpuTimestampQuery::FrameStart as usize] = true;
-        ready[GpuTimestampQuery::ShadowDepthStart as usize] = true;
-        ready[GpuTimestampQuery::ShadowDepthEnd as usize] = true;
-        ready[GpuTimestampQuery::DistantHorizonsOpaqueStart as usize] = true;
-        ready[GpuTimestampQuery::DistantHorizonsOpaqueEnd as usize] = true;
-        ready[GpuTimestampQuery::DistantHorizonsTransparentSharedStart as usize] = true;
-        ready[GpuTimestampQuery::DistantHorizonsTransparentSharedEnd as usize] = true;
-        ready[GpuTimestampQuery::FrameEnd as usize] = true;
+        for (query, value) in [
+            (FRAME_START_QUERY, 10),
+            (scope_start_query(0), 12),
+            (scope_end_query(0), 18),
+            (scope_start_query(7), 19),
+            (scope_end_query(7), 27),
+            (scope_start_query(11), 27),
+            (scope_end_query(11), 29),
+            (FRAME_END_QUERY, 30),
+        ] {
+            values[query as usize] = value;
+            ready[query as usize] = true;
+        }
         let result = decode_gpu_timestamp_result(&values, &ready, 2.0);
         assert_eq!(1, result.status);
-        assert_eq!(12, result.shadow_depth_nanos);
-        assert_eq!(16, result.distant_horizons_opaque_nanos);
-        assert_eq!(4, result.distant_horizons_transparent_shared_nanos);
+        assert_eq!(12, result.scope_nanos[0]);
+        assert_eq!(16, result.scope_nanos[7]);
+        assert_eq!(4, result.scope_nanos[11]);
         assert_eq!(40, result.frame_total_nanos);
-        assert_eq!(0, result.terrain_opaque_nanos);
+        assert_eq!(0, result.scope_nanos[1]);
     }
 
     #[test]
@@ -3098,43 +2769,49 @@ mod timestamp_tests {
     }
 
     #[test]
-    fn gpu_timestamp_decoder_keeps_written_pass_when_other_queries_are_unavailable() {
+    fn gpu_timestamp_decoder_keeps_written_scope_when_other_queries_are_unavailable() {
         let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
         let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
-        for query in [
-            GpuTimestampQuery::FrameStart,
-            GpuTimestampQuery::FrameEnd,
-            GpuTimestampQuery::TerrainOpaqueStart,
-            GpuTimestampQuery::TerrainOpaqueEnd,
-        ] {
+        for query in [FRAME_START_QUERY, FRAME_END_QUERY, scope_start_query(1), scope_end_query(1)] {
             ready[query as usize] = true;
         }
-        values[GpuTimestampQuery::FrameStart as usize] = 100;
-        values[GpuTimestampQuery::TerrainOpaqueStart as usize] = 110;
-        values[GpuTimestampQuery::TerrainOpaqueEnd as usize] = 160;
-        values[GpuTimestampQuery::FrameEnd as usize] = 200;
+        values[FRAME_START_QUERY as usize] = 100;
+        values[scope_start_query(1) as usize] = 110;
+        values[scope_end_query(1) as usize] = 160;
+        values[FRAME_END_QUERY as usize] = 200;
         let result = decode_gpu_timestamp_result(&values, &ready, 1.5);
         assert_eq!(1, result.status);
         assert_eq!(150, result.frame_total_nanos);
-        assert_eq!(75, result.terrain_opaque_nanos);
-        assert_eq!(0, result.terrain_cutout_nanos);
+        assert_eq!(75, result.scope_nanos[1]);
+        assert_eq!(0, result.scope_nanos[2]);
     }
 
     #[test]
-    fn gpu_timestamp_decoder_requires_both_pass_endpoints() {
+    fn gpu_timestamp_decoder_requires_both_scope_endpoints() {
         let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
         let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
-        ready[GpuTimestampQuery::FrameStart as usize] = true;
-        ready[GpuTimestampQuery::FrameEnd as usize] = true;
-        ready[GpuTimestampQuery::TerrainCutoutStart as usize] = true;
-        values[GpuTimestampQuery::FrameStart as usize] = 3;
-        values[GpuTimestampQuery::FrameEnd as usize] = 9;
-        values[GpuTimestampQuery::TerrainCutoutStart as usize] = 4;
-        values[GpuTimestampQuery::TerrainCutoutEnd as usize] = 8;
+        ready[FRAME_START_QUERY as usize] = true;
+        ready[FRAME_END_QUERY as usize] = true;
+        ready[scope_start_query(2) as usize] = true;
+        values[FRAME_START_QUERY as usize] = 3;
+        values[FRAME_END_QUERY as usize] = 9;
+        values[scope_start_query(2) as usize] = 4;
+        values[scope_end_query(2) as usize] = 8;
         let result = decode_gpu_timestamp_result(&values, &ready, 10.0);
         assert_eq!(1, result.status);
         assert_eq!(60, result.frame_total_nanos);
-        assert_eq!(0, result.terrain_cutout_nanos);
+        assert_eq!(0, result.scope_nanos[2]);
+    }
+
+    #[test]
+    fn timing_spans_ignore_out_of_range_scopes() {
+        let tag = |scope| GpuProfileTag {
+            timing_scope: Some(scope),
+            ..GpuProfileTag::default()
+        };
+        assert!(TimingSpan::from_tag(tag(GPU_PROFILE_SCOPE_COUNT as u8 - 1)).is_some());
+        assert!(TimingSpan::from_tag(tag(GPU_PROFILE_SCOPE_COUNT as u8)).is_none());
+        assert!(TimingSpan::from_tag(GpuProfileTag::default()).is_none());
     }
 
     #[test]
@@ -3267,12 +2944,6 @@ mod timestamp_tests {
 
 #[derive(Default)]
 struct EncodingState {
-    /// Per-submission memo of each bound pipeline's diagnostic pass
-    /// classification (derived from its label), so a bind does not rescan it.
-    pipeline_pass_kinds: std::collections::HashMap<
-        crate::render::vulkanic::handles::Handle,
-        (Option<PipelineStatisticsPassKind>, Option<TimestampPassKind>),
-    >,
     pass_extent: Option<crate::render::vulkanic::resources::Extent3d>,
     raster_y_direction: Option<crate::render::vulkanic::resources::RasterYDirection>,
     in_pass: bool,
@@ -3287,9 +2958,9 @@ struct EncodingState {
     host_reads: Vec<HostReadRequest>,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
-    current_timestamp_pass: Option<TimestampPassKind>,
+    current_timestamp_pass: Option<TimingSpan>,
     current_pipeline_statistics_pass: Option<u32>,
-    current_pipeline_statistics_kind: Option<PipelineStatisticsPassKind>,
+    current_pipeline_statistics_kind: Option<u8>,
 }
 
 struct FramePresentTransition {
@@ -3731,8 +3402,21 @@ fn trace_submissions_enabled() -> bool {
     *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some())
 }
 
-fn trace_entity_texture_ops_enabled() -> bool {
+fn trace_resource_binding_ops_enabled() -> bool {
     static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_ENTITY_TEXTURE_OPS").is_some())
+    *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_RESOURCE_BINDING_OPS").is_some())
+}
+
+/// Label substring selecting textures whose barriers are traced
+/// (`MATTMC_TRACE_BARRIER_LABEL`); unset disables barrier tracing.
+fn trace_barrier_label_filter() -> Option<&'static str> {
+    static FILTER: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    FILTER
+        .get_or_init(|| {
+            std::env::var("MATTMC_TRACE_BARRIER_LABEL")
+                .ok()
+                .filter(|value| !value.is_empty())
+        })
+        .as_deref()
 }
 

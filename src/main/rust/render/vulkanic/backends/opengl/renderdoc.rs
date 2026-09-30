@@ -97,7 +97,7 @@ impl RenderDocFrame {
                 }
             }
             ((*api).start_frame_capture)(ptr::null_mut(), ptr::null_mut());
-            eprintln!("Started RenderDoc frame capture (rust-opengl-gbuffer-test)");
+            eprintln!("Started RenderDoc frame capture (rust-opengl-test)");
             Some(Self {
                 api,
                 _library: library,
@@ -113,7 +113,7 @@ impl Drop for RenderDocFrame {
             unsafe {
                 let result = ((*self.api).end_frame_capture)(ptr::null_mut(), ptr::null_mut());
                 eprintln!(
-                    "Ended RenderDoc frame capture (rust-opengl-gbuffer-test) result={result}"
+                    "Ended RenderDoc frame capture (rust-opengl-test) result={result}"
                 );
             }
             self.active = false;

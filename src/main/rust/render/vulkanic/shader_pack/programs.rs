@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
 use crate::render::vulkanic::resources::{
-    AccessFlags, BackendApi, BlendMode, PipelineStageFlags, ResourceBinding, ResourceBindingDesc,
+    AccessFlags, ShaderConventions, BlendMode, PipelineStageFlags, ResourceBinding, ResourceBindingDesc,
     ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc, ShaderCodeFormat, ShaderModuleDesc,
     ShaderStage,
 };
@@ -136,7 +136,7 @@ impl ShaderStageSource {
     /// description. This selects only the portable coordinate convention
     /// required by the target API; backend compilation and native objects
     /// remain private to their respective backends.
-    pub fn shader_module_descriptor(&self, api: BackendApi) -> ShaderModuleDesc {
+    pub fn shader_module_descriptor(&self, conventions: ShaderConventions) -> ShaderModuleDesc {
         let stage = match self.stage {
             ShaderStageKind::Vertex => ShaderStage::Vertex,
             ShaderStageKind::Fragment => ShaderStage::Fragment,
@@ -145,7 +145,7 @@ impl ShaderStageSource {
             label: self.label.clone(),
             stage,
             code_format: ShaderCodeFormat::Glsl,
-            code: shader_stage_code_for_backend(api, &self.source),
+            code: shader_stage_code(conventions, &self.source),
             entry_point: self.entry_point.clone(),
         }
     }
@@ -255,7 +255,7 @@ pub trait LocalTexturedSourceProgram {
     fn execution_interface(&self) -> &TerrainSourceExecutionInterface;
     fn shader_module_descriptors_with_alpha_cutoff(
         &self,
-        api: BackendApi,
+        conventions: ShaderConventions,
         alpha_cutoff: Option<f32>,
     ) -> [ShaderModuleDesc; 2];
     fn execution_resource_layouts(&self) -> GalResult<TerrainSourceExecutionLayouts>;
@@ -405,8 +405,8 @@ pub struct LoweredDistantHorizonsExactAtlasSourceProgram {
 }
 
 impl LoweredDistantHorizonsExactAtlasSourceProgram {
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
-        self.source.shader_module_descriptors(api)
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
+        self.source.shader_module_descriptors(conventions)
     }
 }
 
@@ -944,10 +944,10 @@ impl FullscreenSourceExecutionInterface {
 }
 
 impl LoweredFullscreenSourceProgram {
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
         [
-            self.vertex.shader_module_descriptor(api),
-            self.fragment.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
+            self.fragment.shader_module_descriptor(conventions),
         ]
     }
 
@@ -1219,10 +1219,10 @@ impl LoweredDistantHorizonsSourceProgram {
                 .any(|binding| matches!(binding.role(), TerrainSourceResourceRole::MaterialAtlas))
     }
 
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
         [
-            self.vertex.shader_module_descriptor(api),
-            self.fragment.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
+            self.fragment.shader_module_descriptor(conventions),
         ]
     }
 
@@ -1368,10 +1368,10 @@ impl LoweredTerrainSourceProgram {
     /// Produces explicit GAL shader descriptions from the retained, lowered
     /// source pair. Creating these descriptions does not allocate shader
     /// modules, make a pipeline, bind resources, or select a render route.
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
         [
-            self.vertex.shader_module_descriptor(api),
-            self.fragment.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
+            self.fragment.shader_module_descriptor(conventions),
         ]
     }
 
@@ -1380,11 +1380,11 @@ impl LoweredTerrainSourceProgram {
     /// specialization so opaque shadow geometry retains the original shader.
     pub fn shadow_shader_module_descriptors(
         &self,
-        api: BackendApi,
+        conventions: ShaderConventions,
         alpha_cutoff: Option<f32>,
     ) -> GalResult<[ShaderModuleDesc; 2]> {
         let Some(alpha_cutoff) = alpha_cutoff else {
-            return Ok(self.shader_module_descriptors(api));
+            return Ok(self.shader_module_descriptors(conventions));
         };
         if !alpha_cutoff.is_finite() || !(0.0..=1.0).contains(&alpha_cutoff) {
             return Err(GalError::invalid_argument(
@@ -1404,12 +1404,12 @@ impl LoweredTerrainSourceProgram {
             "{fragment_source}\nvoid main() {{\n    vulkanic_shadow_cutout_main();\n    if (!(out_shadow_color.a > {alpha_cutoff:.8})) discard;\n}}\n"
         );
         Ok([
-            self.vertex.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
             ShaderModuleDesc {
                 label: self.fragment.label.clone(),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(api, &fragment_source),
+                code: shader_stage_code(conventions, &fragment_source),
                 entry_point: self.fragment.entry_point.clone(),
             },
         ])
@@ -1624,10 +1624,10 @@ impl LoweredEntitySourceProgram {
     /// Converts retained entity source into explicit GAL shader descriptions.
     /// Backend compilation remains private to the backend and this does not
     /// allocate a pipeline or choose a rendering route.
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
         [
-            self.vertex.shader_module_descriptor(api),
-            self.fragment.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
+            self.fragment.shader_module_descriptor(conventions),
         ]
     }
 
@@ -1637,7 +1637,7 @@ impl LoweredEntitySourceProgram {
     /// copied material mode and Rust supplies the corresponding shader hook.
     pub fn shader_module_descriptors_with_alpha_cutoff(
         &self,
-        api: BackendApi,
+        conventions: ShaderConventions,
         alpha_cutoff: Option<f32>,
     ) -> [ShaderModuleDesc; 2] {
         let fragment_source = match alpha_cutoff {
@@ -1654,12 +1654,12 @@ impl LoweredEntitySourceProgram {
             None => self.fragment.source.clone(),
         };
         [
-            self.vertex.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
             ShaderModuleDesc {
                 label: self.fragment.label.clone(),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(api, &fragment_source),
+                code: shader_stage_code(conventions, &fragment_source),
                 entry_point: self.fragment.entry_point.clone(),
             },
         ]
@@ -1888,12 +1888,12 @@ impl LocalTexturedSourceProgram for LoweredEntitySourceProgram {
 
     fn shader_module_descriptors_with_alpha_cutoff(
         &self,
-        api: BackendApi,
+        conventions: ShaderConventions,
         alpha_cutoff: Option<f32>,
     ) -> [ShaderModuleDesc; 2] {
         LoweredEntitySourceProgram::shader_module_descriptors_with_alpha_cutoff(
             self,
-            api,
+            conventions,
             alpha_cutoff,
         )
     }
@@ -1920,10 +1920,10 @@ impl LocalTexturedSourceProgram for LoweredEntitySourceProgram {
 }
 
 impl LoweredHandSourceProgram {
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
         [
-            self.vertex.shader_module_descriptor(api),
-            self.fragment.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
+            self.fragment.shader_module_descriptor(conventions),
         ]
     }
 
@@ -1931,7 +1931,7 @@ impl LoweredHandSourceProgram {
     /// entity writer, but the projection/depth domain remains hand-specific.
     pub fn shader_module_descriptors_with_alpha_cutoff(
         &self,
-        api: BackendApi,
+        conventions: ShaderConventions,
         alpha_cutoff: Option<f32>,
     ) -> [ShaderModuleDesc; 2] {
         let fragment_source = match alpha_cutoff {
@@ -1948,12 +1948,12 @@ impl LoweredHandSourceProgram {
             None => self.fragment.source.clone(),
         };
         [
-            self.vertex.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
             ShaderModuleDesc {
                 label: self.fragment.label.clone(),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(api, &fragment_source),
+                code: shader_stage_code(conventions, &fragment_source),
                 entry_point: self.fragment.entry_point.clone(),
             },
         ]
@@ -2156,12 +2156,12 @@ impl LocalTexturedSourceProgram for LoweredHandSourceProgram {
 
     fn shader_module_descriptors_with_alpha_cutoff(
         &self,
-        api: BackendApi,
+        conventions: ShaderConventions,
         alpha_cutoff: Option<f32>,
     ) -> [ShaderModuleDesc; 2] {
         LoweredHandSourceProgram::shader_module_descriptors_with_alpha_cutoff(
             self,
-            api,
+            conventions,
             alpha_cutoff,
         )
     }
@@ -2195,10 +2195,10 @@ impl LoweredTexturedMaterialSourceProgram {
         &self.named_output_color_slots
     }
 
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
         [
-            self.vertex.shader_module_descriptor(api),
-            self.fragment.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
+            self.fragment.shader_module_descriptor(conventions),
         ]
     }
 
@@ -2392,10 +2392,10 @@ impl LoweredWeatherSourceProgram {
         }
     }
 
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
         [
-            self.vertex.shader_module_descriptor(api),
-            self.fragment.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
+            self.fragment.shader_module_descriptor(conventions),
         ]
     }
 
@@ -2466,10 +2466,10 @@ impl LoweredCloudSourceProgram {
         }
     }
 
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
         [
-            self.vertex.shader_module_descriptor(api),
-            self.fragment.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
+            self.fragment.shader_module_descriptor(conventions),
         ]
     }
 
@@ -3114,10 +3114,10 @@ impl TerrainMaterialProgram {
     /// shader modules. This is shared by ordinary mesh materials and DH LOD
     /// materials so neither frontend has to reproduce backend dialect
     /// selection or module descriptions.
-    pub fn shader_module_descriptors(&self, api: BackendApi) -> [ShaderModuleDesc; 2] {
+    pub fn shader_module_descriptors(&self, conventions: ShaderConventions) -> [ShaderModuleDesc; 2] {
         [
-            self.vertex.shader_module_descriptor(api),
-            self.fragment.shader_module_descriptor(api),
+            self.vertex.shader_module_descriptor(conventions),
+            self.fragment.shader_module_descriptor(conventions),
         ]
     }
 
@@ -5159,17 +5159,27 @@ pub fn minimal_shadow_depth_program() -> TerrainMaterialProgram {
     }
 }
 
-pub fn shader_stage_code_for_backend(api: BackendApi, source: &str) -> Vec<u8> {
-    if api != BackendApi::Vulkan {
+/// Adapts shared GLSL text to the backend's native conventions by defining
+/// the `VULKANIC_GAL_*` convention macros the shader may test.
+pub fn shader_stage_code(conventions: ShaderConventions, source: &str) -> Vec<u8> {
+    let mut defines = String::new();
+    if conventions.zero_to_one_clip_depth {
+        defines.push_str("#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1\n");
+    }
+    // When a backend's framebuffer rows and sampled-image coordinates differ
+    // from the pass graph's top-left image convention, every fullscreen
+    // transfer compensates exactly once; otherwise forward work inserted
+    // after a transfer acquires a different vertical parity from G-buffer
+    // content.
+    if conventions.flip_fullscreen_uv_y {
+        defines.push_str("#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1\n");
+    }
+    if defines.is_empty() {
         return source.as_bytes().to_vec();
     }
-    // A Vulkan framebuffer's row direction and sampled-image coordinates
-    // differ from the pass graph's top-left image convention. Every
-    // fullscreen transfer compensates exactly once; otherwise forward work
-    // inserted after a transfer acquires a different vertical parity from
-    // G-buffer content.
-    let prefix = "#version 450\n#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1\n#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1\n";
-    source.replacen("#version 450\n", &prefix, 1).into_bytes()
+    source
+        .replacen("#version 450\n", &format!("#version 450\n{defines}"), 1)
+        .into_bytes()
 }
 
 #[cfg(test)]
@@ -5179,7 +5189,7 @@ mod shader_stage_code_tests {
     #[test]
     fn vulkan_fullscreen_transfers_correct_framebuffer_to_texture_row_origin() {
         let source = "#version 450\n#ifdef VULKANIC_GAL_FULLSCREEN_UV_TOP_ORIGIN\n#endif\n";
-        let lowered = String::from_utf8(shader_stage_code_for_backend(BackendApi::Vulkan, source))
+        let lowered = String::from_utf8(shader_stage_code(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, source))
             .expect("Vulkan shader source must remain UTF-8");
 
         assert!(lowered.contains("#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1"));
@@ -5190,7 +5200,7 @@ mod shader_stage_code_tests {
     #[test]
     fn vulkan_fullscreen_transfers_correct_the_framebuffer_to_texture_row_origin() {
         let source = "#version 450\n#ifdef VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y\n#endif\n";
-        let lowered = String::from_utf8(shader_stage_code_for_backend(BackendApi::Vulkan, source))
+        let lowered = String::from_utf8(shader_stage_code(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, source))
             .expect("Vulkan shader source must remain UTF-8");
 
         assert!(lowered.contains("#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1"));
@@ -8734,14 +8744,14 @@ mod tests {
             crate::render::vulkanic::shader_pack::lowering::TerrainSourceOpaqueResourceKind::CombinedTextureSampler,
             program.opaque_resource_bindings.bindings()[0].kind()
         );
-        let vulkan_modules = program.shader_module_descriptors(BackendApi::Vulkan);
+        let vulkan_modules = program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions);
         assert_eq!(ShaderStage::Vertex, vulkan_modules[0].stage);
         assert_eq!(ShaderStage::Fragment, vulkan_modules[1].stage);
         assert_eq!(ShaderCodeFormat::Glsl, vulkan_modules[0].code_format);
         assert!(std::str::from_utf8(&vulkan_modules[0].code)
             .unwrap()
             .contains("VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH"));
-        let opengl_modules = program.shader_module_descriptors(BackendApi::OpenGl);
+        let opengl_modules = program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions);
         let opengl_vertex = std::str::from_utf8(&opengl_modules[0].code).unwrap();
         assert!(
             opengl_vertex.contains("VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH"),
@@ -9022,12 +9032,12 @@ mod tests {
             program.opaque_resource_bindings.role_for("tex")
         );
         let cutout_descriptors =
-            program.shader_module_descriptors_with_alpha_cutoff(BackendApi::Vulkan, Some(0.1));
+            program.shader_module_descriptors_with_alpha_cutoff(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, Some(0.1));
         let cutout =
             String::from_utf8(cutout_descriptors.into_iter().nth(1).unwrap().code).unwrap();
         assert!(cutout.contains("#define VULKANIC_SOURCE_ENTITY_ALPHA_CUTOFF 0.10000000"));
         let opaque_descriptors =
-            program.shader_module_descriptors_with_alpha_cutoff(BackendApi::Vulkan, None);
+            program.shader_module_descriptors_with_alpha_cutoff(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, None);
         let opaque =
             String::from_utf8(opaque_descriptors.into_iter().nth(1).unwrap().code).unwrap();
         // No cutoff define: the output alpha test compiles out (Iris ALWAYS).
@@ -9829,13 +9839,13 @@ void main() {
         );
         assert!(program.required_resources.is_empty());
         let opaque = program
-            .shadow_shader_module_descriptors(BackendApi::Vulkan, None)
+            .shadow_shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, None)
             .unwrap();
         let cutout = program
-            .shadow_shader_module_descriptors(BackendApi::Vulkan, Some(0.1))
+            .shadow_shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, Some(0.1))
             .unwrap();
         let overridden = program
-            .shadow_shader_module_descriptors(BackendApi::Vulkan, Some(0.25))
+            .shadow_shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, Some(0.25))
             .unwrap();
         assert_eq!(opaque[0].code, cutout[0].code);
         assert!(!String::from_utf8_lossy(&opaque[1].code).contains("out_shadow_color.a >"));
@@ -9914,7 +9924,7 @@ void main() {
         let program = prepare_lowered_entity_shadow_source_program(&contract, &lowered, &bindings).unwrap();
         assert!(program.identity.as_str().contains("entity_shadow_source"));
         let [_, fragment] = program.shader_module_descriptors_with_alpha_cutoff(
-            BackendApi::Vulkan,
+            crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions,
             Some(0.1),
         );
         let text = String::from_utf8_lossy(&fragment.code).to_string();

@@ -7,6 +7,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::render::vulkanic::resources::ShaderConventions;
+
 use crate::render::vulkanic::commands::{
     AttachmentLoadOp, AttachmentStoreOp, CommandOp, PassAttachment, ResourceBarrier,
     TextureUsageState,
@@ -24,7 +26,7 @@ use crate::render::vulkanic::resources::{
 };
 
 use super::lowering::{FullscreenSourceRasterPrimitive, TerrainSourceOpaqueResourceKind};
-use super::programs::{shader_stage_code_for_backend, LoweredFullscreenSourceProgram};
+use super::programs::{shader_stage_code, LoweredFullscreenSourceProgram};
 use super::source_targets::{
     prepare_fullscreen_source_color_resources, resolve_fullscreen_source_color_attachments,
     source_color_clear_color, FullscreenSourceColorAttachment, ShaderPackColorBootstrapClearValues,
@@ -1025,7 +1027,7 @@ impl SourceColorCopyPlan {
             })?;
             created.push(pipeline_layout);
             let [vertex_desc, fragment_desc] =
-                source_final_copy_shader_modules(gal.capabilities().api, label);
+                source_final_copy_shader_modules(gal.capabilities().shader_conventions, label);
             let vertex_shader = gal.create_shader_module(vertex_desc)?;
             created.push(vertex_shader);
             let fragment_shader = gal.create_shader_module(fragment_desc)?;
@@ -1299,7 +1301,7 @@ void main() {
 "#;
 
 fn source_final_copy_shader_modules(
-    api: crate::render::vulkanic::resources::BackendApi,
+    conventions: ShaderConventions,
     label: &str,
 ) -> [ShaderModuleDesc; 2] {
     [
@@ -1307,14 +1309,14 @@ fn source_final_copy_shader_modules(
             label: format!("{label}.vertex"),
             stage: ShaderStage::Vertex,
             code_format: ShaderCodeFormat::Glsl,
-            code: shader_stage_code_for_backend(api, SOURCE_FINAL_COPY_VERTEX),
+            code: shader_stage_code(conventions, SOURCE_FINAL_COPY_VERTEX),
             entry_point: "main".to_string(),
         },
         ShaderModuleDesc {
             label: format!("{label}.fragment"),
             stage: ShaderStage::Fragment,
             code_format: ShaderCodeFormat::Glsl,
-            code: shader_stage_code_for_backend(api, SOURCE_FINAL_COPY_FRAGMENT),
+            code: shader_stage_code(conventions, SOURCE_FINAL_COPY_FRAGMENT),
             entry_point: "main".to_string(),
         },
     ]
@@ -1555,7 +1557,7 @@ impl PreparedFullscreenSourcePass {
                 resource_layouts: vec![source_data_layout, pack_resources_layout],
             })?;
             created.push(pipeline_layout);
-            let [vertex, fragment] = program.shader_module_descriptors(gal.capabilities().api);
+            let [vertex, fragment] = program.shader_module_descriptors(gal.capabilities().shader_conventions);
             let vertex_shader = gal.create_shader_module(vertex)?;
             created.push(vertex_shader);
             let fragment_shader = gal.create_shader_module(fragment)?;
@@ -2774,7 +2776,7 @@ mod tests {
         };
         let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
         for module in source_final_copy_shader_modules(
-            crate::render::vulkanic::resources::BackendApi::Vulkan,
+            crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions,
             "source-final-copy.vulkan",
         ) {
             gal.create_shader_module(module).unwrap_or_else(|error| {
@@ -2798,7 +2800,7 @@ mod tests {
         };
         let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
         for module in source_final_copy_shader_modules(
-            crate::render::vulkanic::resources::BackendApi::OpenGl,
+            crate::render::vulkanic::backends::opengl_capabilities().shader_conventions,
             "source-final-copy.opengl",
         ) {
             gal.create_shader_module(module).unwrap_or_else(|error| {

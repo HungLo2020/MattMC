@@ -441,6 +441,335 @@ fn source_terrain_execution_is_rust_owned_and_never_an_ffi_or_iris_route() {
     }
 }
 
+#[test]
+fn backend_identity_is_not_part_of_the_gal_api() {
+    // Frontends select behavior through capability facts (feature flags,
+    // limits, shader conventions), never by asking which backend is running.
+    let rust_root = Path::new(RUST_ROOT);
+    let mut violations = Vec::new();
+    for file in rust_files(rust_root) {
+        if file.ends_with("architecture_boundary.rs") {
+            continue;
+        }
+        for (line_index, line) in read_source(&file).lines().enumerate() {
+            if line.contains("BackendApi") {
+                violations.push(format!("{}:{}: {}", relative(&file), line_index + 1, line.trim()));
+            }
+        }
+    }
+    let resources = rust_root.join("render/vulkanic/resources.rs");
+    let source = read_source(&resources);
+    let capabilities = source
+        .split("pub struct BackendCapabilities {")
+        .nth(1)
+        .and_then(|rest| rest.split('}').next())
+        .expect("BackendCapabilities is declared in resources.rs");
+    for field in capabilities.lines().map(str::trim).filter(|line| line.starts_with("pub ")) {
+        if field.starts_with("pub api") || field.starts_with("pub backend") || field.starts_with("pub kind") {
+            violations.push(format!("{}: BackendCapabilities field `{field}`", relative(&resources)));
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "Backend identity must not be exposed to or tested by frontends; add a capability instead:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn frontend_production_code_does_not_name_backend_implementations() {
+    let rust_root = Path::new(RUST_ROOT);
+    let vulkanic = rust_root.join("render/vulkanic");
+    let backends = vulkanic.join("backends");
+    let forbidden = [
+        "backends::vulkan",
+        "backends::opengl",
+        "VulkanBackend",
+        "OpenGlBackend",
+        "\"Rust Vulkan\"",
+        "\"Rust OpenGL\"",
+        "capabilities().name ==",
+    ];
+    let mut violations = Vec::new();
+    for file in production_files(&vulkanic) {
+        if is_inside(&file, &backends) {
+            continue;
+        }
+        // The FFI context is the composition root that constructs the
+        // backend Java selected; it may name backend constructors.
+        let composition_root = file.ends_with("ffi/mod.rs") || file.ends_with("ffi/context.rs");
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            for token in forbidden {
+                if line.contains(token) && !(composition_root && token.starts_with("backends::")) {
+                    violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+                }
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "Frontend/GAL production code must reach backends only through the GAL:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn core_gal_and_backends_do_not_depend_on_frontends() {
+    let rust_root = Path::new(RUST_ROOT);
+    let forbidden = [
+        "world_primitive_frontend",
+        "gui_frontend",
+        "gui_mesh_frontend",
+        "shader_pack",
+        "vulkanic::terrain",
+        "vulkanic::ffi",
+        "super::ffi",
+    ];
+    let mut violations = Vec::new();
+    for file in core_and_backend_production_files(rust_root) {
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            for token in forbidden {
+                if line.contains(token) {
+                    violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+                }
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "The core GAL and its backends must not depend on rendering frontends:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn core_gal_and_backends_carry_no_game_vocabulary() {
+    // Game concepts (content, render features, shader-pack names) belong to
+    // frontends. The GAL and backends see opaque scopes, labels and states.
+    let rust_root = Path::new(RUST_ROOT);
+    let forbidden_words = [
+        "minecraft", "terrain", "iris", "optifine", "lightmap", "entity", "entities", "glint",
+        "vignette", "crumbling", "particle", "particles", "gbuffer", "dh", "voxel", "sky",
+        "weather", "gui", "hud",
+    ];
+    let forbidden_phrases = [
+        ["distant", "horizons"],
+        ["shadow", "depth"],
+        ["g", "buffer"],
+        ["shader", "pack"],
+        ["world", "lod"],
+        ["world", "mesh"],
+    ];
+    let mut violations = Vec::new();
+    for file in core_and_backend_production_files(rust_root) {
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            let words = identifier_words(&line);
+            let hit = words.iter().any(|word| forbidden_words.contains(&word.as_str()))
+                || words.windows(2).any(|pair| {
+                    forbidden_phrases
+                        .iter()
+                        .any(|phrase| pair[0] == phrase[0] && pair[1] == phrase[1])
+                });
+            if hit {
+                violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "Game vocabulary must stay in frontends, not the core GAL or backends:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn identifier_words_split_snake_kebab_and_camel_case() {
+    assert_eq!(
+        vec!["egl", "int", "binding", "buffer", "distant", "horizons", "lod", "frame", "gl", "vertex", "id"],
+        identifier_words("EglInt binding_buffer distant-horizons LodFrame gl_VertexID")
+    );
+}
+
+/// Lowercase words of every identifier or literal on a line, split at
+/// `_`, `-`, `.`, spaces and camelCase boundaries (`GLCapsTest` → gl caps test).
+fn identifier_words(line: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    for chunk in line.split(|character: char| !character.is_ascii_alphanumeric()) {
+        let characters: Vec<char> = chunk.chars().collect();
+        let mut word = String::new();
+        for (index, character) in characters.iter().enumerate() {
+            let previous = index.checked_sub(1).map(|index| characters[index]);
+            let next = characters.get(index + 1);
+            let boundary = character.is_ascii_uppercase()
+                && previous.is_some_and(|previous| {
+                    previous.is_ascii_lowercase()
+                        || (previous.is_ascii_uppercase()
+                            && next.is_some_and(|next| next.is_ascii_lowercase()))
+                });
+            if boundary && !word.is_empty() {
+                words.push(std::mem::take(&mut word));
+            }
+            word.push(character.to_ascii_lowercase());
+        }
+        if !word.is_empty() {
+            words.push(word);
+        }
+    }
+    words
+}
+
+#[test]
+fn core_gal_and_backends_do_not_branch_on_resource_labels() {
+    // Labels are diagnostics. Behavior keyed on label text (profiling
+    // classification, feature detection) belongs to the frontend that chose
+    // the label; env-selected trace filters take the text from outside.
+    let rust_root = Path::new(RUST_ROOT);
+    let forbidden = [
+        "label.contains(\"",
+        "label.starts_with(\"",
+        "label.ends_with(\"",
+        "label == \"",
+    ];
+    let mut violations = Vec::new();
+    for file in core_and_backend_production_files(rust_root) {
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            let compact = compact_line(&line);
+            for token in forbidden {
+                if compact.contains(&compact_line(token)) {
+                    violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+                }
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "The core GAL and backends must not change behavior based on resource label text:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn production_line_filter_drops_comments_and_test_items() {
+    let source = "fn keep() {}\n// terrain comment\n#[cfg(test)]\nmod tests {\n    fn x() { let _ = \"}\"; }\n}\nfn after() {} // tail\n#[cfg(test)]\nmod more;\n";
+    let lines: Vec<(usize, String)> = production_lines(source);
+    let text: Vec<&str> = lines.iter().map(|(_, line)| line.trim()).filter(|line| !line.is_empty()).collect();
+    assert_eq!(vec!["fn keep() {}", "fn after() {}"], text);
+    assert_eq!(7, lines.iter().find(|(_, line)| line.contains("after")).unwrap().0);
+}
+
+/// Core GAL files (backend-neutral API and bookkeeping) plus backend
+/// implementation files, excluding test-only suites.
+fn core_and_backend_production_files(rust_root: &Path) -> Vec<PathBuf> {
+    let vulkanic = rust_root.join("render/vulkanic");
+    let mut files: Vec<PathBuf> = [
+        "gal.rs", "resources.rs", "commands.rs", "frame.rs", "sync.rs", "handles.rs", "error.rs",
+    ]
+    .iter()
+    .map(|name| vulkanic.join(name))
+    .collect();
+    files.extend(production_files(&vulkanic.join("backends")));
+    files
+}
+
+/// Rust files that are not test-only suites (by the repository's naming).
+fn production_files(root: &Path) -> Vec<PathBuf> {
+    rust_files(root)
+        .into_iter()
+        .filter(|file| {
+            let name = file.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+            let in_tests_dir = file.components().any(|part| part.as_os_str() == "tests");
+            !in_tests_dir
+                && name != "tests.rs"
+                && name != "architecture_boundary.rs"
+                && !name.ends_with("_tests.rs")
+                && !name.contains("conformance")
+                && name != "terrain_interpolation_observation.rs"
+        })
+        .collect()
+}
+
+/// Production source lines with `//` comments and `#[cfg(test)]` items
+/// removed, paired with their 1-based line numbers.
+fn production_lines(source: &str) -> Vec<(usize, String)> {
+    let bytes = source.as_bytes();
+    let mut keep = vec![true; bytes.len()];
+    let marker = b"#[cfg(test)]";
+    let mut index = 0;
+    while index + marker.len() <= bytes.len() {
+        if &bytes[index..index + marker.len()] != marker {
+            index += 1;
+            continue;
+        }
+        let start = index;
+        let mut cursor = index + marker.len();
+        let mut depth = 0usize;
+        let mut end = bytes.len();
+        while cursor < bytes.len() {
+            match bytes[cursor] {
+                b'"' => cursor = skip_string(bytes, cursor),
+                b'/' if bytes.get(cursor + 1) == Some(&b'/') => {
+                    while cursor < bytes.len() && bytes[cursor] != b'\n' {
+                        cursor += 1;
+                    }
+                }
+                b';' if depth == 0 => {
+                    end = cursor + 1;
+                    break;
+                }
+                b'{' => depth += 1,
+                b'}' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        end = cursor + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            cursor += 1;
+        }
+        for slot in keep.iter_mut().take(end).skip(start) {
+            *slot = false;
+        }
+        index = end;
+    }
+    let mut kept = String::with_capacity(source.len());
+    for (offset, character) in source.char_indices() {
+        kept.push(if keep[offset] || character == '\n' { character } else { ' ' });
+    }
+    kept.lines()
+        .enumerate()
+        .map(|(line_index, line)| (line_index + 1, strip_line_comment(line).to_string()))
+        .collect()
+}
+
+fn skip_string(bytes: &[u8], open: usize) -> usize {
+    let mut cursor = open + 1;
+    while cursor < bytes.len() {
+        match bytes[cursor] {
+            b'\\' => cursor += 2,
+            b'"' => return cursor,
+            _ => cursor += 1,
+        }
+    }
+    cursor
+}
+
+fn strip_line_comment(line: &str) -> &str {
+    let mut in_string = false;
+    let mut previous = '\0';
+    for (offset, character) in line.char_indices() {
+        if character == '"' && previous != '\\' {
+            in_string = !in_string;
+        }
+        if !in_string && character == '/' && line[offset + 1..].starts_with('/') {
+            return &line[..offset];
+        }
+        previous = character;
+    }
+    line
+}
+
 fn assert_no_public_backend_exposure(path: &Path, source: &str) {
     let mut violations = Vec::new();
 

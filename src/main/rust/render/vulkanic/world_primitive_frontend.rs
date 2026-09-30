@@ -12,6 +12,7 @@ mod background;
 mod crack;
 mod decal_capture;
 mod equipment_capture;
+pub(crate) mod gpu_profile_scopes;
 pub(crate) mod experience_orb;
 mod lod;
 pub(crate) mod material;
@@ -40,7 +41,7 @@ use super::gui_mesh_frontend::GuiMeshBatchRequest;
 use super::handles::Handle;
 use super::metrics::{elapsed_nanos_u64, WholeFrameProfile};
 use super::resources::{
-    AccessFlags, BackendApi, BackendFeature, BlendMode, BufferDesc, BufferUsage, ColorFormat,
+    AccessFlags, BackendFeature, BlendMode, BufferDesc, BufferUsage, ColorFormat, ShaderConventions,
     CombinedTextureSamplerDesc, CompareOp, DepthBias, Extent3d, FrontFace, GraphicsPipelineDesc,
     IndexType, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags, PrimitiveTopology, QueueClass,
     RasterYDirection, RenderPassDesc, RenderTargetDesc, ResourceBinding, ResourceBindingDesc,
@@ -74,7 +75,7 @@ use super::shader_pack::programs::{
     minimal_optical_stencil_write_program, minimal_shadow_depth_program,
     minimal_static_compact_direct_terrain_program, minimal_terrain_cutout_program,
     minimal_terrain_solid_program, prepare_lowered_distant_horizons_exact_atlas_source_program,
-    shader_stage_code_for_backend, CompositeProgram, DistantHorizonsMaterialIdentityContract,
+    shader_stage_code, CompositeProgram, DistantHorizonsMaterialIdentityContract,
     LocalTexturedSourceProgram, LoweredCloudSourceProgram, LoweredDistantHorizonsSourceProgram,
     LoweredEntitySourceProgram, LoweredFullscreenSourceProgram, LoweredHandSourceProgram,
     LoweredTerrainSourceProgram, LoweredTexturedMaterialSourceProgram, LoweredWeatherSourceProgram,
@@ -6195,7 +6196,7 @@ impl MeshGeometryArena {
         label: &str,
         bytes: u64,
     ) -> GalResult<(Handle, u64)> {
-        let device_local = gal.capabilities().api == BackendApi::Vulkan;
+        let device_local = gal.capabilities().supports(BackendFeature::DeviceLocalMemory);
         Self::allocate_in_pages(
             gal,
             &mut self.vertex_pages,
@@ -7837,14 +7838,22 @@ impl WorldPrimitiveFrontend {
         Ok(sources == bundled_sources)
     }
 
-    fn custom_post_effect_sources(&self, identity: &str) -> GalResult<Vec<CustomPostEffectSource>> {
-        self.custom_post_effect_sources_with_globals(identity, None)
+    #[cfg(test)]
+    fn custom_post_effect_sources(
+        &self,
+        identity: &str,
+        conventions: ShaderConventions,
+    ) -> GalResult<Vec<CustomPostEffectSource>> {
+        self.custom_post_effect_sources_with_globals(identity, None, conventions)
     }
 
+    /// Lowers the pack's post-effect passes to explicit-binding GLSL adapted
+    /// to `conventions`; execution admits them only on such backends.
     fn custom_post_effect_sources_with_globals(
         &self,
         identity: &str,
         globals: Option<super::shader_pack::engine_globals::EngineGlobals>,
+        conventions: ShaderConventions,
     ) -> GalResult<Vec<CustomPostEffectSource>> {
         let source = self.shader_pack_sources.active().ok_or_else(|| {
             GalError::unsupported_feature(
@@ -7981,13 +7990,13 @@ impl WorldPrimitiveFrontend {
                     input_bilinear: pass.inputs.iter().map(|input| input.bilinear).collect(),
                     sampler_info_uniform,
                     vertex_shader: normalize_vulkan_vertex_source_for_pass(
-                        BackendApi::Vulkan,
+                        conventions,
                         vertex_source.as_bytes(),
                         &pass,
                         super::commands::TextureRowOrder::Reverse,
                     )?,
                     fragment_shader: normalize_vulkan_fullscreen_source(
-                        BackendApi::Vulkan,
+                        conventions,
                         fragment_source.as_bytes(),
                         &pass,
                     )?,
@@ -8016,14 +8025,19 @@ impl WorldPrimitiveFrontend {
     /// Static effect uniforms and explicit per-frame engine data are packed
     /// into Rust-owned buffers. Fabulous and outline external-target routes
     /// retain their separate composition contracts.
-    pub(crate) fn validate_post_effect_request(&self, identity: &[u8]) -> GalResult<()> {
-        self.validate_post_effect_request_with_globals(identity, None)
+    pub(crate) fn validate_post_effect_request(
+        &self,
+        identity: &[u8],
+        conventions: ShaderConventions,
+    ) -> GalResult<()> {
+        self.validate_post_effect_request_with_globals(identity, None, conventions)
     }
 
     pub(crate) fn validate_post_effect_request_with_globals(
         &self,
         identity: &[u8],
         globals: Option<super::shader_pack::engine_globals::EngineGlobals>,
+        conventions: ShaderConventions,
     ) -> GalResult<()> {
         if identity.is_empty() {
             return Ok(());
@@ -8057,7 +8071,7 @@ impl WorldPrimitiveFrontend {
         {
             return Ok(());
         }
-        self.custom_post_effect_sources_with_globals(identity, globals)
+        self.custom_post_effect_sources_with_globals(identity, globals, conventions)
             .map(|_| ())
     }
 
@@ -15679,7 +15693,7 @@ impl WorldPrimitiveFrontend {
         let mut created = Vec::new();
         let result = (|| -> GalResult<LoweredEntitySourcePipelineResources> {
             let [vertex_desc, fragment_desc] = program.shader_module_descriptors_with_alpha_cutoff(
-                gal.capabilities().api,
+                gal.capabilities().shader_conventions,
                 match shadow_caster {
                     Some(cutoff) => cutoff,
                     None => source_entity_alpha_cutoff(material_mode)?,
@@ -15903,7 +15917,7 @@ impl WorldPrimitiveFrontend {
         let mut created = Vec::new();
         let result = (|| -> GalResult<LoweredTexturedMaterialSourcePipelineResources> {
             let [vertex_desc, fragment_desc] =
-                program.shader_module_descriptors(gal.capabilities().api);
+                program.shader_module_descriptors(gal.capabilities().shader_conventions);
             let vertex_shader = gal.create_shader_module(vertex_desc)?;
             created.push(vertex_shader);
             let fragment_shader = gal.create_shader_module(fragment_desc)?;
@@ -16193,7 +16207,7 @@ impl WorldPrimitiveFrontend {
                     color_formats,
                     // Vanilla `RenderPipelines.CRUMBLING`: DST_COLOR/SRC_COLOR
                     // colour, ONE/ZERO alpha; Iris keeps it (no pack blend).
-                    BlendMode::Crumbling,
+                    BlendMode::DoubleModulate,
                     &[WORLD_MATERIAL_MODE_TRANSLUCENT],
                     "damagedblock",
                     Some(DepthBias {
@@ -16586,11 +16600,11 @@ impl WorldPrimitiveFrontend {
             "{writer_label}-geometry-{:?}-mesh{}-gen{}",
             key.abi, key.mesh_key, key.mesh_generation
         );
-        // Shader programs read every source vertex each frame, so on Vulkan
-        // the streams live in device-local memory behind a one-shot staging
-        // copy, like ordinary terrain arenas; host-visible memory would put
-        // the whole resident world on the PCIe bus every frame.
-        let device_local = gal.capabilities().api == BackendApi::Vulkan;
+        // Shader programs read every source vertex each frame, so where the
+        // backend has device-local memory the streams live there behind a
+        // one-shot staging copy, like ordinary terrain arenas; host-visible
+        // memory would put the whole resident world on the bus every frame.
+        let device_local = gal.capabilities().supports(BackendFeature::DeviceLocalMemory);
         if key.abi == SourceGeometryAbi::Terrain && source_terrain_geometry_pages_enabled() {
             return self.ensure_paged_source_terrain_geometry(
                 gal,
@@ -18302,11 +18316,11 @@ impl WorldPrimitiveFrontend {
         let result = (|| -> GalResult<LoweredSourceTerrainPipelineResources> {
             let [vertex_desc, fragment_desc] = if program.terrain_output_color_slots().is_none() {
                 program.shadow_shader_module_descriptors(
-                    gal.capabilities().api,
+                    gal.capabilities().shader_conventions,
                     shadow_alpha_cutoff,
                 )?
             } else {
-                program.shader_module_descriptors(gal.capabilities().api)
+                program.shader_module_descriptors(gal.capabilities().shader_conventions)
             };
             let vertex_shader = gal.create_shader_module(vertex_desc)?;
             created.push(vertex_shader);
@@ -26605,7 +26619,7 @@ impl WorldPrimitiveFrontend {
         target: Handle,
         frame: &WorldPrimitiveFrame,
     ) -> Option<RasterYDirection> {
-        (gal.capabilities().api == BackendApi::Vulkan
+        (gal.capabilities().supports(BackendFeature::TextureRowReversal)
             && target.kind() == Some(super::handles::HandleKind::FrameTarget)
             && frame.background.enabled
             && frame.background.load_intent == WORLD_BACKGROUND_LOAD_CLEAR
@@ -26722,10 +26736,10 @@ impl WorldPrimitiveFrontend {
         owned_world_direction: Option<RasterYDirection>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
         if owned_world_direction.is_some()
-            && (gal.capabilities().api != BackendApi::Vulkan
+            && (!gal.capabilities().supports(BackendFeature::TextureRowReversal)
                 || self.runtime_source_execution_is_armed())
         {
-            return Err(GalError::unsupported_feature("private owned vanilla world target requires Rust Vulkan without an armed source runtime"));
+            return Err(GalError::unsupported_feature("private owned vanilla world target requires texture row reversal without an armed source runtime"));
         }
         self.discard_stale_pending_vanilla_lightmap(gal);
         self.world_text.begin_submission();
@@ -26937,7 +26951,7 @@ impl WorldPrimitiveFrontend {
             &frame,
             generation,
             self.mesh_asset_generation,
-            gal.capabilities().api,
+            gal.capabilities().shader_conventions,
         )?;
         if gameplay_attachment_capture.is_some() {
             for observation in &self.latest_atlas_animation_observations {
@@ -28347,6 +28361,7 @@ impl WorldPrimitiveFrontend {
                     GalError::invalid_argument("post-effect identity must be UTF-8")
                 })?,
                 frame.engine_globals,
+                gal.capabilities().shader_conventions,
             )?)
         } else {
             None
@@ -31843,7 +31858,7 @@ impl WorldPrimitiveFrontend {
             &frame,
             generation,
             self.mesh_asset_generation,
-            gal.capabilities().api,
+            gal.capabilities().shader_conventions,
         )?;
         if gameplay_attachment_capture.is_some() {
             for observation in &self.latest_atlas_animation_observations {
@@ -34645,7 +34660,8 @@ impl WorldPrimitiveFrontend {
         raster_y_direction: RasterYDirection,
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
         self.pending_terrain_external_item_entity_written = false;
-        let vulkan_backend = gal.capabilities().api == BackendApi::Vulkan;
+        // Staged device-local uploads are batched into one flush per frame.
+        let batch_staged_uploads = gal.capabilities().supports(BackendFeature::DeviceLocalMemory);
         if self.generation == 0 {
             self.generation = generation;
         }
@@ -35074,7 +35090,7 @@ impl WorldPrimitiveFrontend {
         let resource_destroys_before = gal.metrics().resource_destroys;
         let resource_started = std::time::Instant::now();
         let previous_defer_world_uploads = self.defer_world_uploads;
-        self.defer_world_uploads = previous_defer_world_uploads || vulkan_backend;
+        self.defer_world_uploads = previous_defer_world_uploads || batch_staged_uploads;
         let render_resources_started = std::time::Instant::now();
         if !frame.segments.is_empty() {
             self.ensure_resources(gal, color_format, raster_y_direction)?;
@@ -35171,7 +35187,7 @@ impl WorldPrimitiveFrontend {
             self.pending_world_upload_ops.clear();
         }
         mesh_upload_result?;
-        if !previous_defer_world_uploads && vulkan_backend {
+        if !previous_defer_world_uploads && batch_staged_uploads {
             self.flush_pending_world_uploads(gal)?;
         }
         profile.world_prepare_mesh_resource_nanos = elapsed_nanos_u64(mesh_resource_started);
@@ -35984,7 +36000,8 @@ impl WorldPrimitiveFrontend {
                     self,
                     &mesh_batches,
                     stats.profile.world_prepare_mesh_stream_required_bytes,
-                    source_terrain_programs.is_none(),
+                    source_terrain_programs.is_none()
+                        && gal.capabilities().supports(BackendFeature::IndirectDraw),
                     std::env::var_os("MATTMC_RUST_DISABLE_TRANSLUCENT_PAGE_INDIRECT").is_none(),
                 )?;
                 stats.profile.world_mesh_stream_payload_pack_nanos =
@@ -37551,8 +37568,8 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     std::str::from_utf8(WORLD_SKY_DISC_VERTEX_SHADER_VULKAN)
                         .expect("sky shader UTF-8"),
                 ),
@@ -37667,8 +37684,8 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     std::str::from_utf8(WORLD_SKY_DISC_VERTEX_SHADER_VULKAN)
                         .expect("sky shader UTF-8"),
                 ),
@@ -37783,8 +37800,8 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     std::str::from_utf8(WORLD_LINE_VERTEX_SHADER_VULKAN)
                         .expect("world line shader is UTF-8"),
                 ),
@@ -37977,8 +37994,8 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     std::str::from_utf8(WORLD_CRACK_VERTEX_SHADER_VULKAN)
                         .expect("world crack shader is UTF-8"),
                 ),
@@ -38260,8 +38277,8 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     std::str::from_utf8(WORLD_BORDER_VERTEX_SHADER_VULKAN)
                         .expect("world border shader is UTF-8"),
                 ),
@@ -38634,7 +38651,7 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(gal.capabilities().api, &vertex_source),
+                code: shader_stage_code(gal.capabilities().shader_conventions, &vertex_source),
                 entry_point: "main".to_string(),
             })?;
             created.push(vertex_shader);
@@ -39155,7 +39172,7 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(gal.capabilities().api, &vertex_source),
+                code: shader_stage_code(gal.capabilities().shader_conventions, &vertex_source),
                 entry_point: terrain_program.vertex.entry_point.clone(),
             })?;
             created.push(vertex_shader);
@@ -39178,8 +39195,8 @@ impl WorldPrimitiveFrontend {
                     label: format!("{label}.shadow.vertex"),
                     stage: ShaderStage::Vertex,
                     code_format: ShaderCodeFormat::Glsl,
-                    code: shader_stage_code_for_backend(
-                        gal.capabilities().api,
+                    code: shader_stage_code(
+                        gal.capabilities().shader_conventions,
                         &shadow_program.vertex.source,
                     ),
                     entry_point: shadow_program.vertex.entry_point.clone(),
@@ -39271,7 +39288,7 @@ impl WorldPrimitiveFrontend {
                 blend: if is_optical_write {
                     BlendMode::Alpha
                 } else if is_glint {
-                    BlendMode::Glint
+                    BlendMode::SrcColorAdditive
                 } else if is_translucent {
                     BlendMode::Alpha
                 } else {
@@ -40295,7 +40312,10 @@ impl WorldPrimitiveFrontend {
         command_count: u64,
     ) -> GalResult<()> {
         self.source_terrain_multidraw_frame = None;
-        if command_count == 0 || !source_terrain_multidraw_enabled() {
+        if command_count == 0
+            || !source_terrain_multidraw_enabled()
+            || !gal.capabilities().supports(BackendFeature::IndirectDraw)
+        {
             return Ok(());
         }
         let required = command_count
@@ -41876,8 +41896,8 @@ impl WorldPrimitiveFrontend {
                 label: format!("{label}.screen.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     &screen_vertex_program.vertex.source,
                 ),
                 entry_point: screen_vertex_program.vertex.entry_point.clone(),
@@ -47248,7 +47268,7 @@ fn source_textured_material_blend(material_mode: u32) -> GalResult<BlendMode> {
         | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST => Ok(BlendMode::Disabled),
         // Vanilla `BlendFunction.GLINT` (SRC_COLOR, ONE / ZERO, ONE); Iris
         // keeps it for `gbuffers_armor_glint` (no pack or program override).
-        WORLD_MATERIAL_MODE_GLINT => Ok(BlendMode::Glint),
+        WORLD_MATERIAL_MODE_GLINT => Ok(BlendMode::SrcColorAdditive),
         WORLD_MATERIAL_MODE_TRANSLUCENT | WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT => {
             Ok(BlendMode::Alpha)
         }
@@ -49494,7 +49514,7 @@ fn generic_material_raster_state_for(
     let mut cull_mode = cull_mode_from_policy(cull_policy)?;
     let mut front_face = FrontFace::CounterClockwise;
     let mut blend = if material_mode == WORLD_MATERIAL_MODE_GLINT {
-        BlendMode::Glint
+        BlendMode::SrcColorAdditive
     } else if material_mode_uses_alpha_blending(material_mode) {
         BlendMode::Alpha
     } else {
@@ -49904,7 +49924,7 @@ fn create_shader_screen_fragment_shader(
         label: format!("{label}.fragment"),
         stage: ShaderStage::Fragment,
         code_format: ShaderCodeFormat::Glsl,
-        code: shader_stage_code_for_backend(gal.capabilities().api, &program.fragment.source),
+        code: shader_stage_code(gal.capabilities().shader_conventions, &program.fragment.source),
         entry_point: program.fragment.entry_point.clone(),
     })
 }
@@ -51025,7 +51045,7 @@ fn source_terrain_pipeline_raster_state(
                 // their clear value. Vulkan expresses that MRT distinction
                 // explicitly while OpenGL retains its equivalent legacy path.
                 let blend = if blend == BlendMode::Alpha {
-                    BlendMode::TerrainTranslucent
+                    BlendMode::AlphaFirstAttachmentOnly
                 } else {
                     blend
                 };
@@ -51897,7 +51917,7 @@ impl SelectedSourceOutputCapture {
             artifact_name,
             format,
             extent,
-            readback_rows_bottom_up: diagnostic_readback_rows_bottom_up(gal.capabilities().api),
+            readback_rows_bottom_up: diagnostic_readback_rows_bottom_up(gal.capabilities().shader_conventions),
             texture,
             readback,
         }))
@@ -52165,9 +52185,9 @@ impl GameplayAttachmentCapture {
         frame: &WorldPrimitiveFrame,
         generation: u64,
         resource_generation: u64,
-        api: BackendApi,
+        conventions: ShaderConventions,
     ) -> GalResult<Option<Self>> {
-        Self::select_for_frame(frame, generation, resource_generation, api, false)
+        Self::select_for_frame(frame, generation, resource_generation, conventions, false)
     }
 
     /// The selected-source graph is admitted a frame after the normal graph
@@ -52177,16 +52197,16 @@ impl GameplayAttachmentCapture {
         frame: &WorldPrimitiveFrame,
         generation: u64,
         resource_generation: u64,
-        api: BackendApi,
+        conventions: ShaderConventions,
     ) -> GalResult<Option<Self>> {
-        Self::select_for_frame(frame, generation, resource_generation, api, true)
+        Self::select_for_frame(frame, generation, resource_generation, conventions, true)
     }
 
     fn select_for_frame(
         frame: &WorldPrimitiveFrame,
         generation: u64,
         resource_generation: u64,
-        api: BackendApi,
+        conventions: ShaderConventions,
         source_selected: bool,
     ) -> GalResult<Option<Self>> {
         let Some(dir) = std::env::var_os("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR") else {
@@ -52282,7 +52302,7 @@ impl GameplayAttachmentCapture {
                 height: frame.viewport_height.max(1),
                 depth: 1,
             },
-            readback_rows_bottom_up: diagnostic_readback_rows_bottom_up(api),
+            readback_rows_bottom_up: diagnostic_readback_rows_bottom_up(conventions),
             // A full attachment dump is intentionally expensive. Deterministic
             // multi-pose captures retain it for their selected diagnostic pose;
             // later poses need only the exact renderer-owned final image.
@@ -53814,12 +53834,12 @@ fn write_rgba_png(path: &Path, width: u32, height: u32, pixels: &[u8]) -> GalRes
         .map_err(|error| GalError::backend(format!("failed to write PNG pixels: {error}")))
 }
 
-/// OpenGL framebuffer readback starts at the bottom row. Vulkan frames use the
-/// backend's negative-height viewport, so image row zero is already the top
-/// row used by Java GUI semantics and final-output diagnostics. PNG artifacts
-/// are top-origin; raw readback files intentionally remain untouched.
-fn diagnostic_readback_rows_bottom_up(api: BackendApi) -> bool {
-    api == BackendApi::OpenGl
+/// Some backends read framebuffers back bottom row first; others already
+/// return the top row used by Java GUI semantics and final-output
+/// diagnostics. PNG artifacts are top-origin; raw readback files
+/// intentionally remain untouched.
+fn diagnostic_readback_rows_bottom_up(conventions: ShaderConventions) -> bool {
+    conventions.readback_rows_bottom_up
 }
 
 fn flip_rgba_rows_in_place(pixels: &mut [u8], width: u32, height: u32) -> GalResult<()> {
@@ -54147,6 +54167,11 @@ mod tests {
     use crate::render::vulkanic::commands::ClearColor;
     use crate::render::vulkanic::gui_frontend::{GuiFrontend, GuiSpriteRequest};
     use crate::render::vulkanic::handles::HandleKind;
+
+    /// Explicit-binding conventions of the default test backend.
+    fn test_conventions() -> ShaderConventions {
+        vulkan_capabilities().shader_conventions
+    }
     use crate::render::vulkanic::resources::{
         BufferDesc, BufferUsage, FrameTargetDesc, FrontFace, MemoryDomain, RenderTargetDesc,
         TextureDesc, TextureDimension, TextureSubresourceRange, TextureUsage, TextureViewDesc,
@@ -60254,30 +60279,30 @@ mod tests {
             })
             .unwrap();
         frontend
-            .validate_post_effect_request(b"minecraft:custom")
+            .validate_post_effect_request(b"minecraft:custom", test_conventions())
             .expect("bounded one-pass custom post effect is Rust-owned");
         frontend
-            .validate_post_effect_request(b"minecraft:multi")
+            .validate_post_effect_request(b"minecraft:multi", test_conventions())
             .expect("bounded multi-input main-target post effect is Rust-owned");
 
         frontend
-            .validate_post_effect_request(b"minecraft:complex")
+            .validate_post_effect_request(b"minecraft:complex", test_conventions())
             .expect("one private intermediate target is Rust-owned");
         frontend
-            .validate_post_effect_request(b"minecraft:multi_target")
+            .validate_post_effect_request(b"minecraft:multi_target", test_conventions())
             .expect("multiple generation-bound private intermediate targets are Rust-owned");
         frontend
-            .validate_post_effect_request(b"minecraft:external")
+            .validate_post_effect_request(b"minecraft:external", test_conventions())
             .expect("external role is copied as semantic post-effect input; frame admission remains gated");
         let external_sources = frontend
-            .custom_post_effect_sources("minecraft:external")
+            .custom_post_effect_sources("minecraft:external", test_conventions())
             .expect("external post-effect source is retained for gated frame admission");
         assert_eq!(
             "minecraft:translucent",
             external_sources[0].input_targets[0]
         );
         let texture_sources = frontend
-            .custom_post_effect_sources("minecraft:texture")
+            .custom_post_effect_sources("minecraft:texture", test_conventions())
             .expect("resource-pack texture input is Rust-owned");
         assert_eq!(1, texture_sources.len());
         assert_eq!(
@@ -60349,7 +60374,7 @@ mod tests {
             b"minecraft:creeper".as_slice(),
             b"minecraft:spider".as_slice(),
         ] {
-            assert!(frontend.validate_post_effect_request(identity).is_err(),
+            assert!(frontend.validate_post_effect_request(identity, test_conventions()).is_err(),
                 "a familiar name must not substitute bundled rendering for missing resource semantics");
         }
     }
@@ -60411,7 +60436,7 @@ mod tests {
             })
             .unwrap();
         assert!(frontend
-            .custom_post_effect_sources("minecraft:spider")
+            .custom_post_effect_sources("minecraft:spider", test_conventions())
             .err()
             .unwrap()
             .message
@@ -60428,7 +60453,7 @@ mod tests {
                         partial_tick: 0.0,
                         menu_blur_radius: 5,
                     },
-                ),
+                ), test_conventions(),
             )
             .unwrap();
         assert_eq!(10, passes.len());
@@ -60503,7 +60528,7 @@ mod tests {
                     game_ticks: 6000,
                     partial_tick: 0.0,
                     menu_blur_radius: 5,
-                }),
+                }), test_conventions(),
             )
             .unwrap();
         let next = frontend
@@ -60516,7 +60541,7 @@ mod tests {
                     game_ticks: 12000,
                     partial_tick: 0.0,
                     menu_blur_radius: 2,
-                }),
+                }), test_conventions(),
             )
             .unwrap();
         assert_copied_graph_fixture_executes_on_vulkan(
@@ -60775,10 +60800,10 @@ mod tests {
                 })
                 .unwrap();
             frontend
-                .validate_post_effect_request(b"minecraft:creeper")
+                .validate_post_effect_request(b"minecraft:creeper", test_conventions())
                 .unwrap();
             let passes = frontend
-                .custom_post_effect_sources("minecraft:creeper")
+                .custom_post_effect_sources("minecraft:creeper", test_conventions())
                 .unwrap();
             assert_eq!(2, passes.len());
             assert_eq!("swap", passes[0].output_target);
@@ -60860,10 +60885,10 @@ mod tests {
                 })
                 .unwrap();
             frontend
-                .validate_post_effect_request(b"minecraft:invert")
+                .validate_post_effect_request(b"minecraft:invert", test_conventions())
                 .unwrap();
             let passes = frontend
-                .custom_post_effect_sources("minecraft:invert")
+                .custom_post_effect_sources("minecraft:invert", test_conventions())
                 .unwrap();
             assert_eq!(2, passes.len());
             assert_eq!("swap", passes[0].output_target);
@@ -60884,14 +60909,14 @@ mod tests {
     fn post_effect_validation_rejects_control_and_blank_identities_before_asset_lookup() {
         let frontend = WorldPrimitiveFrontend::default();
         for identity in [b"   ".as_slice(), b"minecraft:bad\nname".as_slice()] {
-            let error = frontend.validate_post_effect_request(identity).unwrap_err();
+            let error = frontend.validate_post_effect_request(identity, test_conventions()).unwrap_err();
             assert!(error
                 .to_string()
                 .contains("empty or contains control characters"));
         }
         let oversized = vec![b'a'; 257];
         assert!(frontend
-            .validate_post_effect_request(&oversized)
+            .validate_post_effect_request(&oversized, test_conventions())
             .unwrap_err()
             .to_string()
             .contains("exceeds 256 UTF-8 bytes"));
@@ -60925,7 +60950,7 @@ mod tests {
             .dedicated_post_effect_is_bundled("transparency")
             .unwrap());
         frontend
-            .validate_post_effect_request(b"minecraft:transparency")
+            .validate_post_effect_request(b"minecraft:transparency", test_conventions())
             .expect(
                 "bundled Fabulous transparency is admitted through its dedicated Rust executor",
             );
@@ -60959,7 +60984,7 @@ mod tests {
             .unwrap());
         assert!(
             frontend
-                .validate_post_effect_request(b"minecraft:transparency")
+                .validate_post_effect_request(b"minecraft:transparency", test_conventions())
                 .is_err(),
             "a resource-pack transparency override must not be routed through bundled Rust shaders"
         );
@@ -63865,7 +63890,7 @@ mod tests {
         assert_eq!(WORLD_MATERIAL_MODE_OPAQUE, semantic.mode);
         assert!(semantic.fullbright);
         assert_eq!(
-            Some(BlendMode::Crumbling),
+            Some(BlendMode::DoubleModulate),
             material_registry::blend_override(WORLD_MATERIAL_ID_MODEL_CRUMBLING)
         );
         assert_eq!(
@@ -63896,7 +63921,7 @@ mod tests {
         let pipeline = gal
             .graphics_pipeline_descriptor_for_test(resources.pipeline)
             .unwrap();
-        assert_eq!(BlendMode::Crumbling, pipeline.blend);
+        assert_eq!(BlendMode::DoubleModulate, pipeline.blend);
         assert_eq!(Some(CompareOp::LessOrEqual), pipeline.depth_compare);
         assert!(!pipeline.depth_write);
         assert_eq!(
@@ -71600,7 +71625,7 @@ mod tests {
         let pipeline = gal
             .graphics_pipeline_descriptor_for_test(foil_pipeline)
             .unwrap();
-        assert_eq!(pipeline.blend, BlendMode::Glint);
+        assert_eq!(pipeline.blend, BlendMode::SrcColorAdditive);
         assert_eq!(pipeline.depth_compare, Some(CompareOp::Equal));
         assert!(!pipeline.depth_write);
         assert_eq!(pipeline.color_formats.len(), 1);
@@ -75897,8 +75922,9 @@ mod tests {
             None
         );
         scene.lod_render_frame = WorldLodRenderFrame::default();
+        // A backend without row-reversal copies cannot own the oriented target.
         let mut gl_caps = gal.capabilities().clone();
-        gl_caps.api = BackendApi::OpenGl;
+        gl_caps.features.texture_row_reversal = false;
         let gl =
             VulkanicGal::new_with_backend(Box::new(MockBackend::with_capabilities(gl_caps)), false);
         assert_eq!(
@@ -76999,16 +77025,6 @@ mod tests {
         stats: WorldPrimitiveSubmitStats,
     }
 
-    enum RuntimeRenderDocFrame {
-        Vulkan {
-            _guard: Option<crate::render::vulkanic::backends::vulkan::renderdoc::RenderDocFrame>,
-        },
-        OpenGl {
-            _guard: Option<crate::render::vulkanic::backends::opengl::renderdoc::RenderDocFrame>,
-        },
-        None,
-    }
-
     fn render_material_scene(
         gal: &mut VulkanicGal,
         frontend: &mut WorldPrimitiveFrontend,
@@ -77448,15 +77464,7 @@ mod tests {
         frame: WorldPrimitiveFrame,
         label: &str,
     ) -> GalResult<RuntimeRenderResult> {
-        let _renderdoc_frame = match gal.capabilities().api {
-            BackendApi::Vulkan => RuntimeRenderDocFrame::Vulkan {
-                _guard: crate::render::vulkanic::backends::vulkan::renderdoc::RenderDocFrame::start_if_requested(),
-            },
-            BackendApi::OpenGl => RuntimeRenderDocFrame::OpenGl {
-                _guard: crate::render::vulkanic::backends::opengl::renderdoc::RenderDocFrame::start_if_requested(),
-            },
-            BackendApi::Mock => RuntimeRenderDocFrame::None,
-        };
+        let _renderdoc_frame = gal.begin_debug_capture();
         let extent = Extent3d {
             width,
             height,
@@ -80794,9 +80802,8 @@ mod tests {
 
     #[test]
     fn diagnostic_readback_origin_matches_backend_viewport_contract() {
-        assert!(!diagnostic_readback_rows_bottom_up(BackendApi::Vulkan));
-        assert!(diagnostic_readback_rows_bottom_up(BackendApi::OpenGl));
-        assert!(!diagnostic_readback_rows_bottom_up(BackendApi::Mock));
+        assert!(!diagnostic_readback_rows_bottom_up(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions));
+        assert!(diagnostic_readback_rows_bottom_up(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions));
     }
 
     #[test]

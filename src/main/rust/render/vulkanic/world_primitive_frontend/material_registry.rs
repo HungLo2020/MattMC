@@ -297,7 +297,7 @@ pub(crate) fn blend_override(material_key: u32) -> Option<BlendMode> {
     match material_key {
         WORLD_MATERIAL_ID_SKY_STARS | WORLD_MATERIAL_ID_CELESTIAL => Some(BlendMode::Overlay),
         WORLD_MATERIAL_ID_ENERGY_SWIRL => Some(BlendMode::Additive),
-        WORLD_MATERIAL_ID_MODEL_CRUMBLING => Some(BlendMode::Crumbling),
+        WORLD_MATERIAL_ID_MODEL_CRUMBLING => Some(BlendMode::DoubleModulate),
         WORLD_MATERIAL_ID_BOAT_WATER_MASK => Some(BlendMode::DepthMask),
         _ => None,
     }

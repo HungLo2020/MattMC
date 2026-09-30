@@ -25,7 +25,7 @@ use crate::render::vulkanic::world_primitive_frontend::{
     WORLD_MESH_VERTEX_LAYOUT_V3, WORLD_STRATUM_TERRAIN,
 };
 
-use super::programs::shader_stage_code_for_backend;
+use super::programs::shader_stage_code;
 use super::terrain_source_resources::{
     TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet, TerrainSourceOwnedStorageResource,
     TerrainSourceResourceAvailability, TerrainSourceResourceAvailabilitySet,
@@ -2569,7 +2569,7 @@ impl TerrainFloodFillComputeResources {
             label: format!("{label}.flood-fill.init.compute"),
             stage: ShaderStage::Compute,
             code_format: ShaderCodeFormat::Glsl,
-            code: shader_stage_code_for_backend(gal.capabilities().api, FLOOD_FILL_INIT_SHADER),
+            code: shader_stage_code(gal.capabilities().shader_conventions, FLOOD_FILL_INIT_SHADER),
             entry_point: "main".to_owned(),
         }) {
             Ok(handle) => handle,
@@ -2713,8 +2713,8 @@ impl TerrainFloodFillComputeResources {
             label: format!("{label}.flood-fill.propagate.compute"),
             stage: ShaderStage::Compute,
             code_format: ShaderCodeFormat::Glsl,
-            code: shader_stage_code_for_backend(
-                gal.capabilities().api,
+            code: shader_stage_code(
+                gal.capabilities().shader_conventions,
                 FLOOD_FILL_PROPAGATE_SHADER,
             ),
             entry_point: "main".to_owned(),

@@ -199,9 +199,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
         let kind = backend_kind(request.backend_kind)?;
         let label = read_label(request.label, "context label")?;
         let backend = create_backend(kind, &label)?;
-        let gal = VulkanicGal::new_with_backend(
+        let mut gal = VulkanicGal::new_with_backend(
             backend,
             bool_flag(request.tracy_enabled, "tracy enabled")?,
+        );
+        gal.install_gpu_profile_classifier(
+            crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {
@@ -289,9 +292,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
         }
         let label = read_label(request.label, "borrowed OpenGL context label")?;
         let backend = create_borrowed_opengl_backend(&label, request.stable_window_id)?;
-        let gal = VulkanicGal::new_with_backend(
+        let mut gal = VulkanicGal::new_with_backend(
             backend,
             bool_flag(request.tracy_enabled, "tracy enabled")?,
+        );
+        gal.install_gpu_profile_classifier(
+            crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {
@@ -400,9 +406,12 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
             request.native_window,
             surface_desc,
         )?;
-        let gal = VulkanicGal::new_with_backend(
+        let mut gal = VulkanicGal::new_with_backend(
             backend,
             bool_flag(request.tracy_enabled, "tracy enabled")?,
+        );
+        gal.install_gpu_profile_classifier(
+            crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {

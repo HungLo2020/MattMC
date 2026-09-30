@@ -22,7 +22,7 @@ use super::frame::{
 };
 use super::handles::{Handle, HandleKind};
 use super::resources::{
-    BackendApi, BackendCapabilities, BackendFeatureFlags, BackendLimits, BufferDesc,
+    BackendCapabilities, GlslDialect, GpuProfileTag, ShaderConventions, GPU_PROFILE_SCOPE_COUNT, BackendFeatureFlags, BackendLimits, BufferDesc,
     CombinedTextureSamplerDesc, ComputePipelineDesc, FrameTargetDesc, GraphicsPipelineDesc,
     PipelineLayoutDesc, RenderPassDesc, RenderTargetDesc, ResourceLayoutDesc, ResourceSetDesc,
     SamplerDesc, ShaderModuleDesc, TextureDesc, TextureViewDesc,
@@ -51,50 +51,48 @@ pub(in crate::render::vulkanic) struct BackendRuntimeMetrics {
     pub(in crate::render::vulkanic) command_batches: u64,
     pub(in crate::render::vulkanic) command_lists: u64,
     pub(in crate::render::vulkanic) command_ops: u64,
-    pub(in crate::render::vulkanic) gl_calls: u64,
-    pub(in crate::render::vulkanic) gl_flushes: u64,
-    pub(in crate::render::vulkanic) gl_finishes: u64,
-    pub(in crate::render::vulkanic) gl_fences_inserted: u64,
-    pub(in crate::render::vulkanic) gl_fences_polled: u64,
-    pub(in crate::render::vulkanic) gl_fences_waited: u64,
-    pub(in crate::render::vulkanic) gl_fences_deleted: u64,
-    pub(in crate::render::vulkanic) vulkan_command_buffer_alloc_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_command_buffer_begin_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_command_recording_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_command_buffer_end_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_queue_submit_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_timeline_poll_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_timeline_wait_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_device_wait_idle_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_acquire_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_present_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_present_wait_nanos: u64,
-    pub(in crate::render::vulkanic) vulkan_command_buffers_allocated: u64,
-    pub(in crate::render::vulkanic) vulkan_command_buffers_freed: u64,
-    pub(in crate::render::vulkanic) vulkan_wait_count: u64,
-    pub(in crate::render::vulkanic) vulkan_device_wait_idle_count: u64,
-    pub(in crate::render::vulkanic) vulkan_present_mode: u64,
-    pub(in crate::render::vulkanic) vulkan_requested_present_mode: u64,
-    pub(in crate::render::vulkanic) vulkan_supported_present_modes: u64,
-    pub(in crate::render::vulkanic) vulkan_present_mode_fallback_reason: u64,
-    pub(in crate::render::vulkanic) vulkan_acquired_image_index: u64,
-    pub(in crate::render::vulkanic) vulkan_swapchain_generation: u64,
-    pub(in crate::render::vulkanic) vulkan_swapchain_image_count: u64,
-    pub(in crate::render::vulkanic) vulkan_surface_min_image_count: u64,
-    pub(in crate::render::vulkanic) vulkan_surface_max_image_count: u64,
-    pub(in crate::render::vulkanic) vulkan_configured_frames_in_flight: u64,
-    pub(in crate::render::vulkanic) vulkan_images_in_flight: u64,
-    pub(in crate::render::vulkanic) vulkan_available_frame_slots: u64,
+    pub(in crate::render::vulkanic) native_calls: u64,
+    pub(in crate::render::vulkanic) native_flushes: u64,
+    pub(in crate::render::vulkanic) native_finishes: u64,
+    pub(in crate::render::vulkanic) native_fences_inserted: u64,
+    pub(in crate::render::vulkanic) native_fences_polled: u64,
+    pub(in crate::render::vulkanic) native_fences_waited: u64,
+    pub(in crate::render::vulkanic) native_fences_deleted: u64,
+    pub(in crate::render::vulkanic) native_command_buffer_alloc_nanos: u64,
+    pub(in crate::render::vulkanic) native_command_buffer_begin_nanos: u64,
+    pub(in crate::render::vulkanic) native_command_recording_nanos: u64,
+    pub(in crate::render::vulkanic) native_command_buffer_end_nanos: u64,
+    pub(in crate::render::vulkanic) native_queue_submit_nanos: u64,
+    pub(in crate::render::vulkanic) native_timeline_poll_nanos: u64,
+    pub(in crate::render::vulkanic) native_timeline_wait_nanos: u64,
+    pub(in crate::render::vulkanic) native_device_wait_idle_nanos: u64,
+    pub(in crate::render::vulkanic) native_acquire_nanos: u64,
+    pub(in crate::render::vulkanic) native_present_nanos: u64,
+    pub(in crate::render::vulkanic) native_present_wait_nanos: u64,
+    pub(in crate::render::vulkanic) native_command_buffers_allocated: u64,
+    pub(in crate::render::vulkanic) native_command_buffers_freed: u64,
+    pub(in crate::render::vulkanic) native_wait_count: u64,
+    pub(in crate::render::vulkanic) native_device_wait_idle_count: u64,
+    pub(in crate::render::vulkanic) native_present_mode: u64,
+    pub(in crate::render::vulkanic) native_requested_present_mode: u64,
+    pub(in crate::render::vulkanic) native_supported_present_modes: u64,
+    pub(in crate::render::vulkanic) native_present_mode_fallback_reason: u64,
+    pub(in crate::render::vulkanic) native_acquired_image_index: u64,
+    pub(in crate::render::vulkanic) native_swapchain_generation: u64,
+    pub(in crate::render::vulkanic) native_swapchain_image_count: u64,
+    pub(in crate::render::vulkanic) native_surface_min_image_count: u64,
+    pub(in crate::render::vulkanic) native_surface_max_image_count: u64,
+    pub(in crate::render::vulkanic) native_configured_frames_in_flight: u64,
+    pub(in crate::render::vulkanic) native_images_in_flight: u64,
+    pub(in crate::render::vulkanic) native_available_frame_slots: u64,
     pub(in crate::render::vulkanic) gpu_timestamp_status: u64,
-    pub(in crate::render::vulkanic) gpu_shadow_depth_nanos: u64,
-    pub(in crate::render::vulkanic) gpu_terrain_opaque_nanos: u64,
-    pub(in crate::render::vulkanic) gpu_terrain_cutout_nanos: u64,
-    pub(in crate::render::vulkanic) gpu_deferred_lighting_nanos: u64,
-    pub(in crate::render::vulkanic) gpu_composite0_nanos: u64,
-    pub(in crate::render::vulkanic) gpu_composite1_nanos: u64,
-    pub(in crate::render::vulkanic) gpu_final_output_nanos: u64,
+    pub(in crate::render::vulkanic) gpu_scope_nanos: [u64; GPU_PROFILE_SCOPE_COUNT],
     pub(in crate::render::vulkanic) gpu_frame_total_nanos: u64,
-    pub(in crate::render::vulkanic) gpu_distant_horizons_opaque_nanos: u64,
+}
+
+/// Requests GPU frame timestamps from every backend that records them.
+pub(in crate::render::vulkanic) fn set_gpu_timestamps_requested(requested: bool) {
+    vulkan::set_gpu_timestamps_requested(requested);
 }
 
 pub(super) fn graphics_backend_lock() -> &'static Mutex<()> {
@@ -116,7 +114,7 @@ pub(in crate::render::vulkanic) fn create_borrowed_opengl_backend(
     label: &str,
     stable_window_id: u64,
 ) -> GalResult<Box<dyn Backend>> {
-    Ok(Box::new(opengl::OpenGlBackend::borrowed_minecraft_context(
+    Ok(Box::new(opengl::OpenGlBackend::borrowed_host_context(
         label,
         stable_window_id,
     )?))
@@ -201,6 +199,19 @@ pub(super) trait Backend {
         Ok(())
     }
 
+    /// Records the frontend's profiling tag for a created pass or pipeline.
+    fn set_gpu_profile_tag(&mut self, _handle: Handle, _tag: GpuProfileTag) {}
+
+    /// Names statistics scopes in the backend's diagnostic output.
+    fn set_gpu_profile_scope_names(&mut self, _names: fn(u8) -> &'static str) {}
+
+    /// Starts a RenderDoc frame capture when the environment requests one;
+    /// the capture ends when the returned guard drops.
+    #[cfg(test)]
+    fn begin_debug_capture(&self) -> Option<Box<dyn std::any::Any>> {
+        None
+    }
+
     #[cfg(test)]
     fn as_any(&self) -> &dyn std::any::Any;
 
@@ -210,7 +221,12 @@ pub(super) trait Backend {
 
 pub(super) fn vulkan_capabilities() -> BackendCapabilities {
     BackendCapabilities {
-        api: BackendApi::Vulkan,
+        shader_conventions: ShaderConventions {
+            glsl_dialect: GlslDialect::ExplicitBindings,
+            zero_to_one_clip_depth: true,
+            flip_fullscreen_uv_y: true,
+            readback_rows_bottom_up: false,
+        },
         name: "Rust Vulkan",
         features: BackendFeatureFlags {
             graphics: true,
@@ -235,6 +251,8 @@ pub(super) fn vulkan_capabilities() -> BackendCapabilities {
             tracy_zones: true,
             texture_3d: true,
             texture_row_reversal: true,
+            device_local_memory: true,
+            texture_3d_packed_formats: true,
         },
         limits: BackendLimits {
             max_buffer_size: 256 * 1024 * 1024,
@@ -264,7 +282,12 @@ pub(super) fn presentation_capabilities(
 
 pub(super) fn opengl_capabilities() -> BackendCapabilities {
     BackendCapabilities {
-        api: BackendApi::OpenGl,
+        shader_conventions: ShaderConventions {
+            glsl_dialect: GlslDialect::CoreProfile,
+            zero_to_one_clip_depth: false,
+            flip_fullscreen_uv_y: false,
+            readback_rows_bottom_up: true,
+        },
         name: "Rust OpenGL",
         features: BackendFeatureFlags {
             graphics: true,
@@ -289,6 +312,9 @@ pub(super) fn opengl_capabilities() -> BackendCapabilities {
             tracy_zones: true,
             texture_3d: true,
             texture_row_reversal: false,
+            device_local_memory: false,
+            // BGRA and packed depth/stencil 3D storage are not lowered for GL.
+            texture_3d_packed_formats: false,
         },
         limits: BackendLimits {
             max_buffer_size: 64 * 1024 * 1024,

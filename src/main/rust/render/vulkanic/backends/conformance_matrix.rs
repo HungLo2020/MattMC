@@ -18,7 +18,7 @@ use crate::render::vulkanic::{
 #[test]
 fn isolated_vulkan_vignette_blend_preserves_and_darkens_loaded_color() {
     isolated_loaded_blend(
-        BlendMode::Vignette,
+        BlendMode::InverseSrcColorModulate,
         [0.75, 0.75, 0.75, 1.0],
         ClearColor {
             r: 0.8,
@@ -39,7 +39,7 @@ fn isolated_vulkan_glint_blend_matches_frozen_and_preserves_destination_alpha() 
     // Avoid the hardware's half-intensity blend-factor rounding boundary;
     // quarter-intensity probes retain exact byte assertions on this fixture.
     isolated_loaded_blend(
-        BlendMode::Glint,
+        BlendMode::SrcColorAdditive,
         [0.25, 0.25, 0.75, 0.125],
         ClearColor {
             r: 0.125,
@@ -112,7 +112,7 @@ fn isolated_loaded_raster(
                     );
                     assert_ne!(
                         blend,
-                        BlendMode::Glint,
+                        BlendMode::SrcColorAdditive,
                         "Vulkan required for glint blend regression: {error}"
                     );
                     eprintln!("skipping Vulkan vignette conformance: {error}");
@@ -356,7 +356,8 @@ fn vulkan_and_opengl_clean_conformance_match_for_shared_graphics_subset() {
         .capabilities_json
         .contains("\"name\":\"Rust OpenGL\""));
     assert!(vulkan.capabilities_json.contains("\"compute\":true"));
-    assert!(opengl.capabilities_json.contains("\"compute\":false"));
+    // OpenGL compute follows the context (GL 4.3 / ARB_compute_shader), so it
+    // is reported, not pinned.
 }
 
 #[test]

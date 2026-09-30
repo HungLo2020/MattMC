@@ -209,6 +209,26 @@ impl VulkanBackend {
 }
 
 impl Backend for VulkanBackend {
+    fn set_gpu_profile_tag(
+        &mut self,
+        handle: Handle,
+        tag: crate::render::vulkanic::resources::GpuProfileTag,
+    ) {
+        self.objects.set_profile_tag(handle, tag);
+    }
+
+    fn set_gpu_profile_scope_names(&mut self, names: fn(u8) -> &'static str) {
+        if let Ok(mut lowerer) = self.lowerer.lock() {
+            lowerer.set_statistics_scope_names(names);
+        }
+    }
+
+    #[cfg(test)]
+    fn begin_debug_capture(&self) -> Option<Box<dyn std::any::Any>> {
+        renderdoc::RenderDocFrame::start_if_requested()
+            .map(|frame| Box::new(frame) as Box<dyn std::any::Any>)
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         let mut capabilities = vulkan_capabilities();
         let properties = unsafe {
@@ -369,43 +389,36 @@ impl Backend for VulkanBackend {
             .map(|swapchain| swapchain.metrics())
             .unwrap_or_default();
         BackendRuntimeMetrics {
-            vulkan_command_buffer_alloc_nanos: lowering.command_buffer_alloc_nanos,
-            vulkan_command_buffer_begin_nanos: lowering.command_buffer_begin_nanos,
-            vulkan_command_recording_nanos: lowering.command_recording_nanos,
-            vulkan_command_buffer_end_nanos: lowering.command_buffer_end_nanos,
-            vulkan_queue_submit_nanos: lowering.queue_submit_nanos,
-            vulkan_timeline_poll_nanos: lowering.timeline_poll_nanos,
-            vulkan_timeline_wait_nanos: lowering.timeline_wait_nanos,
-            vulkan_device_wait_idle_nanos: lowering.device_wait_idle_nanos,
-            vulkan_acquire_nanos: swapchain.acquire_nanos,
-            vulkan_present_nanos: swapchain.present_nanos,
-            vulkan_present_wait_nanos: swapchain.present_wait_nanos,
-            vulkan_command_buffers_allocated: lowering.command_buffers_allocated,
-            vulkan_command_buffers_freed: lowering.command_buffers_freed,
-            vulkan_wait_count: lowering.wait_count,
-            vulkan_device_wait_idle_count: lowering.device_wait_idle_count,
-            vulkan_present_mode: swapchain.present_mode,
-            vulkan_requested_present_mode: swapchain.requested_present_mode,
-            vulkan_supported_present_modes: swapchain.supported_present_modes,
-            vulkan_present_mode_fallback_reason: swapchain.present_mode_fallback_reason,
-            vulkan_acquired_image_index: swapchain.acquired_image_index,
-            vulkan_swapchain_generation: swapchain.swapchain_generation,
-            vulkan_swapchain_image_count: swapchain.swapchain_image_count,
-            vulkan_surface_min_image_count: swapchain.surface_min_image_count,
-            vulkan_surface_max_image_count: swapchain.surface_max_image_count,
-            vulkan_configured_frames_in_flight: swapchain.configured_frames_in_flight,
-            vulkan_images_in_flight: swapchain.images_in_flight,
-            vulkan_available_frame_slots: swapchain.available_frame_slots,
+            native_command_buffer_alloc_nanos: lowering.command_buffer_alloc_nanos,
+            native_command_buffer_begin_nanos: lowering.command_buffer_begin_nanos,
+            native_command_recording_nanos: lowering.command_recording_nanos,
+            native_command_buffer_end_nanos: lowering.command_buffer_end_nanos,
+            native_queue_submit_nanos: lowering.queue_submit_nanos,
+            native_timeline_poll_nanos: lowering.timeline_poll_nanos,
+            native_timeline_wait_nanos: lowering.timeline_wait_nanos,
+            native_device_wait_idle_nanos: lowering.device_wait_idle_nanos,
+            native_acquire_nanos: swapchain.acquire_nanos,
+            native_present_nanos: swapchain.present_nanos,
+            native_present_wait_nanos: swapchain.present_wait_nanos,
+            native_command_buffers_allocated: lowering.command_buffers_allocated,
+            native_command_buffers_freed: lowering.command_buffers_freed,
+            native_wait_count: lowering.wait_count,
+            native_device_wait_idle_count: lowering.device_wait_idle_count,
+            native_present_mode: swapchain.present_mode,
+            native_requested_present_mode: swapchain.requested_present_mode,
+            native_supported_present_modes: swapchain.supported_present_modes,
+            native_present_mode_fallback_reason: swapchain.present_mode_fallback_reason,
+            native_acquired_image_index: swapchain.acquired_image_index,
+            native_swapchain_generation: swapchain.swapchain_generation,
+            native_swapchain_image_count: swapchain.swapchain_image_count,
+            native_surface_min_image_count: swapchain.surface_min_image_count,
+            native_surface_max_image_count: swapchain.surface_max_image_count,
+            native_configured_frames_in_flight: swapchain.configured_frames_in_flight,
+            native_images_in_flight: swapchain.images_in_flight,
+            native_available_frame_slots: swapchain.available_frame_slots,
             gpu_timestamp_status: lowering.gpu_timestamp_status,
-            gpu_shadow_depth_nanos: lowering.gpu_shadow_depth_nanos,
-            gpu_terrain_opaque_nanos: lowering.gpu_terrain_opaque_nanos,
-            gpu_terrain_cutout_nanos: lowering.gpu_terrain_cutout_nanos,
-            gpu_deferred_lighting_nanos: lowering.gpu_deferred_lighting_nanos,
-            gpu_composite0_nanos: lowering.gpu_composite0_nanos,
-            gpu_composite1_nanos: lowering.gpu_composite1_nanos,
-            gpu_final_output_nanos: lowering.gpu_final_output_nanos,
+            gpu_scope_nanos: lowering.gpu_scope_nanos,
             gpu_frame_total_nanos: lowering.gpu_frame_total_nanos,
-            gpu_distant_horizons_opaque_nanos: lowering.gpu_distant_horizons_opaque_nanos,
             ..BackendRuntimeMetrics::default()
         }
     }

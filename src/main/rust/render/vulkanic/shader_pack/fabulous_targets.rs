@@ -120,7 +120,9 @@ impl FabulousTransparencyPipelines {
         color_format: TextureFormat,
     ) -> GalResult<Self> {
         let sources =
-            super::vanilla_post_effect_executor::bundled_transparency_vulkan_shader_sources()?;
+            super::vanilla_post_effect_executor::bundled_transparency_lowered_shader_sources(
+                gal.capabilities().shader_conventions,
+            )?;
         if sources.len() != 2 {
             return Err(GalError::backend(
                 "bundled transparency pipeline requires exactly two shader passes",

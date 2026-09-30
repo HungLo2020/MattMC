@@ -447,6 +447,8 @@ pub struct VulkanicGal {
     buffer_upload_capture: super::buffer_upload_capture::BufferUploadCapture,
     completed_submission: SubmissionId,
     metrics: Metrics,
+    /// Frontend policy tagging passes/pipelines with GPU profiling scopes.
+    gpu_profile_classifier: Option<GpuProfileClassifier>,
 }
 
 fn submission_trace(message: &str) {
@@ -492,6 +494,25 @@ impl VulkanicGal {
             buffer_upload_capture: Default::default(),
             completed_submission: SubmissionId(0),
             metrics: Metrics::new(tracy_enabled),
+            gpu_profile_classifier: None,
+        }
+    }
+
+    /// Installs the frontend's GPU profiling classification. Passes and
+    /// pipelines created afterwards carry its tags; backends see only scope
+    /// indices, and the frontend alone knows what each scope measures.
+    pub fn install_gpu_profile_classifier(&mut self, classifier: GpuProfileClassifier) {
+        self.gpu_profile_classifier = Some(classifier);
+        self.backend
+            .set_gpu_profile_scope_names(classifier.statistics_scope_name);
+    }
+
+    fn tag_gpu_profile(&mut self, handle: Handle, object: GpuProfiledObject, label: &str) {
+        if let Some(classifier) = self.gpu_profile_classifier {
+            let tag = (classifier.classify)(object, label);
+            if tag != GpuProfileTag::default() {
+                self.backend.set_gpu_profile_tag(handle, tag);
+            }
         }
     }
 
@@ -507,6 +528,13 @@ impl VulkanicGal {
 
     pub fn capabilities(&self) -> BackendCapabilities {
         self.backend.capabilities()
+    }
+
+    /// Backend-neutral debug capture for tests: the active backend starts a
+    /// RenderDoc capture if requested, ending when the guard drops.
+    #[cfg(test)]
+    pub(in crate::render::vulkanic) fn begin_debug_capture(&self) -> Option<Box<dyn std::any::Any>> {
+        self.backend.begin_debug_capture()
     }
 
     pub fn configure_frame_surface(&mut self, desc: FrameSurfaceDesc) -> GalResult<()> {
@@ -1209,13 +1237,9 @@ impl VulkanicGal {
     ) -> GalResult<Handle> {
         let view = self.texture_view_info(desc.texture_view)?;
         let sampler = self.samplers.get(desc.sampler)?;
-        if matches!(
-            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
-            Ok("1") | Ok("true") | Ok("TRUE")
-        ) && desc.label.contains("source-main_depth")
-        {
+        if trace_label_matches("MATTMC_GAL_TRACE_SAMPLER_LABEL", &desc.label) {
             eprintln!(
-                "[MattMC source-depth-trace] combined label={} view=0x{:016x} texture=0x{:016x} sampler=0x{:016x}",
+                "[MattMC sampler-trace] combined label={} view=0x{:016x} texture=0x{:016x} sampler=0x{:016x}",
                 desc.label,
                 desc.texture_view.raw(),
                 view.texture.raw(),
@@ -1511,11 +1535,7 @@ impl VulkanicGal {
     }
 
     pub fn create_graphics_pipeline(&mut self, desc: GraphicsPipelineDesc) -> GalResult<Handle> {
-        if matches!(
-            std::env::var("MATTMC_RUST_PIPELINE_DEPTH_TRACE").as_deref(),
-            Ok("1") | Ok("true") | Ok("TRUE")
-        ) && desc.label.to_ascii_lowercase().contains("terrain")
-        {
+        if trace_label_matches("MATTMC_GAL_TRACE_PIPELINE_LABEL", &desc.label) {
             eprintln!(
                 "[MattMC pipeline-depth-trace] label={} depth_format={:?} depth_compare={:?} depth_write={} colors={:?}",
                 desc.label, desc.depth_format, desc.depth_compare, desc.depth_write, desc.color_formats
@@ -1593,6 +1613,7 @@ impl VulkanicGal {
         let token = self
             .backend
             .create(handle, BackendCreateDesc::GraphicsPipeline(&desc))?;
+        self.tag_gpu_profile(handle, GpuProfiledObject::GraphicsPipeline, &desc.label);
         self.add_dependency(desc.layout, handle);
         self.add_dependency(desc.vertex_shader, handle);
         self.add_dependency(desc.fragment_shader, handle);
@@ -1785,6 +1806,7 @@ impl VulkanicGal {
         let token = self
             .backend
             .create(handle, BackendCreateDesc::RenderPass(&desc))?;
+        self.tag_gpu_profile(handle, GpuProfiledObject::RenderPass, &desc.label);
         self.add_dependency(desc.target, handle);
         self.metrics.resource_creates += 1;
         self.render_passes.insert_at(
@@ -5064,73 +5086,74 @@ fn add_backend_metric_deltas(
     before: BackendRuntimeMetrics,
     after: BackendRuntimeMetrics,
 ) {
-    profile.vulkan_command_buffer_alloc_nanos = after
-        .vulkan_command_buffer_alloc_nanos
-        .saturating_sub(before.vulkan_command_buffer_alloc_nanos);
-    profile.vulkan_command_buffer_begin_nanos = after
-        .vulkan_command_buffer_begin_nanos
-        .saturating_sub(before.vulkan_command_buffer_begin_nanos);
-    profile.vulkan_command_recording_nanos = after
-        .vulkan_command_recording_nanos
-        .saturating_sub(before.vulkan_command_recording_nanos);
-    profile.vulkan_command_buffer_end_nanos = after
-        .vulkan_command_buffer_end_nanos
-        .saturating_sub(before.vulkan_command_buffer_end_nanos);
-    profile.vulkan_queue_submit_nanos = after
-        .vulkan_queue_submit_nanos
-        .saturating_sub(before.vulkan_queue_submit_nanos);
-    profile.vulkan_timeline_poll_nanos = after
-        .vulkan_timeline_poll_nanos
-        .saturating_sub(before.vulkan_timeline_poll_nanos);
-    profile.vulkan_timeline_wait_nanos = after
-        .vulkan_timeline_wait_nanos
-        .saturating_sub(before.vulkan_timeline_wait_nanos);
-    profile.vulkan_device_wait_idle_nanos = after
-        .vulkan_device_wait_idle_nanos
-        .saturating_sub(before.vulkan_device_wait_idle_nanos);
-    profile.vulkan_command_buffers_allocated = after
-        .vulkan_command_buffers_allocated
-        .saturating_sub(before.vulkan_command_buffers_allocated);
-    profile.vulkan_command_buffers_freed = after
-        .vulkan_command_buffers_freed
-        .saturating_sub(before.vulkan_command_buffers_freed);
-    profile.vulkan_wait_count = after
-        .vulkan_wait_count
-        .saturating_sub(before.vulkan_wait_count);
-    profile.vulkan_device_wait_idle_count = after
-        .vulkan_device_wait_idle_count
-        .saturating_sub(before.vulkan_device_wait_idle_count);
-    profile.vulkan_acquire_nanos = after
-        .vulkan_acquire_nanos
-        .saturating_sub(before.vulkan_acquire_nanos);
-    profile.vulkan_present_nanos = after
-        .vulkan_present_nanos
-        .saturating_sub(before.vulkan_present_nanos);
-    profile.vulkan_present_wait_nanos = after
-        .vulkan_present_wait_nanos
-        .saturating_sub(before.vulkan_present_wait_nanos);
-    profile.vulkan_present_mode = after.vulkan_present_mode;
-    profile.vulkan_requested_present_mode = after.vulkan_requested_present_mode;
-    profile.vulkan_supported_present_modes = after.vulkan_supported_present_modes;
-    profile.vulkan_present_mode_fallback_reason = after.vulkan_present_mode_fallback_reason;
-    profile.vulkan_acquired_image_index = after.vulkan_acquired_image_index;
-    profile.vulkan_swapchain_generation = after.vulkan_swapchain_generation;
-    profile.vulkan_swapchain_image_count = after.vulkan_swapchain_image_count;
-    profile.vulkan_surface_min_image_count = after.vulkan_surface_min_image_count;
-    profile.vulkan_surface_max_image_count = after.vulkan_surface_max_image_count;
-    profile.vulkan_configured_frames_in_flight = after.vulkan_configured_frames_in_flight;
-    profile.vulkan_images_in_flight = after.vulkan_images_in_flight;
-    profile.vulkan_available_frame_slots = after.vulkan_available_frame_slots;
+    profile.native_command_buffer_alloc_nanos = after
+        .native_command_buffer_alloc_nanos
+        .saturating_sub(before.native_command_buffer_alloc_nanos);
+    profile.native_command_buffer_begin_nanos = after
+        .native_command_buffer_begin_nanos
+        .saturating_sub(before.native_command_buffer_begin_nanos);
+    profile.native_command_recording_nanos = after
+        .native_command_recording_nanos
+        .saturating_sub(before.native_command_recording_nanos);
+    profile.native_command_buffer_end_nanos = after
+        .native_command_buffer_end_nanos
+        .saturating_sub(before.native_command_buffer_end_nanos);
+    profile.native_queue_submit_nanos = after
+        .native_queue_submit_nanos
+        .saturating_sub(before.native_queue_submit_nanos);
+    profile.native_timeline_poll_nanos = after
+        .native_timeline_poll_nanos
+        .saturating_sub(before.native_timeline_poll_nanos);
+    profile.native_timeline_wait_nanos = after
+        .native_timeline_wait_nanos
+        .saturating_sub(before.native_timeline_wait_nanos);
+    profile.native_device_wait_idle_nanos = after
+        .native_device_wait_idle_nanos
+        .saturating_sub(before.native_device_wait_idle_nanos);
+    profile.native_command_buffers_allocated = after
+        .native_command_buffers_allocated
+        .saturating_sub(before.native_command_buffers_allocated);
+    profile.native_command_buffers_freed = after
+        .native_command_buffers_freed
+        .saturating_sub(before.native_command_buffers_freed);
+    profile.native_wait_count = after
+        .native_wait_count
+        .saturating_sub(before.native_wait_count);
+    profile.native_device_wait_idle_count = after
+        .native_device_wait_idle_count
+        .saturating_sub(before.native_device_wait_idle_count);
+    profile.native_acquire_nanos = after
+        .native_acquire_nanos
+        .saturating_sub(before.native_acquire_nanos);
+    profile.native_present_nanos = after
+        .native_present_nanos
+        .saturating_sub(before.native_present_nanos);
+    profile.native_present_wait_nanos = after
+        .native_present_wait_nanos
+        .saturating_sub(before.native_present_wait_nanos);
+    profile.native_present_mode = after.native_present_mode;
+    profile.native_requested_present_mode = after.native_requested_present_mode;
+    profile.native_supported_present_modes = after.native_supported_present_modes;
+    profile.native_present_mode_fallback_reason = after.native_present_mode_fallback_reason;
+    profile.native_acquired_image_index = after.native_acquired_image_index;
+    profile.native_swapchain_generation = after.native_swapchain_generation;
+    profile.native_swapchain_image_count = after.native_swapchain_image_count;
+    profile.native_surface_min_image_count = after.native_surface_min_image_count;
+    profile.native_surface_max_image_count = after.native_surface_max_image_count;
+    profile.native_configured_frames_in_flight = after.native_configured_frames_in_flight;
+    profile.native_images_in_flight = after.native_images_in_flight;
+    profile.native_available_frame_slots = after.native_available_frame_slots;
     profile.gpu_timestamp_status = after.gpu_timestamp_status;
-    profile.gpu_shadow_depth_nanos = after.gpu_shadow_depth_nanos;
-    profile.gpu_terrain_opaque_nanos = after.gpu_terrain_opaque_nanos;
-    profile.gpu_terrain_cutout_nanos = after.gpu_terrain_cutout_nanos;
-    profile.gpu_deferred_lighting_nanos = after.gpu_deferred_lighting_nanos;
-    profile.gpu_composite0_nanos = after.gpu_composite0_nanos;
-    profile.gpu_composite1_nanos = after.gpu_composite1_nanos;
-    profile.gpu_final_output_nanos = after.gpu_final_output_nanos;
+    profile.gpu_scope_nanos = after.gpu_scope_nanos;
     profile.gpu_frame_total_nanos = after.gpu_frame_total_nanos;
-    profile.gpu_distant_horizons_opaque_nanos = after.gpu_distant_horizons_opaque_nanos;
+}
+
+/// Diagnostic tracing selected by label: the environment variable holds a
+/// case-insensitive label substring; unset or empty traces nothing.
+fn trace_label_matches(variable: &str, label: &str) -> bool {
+    std::env::var(variable).is_ok_and(|filter| {
+        !filter.is_empty() && label.to_ascii_lowercase().contains(&filter.to_ascii_lowercase())
+    })
 }
 
 fn is_depth_stencil_format(format: TextureFormat) -> bool {

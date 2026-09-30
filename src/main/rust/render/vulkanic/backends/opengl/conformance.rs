@@ -97,7 +97,7 @@ fn distant_horizons_lod_opaque_program_compiles_at_the_opengl_boundary() {
     };
     let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
     let program = minimal_distant_horizons_lod_opaque_program();
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "Rust-owned Distant Horizons opaque LOD shader must compile through OpenGL lowering: {error}"
@@ -122,7 +122,7 @@ fn distant_horizons_lod_exact_atlas_program_compiles_at_the_opengl_boundary() {
     };
     let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
     let program = minimal_distant_horizons_lod_exact_atlas_opaque_program();
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "Rust-owned Distant Horizons exact-atlas LOD shader must compile through OpenGL lowering: {error}"
@@ -162,7 +162,7 @@ fn selected_source_exact_atlas_distant_horizons_program_compiles_at_the_opengl_b
     let program =
         prepare_lowered_distant_horizons_exact_atlas_source_program(&source_program).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "selected-source exact-atlas Distant Horizons shader must compile through OpenGL lowering: {error}"
@@ -187,7 +187,7 @@ fn distant_horizons_lod_transparent_program_compiles_at_the_opengl_boundary() {
         };
     let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
     let program = minimal_distant_horizons_lod_transparent_program();
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "Rust-owned Distant Horizons transparent LOD shader must compile through OpenGL lowering: {error}"
@@ -256,7 +256,7 @@ fn lowered_fullscreen_source_compiles_at_the_opengl_boundary_without_a_vertex_st
         &bindings,
     )
     .unwrap();
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "lowered fullscreen source must compile through OpenGL without a vertex stream: {error}"
@@ -293,7 +293,7 @@ fn lowered_complete_complementary_distant_horizons_pair_compiles_at_the_opengl_b
     let program =
         prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary Distant Horizons shader must compile through OpenGL lowering: {error}"
@@ -347,7 +347,7 @@ fn lowered_complete_complementary_distant_horizons_water_pair_compiles_at_the_op
     let program =
         prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary Distant Horizons water shader must compile through OpenGL lowering: {error}"
@@ -382,7 +382,7 @@ fn distant_horizons_lod_opaque_pipeline_uses_explicit_two_set_gal_layout() {
             resource_layouts: vec![geometry_and_frame, lightmap],
         })
         .unwrap();
-    let [vertex, fragment] = program.shader_module_descriptors(BackendApi::OpenGl);
+    let [vertex, fragment] = program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions);
     let vertex_shader = gal.create_shader_module(vertex).unwrap();
     let fragment_shader = gal.create_shader_module(fragment).unwrap();
     gal.create_graphics_pipeline(GraphicsPipelineDesc {
@@ -459,7 +459,7 @@ fn prepared_lowered_terrain_program_compiles_at_the_opengl_boundary() {
     )
     .unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "prepared source terrain shader must compile through the OpenGL lowering: {error}"
@@ -498,7 +498,7 @@ fn lowered_complete_complementary_textured_material_pair_compiles_at_the_opengl_
     let program =
         prepare_lowered_textured_material_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary textured-material shader must compile through the OpenGL lowering: {error}"
@@ -535,7 +535,7 @@ fn lowered_complete_complementary_weather_pair_compiles_at_the_opengl_boundary()
         .unwrap();
     let program = prepare_lowered_weather_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary weather shader must compile through the OpenGL lowering: {error}"
@@ -585,7 +585,7 @@ fn lowered_complete_complementary_terrain_pair_compiles_at_the_opengl_boundary()
     )
     .unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary terrain shader must compile through the OpenGL lowering: {error}"
@@ -619,7 +619,7 @@ fn lowered_complete_complementary_hand_pair_compiles_at_the_opengl_boundary() {
     let bindings = bind_hand_source_resources(&lowered, &declarations).unwrap();
     let program = prepare_lowered_hand_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::OpenGl) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary hand shader must compile through the OpenGL lowering: {error}"
@@ -1767,17 +1767,19 @@ pub(in crate::render::vulkanic::backends) struct ConformanceReport {
 }
 
 fn assert_conformance_conventions(report: &ConformanceReport) {
-    assert_eq!(report.pixel_hash, 0xfc90_d68e);
+    // Same image as the Vulkan conformance pin: both backends honor the GAL
+    // coordinate conventions.
+    assert_eq!(report.pixel_hash, 0x7212_13ca);
     assert_eq!(report.non_zero_pixels, 15_362);
     assert!(report.evidence_json.contains("\"top_left\":[0,0,0,255]"));
     assert!(report.evidence_json.contains("\"top_mid\":[0,0,0,255]"));
     assert!(report
         .evidence_json
-        .contains("\"upper_inner\":[191,0,191,255]"));
-    assert!(report.evidence_json.contains("\"center\":[96,0,191,255]"));
+        .contains("\"upper_inner\":[96,0,191,255]"));
+    assert!(report.evidence_json.contains("\"center\":[191,0,191,255]"));
     assert!(report
         .evidence_json
-        .contains("\"lower_inner\":[96,0,191,255]"));
+        .contains("\"lower_inner\":[191,0,191,255]"));
     assert!(report.evidence_json.contains("\"bottom_mid\":[0,0,0,255]"));
     assert!(report
         .evidence_json
@@ -2458,8 +2460,8 @@ void main() {
 "#;
 
 const FRAGMENT_SHADER: &str = r#"
-#version 330 core
-uniform sampler2D tex0;
+#version 430 core
+layout(binding = 1) uniform sampler2D tex0;
 in vec2 v_uv;
 out vec4 out_color;
 void main() {

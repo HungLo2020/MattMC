@@ -3334,7 +3334,11 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         crate::render::vulkanic::metrics::elapsed_nanos_u64(decode_started);
                     context
                         .world_primitive_frontend
-                        .validate_post_effect_request_with_globals(&post_effect_id, world_frame.engine_globals)?;
+                        .validate_post_effect_request_with_globals(
+                            &post_effect_id,
+                            world_frame.engine_globals,
+                            context.gal.capabilities().shader_conventions,
+                        )?;
                     whole_frame_trace(&format!(
                         "whole-frame.frontend.begin generation={} frame={} decode_nanos={}",
                         generation, world_frame_id, ffi_decode_nanos
@@ -3435,14 +3439,14 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         "whole-frame.gpu-profile frame={} total_nanos={} dh_opaque_nanos={} terrain_opaque_nanos={} terrain_cutout_nanos={} shadow_nanos={} deferred_nanos={} composite0_nanos={} composite1_nanos={} final_nanos={}",
                         world_frame_id,
                         world_stats.profile.gpu_frame_total_nanos,
-                        world_stats.profile.gpu_distant_horizons_opaque_nanos,
-                        world_stats.profile.gpu_terrain_opaque_nanos,
-                        world_stats.profile.gpu_terrain_cutout_nanos,
-                        world_stats.profile.gpu_shadow_depth_nanos,
-                        world_stats.profile.gpu_deferred_lighting_nanos,
-                        world_stats.profile.gpu_composite0_nanos,
-                        world_stats.profile.gpu_composite1_nanos,
-                        world_stats.profile.gpu_final_output_nanos,
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::DISTANT_HORIZONS_OPAQUE)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::TERRAIN_OPAQUE)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::TERRAIN_CUTOUT)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::SHADOW_DEPTH)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::DEFERRED_LIGHTING)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::COMPOSITE_0)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::COMPOSITE_1)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::FINAL_OUTPUT)],
                     ));
                     if let Some((parents, children)) = tiled_receipt {
                         eprintln!("whole-frame.gui-tiles.submitted frame={} parents={} children={}",

@@ -15,7 +15,7 @@ use crate::render::vulkanic::commands::{
 };
 use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::handles::{Handle, HandleKind};
-use crate::render::vulkanic::resources::BackendApi;
+use crate::render::vulkanic::resources::{GlslDialect, ShaderConventions};
 
 const MAX_PACKED_UNIFORM_BLOCK_BYTES: usize = 64 * 1024;
 
@@ -364,7 +364,9 @@ pub fn bundled_transparency_shader_sources(
 /// ABI used by the Rust post-effect resource writer. The source graph remains
 /// semantic input: sampler and uniform binding numbers are derived from the
 /// validated pass order, never from Java's runtime shader objects.
-pub fn bundled_transparency_vulkan_shader_sources() -> GalResult<Vec<(Vec<u8>, Vec<u8>)>> {
+pub fn bundled_transparency_lowered_shader_sources(
+    conventions: ShaderConventions,
+) -> GalResult<Vec<(Vec<u8>, Vec<u8>)>> {
     let contract = super::vanilla_post_effect_contract::VanillaPostEffectContract::parse(
         "minecraft:transparency",
         include_bytes!("../../../../resources/assets/minecraft/post_effect/transparency.json"),
@@ -381,9 +383,9 @@ pub fn bundled_transparency_vulkan_shader_sources() -> GalResult<Vec<(Vec<u8>, V
         .zip(sources)
         .map(|(pass, source)| {
             Ok((
-                normalize_vulkan_vertex_source(BackendApi::Vulkan, &source.vertex_shader)?,
+                normalize_vulkan_vertex_source(conventions, &source.vertex_shader)?,
                 normalize_vulkan_fullscreen_source(
-                    BackendApi::Vulkan,
+                    conventions,
                     &source.fragment_shader,
                     pass,
                 )?,
@@ -392,9 +394,22 @@ pub fn bundled_transparency_vulkan_shader_sources() -> GalResult<Vec<(Vec<u8>, V
         .collect()
 }
 
-pub(crate) fn normalize_vulkan_vertex_source(api: BackendApi, source: &[u8]) -> GalResult<Vec<u8>> {
+/// `#version 450` plus the convention macros the backend needs; the UV flip
+/// applies only where attachment rows keep their original order.
+fn explicit_binding_version_header(conventions: ShaderConventions, flip_uv: bool) -> String {
+    let mut header = String::from("#version 450");
+    if conventions.zero_to_one_clip_depth {
+        header.push_str("\n#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1");
+    }
+    if flip_uv && conventions.flip_fullscreen_uv_y {
+        header.push_str("\n#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1");
+    }
+    header
+}
+
+pub(crate) fn normalize_vulkan_vertex_source(conventions: ShaderConventions, source: &[u8]) -> GalResult<Vec<u8>> {
     normalize_vulkan_vertex_source_for_input_rows(
-        api,
+        conventions,
         source,
         crate::render::vulkanic::commands::TextureRowOrder::Preserve,
     )
@@ -403,22 +418,21 @@ pub(crate) fn normalize_vulkan_vertex_source(api: BackendApi, source: &[u8]) -> 
 /// Preserve copied shader arithmetic when attachment inputs have already
 /// been converted into the shader's original row convention explicitly.
 pub(crate) fn normalize_vulkan_vertex_source_for_input_rows(
-    api: BackendApi,
+    conventions: ShaderConventions,
     source: &[u8],
     rows: crate::render::vulkanic::commands::TextureRowOrder,
 ) -> GalResult<Vec<u8>> {
     let source = std::str::from_utf8(source).map_err(|_| {
         GalError::invalid_argument("vanilla post-effect vertex shader is not UTF-8")
     })?;
-    if api != BackendApi::Vulkan {
+    if conventions.glsl_dialect != GlslDialect::ExplicitBindings {
         return Ok(source.as_bytes().to_vec());
     }
+    let preserve_rows = rows == crate::render::vulkanic::commands::TextureRowOrder::Preserve;
     Ok(source
         .replacen(
             "#version 330",
-            if rows == crate::render::vulkanic::commands::TextureRowOrder::Preserve {
-                "#version 450\n#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1\n#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1"
-            } else { "#version 450\n#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1" },
+            &explicit_binding_version_header(conventions, preserve_rows),
             1,
         )
         .replacen("out vec2 texCoord;", "layout(location = 0) out vec2 texCoord;",
@@ -441,13 +455,13 @@ pub(crate) fn normalize_vulkan_vertex_source_for_input_rows(
 }
 
 pub(crate) fn normalize_vulkan_vertex_source_for_pass(
-    api: BackendApi,
+    conventions: ShaderConventions,
     source: &[u8],
     pass: &VanillaPostEffectPass,
     rows: crate::render::vulkanic::commands::TextureRowOrder,
 ) -> GalResult<Vec<u8>> {
-    let normalized = normalize_vulkan_vertex_source_for_input_rows(api, source, rows)?;
-    if api != BackendApi::Vulkan {
+    let normalized = normalize_vulkan_vertex_source_for_input_rows(conventions, source, rows)?;
+    if conventions.glsl_dialect != GlslDialect::ExplicitBindings {
         return Ok(normalized);
     }
     let source = std::str::from_utf8(&normalized)
@@ -470,21 +484,17 @@ fn bind_vulkan_uniform_blocks(mut source: String, pass: &VanillaPostEffectPass) 
 }
 
 pub(crate) fn normalize_vulkan_fullscreen_source(
-    api: BackendApi,
+    conventions: ShaderConventions,
     source: &[u8],
     pass: &VanillaPostEffectPass,
 ) -> GalResult<Vec<u8>> {
     let source = std::str::from_utf8(source)
         .map_err(|_| GalError::invalid_argument("vanilla post-effect shader is not UTF-8"))?;
-    if api != BackendApi::Vulkan {
+    if conventions.glsl_dialect != GlslDialect::ExplicitBindings {
         return Ok(source.as_bytes().to_vec());
     }
     let mut lowered = source
-        .replacen(
-            "#version 330",
-            "#version 450\n#define VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH 1\n#define VULKANIC_GAL_FLIP_FULLSCREEN_UV_Y 1",
-            1,
-        )
+        .replacen("#version 330", &explicit_binding_version_header(conventions, true), 1)
         .replacen("in vec2 texCoord;", "layout(location = 0) in vec2 texCoord;",
             usize::from(source.lines().any(|line| line.trim() == "in vec2 texCoord;")))
         .replacen(
@@ -777,6 +787,16 @@ mod tests {
     use super::*;
     use crate::render::vulkanic::handles::HandleKind;
 
+    /// Explicit-binding conventions with every adaptation macro enabled.
+    fn test_conventions() -> ShaderConventions {
+        ShaderConventions {
+            glsl_dialect: GlslDialect::ExplicitBindings,
+            zero_to_one_clip_depth: true,
+            flip_fullscreen_uv_y: true,
+            readback_rows_bottom_up: false,
+        }
+    }
+
     fn handle(kind: HandleKind, index: u32) -> Handle {
         Handle::new(kind, index, 1).unwrap()
     }
@@ -953,7 +973,7 @@ mod tests {
         let source =
             include_bytes!("../../../../resources/assets/minecraft/shaders/core/screenquad.vsh");
         let lowered = String::from_utf8(
-            normalize_vulkan_vertex_source(BackendApi::Vulkan, source)
+            normalize_vulkan_vertex_source(test_conventions(), source)
                 .expect("bundled screenquad must normalize for Vulkan"),
         )
         .unwrap();
@@ -1038,7 +1058,7 @@ mod tests {
         let source = "#version 330\nin vec2 texCoord;\nuniform sampler2D InSampler;\nlayout(std140) uniform First { vec4 value; };\nlayout(std140) uniform Second { vec4 value; };\nout vec4 fragColor;";
         pass.fragment_shader = source.to_owned();
         let lowered =
-            normalize_vulkan_fullscreen_source(BackendApi::Vulkan, source.as_bytes(), &pass)
+            normalize_vulkan_fullscreen_source(test_conventions(), source.as_bytes(), &pass)
                 .unwrap();
         let lowered = String::from_utf8(lowered).unwrap();
         assert!(lowered.contains("layout(set = 0, binding = 1, std140) uniform First"));
@@ -1107,7 +1127,8 @@ mod tests {
         assert!(sources.iter().all(|source| {
             !source.vertex_shader.is_empty() && !source.fragment_shader.is_empty()
         }));
-        let vulkan_sources = bundled_transparency_vulkan_shader_sources().unwrap();
+        let vulkan_sources =
+            bundled_transparency_lowered_shader_sources(test_conventions()).unwrap();
         assert_eq!(2, vulkan_sources.len());
         let first_vertex = String::from_utf8(vulkan_sources[0].0.clone()).unwrap();
         assert!(first_vertex.contains("#version 450"));

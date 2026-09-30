@@ -363,22 +363,21 @@ pub enum BlendMode {
     /// Additive overlay tint: `out.rgb = src.rgb * src.a + dst.rgb`, `out.a = src.a`.
     /// This is the backend-neutral semantic used by forcefield-style world overlays.
     Overlay = 6,
-    /// Vanilla glint: `out.rgb = src.rgb * src.rgb + dst.rgb`, `out.a = dst.a`.
-    Glint = 7,
-    /// Vignette compositing: `out = dst * (1 - src.rgb)`.
-    Vignette = 8,
+    /// `out.rgb = src.rgb * src.rgb + dst.rgb`, `out.a = dst.a` (glint).
+    SrcColorAdditive = 7,
+    /// `out = dst * (1 - src.rgb)` (vignette).
+    InverseSrcColorModulate = 8,
     /// Premultiplied-alpha compositing: `out.rgb = src.rgb + dst.rgb * (1-src.a)`.
     Premultiplied = 9,
-    /// Terrain translucency writes alpha-blended color to attachment zero while
-    /// its auxiliary revealage/multiplier attachments are replacement writes.
-    /// Vulkan lowers this as per-attachment blend state; OpenGL treats it as
-    /// ordinary alpha because its legacy path has a single blend state.
-    TerrainTranslucent = 10,
+    /// Alpha blending on attachment zero while the remaining attachments are
+    /// replacement writes (translucent terrain's auxiliary outputs). Backends
+    /// with a single blend state treat it as ordinary alpha.
+    AlphaFirstAttachmentOnly = 10,
     /// Source-alpha RGB composition with destination alpha preserved:
     /// RGB factors SrcAlpha/OneMinusSrcAlpha, alpha factors Zero/One.
     AlphaPreserveAlpha = 11,
-    /// Vanilla block-destruction composition: `out.rgb = 2 * src.rgb * dst.rgb`.
-    Crumbling = 12,
+    /// `out.rgb = 2 * src.rgb * dst.rgb` (block-breaking cracks).
+    DoubleModulate = 12,
     /// Source-alpha RGB composition with source alpha replacing the
     /// destination alpha. This matches DH's vanilla water state, whose
     /// transparent blend setup preserves RGB alpha-over while leaving the
@@ -484,6 +483,12 @@ pub enum BackendFeature {
     TracyZones = 20,
     Texture3d = 21,
     TextureRowReversal = 22,
+    /// Device-local memory is distinct from host-visible memory: frequently
+    /// read resources belong there, behind staged (and batched) uploads.
+    DeviceLocalMemory = 23,
+    /// Three-dimensional textures also accept packed formats (BGRA8 and
+    /// packed depth/stencil), not only the common color formats.
+    Texture3dPackedFormats = 24,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -510,6 +515,8 @@ pub struct BackendFeatureFlags {
     pub tracy_zones: bool,
     pub texture_3d: bool,
     pub texture_row_reversal: bool,
+    pub device_local_memory: bool,
+    pub texture_3d_packed_formats: bool,
 }
 
 impl BackendFeatureFlags {
@@ -537,6 +544,8 @@ impl BackendFeatureFlags {
             BackendFeature::TracyZones => self.tracy_zones,
             BackendFeature::Texture3d => self.texture_3d,
             BackendFeature::TextureRowReversal => self.texture_row_reversal,
+            BackendFeature::DeviceLocalMemory => self.device_local_memory,
+            BackendFeature::Texture3dPackedFormats => self.texture_3d_packed_formats,
         }
     }
 }
@@ -560,16 +569,67 @@ pub struct BackendLimits {
     pub max_dispatch_groups_per_axis: u32,
 }
 
+/// Number of GPU profiling scopes a backend can time or count per frame.
+pub const GPU_PROFILE_SCOPE_COUNT: usize = 12;
+
+/// Profiling classification a frontend assigns to a render pass or graphics
+/// pipeline. Scope indices are opaque to the GAL and its backends: they time
+/// and count work per index, and the frontend that assigned them names them.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct GpuProfileTag {
+    /// Scope (< `GPU_PROFILE_SCOPE_COUNT`) whose GPU time includes this work.
+    pub timing_scope: Option<u8>,
+    /// Scope (< `GPU_PROFILE_SCOPE_COUNT`) whose pipeline statistics include
+    /// this pipeline's work.
+    pub statistics_scope: Option<u8>,
+    /// A timing span begun by this pipeline ends when a pipeline without a
+    /// timing scope binds, instead of lasting until the pass ends.
+    pub timing_ends_at_untimed_pipeline: bool,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum BackendApi {
-    Vulkan,
-    OpenGl,
-    Mock,
+pub enum GpuProfiledObject {
+    RenderPass,
+    GraphicsPipeline,
+}
+
+/// Frontend policy installed on the GAL: tags created passes/pipelines from
+/// their labels and names statistics scopes for diagnostics.
+#[derive(Clone, Copy)]
+pub struct GpuProfileClassifier {
+    pub classify: fn(GpuProfiledObject, &str) -> GpuProfileTag,
+    pub statistics_scope_name: fn(u8) -> &'static str,
+}
+
+/// GLSL flavour a backend compiles. Frontends that ship several source
+/// variants choose by dialect, never by which backend is running.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum GlslDialect {
+    /// GLSL 4.50 with explicit `set`/`binding`/`location` decorations and
+    /// SPIR-V built-ins (`gl_VertexIndex`).
+    ExplicitBindings,
+    /// Desktop core-profile GLSL with implicit locations and GL built-ins.
+    CoreProfile,
+}
+
+/// Native coordinate conventions a backend imposes on shaders and readback.
+/// Frontends adapt shared shader text through these facts (see
+/// `shader_pack::programs::shader_stage_code`), never through backend identity.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ShaderConventions {
+    pub glsl_dialect: GlslDialect,
+    /// Clip-space depth maps to [0, 1] rather than [-1, 1].
+    pub zero_to_one_clip_depth: bool,
+    /// Sampling a render target in a fullscreen pass needs V flipped to keep
+    /// the pass graph's top-left image origin.
+    pub flip_fullscreen_uv_y: bool,
+    /// Framebuffer readback returns the bottom row first.
+    pub readback_rows_bottom_up: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BackendCapabilities {
-    pub api: BackendApi,
+    pub shader_conventions: ShaderConventions,
     pub name: &'static str,
     pub features: BackendFeatureFlags,
     pub limits: BackendLimits,
@@ -588,16 +648,11 @@ impl BackendCapabilities {
             return false;
         }
 
-        let format_supported = match self.api {
-            // BGRA and three-dimensional packed depth/stencil storage remain
-            // unavailable in private OpenGL lowering. D2 depth/stencil
-            // attachment support does not admit an unimplemented D3 route.
-            BackendApi::OpenGl => !matches!(
+        let format_supported = self.supports(BackendFeature::Texture3dPackedFormats)
+            || !matches!(
                 format,
                 TextureFormat::Bgra8Unorm | TextureFormat::Depth24Stencil8
-            ),
-            BackendApi::Vulkan | BackendApi::Mock => true,
-        };
+            );
         if !format_supported {
             return false;
         }

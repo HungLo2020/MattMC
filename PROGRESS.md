@@ -86,6 +86,18 @@ the 28 pre-existing Mockito/JDK25 failures (obsolete route/source-contract tests
 Regressions after deletion: day 2.39, glass 7.49, down 7.15, off 0.14-0.25, gun 2.20, pane 2.38,
 DH generic 4.88/4.96/3.09, 0 VUIDs; real config shaders on/off: joins, route active, no crash.
 bench.sh after deletion (Current, moving): DH 38.8 -> 45.0 fps, noDH 44.0 -> 45.9; RSS ~12.5 GB.
+**Architecture boundaries (09-30).** `BackendApi` removed: frontends use capabilities
+(`ShaderConventions` = GLSL dialect/clip depth/UV flip/readback rows; `DeviceLocalMemory`,
+`Texture3dPackedFormats`, `IndirectDraw`, `TextureRowReversal`). GPU timing/statistics use opaque
+`GpuProfileTag` scopes; names/label rules live in `world_primitive_frontend/gpu_profile_scopes.rs`.
+Game-named blend modes renamed by math; `vulkan_*`/`gl_*` GAL metrics -> `native_*` (FFI ABI names
+unchanged). GL backend lowers separate texture/sampler GLSL generically and reads bindings from
+source (no game names); GL shader variants declare bindings. `architecture_boundary.rs` enforces:
+no backend identity, no backend names outside `backends/`, no frontend imports or game vocabulary
+or label branching in core GAL/backends. GL conformance tests had silently "skipped" (any error
+containing "GL" counts as an environment gap); they now run and match Vulkan's pin. New dirs
+`render/{worldrender,guirender,shaderpack,shared,bridge}` (READMEs only). Rust GL next gap:
+`CopyFrameTargetToTexture` unimplemented (GL is allowed incomplete).
 Ported while pruning: VoxelMap world map (regions staged as Rust raw images, released on
 unload), VoxelMap init (packet bridge was null on Rust), F3 GPU% (`TimerQuery` on Rust Vulkan
 timestamps via `mattmc_vulkanic_gal_set_gpu_timestamps_requested`), pack `weatherParticles`,
@@ -116,22 +128,11 @@ additive blend + texture matrix); no Iris program fallback chains;
 load-only passes; `invariant gl_Position` fixed EQUAL streaks; alpha tests after main.
 **Camera-motion smear (09-27):** same-frame `camera_history` returned previous =
 current (TAA saw no motion); fixed (sharpness 135 vs 256 -> 173 vs 183).
-**Held items / hand passes (2026-09-27).** Crash on hotbar switch fixed:
-`currentRenderedItemId` now resolves from the drawn mesh (vanilla draws the old
-stack during the equip animation), as Iris does. Block items resolve the pack's
-block material of the default state (`mattmc/runtime-block-items.properties`,
-0 when unmatched); `heldItemId` keeps item.properties. Iris `isHandTranslucent`
-(ABI 66 `translucent_hand_mask`): that whole hand draws in a late pass after
-weather, before composite, into main depth. Degenerate/sub-mm quads (TaCZ gun
-faces) no longer reject the frame (scale-independent normals, second-triangle
-fallback); producer-authored TaCZ hand normals were worse (2.0 -> 3.6 MAE).
-Source local materials honour copied `.mcmeta` sampling (glint blur/clamp).
-Gaps: gun muzzle/stock-edge shading; `gbuffers_hand_water` packs unadmitted. Gun hotbar icon fixed: it was composited under the hotbar
-sprite (raw phase order, not `dynamicLayerOrder/Id`); the raster now uses
-Frozen's PIP pose scale(f,f,-f)*scale(1,-1,-1) and new GUI lighting modes
-6/7 (OversizedItemRenderer ITEMS_3D / ITEMS_FLAT by `usesBlockLight`).
-Shader-off gun pair 0.41/0.70/0.80 -> 0.14/0.25/0.24; TACZ icon offset = animation timing. World item layers carry `minecraft:item_entity/ground/<ns>/<path>`
-(`submitSemantic`); others 0. Gap: dropped flat foil item (clamp-glint) opaque here.
+**Held items / hand passes (09-27).** `currentRenderedItemId` resolves from the drawn mesh
+(equip-animation crash); block items use the pack's default-state material; Iris
+`isHandTranslucent` hands draw late into main depth; degenerate TaCZ quads no longer reject.
+Gun icon uses Frozen's PIP pose + GUI lighting modes 6/7 (off-pair 0.14/0.25/0.24). Gaps: gun
+muzzle/stock shading, `gbuffers_hand_water`, dropped flat foil items opaque.
 **Crash robustness (2026-09-27).** A failed armed submission within 60 frames
 of (re)arming disarms and redraws that frame on the vanilla Rust route; later
 failures disarm and return `retryable selected-source failure` (Java resubmits

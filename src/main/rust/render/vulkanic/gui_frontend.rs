@@ -18,7 +18,7 @@ use super::gui_mesh_frontend::{
 };
 use super::handles::Handle;
 use super::resources::{
-    AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, ColorFormat,
+    AccessFlags, BlendMode, GlslDialect, BufferDesc, BufferUsage, ColorFormat,
     CombinedTextureSamplerDesc, CompareOp, Extent3d, GraphicsPipelineDesc, MemoryDomain,
     PipelineLayoutDesc, PipelineStageFlags, PrimitiveTopology, QueueClass, RenderPassDesc,
     RenderTargetDesc, ResourceBinding, ResourceBindingDesc, ResourceBindingKind,
@@ -80,7 +80,7 @@ const GUI_MAX_MESH_SHARED_PROGRAMS: usize = 16;
 /// explicit pipelines and uniform storage until the GUI generation changes.
 const GUI_MAX_MESH_COMPOSITE_RESOURCES: usize = 256;
 
-const VERTEX_SHADER_OPENGL: &[u8] = br#"#version 330 core
+const VERTEX_SHADER_OPENGL: &[u8] = br#"#version 430 core
 struct PackedGuiQuad {
     vec4 origin_axis_u;
     vec4 axis_v_mode;
@@ -89,7 +89,7 @@ struct PackedGuiQuad {
     vec4 uv_region;
     vec4 color;
 };
-layout(std140) uniform GuiSpriteBatch {
+layout(std140, binding = 0) uniform GuiSpriteBatch {
     PackedGuiQuad sprites[256];
 };
 out vec2 v_uv;
@@ -184,8 +184,8 @@ void main() {
 }
 "#;
 
-const FRAGMENT_SHADER_OPENGL: &[u8] = br#"#version 330 core
-uniform sampler2D Sampler0;
+const FRAGMENT_SHADER_OPENGL: &[u8] = br#"#version 430 core
+layout(binding = 1) uniform sampler2D Sampler0;
 in vec2 v_uv;
 in vec2 v_sprite_corner;
 in vec2 v_pixel;
@@ -462,9 +462,9 @@ impl TextureGroup {
             Self::Invert => BlendMode::Invert,
             Self::Dynamic(_) => BlendMode::Alpha,
             Self::DynamicLinear(_) => BlendMode::Alpha,
-            Self::DynamicGlint(_) => BlendMode::Glint,
+            Self::DynamicGlint(_) => BlendMode::SrcColorAdditive,
             Self::DynamicOpaque(_) => BlendMode::Disabled,
-            Self::DynamicVignette(_) => BlendMode::Vignette,
+            Self::DynamicVignette(_) => BlendMode::InverseSrcColorModulate,
             Self::DynamicInvert(_) => BlendMode::Invert,
             Self::DynamicPremultiplied(_) => BlendMode::Premultiplied,
             Self::DynamicAdditive(_) => BlendMode::Additive,
@@ -2831,24 +2831,15 @@ impl GuiFrontend {
         }
         stats.sprite_batch_count = batches.len() as u64;
         let mut ops = Vec::new();
-        let whole_frame_vulkan = gal.capabilities().api == BackendApi::Vulkan;
-        if whole_frame_vulkan {
-            ops.push(CommandOp::BeginPass {
-                pass: frame_pass,
-                target: render_target,
-                colors: vec![loaded_frame_color_attachment(color_attachment)],
-                depth_stencil: depth_attachment.map(loaded_frame_depth_attachment),
-            });
-            ops.push(CommandOp::EndPass);
-        } else if batches.is_empty() {
-            ops.push(CommandOp::BeginPass {
-                pass: frame_pass,
-                target: render_target,
-                colors: vec![loaded_frame_color_attachment(color_attachment)],
-                depth_stencil: depth_attachment.map(loaded_frame_depth_attachment),
-            });
-            ops.push(CommandOp::EndPass);
-        }
+        // An empty loaded pass opens the frame target before any batch (or
+        // when there are none) on every backend.
+        ops.push(CommandOp::BeginPass {
+            pass: frame_pass,
+            target: render_target,
+            colors: vec![loaded_frame_color_attachment(color_attachment)],
+            depth_stencil: depth_attachment.map(loaded_frame_depth_attachment),
+        });
+        ops.push(CommandOp::EndPass);
         append_gui_batches_ops(
             self,
             frame_pass,
@@ -3378,9 +3369,9 @@ impl GuiFrontend {
         output_target: &str,
         uniform_blocks: &[Vec<u8>],
     ) -> GalResult<&CustomPostEffectResources> {
-        if gal.capabilities().api != BackendApi::Vulkan {
+        if gal.capabilities().shader_conventions.glsl_dialect != GlslDialect::ExplicitBindings {
             return Err(GalError::unsupported_feature(
-                "Rust custom post effects require the Vulkan backend",
+                "Rust custom post effects require an explicit-binding GLSL backend",
             ));
         }
         if pass_index >= MAX_CUSTOM_POST_EFFECT_PASSES {
@@ -5750,15 +5741,13 @@ impl GuiFrontend {
         self.mesh_composite_uniform_cursor = 0;
         let mut stats = GuiSubmitStats::default();
         let mut ops = Vec::new();
-        if gal.capabilities().api == BackendApi::Vulkan {
-            ops.push(CommandOp::BeginPass {
-                pass: frame_pass,
-                target: render_target,
-                colors: vec![loaded_frame_color_attachment(color_attachment)],
-                depth_stencil: depth_attachment.map(loaded_frame_depth_attachment),
-            });
-            ops.push(CommandOp::EndPass);
-        }
+        ops.push(CommandOp::BeginPass {
+            pass: frame_pass,
+            target: render_target,
+            colors: vec![loaded_frame_color_attachment(color_attachment)],
+            depth_stencil: depth_attachment.map(loaded_frame_depth_attachment),
+        });
+        ops.push(CommandOp::EndPass);
         let item_raster_placements = if ordered.iter().any(|entry| matches!(entry,
             GuiFrameRequest::AffineBatch(batch) if batch.iter().any(|request| request.item_raster_scale != 0))) {
             let creates = gal.metrics().resource_creates;
@@ -6696,7 +6685,9 @@ impl GuiFrontend {
             key.item_raster,
             key.item_cutout,
         );
-        let (vertex_code, fragment_code) = if gal.capabilities().api == BackendApi::Vulkan {
+        let (vertex_code, fragment_code) = if gal.capabilities().shader_conventions.glsl_dialect
+            == GlslDialect::ExplicitBindings
+        {
             (VERTEX_SHADER_VULKAN, FRAGMENT_SHADER_VULKAN)
         } else {
             (VERTEX_SHADER_OPENGL, FRAGMENT_SHADER_OPENGL)
@@ -7076,9 +7067,9 @@ impl GuiFrontend {
         height: u32,
         color_format: ColorFormat,
     ) -> GalResult<&GuiBlurResources> {
-        if gal.capabilities().api != BackendApi::Vulkan {
+        if gal.capabilities().shader_conventions.glsl_dialect != GlslDialect::ExplicitBindings {
             return Err(GalError::unsupported_feature(
-                "Rust GUI blur requires the Vulkan backend",
+                "Rust GUI blur requires an explicit-binding GLSL backend",
             ));
         }
         if self.blur_resources.as_ref().is_some_and(|resources| {
@@ -9823,7 +9814,7 @@ mod tests {
     }
 
     /// Exercises the same dynamic raw-image, uniform, indexed-draw, and
-    /// `BlendMode::Vignette` path used by the whole-frame HUD.  A pipeline
+    /// `BlendMode::InverseSrcColorModulate` path used by the whole-frame HUD.  A pipeline
     /// descriptor assertion cannot catch a later frontend regression that
     /// loses the loaded target or samples the raw mask as black.
     #[test]
@@ -15317,7 +15308,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
     #[test]
     fn affine_pipeline_strata_select_exact_blend_groups() {
         assert_eq!(BlendMode::Disabled, dynamic_texture_group(760, 1).blend());
-        assert_eq!(BlendMode::Vignette, dynamic_texture_group(770, 1).blend());
+        assert_eq!(BlendMode::InverseSrcColorModulate, dynamic_texture_group(770, 1).blend());
         assert_eq!(BlendMode::Invert, dynamic_texture_group(780, 1).blend());
         assert_eq!(BlendMode::Invert, dynamic_texture_group(200, 1).blend());
         assert_eq!(

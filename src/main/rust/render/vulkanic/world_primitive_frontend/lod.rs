@@ -23,7 +23,7 @@ use crate::render::vulkanic::commands::{
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::{
-    AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, CombinedTextureSamplerDesc,
+    AccessFlags, BlendMode, BufferDesc, BufferUsage, CombinedTextureSamplerDesc,
     CompareOp, Extent3d, FrontFace, GraphicsPipelineDesc, IndexType, MemoryDomain,
     PipelineLayoutDesc, PipelineStageFlags, PrimitiveTopology, QueueClass, RasterYDirection,
     RenderPassDesc, RenderTargetDesc, ResourceBinding, ResourceBindingDesc, ResourceBindingKind,
@@ -41,7 +41,7 @@ use crate::render::vulkanic::shader_pack::programs::{
     minimal_distant_horizons_lod_exact_atlas_opaque_program,
     minimal_distant_horizons_lod_forward_opaque_program,
     minimal_distant_horizons_lod_opaque_program, minimal_distant_horizons_lod_transparent_program,
-    shader_stage_code_for_backend, LoweredDistantHorizonsExactAtlasSourceProgram,
+    shader_stage_code, LoweredDistantHorizonsExactAtlasSourceProgram,
     LoweredDistantHorizonsSourceProgram, MINIMAL_DISTANT_HORIZONS_DIRECT_APPLY_FRAGMENT,
     MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT,
     MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_VERTEX,
@@ -81,7 +81,7 @@ fn packed_lod_uniforms_enabled() -> bool {
 /// back-face classification remains counter-clockwise on every backend. Keep
 /// this DH-specific state separate from near-terrain winding; the source quad
 /// index contract is otherwise unchanged.
-fn world_lod_source_front_face(_api: BackendApi) -> FrontFace {
+fn world_lod_source_front_face() -> FrontFace {
     FrontFace::CounterClockwise
 }
 
@@ -1665,8 +1665,8 @@ impl WorldLodDirectCompositionResources {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_VERTEX,
                 ),
                 entry_point: "main".to_string(),
@@ -1676,8 +1676,8 @@ impl WorldLodDirectCompositionResources {
                 label: format!("{label}.fragment"),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_FRAGMENT,
                 ),
                 entry_point: "main".to_string(),
@@ -1706,8 +1706,8 @@ impl WorldLodDirectCompositionResources {
                 label: format!("{label}.apply.fragment"),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     MINIMAL_DISTANT_HORIZONS_DIRECT_APPLY_FRAGMENT,
                 ),
                 entry_point: "main".to_string(),
@@ -1736,8 +1736,8 @@ impl WorldLodDirectCompositionResources {
                 label: format!("{label}.fade.fragment"),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT,
                 ),
                 entry_point: "main".to_string(),
@@ -1835,8 +1835,8 @@ impl WorldLodDirectCompositionResources {
                 label: format!("{label}.ssao.fragment"),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT,
                 ),
                 entry_point: "main".to_string(),
@@ -2819,9 +2819,7 @@ impl WorldLodPassResources {
         // The capture-only probe can invert the explicit source winding for a
         // paired raster experiment. Production remains pinned to the copied
         // DH source contract.
-        let front_face = selected_source_raster_probe_front_face(world_lod_source_front_face(
-            gal.capabilities().api,
-        ))?;
+        let front_face = selected_source_raster_probe_front_face(world_lod_source_front_face())?;
         let depth_compare = selected_source_raster_probe_depth_compare(Some(depth_compare))?;
         let [mut geometry_and_frame_desc, lightmap_desc] =
             distant_horizons_lod_opaque_resource_layouts(label);
@@ -2840,7 +2838,7 @@ impl WorldLodPassResources {
             })?;
             created.push(pipeline_layout);
             let [vertex_desc, fragment_desc] =
-                program.shader_module_descriptors(gal.capabilities().api);
+                program.shader_module_descriptors(gal.capabilities().shader_conventions);
             let vertex_shader = gal.create_shader_module(vertex_desc)?;
             created.push(vertex_shader);
             let fragment_shader = gal.create_shader_module(fragment_desc)?;
@@ -3892,10 +3890,10 @@ impl WorldLodExactAtlasPassResources {
             created.push(pipeline_layout);
             let [vertex_desc, fragment_desc] = if self.deferred {
                 minimal_distant_horizons_lod_exact_atlas_opaque_program()
-                    .shader_module_descriptors(gal.capabilities().api)
+                    .shader_module_descriptors(gal.capabilities().shader_conventions)
             } else {
                 minimal_distant_horizons_lod_exact_atlas_forward_opaque_program()
-                    .shader_module_descriptors(gal.capabilities().api)
+                    .shader_module_descriptors(gal.capabilities().shader_conventions)
             };
             let vertex_shader = gal.create_shader_module(vertex_desc)?;
             created.push(vertex_shader);
@@ -3913,9 +3911,7 @@ impl WorldLodExactAtlasPassResources {
                 } else {
                     cull_mode
                 },
-                front_face: selected_source_raster_probe_front_face(world_lod_source_front_face(
-                    gal.capabilities().api,
-                ))?,
+                front_face: selected_source_raster_probe_front_face(world_lod_source_front_face())?,
                 provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
                 raster_y_direction: crate::render::vulkanic::resources::RasterYDirection::Up,
                 blend,
@@ -3954,7 +3950,7 @@ impl WorldLodExactAtlasPassResources {
                         cull_mode
                     },
                     front_face: selected_source_raster_probe_front_face(
-                        world_lod_source_front_face(gal.capabilities().api),
+                        world_lod_source_front_face(),
                     )?,
                     provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
                     raster_y_direction: RasterYDirection::Up,
@@ -3992,7 +3988,7 @@ impl WorldLodExactAtlasPassResources {
                             cull_mode
                         },
                         front_face: selected_source_raster_probe_front_face(
-                            world_lod_source_front_face(gal.capabilities().api),
+                            world_lod_source_front_face(),
                         )?,
                         provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex::Last,
                         raster_y_direction: RasterYDirection::Up,
@@ -4212,7 +4208,6 @@ impl WorldLodExactAtlasSourcePassResources {
             program,
             color_attachment,
             pack_resources_layout,
-            gal.capabilities().api,
         )?;
         self.ensure_pipeline(gal, program, &pipeline_key)?;
         let scalar_uniforms = program.source.pack_scalar_uniforms(source_uniforms)?;
@@ -4467,7 +4462,7 @@ impl WorldLodExactAtlasSourcePassResources {
             })?;
             created.push(pipeline_layout);
             let [vertex_desc, fragment_desc] =
-                program.shader_module_descriptors(gal.capabilities().api);
+                program.shader_module_descriptors(gal.capabilities().shader_conventions);
             let vertex_shader = gal.create_shader_module(vertex_desc)?;
             created.push(vertex_shader);
             let fragment_shader = gal.create_shader_module(fragment_desc)?;
@@ -4580,7 +4575,6 @@ impl WorldLodSourceProgramKey {
     fn from_program(
         program: &LoweredDistantHorizonsSourceProgram,
         color_format: TextureFormat,
-        api: BackendApi,
     ) -> GalResult<Self> {
         Ok(Self {
             identity: program.identity.as_str().to_string(),
@@ -4590,7 +4584,7 @@ impl WorldLodSourceProgramKey {
             // pipeline identity so a cached normal pipeline cannot make an
             // experiment silently ineffective.
             cull_mode: selected_source_raster_probe_cull_mode()? as u32,
-            front_face: selected_source_raster_probe_front_face(world_lod_source_front_face(api))?,
+            front_face: selected_source_raster_probe_front_face(world_lod_source_front_face())?,
             alpha_blend: false,
         })
     }
@@ -4771,7 +4765,6 @@ fn exact_atlas_source_pipeline_key(
     program: &LoweredDistantHorizonsExactAtlasSourceProgram,
     attachment: &TerrainSourceColorAttachment,
     pack_resources_layout: Handle,
-    api: BackendApi,
 ) -> GalResult<WorldLodExactAtlasSourcePipelineKey> {
     if attachment.output != TerrainPassOutput::LitTerrainColor {
         return Err(GalError::invalid_argument(
@@ -4783,7 +4776,7 @@ fn exact_atlas_source_pipeline_key(
         shader_pack_generation: program.source.shader_pack_generation,
         primary_format: attachment.format,
         pack_resources_layout,
-        front_face: selected_source_raster_probe_front_face(world_lod_source_front_face(api))?,
+        front_face: selected_source_raster_probe_front_face(world_lod_source_front_face())?,
     })
 }
 
@@ -5329,7 +5322,7 @@ impl WorldLodSourcePassResources {
         count: usize,
     ) -> GalResult<()> {
         let key =
-            WorldLodSourceProgramKey::from_program(program, color_format, gal.capabilities().api)?;
+            WorldLodSourceProgramKey::from_program(program, color_format)?;
         self.ensure_column_frame_capacity(gal, program, &key, count)
     }
 
@@ -5442,11 +5435,7 @@ impl WorldLodSourcePassResources {
                 key.clone()
             }
             _ => {
-                let key = WorldLodSourceProgramKey::from_program(
-                    program,
-                    color_format,
-                    gal.capabilities().api,
-                )?;
+                let key = WorldLodSourceProgramKey::from_program(program, color_format)?;
                 self.key_memo = Some((
                     program_address,
                     program.shader_pack_generation,
@@ -5657,7 +5646,7 @@ impl WorldLodSourcePassResources {
             ));
         }
         let program_key =
-            WorldLodSourceProgramKey::from_program(program, color_format, gal.capabilities().api)?;
+            WorldLodSourceProgramKey::from_program(program, color_format)?;
         self.ensure_pipeline(gal, program, &program_key)?;
         let key = WorldLodSourcePackKey {
             program: program_key.clone(),
@@ -5712,7 +5701,7 @@ impl WorldLodSourcePassResources {
         color_format: TextureFormat,
     ) -> GalResult<Handle> {
         let key =
-            WorldLodSourceProgramKey::from_program(program, color_format, gal.capabilities().api)?;
+            WorldLodSourceProgramKey::from_program(program, color_format)?;
         self.ensure_pipeline(gal, program, &key)?;
         Ok(self
             .pipelines
@@ -5856,7 +5845,7 @@ impl WorldLodSourcePassResources {
             })?;
             created.push(pipeline_layout);
             let [vertex_desc, fragment_desc] =
-                program.shader_module_descriptors(gal.capabilities().api);
+                program.shader_module_descriptors(gal.capabilities().shader_conventions);
             let vertex_shader = gal.create_shader_module(vertex_desc)?;
             created.push(vertex_shader);
             let fragment_shader = gal.create_shader_module(fragment_desc)?;
@@ -9313,18 +9302,7 @@ mod tests {
         // coordinate contract; each backend realizes that contract without
         // changing the copied DH source winding, so no source-index rewrite is
         // needed on any backend.
-        assert_eq!(
-            FrontFace::CounterClockwise,
-            world_lod_source_front_face(BackendApi::Vulkan)
-        );
-        assert_eq!(
-            FrontFace::CounterClockwise,
-            world_lod_source_front_face(BackendApi::OpenGl)
-        );
-        assert_eq!(
-            FrontFace::CounterClockwise,
-            world_lod_source_front_face(BackendApi::Mock)
-        );
+        assert_eq!(FrontFace::CounterClockwise, world_lod_source_front_face());
     }
 
     #[test]

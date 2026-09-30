@@ -1,6 +1,6 @@
 use super::*;
 use crate::render::vulkanic::resources::{
-    BackendApi, BackendFeatureFlags, BackendLimits, BlendMode,
+    BackendFeatureFlags, GlslDialect, ShaderConventions, BackendLimits, BlendMode,
 };
 use crate::render::vulkanic::world_primitive_frontend::world_text::WORLD_TEXT_DEPTH_POLYGON_OFFSET;
 use crate::render::vulkanic::world_primitive_frontend::{
@@ -18,7 +18,12 @@ use crate::render::vulkanic::world_primitive_frontend::{
 
 fn test_capabilities() -> BackendCapabilities {
     BackendCapabilities {
-        api: BackendApi::Mock,
+        shader_conventions: ShaderConventions {
+            glsl_dialect: GlslDialect::ExplicitBindings,
+            zero_to_one_clip_depth: false,
+            flip_fullscreen_uv_y: false,
+            readback_rows_bottom_up: false,
+        },
         name: "ffi-test",
         features: BackendFeatureFlags {
             graphics: true,
@@ -59,12 +64,12 @@ fn blend_mode_wire_values_cover_every_declared_mode_including_crumbling() {
         BlendMode::Invert,
         BlendMode::Multiply,
         BlendMode::Overlay,
-        BlendMode::Glint,
-        BlendMode::Vignette,
+        BlendMode::SrcColorAdditive,
+        BlendMode::InverseSrcColorModulate,
         BlendMode::Premultiplied,
-        BlendMode::TerrainTranslucent,
+        BlendMode::AlphaFirstAttachmentOnly,
         BlendMode::AlphaPreserveAlpha,
-        BlendMode::Crumbling,
+        BlendMode::DoubleModulate,
         BlendMode::AlphaSource,
         BlendMode::DepthMask,
     ];
@@ -255,7 +260,6 @@ fn particle_semantic_transport_lowers_owned_geometry_in_the_whole_frame() {
     let mut request = whole_frame_request(&[], &[]);
     request.world_particle_quads = FfiSlice { ptr: &p, count: 1 };
     let mut capabilities = test_capabilities();
-    capabilities.api = BackendApi::Vulkan;
     let decoded = unsafe { decode_whole_frame_submit(&request, capabilities) }.unwrap();
     let quad = &decoded.2.material_quads[0];
     assert_eq!(
@@ -301,7 +305,6 @@ fn terrain_surface_transport_uses_rust_block_atlas_and_cutout_policy() {
         let mut request = whole_frame_request(&[], &[]);
         request.world_particle_quads = FfiSlice { ptr: &p, count: 1 };
         let mut capabilities = test_capabilities();
-        capabilities.api = BackendApi::Vulkan;
         let decoded = unsafe { decode_whole_frame_submit(&request, capabilities) }.unwrap();
         let quad = &decoded.2.material_quads[0];
         assert_eq!(
@@ -358,7 +361,6 @@ fn particle_semantic_transport_rejects_bad_records_and_bounds_before_reading() {
     let good = semantic_particle_record();
     let mut request = whole_frame_request(&[], &[]);
     let mut capabilities = test_capabilities();
-    capabilities.api = BackendApi::Vulkan;
     let mut bads = [good; 4];
     bads[0].byte_size -= 4;
     bads[1].surface_kind = 5;
@@ -837,7 +839,6 @@ fn semantic_gui_tiled_frame_transport_forwards_owned_parents_and_rejects_collisi
         count: 1,
     };
     let mut capabilities = test_capabilities();
-    capabilities.api = BackendApi::Vulkan;
     let decoded =
         unsafe { decode_whole_frame_submit_with_tiled_gui(&whole, capabilities) }.unwrap();
     assert_eq!(tile.sequence, decoded.9[0].sequence);
@@ -906,7 +907,8 @@ fn stable_ffi_rejects_internal_d3_texture_resources_even_when_the_backend_suppor
 
 fn test_vulkan_capabilities() -> BackendCapabilities {
     BackendCapabilities {
-        api: BackendApi::Vulkan,
+        shader_conventions: crate::render::vulkanic::backends::vulkan_capabilities()
+            .shader_conventions,
         name: "ffi-test-vulkan",
         ..test_capabilities()
     }

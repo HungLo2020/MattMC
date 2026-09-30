@@ -1,5 +1,6 @@
 use super::*;
 use crate::render::vulkanic::metrics::WholeFrameProfile;
+use crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes as scopes;
 
 pub fn status_result_from_error(error: &GalError) -> FfiStatusResult {
     FfiStatusResult {
@@ -137,7 +138,7 @@ pub(crate) fn context_metrics(context: &BridgeContext) -> FfiMetricsSnapshot {
     metrics.command_lists = backend.command_lists;
     metrics.command_ops = backend.command_ops;
     metrics.backend_submissions = backend.command_batches;
-    metrics.backend_waits = backend.gl_fences_waited;
+    metrics.backend_waits = backend.native_fences_waited;
     metrics.ffi_calls = context.ffi_calls;
     metrics.ffi_input_bytes = context.ffi_input_bytes;
     metrics.ffi_output_bytes = context.ffi_output_bytes;
@@ -260,18 +261,18 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
             backend_encode_nanos: profile.backend_encode_nanos,
             backend_submit_nanos: profile.backend_submit_nanos,
             backend_retire_nanos: profile.backend_retire_nanos,
-            vulkan_command_buffer_alloc_nanos: profile.vulkan_command_buffer_alloc_nanos,
-            vulkan_command_buffer_begin_nanos: profile.vulkan_command_buffer_begin_nanos,
-            vulkan_command_recording_nanos: profile.vulkan_command_recording_nanos,
-            vulkan_command_buffer_end_nanos: profile.vulkan_command_buffer_end_nanos,
-            vulkan_queue_submit_nanos: profile.vulkan_queue_submit_nanos,
-            vulkan_timeline_poll_nanos: profile.vulkan_timeline_poll_nanos,
-            vulkan_timeline_wait_nanos: profile.vulkan_timeline_wait_nanos,
-            vulkan_device_wait_idle_nanos: profile.vulkan_device_wait_idle_nanos,
-            vulkan_command_buffers_allocated: profile.vulkan_command_buffers_allocated,
-            vulkan_command_buffers_freed: profile.vulkan_command_buffers_freed,
-            vulkan_wait_count: profile.vulkan_wait_count,
-            vulkan_device_wait_idle_count: profile.vulkan_device_wait_idle_count,
+            vulkan_command_buffer_alloc_nanos: profile.native_command_buffer_alloc_nanos,
+            vulkan_command_buffer_begin_nanos: profile.native_command_buffer_begin_nanos,
+            vulkan_command_recording_nanos: profile.native_command_recording_nanos,
+            vulkan_command_buffer_end_nanos: profile.native_command_buffer_end_nanos,
+            vulkan_queue_submit_nanos: profile.native_queue_submit_nanos,
+            vulkan_timeline_poll_nanos: profile.native_timeline_poll_nanos,
+            vulkan_timeline_wait_nanos: profile.native_timeline_wait_nanos,
+            vulkan_device_wait_idle_nanos: profile.native_device_wait_idle_nanos,
+            vulkan_command_buffers_allocated: profile.native_command_buffers_allocated,
+            vulkan_command_buffers_freed: profile.native_command_buffers_freed,
+            vulkan_wait_count: profile.native_wait_count,
+            vulkan_device_wait_idle_count: profile.native_device_wait_idle_count,
             resource_creates_delta: profile.resource_creates_delta,
             resource_destroys_delta: profile.resource_destroys_delta,
             host_write_ops: profile.host_write_ops,
@@ -283,13 +284,13 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
             pipeline_binds: profile.pipeline_binds,
             resource_set_binds: profile.resource_set_binds,
             gpu_timestamp_status: profile.gpu_timestamp_status,
-            gpu_shadow_depth_nanos: profile.gpu_shadow_depth_nanos,
-            gpu_terrain_opaque_nanos: profile.gpu_terrain_opaque_nanos,
-            gpu_terrain_cutout_nanos: profile.gpu_terrain_cutout_nanos,
-            gpu_deferred_lighting_nanos: profile.gpu_deferred_lighting_nanos,
-            gpu_composite0_nanos: profile.gpu_composite0_nanos,
-            gpu_composite1_nanos: profile.gpu_composite1_nanos,
-            gpu_final_output_nanos: profile.gpu_final_output_nanos,
+            gpu_shadow_depth_nanos: profile.gpu_scope_nanos[usize::from(scopes::SHADOW_DEPTH)],
+            gpu_terrain_opaque_nanos: profile.gpu_scope_nanos[usize::from(scopes::TERRAIN_OPAQUE)],
+            gpu_terrain_cutout_nanos: profile.gpu_scope_nanos[usize::from(scopes::TERRAIN_CUTOUT)],
+            gpu_deferred_lighting_nanos: profile.gpu_scope_nanos[usize::from(scopes::DEFERRED_LIGHTING)],
+            gpu_composite0_nanos: profile.gpu_scope_nanos[usize::from(scopes::COMPOSITE_0)],
+            gpu_composite1_nanos: profile.gpu_scope_nanos[usize::from(scopes::COMPOSITE_1)],
+            gpu_final_output_nanos: profile.gpu_scope_nanos[usize::from(scopes::FINAL_OUTPUT)],
             gpu_frame_total_nanos: profile.gpu_frame_total_nanos,
             g_buffer_persistent_cache_hits: profile.g_buffer_persistent_cache_hits,
             g_buffer_persistent_cache_misses: profile.g_buffer_persistent_cache_misses,
@@ -316,21 +317,21 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
                 .world_prepare_mesh_material_asset_nanos,
             world_prepare_metrics_accounting_nanos: profile.world_prepare_metrics_accounting_nanos,
             g_buffer_final_pass_creates: profile.g_buffer_final_pass_creates,
-            vulkan_acquire_nanos: profile.vulkan_acquire_nanos,
-            vulkan_present_nanos: profile.vulkan_present_nanos,
-            vulkan_present_wait_nanos: profile.vulkan_present_wait_nanos,
-            vulkan_present_mode: profile.vulkan_present_mode,
-            vulkan_requested_present_mode: profile.vulkan_requested_present_mode,
-            vulkan_supported_present_modes: profile.vulkan_supported_present_modes,
-            vulkan_present_mode_fallback_reason: profile.vulkan_present_mode_fallback_reason,
-            vulkan_acquired_image_index: profile.vulkan_acquired_image_index,
-            vulkan_swapchain_generation: profile.vulkan_swapchain_generation,
-            vulkan_swapchain_image_count: profile.vulkan_swapchain_image_count,
-            vulkan_surface_min_image_count: profile.vulkan_surface_min_image_count,
-            vulkan_surface_max_image_count: profile.vulkan_surface_max_image_count,
-            vulkan_configured_frames_in_flight: profile.vulkan_configured_frames_in_flight,
-            vulkan_images_in_flight: profile.vulkan_images_in_flight,
-            vulkan_available_frame_slots: profile.vulkan_available_frame_slots,
+            vulkan_acquire_nanos: profile.native_acquire_nanos,
+            vulkan_present_nanos: profile.native_present_nanos,
+            vulkan_present_wait_nanos: profile.native_present_wait_nanos,
+            vulkan_present_mode: profile.native_present_mode,
+            vulkan_requested_present_mode: profile.native_requested_present_mode,
+            vulkan_supported_present_modes: profile.native_supported_present_modes,
+            vulkan_present_mode_fallback_reason: profile.native_present_mode_fallback_reason,
+            vulkan_acquired_image_index: profile.native_acquired_image_index,
+            vulkan_swapchain_generation: profile.native_swapchain_generation,
+            vulkan_swapchain_image_count: profile.native_swapchain_image_count,
+            vulkan_surface_min_image_count: profile.native_surface_min_image_count,
+            vulkan_surface_max_image_count: profile.native_surface_max_image_count,
+            vulkan_configured_frames_in_flight: profile.native_configured_frames_in_flight,
+            vulkan_images_in_flight: profile.native_images_in_flight,
+            vulkan_available_frame_slots: profile.native_available_frame_slots,
             gal_hazard_read_events: profile.gal_hazard_read_events,
             gal_hazard_write_events: profile.gal_hazard_write_events,
             gal_hazard_candidates_examined: profile.gal_hazard_candidates_examined,
@@ -369,7 +370,7 @@ impl From<WholeFrameProfile> for FfiWholeFrameProfileSnapshot {
             world_mesh_dynamic_offset_count: profile.world_mesh_dynamic_offset_count,
             gui_mesh_prepare_nanos: profile.gui_mesh_prepare_nanos,
             gui_mesh_lower_nanos: profile.gui_mesh_lower_nanos,
-            gpu_distant_horizons_opaque_nanos: profile.gpu_distant_horizons_opaque_nanos,
+            gpu_distant_horizons_opaque_nanos: profile.gpu_scope_nanos[usize::from(scopes::DISTANT_HORIZONS_OPAQUE)],
             world_mesh_page_indirect_batch_count: profile.world_mesh_page_indirect_batch_count,
             world_mesh_page_indirect_run_count: profile.world_mesh_page_indirect_run_count,
             world_mesh_dynamic_terrain_batch_count: profile.world_mesh_dynamic_terrain_batch_count,
@@ -1284,12 +1285,12 @@ pub(crate) fn blend_mode(raw: u32) -> GalResult<BlendMode> {
         4 => Ok(BlendMode::Invert),
         5 => Ok(BlendMode::Multiply),
         6 => Ok(BlendMode::Overlay),
-        7 => Ok(BlendMode::Glint),
-        8 => Ok(BlendMode::Vignette),
+        7 => Ok(BlendMode::SrcColorAdditive),
+        8 => Ok(BlendMode::InverseSrcColorModulate),
         9 => Ok(BlendMode::Premultiplied),
-        10 => Ok(BlendMode::TerrainTranslucent),
+        10 => Ok(BlendMode::AlphaFirstAttachmentOnly),
         11 => Ok(BlendMode::AlphaPreserveAlpha),
-        12 => Ok(BlendMode::Crumbling),
+        12 => Ok(BlendMode::DoubleModulate),
         13 => Ok(BlendMode::AlphaSource),
         14 => Ok(BlendMode::DepthMask),
         _ => Err(GalError::ffi(
@@ -1643,10 +1644,11 @@ pub(crate) fn require_any_feature(
     }
 }
 
-/// Turns GPU frame timestamps on or off for Vulkan contexts. Timestamps feed
-/// the per-frame profile's GPU timings; they cost a few query writes per pass.
+/// Turns GPU frame timestamps on or off for backends that record them.
+/// Timestamps feed the per-frame profile's GPU timings; they cost a few query
+/// writes per pass.
 #[no_mangle]
 pub extern "C" fn mattmc_vulkanic_gal_set_gpu_timestamps_requested(requested: i32) -> i32 {
-    crate::render::vulkanic::backends::vulkan::set_gpu_timestamps_requested(requested != 0);
+    crate::render::vulkanic::backends::set_gpu_timestamps_requested(requested != 0);
     StatusCode::Ok as i32
 }

@@ -22,7 +22,7 @@ use super::super::resources::{
     SamplerFilter, ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension,
     TextureFormat, TextureUsage, TextureViewDesc,
 };
-use super::super::shader_pack::programs::shader_stage_code_for_backend;
+use super::super::shader_pack::programs::shader_stage_code;
 use super::super::{BufferImageCopyRegion, CullMode};
 
 pub(crate) const WORLD_TEXT_IMAGE_ALPHA8: u32 = 1;
@@ -683,8 +683,8 @@ impl WorldTextFrontend {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     std::str::from_utf8(WORLD_TEXT_VERTEX_SHADER)
                         .expect("world text shader is UTF-8"),
                 ),
@@ -695,8 +695,8 @@ impl WorldTextFrontend {
                 label: format!("{label}.fragment"),
                 stage: ShaderStage::Fragment,
                 code_format: ShaderCodeFormat::Glsl,
-                code: shader_stage_code_for_backend(
-                    gal.capabilities().api,
+                code: shader_stage_code(
+                    gal.capabilities().shader_conventions,
                     std::str::from_utf8(WORLD_TEXT_FRAGMENT_SHADER)
                         .expect("world text shader is UTF-8"),
                 ),

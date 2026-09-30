@@ -110,7 +110,7 @@ impl OpenGlBackend {
         })
     }
 
-    pub(in crate::render::vulkanic::backends) fn borrowed_minecraft_context(
+    pub(in crate::render::vulkanic::backends) fn borrowed_host_context(
         label: &str,
         stable_window_id: u64,
     ) -> GalResult<Self> {
@@ -180,6 +180,12 @@ impl OpenGlBackend {
 }
 
 impl Backend for OpenGlBackend {
+    #[cfg(test)]
+    fn begin_debug_capture(&self) -> Option<Box<dyn std::any::Any>> {
+        renderdoc::RenderDocFrame::start_if_requested()
+            .map(|frame| Box::new(frame) as Box<dyn std::any::Any>)
+    }
+
     fn capabilities(&self) -> BackendCapabilities {
         let mut capabilities = opengl_capabilities();
         capabilities.limits.uniform_buffer_offset_alignment =
@@ -288,13 +294,13 @@ impl Backend for OpenGlBackend {
             command_batches: sync.command_batches,
             command_lists: sync.command_lists,
             command_ops: sync.command_ops,
-            gl_calls: sync.gl_calls,
-            gl_flushes: sync.flushes as u64,
-            gl_finishes: sync.finishes as u64,
-            gl_fences_inserted: sync.fences_inserted as u64,
-            gl_fences_polled: sync.fences_polled as u64,
-            gl_fences_waited: sync.fences_waited as u64,
-            gl_fences_deleted: sync.fences_deleted as u64,
+            native_calls: sync.gl_calls,
+            native_flushes: sync.flushes as u64,
+            native_finishes: sync.finishes as u64,
+            native_fences_inserted: sync.fences_inserted as u64,
+            native_fences_polled: sync.fences_polled as u64,
+            native_fences_waited: sync.fences_waited as u64,
+            native_fences_deleted: sync.fences_deleted as u64,
             ..BackendRuntimeMetrics::default()
         }
     }
@@ -302,7 +308,7 @@ impl Backend for OpenGlBackend {
     fn configure_frame_surface(&mut self, desc: &FrameSurfaceDesc) -> GalResult<()> {
         let Some(presentation) = &mut self.presentation else {
             return Err(GalError::unsupported_feature(
-                "OpenGL presentation requires an explicit borrowed Minecraft context",
+                "OpenGL presentation requires an explicit borrowed host GL context",
             ));
         };
         self.context.make_current()?;
@@ -314,7 +320,7 @@ impl Backend for OpenGlBackend {
     fn acquire_frame(&mut self, desc: &FrameAcquireDesc) -> GalResult<AcquiredFrame> {
         let Some(presentation) = &mut self.presentation else {
             return Err(GalError::unsupported_feature(
-                "OpenGL presentation requires an explicit borrowed Minecraft context",
+                "OpenGL presentation requires an explicit borrowed host GL context",
             ));
         };
         self.context.make_current()?;
@@ -356,7 +362,7 @@ impl Backend for OpenGlBackend {
     fn resize_frame_surface(&mut self, desc: &FrameResizeDesc) -> GalResult<FrameResizeResult> {
         let Some(presentation) = &mut self.presentation else {
             return Err(GalError::unsupported_feature(
-                "OpenGL presentation requires an explicit borrowed Minecraft context",
+                "OpenGL presentation requires an explicit borrowed host GL context",
             ));
         };
         self.context.make_current()?;
@@ -375,7 +381,7 @@ impl Backend for OpenGlBackend {
     fn present_frame(&mut self, desc: &PresentFrameDesc) -> GalResult<PresentedFrame> {
         let Some(presentation) = &mut self.presentation else {
             return Err(GalError::unsupported_feature(
-                "OpenGL presentation requires an explicit borrowed Minecraft context",
+                "OpenGL presentation requires an explicit borrowed host GL context",
             ));
         };
         if !presentation.acquired.contains(&desc.frame) {
@@ -409,7 +415,7 @@ impl Backend for OpenGlBackend {
     fn cancel_frame(&mut self, frame: FrameId) -> GalResult<()> {
         let Some(presentation) = &mut self.presentation else {
             return Err(GalError::unsupported_feature(
-                "OpenGL presentation requires an explicit borrowed Minecraft context",
+                "OpenGL presentation requires an explicit borrowed host GL context",
             ));
         };
         // The borrowed default framebuffer has no acquire/present fence; a

@@ -485,7 +485,7 @@ impl OpenGlObjects {
             token,
             shader,
             stage: desc.stage,
-            sampler_bindings: parse_sampler2d_layout_bindings(&source),
+            interface: parse_layout_bindings(&source),
         })
     }
 
@@ -516,9 +516,9 @@ impl OpenGlObjects {
                     desc.label
                 )));
             }
-            let mut sampler_bindings = vertex.sampler_bindings.clone();
-            sampler_bindings.extend(fragment.sampler_bindings.clone());
-            self.bind_program_interfaces(program, desc.layout, &sampler_bindings)?;
+            let mut interface = vertex.interface.clone();
+            interface.merge(&fragment.interface);
+            self.bind_program_interfaces(program, desc.layout, &interface)?;
         }
         let vao = unsafe { self.gl.create_vertex_array() }.map_err(|error| {
             unsafe { self.gl.delete_program(program) };
@@ -574,7 +574,7 @@ impl OpenGlObjects {
                     desc.label
                 )));
             }
-            self.bind_program_interfaces(program, desc.layout, &shader.sampler_bindings)?;
+            self.bind_program_interfaces(program, desc.layout, &shader.interface)?;
         }
         Ok(ComputePipelineObject {
             token,
@@ -669,7 +669,7 @@ impl OpenGlObjects {
         &self,
         program: glow::Program,
         layout: Handle,
-        sampler_bindings: &BTreeMap<String, u32>,
+        interface: &ShaderInterfaceBindings,
     ) -> GalResult<()> {
         let pipeline_layout = self.pipeline_layout(layout)?;
         for (set_index, resource_layout) in pipeline_layout.resource_layouts.iter().enumerate() {
@@ -680,27 +680,32 @@ impl OpenGlObjects {
                         .map_err(|_| GalError::backend("OpenGL resource set index exceeds u32"))?,
                     binding.binding,
                 )?;
+                // Blocks and samplers declared with `layout(binding = N)` are
+                // already bound by the driver; name lookup covers the rest. As
+                // on Vulkan, a layout binding the program never declares is
+                // simply unused.
                 unsafe {
                     match binding.kind {
                         ResourceBindingKind::UniformBuffer => {
-                            let mut bound = false;
-                            for name in uniform_block_names(binding_point) {
+                            let mut names = ShaderInterfaceBindings::names_at(
+                                &interface.uniform_blocks,
+                                binding_point,
+                            );
+                            names.push(format!("Uniforms{binding_point}"));
+                            for name in names {
                                 if let Some(index) = self.gl.get_uniform_block_index(program, &name)
                                 {
                                     self.gl.uniform_block_binding(program, index, binding_point);
-                                    bound = true;
                                 }
-                            }
-                            if !bound {
-                                return Err(GalError::backend(format!(
-                                    "OpenGL program is missing uniform block for binding {}",
-                                    binding_point
-                                )));
                             }
                         }
                         ResourceBindingKind::StorageBuffer => {
-                            let mut bound = false;
-                            for name in storage_block_names(binding_point) {
+                            let mut names = ShaderInterfaceBindings::names_at(
+                                &interface.storage_blocks,
+                                binding_point,
+                            );
+                            names.push(format!("Storage{binding_point}"));
+                            for name in names {
                                 if let Some(index) =
                                     self.gl.get_shader_storage_block_index(program, &name)
                                 {
@@ -709,34 +714,24 @@ impl OpenGlObjects {
                                         index,
                                         binding_point,
                                     );
-                                    bound = true;
                                 }
-                            }
-                            if !bound {
-                                return Err(GalError::backend(format!(
-                                    "OpenGL program is missing storage block for binding {}",
-                                    binding_point
-                                )));
                             }
                         }
                         ResourceBindingKind::SampledTexture
                         | ResourceBindingKind::CombinedTextureSampler => {
-                            let mut names = sampler_bindings
-                                .iter()
-                                .filter_map(|(name, declared_binding)| {
-                                    (*declared_binding == binding_point).then(|| name.clone())
-                                })
-                                .collect::<Vec<_>>();
+                            let mut names = ShaderInterfaceBindings::names_at(
+                                &interface.samplers,
+                                binding_point,
+                            );
                             if names.is_empty() {
-                                names = sampler_uniform_names(binding_point)
-                                    .into_iter()
-                                    .filter(|name| {
-                                        sampler_bindings
-                                            .get(name)
-                                            .map(|declared| *declared == binding_point)
-                                            .unwrap_or(true)
-                                    })
-                                    .collect();
+                                names = [
+                                    format!("Sampler{binding_point}"),
+                                    format!("tex{binding_point}"),
+                                    format!("Tex{binding_point}"),
+                                ]
+                                .into_iter()
+                                .filter(|name| !interface.samplers.contains_key(name))
+                                .collect();
                             }
                             for name in names {
                                 if let Some(location) = self.gl.get_uniform_location(program, &name)
@@ -914,7 +909,7 @@ pub(super) struct ShaderModuleObject {
     pub(super) token: BackendToken,
     pub(super) shader: glow::Shader,
     pub(super) stage: ShaderStage,
-    pub(super) sampler_bindings: BTreeMap<String, u32>,
+    pub(super) interface: ShaderInterfaceBindings,
 }
 
 #[allow(dead_code)]
@@ -1155,9 +1150,6 @@ void main() { vec4 color = texture(sampler2D(LightmapTexture, LightmapSampler), 
         assert!(normalized.contains("layout(binding = 8) uniform sampler2D LightmapTexture;"));
         assert!(!normalized.contains("LightmapSampler"));
         assert!(normalized.contains("texture(LightmapTexture, vec2(0.5))"));
-        assert!(sampler_uniform_names(8)
-            .iter()
-            .any(|name| name == "LightmapTexture"));
     }
 
     #[test]
@@ -1206,47 +1198,40 @@ void main() {
         assert!(!normalized.contains("uniform sampler Samp0"));
         assert!(!normalized.contains("sampler2D(MainDepthTex, Samp0)"));
         assert!(normalized.contains("texture(MainDepthTex, vec2(0.5)).r"));
-        assert!(sampler_uniform_names(4)
-            .iter()
-            .any(|name| name == "MainDepthTex"));
     }
 
     #[test]
-    fn opengl_sampler_aliases_cover_existing_tex0_bindings() {
-        assert!(sampler_uniform_names(0).iter().any(|name| name == "Tex0"));
-        assert!(sampler_uniform_names(1).iter().any(|name| name == "Tex0"));
-    }
-
-    #[test]
-    fn opengl_sampler_layout_parser_tracks_declared_bindings() {
+    fn opengl_layout_parser_tracks_declared_interface_bindings() {
         let source = "\
 layout(binding = 0) uniform sampler2D Tex0;
 layout(binding=1) uniform sampler2D NormalTex;
-layout(binding = 4) uniform sampler2D ShadowDepthTex;
+layout(binding = 4) uniform usampler3D Volume[2];
+layout(binding = 1, std140) uniform FrameBlock { mat4 m; };
+layout(binding = 6, std430) readonly buffer Vertices { vec4 data[]; };
+layout(binding = 7, rgba8) uniform image2D Output;
 ";
-        let bindings = parse_sampler2d_layout_bindings(source);
-        assert_eq!(bindings.get("Tex0"), Some(&0));
-        assert_eq!(bindings.get("NormalTex"), Some(&1));
-        assert_eq!(bindings.get("ShadowDepthTex"), Some(&4));
+        let bindings = parse_layout_bindings(source);
+        assert_eq!(bindings.samplers.get("Tex0"), Some(&0));
+        assert_eq!(bindings.samplers.get("NormalTex"), Some(&1));
+        assert_eq!(bindings.samplers.get("Volume"), Some(&4));
+        assert_eq!(bindings.uniform_blocks.get("FrameBlock"), Some(&1));
+        assert_eq!(bindings.storage_blocks.get("Vertices"), Some(&6));
+        assert!(!bindings.uniform_blocks.contains_key("image2D"));
+        assert_eq!(3, bindings.samplers.len());
     }
 
     #[test]
-    fn opengl_program_interface_aliases_include_owned_mesh_blocks() {
-        assert!(uniform_block_names(1)
-            .iter()
-            .any(|name| name == "GuiMeshFrame"));
-        assert!(storage_block_names(0)
-            .iter()
-            .any(|name| name == "WorldMeshVertices"));
-        assert!(storage_block_names(0)
-            .iter()
-            .any(|name| name == "GuiMeshVertices"));
-        assert!(storage_block_names(1)
-            .iter()
-            .any(|name| name == "WorldMeshInstances"));
-        assert!(storage_block_names(6)
-            .iter()
-            .any(|name| name == "CompositeShadowUniforms"));
+    fn opengl_lowering_is_name_agnostic() {
+        let source = "\
+layout(set = 0, binding = 2) uniform texture2D AnyColor;
+layout(set = 0, binding = 4) uniform sampler AnySampler2;
+void main() { vec4 c = texture(sampler2DArray(AnyColor, AnySampler2), vec3(0.5)); vec4 d = texture(sampler2D(AnyColor, AnySampler2), vec2(0.5)); }
+";
+        let normalized = opengl_shader_source(source);
+        assert!(normalized.contains("layout(binding = 2) uniform sampler2D AnyColor;"));
+        assert!(!normalized.contains("uniform sampler AnySampler2;"));
+        assert!(normalized.contains("texture(AnyColor, vec3(0.5))"));
+        assert!(normalized.contains("texture(AnyColor, vec2(0.5))"));
     }
 
     #[test]
@@ -1363,118 +1348,98 @@ pub(super) fn filter(filter: SamplerFilter) -> i32 {
     }
 }
 
+/// Lowers explicit-binding GLSL to GL core-profile GLSL: set/binding pairs
+/// become flat binding points, separate textures become combined samplers,
+/// standalone sampler objects disappear (GL samplers bind per texture unit),
+/// and SPIR-V built-ins become their GL names. Purely syntactic; the backend
+/// knows no resource names.
 fn opengl_shader_source(source: &str) -> String {
-    normalize_vulkan_resource_set_layouts(source)
-        .replace("uniform texture2D Tex0;", "uniform sampler2D Tex0;")
-        .replace("uniform texture2D tex0;", "uniform sampler2D tex0;")
-        .replace(
-            "uniform texture2D TerrainAtlasColor;",
-            "uniform sampler2D TerrainAtlasColor;",
-        )
-        .replace(
-            "uniform texture2D AlbedoTex;",
-            "uniform sampler2D AlbedoTex;",
-        )
-        .replace(
-            "uniform texture2D NormalTex;",
-            "uniform sampler2D NormalTex;",
-        )
-        .replace(
-            "uniform texture2D MaterialLightTex;",
-            "uniform sampler2D MaterialLightTex;",
-        )
-        .replace(
-            "uniform texture2D WorldPositionTex;",
-            "uniform sampler2D WorldPositionTex;",
-        )
-        .replace(
-            "uniform texture2D ShadowDepthTex;",
-            "uniform sampler2D ShadowDepthTex;",
-        )
-        .replace(
-            "uniform texture2D MainDepthTex;",
-            "uniform sampler2D MainDepthTex;",
-        )
-        .replace(
-            "uniform texture2D LightmapTexture;",
-            "uniform sampler2D LightmapTexture;",
-        )
-        .replace(
-            "uniform texture2D vulkanic_source_dh_atlas_texture;",
-            "uniform sampler2D vulkanic_source_dh_atlas_texture;",
-        )
-        .replace(
-            "uniform utexture3D TerrainVoxelOccupancy;",
-            "uniform usampler3D TerrainVoxelOccupancy;",
-        )
-        .replace(
-            "uniform texture3D TerrainColoredVoxelLight;",
-            "uniform sampler3D TerrainColoredVoxelLight;",
-        )
-        .replace("layout(binding = 2) uniform sampler Samp0;\n", "")
-        .replace("layout(binding=2) uniform sampler Samp0;\n", "")
-        .replace("layout(binding = 3) uniform sampler Samp0;\n", "")
-        .replace("layout(binding=3) uniform sampler Samp0;\n", "")
-        .replace(
-            "layout(binding = 3) uniform sampler TerrainAtlasSampler;\n",
-            "",
-        )
-        .replace(
-            "layout(binding=3) uniform sampler TerrainAtlasSampler;\n",
-            "",
-        )
-        .replace("layout(binding = 5) uniform sampler Samp0;\n", "")
-        .replace("layout(binding=5) uniform sampler Samp0;\n", "")
-        .replace("layout(binding = 9) uniform sampler LightmapSampler;\n", "")
-        .replace("layout(binding=9) uniform sampler LightmapSampler;\n", "")
-        .replace(
-            "layout(binding = 17) uniform sampler vulkanic_source_dh_atlas_sampler;\n",
-            "",
-        )
-        .replace(
-            "layout(binding=17) uniform sampler vulkanic_source_dh_atlas_sampler;\n",
-            "",
-        )
-        .replace("layout(binding = 1) uniform sampler samp0;\n", "")
-        .replace("layout(binding=1) uniform sampler samp0;\n", "")
-        .replace(
-            "layout(binding = 10) uniform sampler TerrainVoxelLightSampler;\n",
-            "",
-        )
-        .replace(
-            "layout(binding=10) uniform sampler TerrainVoxelLightSampler;\n",
-            "",
-        )
-        .replace("sampler2D(Tex0, Samp0)", "Tex0")
-        .replace("sampler2D(tex0, samp0)", "tex0")
-        .replace(
-            "sampler2D(TerrainAtlasColor, TerrainAtlasSampler)",
-            "TerrainAtlasColor",
-        )
-        .replace("sampler2D(AlbedoTex, Samp0)", "AlbedoTex")
-        .replace("sampler2D(NormalTex, Samp0)", "NormalTex")
-        .replace("sampler2D(MaterialLightTex, Samp0)", "MaterialLightTex")
-        .replace("sampler2D(WorldPositionTex, Samp0)", "WorldPositionTex")
-        .replace("sampler2D(ShadowDepthTex, Samp0)", "ShadowDepthTex")
-        .replace("sampler2D(MainDepthTex, Samp0)", "MainDepthTex")
-        .replace(
-            "sampler2D(LightmapTexture, LightmapSampler)",
-            "LightmapTexture",
-        )
-        .replace(
-            "sampler2D(vulkanic_source_dh_atlas_texture, vulkanic_source_dh_atlas_sampler)",
-            "vulkanic_source_dh_atlas_texture",
-        )
-        .replace(
-            "sampler3D(TerrainColoredVoxelLight, TerrainVoxelLightSampler)",
-            "TerrainColoredVoxelLight",
-        )
-        .replace(
-            "usampler3D(TerrainVoxelOccupancy, TerrainVoxelLightSampler)",
-            "TerrainVoxelOccupancy",
-        )
+    let normalized = normalize_vulkan_resource_set_layouts(source);
+    let mut combined = String::with_capacity(normalized.len());
+    for line in normalized.split_inclusive('\n') {
+        if is_standalone_sampler_declaration(line) {
+            continue;
+        }
+        combined.push_str(&combine_texture_declaration(line));
+    }
+    collapse_sampler_constructors(&combined)
         .replace("gl_VertexIndex", "gl_VertexID")
         .replace("gl_InstanceIndex", "gl_InstanceID")
+}
+
+/// Splits `layout(...) rest` into its qualifier text and the remainder.
+fn split_layout_prefix(line: &str) -> (Option<&str>, &str) {
+    let trimmed = line.trim_start();
+    if let Some(after) = trimmed.strip_prefix("layout(") {
+        if let Some(close) = after.find(')') {
+            return (Some(&after[..close]), after[close + 1..].trim_start());
+        }
+    }
+    (None, trimmed)
+}
+
+/// `[layout(...)] uniform sampler|samplerShadow NAME;`
+fn is_standalone_sampler_declaration(line: &str) -> bool {
+    let (_, rest) = split_layout_prefix(line);
+    let words: Vec<&str> = rest.split_whitespace().collect();
+    matches!(
+        words.as_slice(),
+        ["uniform", "sampler" | "samplerShadow", name] if name.ends_with(';')
+    )
+}
+
+/// `uniform [u|i]textureXD NAME;` becomes `uniform [u|i]samplerXD NAME;`.
+fn combine_texture_declaration(line: &str) -> String {
+    for (separate, combined) in [
+        ("uniform texture", "uniform sampler"),
+        ("uniform utexture", "uniform usampler"),
+        ("uniform itexture", "uniform isampler"),
+    ] {
+        if line.contains(separate) {
+            return line.replacen(separate, combined, 1);
+        }
+    }
+    line.to_string()
+}
+
+/// `[u|i]samplerXD(TEXTURE, SAMPLER)` becomes `TEXTURE`.
+fn collapse_sampler_constructors(source: &str) -> String {
+    let bytes = source.as_bytes();
+    let is_ident = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
+    let mut out = String::with_capacity(source.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        let at_word_start = index == 0 || !is_ident(bytes[index - 1]);
+        let prefix_len = match bytes[index] {
+            b'u' | b'i' if source[index + 1..].starts_with("sampler") => 1,
+            _ if source[index..].starts_with("sampler") => 0,
+            _ => usize::MAX,
+        };
+        if at_word_start && prefix_len != usize::MAX {
+            let mut cursor = index + prefix_len + "sampler".len();
+            while cursor < bytes.len() && is_ident(bytes[cursor]) {
+                cursor += 1;
+            }
+            if bytes.get(cursor) == Some(&b'(') {
+                if let Some(close) = source[cursor..].find(')') {
+                    let arguments: Vec<&str> =
+                        source[cursor + 1..cursor + close].split(',').map(str::trim).collect();
+                    if let [texture, sampler] = arguments.as_slice() {
+                        let simple = |name: &str| !name.is_empty() && name.bytes().all(is_ident);
+                        if simple(texture) && simple(sampler) {
+                            out.push_str(texture);
+                            index = cursor + close + 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        let character = source[index..].chars().next().unwrap();
+        out.push(character);
+        index += character.len_utf8();
+    }
+    out
 }
 
 fn normalize_vulkan_resource_set_layouts(source: &str) -> String {
@@ -1522,50 +1487,72 @@ fn normalize_vulkan_resource_set_layouts(source: &str) -> String {
     normalized
 }
 
-fn parse_sampler2d_layout_bindings(source: &str) -> BTreeMap<String, u32> {
-    let mut bindings = BTreeMap::new();
+/// Names of the shader's explicitly bound interface objects, by binding.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(super) struct ShaderInterfaceBindings {
+    pub(super) samplers: BTreeMap<String, u32>,
+    pub(super) uniform_blocks: BTreeMap<String, u32>,
+    pub(super) storage_blocks: BTreeMap<String, u32>,
+}
+
+impl ShaderInterfaceBindings {
+    fn merge(&mut self, other: &Self) {
+        self.samplers.extend(other.samplers.clone());
+        self.uniform_blocks.extend(other.uniform_blocks.clone());
+        self.storage_blocks.extend(other.storage_blocks.clone());
+    }
+
+    fn names_at(map: &BTreeMap<String, u32>, binding: u32) -> Vec<String> {
+        map.iter()
+            .filter(|(_, declared)| **declared == binding)
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+}
+
+/// Reads `layout(binding = N ...)` declarations of samplers, uniform blocks
+/// and storage blocks from lowered GL source.
+fn parse_layout_bindings(source: &str) -> ShaderInterfaceBindings {
+    let mut bindings = ShaderInterfaceBindings::default();
     for line in source.lines() {
-        let line = line.trim();
-        if !line.starts_with("layout(") {
-            continue;
-        }
-        let Some(declaration) = [
-            "uniform sampler2D ",
-            "uniform sampler3D ",
-            "uniform usampler3D ",
-            "uniform isampler3D ",
-        ]
-        .into_iter()
-        .find(|declaration| line.contains(declaration)) else {
+        let (Some(qualifiers), rest) = split_layout_prefix(line) else {
             continue;
         };
-        let Some(binding_start) = line.find("binding") else {
+        let Some(binding) = qualifiers.split(',').find_map(|qualifier| {
+            let (name, value) = qualifier.split_once('=')?;
+            (name.trim() == "binding").then(|| value.trim().parse::<u32>().ok())?
+        }) else {
             continue;
         };
-        let Some(eq) = line[binding_start..].find('=') else {
-            continue;
+        let clean = |word: &str| {
+            word.trim_end_matches(|c| c == ';' || c == '{')
+                .split('[')
+                .next()
+                .unwrap_or("")
+                .to_string()
         };
-        let number_start = binding_start + eq + 1;
-        let number = line[number_start..]
-            .trim_start()
-            .chars()
-            .take_while(|ch| ch.is_ascii_digit())
-            .collect::<String>();
-        let Ok(binding) = number.parse::<u32>() else {
-            continue;
-        };
-        let Some(name_start) = line.find(declaration) else {
-            continue;
-        };
-        let name = line[name_start + declaration.len()..]
-            .trim()
-            .trim_end_matches(';')
-            .split(['[', ' ', '\t'])
-            .next()
-            .unwrap_or("")
-            .trim();
-        if !name.is_empty() {
-            bindings.insert(name.to_string(), binding);
+        let words: Vec<&str> = rest
+            .split_whitespace()
+            .skip_while(|word| {
+                matches!(*word, "readonly" | "writeonly" | "restrict" | "coherent" | "volatile")
+            })
+            .collect();
+        match words.as_slice() {
+            ["buffer", name, ..] => {
+                bindings.storage_blocks.insert(clean(name), binding);
+            }
+            ["uniform", ty, name, ..]
+                if ty.starts_with("sampler")
+                    || ty.starts_with("usampler")
+                    || ty.starts_with("isampler") =>
+            {
+                bindings.samplers.insert(clean(name), binding);
+            }
+            ["uniform", ty, ..] if ty.starts_with("image") || ty.starts_with("uimage") || ty.starts_with("iimage") => {}
+            ["uniform", name, ..] => {
+                bindings.uniform_blocks.insert(clean(name), binding);
+            }
+            _ => {}
         }
     }
     bindings
@@ -1589,95 +1576,6 @@ pub(super) fn topology(topology: PrimitiveTopology) -> u32 {
         PrimitiveTopology::Lines => glow::LINES,
         PrimitiveTopology::Triangles => glow::TRIANGLES,
         PrimitiveTopology::TriangleFan => glow::TRIANGLE_FAN,
-    }
-}
-
-fn uniform_block_names(binding: u32) -> Vec<String> {
-    match binding {
-        0 => vec![
-            "GuiRect".to_string(),
-            "GuiSpriteBatch".to_string(),
-            "WorldLineBatch".to_string(),
-            "CrackQuadBatch".to_string(),
-            "WorldBorderBatch".to_string(),
-            "DynamicTransforms".to_string(),
-            "Projection".to_string(),
-        ],
-        1 => vec![
-            "GuiMeshFrame".to_string(),
-            "WorldMeshInstance".to_string(),
-            "DistantHorizonsLodFrame".to_string(),
-            "Uniforms1".to_string(),
-        ],
-        11 => vec![
-            "TerrainVoxelLightMapping".to_string(),
-            "Uniforms11".to_string(),
-        ],
-        _ => vec![format!("Uniforms{binding}")],
-    }
-}
-
-fn storage_block_names(binding: u32) -> Vec<String> {
-    match binding {
-        0 => vec![
-            "WorldMaterialBatch".to_string(),
-            "WorldMeshVertices".to_string(),
-            // Rust-owned GUI mesh rasterization uses the same explicit GAL
-            // storage binding, but deliberately has a separate shader block
-            // name from world geometry. Keep this OpenGL-only interface
-            // reconstruction private to the backend.
-            "GuiMeshVertices".to_string(),
-            "DistantHorizonsLodVertices".to_string(),
-            "Storage0".to_string(),
-        ],
-        1 => vec!["WorldMeshInstances".to_string(), "Storage1".to_string()],
-        6 => vec![
-            "CompositeShadowUniforms".to_string(),
-            "ShaderCompositeUniforms".to_string(),
-            "Storage6".to_string(),
-        ],
-        _ => vec![format!("Storage{binding}")],
-    }
-}
-
-pub(super) fn sampler_uniform_names(binding: u32) -> Vec<String> {
-    match binding {
-        0 => vec![
-            "Sampler0".to_string(),
-            "tex0".to_string(),
-            "Tex0".to_string(),
-            "AlbedoTex".to_string(),
-        ],
-        1 => vec![
-            "Sampler0".to_string(),
-            "tex0".to_string(),
-            "Tex0".to_string(),
-            "Sampler1".to_string(),
-            "tex1".to_string(),
-            "NormalTex".to_string(),
-        ],
-        2 => vec![
-            "Samp0".to_string(),
-            "Sampler2".to_string(),
-            "tex2".to_string(),
-            "MaterialLightTex".to_string(),
-        ],
-        3 => vec![
-            "Samp0".to_string(),
-            "Sampler3".to_string(),
-            "tex3".to_string(),
-            "WorldPositionTex".to_string(),
-        ],
-        4 => vec![
-            "Samp0".to_string(),
-            "Sampler4".to_string(),
-            "tex4".to_string(),
-            "ShadowDepthTex".to_string(),
-            "DepthTex".to_string(),
-            "MainDepthTex".to_string(),
-        ],
-        8 => vec!["LightmapTexture".to_string(), "Sampler8".to_string()],
-        _ => vec![format!("Sampler{binding}"), format!("tex{binding}")],
     }
 }
 

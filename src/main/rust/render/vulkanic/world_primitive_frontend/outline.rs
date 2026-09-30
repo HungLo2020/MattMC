@@ -500,12 +500,13 @@ pub(crate) fn create_entity_outline_post_effect_pipelines(
 ) -> GalResult<EntityOutlinePostEffectPipelines> {
     let mut created = Vec::new();
     let result = (|| -> GalResult<EntityOutlinePostEffectPipelines> {
+        let conventions = gal.capabilities().shader_conventions;
         let mut module = |label: &str, stage: ShaderStage, source: &str| {
             gal.create_shader_module(ShaderModuleDesc {
                 label: label.to_string(),
                 stage,
                 code_format: ShaderCodeFormat::Glsl,
-                code: super::shader_stage_code_for_backend(BackendApi::Vulkan, source),
+                code: super::shader_stage_code(conventions, source),
                 entry_point: "main".to_string(),
             })
         };

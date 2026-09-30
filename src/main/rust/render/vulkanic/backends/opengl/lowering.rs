@@ -1543,7 +1543,7 @@ struct OpenGlBlendState {
 fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
     let factors = match blend {
         BlendMode::Disabled | BlendMode::DepthMask => None,
-        BlendMode::TerrainTranslucent => Some(OpenGlBlendFactors {
+        BlendMode::AlphaFirstAttachmentOnly => Some(OpenGlBlendFactors {
             src_color: glow::SRC_ALPHA,
             dst_color: glow::ONE_MINUS_SRC_ALPHA,
             src_alpha: glow::ONE,
@@ -1597,19 +1597,19 @@ fn opengl_blend_state(blend: BlendMode) -> OpenGlBlendState {
             src_alpha: glow::ONE,
             dst_alpha: glow::ZERO,
         }),
-        BlendMode::Glint => Some(OpenGlBlendFactors {
+        BlendMode::SrcColorAdditive => Some(OpenGlBlendFactors {
             src_color: glow::SRC_COLOR,
             dst_color: glow::ONE,
             src_alpha: glow::ZERO,
             dst_alpha: glow::ONE,
         }),
-        BlendMode::Vignette => Some(OpenGlBlendFactors {
+        BlendMode::InverseSrcColorModulate => Some(OpenGlBlendFactors {
             src_color: glow::ZERO,
             dst_color: glow::ONE_MINUS_SRC_COLOR,
             src_alpha: glow::ONE,
             dst_alpha: glow::ZERO,
         }),
-        BlendMode::Crumbling => Some(OpenGlBlendFactors {
+        BlendMode::DoubleModulate => Some(OpenGlBlendFactors {
             src_color: glow::DST_COLOR,
             dst_color: glow::SRC_COLOR,
             src_alpha: glow::ONE,
@@ -1850,7 +1850,7 @@ mod tests {
 
     #[test]
     fn glint_blend_matches_frozen_rgb_addition_and_preserves_destination_alpha() {
-        let state = opengl_blend_state(BlendMode::Glint);
+        let state = opengl_blend_state(BlendMode::SrcColorAdditive);
         assert!(state.enabled);
         assert_eq!(glow::FUNC_ADD, state.color_op);
         assert_eq!(glow::FUNC_ADD, state.alpha_op);
@@ -1884,7 +1884,7 @@ mod tests {
 
     #[test]
     fn crumbling_blend_lowers_to_symmetric_source_destination_modulation() {
-        let state = opengl_blend_state(BlendMode::Crumbling);
+        let state = opengl_blend_state(BlendMode::DoubleModulate);
         assert!(state.enabled);
         assert_eq!(glow::FUNC_ADD, state.color_op);
         assert_eq!(glow::FUNC_ADD, state.alpha_op);

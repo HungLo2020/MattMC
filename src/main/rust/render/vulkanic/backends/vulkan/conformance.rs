@@ -24,7 +24,7 @@ use crate::render::vulkanic::shader_pack::programs::{
     prepare_lowered_distant_horizons_source_program, prepare_lowered_fullscreen_source_program,
     prepare_lowered_hand_source_program, prepare_lowered_terrain_source_program,
     prepare_lowered_textured_material_source_program, prepare_lowered_weather_source_program,
-    shader_stage_code_for_backend, LoweredTerrainSourceProgram, TerrainMaterialProgramKind,
+    shader_stage_code, LoweredTerrainSourceProgram, TerrainMaterialProgramKind,
     COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT, MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT,
     MINIMAL_TERRAIN_MATERIAL_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT,
     MINIMAL_TERRAIN_MATERIAL_VERTEX,
@@ -145,7 +145,7 @@ fn lowered_complementary_celestial_source_pair_compiles_for_vulkan() {
     )
     .unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         compile_glsl_for_backend_test(
             match module.stage {
                 ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
@@ -167,7 +167,7 @@ fn lowered_complementary_celestial_source_pair_compiles_for_vulkan() {
 #[test]
 fn distant_horizons_lod_opaque_program_compiles_for_vulkan_without_legacy_state() {
     let program = minimal_distant_horizons_lod_opaque_program();
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         compile_glsl_for_backend_test(
             match module.stage {
                 ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
@@ -189,7 +189,7 @@ fn distant_horizons_lod_opaque_program_compiles_for_vulkan_without_legacy_state(
 #[test]
 fn distant_horizons_ssao_program_compiles_for_vulkan() {
     let code =
-        shader_stage_code_for_backend(BackendApi::Vulkan, MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT);
+        shader_stage_code(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT);
     compile_glsl_for_backend_test(
         shaderc::ShaderKind::Fragment,
         std::str::from_utf8(&code).unwrap(),
@@ -204,7 +204,7 @@ fn distant_horizons_lod_exact_atlas_program_compiles_for_vulkan() {
         minimal_distant_horizons_lod_exact_atlas_opaque_program(),
         minimal_distant_horizons_lod_exact_atlas_forward_opaque_program(),
     ] {
-        for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+        for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
             compile_glsl_for_backend_test(
                 match module.stage {
                     ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
@@ -242,7 +242,7 @@ fn selected_source_exact_atlas_distant_horizons_program_compiles_for_vulkan() {
     let program =
         prepare_lowered_distant_horizons_exact_atlas_source_program(&source_program).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         compile_glsl_for_backend_test(
             match module.stage {
                 ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
@@ -264,7 +264,7 @@ fn selected_source_exact_atlas_distant_horizons_program_compiles_for_vulkan() {
 #[test]
 fn distant_horizons_lod_transparent_program_compiles_for_vulkan_without_legacy_state() {
     let program = minimal_distant_horizons_lod_transparent_program();
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         compile_glsl_for_backend_test(
             match module.stage {
                 ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
@@ -331,7 +331,7 @@ fn lowered_fullscreen_source_compiles_for_vulkan_without_a_vertex_stream() {
         &bindings,
     )
     .unwrap();
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         compile_glsl_for_backend_test(
             match module.stage {
                 ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
@@ -369,7 +369,7 @@ fn lowered_complete_complementary_distant_horizons_pair_compiles_for_vulkan() {
     let program =
         prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         compile_glsl_for_backend_test(
             match module.stage {
                 ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
@@ -420,7 +420,7 @@ fn lowered_complete_complementary_distant_horizons_water_pair_compiles_for_vulka
     let program =
         prepare_lowered_distant_horizons_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         compile_glsl_for_backend_test(
             match module.stage {
                 ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
@@ -472,7 +472,7 @@ fn create_distant_horizons_lod_opaque_pipeline(
         label: format!("{label}.pipeline-layout"),
         resource_layouts: vec![geometry_and_frame, lightmap],
     })?;
-    let [vertex, fragment] = program.shader_module_descriptors(BackendApi::Vulkan);
+    let [vertex, fragment] = program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions);
     let vertex_shader = gal.create_shader_module(vertex)?;
     let fragment_shader = gal.create_shader_module(fragment)?;
     gal.create_graphics_pipeline(GraphicsPipelineDesc {
@@ -497,7 +497,7 @@ fn create_distant_horizons_lod_opaque_pipeline(
 
 #[test]
 fn selected_terrain_fragment_compiles_with_and_without_colored_voxel_resources() {
-    let vertex = shader_stage_code_for_backend(BackendApi::Vulkan, MINIMAL_TERRAIN_MATERIAL_VERTEX);
+    let vertex = shader_stage_code(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, MINIMAL_TERRAIN_MATERIAL_VERTEX);
     compile_glsl_for_backend_test(
         shaderc::ShaderKind::Vertex,
         std::str::from_utf8(&vertex).unwrap(),
@@ -519,7 +519,7 @@ fn selected_terrain_fragment_compiles_with_and_without_colored_voxel_resources()
             ),
         ),
     ] {
-        let fragment = shader_stage_code_for_backend(BackendApi::Vulkan, &source);
+        let fragment = shader_stage_code(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, &source);
         compile_glsl_for_backend_test(
             shaderc::ShaderKind::Fragment,
             std::str::from_utf8(&fragment).unwrap(),
@@ -538,7 +538,7 @@ fn selected_terrain_fragment_compiles_with_and_without_colored_voxel_resources()
         ("builtin-deferred", MINIMAL_TERRAIN_MATERIAL_FRAGMENT),
         ("builtin-direct", MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT),
     ] {
-        let fragment = shader_stage_code_for_backend(BackendApi::Vulkan, source);
+        let fragment = shader_stage_code(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, source);
         compile_glsl_for_backend_test(
             shaderc::ShaderKind::Fragment,
             std::str::from_utf8(&fragment).unwrap(),
@@ -615,7 +615,7 @@ fn lowered_complete_complementary_scalar_uniform_offsets_match_spirv_std140_layo
     };
     let artifacts = preprocess_terrain_sources(&source, &stages).unwrap();
     let lowered = lower_terrain_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
-    let fragment = shader_stage_code_for_backend(BackendApi::Vulkan, lowered.fragment().source());
+    let fragment = shader_stage_code(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, lowered.fragment().source());
     let spirv = compile_glsl_for_backend_test(
         shaderc::ShaderKind::Fragment,
         std::str::from_utf8(&fragment).unwrap(),
@@ -705,7 +705,7 @@ fn lowered_complete_complementary_terrain_pair_creates_vulkan_modules() {
     )
     .unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary terrain shader must compile through the Vulkan lowering: {error}"
@@ -741,7 +741,7 @@ fn lowered_complete_complementary_hand_pair_creates_vulkan_modules() {
     let bindings = bind_hand_source_resources(&lowered, &declarations).unwrap();
     let program = prepare_lowered_hand_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary hand shader must compile through the Vulkan lowering: {error}"
@@ -779,7 +779,7 @@ fn lowered_complete_complementary_textured_material_pair_creates_vulkan_modules(
     let program =
         prepare_lowered_textured_material_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary textured-material shader must compile through the Vulkan lowering: {error}"
@@ -815,7 +815,7 @@ fn lowered_complete_complementary_weather_pair_creates_vulkan_modules() {
         .unwrap();
     let program = prepare_lowered_weather_source_program(&contract, &lowered, &bindings).unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary weather shader must compile through the Vulkan lowering: {error}"
@@ -859,7 +859,7 @@ fn lowered_complete_complementary_shadow_pair_creates_vulkan_modules() {
         )
         .unwrap();
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
             panic!(
                 "complete lowered Complementary shadow shader must compile through the Vulkan lowering: {error}"
@@ -885,7 +885,7 @@ fn create_lowered_source_graphics_pipeline(
         label: format!("{label}.layout"),
         resource_layouts: vec![source_data, pack_resources],
     })?;
-    let [vertex_desc, fragment_desc] = program.shader_module_descriptors(BackendApi::Vulkan);
+    let [vertex_desc, fragment_desc] = program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions);
     let vertex_shader = gal.create_shader_module(vertex_desc)?;
     let fragment_shader = gal.create_shader_module(fragment_desc)?;
     gal.create_graphics_pipeline(GraphicsPipelineDesc {
@@ -1040,7 +1040,7 @@ fn prepared_lowered_terrain_program_compiles_at_the_vulkan_boundary() {
             .collect::<Vec<_>>()
     );
 
-    for module in program.shader_module_descriptors(BackendApi::Vulkan) {
+    for module in program.shader_module_descriptors(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions) {
         let kind = match module.stage {
             ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
             ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
@@ -1099,8 +1099,8 @@ fn model_translucent_cutout_spirv_discards_without_terrain_lod_bias() {
         .vertex
         .source
         .contains("normal = trunc(clamp(normal, vec3(-1.0), vec3(1.0)) * 127.0) / 127.0;"));
-    let vertex_source = String::from_utf8(shader_stage_code_for_backend(
-        BackendApi::Vulkan,
+    let vertex_source = String::from_utf8(shader_stage_code(
+        crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions,
         &model_program.vertex.source,
     ))
     .unwrap();
@@ -1145,7 +1145,7 @@ fn standard_item_foil_compiles_without_vertex_lighting_or_terrain_lod_bias() {
     let program = minimal_direct_standard_item_foil_program();
     let compile = |source: &str, kind| {
         let source =
-            String::from_utf8(shader_stage_code_for_backend(BackendApi::Vulkan, source)).unwrap();
+            String::from_utf8(shader_stage_code(crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions, source)).unwrap();
         let bytes = compile_glsl_for_backend_test(kind, &source, "standard-item-foil").unwrap();
         let words = bytes
             .chunks_exact(4)
@@ -1189,8 +1189,8 @@ fn compact_direct_terrain_program_compiles_for_vulkan() {
         TerrainMaterialProgramKind::Cutout,
     ] {
         let program = minimal_compact_direct_terrain_program(kind);
-        let source = String::from_utf8(shader_stage_code_for_backend(
-            BackendApi::Vulkan,
+        let source = String::from_utf8(shader_stage_code(
+            crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions,
             &program.vertex.source,
         ))
         .unwrap();
@@ -1202,8 +1202,8 @@ fn compact_direct_terrain_program_compiles_for_vulkan() {
         .unwrap();
         assert!(!spirv.is_empty());
 
-        let source = String::from_utf8(shader_stage_code_for_backend(
-            BackendApi::Vulkan,
+        let source = String::from_utf8(shader_stage_code(
+            crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions,
             &program.fragment.source,
         ))
         .unwrap();
@@ -1334,8 +1334,8 @@ fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
                 resource_layouts: layouts,
             })
             .unwrap();
-        let vertex_source = String::from_utf8(shader_stage_code_for_backend(
-            BackendApi::Vulkan,
+        let vertex_source = String::from_utf8(shader_stage_code(
+            crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions,
             MINIMAL_TERRAIN_MATERIAL_VERTEX,
         ))
         .unwrap();
@@ -1348,8 +1348,8 @@ fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
         } else {
             COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT.to_owned()
         };
-        let fragment_source = String::from_utf8(shader_stage_code_for_backend(
-            BackendApi::Vulkan,
+        let fragment_source = String::from_utf8(shader_stage_code(
+            crate::render::vulkanic::backends::vulkan_capabilities().shader_conventions,
             &fragment_template,
         ))
         .unwrap();

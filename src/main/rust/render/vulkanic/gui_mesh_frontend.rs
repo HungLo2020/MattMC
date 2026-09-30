@@ -20,7 +20,7 @@ pub use super::gui_item_material::GuiFlatItemLighting;
 use super::handles::Handle;
 pub use super::item_foil::StandardItemFoil as GuiItemFoil;
 use super::resources::{
-    AccessFlags, BackendApi, BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, Extent3d,
+    AccessFlags, BlendMode, GlslDialect, BufferDesc, BufferUsage, ColorFormat, CompareOp, Extent3d,
     GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags,
     PrimitiveTopology, QueueClass, RenderPassDesc, RenderTargetDesc, ResourceBinding,
     ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc, ResourceSetDesc,
@@ -54,8 +54,8 @@ pub(crate) const GUI_MESH_MAX_INDEX_BYTES: u64 =
     (GUI_MESH_MAX_INDICES * std::mem::size_of::<u32>()) as u64;
 
 const GUI_MESH_VERTEX_SHADER_OPENGL: &[u8] = br#"#version 430 core
-layout(std430) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
-layout(std140) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
+layout(std430, binding = 0) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
+layout(std140, binding = 1) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
 out vec2 v_uv;
 out vec4 v_color;
 out vec3 v_normal;
@@ -101,7 +101,7 @@ void main() {
 
 const GUI_MESH_FRAGMENT_SHADER_OPENGL: &[u8] = br#"#version 430 core
 layout(binding = 2) uniform sampler2D Sampler0;
-layout(std140) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
+layout(std140, binding = 1) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
 in vec2 v_uv;
 in vec4 v_color;
 in vec3 v_normal;
@@ -146,8 +146,8 @@ void main() {
 // lighting policy.  In particular, a cube-face edge with a transparent texel
 // must not punch a hole into the title background.
 const GUI_PANORAMA_VERTEX_SHADER_OPENGL: &[u8] = br#"#version 430 core
-layout(std430) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
-layout(std140) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
+layout(std430, binding = 0) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
+layout(std140, binding = 1) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
 out vec3 v_ray;
 void main() {
     int base = gl_VertexID * 3;
@@ -174,7 +174,7 @@ void main() {
 "#;
 
 const GUI_PANORAMA_FRAGMENT_SHADER_OPENGL: &[u8] = br#"#version 430 core
-uniform sampler2D Sampler0;
+layout(binding = 2) uniform sampler2D Sampler0;
 in vec3 v_ray;
 out vec4 out_color;
 void main() {
@@ -243,7 +243,7 @@ void main() {
 "#;
 
 const GUI_MESH_COMPOSITE_VERTEX_SHADER_OPENGL: &[u8] = br#"#version 430 core
-layout(std140) uniform GuiMeshComposite {
+layout(std140, binding = 0) uniform GuiMeshComposite {
     vec4 pose_linear;
     vec4 pose_translation_viewport;
     vec4 bounds;
@@ -312,8 +312,8 @@ void main() {
 "#;
 
 const GUI_MESH_COMPOSITE_FRAGMENT_SHADER_OPENGL: &[u8] = br#"#version 430 core
-uniform sampler2D Sampler0;
-layout(std140) uniform GuiMeshComposite { vec4 pose_linear; vec4 pose_translation_viewport; vec4 bounds; vec4 uv_region; vec4 clip_rect; };
+layout(binding = 1) uniform sampler2D Sampler0;
+layout(std140, binding = 0) uniform GuiMeshComposite { vec4 pose_linear; vec4 pose_translation_viewport; vec4 bounds; vec4 uv_region; vec4 clip_rect; };
 in vec2 v_uv;
 in vec2 v_pixel;
 out vec4 out_color;
@@ -349,7 +349,7 @@ pub(crate) fn vulkan_shader_sources_for_backend_test() -> (&'static str, &'stati
 fn vulkan_shader_sources_for_material(
     material_mode: GuiMeshMaterialMode,
 ) -> (&'static str, &'static str) {
-    let (vertex, fragment) = gui_mesh_shader_sources(BackendApi::Vulkan, material_mode);
+    let (vertex, fragment) = gui_mesh_shader_sources(GlslDialect::ExplicitBindings, material_mode);
     (
         std::str::from_utf8(vertex).expect("GUI mesh Vulkan vertex source is UTF-8"),
         std::str::from_utf8(fragment).expect("GUI mesh Vulkan fragment source is UTF-8"),
@@ -364,7 +364,7 @@ pub(crate) fn vulkan_panorama_shader_sources_for_backend_test() -> (&'static str
 #[cfg(test)]
 pub(crate) fn opengl_panorama_shader_sources_for_backend_test() -> (&'static str, &'static str) {
     let (vertex, fragment) =
-        gui_mesh_shader_sources(BackendApi::OpenGl, GuiMeshMaterialMode::Panorama);
+        gui_mesh_shader_sources(GlslDialect::CoreProfile, GuiMeshMaterialMode::Panorama);
     (
         std::str::from_utf8(vertex).expect("GUI panorama OpenGL vertex source is UTF-8"),
         std::str::from_utf8(fragment).expect("GUI panorama OpenGL fragment source is UTF-8"),
@@ -372,12 +372,12 @@ pub(crate) fn opengl_panorama_shader_sources_for_backend_test() -> (&'static str
 }
 
 fn gui_mesh_shader_sources(
-    api: BackendApi,
+    dialect: GlslDialect,
     material_mode: GuiMeshMaterialMode,
 ) -> (&'static [u8], &'static [u8]) {
     let fragment_is_panorama = material_mode == GuiMeshMaterialMode::Panorama;
-    match api {
-        BackendApi::OpenGl => (
+    match dialect {
+        GlslDialect::CoreProfile => (
             if fragment_is_panorama {
                 GUI_PANORAMA_VERTEX_SHADER_OPENGL
             } else {
@@ -389,7 +389,7 @@ fn gui_mesh_shader_sources(
                 GUI_MESH_FRAGMENT_SHADER_OPENGL
             },
         ),
-        BackendApi::Vulkan | BackendApi::Mock => (
+        GlslDialect::ExplicitBindings => (
             if fragment_is_panorama {
                 GUI_PANORAMA_VERTEX_SHADER_VULKAN
             } else {
@@ -782,7 +782,7 @@ impl GuiMeshSharedProgram {
         let mut created = Vec::new();
         let result = (|| -> GalResult<Self> {
             let (vertex_code, fragment_code) =
-                gui_mesh_shader_sources(gal.capabilities().api, material_mode);
+                gui_mesh_shader_sources(gal.capabilities().shader_conventions.glsl_dialect, material_mode);
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
@@ -1411,7 +1411,7 @@ fn gui_mesh_raster_state(
         ),
         GuiMeshMaterialMode::Glint => (
             CullMode::None,
-            BlendMode::Glint,
+            BlendMode::SrcColorAdditive,
             Some(CompareOp::Equal),
             false,
         ),
@@ -1615,12 +1615,12 @@ impl GuiMeshCompositeResources {
                 comparison: None,
             })?;
             created.push(sampler);
-            let (vertex_code, fragment_code) = match gal.capabilities().api {
-                BackendApi::OpenGl => (
+            let (vertex_code, fragment_code) = match gal.capabilities().shader_conventions.glsl_dialect {
+                GlslDialect::CoreProfile => (
                     GUI_MESH_COMPOSITE_VERTEX_SHADER_OPENGL,
                     GUI_MESH_COMPOSITE_FRAGMENT_SHADER_OPENGL,
                 ),
-                BackendApi::Vulkan | BackendApi::Mock => (
+                GlslDialect::ExplicitBindings => (
                     GUI_MESH_COMPOSITE_VERTEX_SHADER_VULKAN,
                     GUI_MESH_COMPOSITE_FRAGMENT_SHADER_VULKAN,
                 ),
@@ -5309,8 +5309,8 @@ mod tests {
 
     #[test]
     fn panorama_uses_an_unlit_rust_owned_material_program() {
-        for api in [BackendApi::OpenGl, BackendApi::Vulkan] {
-            let (_, panorama) = gui_mesh_shader_sources(api, GuiMeshMaterialMode::Panorama);
+        for dialect in [GlslDialect::CoreProfile, GlslDialect::ExplicitBindings] {
+            let (_, panorama) = gui_mesh_shader_sources(dialect, GuiMeshMaterialMode::Panorama);
             let source = std::str::from_utf8(panorama).expect("panorama shader source is UTF-8");
             assert!(
                 source.contains("texture("),
@@ -5321,7 +5321,7 @@ mod tests {
                 "the panorama must not inherit 3D item cutout or directional-lighting behavior"
             );
 
-            let (_, item) = gui_mesh_shader_sources(api, GuiMeshMaterialMode::Opaque);
+            let (_, item) = gui_mesh_shader_sources(dialect, GuiMeshMaterialMode::Opaque);
             assert_ne!(
                 panorama, item,
                 "Panorama must select a distinct material program rather than the generic item shader"
@@ -6029,8 +6029,8 @@ mod tests {
         let draw = prepare_draw(&request).unwrap();
         let bytes = draw_frame_uniform_bytes(&draw, [48., 48.]);
         assert_eq!(f32::from_le_bytes(bytes[12..16].try_into().unwrap()), 3.);
-        for api in [BackendApi::OpenGl, BackendApi::Vulkan] {
-            let (_, fragment) = gui_mesh_shader_sources(api, GuiMeshMaterialMode::ModelOverlay);
+        for dialect in [GlslDialect::CoreProfile, GlslDialect::ExplicitBindings] {
+            let (_, fragment) = gui_mesh_shader_sources(dialect, GuiMeshMaterialMode::ModelOverlay);
             assert!(std::str::from_utf8(fragment)
                 .unwrap()
                 .contains("!gl_FrontFacing) normal = -normal"));
@@ -6092,7 +6092,7 @@ mod tests {
             gui_mesh_raster_state(GuiMeshMaterialMode::Glint),
             (
                 CullMode::None,
-                BlendMode::Glint,
+                BlendMode::SrcColorAdditive,
                 Some(CompareOp::Equal),
                 false
             ),

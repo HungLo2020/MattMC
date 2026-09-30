@@ -691,6 +691,7 @@ impl VulkanObjects {
                 VulkanObject::RenderPass(RenderPassObject {
                     token,
                     label: desc.label.clone(),
+                    profile_tag: GpuProfileTag::default(),
                     target: desc.target,
                     color_formats: desc.color_formats.clone(),
                     depth_format: desc.depth_format,
@@ -871,6 +872,15 @@ impl VulkanObjects {
         }
     }
 
+    /// Stores the frontend's profiling tag on a pass or graphics pipeline.
+    pub(super) fn set_profile_tag(&mut self, handle: Handle, tag: GpuProfileTag) {
+        match self.objects.get_mut(&handle) {
+            Some(VulkanObject::RenderPass(object)) => object.profile_tag = tag,
+            Some(VulkanObject::GraphicsPipeline(object)) => object.profile_tag = tag,
+            _ => {}
+        }
+    }
+
     pub(super) fn graphics_pipeline(&self, handle: Handle) -> GalResult<&GraphicsPipelineObject> {
         match self.objects.get(&handle) {
             Some(VulkanObject::GraphicsPipeline(object)) => Ok(object),
@@ -945,7 +955,7 @@ impl VulkanObjects {
     /// Diagnostic-only accounting for backend-private Vulkan memory pages.
     /// Logical GAL lifetimes remain authoritative; this reports both live
     /// suballocations and retained page capacity without changing policy.
-    fn trace_memory_residency(&self, label: &str) {
+    fn trace_memory_residency(&self, event: &str) {
         if std::env::var_os("MATTMC_TRACE_VULKAN_RESIDENCY").is_none() {
             return;
         }
@@ -953,14 +963,14 @@ impl VulkanObjects {
         // streaming. Sample it so this opt-in diagnostic cannot itself become
         // an unbounded log producer; creates remain exact and every 1,024th
         // retirement still reports allocator high-water behavior.
-        if label == "destroy"
+        if event == "destroy"
             && VULKAN_RESIDENCY_TRACE_SEQUENCE.fetch_add(1, Ordering::Relaxed) % 1024 != 0
         {
             return;
         }
         eprintln!(
             "vulkan.residency label={} buffer_reserved_bytes={} buffer_allocated_bytes={} buffer_pages={} texture_reserved_bytes={} texture_allocated_bytes={} texture_pages={} logical_objects={}",
-            label,
+            event,
             self.buffer_memory.reserved_bytes(),
             self.buffer_memory.allocated_bytes(),
             self.buffer_memory.blocks.len(),
@@ -1723,6 +1733,7 @@ impl VulkanObjects {
             return Ok(GraphicsPipelineObject {
                 token,
                 label: desc.label.clone(),
+                profile_tag: GpuProfileTag::default(),
                 pipeline,
                 layout: desc.layout,
                 provoking_vertex: desc.provoking_vertex,
@@ -1778,12 +1789,12 @@ impl VulkanObjects {
             .enumerate()
             .map(|(index, _)| color_blend_attachment(desc.blend, index))
             .collect::<Vec<_>>();
-        if desc.blend == BlendMode::TerrainTranslucent
+        if desc.blend == BlendMode::AlphaFirstAttachmentOnly
             && desc.color_formats.len() > 1
             && !self.context.independent_blend
         {
             return Err(GalError::unsupported_feature(
-                "terrain-translucent MRT requires Vulkan independentBlend",
+                "per-attachment blending requires Vulkan independentBlend",
             ));
         }
         let color_blend =
@@ -1853,6 +1864,7 @@ impl VulkanObjects {
         Ok(GraphicsPipelineObject {
             token,
             label: desc.label.clone(),
+            profile_tag: GpuProfileTag::default(),
             pipeline,
             layout: desc.layout,
             provoking_vertex: desc.provoking_vertex,
@@ -2203,6 +2215,7 @@ impl Drop for NativeGraphicsPipeline {
 pub(super) struct GraphicsPipelineObject {
     pub(super) token: BackendToken,
     pub(super) label: String,
+    pub(super) profile_tag: GpuProfileTag,
     pub(super) pipeline: Arc<NativeGraphicsPipeline>,
     pub(super) layout: Handle,
     pub(super) provoking_vertex: crate::render::vulkanic::resources::ProvokingVertex,
@@ -2240,6 +2253,7 @@ pub(super) struct FrameTargetObject {
 pub(super) struct RenderPassObject {
     pub(super) token: BackendToken,
     pub(super) label: String,
+    pub(super) profile_tag: GpuProfileTag,
     pub(super) target: Handle,
     pub(super) color_formats: Vec<ColorFormat>,
     pub(super) depth_format: Option<TextureFormat>,
@@ -2542,10 +2556,10 @@ pub(super) fn color_blend_attachment(
     blend: BlendMode,
     attachment_index: usize,
 ) -> vk::PipelineColorBlendAttachmentState {
-    if blend == BlendMode::TerrainTranslucent && attachment_index != 0 {
+    if blend == BlendMode::AlphaFirstAttachmentOnly && attachment_index != 0 {
         return color_blend_attachment(BlendMode::Disabled, attachment_index);
     }
-    if blend == BlendMode::TerrainTranslucent {
+    if blend == BlendMode::AlphaFirstAttachmentOnly {
         return color_blend_attachment(BlendMode::Alpha, attachment_index);
     }
     match blend {
@@ -2625,7 +2639,7 @@ pub(super) fn color_blend_attachment(
             .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
             .alpha_blend_op(vk::BlendOp::ADD)
             .color_write_mask(vk::ColorComponentFlags::RGBA),
-        BlendMode::Glint => vk::PipelineColorBlendAttachmentState::default()
+        BlendMode::SrcColorAdditive => vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(true)
             .src_color_blend_factor(vk::BlendFactor::SRC_COLOR)
             .dst_color_blend_factor(vk::BlendFactor::ONE)
@@ -2634,7 +2648,7 @@ pub(super) fn color_blend_attachment(
             .dst_alpha_blend_factor(vk::BlendFactor::ONE)
             .alpha_blend_op(vk::BlendOp::ADD)
             .color_write_mask(vk::ColorComponentFlags::RGBA),
-        BlendMode::Vignette => vk::PipelineColorBlendAttachmentState::default()
+        BlendMode::InverseSrcColorModulate => vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(true)
             .src_color_blend_factor(vk::BlendFactor::ZERO)
             .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_COLOR)
@@ -2643,7 +2657,7 @@ pub(super) fn color_blend_attachment(
             .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
             .alpha_blend_op(vk::BlendOp::ADD)
             .color_write_mask(vk::ColorComponentFlags::RGBA),
-        BlendMode::Crumbling => vk::PipelineColorBlendAttachmentState::default()
+        BlendMode::DoubleModulate => vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(true)
             .src_color_blend_factor(vk::BlendFactor::DST_COLOR)
             .dst_color_blend_factor(vk::BlendFactor::SRC_COLOR)
@@ -2652,7 +2666,7 @@ pub(super) fn color_blend_attachment(
             .dst_alpha_blend_factor(vk::BlendFactor::ZERO)
             .alpha_blend_op(vk::BlendOp::ADD)
             .color_write_mask(vk::ColorComponentFlags::RGBA),
-        BlendMode::TerrainTranslucent => unreachable!(),
+        BlendMode::AlphaFirstAttachmentOnly => unreachable!(),
     }
 }
 
@@ -2924,7 +2938,7 @@ mod tests {
 
     #[test]
     fn crumbling_blend_lowers_to_symmetric_source_destination_modulation() {
-        let attachment = color_blend_attachment(BlendMode::Crumbling, 0);
+        let attachment = color_blend_attachment(BlendMode::DoubleModulate, 0);
         assert_eq!(vk::TRUE, attachment.blend_enable);
         assert!(attachment.src_color_blend_factor == vk::BlendFactor::DST_COLOR);
         assert!(attachment.dst_color_blend_factor == vk::BlendFactor::SRC_COLOR);
@@ -2950,8 +2964,8 @@ mod tests {
 
     #[test]
     fn terrain_translucent_blends_only_primary_mrt_attachment() {
-        let primary = color_blend_attachment(BlendMode::TerrainTranslucent, 0);
-        let auxiliary = color_blend_attachment(BlendMode::TerrainTranslucent, 1);
+        let primary = color_blend_attachment(BlendMode::AlphaFirstAttachmentOnly, 0);
+        let auxiliary = color_blend_attachment(BlendMode::AlphaFirstAttachmentOnly, 1);
         assert_eq!(vk::TRUE, primary.blend_enable);
         assert!(vk::BlendFactor::SRC_ALPHA == primary.src_color_blend_factor);
         assert!(vk::FALSE == auxiliary.blend_enable);
