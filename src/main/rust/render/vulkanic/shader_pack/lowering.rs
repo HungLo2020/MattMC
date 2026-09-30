@@ -30,7 +30,10 @@ pub enum FullscreenSourceRasterPrimitive {
     /// Vanilla's sun/moon quad geometry, reconstructed from copied sky
     /// semantics and source-pack configuration. It owns both positions and
     /// UVs; no SkyRenderer buffer, Iris vertex format, or native state is
-    /// borrowed by the selected source route.
+    /// borrowed by the selected source route. With the celestial selector at
+    /// 2 it instead draws SkyRenderer's six-face End sky box (the same
+    /// `gbuffers_skytextured` writer Iris uses for the End sky); sun and moon
+    /// draws leave the extra faces degenerate.
     VanillaCelestialQuad,
 }
 
@@ -39,7 +42,7 @@ impl FullscreenSourceRasterPrimitive {
         match self {
             Self::FullscreenTriangle => 3,
             Self::VanillaSkyDisc => 24,
-            Self::VanillaCelestialQuad => 6,
+            Self::VanillaCelestialQuad => 36,
         }
     }
 }
@@ -5442,7 +5445,13 @@ vec2 vulkanic_source_fullscreen_uv_coordinates() { return vec2(0.0); }
 // preserves vanilla's reversed position/UV ordering for its phase sheet.
 int vulkanic_source_celestial_corner() {
     const int triangle_corners[6] = int[6](0, 1, 2, 0, 2, 3);
-    return triangle_corners[vulkanic_source_fullscreen_vertex_index()];
+    return triangle_corners[vulkanic_source_fullscreen_vertex_index() % 6];
+}
+int vulkanic_source_celestial_face() {
+    return vulkanic_source_fullscreen_vertex_index() / 6;
+}
+bool vulkanic_source_celestial_end_sky() {
+    return vulkanic_source_celestial_is_moon == 2;
 }
 vec3 vulkanic_source_rotate_x(vec3 value, float angle) {
     float s = sin(angle);
@@ -5460,13 +5469,32 @@ vec3 vulkanic_source_rotate_z(vec3 value, float angle) {
     return vec3(c * value.x - s * value.y, s * value.x + c * value.y, value.z);
 }
 vec4 vulkanic_source_fullscreen_celestial_position() {
+    int face = vulkanic_source_celestial_face();
+    if (vulkanic_source_celestial_end_sky()) {
+        // SkyRenderer.buildEndSky: one +/-100 face per rotation.
+        const vec3 box_corners[4] = vec3[4](
+            vec3(-100.0, -100.0, -100.0), vec3(-100.0, -100.0, 100.0),
+            vec3(100.0, -100.0, 100.0), vec3(100.0, -100.0, -100.0)
+        );
+        vec3 corner = box_corners[vulkanic_source_celestial_corner()];
+        if (face == 1) corner = vulkanic_source_rotate_x(corner, 1.57079632679);
+        else if (face == 2) corner = vulkanic_source_rotate_x(corner, -1.57079632679);
+        else if (face == 3) corner = vulkanic_source_rotate_x(corner, 3.14159265359);
+        else if (face == 4) corner = vulkanic_source_rotate_z(corner, 1.57079632679);
+        else if (face == 5) corner = vulkanic_source_rotate_z(corner, -1.57079632679);
+        return vec4(corner, 1.0);
+    }
+    if (face != 0) {
+        // Sun and moon draw one quad; collapse the remaining faces.
+        return vec4(0.0, 100.0, 0.0, 1.0);
+    }
     const vec2 sun_corners[4] = vec2[4](
         vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0)
     );
     const vec2 moon_corners[4] = vec2[4](
         vec2(-1.0, 1.0), vec2(1.0, 1.0), vec2(1.0, -1.0), vec2(-1.0, -1.0)
     );
-    bool moon = vulkanic_source_celestial_is_moon != 0;
+    bool moon = vulkanic_source_celestial_is_moon == 1;
     vec2 corner = moon ? moon_corners[vulkanic_source_celestial_corner()]
                        : sun_corners[vulkanic_source_celestial_corner()];
     float size = moon ? 20.0 : 30.0;
@@ -5479,9 +5507,14 @@ vec4 vulkanic_source_fullscreen_celestial_position() {
 }
 vec2 vulkanic_source_fullscreen_uv_coordinates() {
     int corner = vulkanic_source_celestial_corner();
-    bool moon = vulkanic_source_celestial_is_moon != 0;
+    bool moon = vulkanic_source_celestial_is_moon == 1;
     vec2 coordinate;
-    if (moon) {
+    if (vulkanic_source_celestial_end_sky()) {
+        const vec2 end_uv[4] = vec2[4](
+            vec2(0.0, 0.0), vec2(0.0, 16.0), vec2(16.0, 16.0), vec2(16.0, 0.0)
+        );
+        coordinate = end_uv[corner];
+    } else if (moon) {
         int phase = clamp(moonPhase, 0, 7);
         float u0 = float(phase % 4) * 0.25;
         float v0 = float(phase / 4) * 0.5;
@@ -5512,8 +5545,9 @@ vec2 vulkanic_source_fullscreen_uv_coordinates() {
         FullscreenSourceRasterPrimitive::VanillaSkyDisc => {
             "#define vulkanic_source_fullscreen_vertex_color vec4(skyColor, 1.0)"
         }
+        // The End sky box uses SkyRenderer's constant 0xFF282828 vertex color.
         FullscreenSourceRasterPrimitive::VanillaCelestialQuad => {
-            "#define vulkanic_source_fullscreen_vertex_color vec4(1.0, 1.0, 1.0, vulkanic_source_celestial_alpha)"
+            "#define vulkanic_source_fullscreen_vertex_color (vulkanic_source_celestial_is_moon == 2 ? vec4(vec3(40.0 / 255.0), 1.0) : vec4(1.0, 1.0, 1.0, vulkanic_source_celestial_alpha))"
         }
         FullscreenSourceRasterPrimitive::FullscreenTriangle => {
             "const vec4 vulkanic_source_fullscreen_vertex_color = vec4(1.0);"

@@ -10849,6 +10849,9 @@ mod tests {
             .vertex
             .source
             .contains("vulkanic_source_fullscreen_celestial_position"));
+        // One program serves sun, moon and the End sky box (selector 2).
+        assert!(celestial.vertex.source.contains("vulkanic_source_celestial_end_sky()"));
+        assert_eq!(36, celestial.raster_primitive.vertex_count());
         assert!(celestial
             .vertex
             .source

@@ -69,13 +69,19 @@ class RustShaderPackSourceCollectorTest {
 	}
 
 	@Test
-	void wholeFrameEnvironmentUsesStableRustOwnedStageIdentities() {
+	void wholeFrameEnvironmentUsesIrisRenderStageOrdinals() {
 		Map<String, String> defines = RustShaderPackSourceCollector.wholeFrameEnvironmentDefines();
 		assertEquals("1", defines.get("IS_IRIS"));
 		assertEquals("12000", defines.get("IRIS_VERSION"));
 		assertEquals("12105", defines.get("MC_VERSION"));
+		// Iris (and therefore Frozen) defines every WorldRenderingPhase by ordinal.
+		for (net.irisshaders.iris.pipeline.WorldRenderingPhase phase
+				: net.irisshaders.iris.pipeline.WorldRenderingPhase.values()) {
+			assertEquals(Integer.toString(phase.ordinal()), defines.get("MC_RENDER_STAGE_" + phase.name()));
+		}
+		assertEquals("3", defines.get("MC_RENDER_STAGE_CUSTOM_SKY"));
 		assertEquals("8", defines.get("MC_RENDER_STAGE_TERRAIN_SOLID"));
-		assertEquals("23", defines.get("MC_RENDER_STAGE_ENTITIES"));
+		assertEquals("11", defines.get("MC_RENDER_STAGE_ENTITIES"));
 	}
 
 	@Test

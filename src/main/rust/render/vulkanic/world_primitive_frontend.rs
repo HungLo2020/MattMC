@@ -472,6 +472,43 @@ pub const WORLD_MATERIAL_TEXTURE_CRYSTAL_BEAM: u32 = 0x4352_424d;
 pub const WORLD_MATERIAL_TEXTURE_END_GATEWAY_BEAM: u32 = 0x4547_424d;
 /// Copied vanilla End Portal base sky texture used by the explicit portal cube.
 pub const WORLD_MATERIAL_TEXTURE_END_SKY: u32 = 0x454e_4453;
+/// `vulkanic_source_celestial_is_moon` selector values for the owned
+/// `gbuffers_skytextured` geometry.
+const SOURCE_CELESTIAL_SUN: i32 = 0;
+const SOURCE_CELESTIAL_MOON: i32 = 1;
+const SOURCE_CELESTIAL_END_SKY: i32 = 2;
+
+/// Removes render passes that neither draw nor change their attachments
+/// (every attachment loads and stores). Passes that clear or discard are kept
+/// so validation still sees them.
+fn strip_empty_load_store_passes(ops: &mut Vec<CommandOp>) {
+    let preserves = |attachment: &PassAttachment| {
+        attachment.load_op == AttachmentLoadOp::Load && attachment.store_op == AttachmentStoreOp::Store
+    };
+    let mut index = 0;
+    while index + 1 < ops.len() {
+        let empty = matches!(
+            (&ops[index], &ops[index + 1]),
+            (CommandOp::BeginPass { colors, depth_stencil, .. }, CommandOp::EndPass)
+                if colors.iter().all(preserves) && depth_stencil.as_ref().is_none_or(preserves)
+        );
+        if empty {
+            ops.drain(index..index + 2);
+        } else {
+            index += 1;
+        }
+    }
+}
+
+/// SkyRenderer's End sky box faces (opaque textured, no depth).
+fn is_end_sky_quad(quad: &WorldMaterialQuadRequest) -> bool {
+    quad.texture_id == WORLD_MATERIAL_TEXTURE_END_SKY
+        && quad.material_id == WORLD_MATERIAL_ID_OPAQUE_TEXTURED
+}
+
+fn frame_has_end_sky_quads(frame: &WorldPrimitiveFrame) -> bool {
+    frame.material_quads.iter().any(is_end_sky_quad)
+}
 /// Copied vanilla End flash texture used by the explicit End sky overlay.
 pub const WORLD_MATERIAL_TEXTURE_END_FLASH: u32 = 0x454e_4446;
 /// Copied vanilla End Portal animated layer texture.
@@ -6748,9 +6785,12 @@ pub struct WorldPrimitiveFrontend {
     /// need not re-derive the (large, deliberately uncached) source stream
     /// every frame. Bounded by clearing when it exceeds the frame bound.
     validated_source_terrain_meshes: std::collections::HashSet<(u64, u64, bool)>,
-    /// Exact identity of the last frame whose terrain meshes all validated;
-    /// an identical next frame skips re-validating each terrain mesh.
-    source_terrain_validation_memo: Option<SourceTerrainValidationMemo>,
+    /// Terrain mesh identities (stratum, key, generation) already proven
+    /// admissible for the current pack/material stamp, with whether each has
+    /// translucent sections. Streaming changes the visible set every frame;
+    /// only newly seen identities are validated.
+    source_terrain_validated_identities: HashMap<(u32, u64, u64), bool>,
+    source_terrain_validated_stamp: Option<(bool, Option<u64>)>,
     /// (source generation, scope) -> whether DH joins the pack's shadow pass.
     distant_horizons_shadow_pass_memo: std::cell::Cell<Option<((u64, TerrainProgramScope), bool)>>,
     /// `source_uniform_frame_for_owned_resources` result for one frame id:
@@ -8515,11 +8555,12 @@ impl WorldPrimitiveFrontend {
 
     /// Resolves the selected pack's explicit celestial render category. This
     /// comes from copied shader-pack defines, never an Iris render phase.
-    fn source_celestial_render_stage(&self, is_moon: bool) -> GalResult<i32> {
-        let define = if is_moon {
-            "MC_RENDER_STAGE_MOON"
-        } else {
-            "MC_RENDER_STAGE_SUN"
+    fn source_celestial_render_stage(&self, celestial: i32) -> GalResult<i32> {
+        // Iris renders the End sky box in its CUSTOM_SKY phase.
+        let define = match celestial {
+            SOURCE_CELESTIAL_MOON => "MC_RENDER_STAGE_MOON",
+            SOURCE_CELESTIAL_END_SKY => "MC_RENDER_STAGE_CUSTOM_SKY",
+            _ => "MC_RENDER_STAGE_SUN",
         };
         self.shader_pack_sources
             .active()
@@ -8531,13 +8572,13 @@ impl WorldPrimitiveFrontend {
             .runtime_semantic_i32(define)
     }
 
-    fn source_celestial_assets_available(&self) -> bool {
-        [
-            WORLD_MATERIAL_TEXTURE_SKY_SUN,
-            WORLD_MATERIAL_TEXTURE_SKY_MOON_PHASES,
-        ]
-        .into_iter()
-        .all(|texture_id| {
+    fn source_celestial_assets_available(&self, end_sky: bool) -> bool {
+        let required: &[u32] = if end_sky {
+            &[WORLD_MATERIAL_TEXTURE_END_SKY]
+        } else {
+            &[WORLD_MATERIAL_TEXTURE_SKY_SUN, WORLD_MATERIAL_TEXTURE_SKY_MOON_PHASES]
+        };
+        required.iter().copied().all(|texture_id| {
             self.mesh_texture_assets
                 .get(&texture_id)
                 .is_some_and(|asset| asset.animation_generation != 0)
@@ -8560,7 +8601,9 @@ impl WorldPrimitiveFrontend {
 
     /// Resolves the selected pack's declared first-person render category.
     /// This is copied source configuration, not a borrowed Iris render phase.
-    fn source_hand_render_stage(&self) -> GalResult<i32> {
+    fn source_hand_render_stage(&self, translucent: bool) -> GalResult<i32> {
+        // Iris draws hands in HAND_SOLID, or HAND_TRANSLUCENT for a hand it
+        // classifies as translucent (`isHandTranslucent`).
         self.shader_pack_sources
             .active()
             .ok_or_else(|| {
@@ -8568,7 +8611,11 @@ impl WorldPrimitiveFrontend {
                     "hand source render stage requires an active shader-pack generation",
                 )
             })?
-            .runtime_semantic_i32("MC_RENDER_STAGE_HAND")
+            .runtime_semantic_i32(if translucent {
+                "MC_RENDER_STAGE_HAND_TRANSLUCENT"
+            } else {
+                "MC_RENDER_STAGE_HAND_SOLID"
+            })
     }
 
     /// Iris `currentRenderedItemId` for a world entity draw: an item layer
@@ -8955,8 +9002,8 @@ impl WorldPrimitiveFrontend {
         self.source_terrain_mesh_cache.clear();
         self.source_entity_mesh_cache.clear();
         self.validated_source_terrain_meshes.clear();
+        self.source_terrain_validated_identities.clear();
         self.source_terrain_range_memo.clear();
-        self.source_terrain_validation_memo = None;
         self.reset_candidate_source_occupancy_stability();
         self.source_execution_armed = false;
         self.source_execution_activation_reported = false;
@@ -9131,6 +9178,23 @@ impl WorldPrimitiveFrontend {
         }
         self.pending_distant_horizons_source_targets = None;
         Ok(())
+    }
+
+    /// Releases the frame-local state staged for a source frame whose
+    /// recording failed after its plan was consumed.
+    fn discard_unrecorded_source_frame(&mut self, gal: &mut VulkanicGal, frame_id: u64) {
+        self.discard_source_terrain_frame_transaction(gal, frame_id);
+        if self.pending_distant_horizons_source_targets.is_some() {
+            self.lod_source_targets.discard_submission(gal);
+            self.discard_distant_horizons_generic_source_buffers(gal);
+            self.pending_distant_horizons_source_targets = None;
+            self.lod_gpu_residency.discard_submission(gal);
+            self.lod_textured_gpu_residency.discard_submission(gal);
+        }
+        if let Some(runtime) = self.shader_runtime.as_mut() {
+            runtime.discard_source_color_targets_submission(gal);
+            runtime.discard_private_terrain_occupancy_submission();
+        }
     }
 
     /// Rolls back any unsubmitted DH source targets. The active generation is
@@ -12700,7 +12764,7 @@ impl WorldPrimitiveFrontend {
         self.material_asset_update_failures = 0;
         self.mesh_asset_generation = 0;
         self.mesh_assets.clear();
-        self.source_terrain_validation_memo = None;
+        self.source_terrain_validated_identities.clear();
         self.mesh_batch_plan_cache.clear();
         self.mesh_texture_assets.clear();
         self.mesh_texture_animation_generation =
@@ -13774,7 +13838,7 @@ impl WorldPrimitiveFrontend {
         // Texture replacement can reclassify any section, so it flushes all.
         if !replaced_texture_ids.is_empty() {
             self.mesh_batch_plan_cache.clear();
-            self.source_terrain_validation_memo = None;
+            self.source_terrain_validated_identities.clear();
         } else if !incoming_mesh_keys.is_empty()
             || !decoded_sorted_indices.is_empty()
             || !retirement_keys.is_empty()
@@ -13783,17 +13847,6 @@ impl WorldPrimitiveFrontend {
                 .iter()
                 .map(|update| update.mesh_key)
                 .collect();
-            // Terrain coverage validation depends only on the assets of the
-            // meshes it validated (the same rule as the batch plans).
-            if self.source_terrain_validation_memo.as_ref().is_some_and(|memo| {
-                incoming_mesh_keys
-                    .iter()
-                    .chain(sorted_keys.iter())
-                    .chain(retirement_keys.iter())
-                    .any(|mesh_key| memo.mesh_keys.contains(mesh_key))
-            }) {
-                self.source_terrain_validation_memo = None;
-            }
             self.mesh_batch_plan_cache.retain(|entry| {
                 !entry.key.instances.iter().any(|instance| {
                     incoming_mesh_keys.contains(&instance.mesh_key)
@@ -14777,7 +14830,9 @@ impl WorldPrimitiveFrontend {
                     requirement.semantic == Some(TerrainSourceUniformSemantic::RenderStage)
                 })
             {
-                uniforms.render_stage = Some(self.source_hand_render_stage()?);
+                uniforms.render_stage = Some(
+                    self.source_hand_render_stage(frame.first_person.hand_is_translucent(hand))?,
+                );
             }
             let legacy_texture_transforms = program.pack_legacy_texture_transforms(
                 &source_glint_texture_transforms(foil)?,
@@ -22686,10 +22741,13 @@ impl WorldPrimitiveFrontend {
         if !source_sky_initializer_requested(frame) {
             return Ok(Vec::new());
         }
+        // The End has no sun or moon: SkyRenderer draws its textured sky box
+        // with the same `gbuffers_skytextured` writer instead.
+        let end_sky = frame_has_end_sky_quads(frame);
         // Candidate preparation is also used by non-executing source tests.
         // A selected source route separately treats these assets as required;
         // here their absence simply keeps the optional writer inert.
-        if !self.source_celestial_assets_available() {
+        if !self.source_celestial_assets_available(end_sky) {
             return Ok(Vec::new());
         }
         let source_snapshot = self
@@ -22712,10 +22770,15 @@ impl WorldPrimitiveFrontend {
         }
         let program = program.expect("checked source celestial program presence");
         let mut consumers = Vec::with_capacity(2);
-        for (is_moon, texture_id) in [
-            (false, WORLD_MATERIAL_TEXTURE_SKY_SUN),
-            (true, WORLD_MATERIAL_TEXTURE_SKY_MOON_PHASES),
-        ] {
+        let draws: &[(i32, u32)] = if end_sky {
+            &[(SOURCE_CELESTIAL_END_SKY, WORLD_MATERIAL_TEXTURE_END_SKY)]
+        } else {
+            &[
+                (SOURCE_CELESTIAL_SUN, WORLD_MATERIAL_TEXTURE_SKY_SUN),
+                (SOURCE_CELESTIAL_MOON, WORLD_MATERIAL_TEXTURE_SKY_MOON_PHASES),
+            ]
+        };
+        for &(celestial, texture_id) in draws {
             let (resources, _, texture_extent) = self
                 .source_resources_with_local_material_texture(
                     gal,
@@ -22749,9 +22812,13 @@ impl WorldPrimitiveFrontend {
                     )
                 })?;
             let mut source_uniforms = self.source_uniform_frame_for_owned_resources(frame)?;
-            source_uniforms.render_stage = Some(self.source_celestial_render_stage(is_moon)?);
-            source_uniforms.celestial_is_moon = Some(i32::from(is_moon));
-            source_uniforms.celestial_alpha = Some(frame.background.sky.rain_brightness);
+            source_uniforms.render_stage = Some(self.source_celestial_render_stage(celestial)?);
+            source_uniforms.celestial_is_moon = Some(celestial);
+            source_uniforms.celestial_alpha = Some(if celestial == SOURCE_CELESTIAL_END_SKY {
+                1.0
+            } else {
+                frame.background.sky.rain_brightness
+            });
             source_uniforms.moon_phase = Some(frame.background.sky.moon_phase);
             source_uniforms.material_atlas_size = Some(texture_extent);
             let scalar_uniforms = program.pack_scalar_uniforms(&source_uniforms)?;
@@ -22816,10 +22883,11 @@ impl WorldPrimitiveFrontend {
         // The copied vanilla celestial quads are represented by the source
         // skytextured writer in this route. If that writer is absent, reject
         // the frame instead of silently drawing them through gbuffers_textured.
-        if frame
+        if (frame
             .material_quads
             .iter()
             .any(|quad| quad.material_id == WORLD_MATERIAL_ID_CELESTIAL)
+            || frame_has_end_sky_quads(frame))
             && !self
                 .shader_runtime
                 .as_ref()
@@ -24234,17 +24302,29 @@ impl WorldPrimitiveFrontend {
                 .prepared_lowered_pre_terrain_celestial_program()?
                 .is_some()
         {
-            if !self.source_celestial_assets_available() {
-                return Err(GalError::unsupported_feature(
-                    "selected source sky requires Rust-owned sun and moon texture assets",
-                ));
+            let end_sky = frame_has_end_sky_quads(frame);
+            if !self.source_celestial_assets_available(end_sky) {
+                return Err(GalError::unsupported_feature(if end_sky {
+                    "selected source End sky requires a Rust-owned End sky texture asset"
+                } else {
+                    "selected source sky requires Rust-owned sun and moon texture assets"
+                }));
             }
-            for is_moon in [false, true] {
+            let draws: &[i32] = if end_sky {
+                &[SOURCE_CELESTIAL_END_SKY]
+            } else {
+                &[SOURCE_CELESTIAL_SUN, SOURCE_CELESTIAL_MOON]
+            };
+            for &celestial in draws {
                 let mut celestial_uniforms = base_uniforms.clone();
                 celestial_uniforms.render_stage =
-                    Some(self.source_celestial_render_stage(is_moon)?);
-                celestial_uniforms.celestial_is_moon = Some(i32::from(is_moon));
-                celestial_uniforms.celestial_alpha = Some(frame.background.sky.rain_brightness);
+                    Some(self.source_celestial_render_stage(celestial)?);
+                celestial_uniforms.celestial_is_moon = Some(celestial);
+                celestial_uniforms.celestial_alpha = Some(if celestial == SOURCE_CELESTIAL_END_SKY {
+                    1.0
+                } else {
+                    frame.background.sky.rain_brightness
+                });
                 celestial_uniforms.moon_phase = Some(frame.background.sky.moon_phase);
                 runtime
                     .prepared_lowered_pre_terrain_celestial_program()?
@@ -24509,7 +24589,7 @@ impl WorldPrimitiveFrontend {
                     "selected source frame has DH generic objects but no DH LOD pass yet",
                 ));
             }
-            distant_horizons_generic_source_geometry(&frame.dh_generic_boxes)?;
+            validate_distant_horizons_generic_source_boxes(&frame.dh_generic_boxes)?;
         }
         let unsupported_families = frame.feature_coverage.unsupported_families();
         if !unsupported_families.is_empty() {
@@ -24967,18 +25047,11 @@ impl WorldPrimitiveFrontend {
             .filter(|instance| is_terrain(instance))
             .map(|instance| (instance.stratum, instance.mesh_key, instance.mesh_generation))
             .collect::<Vec<_>>();
-        let terrain_memo_hit = self.source_terrain_validation_memo.as_ref().is_some_and(|memo| {
-            memo.material_ids == material_ids
-                && memo.pack_generation == pack_generation
-                && memo.identities == identities
-                && (!memo.any_translucent
-                    || self.shader_runtime.as_ref().is_some_and(|runtime| {
-                        matches!(
-                            runtime.prepared_lowered_translucent_terrain_source_program(),
-                            Ok(Some(_))
-                        )
-                    }))
-        });
+        let stamp = (material_ids, pack_generation);
+        if self.source_terrain_validated_stamp != Some(stamp) {
+            self.source_terrain_validated_identities.clear();
+            self.source_terrain_validated_stamp = Some(stamp);
+        }
         let mut any_translucent = false;
         let mut seen = BTreeSet::new();
         // The translucent writer's availability is frame-invariant; resolve it
@@ -24993,9 +25066,6 @@ impl WorldPrimitiveFrontend {
                 // require the entity material program.
                 continue;
             }
-            if terrain_memo_hit && is_terrain(instance) {
-                continue;
-            }
             let key = (
                 instance.stratum,
                 instance.mesh_key,
@@ -25003,6 +25073,12 @@ impl WorldPrimitiveFrontend {
             );
             if !seen.insert(key) {
                 continue;
+            }
+            if is_terrain(instance) {
+                if let Some(translucent) = self.source_terrain_validated_identities.get(&key) {
+                    any_translucent |= *translucent;
+                    continue;
+                }
             }
             if instance.stratum == WORLD_STRATUM_ENTITY_SHADOW_CASTER {
                 // Shadow-only casters (Iris `shadowPlayer`) never reach a
@@ -25064,6 +25140,7 @@ impl WorldPrimitiveFrontend {
                         .iter()
                         .any(|section| section.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT)
                 });
+            let is_translucent = translucent_asset.is_some();
             if let Some(asset) = translucent_asset {
                 any_translucent = true;
                 let stage_status = translucent_stage_status.get_or_insert_with(|| {
@@ -25082,6 +25159,7 @@ impl WorldPrimitiveFrontend {
                     }
                 });
                 let Some(stage_status) = stage_status else {
+                    self.source_terrain_validated_identities.insert(key, true);
                     continue;
                 };
                 let translucent_sections = asset
@@ -25097,15 +25175,27 @@ impl WorldPrimitiveFrontend {
                     instance.mesh_key, instance.mesh_generation, translucent_sections
                 )));
             }
+            if !is_translucent {
+                self.source_terrain_validated_identities.insert(key, false);
+            }
         }
-        if !terrain_memo_hit {
-            self.source_terrain_validation_memo = Some(SourceTerrainValidationMemo {
-                mesh_keys: identities.iter().map(|(_, mesh_key, _)| *mesh_key).collect(),
-                material_ids,
-                pack_generation,
-                identities,
-                any_translucent,
-            });
+        // Retained translucent meshes still need a translucent writer now.
+        if any_translucent
+            && !self.shader_runtime.as_ref().is_some_and(|runtime| {
+                matches!(
+                    runtime.prepared_lowered_translucent_terrain_source_program(),
+                    Ok(Some(_))
+                )
+            })
+        {
+            return Err(GalError::unsupported_feature(
+                "selected source terrain has translucent sections but no admitted translucent writer",
+            ));
+        }
+        // Bound the cache to identities still visible.
+        if self.source_terrain_validated_identities.len() > identities.len().saturating_mul(2).max(4096) {
+            let visible = identities.iter().copied().collect::<std::collections::HashSet<_>>();
+            self.source_terrain_validated_identities.retain(|key, _| visible.contains(key));
         }
         Ok(())
     }
@@ -26541,6 +26631,13 @@ impl WorldPrimitiveFrontend {
         occupancy_frame: &WorldPrimitiveFrame,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<bool> {
+        // Occupancy submissions are confirmed by the call that submits them;
+        // one still pending here was left by an aborted frame (either route).
+        if let Some(runtime) = self.shader_runtime.as_mut() {
+            if runtime.has_pending_private_terrain_occupancy_submission() {
+                runtime.discard_private_terrain_occupancy_submission();
+            }
+        }
         if !self
             .shader_runtime
             .as_ref()
@@ -31335,6 +31432,15 @@ impl WorldPrimitiveFrontend {
         ) -> GalResult<(Vec<CommandOp>, GuiSubmitStats)>,
     {
         self.world_text.begin_submission();
+        // DH source targets are confirmed within the same call that submits
+        // them, so one still pending here belongs to an aborted earlier frame.
+        // Release it instead of rejecting every later frame.
+        if self.pending_distant_horizons_source_targets.is_some() {
+            self.discard_distant_horizons_source_targets(gal);
+            self.discard_distant_horizons_generic_source_buffers(gal);
+            self.lod_gpu_residency.discard_submission(gal);
+            self.lod_textured_gpu_residency.discard_submission(gal);
+        }
         let started = std::time::Instant::now();
         let mut profile = WholeFrameProfile::default();
         self.write_runtime_source_execution_attempt(
@@ -32007,7 +32113,7 @@ impl WorldPrimitiveFrontend {
                 TextureUsageState::ShaderRead,
             )));
         }
-        let mut source_submission = plan.into_submission_parts(
+        let source_submission = plan.into_submission_parts(
             gal,
             self.shader_runtime.as_ref().ok_or_else(|| {
                 GalError::backend(
@@ -32149,12 +32255,15 @@ impl WorldPrimitiveFrontend {
                 // sampled-image row convention to the acquired image. GUI
                 // vertices are already top-left semantic coordinates, so it
                 // must be composed afterwards rather than inherit that flip.
-                let (gui_ops, gui_stats) = append_gui(
+                let (mut gui_ops, gui_stats) = append_gui(
                     gal,
                     final_output.presentation_target(),
                     final_output.presentation_target(),
                     false,
                 )?;
+                // A frame with no GUI elements (spectator mode, F1) still
+                // opens its load/store pass; that pass is a no-op.
+                strip_empty_load_store_passes(&mut gui_ops);
                 Self::validate_source_gui_ops(
                     &gui_ops,
                     final_output.presentation_target(),
@@ -32177,7 +32286,17 @@ impl WorldPrimitiveFrontend {
                 }
                 Ok(())
             },
-        )?;
+        );
+        // A failed recording step (overlay/GUI validation, consumer staging)
+        // consumed the plan. Release every frame-local owner it staged, or
+        // the next frame is rejected as "already awaiting" forever.
+        let mut source_submission = match source_submission {
+            Ok(submission) => submission,
+            Err(error) => {
+                self.discard_unrecorded_source_frame(gal, frame.frame_id);
+                return Err(error);
+            }
+        };
         self.write_runtime_source_execution_attempt(
             &frame,
             "submission-ops-ready",
@@ -40889,13 +41008,6 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         update: WorldMeshSortedIndexUpdate,
     ) -> GalResult<()> {
-        if self
-            .source_terrain_validation_memo
-            .as_ref()
-            .is_some_and(|memo| memo.mesh_keys.contains(&update.mesh_key))
-        {
-            self.source_terrain_validation_memo = None;
-        }
         let asset = self.mesh_assets.get_mut(&update.mesh_key).ok_or_else(|| {
             GalError::invalid_argument(format!(
                 "world mesh sorted index update references unknown mesh key {}",
@@ -44405,7 +44517,6 @@ fn prepare_source_terrain_mesh_asset_view_with_material_ids<V: TerrainSourceVert
         index_bytes,
         sections,
     };
-    prepared.validate()?;
     Ok(prepared)
 }
 
@@ -46520,19 +46631,6 @@ struct MeshBatchInstanceKey {
     has_decal_foil: bool,
 }
 
-/// Everything terrain coverage validation depends on besides the translucent
-/// writer status, which is re-resolved every frame (`any_translucent`).
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct SourceTerrainValidationMemo {
-    /// Mesh keys the memo validated. Mesh updates drop the memo only when
-    /// they touch one of these keys: animated entity models re-upload every
-    /// frame and must not force the static terrain set to re-validate.
-    mesh_keys: std::collections::HashSet<u64>,
-    material_ids: bool,
-    pack_generation: Option<u64>,
-    identities: Vec<(u32, u64, u64)>,
-    any_translucent: bool,
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct MeshBatchPlanKey {
@@ -47019,7 +47117,7 @@ fn source_material_batches_for_program(
         // gbuffers_textured, after deferred1 has generated clouds, overwrites
         // the clouds with a rectangular patch of sky color.
         if source_program == WORLD_MATERIAL_SOURCE_TEXTURED
-            && quad.material_id == WORLD_MATERIAL_ID_CELESTIAL
+            && (quad.material_id == WORLD_MATERIAL_ID_CELESTIAL || is_end_sky_quad(quad))
         {
             continue;
         }
@@ -51196,6 +51294,45 @@ fn distant_horizons_generic_source_geometry(
         }
     }
     Ok(geometry)
+}
+
+/// Admission check for [`distant_horizons_generic_source_geometry`] without
+/// building vertices: every group needs one consistent sub-block offset and
+/// an i16-representable extent around its first box.
+fn validate_distant_horizons_generic_source_boxes(
+    boxes: &[WorldDistantHorizonsGenericBoxRequest],
+) -> GalResult<()> {
+    let mut groups = HashMap::<(bool, u32), ([f32; 3], [i32; 3])>::new();
+    for item in boxes {
+        let fraction = item.min.map(|value| value - value.floor());
+        for axis in 0..3 {
+            let local_max = item.max[axis] - fraction[axis];
+            if (local_max - local_max.round()).abs() > 1.0e-3 {
+                return Err(GalError::unsupported_feature(
+                    "DH generic box is not representable in the DH source vertex stream",
+                ));
+            }
+        }
+        let (group_fraction, anchor) = *groups
+            .entry((item.ssao_enabled, item.group))
+            .or_insert_with(|| (fraction, item.min.map(|value| value.floor() as i32)));
+        for axis in 0..3 {
+            let delta = (fraction[axis] - group_fraction[axis]).abs();
+            if delta > 1.0e-3 && delta < 1.0 - 1.0e-3 {
+                return Err(GalError::unsupported_feature(
+                    "DH generic box group has inconsistent sub-block offsets",
+                ));
+            }
+            let low = (item.min[axis] - group_fraction[axis]).round() as i64 - i64::from(anchor[axis]);
+            let high = (item.max[axis] - group_fraction[axis]).round() as i64 - i64::from(anchor[axis]);
+            if low.abs() > 32767 || high.abs() > 32767 {
+                return Err(GalError::unsupported_feature(
+                    "DH generic box range exceeds the DH source vertex stream",
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Transient GPU copy of the current generic-box geometry. Replaced (never
@@ -63157,6 +63294,28 @@ mod tests {
             generic_box([40000.0, 0.0, 0.0], [40001.0, 1.0, 1.0], false),
         ])
         .is_err());
+    }
+
+    #[test]
+    fn distant_horizons_generic_validation_matches_geometry_admission() {
+        let cases: Vec<Vec<WorldDistantHorizonsGenericBoxRequest>> = vec![
+            vec![generic_box([0.25, 0.0, 0.0], [1.25, 1.0, 1.0], false)],
+            vec![generic_box([0.25, 0.0, 0.0], [1.5, 1.0, 1.0], false)],
+            vec![
+                generic_box([0.0, 0.0, 0.0], [1.0, 1.0, 1.0], false),
+                generic_box([40000.0, 0.0, 0.0], [40001.0, 1.0, 1.0], false),
+            ],
+            vec![
+                generic_box([0.5, 0.0, 0.0], [1.5, 1.0, 1.0], false),
+                generic_box([0.25, 0.0, 0.0], [1.25, 1.0, 1.0], false),
+            ],
+        ];
+        for boxes in cases {
+            assert_eq!(
+                distant_horizons_generic_source_geometry(&boxes).is_ok(),
+                validate_distant_horizons_generic_source_boxes(&boxes).is_ok()
+            );
+        }
     }
 
     #[test]
@@ -80648,6 +80807,37 @@ mod tests {
         assert!(!diagnostic_readback_rows_bottom_up(BackendApi::Vulkan));
         assert!(diagnostic_readback_rows_bottom_up(BackendApi::OpenGl));
         assert!(!diagnostic_readback_rows_bottom_up(BackendApi::Mock));
+    }
+
+    #[test]
+    fn empty_load_store_gui_passes_are_stripped_but_clearing_passes_are_kept() {
+        let pass = Handle::new(super::super::handles::HandleKind::RenderPass, 9, 1).unwrap();
+        let target = Handle::new(super::super::handles::HandleKind::RenderTarget, 10, 1).unwrap();
+        let attachment = |load_op| PassAttachment {
+            view: Handle::new(super::super::handles::HandleKind::TextureView, 11, 1).unwrap(),
+            load_op,
+            store_op: AttachmentStoreOp::Store,
+            clear_color: None,
+        };
+        let begin = |load_op| CommandOp::BeginPass {
+            pass,
+            target,
+            colors: vec![attachment(load_op)],
+            depth_stencil: None,
+        };
+        let mut ops = vec![begin(AttachmentLoadOp::Load), CommandOp::EndPass];
+        strip_empty_load_store_passes(&mut ops);
+        assert!(ops.is_empty());
+        let mut ops = vec![begin(AttachmentLoadOp::Clear), CommandOp::EndPass];
+        strip_empty_load_store_passes(&mut ops);
+        assert_eq!(2, ops.len());
+        let mut ops = vec![
+            begin(AttachmentLoadOp::Load),
+            CommandOp::Draw { vertices: 3, instances: 1 },
+            CommandOp::EndPass,
+        ];
+        strip_empty_load_store_passes(&mut ops);
+        assert_eq!(3, ops.len());
     }
 
     #[test]

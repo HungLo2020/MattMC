@@ -684,6 +684,26 @@ public class GuiGraphics {
 		float v1,
 		int color
 	) {
+		this.submitRustSemanticTiledBlit(RenderPipelines.GUI_TEXTURED, semanticTexture, x, y, width, height,
+			tileWidth, tileHeight, u0, v0, u1, v1, color);
+	}
+
+	/** Tiled semantic blit with an explicit vanilla pipeline (blend/stratum identity). */
+	public void submitRustSemanticTiledBlit(
+		net.blaze3d.pipeline.RenderPipeline pipeline,
+		ResourceLocation semanticTexture,
+		int x,
+		int y,
+		int width,
+		int height,
+		int tileWidth,
+		int tileHeight,
+		float u0,
+		float v0,
+		float u1,
+		float v1,
+		int color
+	) {
 		if (semanticTexture == null || width <= 0 || height <= 0 || tileWidth <= 0 || tileHeight <= 0) {
 			throw new IllegalArgumentException("invalid Rust semantic tiled blit");
 		}
@@ -692,7 +712,7 @@ public class GuiGraphics {
 			? TextureSetup.noTexture()
 			: TextureSetup.singleTexture(this.minecraft.getTextureManager().getTexture(semanticTexture).getTextureView());
 		this.guiRenderState.submitGuiElement(new TiledBlitRenderState(
-			RenderPipelines.GUI_TEXTURED,
+			pipeline,
 			textureSetup,
 			semanticTexture,
 			new Matrix3x2f(this.pose),
@@ -724,6 +744,24 @@ public class GuiGraphics {
 		float v1,
 		int color
 	) {
+		this.submitRustSemanticBlit(RenderPipelines.GUI_TEXTURED, semanticTexture, x, y, width, height,
+			u0, v0, u1, v1, color);
+	}
+
+	/** Semantic blit with an explicit vanilla pipeline (blend/stratum identity). */
+	public void submitRustSemanticBlit(
+		net.blaze3d.pipeline.RenderPipeline pipeline,
+		ResourceLocation semanticTexture,
+		int x,
+		int y,
+		int width,
+		int height,
+		float u0,
+		float v0,
+		float u1,
+		float v1,
+		int color
+	) {
 		if (semanticTexture == null || width <= 0 || height <= 0
 			|| !Float.isFinite(u0) || !Float.isFinite(v0) || !Float.isFinite(u1) || !Float.isFinite(v1)) {
 			throw new IllegalArgumentException("invalid Rust semantic blit");
@@ -733,7 +771,7 @@ public class GuiGraphics {
 			? TextureSetup.noTexture()
 			: TextureSetup.singleTexture(this.minecraft.getTextureManager().getTexture(semanticTexture).getTextureView());
 		this.guiRenderState.submitGuiElement(new BlitRenderState(
-			RenderPipelines.GUI_TEXTURED,
+			pipeline,
 			textureSetup,
 			semanticTexture,
 			new Matrix3x2f(this.pose),

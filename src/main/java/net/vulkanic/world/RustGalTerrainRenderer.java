@@ -103,6 +103,14 @@ public final class RustGalTerrainRenderer {
 	private static volatile List<TerrainTextureProbe> activeTextureProbes = List.of();
 	/** Must match the Rust whole-frame static-terrain residency bound. */
 	private static final int MAX_SEMANTIC_TERRAIN_SECTIONS = 4096;
+	/**
+	 * Shadow-only caster sections per frame. Each adds at most one instance per
+	 * SHADOW_CANDIDATE_LAYERS entry; with the camera-visible sections this stays
+	 * inside Rust's 65,536 WORLD_MAX_FRAME_MESH_INSTANCES and covers a complete
+	 * render-distance-10 window (23 x 23 columns x 24 sections).
+	 */
+	private static final int MAX_SHADOW_CANDIDATE_SECTIONS = 12_288;
+	private static boolean shadowCandidateTruncationLogged;
 	private static final ChunkSectionLayer[] SHADOW_CANDIDATE_LAYERS = {
 		ChunkSectionLayer.SOLID, ChunkSectionLayer.CUTOUT_MIPPED, ChunkSectionLayer.TRANSLUCENT
 	};
@@ -1013,12 +1021,9 @@ public final class RustGalTerrainRenderer {
 		// This is a separate bounded semantic stream. Candidate assets stay
 		// resident, but only Rust may select them into a source shadow pass.
 		if (shadowCandidates != null) {
-			int candidateCount = 0;
+			shadowCandidates = nearestShadowCandidates(shadowCandidates, camera);
 			for (RenderSection section : shadowCandidates) {
 				if (section == null || !section.isBuilt()) continue;
-				if (++candidateCount > MAX_SEMANTIC_TERRAIN_SECTIONS) {
-					throw new IllegalStateException("shadow candidate section bound exceeded");
-				}
 				long sectionPos = section.getPositionAsLong();
 				// A camera-visible section already contributed every layer asset
 				// from this frame's snapshot, so none can be a new shadow key.
@@ -1161,6 +1166,40 @@ public final class RustGalTerrainRenderer {
 		}
 		TerrainSetScratch scratch = TERRAIN_SET_SCRATCH.get();
 		return snapshotBuiltTerrainSections(sections, scratch.seenPositions, new ArrayList<>());
+	}
+
+	/**
+	 * A wider window than the caster budget keeps the nearest casters (the
+	 * shadow map's resolution concentrates there and distant ones fall outside
+	 * the pack's shadow distance first) instead of failing the frame.
+	 */
+	private static Iterable<RenderSection> nearestShadowCandidates(Iterable<RenderSection> candidates, Camera camera) {
+		int built = 0;
+		for (RenderSection section : candidates) {
+			if (section != null && section.isBuilt()) built++;
+		}
+		if (built <= MAX_SHADOW_CANDIDATE_SECTIONS) {
+			return candidates;
+		}
+		if (!shadowCandidateTruncationLogged) {
+			shadowCandidateTruncationLogged = true;
+			LOGGER.warn("Rust whole-frame shadow casters limited to the nearest {} of {} sections",
+				MAX_SHADOW_CANDIDATE_SECTIONS, built);
+		}
+		double cx = camera.getPosition().x();
+		double cy = camera.getPosition().y();
+		double cz = camera.getPosition().z();
+		ArrayList<RenderSection> nearest = new ArrayList<>(built);
+		for (RenderSection section : candidates) {
+			if (section != null && section.isBuilt()) nearest.add(section);
+		}
+		nearest.sort(Comparator.comparingDouble((RenderSection section) -> {
+			double dx = section.getOriginX() + 8.0D - cx;
+			double dy = section.getOriginY() + 8.0D - cy;
+			double dz = section.getOriginZ() + 8.0D - cz;
+			return dx * dx + dy * dy + dz * dz;
+		}));
+		return nearest.subList(0, MAX_SHADOW_CANDIDATE_SECTIONS);
 	}
 
 	private static List<RenderSection> snapshotBuiltTerrainSections(Iterable<RenderSection> sections,

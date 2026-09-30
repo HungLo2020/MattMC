@@ -62,6 +62,11 @@ public final class RustShaderPackSourceCollector {
 		return copiedBooleanDirective(source, "vignette", true);
 	}
 
+	/** Whether vanilla's underwater screen overlay remains enabled under the copied pack. */
+	public static boolean copiedUnderwaterOverlayEnabled(SourceGeneration source) throws IOException {
+		return copiedBooleanDirective(source, "underwaterOverlay", true);
+	}
+
 	private static boolean copiedBooleanDirective(SourceGeneration source, String directive) throws IOException {
 		return copiedBooleanDirective(source, directive, false);
 	}
@@ -513,16 +518,12 @@ public final class RustShaderPackSourceCollector {
 		defines.put("COLORED_LIGHTING", "256");
 		defines.put("RAIN_PUDDLES", "0");
 		defines.put("ANISOTROPIC_FILTER", "0");
-		defines.put("MC_RENDER_STAGE_SUN", "4");
-		defines.put("MC_RENDER_STAGE_MOON", "5");
-		defines.put("MC_RENDER_STAGE_TERRAIN_SOLID", "8");
-		defines.put("MC_RENDER_STAGE_TERRAIN_CUTOUT_MIPPED", "9");
-		defines.put("MC_RENDER_STAGE_TERRAIN_CUTOUT", "10");
-		defines.put("MC_RENDER_STAGE_TERRAIN_TRANSLUCENT", "15");
-		defines.put("MC_RENDER_STAGE_RAIN_SNOW", "19");
-		defines.put("MC_RENDER_STAGE_CLOUDS", "20");
-		defines.put("MC_RENDER_STAGE_ENTITIES", "23");
-		defines.put("MC_RENDER_STAGE_HAND", "24");
+		// Iris defines MC_RENDER_STAGE_<phase> for every WorldRenderingPhase
+		// (e.g. the End sky box draws in CUSTOM_SKY).
+		for (net.irisshaders.iris.pipeline.WorldRenderingPhase phase
+				: net.irisshaders.iris.pipeline.WorldRenderingPhase.values()) {
+			defines.put("MC_RENDER_STAGE_" + phase.name(), Integer.toString(phase.ordinal()));
+		}
 		return defines;
 	}
 

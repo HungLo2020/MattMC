@@ -1828,6 +1828,9 @@ public final class RustGalGuiRenderer {
 			requestLayerOrder = GuiRenderStratum.GUI_OPAQUE_BLIT.order();
 		} else if (blit.pipeline() == RenderPipelines.VIGNETTE) {
 			requestLayerOrder = GuiRenderStratum.GUI_VIGNETTE_BLIT.order();
+		} else if (blit.pipeline() == RenderPipelines.BLOCK_SCREEN_EFFECT
+			|| blit.pipeline() == RenderPipelines.FIRE_SCREEN_EFFECT) {
+			requestLayerOrder = GuiRenderStratum.GUI_SCREEN_EFFECT.order();
 		} else if (blit.pipeline() == net.voxelmap.util.VoxelMapPipelines.GUI_TEXTURED_LESS_OR_EQUAL_DEPTH_PIPELINE) {
 			requestLayerOrder = GuiRenderStratum.GUI_LEQUAL_DEPTH_BLIT.order();
 		}
@@ -2076,6 +2079,7 @@ public final class RustGalGuiRenderer {
 			|| (blit.pipeline() != RenderPipelines.GUI_TEXTURED
 				&& blit.pipeline() != RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND
 				&& blit.pipeline() != RenderPipelines.VIGNETTE
+				&& blit.pipeline() != RenderPipelines.BLOCK_SCREEN_EFFECT
 				&& blit.pipeline() != RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA
 				&& blit.pipeline() != RenderPipelines.GUI_NAUSEA_OVERLAY)
 			|| blit.semanticTexture() == null
@@ -2104,6 +2108,7 @@ public final class RustGalGuiRenderer {
 		int stratum = dynamicLayerOrder(layerOrder);
 		if (blit.pipeline() == RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND) stratum = GuiRenderStratum.GUI_OPAQUE_BLIT.order();
 		else if (blit.pipeline() == RenderPipelines.VIGNETTE) stratum = GuiRenderStratum.GUI_VIGNETTE_BLIT.order();
+		else if (blit.pipeline() == RenderPipelines.BLOCK_SCREEN_EFFECT) stratum = GuiRenderStratum.GUI_SCREEN_EFFECT.order();
 		else if (blit.pipeline() == RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA) stratum = GuiRenderStratum.GUI_PREMULTIPLIED_BLIT.order();
 		else if (blit.pipeline() == RenderPipelines.GUI_NAUSEA_OVERLAY) stratum = GuiRenderStratum.GUI_ADDITIVE_BLIT.order();
 		Matrix3x2f pose = blit.pose();

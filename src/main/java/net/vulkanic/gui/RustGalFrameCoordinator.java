@@ -102,6 +102,7 @@ public final class RustGalFrameCoordinator {
 	private static long shaderPackAssetUpdateFailures;
 	private static RustShaderPackSourceCollector.SourceGeneration pendingShaderPackSources;
 	private static volatile boolean copiedShaderPackVignetteEnabled = true;
+	private static volatile boolean copiedShaderPackUnderwaterOverlayEnabled = true;
 	private static String pendingShaderPackSourceName = "";
 	/** Set when the user changes the pack, its options, or the shader toggle. */
 	private static volatile boolean shaderPackConfigurationChanged;
@@ -2556,6 +2557,10 @@ public final class RustGalFrameCoordinator {
 		return copiedShaderPackVignetteEnabled;
 	}
 
+	public static boolean copiedShaderPackUnderwaterOverlayEnabled() {
+		return copiedShaderPackUnderwaterOverlayEnabled;
+	}
+
 	private static void stageShaderPackSourcesLocked(RustShaderPackSourceCollector.SourceGeneration source) {
 		stageShaderPackSourcesLocked(source, source.packName());
 	}
@@ -2567,16 +2572,19 @@ public final class RustGalFrameCoordinator {
 		boolean separateAo;
 		boolean disableDirectionalShading;
 		boolean vignetteEnabled;
+		boolean underwaterOverlayEnabled;
 		try {
 			separateAo = RustShaderPackSourceCollector.copiedSeparateAo(source);
 			disableDirectionalShading = RustShaderPackSourceCollector.copiedDisableDirectionalShading(source);
 			vignetteEnabled = RustShaderPackSourceCollector.copiedVignetteEnabled(source);
+			underwaterOverlayEnabled = RustShaderPackSourceCollector.copiedUnderwaterOverlayEnabled(source);
 		} catch (IOException error) {
 			LOGGER.error("Rust VulkanicGAL copied shader pack has ambiguous terrain AO semantics; preserving prior source", error);
 			return;
 		}
 		RustGalTerrainRenderer.setCopiedShaderPackTerrainPolicy(separateAo, disableDirectionalShading);
 		copiedShaderPackVignetteEnabled = vignetteEnabled;
+		copiedShaderPackUnderwaterOverlayEnabled = underwaterOverlayEnabled;
 		pendingShaderPackSources = source;
 		pendingShaderPackSourceName = selectionKey;
 		boolean wasShaderPackSourceActive = shaderPackSourceActive;

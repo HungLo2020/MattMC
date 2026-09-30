@@ -113,7 +113,7 @@ public class ScreenEffectRenderer {
 	}
 
 	/** Extracts the resource-pack-backed underwater overlay through Rust GUI tiling. */
-	public void renderRustVulkanScreenEffects(net.minecraft.client.gui.GuiGraphics guiGraphics) {
+	public void renderRustVulkanScreenEffects(net.minecraft.client.gui.GuiGraphics guiGraphics, float itemFov) {
 		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
 			throw new IllegalStateException("Rust Vulkan screen-effect extraction requires an active whole-frame shell");
 		}
@@ -123,7 +123,19 @@ public class ScreenEffectRenderer {
 			return;
 		}
 		Player player = this.minecraft.player;
-		if (player.isEyeInFluid(FluidTags.WATER)) {
+		// Vanilla order: view-blocking block, then water, then fire.
+		// Match vanilla's no-physics behavior: spectator/no-clip cameras do not
+		// acquire a block-screen overlay even when their eye intersects a solid
+		// block.  Keep this decision in the semantic producer so Rust receives
+		// the same gameplay-visible overlay eligibility as OpenGL.
+		BlockState blockingState = player.noPhysics ? null : getViewBlockingState(player);
+		if (blockingState != null) {
+			submitRustViewBlockingOverlay(guiGraphics,
+				this.minecraft.getBlockRenderer().getBlockModelShaper().getParticleIcon(blockingState), itemFov);
+		}
+		// Iris: the pack may disable the underwater overlay (`underwaterOverlay`).
+		if (player.isEyeInFluid(FluidTags.WATER)
+			&& net.vulkanic.gui.RustGalFrameCoordinator.copiedShaderPackUnderwaterOverlayEnabled()) {
 			BlockPos blockPos = BlockPos.containing(player.getX(), player.getEyeY(), player.getZ());
 			float brightness = LightTexture.getBrightness(player.level().dimensionType(), player.level().getMaxLocalRawBrightness(blockPos));
 			int color = ARGB.colorFromFloat(0.1F, brightness, brightness, brightness);
@@ -136,7 +148,7 @@ public class ScreenEffectRenderer {
 			int height = guiGraphics.guiHeight();
 			// Vanilla spans four texture repeats in each screen axis. Tiled semantic
 			// blits preserve that repeat without requiring a Java atlas or GPU view.
-			guiGraphics.submitRustSemanticTiledBlit(
+			guiGraphics.submitRustSemanticTiledBlit(RenderPipelines.BLOCK_SCREEN_EFFECT,
 				UNDERWATER_LOCATION,
 				0, 0, width, height,
 				Math.max(1, width / 4), Math.max(1, height / 4),
@@ -144,34 +156,103 @@ public class ScreenEffectRenderer {
 			);
 		}
 		if (player.isOnFire()) {
-			TextureAtlasSprite fire = this.materials.get(ModelBakery.FIRE_1);
-			int width = guiGraphics.guiWidth();
-			int height = guiGraphics.guiHeight();
-			for (int side = 0; side < 2; side++) {
+			submitRustFireOverlay(guiGraphics, this.materials.get(ModelBakery.FIRE_1), itemFov);
+		}
+	}
+
+	/**
+	 * Vanilla draws two fire quads in view space ([-0.5, 0.5]^2 at z = -0.5,
+	 * translated by (-/+0.24, -0.3) and yawed -/+10 degrees) under the hand
+	 * projection. The GUI path is affine, so each quad is split into vertical
+	 * strips whose corners are projected exactly.
+	 */
+	private static void submitRustFireOverlay(net.minecraft.client.gui.GuiGraphics guiGraphics,
+			TextureAtlasSprite sprite, float itemFov) {
+		int width = guiGraphics.guiWidth();
+		int height = guiGraphics.guiHeight();
+		float tanHalf = (float) Math.tan(Math.toRadians(itemFov) * 0.5);
+		float aspect = width / (float) height;
+		float uMid = (sprite.getU0() + sprite.getU1()) * 0.5F;
+		float vMid = (sprite.getV0() + sprite.getV1()) * 0.5F;
+		float shrink = sprite.uvShrinkRatio();
+		float uA = Mth.lerp(shrink, sprite.getU1(), uMid); // x = -0.5
+		float uB = Mth.lerp(shrink, sprite.getU0(), uMid); // x = +0.5
+		float vTop = Mth.lerp(shrink, sprite.getV0(), vMid); // y = +0.5
+		float vBottom = Mth.lerp(shrink, sprite.getV1(), vMid); // y = -0.5
+		int color = ARGB.colorFromFloat(0.9F, 1.0F, 1.0F, 1.0F);
+		for (int side = 0; side < 2; side++) {
+			float sign = side * 2 - 1;
+			float yaw = (float) Math.toRadians(sign * 10.0F);
+			float cos = Mth.cos(yaw);
+			float sin = Mth.sin(yaw);
+			float offsetX = -sign * 0.24F;
+			for (int strip = 0; strip < FIRE_OVERLAY_STRIPS; strip++) {
+				float s0 = strip / (float) FIRE_OVERLAY_STRIPS;
+				float s1 = (strip + 1) / (float) FIRE_OVERLAY_STRIPS;
+				// Screen positions of the strip's top-left, top-right and bottom-left.
+				float[] topLeft = projectFireVertex(Mth.lerp(s0, -0.5F, 0.5F), 0.5F, cos, sin, offsetX, tanHalf, aspect, width, height);
+				float[] topRight = projectFireVertex(Mth.lerp(s1, -0.5F, 0.5F), 0.5F, cos, sin, offsetX, tanHalf, aspect, width, height);
+				float[] bottomLeft = projectFireVertex(Mth.lerp(s0, -0.5F, 0.5F), -0.5F, cos, sin, offsetX, tanHalf, aspect, width, height);
 				guiGraphics.pose().pushMatrix();
-				guiGraphics.pose().translate(width * 0.5F, height * 0.5F);
-				guiGraphics.pose().rotate((side * 2 - 1) * 10.0F * (float)Math.PI / 180.0F);
-				guiGraphics.pose().translate(-width * 0.5F, -height * 0.5F);
-				guiGraphics.submitRustSemanticBlit(
-					fire.atlasLocation(), 0, 0, width, height,
-					fire.getU0(), fire.getV0(), fire.getU1(), fire.getV1(), ARGB.colorFromFloat(0.9F, 1.0F, 1.0F, 1.0F)
+				// Map the unit square onto the parallelogram spanned by the
+				// strip's top edge and left edge.
+				guiGraphics.pose().mul(new org.joml.Matrix3x2f(
+					(topRight[0] - topLeft[0]) / FIRE_OVERLAY_UNIT, (topRight[1] - topLeft[1]) / FIRE_OVERLAY_UNIT,
+					(bottomLeft[0] - topLeft[0]) / FIRE_OVERLAY_UNIT, (bottomLeft[1] - topLeft[1]) / FIRE_OVERLAY_UNIT,
+					topLeft[0], topLeft[1]));
+				guiGraphics.submitRustSemanticBlit(RenderPipelines.FIRE_SCREEN_EFFECT,
+					sprite.atlasLocation(), 0, 0, FIRE_OVERLAY_UNIT, FIRE_OVERLAY_UNIT,
+					Mth.lerp(s0, uA, uB), vTop, Mth.lerp(s1, uA, uB), vBottom, color
 				);
 				guiGraphics.pose().popMatrix();
 			}
 		}
-		// Match vanilla's no-physics behavior: spectator/no-clip cameras do not
-		// acquire a block-screen overlay even when their eye intersects a solid
-		// block.  Keep this decision in the semantic producer so Rust receives
-		// the same gameplay-visible overlay eligibility as OpenGL.
-		BlockState blockingState = player.noPhysics ? null : getViewBlockingState(player);
-		if (blockingState != null) {
-			TextureAtlasSprite blocking = this.minecraft.getBlockRenderer().getBlockModelShaper().getParticleIcon(blockingState);
-			int color = ARGB.colorFromFloat(0.1F, 1.0F, 1.0F, 1.0F);
-			guiGraphics.submitRustSemanticBlit(
-				blocking.atlasLocation(), 0, 0, guiGraphics.guiWidth(), guiGraphics.guiHeight(),
-				blocking.getU0(), blocking.getV0(), blocking.getU1(), blocking.getV1(), color
-			);
-		}
+	}
+
+	private static final int FIRE_OVERLAY_STRIPS = 8;
+	private static final int FIRE_OVERLAY_UNIT = 1024;
+
+	/** Projects one fire-quad vertex (model x, y at z = -0.5) to GUI coordinates. */
+	private static float[] projectFireVertex(float x, float y, float cos, float sin, float offsetX,
+			float tanHalf, float aspect, int width, int height) {
+		float z = -0.5F;
+		float viewX = x * cos + z * sin + offsetX;
+		float viewY = y - 0.3F;
+		float viewZ = -x * sin + z * cos;
+		float depth = -viewZ;
+		float ndcX = viewX / (depth * aspect * tanHalf);
+		float ndcY = viewY / (depth * tanHalf);
+		return new float[] { (ndcX + 1.0F) * 0.5F * width, (1.0F - ndcY) * 0.5F * height };
+	}
+
+	/**
+	 * Vanilla draws the view-blocking sprite as a view-space quad spanning
+	 * [-1, 1] at z = -0.5 under the hand projection (`itemFov`), so the screen
+	 * shows only its central region, mirrored horizontally, tinted 0.1 grey
+	 * and opaque. Reproduce that exact screen-space UV window.
+	 */
+	private static void submitRustViewBlockingOverlay(net.minecraft.client.gui.GuiGraphics guiGraphics,
+			TextureAtlasSprite sprite, float itemFov) {
+		int width = guiGraphics.guiWidth();
+		int height = guiGraphics.guiHeight();
+		float halfHeight = 0.5F * (float) Math.tan(Math.toRadians(itemFov) * 0.5);
+		float halfWidth = halfHeight * width / (float) height;
+		// Visible quad extent in its own [-1, 1] units and the screen span it covers.
+		float quadX = Math.min(1.0F, halfWidth);
+		float quadY = Math.min(1.0F, halfHeight);
+		int x0 = Math.round(width * 0.5F * (1.0F - quadX / halfWidth));
+		int x1 = width - x0;
+		int y0 = Math.round(height * 0.5F * (1.0F - quadY / halfHeight));
+		int y1 = height - y0;
+		// Quad x = -1 samples u1 and x = +1 samples u0; y = +1 (top) samples v0.
+		float uLeft = Mth.lerp((1.0F - quadX) * 0.5F, sprite.getU1(), sprite.getU0());
+		float uRight = Mth.lerp((1.0F + quadX) * 0.5F, sprite.getU1(), sprite.getU0());
+		float vTop = Mth.lerp((1.0F - quadY) * 0.5F, sprite.getV0(), sprite.getV1());
+		float vBottom = Mth.lerp((1.0F + quadY) * 0.5F, sprite.getV0(), sprite.getV1());
+		guiGraphics.submitRustSemanticBlit(RenderPipelines.BLOCK_SCREEN_EFFECT,
+			sprite.atlasLocation(), x0, y0, x1 - x0, y1 - y0,
+			uLeft, vTop, uRight, vBottom, ARGB.colorFromFloat(1.0F, 0.1F, 0.1F, 0.1F)
+		);
 	}
 
 	private void renderItemActivationAnimation(PoseStack poseStack, float f, SubmitNodeCollector submitNodeCollector) {

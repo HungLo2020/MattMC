@@ -3,6 +3,12 @@ package net.vulkanic.gui;
 public enum GuiRenderStratum {
 	/** Flat semantic GUI rectangles, kept below specialized HUD strata. */
 	GUI_RECTANGLES("gui.rectangles", 100),
+	/**
+	 * First-person screen effects (view-blocking block, underwater, fire).
+	 * Vanilla draws them in the world pass after the hand, so they precede the
+	 * post effect and every HUD element.
+	 */
+	GUI_SCREEN_EFFECT("gui.screen-effect", 50),
 	GUI_POST_EFFECT("gui.post-effect", 80),
 	// Panorama is the pre-GUI background, including before the first menu
 	// blur boundary (source stratum 1, semantic phase order 3).

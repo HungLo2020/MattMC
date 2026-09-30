@@ -22,6 +22,8 @@ import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
  * shrink a buffer.
  */
 public class ChunkBuildBuffers {
+    private static final int INITIAL_FACING_QUAD_CAPACITY = 2048;
+
     private final Reference2ReferenceOpenHashMap<TerrainRenderPass, BakedChunkModelBuilder> builders = new Reference2ReferenceOpenHashMap<>();
 
     private final ChunkVertexType vertexType;
@@ -44,7 +46,10 @@ public class ChunkBuildBuffers {
 		this.separateAo = separateAo;
 
         for (TerrainRenderPass pass : DefaultTerrainRenderPasses.ALL) {
-            NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(128 * 1024 / 4);
+            // Initial per-facing quad capacity; the native builder doubles on
+            // demand. Pre-sizing every facing of every pass for 32K quads kept
+            // ~50 MB of scratch resident per worker context.
+            NativeSectionMeshBuilder sectionBuilder = NativeSectionMeshBuilder.create(INITIAL_FACING_QUAD_CAPACITY);
             var vertexBuffers = new NativeSectionMeshBuilder.FacingBuffer[ModelQuadFacing.COUNT];
 
             for (int facing = 0; facing < ModelQuadFacing.COUNT; facing++) {

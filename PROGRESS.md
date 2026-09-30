@@ -24,9 +24,10 @@ sky -> DH opaque -> vanilla opaque -> ... -> deferred (beginTranslucents) -> DH
 translucent -> vanilla translucent -> composites (was DH after all terrain and
 deferred after water: VL-cloud discard removed all water). Pairs: r4 day
 1.63/1.61/2.28; r32 land (150.5,100,530.5,0,5, shared DB) 19 -> 4.38/4.46/2.89;
-0 VUIDs. Open: DH hill band ~9 levels brighter on Current (not vlFactor: forcing 1
-is far brighter). Goal 3 regressions unchanged after the toggle fix. DH-off frames (0 LODs,
-define removed) admit normally.
+0 VUIDs. **Suspected Frozen bug #2 (awaiting user):** DH hill band ~7 brighter on Current.
+Diag packs (dh_terrain outputs): color/lmCoord/normal/shadow/playerPos match; Frozen's DH
+`noisetex` samples ~black (not pack noise.png) so pow(noise+.5) darkens. No prompt-doc
+edits, commits, pushes or Frozen changes; <=200 lines.
 **Suspected Frozen bug (user: note, ignore).** Look-down r32 (150.5,100,530.5,105,80)
 MAE 15/18/33: Frozen `composite` sees `textureSize(shadowcolor1)=0` with DH (no DH:
 `shadowtex0` 0x0) -> vlFactor pinned 1 -> haze; `final` binds the real maps.
@@ -40,56 +41,71 @@ Generic-on pairs: land 4.88/4.95/3.09, up 2.71/2.86/2.76 (2241 boxes), 0 VUIDs.
 packed slots reset+flush in both modes; meshes cached with shaders off stay
 unadmitted; Java calls allChanged + resends entity meshes once Rust accepts the
 source (re-arms in 1-2 frames). Real-config copy `~/.cache/mattmc-claude/realrun`
-via scratch `realtest.sh` (kills its client). **Perf (RD10, DH r128, shaders):**
-247->107 ms. Root cause: material wrapper keyed on mesh_asset_generation (now
-view+sampler) retired every pack/DH set per mesh update; lightmap/voxel changes
-release DH set-one only. Plus shared
+via scratch `realtest.sh` (kills its client; now `-PmattmcRustProfile=release` like
+RunDev — the old ms figures were a dev build). **Perf (RD10, DH r128, shaders):**
+material wrapper keyed on mesh_asset_generation (now view+sampler) retired every
+pack/DH set per mesh update; lightmap/voxel changes release DH set-one only; shared
 DH scalar block + column-frame ring; generic boxes grouped by DH group ordinal
-(flags 16-31), anchored at the first box. Encoder: env switches cached, pipeline
-pass-kind memo (encode 27->14 ms). Voxel list memo applies with DH sans dh_shadow.
-Left: hazard 10, entities 15-18, setup 11-14, occupancy 8-10 while streaming.
-Regressions after perf: day 2.38/2.10/2.50, glass 7.48/6.41/4.55, down 7.11/7.64/
-7.06, off 0.14/0.24/0.23, gun 2.18, pane 2.37, DH generic 4.73/4.83/2.98, 0 VUIDs.
-Day vs 09-27 (same Frozen image, diff 0.18) unchanged 2.53 mean; earlier 2.27 runs
-used a different Frozen fixture state (Frozen-vs-Frozen 14). Timing bisect: none.
-No prompt-doc edits, commits, pushes, or Frozen changes; <=200 lines. Java: semantics.
+(flags 16-31); encoder env switches cached + pass-kind memo; terrain validation
+cached per (stratum,key,generation) (cleared on pack/material/texture change);
+generic validation without geometry. Release: frontend 17.5 ms median, admit 2.1.
+**Memory (real config, RSS 14.5 GB = java heap memfd 7.9 + anon 5.3 + nvidia 1.1):**
+Rust heap 4.25 -> 2.34 GB. Sodium section builders pre-sized 32K quads x 7 facings
+x 3 passes per worker (1.15 GB) -> 2048 growing. DH columns kept CPU payload until
+first visible (0.83 GB) -> off-screen columns upload 8 MB/frame, then release.
+Found by that change: shadow-caster sweep skipped columns whose chunk arrived after
+the cursor (caster set timing-dependent, 2776 vs 4714 sections) -> deferred retry.
+Left: mesh vertex 756 MB + semantic 529 MB CPU copies. RSS peaks now land 9.1 vs
+Frozen 9.5, water 10.8 vs 9.7 (were 12.0/12.8, guard failures).
+**Screen effects (Rust GUI):** in-wall used alpha .1 white (vanilla: opaque .1 grey,
+mirrored, central window of the z=-.5 quad under itemFov) -> in-wall pair 84-119 ->
+1.6 MAE; underwater overlay now honors copied `underwaterOverlay`; fire = vanilla's two
+yawed quads projected (8 affine strips); all in new stratum GUI_SCREEN_EFFECT (50,
+below post effect/HUD; dynamic layers >=10000 were drawn over the Rust hotbar).
+**Tour (real config, DH r128, shaders; nether/end/walk/F5):** walk crashed "shadow
+candidate section bound exceeded" (full sweep > 4096) -> own 12288 bound, nearest kept.
+End fell back all visit (End sky quads: depth disabled) -> skytextured box (selector 2,
+36-vertex primitive, CUSTOM_SKY). MC_RENDER_STAGE_* now Iris ordinals (were stale:
+translucent 15/rain 19/entities 23/HAND); hand = HAND_SOLID/_TRANSLUCENT. 1-frame
+fallbacks remain on dimension change (DH depth snapshot / shadowtex0).
+**Robustness (09-30):** a failed recording (GUI validation) consumed the plan without
+discarding DH targets -> every later frame "already awaiting" (1309 fallbacks); now
+discarded on failure and stale ones at entry; stale occupancy submissions are dropped
+before append (vanilla fallback crashed "colored-light ... awaiting"). Spectator/empty
+GUI emitted an empty load/store pass -> rejected every frame; such passes are stripped.
+Real-config tours (shaders+DH r128): F1/F3/inventory/pause/chat/F5 and RD 16->6->10
+mid-game: 0 crashes, only startup fallbacks. Regressions 09-30: day 2.38, glass 7.42,
+down 7.16, gun 2.20, pane 2.38, DH land 5.04 (Frozen run-to-run ~0.6), up 2.55; off
+0.26-0.43 = water animation phase only (non-water 0.03).
+**DH water:** dh_water now writes depth like DH TRANSPARENT (dhDepthTex0 vs 1): streaks
+gone, w-north 4.41 -> 4.13. Rings also appear without DH (RD8): deferred 09-26 water gap.
+**Scenarios:** r128 needs a pregenerated DB; water poses flake on DH payload churn.
+**Perf (bench.sh, g4src, RD10, DH r32, moving):** 39.8 fps vs Frozen 9.5; RSS 12.3 vs 12.6.
 
 ## Current gate (2026-09-25)
 
-Canonical pair: `Origin`, 1280x720, camera `150.5,100,530.5,105,10`, RD 4, DH off,
-one two-mode `Capture.py` run (Current Rust Vulkan + Frozen OpenGL shaders-on,
-`--rust-selected-source-execution`), pack `run/shaderpacks/ComplementaryHungLoIfied
-.zip` (SHA-256 `cb4343913a0d...`) staged via `MATTMC_CAPTURE_SHADER_PACK_SOURCE`
-(harness verifies the receipt). Mask chat x<1000,y=570..609. Shadow terrain unculled.
+Canonical pair: `Origin`, 1280x720, `150.5,100,530.5,105,10`, RD 4, DH off, one two-mode
+`Capture.py` run (`--rust-selected-source-execution`), pack ComplementaryHungLoIfied.zip
+(SHA-256 `cb4343913a0d...`) via `MATTMC_CAPTURE_SHADER_PACK_SOURCE`. Mask chat x<1000,y=570..609.
 
 ## Validation and history
 
-Celestial quads: pre-terrain sky writer only. Only programs declaring
-`colortexNMipmapEnabled` sample mips.
+Celestial/End-sky quads: pre-terrain sky writer only; mips only if declared.
 **Night/rain gap: deferred by the user (2026-09-25); not a Frozen bug.** Night
 5.47/6.78/10.83, rain 8.14/9.34/8.83 (night fog brighter/bluer; dither).
-**Iris hand order (09-25).** Non-DH Depth32 hands: depthtex2 snapshot -> hand
-pass -> hand depth into main depth -> depthtex1 -> deferred -> translucents.
-Entity-shadow decals omitted when the pack owns a shadow pass.
-**Shadow map orientation + casters (2026-09-25).** Source shadow pipelines use
-`RasterYDirection::Down` (use `gl_FragCoord` in a world stage to check it). Java
-sweeps the render window for off-camera casters (384 builds/256 columns per
-frame). Layered overlays fold VIEW_OFFSET_Z_LAYERING into the instance transform.
+**Iris hand order (09-25).** depthtex2 snapshot -> hand -> hand depth into main depth
+-> depthtex1 -> deferred -> translucents. Entity-shadow decals omitted with a shadow pass.
+**Shadow map (09-25).** Source shadow pipelines use `RasterYDirection::Down`. Java
+sweeps the window for off-camera casters (384/256 per frame; unloaded columns retried).
 Look-down residual is timing (dither 0.5 + `WAVING_SPEED 0`: 4.96/4.52/3.45). Gaps:
 energy swirl unadmitted (Iris: gbuffers_entities, ENTITIES_CUTOUT, pipeline's
 additive blend + texture matrix); no Iris program fallback chains;
 `texture2D(sampler2DShadow, vec2)` rejected; edited water sources unadmitted.
 
-**Glint (09-27):** Iris draws every glint with `ShaderKey.GLINT` (position+UV,
-`gl_Color=(1,1,1,glintStrength)`, glint texture matrix, GLINT blend, EQUAL depth,
-no write/cull, alpha>0.0001) via `EntityGlint`/`HandGlint` load-only passes;
-`invariant gl_Position` fixed EQUAL streaks (trident 7.25 -> 2.34). Decal foil
-glint uses per-pose SheetedDecal UVs. Entity/hand alpha tests run on output 0
-after `main`, as Iris appends them (clock 3.50 -> 2.95). Harness: chicken/horse
-differ on Frozen (mob pose); the spawner evidence rule never matches.
-**Camera-motion smear (09-27):** same-frame `camera_history` calls returned
-previous = current, so TAA/reflection filters saw no motion; fixed (motion pair
-sharpness 135 vs 256 -> 173 vs 183; arm residual is harness timing).
+**Glint (09-27):** Iris `ShaderKey.GLINT` (GLINT blend, EQUAL depth, no write/cull) in
+load-only passes; `invariant gl_Position` fixed EQUAL streaks; alpha tests after main.
+**Camera-motion smear (09-27):** same-frame `camera_history` returned previous =
+current (TAA saw no motion); fixed (sharpness 135 vs 256 -> 173 vs 183).
 **Held items / hand passes (2026-09-27).** Crash on hotbar switch fixed:
 `currentRenderedItemId` now resolves from the drawn mesh (vanilla draws the old
 stack during the equip animation), as Iris does. Block items resolve the pack's
@@ -104,22 +120,17 @@ Gaps: gun muzzle/stock-edge shading; `gbuffers_hand_water` packs unadmitted. Gun
 sprite (raw phase order, not `dynamicLayerOrder/Id`); the raster now uses
 Frozen's PIP pose scale(f,f,-f)*scale(1,-1,-1) and new GUI lighting modes
 6/7 (OversizedItemRenderer ITEMS_3D / ITEMS_FLAT by `usesBlockLight`).
-Shader-off gun pair 0.41/0.70/0.80 -> 0.14/0.25/0.24 (one barrel-top px row
-differs). TACZ GUI capture cache is skipped while its animation is active; a
-selected-slot icon offset in shader-on pairs is wall-clock TACZ animation timing
-(first-person poses match). World item layers carry `minecraft:item_entity/ground/<ns>/<path>`
-(`ItemStackRenderState.submitSemantic`); other entity draws get 0 (Iris resets).
-Gap: dropped flat foil item under clamp-glint fixture: washed on Frozen, opaque here.
+Shader-off gun pair 0.41/0.70/0.80 -> 0.14/0.25/0.24; TACZ icon offset = animation timing. World item layers carry `minecraft:item_entity/ground/<ns>/<path>`
+(`submitSemantic`); others 0. Gap: dropped flat foil item (clamp-glint) opaque here.
 **Crash robustness (2026-09-27).** A failed armed submission within 60 frames
 of (re)arming disarms and redraws that frame on the vanilla Rust route; later
 failures disarm and return `retryable selected-source failure` (Java resubmits
 once); a missing DH depth snapshot after a world change disarms in admission.
 GUI item layers are compacted, not rejected. Dimension tour: 0 crashes/VUIDs
 (program identities carry a dimension tag, shadow identity a content hash;
-writer-declared shadow roles are staged even if terrain samples none). Vanilla's below-horizon dark disc is sky geometry (Iris:
-skybasic), skipped by the textured writer. Deferred water gap: underwater pair
-152.5,60,499.5,180,10 is 131.8/152.9/168.7 (Frozen near-black water fog).
-Sweeps (hotbar, block-entity/mob models): 0 fallbacks; fixed XP orbs, End portals.
+writer-declared shadow roles are staged even if terrain samples none). Below-horizon
+dark disc is sky geometry (skybasic). The old "underwater" 131/152/168 gap was the
+camera inside the seabed: missing in-wall overlay (fixed 09-29, see above).
 **Block edits (09-28):** placed/broken blocks could stay invisible (both routes;
 more often with shaders): an edited section invalidated while its build was in
 flight was re-dispatched into the in-flight gate and dropped, and edits waited
@@ -144,24 +155,16 @@ uninitialized volume uploads a cleared field like Iris; full stream slots wait
 for the oldest; stale pending lightmaps are discarded at frame entry and never
 promoted unuploaded (injected failures 1/5 -> 0/35). Occupancy is exact-
 incremental (randomized equivalence test): per-box patches, in-place shift on
-cell crossings; 230 ms/frame while loading -> 0.5 ms static, walking p50 3.9/p95 20 ms. Gap: the per-asset voxel vertex cache keeps
-pack material ids until the asset reloads. Pairs after the perf pass: day 2.26/1.82/2.12,
-glass 6.67/5.61/4.42, down 6.83/7.54/6.60, off 0.13/0.22/0.22, gun 2.07/1.63/2.07,
-pane 2.32/1.81/2.10, 0 VUIDs; Rust suite 1877. Entity/hand source normals are
-Iris's in-level BufferBuilder face normal (diagonal cross, authored side; the
-vertex stage flips it under a mirroring pose): cow 2.09/1.64/2.06, gun
-2.11/1.66/2.09, banner 2.22/1.87/2.27. Gun gap: muzzle cap/front sight px. TaCZ
-fire/reload/aim: 0 fallbacks/VUIDs; 50 ms muzzle flash shading unverified.
-**Casters / outline (09-26).** Player/vehicle casters: entity `shadow` stage only.
-Selection box: pack `gbuffers_line` into colortex0/6 after the opaque flush
-(`line_contract` lowers Iris-injected va*/matrix inputs; LINES quads s,s,e,e;
-own `Lines` phase). Outline crop MAE 0.42/0.70/0.51 (146.5,66,530.5,105,60).
+cell crossings (walking p50 3.9/p95 20 ms). Gap: voxel vertex cache keeps pack material
+ids until the asset reloads. Entity/hand normals = Iris BufferBuilder face normal
+(cow 2.09, banner 2.22). Gun gap: muzzle cap/front sight px. TaCZ: 0 fallbacks.
+**Casters / outline (09-26).** Player casters: entity `shadow` stage only. Selection
+box: pack `gbuffers_line` after the opaque flush (LINES quads s,s,e,e); MAE .42/.70/.51.
 **Block breaking via `gbuffers_damagedblock` (2026-09-27).** Crumbling draws
 with the pack's damagedblock program after the outline, before
 `beginTranslucents` (vanilla CRUMBLING state, bias -1/-10, alphaTest default
 0.1); terrain cracks copy vanilla model quads with SheetedDecal UVs. An armed
-route meeting an uncoverable frame disarms (`admit_armed_source_frame`).
-Sign-breaking pair 2.542/2.228/2.779, 0 VUIDs (terrain cracks Current-only).
+route meeting an uncoverable frame disarms (`admit_armed_source_frame`). Sign pair 2.54.
 **Translucent/water fixes (2026-09-26).** DYNAMIC sorted runs map to one
 `index_subrange`; source translucent terrain writes depth; discarded frames
 re-queue first-use uploads; sorted-index updates retire cached geometry; Iris

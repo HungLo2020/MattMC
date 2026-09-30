@@ -3050,7 +3050,7 @@ mod tests {
     }
 
     #[test]
-    fn source_celestial_quad_records_owned_six_vertex_geometry() {
+    fn source_celestial_quad_records_owned_sky_box_capacity_geometry() {
         let source = source(
             "#version 130\nin vec2 uv;\nvoid main() { gl_FragData[0] = vec4(uv, 0.0, 1.0); }",
         );
@@ -3099,7 +3099,7 @@ mod tests {
         assert!(operations.iter().any(|operation| matches!(
             operation,
             CommandOp::Draw {
-                vertices: 6,
+                vertices: 36,
                 instances: 1
             }
         )));

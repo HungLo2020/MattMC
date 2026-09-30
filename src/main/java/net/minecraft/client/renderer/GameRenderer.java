@@ -1310,7 +1310,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		// transports the boundary stratum and bounded radius through the whole-frame
 		// ABI, and Rust's GUI frontend owns the snapshot/blur/composite passes.
 		// Do not mark this implemented path unavailable or reopen Java PostChain.
-		this.screenEffectRenderer.renderRustVulkanScreenEffects(guiGraphics);
+		this.screenEffectRenderer.renderRustVulkanScreenEffects(guiGraphics, this.getFov(this.mainCamera, f, false));
 		if (gameLoadFinished && bl && this.minecraft.level != null) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("gui.hud-render");
 			this.minecraft.gui.render(guiGraphics, deltaTracker);

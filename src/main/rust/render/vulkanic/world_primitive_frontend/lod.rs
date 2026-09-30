@@ -5863,7 +5863,10 @@ impl WorldLodSourcePassResources {
             created.push(fragment_shader);
             let (blend, depth_write) = match (program.pass_kind, program.translucent_blend) {
                 (DistantHorizonsPassKind::Opaque, None) => (BlendMode::Disabled, true),
-                (DistantHorizonsPassKind::Translucent, Some(_)) => (BlendMode::Alpha, false),
+                // DH's TRANSPARENT render state keeps depth writes on, so
+                // Iris's dhDepthTex0 holds the water surface (composites
+                // compare it with the pre-translucent dhDepthTex1).
+                (DistantHorizonsPassKind::Translucent, Some(_)) => (BlendMode::Alpha, true),
                 (DistantHorizonsPassKind::Opaque, Some(_)) => {
                     return Err(GalError::invalid_argument(
                         "opaque Distant Horizons source pipeline cannot carry translucent blend semantics",
@@ -6778,6 +6781,9 @@ impl WorldLodGpuColumnResources {
 /// pipeline, material, or draw operation: a completed material/pass contract
 /// must select those separately. Uploads are staged into the caller's combined
 /// frame submission and commit only once that submission is accepted.
+/// Host bytes of off-screen DH columns staged for upload per frame.
+const WORLD_LOD_PREFETCH_UPLOAD_BYTES_PER_FRAME: usize = 8 * 1024 * 1024;
+
 #[derive(Default)]
 pub(crate) struct WorldLodGpuResidency {
     active: BTreeMap<u64, WorldLodGpuColumnResources>,
@@ -6830,6 +6836,31 @@ impl WorldLodGpuResidency {
                 ));
             }
             requested.insert(instance.column_key);
+        }
+        // DH uploads every loaded column, not only the visible ones. Uploading
+        // off-screen columns too (bounded per frame) lets their CPU copies be
+        // released once confirmed instead of being kept until they come into
+        // view.
+        let mut prefetch_budget = WORLD_LOD_PREFETCH_UPLOAD_BYTES_PER_FRAME;
+        for (column_key, asset) in assets {
+            if prefetch_budget == 0 {
+                break;
+            }
+            if requested.contains(column_key)
+                || self.active.get(column_key).is_some_and(|resources| {
+                    resources.column_generation == asset.column_generation
+                })
+                || !asset.segments.iter().all(WorldLodGpuSegment::upload_payload_is_present)
+            {
+                continue;
+            }
+            let bytes = asset
+                .segments
+                .iter()
+                .map(|segment| segment.vertex_bytes.len() + segment.index_bytes.len())
+                .sum::<usize>();
+            prefetch_budget = prefetch_budget.saturating_sub(bytes);
+            requested.insert(*column_key);
         }
 
         let mut created = BTreeMap::new();
@@ -9975,6 +10006,37 @@ mod tests {
         assert!(residency
             .resolve_visible_draws_cached_into(&assets, &[instance], &mut cached)
             .is_err());
+    }
+
+    #[test]
+    fn off_screen_columns_are_prefetched_for_payload_release() {
+        let packed = pack_world_lod_gpu_column_asset(&expand_world_lod_column_asset(&asset()).unwrap()).unwrap();
+        let mut off_screen = packed.clone();
+        off_screen.column_key = 8;
+        let assets = BTreeMap::from([(packed.column_key, packed), (8, off_screen)]);
+        let visible = [WorldLodColumnInstanceRequest {
+            column_key: 7,
+            column_generation: 3,
+            layer: WORLD_LOD_LAYER_OPAQUE,
+            segment_index: 0,
+            order: 0,
+        }];
+        let mut gal = VulkanicGal::new_with_backend(
+            Box::new(MockBackend::with_capabilities(presentation_capabilities(
+                vulkan_capabilities(),
+            ))),
+            false,
+        );
+        let mut residency = WorldLodGpuResidency::default();
+        let mut ops = Vec::new();
+        residency
+            .stage_visible_uploads(&mut gal, &assets, &visible, &mut ops)
+            .unwrap();
+        residency.confirm_submission(&mut gal).unwrap();
+        assert_eq!(Some(3), residency.active_generation(7));
+        assert_eq!(Some(3), residency.active_generation(8));
+        // Only the visible column is drawn.
+        assert_eq!(1, residency.resolve_visible_draws(&assets, &visible).unwrap().len());
     }
 
     #[test]
