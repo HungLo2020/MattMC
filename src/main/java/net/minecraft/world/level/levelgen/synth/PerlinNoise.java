@@ -146,22 +146,7 @@ public class PerlinNoise {
 
 	@Deprecated
 	public double getValue(double d, double e, double f, double g, double h, boolean bl) {
-		double i = 0.0;
-		double j = this.lowestFreqInputFactor;
-		double k = this.lowestFreqValueFactor;
-
-		for (int l = 0; l < this.noiseLevels.length; l++) {
-			ImprovedNoise improvedNoise = this.noiseLevels[l];
-			if (improvedNoise != null) {
-				double m = improvedNoise.noise(wrap(d * j), bl ? -improvedNoise.yo : wrap(e * j), wrap(f * j), g * j, h * j);
-				i += this.amplitudes.getDouble(l) * m * k;
-			}
-
-			j *= 2.0;
-			k /= 2.0;
-		}
-
-		return i;
+		return nativeNoise().sample(d, e, f, g, h, bl ? 1 : 0);
 	}
 
 	public double maxBrokenValue(double d) {
@@ -222,4 +207,38 @@ public class PerlinNoise {
 		stringBuilder.append("]");
 		stringBuilder.append("}");
 	}
+
+	private volatile NativeNoise nativeNoise;
+	NativeNoise nativeNoise() {
+		NativeNoise value = nativeNoise;
+		if (value == null || !matchesAmplitudes(value)) {
+			synchronized (this) {
+				value = nativeNoise;
+				if (value == null || !matchesAmplitudes(value)) {
+					var state = NativeNoise.allocate(2, noiseLevels.length, 0, 0, lowestFreqInputFactor, lowestFreqValueFactor);
+					writeNative(state, 0);
+					value = new NativeNoise(state);
+					nativeNoise = value;
+				}
+			}
+		}
+		return value;
+	}
+
+	// The public factories accept mutable lists. Preserve changes made after first use.
+	boolean matchesAmplitudes(NativeNoise value) {
+		for (int i = 0; i < noiseLevels.length; i++)
+			if (noiseLevels[i] != null && Double.doubleToRawLongBits(amplitudes.getDouble(i)) !=
+				Double.doubleToRawLongBits(value.amplitudes[i])) return false;
+		return true;
+	}
+
+	int octaveCount() { return noiseLevels.length; }
+	double inputFactor() { return lowestFreqInputFactor; }
+	double valueFactor() { return lowestFreqValueFactor; }
+	void writeNative(java.lang.foreign.MemorySegment state, int start) {
+		for (int i = 0; i < noiseLevels.length; i++)
+			if (noiseLevels[i] != null) noiseLevels[i].writeNative(state, start + i, amplitudes.getDouble(i));
+	}
+
 }

@@ -61,19 +61,25 @@ public class PerlinSimplexNoise {
 	}
 
 	public double getValue(double d, double e, boolean bl) {
-		double f = 0.0;
-		double g = this.highestFreqInputFactor;
-		double h = this.highestFreqValueFactor;
-
-		for (SimplexNoise simplexNoise : this.noiseLevels) {
-			if (simplexNoise != null) {
-				f += simplexNoise.getValue(d * g + (bl ? simplexNoise.xo : 0.0), e * g + (bl ? simplexNoise.yo : 0.0)) * h;
-			}
-
-			g /= 2.0;
-			h *= 2.0;
-		}
-
-		return f;
+		return nativeNoise().sample(d, e, 0.0, 0.0, 0.0, bl ? 1 : 0);
 	}
+
+	private volatile NativeNoise nativeNoise;
+	NativeNoise nativeNoise() {
+		NativeNoise value = nativeNoise;
+		if (value == null) {
+			synchronized (this) {
+				value = nativeNoise;
+				if (value == null) {
+					var state = NativeNoise.allocate(6, noiseLevels.length, 0, 0, highestFreqInputFactor, highestFreqValueFactor);
+					for (int i = 0; i < noiseLevels.length; i++)
+						if (noiseLevels[i] != null) noiseLevels[i].writeNative(state, i);
+					value = new NativeNoise(state);
+					nativeNoise = value;
+				}
+			}
+		}
+		return value;
+	}
+
 }

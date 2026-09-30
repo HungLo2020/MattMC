@@ -127,6 +127,26 @@ public final class RandomState {
 			.computeIfAbsent(resourceLocation, resourceLocation2 -> this.random.fromHashOf(resourceLocation).forkPositional());
 	}
 
+    private final Map<DensityFunction, DensityFunction> nativeDensities = new ConcurrentHashMap<>();
+    private final Map<java.util.List<net.minecraft.world.level.levelgen.synth.NativeUnaryProgram.Step>, net.minecraft.world.level.levelgen.synth.NativeUnaryProgram> unaryPrograms = new ConcurrentHashMap<>();
+    private final Map<NativeOperands.Key,net.minecraft.world.level.levelgen.synth.NativeDensityProgram> operandPrograms = new ConcurrentHashMap<>();
+
+    private final Map<NativeCellDensity.Key,net.minecraft.world.level.levelgen.synth.NativeDensityProgram> cellPrograms = new ConcurrentHashMap<>();
+    DensityFunction optimizeUnary(DensityFunction function) {
+        return NativeUnary.tree(function, unaryPrograms, operandPrograms, cellPrograms);
+    }
+
+    DensityFunction optimizeDensity(DensityFunction function) {
+        if (!NativeDensity.candidate(function)) return function;
+        DensityFunction cached = nativeDensities.get(function);
+        if (cached != null) return cached;
+        DensityFunction compiled = NativeDensity.compile(function);
+        // Never retain unsupported expressions: they can reference a live NoiseChunk.
+        if (compiled == function) return function;
+        DensityFunction previous = nativeDensities.putIfAbsent(function, compiled);
+        return previous == null ? compiled : previous;
+    }
+
 	public NoiseRouter router() {
 		return this.router;
 	}

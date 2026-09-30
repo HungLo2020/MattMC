@@ -7,7 +7,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Locale;
 import java.util.stream.IntStream;
 import net.minecraft.util.KeyDispatchDataCodec;
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
@@ -75,58 +74,16 @@ public class BlendedNoise implements DensityFunction.SimpleFunction {
 
 	@Override
 	public double compute(DensityFunction.FunctionContext functionContext) {
-		double d = functionContext.blockX() * this.xzMultiplier;
-		double e = functionContext.blockY() * this.yMultiplier;
-		double f = functionContext.blockZ() * this.xzMultiplier;
-		double g = d / this.xzFactor;
-		double h = e / this.yFactor;
-		double i = f / this.xzFactor;
-		double j = this.yMultiplier * this.smearScaleMultiplier;
-		double k = j / this.yFactor;
-		double l = 0.0;
-		double m = 0.0;
-		double n = 0.0;
-		boolean bl = true;
-		double o = 1.0;
-
-		for (int p = 0; p < 8; p++) {
-			ImprovedNoise improvedNoise = this.mainNoise.getOctaveNoise(p);
-			if (improvedNoise != null) {
-				n += improvedNoise.noise(PerlinNoise.wrap(g * o), PerlinNoise.wrap(h * o), PerlinNoise.wrap(i * o), k * o, h * o) / o;
-			}
-
-			o /= 2.0;
-		}
-
-		double q = (n / 10.0 + 1.0) / 2.0;
-		boolean bl2 = q >= 1.0;
-		boolean bl3 = q <= 0.0;
-		o = 1.0;
-
-		for (int r = 0; r < 16; r++) {
-			double s = PerlinNoise.wrap(d * o);
-			double t = PerlinNoise.wrap(e * o);
-			double u = PerlinNoise.wrap(f * o);
-			double v = j * o;
-			if (!bl2) {
-				ImprovedNoise improvedNoise2 = this.minLimitNoise.getOctaveNoise(r);
-				if (improvedNoise2 != null) {
-					l += improvedNoise2.noise(s, t, u, v, e * o) / o;
-				}
-			}
-
-			if (!bl3) {
-				ImprovedNoise improvedNoise2 = this.maxLimitNoise.getOctaveNoise(r);
-				if (improvedNoise2 != null) {
-					m += improvedNoise2.noise(s, t, u, v, e * o) / o;
-				}
-			}
-
-			o /= 2.0;
-		}
-
-		return Mth.clampedLerp(l / 512.0, m / 512.0, q) / 128.0;
+		return nativeNoise().sample(functionContext.blockX(), functionContext.blockY(), functionContext.blockZ());
 	}
+
+    /** Raw block coordinates, sampled by the same native state as compute. */
+    public void fillNative(double[] coordinates, double[] output) {
+        fillNative(coordinates, output, output.length);
+    }
+    public void fillNative(double[] coordinates, double[] output, int count) {
+        nativeNoise().batch(coordinates, output, count, 0., 0., 0);
+    }
 
 	@Override
 	public double minValue() {
@@ -163,4 +120,24 @@ public class BlendedNoise implements DensityFunction.SimpleFunction {
 	public KeyDispatchDataCodec<? extends DensityFunction> codec() {
 		return CODEC;
 	}
+
+	private volatile NativeNoise nativeNoise;
+	NativeNoise nativeNoise() {
+		NativeNoise value = nativeNoise;
+		if (value == null) {
+			synchronized (this) {
+				value = nativeNoise;
+				if (value == null) {
+					var state = NativeNoise.allocate(4, 16, 16, 8, xzMultiplier, yMultiplier, xzFactor, yFactor, smearScaleMultiplier);
+					minLimitNoise.writeNative(state, 0);
+					maxLimitNoise.writeNative(state, 16);
+					mainNoise.writeNative(state, 32);
+					value = new NativeNoise(state);
+					nativeNoise = value;
+				}
+			}
+		}
+		return value;
+	}
+
 }

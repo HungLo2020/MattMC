@@ -14,7 +14,6 @@ import net.minecraft.resources.RegistryFileCodec;
 import net.minecraft.util.RandomSource;
 
 public class NormalNoise {
-	private static final double INPUT_FACTOR = 1.0181268882175227;
 	private static final double TARGET_DEVIATION = 0.3333333333333333;
 	private final double valueFactor;
 	private final PerlinNoise first;
@@ -73,10 +72,7 @@ public class NormalNoise {
 	}
 
 	public double getValue(double d, double e, double f) {
-		double g = d * 1.0181268882175227;
-		double h = e * 1.0181268882175227;
-		double i = f * 1.0181268882175227;
-		return (this.first.getValue(d, e, f) + this.second.getValue(g, h, i)) * this.valueFactor;
+		return nativeNoise().sample(d, e, f);
 	}
 
 	public NormalNoise.NoiseParameters parameters() {
@@ -111,4 +107,29 @@ public class NormalNoise {
 			this(i, Util.make(new DoubleArrayList(ds), doubleArrayList -> doubleArrayList.add(0, d)));
 		}
 	}
+
+	private volatile NativeNoise nativeNoise;
+	NativeNoise nativeNoise() {
+		NativeNoise value = nativeNoise;
+		if (value == null || !first.matchesAmplitudes(value)) {
+			synchronized (this) {
+				value = nativeNoise;
+				if (value == null || !first.matchesAmplitudes(value)) {
+					var state = NativeNoise.allocate(3, first.octaveCount(), second.octaveCount(), 0,
+						first.inputFactor(), first.valueFactor(), second.inputFactor(), second.valueFactor(), valueFactor);
+					first.writeNative(state, 0);
+					second.writeNative(state, first.octaveCount());
+					value = new NativeNoise(state);
+					nativeNoise = value;
+				}
+			}
+		}
+		return value;
+	}
+
+	/** Evaluate packed xyz triples in one bounded native batch at a time. */
+	public void fill(double[] xyz, double[] output) {
+		nativeNoise().batch(xyz, output, 0.0, 0.0, 0);
+	}
+
 }

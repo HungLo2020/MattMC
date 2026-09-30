@@ -517,27 +517,4 @@ public class NoiseRouterData {
 		return DensityFunctions.lerp(densityFunction4, e, densityFunction2);
 	}
 
-	protected static final class QuantizedSpaghettiRarity {
-		protected static double getSphaghettiRarity2D(double d) {
-			if (d < -0.75) {
-				return 0.5;
-			} else if (d < -0.5) {
-				return 0.75;
-			} else if (d < 0.5) {
-				return 1.0;
-			} else {
-				return d < 0.75 ? 2.0 : 3.0;
-			}
-		}
-
-		protected static double getSpaghettiRarity3D(double d) {
-			if (d < -0.5) {
-				return 0.75;
-			} else if (d < 0.0) {
-				return 1.0;
-			} else {
-				return d < 0.5 ? 1.5 : 2.0;
-			}
-		}
-	}
 }

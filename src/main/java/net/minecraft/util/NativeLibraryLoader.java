@@ -24,6 +24,10 @@ public final class NativeLibraryLoader {
 		return LINKER.downcallHandle(loadRustSymbol(libraryName, symbolName), descriptor);
 	}
 
+	public static MethodHandle downcallHandle(String libraryName, String symbolName, FunctionDescriptor descriptor, Linker.Option... options) {
+		return LINKER.downcallHandle(loadRustSymbol(libraryName, symbolName), descriptor, options);
+	}
+
 	private static MemorySegment loadRustSymbol(String libraryName, String symbolName) {
 		return rustLibraryLookup(libraryName)
 				.find(symbolName)

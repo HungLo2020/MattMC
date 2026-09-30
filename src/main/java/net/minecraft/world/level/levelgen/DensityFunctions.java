@@ -1,11 +1,11 @@
 package net.minecraft.world.level.levelgen;
 
+import net.minecraft.world.level.levelgen.synth.NativeDensityMath;
 import com.mojang.datafixers.util.Either;
 import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import it.unimi.dsi.fastutil.doubles.Double2DoubleFunction;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -37,7 +37,10 @@ public final class DensityFunctions {
 	public static final Codec<DensityFunction> DIRECT_CODEC = Codec.either(NOISE_VALUE_CODEC, CODEC)
 		.xmap(
 			either -> either.map(DensityFunctions::constant, Function.identity()),
-			densityFunction -> densityFunction instanceof DensityFunctions.Constant constant ? Either.left(constant.value()) : Either.right(densityFunction)
+			densityFunction -> {
+                densityFunction = NativeDensity.unwrap(densityFunction);
+                return densityFunction instanceof DensityFunctions.Constant constant ? Either.left(constant.value()) : Either.right(densityFunction);
+            }
 		);
 
 	public static MapCodec<? extends DensityFunction> bootstrap(Registry<MapCodec<? extends DensityFunction>> registry) {
@@ -262,53 +265,64 @@ public final class DensityFunctions {
 
 	record Ap2(DensityFunctions.TwoArgumentSimpleFunction.Type type, DensityFunction argument1, DensityFunction argument2, double minValue, double maxValue)
 		implements DensityFunctions.TwoArgumentSimpleFunction {
-		@Override
-		public double compute(DensityFunction.FunctionContext functionContext) {
-			double d = this.argument1.compute(functionContext);
+        private int nativeOperation() {
+            return switch (this.type) { case ADD -> 8; case MUL -> 9; case MIN -> 10; case MAX -> 11; };
+        }
 
-			return switch (this.type) {
-				case ADD -> d + this.argument2.compute(functionContext);
-				case MUL -> d == 0.0 ? 0.0 : d * this.argument2.compute(functionContext);
-				case MIN -> d < this.argument2.minValue() ? d : Math.min(d, this.argument2.compute(functionContext));
-				case MAX -> d > this.argument2.maxValue() ? d : Math.max(d, this.argument2.compute(functionContext));
-			};
-		}
+        @Override
+        public double compute(DensityFunction.FunctionContext context) {
+            double a = this.argument1.compute(context);
+            int op = nativeOperation();
+            double lo = this.type == Type.MIN ? this.argument2.minValue() : 0.0;
+            double hi = this.type == Type.MAX ? this.argument2.maxValue() : 0.0;
+            // A constant has no context reads or cache updates to short-circuit.
+            // Rust can decide the branch and combine it in the same call.
+            if (this.argument2 instanceof Constant constant) {
+                return NativeDensityMath.apply(op, a, constant.value(), lo, hi);
+            }
+            if (this.type != Type.ADD) {
+                int branch = NativeDensityMath.branch(op, a, lo, hi);
+                if (branch != 0) return branch == 1 ? a : 0.0;
+            }
+            return NativeDensityMath.apply(op, a, this.argument2.compute(context), lo, hi);
+        }
 
-		@Override
-		public void fillArray(double[] ds, DensityFunction.ContextProvider contextProvider) {
-			this.argument1.fillArray(ds, contextProvider);
-			switch (this.type) {
-				case ADD:
-					double[] es = new double[ds.length];
-					this.argument2.fillArray(es, contextProvider);
-
-					for (int i = 0; i < ds.length; i++) {
-						ds[i] += es[i];
-					}
-					break;
-				case MUL:
-					for (int j = 0; j < ds.length; j++) {
-						double d = ds[j];
-						ds[j] = d == 0.0 ? 0.0 : d * this.argument2.compute(contextProvider.forIndex(j));
-					}
-					break;
-				case MIN:
-					double eMin = this.argument2.minValue();
-
-					for (int k = 0; k < ds.length; k++) {
-						double f = ds[k];
-						ds[k] = f < eMin ? f : Math.min(f, this.argument2.compute(contextProvider.forIndex(k)));
-					}
-					break;
-				case MAX:
-					double eMax = this.argument2.maxValue();
-
-					for (int k = 0; k < ds.length; k++) {
-						double f = ds[k];
-						ds[k] = f > eMax ? f : Math.max(f, this.argument2.compute(contextProvider.forIndex(k)));
-					}
-			}
-		}
+        @Override
+        public void fillArray(double[] values, DensityFunction.ContextProvider provider) {
+            this.argument1.fillArray(values, provider);
+            int op = nativeOperation();
+            if (this.type == Type.ADD) {
+                double[] right = new double[values.length];
+                this.argument2.fillArray(right, provider);
+                NativeDensityMath.applyArray(op, values, right, 0.0, 0.0);
+                return;
+            }
+            double lo = this.type == Type.MIN ? this.argument2.minValue() : 0.0;
+            double hi = this.type == Type.MAX ? this.argument2.maxValue() : 0.0;
+            if (provider instanceof DensityBatch.Provider && NativeDensity.safeInputs(this.argument2)) {
+                // Terrain providers and known children cannot observe or mutate this
+                // destination during child visits. Keep the same forIndex sequence.
+                var scratch = DensityBatch.arithmeticScratch(values.length);
+                byte[] mask = scratch.mask;
+                double[] right = scratch.right;
+                NativeDensityMath.mask(op, values, mask, lo, hi);
+                for (int i = 0; i < values.length; i++) {
+                    if (mask[i] != 0) right[i] = this.argument2.compute(provider.forIndex(i));
+                }
+                NativeDensityMath.applyArray(op, values, right, lo, hi);
+                return;
+            }
+            // Preserve incremental writes for unknown contexts or extension nodes.
+            for (int i = 0; i < values.length; i++) {
+                double a = values[i];
+                int branch = NativeDensityMath.branch(op, a, lo, hi);
+                values[i] = switch (branch) {
+                    case 1 -> a;
+                    case 2 -> 0.0;
+                    default -> NativeDensityMath.apply(op, a, this.argument2.compute(provider.forIndex(i)), lo, hi);
+                };
+            }
+        }
 
 		@Override
 		public DensityFunction mapAll(DensityFunction.Visitor visitor) {
@@ -455,7 +469,7 @@ public final class DensityFunctions {
 
 		@Override
 		public double transform(double d) {
-			return Mth.clamp(d, this.minValue, this.maxValue);
+			return NativeDensityMath.apply(21, d, 0.0, this.minValue, this.maxValue);
 		}
 
 		@Override
@@ -505,7 +519,6 @@ public final class DensityFunctions {
 		public static final KeyDispatchDataCodec<DensityFunctions.EndIslandDensityFunction> CODEC = KeyDispatchDataCodec.of(
 			MapCodec.unit(new DensityFunctions.EndIslandDensityFunction(0L))
 		);
-		private static final float ISLAND_THRESHOLD = -0.9F;
 		private final SimplexNoise islandNoise;
 
 		public EndIslandDensityFunction(long l) {
@@ -514,35 +527,9 @@ public final class DensityFunctions {
 			this.islandNoise = new SimplexNoise(randomSource);
 		}
 
-		private static float getHeightValue(SimplexNoise simplexNoise, int i, int j) {
-			int k = i / 2;
-			int l = j / 2;
-			int m = i % 2;
-			int n = j % 2;
-			float f = 100.0F - Mth.sqrt(i * i + j * j) * 8.0F;
-			f = Mth.clamp(f, -100.0F, 80.0F);
-
-			for (int o = -12; o <= 12; o++) {
-				for (int p = -12; p <= 12; p++) {
-					long q = k + o;
-					long r = l + p;
-					if (q * q + r * r > 4096L && simplexNoise.getValue(q, r) < -0.9F) {
-						float g = (Mth.abs((float)q) * 3439.0F + Mth.abs((float)r) * 147.0F) % 13.0F + 9.0F;
-						float h = m - o * 2;
-						float s = n - p * 2;
-						float t = 100.0F - Mth.sqrt(h * h + s * s) * g;
-						t = Mth.clamp(t, -100.0F, 80.0F);
-						f = Math.max(f, t);
-					}
-				}
-			}
-
-			return f;
-		}
-
 		@Override
 		public double compute(DensityFunction.FunctionContext functionContext) {
-			return (getHeightValue(this.islandNoise, functionContext.blockX() / 8, functionContext.blockZ() / 8) - 8.0) / 128.0;
+			return (this.islandNoise.endIslandHeight(functionContext.blockX() / 8, functionContext.blockZ() / 8) - 8.0) / 128.0;
 		}
 
 		@Override
@@ -666,20 +653,9 @@ public final class DensityFunctions {
 			}
 		}
 
-		private static double transform(DensityFunctions.Mapped.Type type, double d) {
-			return switch (type) {
-				case ABS -> Math.abs(d);
-				case SQUARE -> d * d;
-				case CUBE -> d * d * d;
-				case HALF_NEGATIVE -> d > 0.0 ? d : d * 0.5;
-				case QUARTER_NEGATIVE -> d > 0.0 ? d : d * 0.25;
-				case INVERT -> 1.0 / d;
-				case SQUEEZE -> {
-					double e = Mth.clamp(d, -1.0, 1.0);
-					yield e / 2.0 - e * e * e / 24.0;
-				}
-			};
-		}
+        private static double transform(DensityFunctions.Mapped.Type type, double d) {
+            return NativeDensityMath.apply(14 + type.ordinal(), d, 0.0, 0.0, 0.0);
+        }
 
 		@Override
 		public double transform(double d) {
@@ -802,10 +778,7 @@ public final class DensityFunctions {
 
 		@Override
 		public double transform(double d) {
-			return switch (this.specificType) {
-				case MUL -> d * this.argument;
-				case ADD -> d + this.argument;
-			};
+			return NativeDensityMath.apply(this.specificType == Type.MUL ? 12 : 13, d, 0.0, this.argument, 0.0);
 		}
 
 		@Override
@@ -848,7 +821,7 @@ public final class DensityFunctions {
 
 		@Override
 		public double compute(DensityFunction.FunctionContext functionContext) {
-			return this.noise.getValue(functionContext.blockX() * this.xzScale, functionContext.blockY() * this.yScale, functionContext.blockZ() * this.xzScale);
+			return NativeDensityMath.noise(this.noise.noise(), 1, functionContext.blockX(), functionContext.blockY(), functionContext.blockZ(), 0.0, 0.0, 0.0, this.xzScale, this.yScale);
 		}
 
 		@Override
@@ -885,14 +858,20 @@ public final class DensityFunctions {
 			return this.transform(this.input().compute(functionContext));
 		}
 
-		@Override
-		default void fillArray(double[] ds, DensityFunction.ContextProvider contextProvider) {
-			this.input().fillArray(ds, contextProvider);
-
-			for (int i = 0; i < ds.length; i++) {
-				ds[i] = this.transform(ds[i]);
-			}
-		}
+        @Override
+        default void fillArray(double[] values, DensityFunction.ContextProvider provider) {
+            this.input().fillArray(values, provider);
+            if (this instanceof Mapped n) {
+                NativeDensityMath.applyArray(14 + n.type().ordinal(), values, null, 0.0, 0.0);
+            } else if (this instanceof MulOrAdd n) {
+                NativeDensityMath.applyArray(n.specificType() == MulOrAdd.Type.MUL ? 12 : 13, values, null, n.argument(), 0.0);
+            } else if (this instanceof Clamp n) {
+                NativeDensityMath.applyArray(21, values, null, n.minValue(), n.maxValue());
+            } else {
+                // Extension-owned transformers retain their own implementation.
+                for (int i = 0; i < values.length; i++) values[i] = this.transform(values[i]);
+            }
+        }
 
 		double transform(double d);
 	}
@@ -914,22 +893,24 @@ public final class DensityFunctions {
 		@Override
 		public double compute(DensityFunction.FunctionContext functionContext) {
 			double d = this.input.compute(functionContext);
-			return d >= this.minInclusive && d < this.maxExclusive ? this.whenInRange.compute(functionContext) : this.whenOutOfRange.compute(functionContext);
+			return NativeDensityMath.inRange(d, this.minInclusive, this.maxExclusive) ? this.whenInRange.compute(functionContext) : this.whenOutOfRange.compute(functionContext);
 		}
 
-		@Override
-		public void fillArray(double[] ds, DensityFunction.ContextProvider contextProvider) {
-			this.input.fillArray(ds, contextProvider);
-
-			for (int i = 0; i < ds.length; i++) {
-				double d = ds[i];
-				if (d >= this.minInclusive && d < this.maxExclusive) {
-					ds[i] = this.whenInRange.compute(contextProvider.forIndex(i));
-				} else {
-					ds[i] = this.whenOutOfRange.compute(contextProvider.forIndex(i));
-				}
-			}
-		}
+        @Override
+        public void fillArray(double[] values, DensityFunction.ContextProvider provider) {
+            this.input.fillArray(values, provider);
+            if (DensityBatch.rangeChoice(values, provider, this.whenInRange, this.whenOutOfRange, this.minInclusive, this.maxExclusive)) return;
+            byte[] mask = null;
+            if (provider instanceof DensityBatch.Provider && NativeDensity.safeInputs(this.whenInRange)
+                && NativeDensity.safeInputs(this.whenOutOfRange)) {
+                mask = DensityBatch.arithmeticScratch(values.length).mask;
+                NativeDensityMath.mask(22, values, mask, this.minInclusive, this.maxExclusive);
+            }
+            for (int i = 0; i < values.length; i++) {
+                boolean inside = mask == null ? NativeDensityMath.inRange(values[i], this.minInclusive, this.maxExclusive) : mask[i] != 0;
+                values[i] = (inside ? this.whenInRange : this.whenOutOfRange).compute(provider.forIndex(i));
+            }
+        }
 
 		@Override
 		public DensityFunction mapAll(DensityFunction.Visitor visitor) {
@@ -1033,7 +1014,7 @@ public final class DensityFunctions {
 		}
 
 		default double compute(double d, double e, double f) {
-			return this.offsetNoise().getValue(d * 0.25, e * 0.25, f * 0.25) * 4.0;
+			return NativeDensityMath.noise(this.offsetNoise().noise(), 2, d, e, f, 0.0, 0.0, 0.0, 0.0, 0.0);
 		}
 
 		@Override
@@ -1060,10 +1041,13 @@ public final class DensityFunctions {
 
 		@Override
 		public double compute(DensityFunction.FunctionContext functionContext) {
-			double d = functionContext.blockX() * this.xzScale + this.shiftX.compute(functionContext);
-			double e = functionContext.blockY() * this.yScale + this.shiftY.compute(functionContext);
-			double f = functionContext.blockZ() * this.xzScale + this.shiftZ.compute(functionContext);
-			return this.noise.getValue(d, e, f);
+			double x = functionContext.blockX();
+            double sx = this.shiftX.compute(functionContext);
+            double y = functionContext.blockY();
+            double sy = this.shiftY.compute(functionContext);
+            double z = functionContext.blockZ();
+            double sz = this.shiftZ.compute(functionContext);
+            return NativeDensityMath.noise(this.noise.noise(), 5, x, y, z, sx, sy, sz, this.xzScale, this.yScale);
 		}
 
 		@Override
@@ -1310,10 +1294,16 @@ public final class DensityFunctions {
 		);
 		public static final KeyDispatchDataCodec<DensityFunctions.WeirdScaledSampler> CODEC = DensityFunctions.makeCodec(DATA_CODEC);
 
+        @Override
+        public void fillArray(double[] values, DensityFunction.ContextProvider provider) {
+            if (!DensityBatch.fillRarity(this, values, provider))
+                DensityFunctions.TransformerWithContext.super.fillArray(values, provider);
+        }
+
 		@Override
 		public double transform(DensityFunction.FunctionContext functionContext, double d) {
-			double e = this.rarityValueMapper.mapper.get(d);
-			return e * Math.abs(this.noise.getValue(functionContext.blockX() / e, functionContext.blockY() / e, functionContext.blockZ() / e));
+			return NativeDensityMath.noise(this.noise.noise(), this.rarityValueMapper == RarityValueMapper.TYPE1 ? 6 : 7,
+                functionContext.blockX(), functionContext.blockY(), functionContext.blockZ(), d, 0.0, 0.0, 0.0, 0.0);
 		}
 
 		@Override
@@ -1337,19 +1327,17 @@ public final class DensityFunctions {
 		}
 
 		public static enum RarityValueMapper implements StringRepresentable {
-			TYPE1("type_1", NoiseRouterData.QuantizedSpaghettiRarity::getSpaghettiRarity3D, 2.0),
-			TYPE2("type_2", NoiseRouterData.QuantizedSpaghettiRarity::getSphaghettiRarity2D, 3.0);
+			TYPE1("type_1", 2.0),
+			TYPE2("type_2", 3.0);
 
 			public static final Codec<DensityFunctions.WeirdScaledSampler.RarityValueMapper> CODEC = StringRepresentable.fromEnum(
 				DensityFunctions.WeirdScaledSampler.RarityValueMapper::values
 			);
 			private final String name;
-			final Double2DoubleFunction mapper;
 			final double maxRarity;
 
-			private RarityValueMapper(final String string2, final Double2DoubleFunction double2DoubleFunction, final double d) {
+			private RarityValueMapper(final String string2, final double d) {
 				this.name = string2;
-				this.mapper = double2DoubleFunction;
 				this.maxRarity = d;
 			}
 
