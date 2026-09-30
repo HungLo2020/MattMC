@@ -41,16 +41,6 @@ public class Material {
 		return this.renderType;
 	}
 
-	public VertexConsumer buffer(MaterialSet materialSet, MultiBufferSource multiBufferSource, Function<ResourceLocation, RenderType> function) {
-		return materialSet.get(this).wrap(multiBufferSource.getBuffer(this.renderType(function)));
-	}
-
-	public VertexConsumer buffer(
-		MaterialSet materialSet, MultiBufferSource multiBufferSource, Function<ResourceLocation, RenderType> function, boolean bl, boolean bl2
-	) {
-		return materialSet.get(this).wrap(ItemRenderer.getFoilBuffer(multiBufferSource, this.renderType(function), bl, bl2));
-	}
-
 	public boolean equals(Object object) {
 		if (this == object) {
 			return true;

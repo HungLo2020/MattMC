@@ -59,7 +59,6 @@ public class DhChunkPos
 	//=========//
 	
 	public DhBlockPos centerBlockPos() { return new DhBlockPos(8 + this.x << 4, 0, 8 + this.z << 4); }
-	public DhBlockPos minCornerBlockPos() { return new DhBlockPos(this.x << 4, 0, this.z << 4); }
 	
 	public int getMinBlockX() { return this.x << 4; }
 	public int getMinBlockZ() { return this.z << 4; }
@@ -77,7 +76,6 @@ public class DhChunkPos
 		return minBlockPos;
 	}
 	
-	public DhBlockPos2D getMinBlockPos() { return new DhBlockPos2D(this.x << 4, this.z << 4); }
 	
 	public boolean contains(DhBlockPos pos)
 	{

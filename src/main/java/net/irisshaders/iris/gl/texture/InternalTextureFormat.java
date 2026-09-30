@@ -102,19 +102,8 @@ public enum InternalTextureFormat {
 		}
 	}
 
-	public int getGlFormat() {
-		return glFormat;
-	}
-
 	public PixelFormat getPixelFormat() {
 		return expectedPixelFormat;
 	}
 
-	public GlVersion getMinimumGlVersion() {
-		return minimumGlVersion;
-	}
-
-	public ShaderDataType getShaderDataType() {
-		return shaderDataType;
-	}
 }

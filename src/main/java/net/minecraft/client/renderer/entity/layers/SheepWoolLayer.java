@@ -33,39 +33,17 @@ public class SheepWoolLayer extends RenderLayer<SheepRenderState, SheepModel> {
 			int j = LivingEntityRenderer.getOverlayCoords(sheepRenderState, 0.0F);
 			if (sheepRenderState.isInvisible) {
 				if (sheepRenderState.appearsGlowing()) {
-					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
-						&& j == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
+					if ((j == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
 						&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMeshOutlineOnly(
 							entityModel, sheepRenderState, poseStack.last(), RenderType.entityCutoutNoCull(SHEEP_WOOL_LOCATION),
 							SHEEP_WOOL_LOCATION, ResourceLocation.withDefaultNamespace("sheep_wool"), i,
 							sheepRenderState.outlineColor)) {
 						return;
 					}
-					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-						throw new IllegalStateException("Rust whole-frame sheep-wool outline route has no semantic mesh");
-					}
-					if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-						throw new IllegalStateException("Rust whole-frame sheep-wool outline route is unavailable; Java model geometry is not a fallback");
-					}
-					submitNodeCollector.submitModelSemantic(
-						entityModel,
-						sheepRenderState,
-						poseStack,
-						RenderType.outline(SHEEP_WOOL_LOCATION),
-						i,
-						LivingEntityRenderer.getOverlayCoords(sheepRenderState, 0.0F),
-						-16777216,
-						null,
-						sheepRenderState.outlineColor,
-						null
-					);
+					throw new IllegalStateException("Rust whole-frame sheep-wool outline route has no semantic mesh");
 				}
 			} else {
-				boolean rustWholeFrame = net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan();
-				if (rustWholeFrame
-					&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+				if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 						entityModel, sheepRenderState, poseStack.last(), RenderType.entityCutoutNoCull(SHEEP_WOOL_LOCATION),
 						SHEEP_WOOL_LOCATION, ResourceLocation.withDefaultNamespace("sheep_wool"), i,
 						j, sheepRenderState.getWoolColor(), sheepRenderState.outlineColor)) {
@@ -75,14 +53,11 @@ public class SheepWoolLayer extends RenderLayer<SheepRenderState, SheepModel> {
 					);
 					return;
 				}
-				if (rustWholeFrame) {
-					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-						"rust-vulkan-unavailable", SHEEP_WOOL_LOCATION, entityModel.getClass().getName(),
-						sheepRenderState.entityId, false, false, false
-					);
-					throw new IllegalStateException("Rust whole-frame sheep-wool route has no semantic mesh");
-				}
-				coloredCutoutModelCopyLayerRender(entityModel, SHEEP_WOOL_LOCATION, poseStack, submitNodeCollector, i, sheepRenderState, sheepRenderState.getWoolColor(), 0);
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					"rust-vulkan-unavailable", SHEEP_WOOL_LOCATION, entityModel.getClass().getName(),
+					sheepRenderState.entityId, false, false, false
+				);
+				throw new IllegalStateException("Rust whole-frame sheep-wool route has no semantic mesh");
 			}
 		}
 	}

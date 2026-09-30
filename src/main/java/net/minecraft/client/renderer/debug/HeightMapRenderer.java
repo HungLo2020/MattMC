@@ -8,7 +8,6 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -33,54 +32,8 @@ public class HeightMapRenderer implements DebugRenderer.SimpleDebugRenderer {
 		this.minecraft = minecraft;
 	}
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		LevelAccessor levelAccessor = this.minecraft.level;
-		VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.debugFilledBox());
-		BlockPos blockPos = BlockPos.containing(d, 0.0, f);
-
-		for (int i = -2; i <= 2; i++) {
-			for (int j = -2; j <= 2; j++) {
-				ChunkAccess chunkAccess = levelAccessor.getChunk(blockPos.offset(i * 16, 0, j * 16));
-
-				for (Entry<Types, Heightmap> entry : chunkAccess.getHeightmaps()) {
-					Types types = (Types)entry.getKey();
-					ChunkPos chunkPos = chunkAccess.getPos();
-					Vector3f vector3f = this.getColor(types);
-
-					for (int k = 0; k < 16; k++) {
-						for (int l = 0; l < 16; l++) {
-							int m = SectionPos.sectionToBlockCoord(chunkPos.x, k);
-							int n = SectionPos.sectionToBlockCoord(chunkPos.z, l);
-							float g = (float)(levelAccessor.getHeight(types, m, n) + types.ordinal() * 0.09375F - e);
-							ShapeRenderer.addChainedFilledBoxVertices(
-								poseStack,
-								vertexConsumer,
-								m + 0.25F - d,
-								(double)g,
-								n + 0.25F - f,
-								m + 0.75F - d,
-								(double)(g + 0.09375F),
-								n + 0.75F - f,
-								vector3f.x(),
-								vector3f.y(),
-								vector3f.z(),
-								1.0F
-							);
-						}
-					}
-				}
-			}
-		}
-	}
-
 	/** Copies the bounded height-map overlay into Rust-owned semantic quads. */
 	public void collectRustSemantics(Camera camera, SubmitNodeStorage geometry) {
-		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
-			return;
-		}
 		LevelAccessor levelAccessor = this.minecraft.level;
 		if (levelAccessor == null) return;
 		double camX = camera.getPosition().x;

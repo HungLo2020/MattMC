@@ -38,19 +38,7 @@ public class DragonFireballRenderer extends EntityRenderer<DragonFireball, Entit
 			super.submit(entityRenderState, poseStack, submitNodeCollector, cameraRenderState);
 			return;
 		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Rust whole-frame dragon-fireball route rejected semantic billboard");
-		}
-		submitNodeCollector.submitCustomGeometrySemantic(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
-			vertex(vertexConsumer, pose, entityRenderState.lightCoords, 0.0F, 0, 0, 1);
-			vertex(vertexConsumer, pose, entityRenderState.lightCoords, 1.0F, 0, 1, 1);
-			vertex(vertexConsumer, pose, entityRenderState.lightCoords, 1.0F, 1, 1, 0);
-			vertex(vertexConsumer, pose, entityRenderState.lightCoords, 0.0F, 1, 0, 0);
-		});
-		poseStack.popPose();
-		super.submit(entityRenderState, poseStack, submitNodeCollector, cameraRenderState);
+		throw new IllegalStateException("Rust whole-frame dragon-fireball route rejected semantic billboard");
 	}
 
 	private static void vertex(VertexConsumer vertexConsumer, PoseStack.Pose pose, int i, float f, int j, int k, int l) {

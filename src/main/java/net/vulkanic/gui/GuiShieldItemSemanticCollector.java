@@ -38,8 +38,7 @@ final class GuiShieldItemSemanticCollector {
         model.get(transform);
         var batches = new ArrayList<GuiMeshBatchRecord>();
         var sources = new ArrayList<GuiItemTextureSource>();
-        long cacheIdentity = net.vulkanic.world.AtlasAnimationResource.shieldLifecycleEnabled()
-            ? GuiItemSemanticIdentities.identityOrZero(item.itemStackRenderState().getModelIdentity()) : 0;
+        long cacheIdentity = GuiItemSemanticIdentities.identityOrZero(item.itemStackRenderState().getModelIdentity());
         var cache = cacheIdentity != 0
             ? new GuiItemCacheRecord(cacheIdentity, item.itemStackRenderState().isAnimated()) : null;
         for (var layer : layers(shield.model(), components, foil != null)) {
@@ -50,7 +49,7 @@ final class GuiShieldItemSemanticCollector {
             if (sprite == null)
                 throw new IllegalArgumentException("shield semantic image is unavailable");
             GuiItemTextureSource source;
-            if (!layer.foil() && net.vulkanic.world.AtlasAnimationResource.shieldLifecycleEnabled()) {
+            if (!layer.foil()) {
                 var region = net.vulkanic.world.RustGalWorldPrimitiveRenderer.requireShieldAtlasSpritePayload(sprite);
                 long asset = RustGalGuiRawImageAssets.assetId("gui-atlas-region:" + sprite.atlasLocation() + ":" + sprite.contents().name());
                 source = new GuiItemTextureSource.Atlas(new GuiAtlasRegion(asset, region.texture(),

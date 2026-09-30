@@ -89,11 +89,6 @@ public enum EPlatform
 		return name;
 	}
 	
-	/** Returns weather the OS is Unix or Unix-Like OS */
-	public boolean isUnix()
-	{
-		return isUnix;
-	}
 	
 	/** Returns the platform on which the library is running. */
 	public static EPlatform get()
@@ -101,11 +96,6 @@ public enum EPlatform
 		return current;
 	}
 	
-	/** Returns the architecture on which the library is running. */
-	public static EArchitecture getArchitecture()
-	{
-		return EArchitecture.current;
-	}
 	
 	
 	@Override

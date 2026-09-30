@@ -7,7 +7,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.function.Supplier;
-import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
@@ -83,22 +82,6 @@ public abstract class RenderStateShard {
 		this.name = string;
 		this.setupState = runnable;
 		this.clearState = runnable2;
-	}
-
-	public void setupRenderState() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java Vulkan render-state setup is unavailable on selected Vulkan");
-		}
-		this.setupState.run();
-	}
-
-	public void clearRenderState() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java Vulkan render-state cleanup is unavailable on selected Vulkan");
-		}
-		this.clearState.run();
 	}
 
 	public String toString() {
@@ -203,20 +186,7 @@ public abstract class RenderStateShard {
 
 	MultiTextureStateShard(List<RenderStateShard.MultiTextureStateShard.Entry> list) {
 		super(() -> {
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-					return;
-				}
-				var ctx = VulkanicAPI.getCommandContext();
-				for (int i = 0; i < list.size(); i++) {
-					RenderStateShard.MultiTextureStateShard.Entry entry = (RenderStateShard.MultiTextureStateShard.Entry)list.get(i);
-					TextureManager textureManager = Minecraft.getInstance().getTextureManager();
-					AbstractTexture abstractTexture = textureManager.getTexture(entry.id);
-					abstractTexture.setUseMipmaps(entry.mipmap);
-					var textureView = abstractTexture.getTextureView();
-					VulkanicAPI.bindTextureUnit(ctx, i, textureView);
-					TextureTracker.INSTANCE.onSetShaderTexture(i, textureView);
-				}
+				return;
 			}, () -> {});
 			this.cutoutTexture = list.isEmpty() ? Optional.empty() : Optional.of(((RenderStateShard.MultiTextureStateShard.Entry)list.getFirst()).id);
 		}
@@ -292,17 +262,7 @@ public abstract class RenderStateShard {
 
 		public TextureStateShard(ResourceLocation resourceLocation, boolean bl) {
 			super(() -> {
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-					return;
-				}
-				TextureManager textureManager = Minecraft.getInstance().getTextureManager();
-				AbstractTexture abstractTexture = textureManager.getTexture(resourceLocation);
-				abstractTexture.setUseMipmaps(bl);
-				var textureView = abstractTexture.getTextureView();
-				var ctx = VulkanicAPI.getCommandContext();
-				VulkanicAPI.bindTextureUnit(ctx, 0, textureView);
-				TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
+				return;
 			}, () -> {});
 			this.texture = Optional.of(resourceLocation);
 			this.mipmap = bl;

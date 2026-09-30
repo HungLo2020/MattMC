@@ -63,13 +63,4 @@ public class LanguageMap {
 		}
 	}
 
-	public Set<String> getLanguages() {
-		// Ensure that the caller can't mess with the language map.
-		return Collections.unmodifiableSet(translationMaps.keySet());
-	}
-
-	public Map<String, String> getTranslations(String language) {
-		// We're returning an immutable map, so the caller can't modify it.
-		return translationMaps.get(language);
-	}
 }

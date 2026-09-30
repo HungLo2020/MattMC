@@ -9,11 +9,4 @@ public final class TextureFilteringData {
 		this.clamp = clamp;
 	}
 
-	public boolean shouldBlur() {
-		return blur;
-	}
-
-	public boolean shouldClamp() {
-		return clamp;
-	}
 }

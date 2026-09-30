@@ -23,49 +23,4 @@ public enum ModelQuadOrientation {
         return this.indices[idx];
     }
 
-    /**
-     * Determines the orientation of the vertices in the quad.
-     */
-    public static ModelQuadOrientation orientByBrightness(float[] brightnesses, int[] lightmaps) {
-        // If one side of the quad is brighter, flip the sides
-        float br02 = brightnesses[0] + brightnesses[2];
-        float br13 = brightnesses[1] + brightnesses[3];
-        if (br02 > br13) {
-            return NORMAL;
-        } else if (br02 < br13) {
-            return FLIP;
-        }
-
-        // If one side of the quad is darker, flip the sides
-        int lm02 = lightmaps[0] + lightmaps[2];
-        int lm13 = lightmaps[1] + lightmaps[3];
-        if (lm02 <= lm13) {
-            return NORMAL;
-        } else {
-            return FLIP;
-        }
-    }
-
-    /**
-     * Determines the orientation of the vertices in the quad.
-     */
-    public static ModelQuadOrientation orientByBrightness(float[] brightnesses, QuadView quad) {
-        // If one side of the quad is brighter, flip the sides
-        float br02 = brightnesses[0] + brightnesses[2];
-        float br13 = brightnesses[1] + brightnesses[3];
-        if (br02 > br13) {
-            return NORMAL;
-        } else if (br02 < br13) {
-            return FLIP;
-        }
-
-        // If one side of the quad is darker, flip the sides
-        int lm02 = quad.lightmap(0) + quad.lightmap(2);
-        int lm13 = quad.lightmap(1) + quad.lightmap(3);
-        if (lm02 <= lm13) {
-            return NORMAL;
-        } else {
-            return FLIP;
-        }
-    }
 }

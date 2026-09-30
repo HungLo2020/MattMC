@@ -216,32 +216,12 @@ public class WaypointManager {
             ServerData serverData = VoxelConstants.getMinecraft().getCurrentServer();
             if (serverData != null) {
                 boolean isOnLAN = serverData.isLan();
-                boolean isRealm = VoxelConstants.isRealmServer();
                 if (isOnLAN) {
                     VoxelConstants.getLogger().warn("LAN server detected!");
                     serverName = serverData.name;
-                } else if (isRealm) {
-                    // VoxelMap: Realms client not available in MattMC - using fallback
-                    VoxelConstants.getLogger().info("Server is a Realm (Realms client unavailable - using server name).");
-                    serverName = "Realm_" + serverData.name;
-                    /* Original Realms code (disabled):
-                    RealmsClient realmsClient = RealmsClient.getOrCreate(Minecraft.getInstance());
-                    RealmsServerList realmsServerList = realmsClient.listRealms();
-                    for (RealmsServer realmsServer : realmsServerList.servers) {
-                        if (realmsServer.name.equals(serverData.name)) {
-                            serverName = "Realm_" + realmsServer.id + "." + realmsServer.ownerUUID;
-                            break;
-                        }
-                    }
-                    */
                 } else {
                     serverName = serverData.ip;
                 }
-            } else if (VoxelConstants.isRealmServer()) {
-                VoxelConstants.getLogger().warn("ServerData was null, and detected as realm server.");
-                User session = VoxelConstants.getMinecraft().getUser();
-                serverName = session.getSessionId();
-                VoxelConstants.getLogger().info(serverName);
             } else {
                 ClientPacketListener netHandler = VoxelConstants.getMinecraft().getConnection();
                 Connection networkManager = netHandler.getConnection();
@@ -350,7 +330,7 @@ public class WaypointManager {
     }
 
     public boolean isMultiworld() {
-        return this.multiworld || VoxelConstants.isRealmServer();
+        return this.multiworld;
     }
 
     public synchronized void setSubworldName(String name, boolean fromServer) {
@@ -763,19 +743,6 @@ public class WaypointManager {
 
     public Waypoint getHighlightedWaypoint() {
         return this.highlightedWaypoint;
-    }
-
-    // public void renderWaypoints(float partialTicks, Matrix4fStack matrixStack, boolean beacons, boolean signs, boolean withDepth, boolean withoutDepth) {
-    // if (VoxelMap.mapOptions.waypointsAllowed && this.waypointContainer != null) {
-    // this.waypointContainer.renderWaypoints(partialTicks, matrixStack, beacons, signs, withDepth, withoutDepth);
-    // }
-    //
-    // }
-
-    public void renderWaypoints(float gameTimeDeltaPartialTick, PoseStack poseStack, BufferSource bufferSource, Camera camera) {
-        if (VoxelMap.mapOptions.waypointsAllowed && this.waypointContainer != null) {
-            this.waypointContainer.renderWaypoints(gameTimeDeltaPartialTick, poseStack, bufferSource, camera);
-        }
     }
 
     private void loadBackgroundMapImage() {

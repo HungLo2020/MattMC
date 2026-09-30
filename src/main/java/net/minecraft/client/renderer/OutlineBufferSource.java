@@ -19,22 +19,7 @@ public class OutlineBufferSource implements MultiBufferSource {
 
 	@Override
 	public VertexConsumer getBuffer(RenderType renderType) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java entity-outline buffers are unavailable on selected Vulkan");
-		}
-		if (renderType.isOutline()) {
-			VertexConsumer vertexConsumer = this.outlineBufferSource.getBuffer(renderType);
-			return new OutlineBufferSource.EntityOutlineGenerator(vertexConsumer, this.outlineColor);
-		} else {
-			Optional<RenderType> optional = renderType.outline();
-			if (optional.isPresent()) {
-				VertexConsumer vertexConsumer2 = this.outlineBufferSource.getBuffer((RenderType)optional.get());
-				return new OutlineBufferSource.EntityOutlineGenerator(vertexConsumer2, this.outlineColor);
-			} else {
-				throw new IllegalStateException("Can't render an outline for this rendertype!");
-			}
-		}
+		throw new IllegalStateException("Java entity-outline buffers are unavailable on selected Vulkan");
 	}
 
 	public void setColor(int i) {
@@ -42,13 +27,9 @@ public class OutlineBufferSource implements MultiBufferSource {
 	}
 
 	public void endOutlineBatch() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Entity-outline masks are Rust-owned in whole-frame Vulkan. Do not
-			// flush a Java outline buffer into the presentation path.
-			return;
-		}
-		this.outlineBufferSource.endBatch();
+		// Entity-outline masks are Rust-owned in whole-frame Vulkan. Do not
+		// flush a Java outline buffer into the presentation path.
+		return;
 	}
 
 	@Environment(EnvType.CLIENT)

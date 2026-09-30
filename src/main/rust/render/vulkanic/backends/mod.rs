@@ -293,7 +293,7 @@ pub(super) fn opengl_capabilities() -> BackendCapabilities {
         limits: BackendLimits {
             max_buffer_size: 64 * 1024 * 1024,
             uniform_buffer_offset_alignment: 256,
-            max_texture_extent_2d: 4096,
+            max_texture_extent_2d: 8192,
             // The isolated GL path supports D3 allocation, explicit mips, box
             // upload/readback, and sampled binding. Storage images remain
             // independently capability-gated by the current context.

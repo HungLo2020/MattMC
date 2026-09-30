@@ -4,7 +4,6 @@ import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.client.renderer.SpriteCoordinateExpander;
 import net.minecraft.hooks.HookRegistry;
 import net.minecraft.hooks.TextureAtlasSpriteHooks;
 import net.minecraft.resources.ResourceLocation;
@@ -80,12 +79,6 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 		
 		return spriteTicker != null ? new TextureAtlasSprite.Ticker() {
 			@Override
-			public void tickAndUpload(GpuTexture gpuTexture) {
-				TextureAtlasSprite.this.rejectSelectedVulkanJavaUpload();
-				spriteTicker.tickAndUpload(TextureAtlasSprite.this.x, TextureAtlasSprite.this.y, gpuTexture);
-			}
-
-			@Override
 			public boolean tickSemantic() {
 				return spriteTicker.tickSemantic();
 			}
@@ -133,18 +126,6 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 		return "TextureAtlasSprite{contents='" + this.contents + "', u0=" + this.u0 + ", u1=" + this.u1 + ", v0=" + this.v0 + ", v1=" + this.v1 + "}";
 	}
 
-	public void uploadFirstFrame(GpuTexture gpuTexture) {
-		rejectSelectedVulkanJavaUpload();
-		this.contents.uploadFirstFrame(this.x, this.y, gpuTexture);
-	}
-
-	private void rejectSelectedVulkanJavaUpload() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java texture-atlas sprite upload is unavailable while Rust owns Vulkan rendering");
-		}
-	}
-
 	private float atlasSize() {
 		float f = this.contents.width() / (this.u1 - this.u0);
 		float g = this.contents.height() / (this.v1 - this.v0);
@@ -165,16 +146,6 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 		return defaultRatio;
 	}
 
-	public VertexConsumer wrap(VertexConsumer vertexConsumer) {
-		rejectSelectedVulkanJavaUpload();
-		// Call hooks when sprite wraps a vertex consumer
-		for (TextureAtlasSpriteHooks hook : HookRegistry.getTextureAtlasSpriteHooks()) {
-			hook.onSpriteWrap(this, vertexConsumer);
-		}
-		
-		return new SpriteCoordinateExpander(vertexConsumer, this);
-	}
-	
 	// Sodium: TextureAtlasSpriteExtension implementation (from TextureAtlasSpriteMixin)
 	@Override
 	public boolean sodium$hasUnknownImageContents() {
@@ -183,8 +154,6 @@ public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 
 	@Environment(EnvType.CLIENT)
 	public interface Ticker extends AutoCloseable {
-		void tickAndUpload(GpuTexture gpuTexture);
-
 		default boolean tickSemantic() {
 			return false;
 		}

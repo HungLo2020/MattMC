@@ -74,14 +74,7 @@ public class DebugScreenEntries {
 		@Override
 		public void display(DebugScreenDisplayer displayer, @Nullable net.minecraft.world.level.Level level,
 			@Nullable net.minecraft.world.level.chunk.LevelChunk chunk, @Nullable net.minecraft.world.level.chunk.LevelChunk chunk2) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-				return;
-			}
-			DebugScreenEntry delegate = detailed
-				? new net.irisshaders.iris.gui.debug.IrisTrueDebugEntry()
-				: new net.irisshaders.iris.gui.debug.IrisDebugEntry();
-			delegate.display(displayer, level, chunk, chunk2);
+			return;
 		}
 
 		@Override

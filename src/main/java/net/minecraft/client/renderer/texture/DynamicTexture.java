@@ -39,26 +39,14 @@ public class DynamicTexture extends AbstractTexture implements Dumpable {
 	}
 
 	private void createTexture(Supplier<String> supplier) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Dynamic textures are copied into the Rust semantic asset registry;
-			// constructing a Java GPU image here would create an unused renderer
-			// resource before the semantic GUI/world route consumes the pixels.
-			return;
-		}
-		this.texture = net.vulkanic.VulkanicAPI.createTexture(supplier, 5, TextureFormat.RGBA8, this.pixels.getWidth(), this.pixels.getHeight(), 1, 1);
-		this.texture.setTextureFilter(FilterMode.NEAREST, false);
-		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
+		// Dynamic textures are copied into the Rust semantic asset registry;
+		// constructing a Java GPU image here would create an unused renderer
+		// resource before the semantic GUI/world route consumes the pixels.
+		return;
 	}
 
 	private void createTexture(String string) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
-		this.texture = net.vulkanic.VulkanicAPI.createTexture(string, 5, TextureFormat.RGBA8, this.pixels.getWidth(), this.pixels.getHeight(), 1, 1);
-		this.texture.setTextureFilter(FilterMode.NEAREST, false);
-		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
+		return;
 	}
 
 	public void upload() {
@@ -66,22 +54,14 @@ public class DynamicTexture extends AbstractTexture implements Dumpable {
 			LOGGER.warn("Trying to upload disposed dynamic texture");
 			return;
 		}
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// A DynamicTexture is a CPU source in the whole-frame route. Its
-			// registered resource identity is copied to VulkanicGAL; Java never
-			// executes a texture upload or owns the resulting GPU image. The
-			// source may be staged before registration during client bootstrap;
-			// registration stages it again once the semantic identity exists.
-			releaseJavaGpuTextureForSemanticRoute();
-			net.vulkanic.gui.RustGalGuiRawImageAssets.stageDynamicTexture(this);
-			return;
-		}
-		if (this.texture == null) {
-			LOGGER.warn("Trying to upload dynamic texture before GPU initialization");
-			return;
-		}
-		net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, this.pixels);
+		// A DynamicTexture is a CPU source in the whole-frame route. Its
+		// registered resource identity is copied to VulkanicGAL; Java never
+		// executes a texture upload or owns the resulting GPU image. The
+		// source may be staged before registration during client bootstrap;
+		// registration stages it again once the semantic identity exists.
+		releaseJavaGpuTextureForSemanticRoute();
+		net.vulkanic.gui.RustGalGuiRawImageAssets.stageDynamicTexture(this);
+		return;
 	}
 
 	/**
@@ -90,23 +70,13 @@ public class DynamicTexture extends AbstractTexture implements Dumpable {
 	 * Retain the producer's request for future semantic sampler admission while
 	 * avoiding the legacy AbstractTexture exception during mod bootstrap.
 	 */
-	@Override
 	public void setFilter(boolean linearFilter, boolean mipmap) {
 		this.semanticLinearFilter = linearFilter;
 		this.semanticMipmaps = mipmap;
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			super.setFilter(linearFilter, mipmap);
-		}
 	}
 
-	@Override
 	public void setClamp(boolean clamp) {
 		this.semanticClamp = clamp;
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			super.setClamp(clamp);
-		}
 	}
 
 	public final boolean semanticLinearFilter() {
@@ -132,14 +102,11 @@ public class DynamicTexture extends AbstractTexture implements Dumpable {
 		}
 
 		this.pixels = nativeImage;
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Keep the Rust-owned copy current even when a producer replaces pixels
-			// without immediately calling upload(). Unregistered textures are
-			// deliberately ignored until TextureManager publishes their identity.
-			releaseJavaGpuTextureForSemanticRoute();
-			net.vulkanic.gui.RustGalGuiRawImageAssets.stageDynamicTexture(this);
-		}
+		// Keep the Rust-owned copy current even when a producer replaces pixels
+		// without immediately calling upload(). Unregistered textures are
+		// deliberately ignored until TextureManager publishes their identity.
+		releaseJavaGpuTextureForSemanticRoute();
+		net.vulkanic.gui.RustGalGuiRawImageAssets.stageDynamicTexture(this);
 	}
 
 	private void releaseJavaGpuTextureForSemanticRoute() {

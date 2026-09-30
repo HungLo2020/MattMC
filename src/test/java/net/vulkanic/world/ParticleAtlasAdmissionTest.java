@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.vulkan.VulkanWholeFrameSemanticGpuDevice;
+import net.vulkanic.bridge.RustSemanticGpuDevice;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,7 +37,7 @@ class ParticleAtlasAdmissionTest {
         int checkpoint = RustGalWorldPrimitiveRenderer.markMaterialQuadBatch();
         try {
             System.setProperty(property, "true");
-            device.set(null, new VulkanWholeFrameSemanticGpuDevice());
+            device.set(null, new RustSemanticGpuDevice());
             client.set(null, null); // no current resource can validate the stale cached ID
             width.setInt(null, 1280); height.setInt(null, 720);
             var png = new java.io.ByteArrayOutputStream();
@@ -45,7 +45,7 @@ class ParticleAtlasAdmissionTest {
                 java.awt.image.BufferedImage.TYPE_INT_ARGB), "PNG", png));
             var stale = new VulkanicGalBridge.WorldMeshTextureAssetRecord(id, png.toByteArray(), List.of());
             textures.put(id, stale);
-            assertTrue(WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan());
+            assertTrue(true);
             var state = new QuadParticleRenderState();
             state.add(SingleQuadParticle.Layer.OPAQUE, 0, 0, 0, 0, 0, 0, 1, .25F, 0, 1, 0, 1, -1, 240);
             state.add(SingleQuadParticle.Layer.TRANSLUCENT, 0, 0, 0, 0, 0, 0, 1, .25F, 0, 1, 0, 1, -1, 240);

@@ -1,9 +1,6 @@
 package net.irisshaders.iris.gui;
 
 import net.blaze3d.textures.GpuTextureView;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.gl.blending.BlendModeStorage;
-import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -41,15 +38,9 @@ public final class GuiUtil {
 	 * used for succeeding draw calls.
 	 */
 	public static void bindIrisWidgetsTexture() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			// Rust GUI callsites carry the widget resource identity in their
-			// semantic blit; never materialize an Iris Java texture view here.
-			return;
-		}
-		GpuTextureView textureView = Minecraft.getInstance().getTextureManager().getTexture(IRIS_WIDGETS_TEX).getTextureView();
-		IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(textureView));
-		TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
+		// Rust GUI callsites carry the widget resource identity in their
+		// semantic blit; never materialize an Iris Java texture view here.
+		return;
 	}
 
 	/**
@@ -73,14 +64,6 @@ public final class GuiUtil {
 		// V offset for which button texture to use
 		int vOffset = disabled ? 46 : hovered ? 86 : 66;
 
-		// Sets RenderSystem to use solid white as the tint color for blend mode, and enables blend mode
-		// Rust GUI pipelines carry blending explicitly; mutating Iris's global
-		// command-context capability here would bypass semantic extraction and
-		// borrow Java/Iris GPU state. Keep the compatibility mutation OpenGL-only.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !VulkanicAPI.isVulkanBackendSelected()) {
-			BlendModeStorage.setBlendEnabled(true);
-		}
 
 		// Top left section
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, IRIS_WIDGETS_TEX, x, y, 0, vOffset, halfWidth, halfHeight, 256, 256);
@@ -207,13 +190,6 @@ public final class GuiUtil {
 		 * @param y The y position to draw the icon at (top)
 		 */
 		public void draw(GuiGraphics guiGraphics, int x, int y) {
-			// Sets RenderSystem to use solid white as the tint color for blend mode (1.16), and enables blend mode
-			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& !VulkanicAPI.isVulkanBackendSelected()) {
-				// Rust GUI pipelines own blend state explicitly; do not mutate the
-				// Iris compatibility capability while semantic elements are collected.
-				BlendModeStorage.setBlendEnabled(true);
-			}
 
 			// Draw the texture to the screen
 			guiGraphics.blit(RenderPipelines.GUI_TEXTURED, IRIS_WIDGETS_TEX, x, y, u, v, width, height, 256, 256);

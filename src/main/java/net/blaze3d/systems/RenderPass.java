@@ -13,7 +13,7 @@ import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public interface RenderPass extends AutoCloseable, net.irisshaders.iris.mixinterface.RenderPassInterface {
+public interface RenderPass extends AutoCloseable {
 	void pushDebugGroup(Supplier<String> supplier);
 
 	void popDebugGroup();
@@ -66,14 +66,5 @@ public interface RenderPass extends AutoCloseable, net.irisshaders.iris.mixinter
 	@Environment(EnvType.CLIENT)
 	public interface UniformUploader {
 		void upload(String string, GpuBufferSlice gpuBufferSlice);
-	}
-	
-	// Iris compatibility methods
-	default void iris$setCustomPass(net.irisshaders.iris.mixinterface.CustomPass pass) {
-		// No-op by default - Iris mixin implementation
-	}
-	
-	default net.irisshaders.iris.mixinterface.CustomPass iris$getCustomPass() {
-		return null;
 	}
 }

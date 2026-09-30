@@ -62,7 +62,4 @@ public enum GuiRenderStratum {
 		return order;
 	}
 
-	public boolean supportedForPartialFrame() {
-		return true;
-	}
 }

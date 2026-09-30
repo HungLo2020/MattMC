@@ -54,10 +54,6 @@ public class GlVertexFormat {
                 this.attributesKeyed.size(), this.stride);
     }
 
-    public GlVertexAttributeBinding[] getShaderBindings() {
-        return bindings;
-    }
-
     public static class Builder {
         private final Map<VertexFormatAttribute, GlVertexAttribute> attributes;
         private final Object2IntMap<GlVertexAttribute> bindings;

@@ -45,14 +45,6 @@ public enum PixelFormat {
 		return componentCount;
 	}
 
-	public int getGlFormat() {
-		return glFormat;
-	}
-
-	public GlVersion getMinimumGlVersion() {
-		return minimumGlVersion;
-	}
-
 	public boolean isInteger() {
 		return isInteger;
 	}

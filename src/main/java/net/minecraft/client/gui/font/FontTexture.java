@@ -58,12 +58,6 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 			// generation; close() cannot remove this newly-installed entry.
 			previousAtlas.close();
 		}
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			this.texture = net.vulkanic.VulkanicAPI.createTexture(resourceLocation::toString, 7, bl ? TextureFormat.RGBA8 : TextureFormat.RED8, 256, 256, 1, 1);
-			this.texture.setTextureFilter(FilterMode.NEAREST, false);
-			this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
-		}
 		this.renderTypes = glyphRenderTypes;
 	}
 
@@ -74,10 +68,6 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 		} else {
 			FontTexture.Node node = this.root.insert(glyphBitmap);
 			if (node != null) {
-				if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-					glyphBitmap.upload(node.x, node.y, this.getTexture());
-				}
 				// The whole-frame Vulkan route owns a copied atlas image, not this
 				// Java texture.  Glyph pixels below are copied into that semantic
 				// snapshot and uploaded through VulkanicGAL by the text collector.
@@ -95,10 +85,7 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 				float f = 256.0F;
 				float g = 256.0F;
 				float h = 0.01F;
-				net.blaze3d.textures.GpuTextureView glyphTextureView = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-					? this.textureView
-					: this.getTextureView();
+				net.blaze3d.textures.GpuTextureView glyphTextureView = this.textureView;
 				return new BakedSheetGlyph(
 					glyphInfo,
 					this.renderTypes,
@@ -164,14 +151,11 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 	 * copied semantic atlas remains live for Rust text extraction and staging.
 	 */
 	public void ensureRustSemanticRoute() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Keep the CPU atlas and semantic registry alive for Rust text
-			// extraction.  Only the legacy Java GPU allocation crosses this
-			// ownership boundary; full close() remains responsible for destroying
-			// the semantic source during resource teardown.
-			closeGpuAllocation();
-		}
+		// Keep the CPU atlas and semantic registry alive for Rust text
+		// extraction.  Only the legacy Java GPU allocation crosses this
+		// ownership boundary; full close() remains responsible for destroying
+		// the semantic source during resource teardown.
+		closeGpuAllocation();
 	}
 
 	public record SemanticAtlasSnapshot(

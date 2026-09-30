@@ -67,6 +67,11 @@ public final class RustShaderPackSourceCollector {
 		return copiedBooleanDirective(source, "underwaterOverlay", true);
 	}
 
+	/** Whether weather particles (rain splashes) stay enabled under the copied pack. */
+	public static boolean copiedWeatherParticlesEnabled(SourceGeneration source) throws IOException {
+		return copiedBooleanDirective(source, "weatherParticles", true);
+	}
+
 	private static boolean copiedBooleanDirective(SourceGeneration source, String directive) throws IOException {
 		return copiedBooleanDirective(source, directive, false);
 	}
@@ -96,53 +101,44 @@ public final class RustShaderPackSourceCollector {
 	}
 
 	public static SourceGeneration collectConfiguredPack(long generation) throws IOException {
-		// Backend selection is an ownership decision that precedes activation of
-		// the whole-frame shell.  A selected Vulkan backend must therefore use the
-		// copied, filesystem-only collector during that startup window as well;
-		// falling through to the Iris compatibility collector would borrow Iris
-		// runtime state before Rust has begun presenting.
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Vanilla/resource-pack post effects are semantic game resources, not
-			// Iris shader-pack execution. In particular Fabulous owns
-			// minecraft:transparency even when Iris shaders are disabled, so do
-			// not let Iris's preference suppress the copied Rust snapshot.
-			Optional<String> postEffect = activeVanillaPostEffectId();
-			if (!wholeFrameShaderConfigEnabled() && postEffect.isEmpty()) {
-				return disabled(generation);
-			}
-			Optional<String> configuredName = configuredPackNameFromDisk();
-			if (configuredName.isEmpty()) {
-				return postEffect.isPresent()
-					? collectVanillaPostEffect(postEffect.get(), generation)
-					: disabled(generation);
-			}
-			Path shaderpacks = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
-				.resolve("shaderpacks").toAbsolutePath().normalize();
-			String packName = configuredName.get();
-			Path pack = shaderpacks.resolve(packName).normalize();
-			if (!pack.startsWith(shaderpacks) || !pack.getFileName().toString().equals(packName)) {
-				throw new IOException("configured shader-pack path escapes shaderpacks directory");
-			}
-			SourceGeneration source;
-			if (Files.isDirectory(pack)) {
-				source = collectWithAssets(pack.resolve("shaders"), packName, generation);
-			} else {
-				try (FileSystem archive = FileSystems.newFileSystem(pack)) {
-					source = collectWithAssets(archive.getPath("/shaders"), packName, generation);
-				}
-			}
-			// Rust owns option/profile interpretation. Only copied source, assets,
-			// and immutable Minecraft block-state identities cross the boundary.
-			return withRuntimeEnvironmentSnapshot(
-				withRuntimeOptionSnapshot(
-					withRuntimeBlockStateIdentitySnapshot(withActiveVanillaPostEffectResources(source)),
-					readWholeFramePackOptions(shaderpacks, packName)
-				),
-				wholeFrameEnvironmentDefines(collectedDistantHorizonsDefine = distantHorizonsRenderingEnabled())
-			);
+		// Vanilla/resource-pack post effects are semantic game resources, not
+		// Iris shader-pack execution. In particular Fabulous owns
+		// minecraft:transparency even when Iris shaders are disabled, so do
+		// not let Iris's preference suppress the copied Rust snapshot.
+		Optional<String> postEffect = activeVanillaPostEffectId();
+		if (!wholeFrameShaderConfigEnabled() && postEffect.isEmpty()) {
+			return disabled(generation);
 		}
-		return IrisShaderPackCompatibilityCollector.collectConfiguredPack(generation);
+		Optional<String> configuredName = configuredPackNameFromDisk();
+		if (configuredName.isEmpty()) {
+			return postEffect.isPresent()
+				? collectVanillaPostEffect(postEffect.get(), generation)
+				: disabled(generation);
+		}
+		Path shaderpacks = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
+			.resolve("shaderpacks").toAbsolutePath().normalize();
+		String packName = configuredName.get();
+		Path pack = shaderpacks.resolve(packName).normalize();
+		if (!pack.startsWith(shaderpacks) || !pack.getFileName().toString().equals(packName)) {
+			throw new IOException("configured shader-pack path escapes shaderpacks directory");
+		}
+		SourceGeneration source;
+		if (Files.isDirectory(pack)) {
+			source = collectWithAssets(pack.resolve("shaders"), packName, generation);
+		} else {
+			try (FileSystem archive = FileSystems.newFileSystem(pack)) {
+				source = collectWithAssets(archive.getPath("/shaders"), packName, generation);
+			}
+		}
+		// Rust owns option/profile interpretation. Only copied source, assets,
+		// and immutable Minecraft block-state identities cross the boundary.
+		return withRuntimeEnvironmentSnapshot(
+			withRuntimeOptionSnapshot(
+				withRuntimeBlockStateIdentitySnapshot(withActiveVanillaPostEffectResources(source)),
+				readWholeFramePackOptions(shaderpacks, packName)
+			),
+			wholeFrameEnvironmentDefines(collectedDistantHorizonsDefine = distantHorizonsRenderingEnabled())
+		);
 	}
 
 	/**
@@ -152,29 +148,25 @@ public final class RustShaderPackSourceCollector {
 	 * produce a complete immutable snapshot.
 	 */
 	public static Optional<String> activeConfiguredPackName() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			try {
-				Optional<String> postEffect = activeVanillaPostEffectId();
-				if (!wholeFrameShaderConfigEnabled() && postEffect.isEmpty()) {
-					return Optional.empty();
-				}
-				Optional<String> configured = configuredPackNameFromDisk();
-				if (configured.isEmpty()) {
-					return postEffect;
-				}
-				Path shaderpacks = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
-					.resolve("shaderpacks").toAbsolutePath().normalize();
-				Path pack = shaderpacks.resolve(configured.get()).normalize();
-				if (!pack.startsWith(shaderpacks) || !Files.exists(pack)) {
-					return Optional.empty();
-				}
-				return Optional.of(sourceGenerationKey(configured.get(), activeVanillaPostEffectId()));
-			} catch (IOException error) {
+		try {
+			Optional<String> postEffect = activeVanillaPostEffectId();
+			if (!wholeFrameShaderConfigEnabled() && postEffect.isEmpty()) {
 				return Optional.empty();
 			}
+			Optional<String> configured = configuredPackNameFromDisk();
+			if (configured.isEmpty()) {
+				return postEffect;
+			}
+			Path shaderpacks = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
+				.resolve("shaderpacks").toAbsolutePath().normalize();
+			Path pack = shaderpacks.resolve(configured.get()).normalize();
+			if (!pack.startsWith(shaderpacks) || !Files.exists(pack)) {
+				return Optional.empty();
+			}
+			return Optional.of(sourceGenerationKey(configured.get(), activeVanillaPostEffectId()));
+		} catch (IOException error) {
+			return Optional.empty();
 		}
-		return IrisShaderPackCompatibilityCollector.activeConfiguredPackName();
 	}
 
 	static String sourceGenerationKey(String packName, Optional<String> postEffect) {
@@ -465,9 +457,6 @@ public final class RustShaderPackSourceCollector {
 	 * the Rust-owned DH route, read as copied configuration, never Iris state.
 	 */
 	public static boolean distantHorizonsRenderingEnabled() {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		try {
 			return com.seibel.distanthorizons.api.DhApi.Delayed.configs != null
 				&& com.seibel.distanthorizons.api.DhApi.Delayed.configs.graphics().renderingEnabled().getValue();
@@ -713,53 +702,6 @@ public final class RustShaderPackSourceCollector {
 	}
 
 	/**
-	 * Copies only the resolved scalar option values that affect source
-	 * preprocessing. The Iris option objects are never retained or passed over
-	 * FFI; Rust receives one immutable, bounded properties payload alongside
-	 * the selected pack sources.
-	 */
-	static boolean isShaderStageSelector(String name) {
-		return switch (Objects.requireNonNull(name, "name")) {
-			case "VERTEX_SHADER", "FRAGMENT_SHADER", "GEOMETRY_SHADER", "COMPUTE_SHADER" -> true;
-			default -> false;
-		};
-	}
-
-	static void putEnabledBooleanOption(Map<String, String> options, String name, boolean enabled) {
-		Objects.requireNonNull(options, "options");
-		Objects.requireNonNull(name, "name");
-		if (enabled) {
-			options.put(name, "1");
-		}
-	}
-
-	/**
-	 * Replaces raw shader files with the configured include graph's immutable
-	 * source. This is a source/configuration snapshot only: it copies no Iris
-	 * program, framebuffer, texture, callback, or native handle.
-	 */
-	static SourceGeneration withResolvedSourceSnapshot(SourceGeneration source, Map<String, byte[]> resolvedSources) throws IOException {
-		Objects.requireNonNull(source, "source");
-		Objects.requireNonNull(resolvedSources, "resolvedSources");
-		long totalBytes = 0L;
-		List<VulkanicGalBridge.ShaderPackSourceFileRecord> files = new java.util.ArrayList<>(source.files().size());
-		for (VulkanicGalBridge.ShaderPackSourceFileRecord file : source.files()) {
-			byte[] contents = resolvedSources.getOrDefault(file.path(), file.contentsUtf8());
-			if (contents.length > MAX_FILE_BYTES) {
-				throw new IOException("resolved shader-pack source file exceeds " + MAX_FILE_BYTES + " bytes: " + file.path());
-			}
-			totalBytes = Math.addExact(totalBytes, contents.length);
-			if (totalBytes > MAX_TOTAL_BYTES) {
-				throw new IOException("resolved shader-pack source payload exceeds " + MAX_TOTAL_BYTES + " bytes");
-			}
-			files.add(new VulkanicGalBridge.ShaderPackSourceFileRecord(file.path(), contents));
-		}
-		return new SourceGeneration(
-			source.packName(), source.generation(), List.copyOf(files), totalBytes, source.assets(), source.assetTotalBytes()
-		);
-	}
-
-	/**
 	 * Copies immutable game semantics, not Iris's resolved material map. Rust
 	 * owns the selected-pack parser and resolves these identities against its
 	 * own source-derived block-property contract.
@@ -834,10 +776,6 @@ public final class RustShaderPackSourceCollector {
 
 	static SourceGeneration withRuntimeOptionSnapshot(SourceGeneration source, java.util.Map<String, String> options) throws IOException {
 		return withRuntimeScalarSnapshot(source, options, RUNTIME_OPTIONS_PATH, "option");
-	}
-
-	static SourceGeneration withRuntimeConstantSnapshot(SourceGeneration source, java.util.Map<String, String> constants) throws IOException {
-		return withRuntimeScalarSnapshot(source, constants, RUNTIME_CONSTANTS_PATH, "constant");
 	}
 
 	private static SourceGeneration withRuntimeScalarSnapshot(
@@ -933,5 +871,56 @@ public final class RustShaderPackSourceCollector {
 			files = List.copyOf(files);
 			assets = List.copyOf(assets);
 		}
+	}
+
+	/**
+	 * Copies only the resolved scalar option values that affect source
+	 * preprocessing. The Iris option objects are never retained or passed over
+	 * FFI; Rust receives one immutable, bounded properties payload alongside
+	 * the selected pack sources.
+	 */
+	static boolean isShaderStageSelector(String name) {
+		return switch (Objects.requireNonNull(name, "name")) {
+			case "VERTEX_SHADER", "FRAGMENT_SHADER", "GEOMETRY_SHADER", "COMPUTE_SHADER" -> true;
+			default -> false;
+		};
+	}
+
+	static void putEnabledBooleanOption(Map<String, String> options, String name, boolean enabled) {
+		Objects.requireNonNull(options, "options");
+		Objects.requireNonNull(name, "name");
+		if (enabled) {
+			options.put(name, "1");
+		}
+	}
+
+	/**
+	 * Replaces raw shader files with the configured include graph's immutable
+	 * source. This is a source/configuration snapshot only: it copies no Iris
+	 * program, framebuffer, texture, callback, or native handle.
+	 */
+	static SourceGeneration withResolvedSourceSnapshot(SourceGeneration source, Map<String, byte[]> resolvedSources) throws IOException {
+		Objects.requireNonNull(source, "source");
+		Objects.requireNonNull(resolvedSources, "resolvedSources");
+		long totalBytes = 0L;
+		List<VulkanicGalBridge.ShaderPackSourceFileRecord> files = new java.util.ArrayList<>(source.files().size());
+		for (VulkanicGalBridge.ShaderPackSourceFileRecord file : source.files()) {
+			byte[] contents = resolvedSources.getOrDefault(file.path(), file.contentsUtf8());
+			if (contents.length > MAX_FILE_BYTES) {
+				throw new IOException("resolved shader-pack source file exceeds " + MAX_FILE_BYTES + " bytes: " + file.path());
+			}
+			totalBytes = Math.addExact(totalBytes, contents.length);
+			if (totalBytes > MAX_TOTAL_BYTES) {
+				throw new IOException("resolved shader-pack source payload exceeds " + MAX_TOTAL_BYTES + " bytes");
+			}
+			files.add(new VulkanicGalBridge.ShaderPackSourceFileRecord(file.path(), contents));
+		}
+		return new SourceGeneration(
+			source.packName(), source.generation(), List.copyOf(files), totalBytes, source.assets(), source.assetTotalBytes()
+		);
+	}
+
+	static SourceGeneration withRuntimeConstantSnapshot(SourceGeneration source, java.util.Map<String, String> constants) throws IOException {
+		return withRuntimeScalarSnapshot(source, constants, RUNTIME_CONSTANTS_PATH, "constant");
 	}
 }

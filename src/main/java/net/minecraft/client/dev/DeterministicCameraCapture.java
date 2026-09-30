@@ -272,9 +272,7 @@ public final class DeterministicCameraCapture {
 	private static final String FALLING_BLOCK_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalWorldMesh.fallingBlockScenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final String FALLING_BLOCK_ROUTE_CONTROL =
-		Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.disabled")
-			? "disabled"
-			: Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.legacyControl") ? "legacy" : "rust";
+		"rust";
 	private static final String PISTON_SCENARIO =
 		System.getProperty("mattmc.dev.rustGalWorldMesh.pistonScenario", "").trim().toLowerCase(Locale.ROOT);
 	private static final String PRIMED_TNT_SCENARIO =
@@ -1856,7 +1854,6 @@ public final class DeterministicCameraCapture {
 		}
 			RenderDocCaptureHook.endFrameCaptureOnce(minecraft.getWindow(), poses[poseIndex].name() + "#" + renderedFrameIndex);
 
-			VulkanicAPI.traceScopedCompositeColortex0PoseBoundary();
 			if (!realSurvivalCrackPoseReady()) {
 				wholeFrameAttachmentCaptureArmed = false;
 				renderedFramesAtPose = 0;
@@ -2266,7 +2263,6 @@ public final class DeterministicCameraCapture {
 				return false;
 			}
 			if ("evoker-fangs".equals(MODEL_MESH_SCENARIO)
-				&& WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()
 				&& !hasCurrentModelMeshRoute(renderedFrameIndex, 1L)) {
 				// Do not let an older short-lived animation satisfy this pose. The
 				// screenshot gate requires this same tight model/execution correlation.
@@ -4903,9 +4899,6 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean staticTerrainReplacementReady(long observedGeneration) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return framesWaitingForStaticTerrainLifecycle >= Math.max(4, FRAMES_PER_POSE / 2);
-		}
 		if (observedGeneration == 0L) {
 			return false;
 		}
@@ -4936,7 +4929,7 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean staticTerrainRequiresPostSetupExecution() {
-		return WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan();
+		return true;
 	}
 
 	private static int staticTerrainPostSetupRequiredFrames() {
@@ -4952,8 +4945,7 @@ public final class DeterministicCameraCapture {
 	private static boolean staticTerrainPostSetupExecutionReady(Minecraft minecraft) {
 		RustGalTerrainRenderer.StaticTerrainExecutionSnapshot execution =
 			RustGalTerrainRenderer.staticTerrainExecutionSnapshot();
-		if (staticTerrainRequiresPostSetupExecution()
-			&& !execution.executedAfter(staticTerrainLifecycleExecutionSubmissionBaseline)) {
+		if (!execution.executedAfter(staticTerrainLifecycleExecutionSubmissionBaseline)) {
 			staticTerrainLifecycleStage = "waiting-for-post-setup-static-terrain-execution";
 			if (framesWaitingForStaticTerrainLifecycle > SETTLED_READY_MAX_WAIT_FRAMES) {
 				fail("timed out waiting for post-setup Rust static-terrain execution: baselineSubmission="
@@ -6051,12 +6043,6 @@ public final class DeterministicCameraCapture {
 			settledReadyGateSatisfied = true;
 			return true;
 		}
-		if (poseIndex > 0
-			&& !Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			settledReadyGateSatisfied = true;
-			return true;
-		}
 
 		long latestCompletedFrame = Math.max(0L, renderedFrameIndex - 1L);
 		 synchronized (SUBMITTED_WORK_BY_FRAME) {
@@ -6067,8 +6053,6 @@ public final class DeterministicCameraCapture {
 				// authoritative bounded readiness signal for this route; visibility,
 				// uploaded-assets, and appearance-light gates below remain mandatory.
 				if ("sodium-terrain".equals(family)
-					&& (Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")
-						|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
 					) {
 					if (net.vulkanic.world.RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
 						settledRustTerrainFrames = Math.min(SETTLED_READY_FRAMES, settledRustTerrainFrames + 1);
@@ -6177,9 +6161,7 @@ public final class DeterministicCameraCapture {
 		if (!staticTerrainAssetsSettled()) {
 			return false;
 		}
-		if ((Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			&& (net.vulkanic.gui.RustGalFrameCoordinator.lastRenderableWholeFrameWorldFrame() <= 0
+		if ((net.vulkanic.gui.RustGalFrameCoordinator.lastRenderableWholeFrameWorldFrame() <= 0
 				|| net.vulkanic.gui.RustGalFrameCoordinator.lastAcquiredWholeFrameFrame()
 					- net.vulkanic.gui.RustGalFrameCoordinator.lastRenderableWholeFrameWorldFrame() > 1)) {
 			return false;
@@ -6315,15 +6297,13 @@ public final class DeterministicCameraCapture {
 				.append(" signature=")
 				.append(staticTerrainSettledSignature);
 		}
-		if (WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			summary.append(";rust-whole-frame-terrain=")
-				.append(net.vulkanic.world.RustGalWholeFrameTerrainSource.wholeFrameTerrainQueueSummary());
-			summary.append(";rust-terrain-settled=")
-				.append(settledRustTerrainFrames)
-				.append("/").append(SETTLED_READY_FRAMES);
-			summary.append(";rust-whole-frame-assets=")
-				.append(RustGalTerrainRenderer.wholeFrameAssetUploadSummary());
-		}
+		summary.append(";rust-whole-frame-terrain=")
+			.append(net.vulkanic.world.RustGalWholeFrameTerrainSource.wholeFrameTerrainQueueSummary());
+		summary.append(";rust-terrain-settled=")
+			.append(settledRustTerrainFrames)
+			.append("/").append(SETTLED_READY_FRAMES);
+		summary.append(";rust-whole-frame-assets=")
+			.append(RustGalTerrainRenderer.wholeFrameAssetUploadSummary());
 		if (SETTLED_READY_FAMILIES.contains("distant-horizons")) {
 			summary.append(";dh-generation-settled=")
 				.append(settledDistantHorizonsGenerationFrames)
@@ -6550,14 +6530,12 @@ public final class DeterministicCameraCapture {
 	}
 
 	private static boolean staticTerrainAssetsSettled() {
-		boolean rustWholeFrameTerrain = WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan();
-		if (rustWholeFrameTerrain
-			&& !net.vulkanic.world.RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
+		if (!net.vulkanic.world.RustGalWholeFrameTerrainSource.isWholeFrameTerrainQueueDrained()) {
 			staticTerrainSettledFrames = 0;
 			staticTerrainSettledSignature = "rust-whole-frame-queue-not-drained";
 			return false;
 		}
-		if (rustWholeFrameTerrain && !RustGalTerrainRenderer.areWholeFrameAssetsUploaded()) {
+		if (!RustGalTerrainRenderer.areWholeFrameAssetsUploaded()) {
 			staticTerrainSettledFrames = 0;
 			staticTerrainSettledSignature = "rust-whole-frame-assets-not-uploaded";
 			return false;
@@ -6576,20 +6554,13 @@ public final class DeterministicCameraCapture {
 		// keep the portal frontier drained for the same consecutive frame window;
 		// a one-frame empty queue can otherwise be followed by completed builds
 		// that expand the visible traversal after the capture was admitted.
-		staticTerrainSettledSignature = rustWholeFrameTerrain
-			? "visible-submission-identities+rust-whole-frame-queue-drained+assets-uploaded"
-			: "visible-submission-identities";
-		if (rustWholeFrameTerrain) {
-			staticTerrainSettledFrames = Math.min(SETTLED_READY_FRAMES, staticTerrainSettledFrames + 1);
-			return staticTerrainSettledFrames >= SETTLED_READY_FRAMES;
-		}
-		staticTerrainSettledFrames = SETTLED_READY_FRAMES;
-		return true;
+		staticTerrainSettledSignature = "visible-submission-identities+rust-whole-frame-queue-drained+assets-uploaded";
+		staticTerrainSettledFrames = Math.min(SETTLED_READY_FRAMES, staticTerrainSettledFrames + 1);
+		return staticTerrainSettledFrames >= SETTLED_READY_FRAMES;
 	}
 
 	private static boolean staticTerrainRequiresSettledAssets() {
-		return ("real-world".equals(STATIC_TERRAIN_SCENARIO) || staticTerrainLifecycleScenario())
-			&& WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan();
+		return ("real-world".equals(STATIC_TERRAIN_SCENARIO) || staticTerrainLifecycleScenario());
 	}
 
 	private static Set<String> parseSettledReadyFamilies() {
@@ -6888,7 +6859,7 @@ public final class DeterministicCameraCapture {
 		}
 
 		try {
-			Screenshot.takeScreenshot(minecraft.getMainRenderTarget(), nativeImage -> {
+			Screenshot.captureNextFrame(nativeImage -> {
 				try (nativeImage) {
 					nativeImage.writeToFile(currentScreenshotPath);
 					writeInternalScreenshotAck(minecraft, pose, captureIndex);
@@ -7447,11 +7418,6 @@ public final class DeterministicCameraCapture {
 			return false;
 		}
 		long tolerance = movingMeshFrameTolerance();
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentEntityFlameRoute();
-		if (!route.usesRustWholeFrameVulkan()) {
-			// Compatibility controls deliberately have no Rust execution receipt.
-			return modelMeshSetupClientEntityPresent;
-		}
 		boolean submitted = RustGalWorldPrimitiveRenderer.entityFlameSemanticDiagnostics().stream().anyMatch(diagnostic ->
 			Math.abs(diagnostic.frameIndex() - frameIndex) <= tolerance
 				&& "rust-vulkan-whole-frame".equals(diagnostic.route())
@@ -7470,11 +7436,6 @@ public final class DeterministicCameraCapture {
 			return false;
 		}
 		long tolerance = movingMeshFrameTolerance();
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentEntityShadowRoute();
-		if (!route.usesRustWholeFrameVulkan()) {
-			// Compatibility controls deliberately do not produce a Rust receipt.
-			return modelMeshSetupClientEntityPresent;
-		}
 		boolean submitted = RustGalWorldPrimitiveRenderer.entityShadowSemanticDiagnostics().stream().anyMatch(diagnostic ->
 			Math.abs(diagnostic.frameIndex() - frameIndex) <= tolerance
 				&& "rust-vulkan-whole-frame".equals(diagnostic.route())
@@ -7493,12 +7454,6 @@ public final class DeterministicCameraCapture {
 			return false;
 		}
 		long tolerance = movingMeshFrameTolerance();
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentEntityLeashRoute();
-		if (!route.usesRustWholeFrameVulkan()) {
-			// Controls must still observe the real copied leash producer, but they
-			// intentionally have no Rust execution receipt.
-			return modelMeshSetupClientEntityPresent;
-		}
 		boolean submitted = RustGalWorldPrimitiveRenderer.entityLeashSemanticDiagnostics().stream().anyMatch(diagnostic ->
 			Math.abs(diagnostic.frameIndex() - frameIndex) <= tolerance
 				&& "rust-vulkan-whole-frame".equals(diagnostic.route())
@@ -7531,9 +7486,6 @@ public final class DeterministicCameraCapture {
 		}
 		if (!traversalColumns) {
 			return false;
-		}
-		if (!route.usesRustOpenGl() && !route.usesRustWholeFrameVulkan()) {
-			return true;
 		}
 		boolean semanticColumns = false;
 		for (RustGalWorldPrimitiveRenderer.WeatherSemanticDiagnostic diagnostic : RustGalWorldPrimitiveRenderer.weatherSemanticDiagnostics()) {
@@ -7569,9 +7521,6 @@ public final class DeterministicCameraCapture {
 		long frameIndex = renderedFrameIndex;
 		long tolerance = Math.max(16L, FRAMES_PER_POSE + 4L);
 		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentCloudRoute();
-		if (!route.usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		boolean traversal = false;
 		for (RustGalWorldPrimitiveRenderer.CloudTraversalDiagnostic diagnostic : RustGalWorldPrimitiveRenderer.cloudTraversalDiagnostics()) {
 			if (Math.abs(diagnostic.frameIndex() - frameIndex) <= tolerance
@@ -7723,10 +7672,6 @@ public final class DeterministicCameraCapture {
 	private static boolean hasCurrentBeaconBeamRoute(long frameIndex) {
 		if (!beaconBeamSetupClientReady) {
 			return false;
-		}
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentBeaconBeamRoute();
-		if (!route.usesRustWholeFrameVulkan()) {
-			return true;
 		}
 		long tolerance = movingMeshFrameTolerance();
 		boolean submitted;
@@ -8148,16 +8093,7 @@ public final class DeterministicCameraCapture {
 		if (isModelPartMeshScenario()) {
 			return hasCurrentModelPartMeshTraversal(frameIndex);
 		}
-		if (WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-			return hasCurrentModelMeshRoute(frameIndex);
-		}
-		long frameTolerance = movingMeshFrameTolerance();
-		return RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions().stream().anyMatch(decision ->
-			Math.abs(decision.frameIndex() - frameIndex) <= frameTolerance
-				&& expectedModelMeshTextureId().equals(decision.textureId())
-				&& ("java-legacy".equals(decision.route()) || "disabled".equals(decision.route()))
-				&& !decision.rustQueued()
-		);
+		return hasCurrentModelMeshRoute(frameIndex);
 	}
 
 	private static boolean isModelPartMeshScenario() {
@@ -8173,7 +8109,6 @@ public final class DeterministicCameraCapture {
 	private static boolean hasCurrentModelPartMeshTraversal(long frameIndex) {
 		long frameTolerance = movingMeshFrameTolerance();
 		String expectedTexture = expectedModelMeshTextureId();
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentModelPartMeshRoute(true);
 		boolean traversed = RustGalWorldPrimitiveRenderer.modelPartMeshTraversalDiagnostics().stream().anyMatch(diagnostic ->
 			Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
 				&& expectedTexture.equals(diagnostic.textureId())
@@ -8216,9 +8151,6 @@ public final class DeterministicCameraCapture {
 					&& "eligible".equals(diagnostic.eligibility())
 					&& expectedEye.equals(diagnostic.textureId()));
 			if (cageParts < 1L || windParts < 2L || !eyePresent) return false;
-		}
-		if (!route.usesRustWholeFrameVulkan()) {
-			return true;
 		}
 		var copied = RustGalWorldPrimitiveRenderer.modelMeshDiagnostics().stream().filter(diagnostic ->
 			Math.abs(diagnostic.frameIndex() - frameIndex) <= frameTolerance
@@ -17989,7 +17921,7 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 			RustGalTerrainRenderer.staticTerrainExecutionSnapshot();
 		String padding = " ".repeat(Math.max(0, indent));
 		json.append(padding).append("\"rustGalStaticTerrainExecution\": { ");
-		json.append("\"required\": ").append(staticTerrainRequiresPostSetupExecution()).append(", ");
+		json.append("\"required\": ").append(true).append(", ");
 		json.append("\"setupSubmissionBaseline\": ").append(staticTerrainLifecycleExecutionSubmissionBaseline).append(", ");
 		json.append("\"lifecycleFrame\": ").append(staticTerrainLifecycleExecutionFrame).append(", ");
 		json.append("\"lifecycleSubmission\": ").append(staticTerrainLifecycleExecutionSubmission).append(", ");

@@ -9,11 +9,6 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import com.seibel.distanthorizons.core.pos.DhLodPos;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.render.glObject.buffer.GLElementBuffer;
-import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
-import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
-import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
-import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.util.math.Vec3d;
@@ -21,8 +16,6 @@ import com.seibel.distanthorizons.core.util.math.Vec3f;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicIndexType;
-import net.vulkanic.VulkanicPolygonFace;
-import net.vulkanic.VulkanicPolygonMode;
 import net.vulkanic.VulkanicPrimitiveMode;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -51,12 +44,6 @@ public class DebugRenderer
 	
 	
 	
-	// rendering setup
-	private ShaderProgram basicShader;
-	private GLVertexBuffer vertexBuffer;
-	private GLElementBuffer outlineIndexBuffer;
-	private AbstractVertexAttribute va;
-	private boolean init = false;
 	
 	// used when rendering
 	private Mat4f transformationMatrixThisFrame;
@@ -106,46 +93,6 @@ public class DebugRenderer
 	
 	private DebugRenderer() { }
 	
-	public void init()
-	{
-		if (this.init)
-		{
-			return;
-		}
-		this.init = true;
-		
-		this.va = AbstractVertexAttribute.create();
-		this.va.bind();
-		// Pos
-		this.va.setVertexAttribute(0, 0, VertexPointer.addVec3Pointer(false));
-		this.va.completeAndCheck(Float.BYTES * 3);
-		this.basicShader = new ShaderProgram("shaders/debug/vert.vert", "shaders/debug/frag.frag",
-				"fragColor", new String[]{"vPosition"});
-		this.createBuffer();
-	}
-	
-	private void createBuffer()
-	{
-		// box vertices 
-		ByteBuffer boxVerticesBuffer = ByteBuffer.allocateDirect(BOX_VERTICES.length * Float.BYTES);
-		boxVerticesBuffer.order(ByteOrder.nativeOrder());
-		boxVerticesBuffer.asFloatBuffer().put(BOX_VERTICES);
-		boxVerticesBuffer.rewind();
-		this.vertexBuffer = new GLVertexBuffer(false);
-		this.vertexBuffer.bind();
-		this.vertexBuffer.uploadBuffer(boxVerticesBuffer, 8, EDhApiGpuUploadMethod.DATA, BOX_VERTICES.length * Float.BYTES);
-		
-		
-		// outline vertex indexes
-		ByteBuffer boxOutlineBuffer = ByteBuffer.allocateDirect(BOX_OUTLINE_INDICES.length * Integer.BYTES);
-		boxOutlineBuffer.order(ByteOrder.nativeOrder());
-		boxOutlineBuffer.asIntBuffer().put(BOX_OUTLINE_INDICES);
-		boxOutlineBuffer.rewind();
-		this.outlineIndexBuffer = new GLElementBuffer(false);
-		this.outlineIndexBuffer.uploadBuffer(boxOutlineBuffer, EDhApiGpuUploadMethod.DATA, BOX_OUTLINE_INDICES.length * Integer.BYTES, VulkanicAPI.GL_STATIC_DRAW);
-		
-	}
-	
 	
 	
 	//==============//
@@ -174,74 +121,20 @@ public class DebugRenderer
 	// rendering //
 	//===========//
 	
+	/** Copies each registered debug box into Rust's world debug-line stream. */
 	public void render(Mat4f transform)
 	{
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-		{
-			// The Rust route still traverses the real DH debug registry, but copies
-			// each bounded box into the explicit world line stream below. It must
-			// never initialize or acquire the legacy Java command context.
-			this.transformationMatrixThisFrame = transform;
-			Vec3d camPos = MC_RENDER.getCameraExactPosition();
-			this.camPosFloatThisFrame = new Vec3f((float) camPos.x, (float) camPos.y, (float) camPos.z);
-			this.rendererLists.render(this);
-			for (BoxParticle particle : this.particles)
-			{
-				if (!particle.isDead()) this.renderBox(particle.getBox());
-			}
-			return;
-		}
-		CommandContext ctx = VulkanicAPI.getCommandContext();
 		this.transformationMatrixThisFrame = transform;
 		Vec3d camPos = MC_RENDER.getCameraExactPosition();
 		this.camPosFloatThisFrame = new Vec3f((float) camPos.x, (float) camPos.y, (float) camPos.z);
-		
-		this.init();
-		
-		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.LINE);
-		VulkanicAPI.setDepthTestEnabled(ctx, true);
-		
-		this.basicShader.bind(ctx);
-		this.va.bind(ctx);
-		this.va.bindBufferToAllBindingPoints(this.vertexBuffer.getId());
-		
-		
-		this.outlineIndexBuffer.bind();
 		this.rendererLists.render(this);
-		
-		
-		// particle rendering		
-		BoxParticle head = null;
-		while ((head = this.particles.poll()) != null && head.isDead())
-		{ /* remove dead particles */ }
-		if (head != null)
-		{
-			// re-add the popped off head
-			this.particles.add(head);
-		}
-		
-		
-		// box rendering
-		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 		for (BoxParticle particle : this.particles)
 		{
-			this.renderBox(particle.getBox(), ctx);
+			if (!particle.isDead()) this.renderBox(particle.getBox());
 		}
 	}
 	
 	public void renderBox(Box box)
-	{
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-		{
-				this.renderBoxRust(box);
-				return;
-		}
-		this.renderBox(box, VulkanicAPI.getCommandContext());
-	}
-
-	private void renderBoxRust(Box box)
 	{
 		if (box == null || this.transformationMatrixThisFrame == null || this.camPosFloatThisFrame == null) return;
 		float minX = box.minPos.x - this.camPosFloatThisFrame.x;
@@ -268,17 +161,6 @@ public class DebugRenderer
 		}
 	}
 
-	private void renderBox(Box box, CommandContext ctx)
-	{
-		Mat4f boxTransform = Mat4f.createTranslateMatrix(box.minPos.x - this.camPosFloatThisFrame.x, box.minPos.y - this.camPosFloatThisFrame.y, box.minPos.z - this.camPosFloatThisFrame.z);
-		boxTransform.multiply(Mat4f.createScaleMatrix(box.maxPos.x - box.minPos.x, box.maxPos.y - box.minPos.y, box.maxPos.z - box.minPos.z));
-		Mat4f t = this.transformationMatrixThisFrame.copy();
-		t.multiply(boxTransform);
-		this.basicShader.setUniform(ctx, this.basicShader.getUniformLocation(ctx, "uTransform"), t);
-		this.basicShader.setUniform(ctx, this.basicShader.getUniformLocation(ctx, "uColor"), box.color);
-		VulkanicAPI.drawElements(ctx, VulkanicPrimitiveMode.LINES, BOX_OUTLINE_INDICES.length, VulkanicIndexType.INT, 0);
-	}
-	
 	
 	
 	//================//

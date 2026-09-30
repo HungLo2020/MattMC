@@ -10,7 +10,6 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -53,13 +52,6 @@ public enum ChunkSectionLayer {
 
 	@Nullable
 	public GpuTextureView textureView() {
-		if (RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			return null;
-		}
-		TextureManager textureManager = Minecraft.getInstance().getTextureManager();
-		AbstractTexture abstractTexture = textureManager.getTexture(TextureAtlas.LOCATION_BLOCKS);
-		abstractTexture.setUseMipmaps(this.useMipmaps);
-		return abstractTexture.getTextureView();
+		return null;
 	}
 }

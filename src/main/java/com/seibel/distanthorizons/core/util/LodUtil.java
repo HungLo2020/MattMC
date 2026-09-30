@@ -108,31 +108,8 @@ public class LodUtil
 	// methods //
 	//=========//
 	
-	/** Returns the chunk int position for the given double position */
-	public static int getChunkPosFromDouble(double value) { return (int) Math.floor(value / CHUNK_WIDTH); }
-	/** Returns the float position inside the chunk for the given double position */
-	public static float getSubChunkPosFromDouble(double value)
-	{
-		double chunkPos = Math.floor(value / CHUNK_WIDTH);
-		return (float) (value - chunkPos * CHUNK_WIDTH);
-	}
 	
 	
-	/**
-	 * Returns true if the requested threshold passes, false otherwise.
-	 * For details, see:
-	 * https://stackoverflow.com/questions/3571203/what-are-runtime-getruntime-totalmemory-and-freememory
-	 */
-	public static boolean checkRamUsage(double minFreeMemoryPercent, int minFreeMemoryMB)
-	{
-		long freeMem = Runtime.getRuntime().freeMemory() + Runtime.getRuntime().maxMemory() - Runtime.getRuntime().totalMemory();
-		if (freeMem < minFreeMemoryMB * 1024L * 1024L) return false;
-		
-		long maxMem = Runtime.getRuntime().maxMemory();
-		if (freeMem / (double) maxMem < minFreeMemoryPercent) return false;
-		
-		return true;
-	}
 	
 	public static class AssertFailureException extends RuntimeException
 	{

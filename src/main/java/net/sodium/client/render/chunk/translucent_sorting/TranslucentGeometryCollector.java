@@ -12,7 +12,6 @@ import net.sodium.client.render.chunk.translucent_sorting.quad.NativeFullTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.client.render.chunk.translucent_sorting.trigger.NativeGfniTriggers;
-import net.sodium.client.render.chunk.translucent_sorting.trigger.SortTriggering;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
 
@@ -192,53 +191,12 @@ public class TranslucentGeometryCollector {
         return this.nativeAnalyzer != null;
     }
 
-    public int appendNativeQuadBatch(long nativeQuadAddress, int quadCount, ModelQuadFacing facing,
-            long packedNormalsAddress, long validityAddress) {
-        if (this.nativeAnalyzer == null) {
-            throw new IllegalStateException("Native translucent batching is unavailable when quad splitting is enabled");
-        }
-
-        return this.nativeAnalyzer.appendNativeQuadBatch(nativeQuadAddress, quadCount, facing, packedNormalsAddress,
-                validityAddress);
-    }
-
     public long nativeAnalyzerHandle() {
         if (this.nativeAnalyzer == null) {
             throw new IllegalStateException("Native translucent batching is unavailable when quad splitting is enabled");
         }
 
         return this.nativeAnalyzer.handle();
-    }
-
-    public void discardNativeAnalyzerForBenchmark() {
-        if (this.nativeAnalyzer != null) {
-            this.nativeAnalyzer.destroy();
-        }
-    }
-
-    public static boolean isInvalidNativeQuad(long nativeQuadAddress) {
-        float lastX = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadX(nativeQuadAddress, 3);
-        float lastY = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadY(nativeQuadAddress, 3);
-        float lastZ = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadZ(nativeQuadAddress, 3);
-        int sameVertexMap = 0;
-
-        for (int index = 0; index < 4; index++) {
-            float currentX = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadX(nativeQuadAddress, index);
-            float currentY = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadY(nativeQuadAddress, index);
-            float currentZ = net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder.nativeQuadZ(nativeQuadAddress, index);
-
-            if (Math.abs(currentX - lastX) < 0.00001F
-                    && Math.abs(currentY - lastY) < 0.00001F
-                    && Math.abs(currentZ - lastZ) < 0.00001F) {
-                sameVertexMap |= 1 << index;
-            }
-
-            lastX = currentX;
-            lastY = currentY;
-            lastZ = currentZ;
-        }
-
-        return Integer.bitCount(sameVertexMap) > 1;
     }
 
     public boolean isSplittingQuads() {
@@ -616,6 +574,12 @@ public class TranslucentGeometryCollector {
             if (this.nativeAnalyzer != null) {
                 this.nativeAnalyzer.destroy();
             }
+        }
+    }
+
+    public void discardNativeAnalyzerForBenchmark() {
+        if (this.nativeAnalyzer != null) {
+            this.nativeAnalyzer.destroy();
         }
     }
 }

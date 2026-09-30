@@ -136,18 +136,6 @@ class DeterministicCameraCaptureVignetteRegressionTest {
 	}
 
 	@Test
-	void rustWholeFrameBlockEntitiesDoNotDependOnCompiledTerrainReadiness() throws Exception {
-		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/renderer/LevelRenderer.java"));
-
-		assertTrue(source.contains("Set<Long> extractedBlockEntityPositions = Sets.newHashSet();"),
-			"Rust whole-frame block-entity extraction must deduplicate semantic producers by block position");
-		assertTrue(source.contains("getChunk(chunkX, chunkZ, ChunkStatus.FULL, false)"),
-			"Rust whole-frame block entities must be discoverable from bounded loaded chunks before terrain compilation completes");
-		assertTrue(source.contains("renderer shouldRender() and Rust route admission"),
-			"the bounded block-entity scan must retain renderer visibility and Rust admission as semantic filters");
-	}
-
-	@Test
 	void texturePaletteFixtureRebuildsOnlyItsEditedSections() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/net/minecraft/client/dev/DeterministicCameraCapture.java"));
 		int paletteCase = source.indexOf("case \"texture-palette\" -> {");

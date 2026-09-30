@@ -20,13 +20,4 @@ public enum ShaderType {
         this.id = stage.toLegacyGlShaderType();
     }
 
-    public static ShaderType fromGlShaderType(int id) {
-        for (ShaderType type : values()) {
-            if (type.id == id) {
-                return type;
-            }
-        }
-
-        return null;
-    }
 }

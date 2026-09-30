@@ -126,26 +126,7 @@ public class GuardianRenderer extends MobRenderer<Guardian, GuardianRenderState,
 		if (submitNodeCollector.submitGuardianBeamSemantic(poseStack, BEAM_RENDER_TYPE, GUARDIAN_BEAM_LOCATION, vertices, uvs, colors, 15728880)) {
 			return;
 		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.world.WorldRenderRoutePolicy.currentGuardianBeamRoute().usesRustWholeFrameVulkan()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Rust whole-frame Guardian beam route rejected semantic quads");
-		}
-		submitNodeCollector.submitCustomGeometrySemantic(poseStack, BEAM_RENDER_TYPE, (pose, vertexConsumer) -> {
-			vertex(vertexConsumer, pose, aa, i, ab, n, o, p, 0.4999F, am);
-			vertex(vertexConsumer, pose, aa, 0.0F, ab, n, o, p, 0.4999F, al);
-			vertex(vertexConsumer, pose, ac, 0.0F, ad, n, o, p, 0.0F, al);
-			vertex(vertexConsumer, pose, ac, i, ad, n, o, p, 0.0F, am);
-			vertex(vertexConsumer, pose, ae, i, af, n, o, p, 0.4999F, am);
-			vertex(vertexConsumer, pose, ae, 0.0F, af, n, o, p, 0.4999F, al);
-			vertex(vertexConsumer, pose, ag, 0.0F, ah, n, o, p, 0.0F, al);
-			vertex(vertexConsumer, pose, ag, i, ah, n, o, p, 0.0F, am);
-			float acx = Mth.floor(f) % 2 == 0 ? 0.5F : 0.0F;
-			vertex(vertexConsumer, pose, s, i, t, n, o, p, 0.5F, acx + 0.5F);
-			vertex(vertexConsumer, pose, u, i, v, n, o, p, 1.0F, acx + 0.5F);
-			vertex(vertexConsumer, pose, y, i, z, n, o, p, 1.0F, acx);
-			vertex(vertexConsumer, pose, w, i, x, n, o, p, 0.5F, acx);
-		});
+		throw new IllegalStateException("Rust whole-frame Guardian beam route rejected semantic quads");
 	}
 
 	private static void vertex(VertexConsumer vertexConsumer, PoseStack.Pose pose, float f, float g, float h, int i, int j, int k, float l, float m) {

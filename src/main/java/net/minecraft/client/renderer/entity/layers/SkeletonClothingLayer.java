@@ -34,8 +34,7 @@ public class SkeletonClothingLayer<S extends SkeletonRenderState, M extends Enti
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, S skeletonRenderState, float f, float g) {
 		RenderType renderType = RenderType.entityCutoutNoCull(this.clothesLocation);
 		if (skeletonRenderState instanceof net.minecraft.client.renderer.entity.state.BoggedRenderState boggedState
-			&& !boggedState.isSheared && BOGGED_OVERLAY.equals(this.clothesLocation)
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+			&& !boggedState.isSheared && BOGGED_OVERLAY.equals(this.clothesLocation)) {
 			boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				this.layerModel, skeletonRenderState, poseStack.last(), renderType, this.clothesLocation,
 				BOGGED_OVERLAY_IDENTITY, i, LivingEntityRenderer.getOverlayCoords(skeletonRenderState, 0.0F), -1
@@ -54,8 +53,7 @@ public class SkeletonClothingLayer<S extends SkeletonRenderState, M extends Enti
 			throw new IllegalStateException("Rust whole-frame bogged-overlay route has no copied semantic mesh");
 		}
 		if (skeletonRenderState.entityType == net.minecraft.world.entity.EntityType.STRAY
-			&& STRAY_OVERLAY.equals(this.clothesLocation)
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+			&& STRAY_OVERLAY.equals(this.clothesLocation)) {
 			boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 				this.layerModel, skeletonRenderState, poseStack.last(), renderType, this.clothesLocation,
 				STRAY_OVERLAY_IDENTITY, i, LivingEntityRenderer.getOverlayCoords(skeletonRenderState, 0.0F), -1

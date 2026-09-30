@@ -85,23 +85,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		try {
 			// Iris: From MixinSpriteContents - redirect mipmap generation to custom generator if available
 			NativeImage[] result;
-			if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& this instanceof net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator.Provider provider) {
-				net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator generator = provider.getMipmapGenerator();
-				if (generator != null) {
-					try {
-						result = generator.generateMipLevels(this.byMipLevel, i);
-					} catch (Exception e) {
-						net.irisshaders.iris.Iris.logger.error("ERROR MIPMAPPING", e);
-						result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
-					}
-				} else {
-					result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
-				}
-			} else {
-				result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
-			}
+			result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
 			this.byMipLevel = result;
 		} catch (Throwable var5) {
 			CrashReport crashReport = CrashReport.forThrowable(var5, "Generating mipmaps for frame");
@@ -177,16 +161,9 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 	}
 
 	public void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Rust consumes the copied atlas/resource-pack pixels; Java texture
-			// uploads are unavailable on the semantic whole-frame device.
-			return;
-		}
-		for (int m = 0; m < this.byMipLevel.length; m++) {
-			VulkanicAPI.createCommandEncoder()
-				.writeToTexture(gpuTexture, nativeImages[m], m, 0, i >> m, j >> m, this.width >> m, this.height >> m, k >> m, l >> m);
-		}
+		// Rust consumes the copied atlas/resource-pack pixels; Java texture
+		// uploads are unavailable on the semantic whole-frame device.
+		return;
 	}
 
 	@Override
@@ -309,13 +286,6 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 	public void close() {
 		for (NativeImage nativeImage : this.byMipLevel) {
 			nativeImage.close();
-		}
-		// Iris PBR holders belong to the Java compatibility texture path. Rust
-		// whole-frame assets are copied from CPU resource data and must not
-		// retain or mutate Iris PBR runtime state during reload.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && iris$pbrHolder != null) {
-			iris$pbrHolder.close();
 		}
 	}
 
@@ -499,38 +469,6 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		}
 
 		@Override
-		public void tickAndUpload(int i, int j, GpuTexture gpuTexture) {
-			// Sodium: From SpriteContentsTickerMixin - on-demand animation check
-			boolean onDemand = SodiumClientMod.options().performance.animateOnlyVisibleTextures;
-			
-			if (onDemand && !net.sodium.client.render.texture.SpriteContentsExtension.isActive(this.parent)) {
-				this.subFrame++;
-				if (this.subFrame >= ((SpriteContents.FrameInfo)this.animationInfo.frames.get(this.frame)).time()) {
-					this.frame = (this.frame + 1) % this.animationInfo.frames.size();
-					this.subFrame = 0;
-				}
-				return; // Skip the upload
-			}
-			
-			this.subFrame++;
-			SpriteContents.FrameInfo frameInfo = (SpriteContents.FrameInfo)this.animationInfo.frames.get(this.frame);
-			if (this.subFrame >= frameInfo.time) {
-				int k = frameInfo.index;
-				this.frame = (this.frame + 1) % this.animationInfo.frames.size();
-				this.subFrame = 0;
-				int l = ((SpriteContents.FrameInfo)this.animationInfo.frames.get(this.frame)).index;
-				if (k != l) {
-					this.animationInfo.uploadFrame(i, j, l, gpuTexture);
-				}
-			} else if (this.interpolationData != null) {
-				this.interpolationData.uploadInterpolatedFrame(i, j, this, gpuTexture);
-			}
-			
-			// Sodium: From SpriteContentsTickerMixin - reset active flag after upload
-			net.sodium.client.render.texture.SpriteContentsExtension.setActive(this.parent, false);
-		}
-
-		@Override
 		public boolean tickSemantic() {
 			this.subFrame++;
 			SpriteContents.FrameInfo frameInfo = (SpriteContents.FrameInfo)this.animationInfo.frames.get(this.frame);
@@ -664,33 +602,11 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 	
 	@Override
 	public net.irisshaders.iris.pbr.texture.PBRSpriteHolder getOrCreatePBRHolder() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Iris PBR sprite state is unavailable on the Rust Vulkan route");
-		}
-		if (iris$pbrHolder == null) {
-			iris$pbrHolder = new net.irisshaders.iris.pbr.texture.PBRSpriteHolder();
-		}
-		return iris$pbrHolder;
+		throw new IllegalStateException("Java Iris PBR sprite state is unavailable on the Rust Vulkan route");
 	}
 	
 	// Iris PBR: From texture.pbr.MixinSpriteContents - Sodium active tracking hook
 	public void sodium$setActive(boolean active) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
-		// Mark PBR sprites active when main sprite is active
-		net.irisshaders.iris.pbr.texture.PBRSpriteHolder pbrHolder = getPBRHolder();
-		if (pbrHolder != null) {
-			net.minecraft.client.renderer.texture.TextureAtlasSprite normalSprite = pbrHolder.getNormalSprite();
-			net.minecraft.client.renderer.texture.TextureAtlasSprite specularSprite = pbrHolder.getSpecularSprite();
-			if (normalSprite != null) {
-				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(normalSprite);
-			}
-			if (specularSprite != null) {
-				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(specularSprite);
-			}
-		}
+		return;
 	}
 }

@@ -34,11 +34,6 @@ import org.joml.Vector3f;
 public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNodeCollectorExtension {
 	private final Int2ObjectAVLTreeMap<SubmitNodeCollection> submitsPerOrder = new Int2ObjectAVLTreeMap<>();
 
-	private static boolean rustWholeFrame() {
-		return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-	}
-
 	public SubmitNodeCollection order(int i) {
 		return this.submitsPerOrder.computeIfAbsent(i, ix -> new SubmitNodeCollection(this, ix));
 	}
@@ -462,35 +457,16 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		private static final java.util.WeakHashMap<CustomGeometrySubmit, ModelStorageData> STORAGE = new java.util.WeakHashMap<>();
 		
 		public CustomGeometrySubmit {
-			if (!SubmitNodeStorage.rustWholeFrame()) {
-				// Iris: Capture state on construction
-				ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
-				data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
-				data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
-				data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
-				data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
-			}
 		}
 		
 		@Override
 		public void iris$capture() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
-			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
-			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
-			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
-			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+			return;
 		}
 		
 		@Override
 		public void iris$set() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.get(this);
-			if (data != null) {
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
-			}
+			return;
 		}
 		
 		@Override
@@ -530,23 +506,12 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$capture() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
-			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
-			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
-			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
-			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+			return;
 		}
 		
 		@Override
 		public void iris$set() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.get(this);
-			if (data != null) {
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
-			}
+			return;
 		}
 		
 		@Override
@@ -582,23 +547,12 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$capture() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
-			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
-			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
-			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
-			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+			return;
 		}
 		
 		@Override
 		public void iris$set() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.get(this);
-			if (data != null) {
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
-			}
+			return;
 		}
 		
 		@Override
@@ -629,23 +583,12 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$capture() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
-			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
-			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
-			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
-			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+			return;
 		}
 		
 		@Override
 		public void iris$set() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.get(this);
-			if (data != null) {
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
-			}
+			return;
 		}
 		
 		@Override
@@ -702,23 +645,12 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 		
 		@Override
 		public void iris$capture() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
-			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
-			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
-			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
-			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+			return;
 		}
 		
 		@Override
 		public void iris$set() {
-			if (SubmitNodeStorage.rustWholeFrame()) return;
-			ModelStorageData data = STORAGE.get(this);
-			if (data != null) {
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
-			}
+			return;
 		}
 		
 		@Override

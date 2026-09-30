@@ -31,27 +31,21 @@ public final class CreakingEyesLayer extends RenderLayer<CreakingRenderState, Cr
 		if (!state.eyesGlowing) return;
 		RenderType renderType = RenderType.eyes(TEXTURE);
 		int overlay = LivingEntityRenderer.getOverlayCoords(state, 0.0F);
-		if (net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
-			boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
-				this.model, state, poseStack.last(), renderType, TEXTURE, IDENTITY,
-				light, overlay, ARGB.white(1.0F)
-			);
-			if (queued) {
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-					"rust-vulkan-whole-frame", TEXTURE, this.model.getClass().getName(),
-					state.entityId, true, true, false
-				);
-				return;
-			}
-			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-				"rust-vulkan-unavailable", TEXTURE, this.model.getClass().getName(),
-				state.entityId, false, false, false
-			);
-			throw new IllegalStateException("Rust whole-frame creaking-eyes route has no copied semantic mesh");
-		}
-		collector.order(1).submitModelSemanticTexture(
-			this.model, state, poseStack, renderType, light, overlay, ARGB.white(1.0F),
-			TEXTURE, state.outlineColor, null
+		boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
+			this.model, state, poseStack.last(), renderType, TEXTURE, IDENTITY,
+			light, overlay, ARGB.white(1.0F)
 		);
+		if (queued) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-whole-frame", TEXTURE, this.model.getClass().getName(),
+				state.entityId, true, true, false
+			);
+			return;
+		}
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+			"rust-vulkan-unavailable", TEXTURE, this.model.getClass().getName(),
+			state.entityId, false, false, false
+		);
+		throw new IllegalStateException("Rust whole-frame creaking-eyes route has no copied semantic mesh");
 	}
 }

@@ -290,36 +290,22 @@ public class ModelEmu extends AdvancedEntityModel<EmuRenderState> {
         this.walk(neck2, idleSpeed, idleDegree, true, 1F, 0.15F, ageInTicks, 1);
         this.walk(head, idleSpeed, idleDegree, false, 1F, 0.25F, ageInTicks, 1);
         this.walk(tail, idleSpeed, idleDegree, false, 2F, -0.05F, ageInTicks, 1);
-        boolean running = true;
-        if (running) {
-            this.walk(leg_right, walkSpeed, walkDegree * 2F, false, 0F, 0F, limbSwing, limbSwingAmount);
-            this.walk(leg_left, walkSpeed, walkDegree * 2F, true, 0F, 0F, limbSwing, limbSwingAmount);
-            this.walk(foot_right, walkSpeed, walkDegree * 1.5F, false, 2F, 0.2F, limbSwing, limbSwingAmount);
-            this.walk(foot_left, walkSpeed, walkDegree * 1.5F, true, 2F, 0.2F, limbSwing, limbSwingAmount);
-            this.walk(neck1, walkSpeed, walkDegree * 1F, false, 1F, 0F, limbSwing, limbSwingAmount);
-            this.walk(neck2, walkSpeed, walkDegree * 0.8F, true, 1.3F, 0F, limbSwing, limbSwingAmount);
-            this.walk(head, walkSpeed, walkDegree * 0.25F, true, 1.3F, 0F, limbSwing, limbSwingAmount);
-            this.walk(tail, walkSpeed, walkDegree * 0.4F, true, 1.3F, -0.4F, limbSwing, limbSwingAmount);
-            this.bob(body, walkSpeed, walkDegree * 14F, true, limbSwing, limbSwingAmount);
-            this.flap(body, walkSpeed, walkDegree * 0.7F, true, 0F, 0F, limbSwing, limbSwingAmount);
-            this.flap(leg_left, walkSpeed, walkDegree * 0.7F, false, 0F, 0F, limbSwing, limbSwingAmount);
-            this.flap(leg_right, walkSpeed, walkDegree * 0.7F, false, 0F, 0F, limbSwing, limbSwingAmount);
-            this.flap(neck1, walkSpeed, walkDegree * 0.8F, true, 3F, 0F, limbSwing, limbSwingAmount);
-            this.flap(neck2, walkSpeed, walkDegree * 0.4F, true, 3.2F, 0F, limbSwing, limbSwingAmount);
-            this.swing(tail, walkSpeed, walkDegree * 0.8F, false, 1F, 0F, limbSwing, limbSwingAmount);
+        this.walk(leg_right, walkSpeed, walkDegree * 2F, false, 0F, 0F, limbSwing, limbSwingAmount);
+        this.walk(leg_left, walkSpeed, walkDegree * 2F, true, 0F, 0F, limbSwing, limbSwingAmount);
+        this.walk(foot_right, walkSpeed, walkDegree * 1.5F, false, 2F, 0.2F, limbSwing, limbSwingAmount);
+        this.walk(foot_left, walkSpeed, walkDegree * 1.5F, true, 2F, 0.2F, limbSwing, limbSwingAmount);
+        this.walk(neck1, walkSpeed, walkDegree * 1F, false, 1F, 0F, limbSwing, limbSwingAmount);
+        this.walk(neck2, walkSpeed, walkDegree * 0.8F, true, 1.3F, 0F, limbSwing, limbSwingAmount);
+        this.walk(head, walkSpeed, walkDegree * 0.25F, true, 1.3F, 0F, limbSwing, limbSwingAmount);
+        this.walk(tail, walkSpeed, walkDegree * 0.4F, true, 1.3F, -0.4F, limbSwing, limbSwingAmount);
+        this.bob(body, walkSpeed, walkDegree * 14F, true, limbSwing, limbSwingAmount);
+        this.flap(body, walkSpeed, walkDegree * 0.7F, true, 0F, 0F, limbSwing, limbSwingAmount);
+        this.flap(leg_left, walkSpeed, walkDegree * 0.7F, false, 0F, 0F, limbSwing, limbSwingAmount);
+        this.flap(leg_right, walkSpeed, walkDegree * 0.7F, false, 0F, 0F, limbSwing, limbSwingAmount);
+        this.flap(neck1, walkSpeed, walkDegree * 0.8F, true, 3F, 0F, limbSwing, limbSwingAmount);
+        this.flap(neck2, walkSpeed, walkDegree * 0.4F, true, 3.2F, 0F, limbSwing, limbSwingAmount);
+        this.swing(tail, walkSpeed, walkDegree * 0.8F, false, 1F, 0F, limbSwing, limbSwingAmount);
 
-        } else {
-            this.walk(leg_right, walkSpeed, walkDegree * 1.85F, false, 0F, 0F, limbSwing, limbSwingAmount);
-            this.walk(leg_left, walkSpeed, walkDegree * 1.85F, true, 0F, 0F, limbSwing, limbSwingAmount);
-            this.walk(foot_right, walkSpeed, walkDegree * 1.5F, false, 1.95F, 0.2F, limbSwing, limbSwingAmount);
-            this.walk(foot_left, walkSpeed, walkDegree * 1.5F, true, 1.95F, 0.2F, limbSwing, limbSwingAmount);
-            this.walk(neck1, walkSpeed, walkDegree * 0.6F, false, 1F, 0F, limbSwing, limbSwingAmount);
-            this.walk(neck2, walkSpeed, walkDegree * 0.5F, true, 1.3F, 0F, limbSwing, limbSwingAmount);
-            this.walk(head, walkSpeed, walkDegree * 0.15F, true, 1.3F, 0F, limbSwing, limbSwingAmount);
-            this.walk(tail, walkSpeed, walkDegree * 0.4F, true, 1.3F, -0.4F, limbSwing, limbSwingAmount);
-            this.bob(body, walkSpeed, walkDegree * 5F, true, limbSwing, limbSwingAmount);
-
-        }
         this.faceTarget(netHeadYaw, headPitch, 1F, neck2, head);
         float runProgress = 5F * limbSwingAmount;
         if(state.currentAnimation != EntityEmu.ANIMATION_PECK_GROUND){

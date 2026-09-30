@@ -344,87 +344,6 @@ public final class NativeChunkMeshEncoder {
         ), "native chunk vertex encoding");
     }
 
-    public static void encodeScattered(
-            long inputAddress,
-            int[] outputVertexOffsets,
-            int updateCount,
-            ByteBuffer output,
-            NativeChunkVertexFormat format,
-            int sectionIndex,
-            boolean separateAo
-    ) {
-        if (updateCount < 0 || updateCount > outputVertexOffsets.length) {
-            throw new IllegalArgumentException("Invalid scattered encode update count: " + updateCount);
-        }
-        if (updateCount == 0) {
-            return;
-        }
-
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment outputVertexOffsetsSegment = arena.allocate(ValueLayout.JAVA_INT, updateCount);
-
-            for (int index = 0; index < updateCount; index++) {
-                outputVertexOffsetsSegment.setAtIndex(ValueLayout.JAVA_INT, index, outputVertexOffsets[index]);
-            }
-
-            check(invokeScatteredEncode(
-                    inputAddress,
-                    outputVertexOffsetsSegment,
-                    updateCount,
-                    MemoryUtil.memAddress(output),
-                    output.remaining(),
-                    NATIVE_QUAD_STRIDE,
-                    format.stride(),
-                    format.blockIdOffset(),
-                    format.normalOffset(),
-                    format.tangentOffset(),
-                    format.midUvOffset(),
-                    format.midBlockOffset(),
-                    sectionIndex,
-                    separateAo ? 1 : 0
-            ), "native scattered chunk vertex encoding");
-        }
-    }
-
-    public static void writeNativeQuadMetadata(long ptr, byte blockEmission, byte renderType, boolean ignoreMidBlock,
-            int blockId, int localX, int localY, int localZ, int materialBits) {
-        check(invokeWriteNativeQuadMetadata(ptr, blockEmission, renderType, ignoreMidBlock ? 1 : 0, blockId, localX,
-                localY, localZ, materialBits), "native quad metadata writing");
-    }
-
-    public static void writeNativeQuadVertex(long ptr, int vertexIndex, float x, float y, float z, int color,
-            float ao, float u, float v, int light) {
-        if (vertexIndex < 0 || vertexIndex >= 4) {
-            throw new IllegalArgumentException("Invalid quad vertex index: " + vertexIndex);
-        }
-
-        check(invokeWriteNativeQuadVertex(ptr, vertexIndex, x, y, z, color, ao, u, v, light),
-                "native quad vertex writing");
-    }
-
-    public static void writeNativeQuad(
-            long ptr,
-            byte blockEmission,
-            byte renderType,
-            boolean ignoreMidBlock,
-            int blockId,
-            int localX,
-            int localY,
-            int localZ,
-            int materialBits,
-            float x0, float y0, float z0, int color0, float ao0, float u0, float v0, int light0,
-            float x1, float y1, float z1, int color1, float ao1, float u1, float v1, int light1,
-            float x2, float y2, float z2, int color2, float ao2, float u2, float v2, int light2,
-            float x3, float y3, float z3, int color3, float ao3, float u3, float v3, int light3
-    ) {
-        check(invokeWriteNativeQuad(ptr, blockEmission, renderType, ignoreMidBlock ? 1 : 0, blockId, localX, localY,
-                localZ, materialBits,
-                x0, y0, z0, color0, ao0, u0, v0, light0,
-                x1, y1, z1, color1, ao1, u1, v1, light1,
-                x2, y2, z2, color2, ao2, u2, v2, light2,
-                x3, y3, z3, color3, ao3, u3, v3, light3), "native quad writing");
-    }
-
     public static void writeNativeQuadMemory(
             long ptr,
             byte blockEmission,
@@ -471,16 +390,6 @@ public final class NativeChunkMeshEncoder {
                 x2, y2, z2, color2, ao2, u2, v2, light2,
                 x3, y3, z3, color3, ao3, u3, v3, light3);
         MemoryUtil.memPutInt(ptr + FLAT_QUAD_PACKED_NORMAL_OFFSET, packedNormal);
-    }
-
-    public static void writeLightBlockRecord(long ptr, int materialBits, byte blockEmission, int blockId,
-            int localX, int localY, int localZ) {
-        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_MATERIAL_BITS_OFFSET, materialBits);
-        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
-        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_ID_OFFSET, blockId);
-        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_LOCAL_X_OFFSET, localX);
-        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_LOCAL_Y_OFFSET, localY);
-        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_LOCAL_Z_OFFSET, localZ);
     }
 
     public static void writeFluidFaceRecord(long ptr, int packedNormal, int materialBits, byte blockEmission,
@@ -576,8 +485,7 @@ public final class NativeChunkMeshEncoder {
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_RENDER_TYPE_OFFSET, renderType & 0xff);
         // Native meshing must see the same copied pack face-shade policy as
         // Frozen's chunk builder. The source shader will light these faces.
-        boolean copiedPackDisablesShade = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                && net.vulkanic.world.RustGalTerrainRenderer.copiedShaderPackDisableDirectionalShading();
+        boolean copiedPackDisablesShade = net.vulkanic.world.RustGalTerrainRenderer.copiedShaderPackDisableDirectionalShading();
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_SHADE_OFFSET,
                 shade && !copiedPackDisablesShade ? 1 : 0);
         MemoryUtil.memPutInt(ptr + STATIC_MODEL_QUAD_FLAGS_OFFSET, flags);
@@ -599,24 +507,6 @@ public final class NativeChunkMeshEncoder {
                 x1, y1, z1, color1, u1, v1, light1,
                 x2, y2, z2, color2, u2, v2, light2,
                 x3, y3, z3, color3, u3, v3, light3);
-    }
-
-    public static void writeStaticModelBlockRecord(long ptr, int modelId, int materialBits, byte blockEmission,
-            byte renderType, int blockId, int localX, int localY, int localZ, int cullMask,
-            float offsetX, float offsetY, float offsetZ) {
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_MODEL_ID_OFFSET, modelId);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_MATERIAL_BITS_OFFSET, materialBits);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_RENDER_TYPE_OFFSET, renderType & 0xff);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_ID_OFFSET, blockId);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_LOCAL_X_OFFSET, localX);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_LOCAL_Y_OFFSET, localY);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_LOCAL_Z_OFFSET, localZ);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_CULL_MASK_OFFSET, cullMask);
-        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_CULL_MASK_OFFSET + 4, 0);
-        MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_X_OFFSET, offsetX);
-        MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_Y_OFFSET, offsetY);
-        MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_Z_OFFSET, offsetZ);
     }
 
     /**
@@ -797,25 +687,6 @@ public final class NativeChunkMeshEncoder {
                 visibleSlices, forceUnassigned, sliceReordering, separateAo, null, INDEX_MODE_NONE, 0, null, 0);
     }
 
-    public static void assembleWithSharedIndex(
-            long[] inputAddresses,
-            int[] inputVertexCounts,
-            ByteBuffer output,
-            int[] vertexSegments,
-            NativeChunkVertexFormat format,
-            int sectionIndex,
-            int visibleSlices,
-            boolean forceUnassigned,
-            boolean sliceReordering,
-            boolean separateAo,
-            ByteBuffer indexOutput,
-            int indexStride
-    ) {
-        assembleOutput(inputAddresses, inputVertexCounts, output, vertexSegments, format, sectionIndex,
-                visibleSlices, forceUnassigned, sliceReordering, separateAo,
-                indexOutput, INDEX_MODE_SHARED, indexStride, null, 0);
-    }
-
     private static void assembleOutput(
             long[] inputAddresses,
             int[] inputVertexCounts,
@@ -899,15 +770,6 @@ public final class NativeChunkMeshEncoder {
         }
     }
 
-    public static void writeSharedQuadIndexBuffer(ByteBuffer output, int indexStride, int primitiveCount) {
-        if (primitiveCount == 0) {
-            return;
-        }
-
-        check(invokeWriteShared(MemoryUtil.memAddress(output), output.remaining(), indexStride, primitiveCount),
-                "native shared quad index buffer writing");
-    }
-
     public static void writeQuadVertexIndexes(IntBuffer output, int[] quadIndexes) {
         writeQuadVertexIndexes(output, quadIndexes, quadIndexes.length);
     }
@@ -980,71 +842,6 @@ public final class NativeChunkMeshEncoder {
         }
     }
 
-    private static int invokeWriteNativeQuadMetadata(
-            long ptr,
-            int blockEmission,
-            int renderType,
-            int ignoreMidBlock,
-            int blockId,
-            int localX,
-            int localY,
-            int localZ,
-            int materialBits
-    ) {
-        try {
-            return (int) WRITE_NATIVE_QUAD_METADATA.invokeExact(ptr, blockEmission, renderType, ignoreMidBlock,
-                    blockId, localX, localY, localZ, materialBits);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust native quad metadata downcall failed", throwable);
-        }
-    }
-
-    private static int invokeWriteNativeQuadVertex(
-            long ptr,
-            int vertexIndex,
-            float x,
-            float y,
-            float z,
-            int color,
-            float ao,
-            float u,
-            float v,
-            int light
-    ) {
-        try {
-            return (int) WRITE_NATIVE_QUAD_VERTEX.invokeExact(ptr, vertexIndex, x, y, z, color, ao, u, v, light);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust native quad vertex downcall failed", throwable);
-        }
-    }
-
-    private static int invokeWriteNativeQuad(
-            long ptr,
-            int blockEmission,
-            int renderType,
-            int ignoreMidBlock,
-            int blockId,
-            int localX,
-            int localY,
-            int localZ,
-            int materialBits,
-            float x0, float y0, float z0, int color0, float ao0, float u0, float v0, int light0,
-            float x1, float y1, float z1, int color1, float ao1, float u1, float v1, int light1,
-            float x2, float y2, float z2, int color2, float ao2, float u2, float v2, int light2,
-            float x3, float y3, float z3, int color3, float ao3, float u3, float v3, int light3
-    ) {
-        try {
-            return (int) WRITE_NATIVE_QUAD.invokeExact(ptr, blockEmission, renderType, ignoreMidBlock, blockId,
-                    localX, localY, localZ, materialBits,
-                    x0, y0, z0, color0, ao0, u0, v0, light0,
-                    x1, y1, z1, color1, ao1, u1, v1, light1,
-                    x2, y2, z2, color2, ao2, u2, v2, light2,
-                    x3, y3, z3, color3, ao3, u3, v3, light3);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust native quad downcall failed", throwable);
-        }
-    }
-
     private static float invokeNativeQuadPosition(long ptr, int vertexIndex, int component) {
         try {
             return (float) NATIVE_QUAD_POSITION.invokeExact(ptr, vertexIndex, component);
@@ -1073,31 +870,6 @@ public final class NativeChunkMeshEncoder {
                     blockIdOffset, normalOffset, tangentOffset, midUvOffset, midBlockOffset, sectionIndex, separateAo);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust chunk vertex encoding downcall failed", throwable);
-        }
-    }
-
-    private static int invokeScatteredEncode(
-            long inputAddress,
-            MemorySegment outputVertexOffsets,
-            int updateCount,
-            long outputAddress,
-            int outputCapacity,
-            int quadStride,
-            int vertexStride,
-            int blockIdOffset,
-            int normalOffset,
-            int tangentOffset,
-            int midUvOffset,
-            int midBlockOffset,
-            int sectionIndex,
-            int separateAo
-    ) {
-        try {
-            return (int) SCATTERED_ENCODE.invokeExact(inputAddress, outputVertexOffsets, updateCount, outputAddress,
-                    outputCapacity, quadStride, vertexStride, blockIdOffset, normalOffset, tangentOffset, midUvOffset,
-                    midBlockOffset, sectionIndex, separateAo);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust scattered chunk vertex encoding downcall failed", throwable);
         }
     }
 
@@ -1139,14 +911,6 @@ public final class NativeChunkMeshEncoder {
         }
     }
 
-    private static int invokeWriteShared(long outputAddress, int outputCapacity, int indexStride, int primitiveCount) {
-        try {
-            return (int) WRITE_SHARED.invokeExact(outputAddress, outputCapacity, indexStride, primitiveCount);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust shared quad index buffer downcall failed", throwable);
-        }
-    }
-
     private static int invokeWriteSorted(long outputAddress, int outputCapacity, MemorySegment quadIndexes, int quadIndexCount) {
         try {
             return (int) WRITE_SORTED.invokeExact(outputAddress, outputCapacity, quadIndexes, quadIndexCount);
@@ -1161,5 +925,156 @@ public final class NativeChunkMeshEncoder {
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust key-sorted quad index buffer downcall failed", throwable);
         }
+    }
+
+    public static void assembleWithSharedIndex(
+            long[] inputAddresses,
+            int[] inputVertexCounts,
+            ByteBuffer output,
+            int[] vertexSegments,
+            NativeChunkVertexFormat format,
+            int sectionIndex,
+            int visibleSlices,
+            boolean forceUnassigned,
+            boolean sliceReordering,
+            boolean separateAo,
+            ByteBuffer indexOutput,
+            int indexStride
+    ) {
+        assembleOutput(inputAddresses, inputVertexCounts, output, vertexSegments, format, sectionIndex,
+                visibleSlices, forceUnassigned, sliceReordering, separateAo,
+                indexOutput, INDEX_MODE_SHARED, indexStride, null, 0);
+    }
+
+    public static void writeNativeQuad(
+            long ptr,
+            byte blockEmission,
+            byte renderType,
+            boolean ignoreMidBlock,
+            int blockId,
+            int localX,
+            int localY,
+            int localZ,
+            int materialBits,
+            float x0, float y0, float z0, int color0, float ao0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float ao1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float ao2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float ao3, float u3, float v3, int light3
+    ) {
+        check(invokeWriteNativeQuad(ptr, blockEmission, renderType, ignoreMidBlock ? 1 : 0, blockId, localX, localY,
+                localZ, materialBits,
+                x0, y0, z0, color0, ao0, u0, v0, light0,
+                x1, y1, z1, color1, ao1, u1, v1, light1,
+                x2, y2, z2, color2, ao2, u2, v2, light2,
+                x3, y3, z3, color3, ao3, u3, v3, light3), "native quad writing");
+    }
+
+    public static void writeNativeQuadMetadata(long ptr, byte blockEmission, byte renderType, boolean ignoreMidBlock,
+            int blockId, int localX, int localY, int localZ, int materialBits) {
+        check(invokeWriteNativeQuadMetadata(ptr, blockEmission, renderType, ignoreMidBlock ? 1 : 0, blockId, localX,
+                localY, localZ, materialBits), "native quad metadata writing");
+    }
+
+    public static void writeNativeQuadVertex(long ptr, int vertexIndex, float x, float y, float z, int color,
+            float ao, float u, float v, int light) {
+        if (vertexIndex < 0 || vertexIndex >= 4) {
+            throw new IllegalArgumentException("Invalid quad vertex index: " + vertexIndex);
+        }
+
+        check(invokeWriteNativeQuadVertex(ptr, vertexIndex, x, y, z, color, ao, u, v, light),
+                "native quad vertex writing");
+    }
+
+    public static void writeStaticModelBlockRecord(long ptr, int modelId, int materialBits, byte blockEmission,
+            byte renderType, int blockId, int localX, int localY, int localZ, int cullMask,
+            float offsetX, float offsetY, float offsetZ) {
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_MODEL_ID_OFFSET, modelId);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_MATERIAL_BITS_OFFSET, materialBits);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_RENDER_TYPE_OFFSET, renderType & 0xff);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_ID_OFFSET, blockId);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_LOCAL_X_OFFSET, localX);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_LOCAL_Y_OFFSET, localY);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_LOCAL_Z_OFFSET, localZ);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_CULL_MASK_OFFSET, cullMask);
+        MemoryUtil.memPutInt(ptr + STATIC_MODEL_BLOCK_CULL_MASK_OFFSET + 4, 0);
+        MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_X_OFFSET, offsetX);
+        MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_Y_OFFSET, offsetY);
+        MemoryUtil.memPutFloat(ptr + STATIC_MODEL_BLOCK_OFFSET_Z_OFFSET, offsetZ);
+    }
+
+    private static int invokeWriteNativeQuad(
+            long ptr,
+            int blockEmission,
+            int renderType,
+            int ignoreMidBlock,
+            int blockId,
+            int localX,
+            int localY,
+            int localZ,
+            int materialBits,
+            float x0, float y0, float z0, int color0, float ao0, float u0, float v0, int light0,
+            float x1, float y1, float z1, int color1, float ao1, float u1, float v1, int light1,
+            float x2, float y2, float z2, int color2, float ao2, float u2, float v2, int light2,
+            float x3, float y3, float z3, int color3, float ao3, float u3, float v3, int light3
+    ) {
+        try {
+            return (int) WRITE_NATIVE_QUAD.invokeExact(ptr, blockEmission, renderType, ignoreMidBlock, blockId,
+                    localX, localY, localZ, materialBits,
+                    x0, y0, z0, color0, ao0, u0, v0, light0,
+                    x1, y1, z1, color1, ao1, u1, v1, light1,
+                    x2, y2, z2, color2, ao2, u2, v2, light2,
+                    x3, y3, z3, color3, ao3, u3, v3, light3);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust native quad downcall failed", throwable);
+        }
+    }
+
+    private static int invokeWriteNativeQuadMetadata(
+            long ptr,
+            int blockEmission,
+            int renderType,
+            int ignoreMidBlock,
+            int blockId,
+            int localX,
+            int localY,
+            int localZ,
+            int materialBits
+    ) {
+        try {
+            return (int) WRITE_NATIVE_QUAD_METADATA.invokeExact(ptr, blockEmission, renderType, ignoreMidBlock,
+                    blockId, localX, localY, localZ, materialBits);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust native quad metadata downcall failed", throwable);
+        }
+    }
+
+    private static int invokeWriteNativeQuadVertex(
+            long ptr,
+            int vertexIndex,
+            float x,
+            float y,
+            float z,
+            int color,
+            float ao,
+            float u,
+            float v,
+            int light
+    ) {
+        try {
+            return (int) WRITE_NATIVE_QUAD_VERTEX.invokeExact(ptr, vertexIndex, x, y, z, color, ao, u, v, light);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust native quad vertex downcall failed", throwable);
+        }
+    }
+
+    public static void writeLightBlockRecord(long ptr, int materialBits, byte blockEmission, int blockId,
+            int localX, int localY, int localZ) {
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_MATERIAL_BITS_OFFSET, materialBits);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_EMISSION_OFFSET, blockEmission & 0xff);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_ID_OFFSET, blockId);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_LOCAL_X_OFFSET, localX);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_LOCAL_Y_OFFSET, localY);
+        MemoryUtil.memPutInt(ptr + LIGHT_BLOCK_LOCAL_Z_OFFSET, localZ);
     }
 }

@@ -597,10 +597,6 @@ public final class NativeStaticBlockModelRegistry {
         return id;
     }
 
-    static boolean skipsRenderingAgainstSameBlock(BlockState state) {
-        return sameBlockSkipMask(state) == ((1 << Direction.values().length) - 1);
-    }
-
     static int sameBlockSkipMask(BlockState state) {
         if (state.getBlock() instanceof IronBarsBlock) {
             return ironBarsSkipMask(state);
@@ -890,5 +886,9 @@ public final class NativeStaticBlockModelRegistry {
             FluidSprite resolvedFlow = this.flow == null ? this.still : this.flow;
             return new FluidSpriteMetadata(this.still, resolvedFlow, this.overlay, this.overlayValid);
         }
+    }
+
+    static boolean skipsRenderingAgainstSameBlock(BlockState state) {
+        return sameBlockSkipMask(state) == ((1 << Direction.values().length) - 1);
     }
 }

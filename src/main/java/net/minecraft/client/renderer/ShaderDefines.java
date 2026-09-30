@@ -26,38 +26,6 @@ public record ShaderDefines(Map<String, String> values, Set<String> flags) {
 		return new ShaderDefines.Builder();
 	}
 
-	public ShaderDefines withOverrides(ShaderDefines shaderDefines) {
-		if (this.isEmpty()) {
-			return shaderDefines;
-		} else if (shaderDefines.isEmpty()) {
-			return this;
-		} else {
-			ImmutableMap.Builder<String, String> builder = ImmutableMap.builderWithExpectedSize(this.values.size() + shaderDefines.values.size());
-			builder.putAll(this.values);
-			builder.putAll(shaderDefines.values);
-			ImmutableSet.Builder<String> builder2 = ImmutableSet.builderWithExpectedSize(this.flags.size() + shaderDefines.flags.size());
-			builder2.addAll(this.flags);
-			builder2.addAll(shaderDefines.flags);
-			return new ShaderDefines(builder.buildKeepingLast(), builder2.build());
-		}
-	}
-
-	public String asSourceDirectives() {
-		StringBuilder stringBuilder = new StringBuilder();
-
-		for (Entry<String, String> entry : this.values.entrySet()) {
-			String string = (String)entry.getKey();
-			String string2 = (String)entry.getValue();
-			stringBuilder.append("#define ").append(string).append(" ").append(string2).append('\n');
-		}
-
-		for (String string3 : this.flags) {
-			stringBuilder.append("#define ").append(string3).append('\n');
-		}
-
-		return stringBuilder.toString();
-	}
-
 	public boolean isEmpty() {
 		return this.values.isEmpty() && this.flags.isEmpty();
 	}

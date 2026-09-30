@@ -65,13 +65,6 @@ public class RenderCachalotEcho extends EntityRenderer<EntityCachalotEcho, Cacha
         poseStack.mulPose(Axis.XP.rotationDegrees(renderState.xRot));
         poseStack.translate(0.0D, 0.0D, 0.4D);
         int arcs = Mth.clamp(Mth.floor(renderState.tickCount / 5F), 1, 4);
-        boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-        boolean rustWholeFrame = net.vulkanic.world.WorldRenderRoutePolicy
-                .currentTexturedBillboardRoute().usesRustWholeFrameVulkan();
-        if (rustPresentation && !rustWholeFrame) {
-            throw new IllegalStateException("Selected Vulkan Cachalot Echo route is unavailable; Java entity geometry is not a fallback");
-        }
         for (int i = 0; i < arcs; i++) {
             poseStack.pushPose();
             poseStack.translate(0.0D, 0.0D, -0.5F * i);
@@ -82,17 +75,10 @@ public class RenderCachalotEcho extends EntityRenderer<EntityCachalotEcho, Cacha
                     1.0F, 0.0F, 1.0F, 1.0F, 0.0F, -1.0F};
             float[] uvs = new float[] {0.0F, 1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F};
             boolean accepted;
-            if (rustWholeFrame) {
-                accepted = submitNodeCollector.submitTexturedQuadSemantic(
-                        poseStack, RenderType.entityCutoutNoCull(texture), texture,
-                        vertices, uvs, 0xFFFFFFFF, 240);
-            } else {
-                submitNodeCollector.submitCustomGeometrySemantic(
-                        poseStack, RenderType.entityCutoutNoCull(texture),
-                        (pose, consumer) -> emitArc(pose, consumer));
-                accepted = true;
-            }
-            if (rustWholeFrame && !accepted) {
+            accepted = submitNodeCollector.submitTexturedQuadSemantic(
+                    poseStack, RenderType.entityCutoutNoCull(texture), texture,
+                    vertices, uvs, 0xFFFFFFFF, 240);
+            if (!accepted) {
                 poseStack.popPose();
                 poseStack.popPose();
                 throw new IllegalStateException("Rust whole-frame Cachalot Echo route rejected semantic textured quad");
@@ -101,28 +87,6 @@ public class RenderCachalotEcho extends EntityRenderer<EntityCachalotEcho, Cacha
         }
         poseStack.popPose();
         super.submit(renderState, poseStack, submitNodeCollector, cameraRenderState);
-    }
-
-    public void render(CachalotEchoRenderState renderState, PoseStack matrixStackIn,
-            MultiBufferSource bufferIn, int packedLightIn) {
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            throw new IllegalStateException("Java Cachalot Echo rendering is unavailable while Rust owns whole-frame presentation");
-        }
-        matrixStackIn.pushPose();
-        matrixStackIn.translate(0.0D, 0.25F, 0.0D);
-        matrixStackIn
-                .mulPose(Axis.YP.rotationDegrees(renderState.yRot - 90.0F));
-        matrixStackIn.mulPose(Axis.XP.rotationDegrees(renderState.xRot));
-        int arcs = Mth.clamp(Mth.floor(renderState.tickCount / 5F), 1, 4);
-        matrixStackIn.translate(0.0D, 0.0F, 0.4D);
-        for (int i = 0; i < arcs; i++) {
-            matrixStackIn.pushPose();
-            matrixStackIn.translate(0, 0, -0.5F * i);
-            renderArc(matrixStackIn, bufferIn, (i + 1) * 5, renderState.isFasterAnimation, renderState.isGreen);
-            matrixStackIn.popPose();
-        }
-        matrixStackIn.popPose();
     }
 
     private void renderArc(PoseStack matrixStackIn, MultiBufferSource bufferIn, int age, boolean fast, boolean green) {

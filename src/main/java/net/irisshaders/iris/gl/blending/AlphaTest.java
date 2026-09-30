@@ -5,28 +5,6 @@ public record AlphaTest(AlphaTestFunction function, float reference) {
 
 	// WARNING: adding new fields requires updating hashCode and equals methods!
 
-	public String toExpression(String indentation) {
-		return toExpression("gl_FragData[0].a", "iris_currentAlphaTest", indentation);
-	}
-
-	public String toExpression(String alphaAccessor, String alphaThreshold, String indentation) {
-		String expr = function.getExpression();
-
-		if (function == AlphaTestFunction.ALWAYS) {
-			return "// alpha test disabled\n";
-		} else if (this.reference == Float.MAX_VALUE) {
-			return indentation + "if (!(" + alphaAccessor + " > iris_vertexColorAlpha)) {\n" +
-				indentation + "    discard;\n" +
-				indentation + "}\n";
-		} else if (function == AlphaTestFunction.NEVER) {
-			return "discard;\n";
-		}
-
-		return indentation + "if (!(" + alphaAccessor + " " + expr + " " + alphaThreshold + ")) {\n" +
-			indentation + "    discard;\n" +
-			indentation + "}\n";
-	}
-
 
 	@Override
 	public boolean equals(Object obj) {

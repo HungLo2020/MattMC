@@ -517,72 +517,8 @@ public final class NativeImage implements AutoCloseable {
 			return this.components;
 		}
 
-		public boolean hasRed() {
-			return this.hasRed;
-		}
-
-		public boolean hasGreen() {
-			return this.hasGreen;
-		}
-
-		public boolean hasBlue() {
-			return this.hasBlue;
-		}
-
-		public boolean hasLuminance() {
-			return this.hasLuminance;
-		}
-
-		public boolean hasAlpha() {
-			return this.hasAlpha;
-		}
-
-		public int redOffset() {
-			return this.redOffset;
-		}
-
-		public int greenOffset() {
-			return this.greenOffset;
-		}
-
-		public int blueOffset() {
-			return this.blueOffset;
-		}
-
-		public int luminanceOffset() {
-			return this.luminanceOffset;
-		}
-
-		public int alphaOffset() {
-			return this.alphaOffset;
-		}
-
-		public boolean hasLuminanceOrRed() {
-			return this.hasLuminance || this.hasRed;
-		}
-
-		public boolean hasLuminanceOrGreen() {
-			return this.hasLuminance || this.hasGreen;
-		}
-
-		public boolean hasLuminanceOrBlue() {
-			return this.hasLuminance || this.hasBlue;
-		}
-
 		public boolean hasLuminanceOrAlpha() {
 			return this.hasLuminance || this.hasAlpha;
-		}
-
-		public int luminanceOrRedOffset() {
-			return this.hasLuminance ? this.luminanceOffset : this.redOffset;
-		}
-
-		public int luminanceOrGreenOffset() {
-			return this.hasLuminance ? this.luminanceOffset : this.greenOffset;
-		}
-
-		public int luminanceOrBlueOffset() {
-			return this.hasLuminance ? this.luminanceOffset : this.blueOffset;
 		}
 
 		public int luminanceOrAlphaOffset() {

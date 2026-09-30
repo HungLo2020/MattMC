@@ -1642,3 +1642,11 @@ pub(crate) fn require_any_feature(
         )))
     }
 }
+
+/// Turns GPU frame timestamps on or off for Vulkan contexts. Timestamps feed
+/// the per-frame profile's GPU timings; they cost a few query writes per pass.
+#[no_mangle]
+pub extern "C" fn mattmc_vulkanic_gal_set_gpu_timestamps_requested(requested: i32) -> i32 {
+    crate::render::vulkanic::backends::vulkan::set_gpu_timestamps_requested(requested != 0);
+    StatusCode::Ok as i32
+}

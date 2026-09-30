@@ -50,23 +50,6 @@ class ChunkJobQueue {
         return job;
     }
 
-    public boolean stealJob(ChunkJob job) {
-        if (!this.semaphore.tryAcquire()) {
-            return false;
-        }
-
-        var success = this.jobs.remove(job);
-
-        if (success) {
-            this.jobDurationSum.addAndGet(-job.getEstimatedDuration());
-        } else {
-            // If we didn't manage to actually steal the task, then we need to release the permit which we did steal
-            this.semaphore.release(1);
-        }
-
-        return success;
-    }
-
     @Nullable
     private ChunkJob getNextTask() {
         return this.jobs.poll();
@@ -96,10 +79,6 @@ class ChunkJobQueue {
 
     public int size() {
         return this.semaphore.availablePermits();
-    }
-
-    public long getJobDurationSum() {
-        return this.jobDurationSum.get();
     }
 
     public boolean isEmpty() {

@@ -160,37 +160,12 @@ public class ProgramDirectives {
 		}
 	}
 
-	public ProgramDirectives withOverriddenDrawBuffers(int[] drawBuffersOverride) {
-		return new ProgramDirectives(drawBuffersOverride, viewportScale, alphaTestOverride, blendModeOverride, bufferBlendInformations,
-			mipmappedBuffers, explicitFlips);
-	}
-
-	public int[] getDrawBuffers() {
-		return drawBuffers;
-	}
-
-	public boolean hasUnknownDrawBuffers() {
-		return unknownDrawBuffers;
-	}
-
-	public ViewportData getViewportScale() {
-		return viewportScale;
-	}
-
-	public Optional<AlphaTest> getAlphaTestOverride() {
-		return Optional.ofNullable(alphaTestOverride);
-	}
-
 	public Optional<BlendModeOverride> getBlendModeOverride() {
 		return blendModeOverride;
 	}
 
 	public List<BufferBlendInformation> getBufferBlendOverrides() {
 		return bufferBlendInformations;
-	}
-
-	public ImmutableSet<Integer> getMipmappedBuffers() {
-		return mipmappedBuffers;
 	}
 
 	public ImmutableMap<Integer, Boolean> getExplicitFlips() {

@@ -268,7 +268,6 @@ public class DhApiMat4f implements IDhApiCopyable
 	//      methods     //
 	//==================//
 	
-	private static int getArrayIndex(int xIndex, int zIndex) { return (zIndex * 4) + xIndex; }
 	
 	/** Returns the values of this matrix in row major order (AKA rows then columns) */
 	public float[] getValuesAsArray()

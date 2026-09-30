@@ -103,50 +103,6 @@ public enum EDhApiMaxHorizontalResolution
 	// static methods //
 	//================//
 	
-	/**
-	 * Returns an array of all LodDetails that have a detail level
-	 * that is less than or equal to the given LodDetail
-	 */
-	public static EDhApiMaxHorizontalResolution[] getSelfAndLowerDetails(EDhApiMaxHorizontalResolution detail)
-	{
-		if (lowerDetailArrays == null)
-		{
-			// run first time setup
-			lowerDetailArrays = new EDhApiMaxHorizontalResolution[EDhApiMaxHorizontalResolution.values().length][];
-			
-			// go through each LodDetail
-			for (EDhApiMaxHorizontalResolution currentDetail : EDhApiMaxHorizontalResolution.values())
-			{
-				ArrayList<EDhApiMaxHorizontalResolution> lowerDetails = new ArrayList<>();
-				
-				// find the details lower than currentDetail
-				for (EDhApiMaxHorizontalResolution compareDetail : EDhApiMaxHorizontalResolution.values())
-				{
-					if (currentDetail.detailLevel <= compareDetail.detailLevel)
-					{
-						lowerDetails.add(compareDetail);
-					}
-				}
-				
-				// have the highest detail item first in the list
-				Collections.sort(lowerDetails);
-				Collections.reverse(lowerDetails);
-				
-				lowerDetailArrays[currentDetail.detailLevel] = lowerDetails.toArray(new EDhApiMaxHorizontalResolution[lowerDetails.size()]);
-			}
-		}
-		
-		return lowerDetailArrays[detail.detailLevel];
-	}
 	
-	/** Returns what detail level should be used at a given distance and maxDistance. */
-	public static EDhApiMaxHorizontalResolution getDetailForDistance(EDhApiMaxHorizontalResolution maxDetailLevel, int distance, int maxDistance)
-	{
-		EDhApiMaxHorizontalResolution[] lowerDetails = getSelfAndLowerDetails(maxDetailLevel);
-		int distanceBetweenDetails = maxDistance / lowerDetails.length;
-		int index = MathUtil.clamp(0, distance / distanceBetweenDetails, lowerDetails.length - 1);
-		
-		return lowerDetails[index];
-	}
 	
 }

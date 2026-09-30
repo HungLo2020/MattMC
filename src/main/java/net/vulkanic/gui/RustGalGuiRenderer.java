@@ -1,6 +1,5 @@
 package net.vulkanic.gui;
 
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.vulkanic.bridge.RustGalFrameScheduler;
 import net.vulkanic.bridge.VulkanicGalBridge;
 
@@ -91,7 +90,7 @@ public final class RustGalGuiRenderer {
 	private static final String AIR_BUBBLE_PRODUCER = "minecraft.gui.air";
 	private static final String MOUNT_HEART_PRODUCER = "minecraft.gui.mount-heart";
 	private static final boolean ASSET_UPDATES_DISABLED =
-		Boolean.getBoolean("mattmc.dev.rustGalGui.assetUpdates.disabled");
+		false;
 	private static final boolean TEXT_ROUTE_ENABLED =
 		Boolean.parseBoolean(System.getProperty("mattmc.rustGal.guiText.enabled", "true"));
 	private static final boolean TEXT_ROUTE_DIAGNOSTICS_ENABLED =
@@ -174,7 +173,7 @@ public final class RustGalGuiRenderer {
 		List<net.minecraft.client.gui.render.state.ColoredRectangleRenderState> rectangles,
 		int guiWidth, int guiHeight, int sourceLayerOrder
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME || rectangles == null
+		if ((rectangles == null)
 			|| rectangles.size() < 1024 || guiWidth <= 2 || guiHeight <= 2 || sourceLayerOrder < 0) return null;
 		List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = new ArrayList<>(rectangles.size() * 4);
 		List<Integer> indices = new ArrayList<>(rectangles.size() * 6);
@@ -216,9 +215,7 @@ public final class RustGalGuiRenderer {
 		int[] colors, int gridSize, int originX, int originY, int cellSize, int stride,
 		int guiWidth, int guiHeight
 	) {
-		if (!currentExecutionRoute().usesRustGui()
-			&& !Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")
-			|| colors == null || gridSize <= 0 || gridSize > 512 || colors.length != gridSize * gridSize
+		if ((colors == null) || gridSize <= 0 || gridSize > 512 || colors.length != gridSize * gridSize
 			|| cellSize <= 0 || stride < cellSize || guiWidth <= 2 || guiHeight <= 2) return null;
 		long extent = (long) (gridSize - 1) * stride + cellSize;
 		if (extent <= 0 || extent > Integer.MAX_VALUE) return null;
@@ -227,7 +224,7 @@ public final class RustGalGuiRenderer {
 		int left = Math.max(0, originX);
 		int top = Math.max(0, originY);
 		if (left >= right || top >= bottom) return null;
-		if (currentExecutionRoute().usesRustGui()) {
+		{
 			// A chunk status is a screen-space coloured rectangle, not a 3D item
 			// surface. Lower every cell through the explicit affine GUI primitive
 			// shared by both Rust backends. This preserves the source colour and
@@ -253,110 +250,6 @@ public final class RustGalGuiRenderer {
 			LOADING_GRID_PRODUCER, -1, -1.0F, GuiFillDirection.NONE,
 			left, top, right - left, bottom - top, guiWidth, guiHeight));
 	}
-		if (Boolean.parseBoolean(System.getProperty("mattmc.dev.rustGalGui.loadingGridTexture", "false"))) {
-			// The packed-image variant is an opt-in diagnostic optimization. It
-			// samples the status cells through the ordinary GUI sampler and can
-			// filter a vanilla-hard cell boundary. The normal Vulkan route keeps
-			// each copied status cell as an explicit coloured semantic quad, just
-			// like Frozen's rectangle producer. Reject pathological producer
-			// strides before the optional image allocation below.
-			if (extent > MAX_LOADING_GRID_TEXTURE_EDGE) return null;
-			int imageWidth = Math.max(1, (int) extent), imageHeight = imageWidth;
-			byte[] pixels = new byte[Math.multiplyExact(Math.multiplyExact(imageWidth, imageHeight), 4)];
-			for (int row = 0; row < gridSize; row++) for (int col = 0; col < gridSize; col++) {
-				int color = ARGB.opaque(colors[row * gridSize + col]);
-				int red = color >> 16 & 255, green = color >> 8 & 255, blue = color & 255;
-				int x0 = col * stride, y0 = row * stride;
-				for (int y = y0; y < y0 + cellSize; y++) for (int x = x0; x < x0 + cellSize; x++) {
-					int offset = (y * imageWidth + x) * 4;
-					pixels[offset] = (byte) red; pixels[offset + 1] = (byte) green; pixels[offset + 2] = (byte) blue; pixels[offset + 3] = (byte) 255;
-				}
-			}
-			VulkanicGalBridge.GuiMeshBatchRecord batch = new VulkanicGalBridge.GuiMeshBatchRecord(
-				GuiRenderStratum.GUI_RECTANGLES.order(), 0, 1, 1, LOADING_GRID_ASSET_ID, 0L, 0.0F,
-				new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, new float[] {1, 0, 0, 1, 0, 0},
-				left, top, right, bottom, guiWidth, guiHeight, right - left + 2, bottom - top + 2, 1,
-				List.of(new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {originX, originY, 0}, new float[] {0, 0}, new float[] {0, 0}, -1, 0x007F0000),
-					new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {originX + extent, originY, 0}, new float[] {1, 0}, new float[] {1, 0}, -1, 0x007F0000),
-					new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {originX + extent, originY + extent, 0}, new float[] {1, 1}, new float[] {1, 1}, -1, 0x007F0000),
-					new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {originX, originY + extent, 0}, new float[] {0, 1}, new float[] {0, 1}, -1, 0x007F0000)), List.of(0, 1, 2, 2, 3, 0));
-			RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(List.of(batch), GuiRenderStratum.GUI_RECTANGLES, System.nanoTime());
-			int assetHash = 31 * (31 * imageWidth + imageHeight) + Arrays.hashCode(pixels);
-			loadingGridFramesSinceUpload++;
-			// A changed status color is visible gameplay state, not a cache hint.
-			// Publish the new packed image on the first frame that observes its hash;
-			// the resident/hash check still prevents repeated uploads while the grid
-			// is unchanged.
-			if (!loadingGridAssetResident || loadingGridAssetHash != assetHash || loadingGridAssetWidth != imageWidth || loadingGridAssetHeight != imageHeight) {
-				RustGalFrameCoordinator.stageGuiRawImage(new VulkanicGalBridge.GuiRawImageAssetRecord(LOADING_GRID_ASSET_ID, 2, imageWidth, imageHeight, pixels));
-				loadingGridAssetHash = assetHash;
-				loadingGridAssetWidth = imageWidth;
-				loadingGridAssetHeight = imageHeight;
-				loadingGridAssetResident = true;
-				loadingGridFramesSinceUpload = 0;
-			}
-			return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_RECTANGLES, LOADING_GRID_PRODUCER, -1, -1.0F, GuiFillDirection.NONE, left, top, right - left, bottom - top, guiWidth, guiHeight));
-		}
-		int vertexCount = Math.multiplyExact(Math.multiplyExact(gridSize, gridSize), 4);
-		int indexCount = Math.multiplyExact(Math.multiplyExact(gridSize, gridSize), 6);
-		List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = new ArrayList<>(vertexCount);
-		List<Integer> indices = new ArrayList<>(indexCount);
-		for (int row = 0; row < gridSize; row++) {
-			for (int col = 0; col < gridSize; col++) {
-				int x0 = originX + col * stride;
-				int y0 = originY + row * stride;
-				int x1 = x0 + cellSize;
-				int y1 = y0 + cellSize;
-				int color = ARGB.opaque(colors[row * gridSize + col]);
-				int base = vertices.size();
-				vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {x0, y0, 0}, new float[] {0, 0}, new float[] {0, 0}, color, 0x007F0000));
-				vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {x1, y0, 0}, new float[] {1, 0}, new float[] {1, 0}, color, 0x007F0000));
-				vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {x1, y1, 0}, new float[] {1, 1}, new float[] {1, 1}, color, 0x007F0000));
-				vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {x0, y1, 0}, new float[] {0, 1}, new float[] {0, 1}, color, 0x007F0000));
-				indices.add(base); indices.add(base + 1); indices.add(base + 2);
-				indices.add(base + 2); indices.add(base + 3); indices.add(base);
-			}
-		}
-		VulkanicGalBridge.GuiMeshBatchRecord batch = new VulkanicGalBridge.GuiMeshBatchRecord(
-			GuiRenderStratum.GUI_RECTANGLES.order(), 0, 1, 1, SOLID_WHITE_ASSET_ID, 0L, 0.0F,
-			new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-			new float[] {1, 0, 0, 1, 0, 0}, left, top, right, bottom, guiWidth, guiHeight,
-			right - left + 2, bottom - top + 2, 1, vertices, indices);
-		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(
-			List.of(batch), GuiRenderStratum.GUI_RECTANGLES, System.nanoTime());
-		RustGalFrameCoordinator.stageGuiRawImage(new VulkanicGalBridge.GuiRawImageAssetRecord(
-			SOLID_WHITE_ASSET_ID, 2, 1, 1, SOLID_WHITE_RGBA));
-		return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_RECTANGLES,
-			LOADING_GRID_PRODUCER, -1, -1.0F, GuiFillDirection.NONE,
-			left, top, right - left, bottom - top, guiWidth, guiHeight));
-	}
-
-	public enum GuiExecutionRoute {
-		DISABLED(false, false),
-		JAVA_COMPATIBILITY(true, false),
-		RUST_OPENGL_BORROWED_CONTEXT(false, true),
-		RUST_VULKAN_WHOLE_FRAME(false, true);
-
-		private final boolean javaCompatibility;
-		private final boolean rustGui;
-
-		GuiExecutionRoute(boolean javaCompatibility, boolean rustGui) {
-			this.javaCompatibility = javaCompatibility;
-			this.rustGui = rustGui;
-		}
-
-		public boolean usesJavaCompatibility() {
-			// GUI compatibility is a private OpenGL lowering. A stale enum value
-			// must never authorize Java GUI rendering after Vulkan selection or
-			// during the Rust whole-frame handoff.
-			return this.javaCompatibility
-				&& !VulkanicAPI.isVulkanBackendSelected()
-				&& !RustGalVulkanWholeFrameMode.enabled();
-		}
-
-		public boolean usesRustGui() {
-			return this.rustGui;
-		}
 	}
 
 	public static boolean isMigratedGuiEnabled() {
@@ -382,7 +275,7 @@ public final class RustGalGuiRenderer {
 	public static List<RustGalGuiElementRenderState> tryEnqueueText(
 		GuiTextRenderState textState, int guiWidth, int guiHeight, @Nullable Integer dynamicLayerOrder
 	) {
-		if (!TEXT_ROUTE_ENABLED || !currentExecutionRoute().usesRustGui()
+		if (!TEXT_ROUTE_ENABLED
 			|| textState == null || guiWidth <= 0 || guiHeight <= 0
 			|| !finiteAffinePose(textState.pose)) {
 			return null;
@@ -500,7 +393,7 @@ public final class RustGalGuiRenderer {
 	public static List<RustGalGuiElementRenderState> tryEnqueueGlyph(
 		GlyphRenderState glyph, int guiWidth, int guiHeight, int dynamicLayerOrder
 	) {
-		if (!TEXT_ROUTE_ENABLED || currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME
+		if (!TEXT_ROUTE_ENABLED
 			|| glyph == null || guiWidth <= 0 || guiHeight <= 0 || dynamicLayerOrder < 0
 			|| !finiteAffinePose(glyph.pose())) {
 			return null;
@@ -593,8 +486,7 @@ public final class RustGalGuiRenderer {
 		net.voxelmap.util.FourColoredRectangleRenderState rectangle, int guiWidth, int guiHeight,
 		int sourceLayerOrder
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME
-			|| rectangle == null || guiWidth <= 0 || guiHeight <= 0 || sourceLayerOrder < 0
+		if ((rectangle == null) || guiWidth <= 0 || guiHeight <= 0 || sourceLayerOrder < 0
 			|| rectangle.textureSetup() != net.minecraft.client.gui.render.TextureSetup.noTexture()
 			|| rectangle.pipeline() != RenderPipelines.GUI || !finiteAffinePose(rectangle.pose())) return null;
 		Matrix3x2f pose = rectangle.pose();
@@ -667,7 +559,7 @@ public final class RustGalGuiRenderer {
 		float radius, float angleRadians, float mapScale, float sourceOffsetX, float sourceOffsetY,
 		int color, boolean circular, int sourceLayerOrder
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME || texture == null
+		if ((texture == null)
 			|| guiWidth <= 0 || guiHeight <= 0 || sourceLayerOrder < 0
 			|| !Float.isFinite(centerX) || !Float.isFinite(centerY) || !Float.isFinite(radius)
 			|| !Float.isFinite(angleRadians) || !Float.isFinite(mapScale)
@@ -780,8 +672,7 @@ public final class RustGalGuiRenderer {
 	public static List<RustGalGuiElementRenderState> tryEnqueueEndPortal(
 		int guiWidth, int guiHeight, float gameTime, int sourceLayerOrder
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME
-			|| guiWidth <= 0 || guiHeight <= 0 || !Float.isFinite(gameTime) || sourceLayerOrder < 0) return null;
+		if ((guiWidth <= 0) || guiHeight <= 0 || !Float.isFinite(gameTime) || sourceLayerOrder < 0) return null;
 		ResourceLocation skyLocation = net.minecraft.client.renderer.blockentity.AbstractEndPortalRenderer.END_SKY_LOCATION;
 		ResourceLocation portalLocation = net.minecraft.client.renderer.blockentity.AbstractEndPortalRenderer.END_PORTAL_LOCATION;
 		RustGalGuiRawImageAssets.Asset sky = RustGalGuiRawImageAssets.resolve(skyLocation);
@@ -833,7 +724,7 @@ public final class RustGalGuiRenderer {
 		float u0, float u1, float v0, float v1, int topColor, int bottomColor,
 		int guiWidth, int guiHeight, int sourceLayerOrder
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME || source == null
+		if ((source == null)
 			|| pose == null || !finiteAffinePose(pose) || guiWidth <= 0 || guiHeight <= 0 || sourceLayerOrder < 0
 			|| !Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(width) || !Float.isFinite(height)
 			|| !Float.isFinite(u0) || !Float.isFinite(u1) || !Float.isFinite(v0) || !Float.isFinite(v1)
@@ -904,8 +795,7 @@ public final class RustGalGuiRenderer {
 	public static List<RustGalGuiElementRenderState> tryEnqueueUniformRectangle(
 		ColoredRectangleRenderState rectangle, int guiWidth, int guiHeight, @Nullable Integer dynamicLayerOrder
 	) {
-		if (!currentExecutionRoute().usesRustGui()
-			|| rectangle == null || guiWidth <= 0 || guiHeight <= 0
+		if ((rectangle == null) || guiWidth <= 0 || guiHeight <= 0
 			|| !finiteAffinePose(rectangle.pose())) {
 			return null;
 		}
@@ -1034,8 +924,7 @@ public final class RustGalGuiRenderer {
 	public static List<RustGalGuiElementRenderState> tryEnqueueProfilerChart(
 		GuiProfilerChartRenderState chart, int guiWidth, int guiHeight, int sourceLayerOrder
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME
-			|| chart == null || guiWidth <= 0 || guiHeight <= 0
+		if ((chart == null) || guiWidth <= 0 || guiHeight <= 0
 			|| chart.x1() <= chart.x0() || chart.y1() <= chart.y0()
 			|| chart.chartData().size() > 128) return null;
 		int left = chart.x0(), top = chart.y0(), right = chart.x1(), bottom = chart.y1();
@@ -1134,7 +1023,6 @@ public final class RustGalGuiRenderer {
 		Matrix3x2f pose, @Nullable ScreenRectangle clip, @Nullable Integer sourceLayerOrder,
 		GuiModelPipSemanticCollector.ModelPose setup, int tint, int materialMode
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME) return null;
 		if (materialMode < 1 || materialMode > 4) return null;
 		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
 		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
@@ -1190,7 +1078,7 @@ public final class RustGalGuiRenderer {
 	public static List<RustGalGuiElementRenderState> tryEnqueueBannerPip(
 		GuiBannerResultRenderState banner, @Nullable Integer sourceLayerOrder
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME || banner == null) return null;
+		if (banner == null) return null;
 		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
 		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 		int guiScale = Math.max(1, Minecraft.getInstance().getWindow().getGuiScale());
@@ -1264,7 +1152,7 @@ public final class RustGalGuiRenderer {
 	/** Admits living-entity GUI previews through copied model/material semantics. */
 	@Nullable
 	public static List<RustGalGuiElementRenderState> tryEnqueueEntityPip(GuiEntityRenderState entityPip, @Nullable Integer sourceLayerOrder) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME || entityPip == null) return null;
+		if (entityPip == null) return null;
 		var dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
 		var renderer = dispatcher.getRenderer(entityPip.renderState());
 		if (!(renderer instanceof LivingEntityRenderer<?, ?, ?>)
@@ -1757,8 +1645,7 @@ public final class RustGalGuiRenderer {
 	public static List<RustGalGuiElementRenderState> tryEnqueueCopiedBlit(
 		BlitRenderState blit, int guiWidth, int guiHeight, int dynamicLayerOrder
 	) {
-		if (blit == null || blit.pose() == null || !finiteAffinePose(blit.pose())
-			|| currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME
+		if ((blit == null || blit.pose() == null || !finiteAffinePose(blit.pose()))
 			|| (blit.pipeline() != RenderPipelines.GUI_TEXTURED
 				&& blit.pipeline() != RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND
 				&& blit.pipeline() != RenderPipelines.BLOCK_SCREEN_EFFECT
@@ -1960,7 +1847,6 @@ public final class RustGalGuiRenderer {
 	/** Bounded diagnostics for a copied blit that was deliberately not admitted. */
 	public static String copiedBlitFailureDetail(BlitRenderState blit) {
 		if (blit == null) return "null-state";
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME) return "route";
 		if (blit.pipeline() != RenderPipelines.GUI_TEXTURED
 			&& blit.pipeline() != RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND
 			&& blit.pipeline() != RenderPipelines.BLOCK_SCREEN_EFFECT
@@ -1986,7 +1872,7 @@ public final class RustGalGuiRenderer {
 		ResourceLocation source, float x0, float y0, float x1, float y1, float x3, float y3,
 		float u0, float v0, float u1, float v1, int color, int guiWidth, int guiHeight, int dynamicLayerOrder
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME || source == null) return null;
+		if (source == null) return null;
 		RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolve(source);
 		if (asset == null) return null;
 		return enqueueAffineAsset(asset, x0, y0, x1, y1, x3, y3, u0, v0, u1, v1,
@@ -1999,7 +1885,7 @@ public final class RustGalGuiRenderer {
 		ResourceLocation identity, DynamicTexture texture, float x0, float y0, float x1, float y1, float x3, float y3,
 		float u0, float v0, float u1, float v1, int color, int guiWidth, int guiHeight, int dynamicLayerOrder
 	) {
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME || identity == null || texture == null) return null;
+		if ((identity == null) || texture == null) return null;
 		RustGalGuiRawImageAssets.registerDynamicTextureUnstaged(identity, texture);
 		if (RustGalGuiRawImageAssets.prepareDynamicTexture(texture) == null) return null;
 		RustGalGuiRawImageAssets.Asset asset = RustGalGuiRawImageAssets.resolve(identity);
@@ -2074,8 +1960,7 @@ public final class RustGalGuiRenderer {
 		long wideHeight = (long)blit.y1() - blit.y0();
 		int width = wideWidth > 0 && wideWidth <= Integer.MAX_VALUE ? (int)wideWidth : -1;
 		int height = wideHeight > 0 && wideHeight <= Integer.MAX_VALUE ? (int)wideHeight : -1;
-		if (currentExecutionRoute() != GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME
-			|| !finiteAffinePose(blit.pose())
+		if (!finiteAffinePose(blit.pose())
 			|| (blit.pipeline() != RenderPipelines.GUI_TEXTURED
 				&& blit.pipeline() != RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND
 				&& blit.pipeline() != RenderPipelines.VIGNETTE
@@ -2170,14 +2055,12 @@ public final class RustGalGuiRenderer {
 			elementKind = "unknown";
 		}
 		synchronized (RustGalGuiRenderer.class) {
-			if (isWholeFrameVulkanEnabled()) {
-				if (wholeFrameUnsupportedElementCount < MAX_GUI_UNSUPPORTED_ELEMENTS) {
-					wholeFrameUnsupportedElementCount++;
-				}
-				if (WHOLE_FRAME_UNSUPPORTED_ELEMENTS.containsKey(elementKind)
-					|| WHOLE_FRAME_UNSUPPORTED_ELEMENTS.size() < MAX_GUI_DIAGNOSTIC_ENTRIES) {
-					WHOLE_FRAME_UNSUPPORTED_ELEMENTS.merge(elementKind, 1, Integer::sum);
-				}
+			if (wholeFrameUnsupportedElementCount < MAX_GUI_UNSUPPORTED_ELEMENTS) {
+				wholeFrameUnsupportedElementCount++;
+			}
+			if (WHOLE_FRAME_UNSUPPORTED_ELEMENTS.containsKey(elementKind)
+				|| WHOLE_FRAME_UNSUPPORTED_ELEMENTS.size() < MAX_GUI_DIAGNOSTIC_ENTRIES) {
+				WHOLE_FRAME_UNSUPPORTED_ELEMENTS.merge(elementKind, 1, Integer::sum);
 			}
 		}
 		recordTextRouteDiagnostic("unsupported-element=" + elementKind);
@@ -2187,11 +2070,9 @@ public final class RustGalGuiRenderer {
 	public static void recordUnsupportedElementDetail(String detail) {
 		if (detail == null || detail.isBlank()) return;
 		synchronized (RustGalGuiRenderer.class) {
-			if (isWholeFrameVulkanEnabled()) {
-				if (WHOLE_FRAME_UNSUPPORTED_ELEMENTS.containsKey(detail)
-					|| WHOLE_FRAME_UNSUPPORTED_ELEMENTS.size() < MAX_GUI_DIAGNOSTIC_ENTRIES) {
-					WHOLE_FRAME_UNSUPPORTED_ELEMENTS.merge(detail, 1, Integer::sum);
-				}
+			if (WHOLE_FRAME_UNSUPPORTED_ELEMENTS.containsKey(detail)
+				|| WHOLE_FRAME_UNSUPPORTED_ELEMENTS.size() < MAX_GUI_DIAGNOSTIC_ENTRIES) {
+				WHOLE_FRAME_UNSUPPORTED_ELEMENTS.merge(detail, 1, Integer::sum);
 			}
 		}
 	}
@@ -2299,116 +2180,36 @@ public final class RustGalGuiRenderer {
 	private record TextAtlasRequest(long assetId, FontTexture.SemanticAtlasSnapshot atlas) {
 	}
 
-	public static boolean isWholeFrameVulkanEnabled() {
-		return RustGalVulkanWholeFrameMode.enabled();
-	}
-
-	public static boolean isWholeFrameVulkanActive() {
-		return RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected());
-	}
-
-	public static boolean isMigratedGuiDisabledForDiagnostics() {
-		return Boolean.getBoolean("mattmc.dev.guiCrosshair.disabled") || Boolean.getBoolean("mattmc.dev.rustGalGui.disabled");
-	}
-
 	public static boolean isMigratedGuiLegacyControl() {
-		return legacyControlEnabled("mattmc.dev.guiCrosshair.legacyControl")
-			|| legacyControlEnabled("mattmc.dev.rustGalGui.legacyControl");
-	}
-
-	public static boolean isArmorDisabledForDiagnostics() {
-		return Boolean.getBoolean("mattmc.dev.rustGalGui.armor.disabled");
+		return false;
 	}
 
 	public static boolean isArmorLegacyControl() {
-		return legacyControlEnabled("mattmc.dev.rustGalGui.armor.legacyControl");
-	}
-
-	public static boolean isPlayerHealthDisabledForDiagnostics() {
-		return Boolean.getBoolean("mattmc.dev.rustGalGui.playerHealth.disabled");
+		return false;
 	}
 
 	public static boolean isPlayerHealthLegacyControl() {
-		return legacyControlEnabled("mattmc.dev.rustGalGui.playerHealth.legacyControl");
-	}
-
-	public static boolean isAbsorptionHealthDisabledForDiagnostics() {
-		return Boolean.getBoolean("mattmc.dev.rustGalGui.absorption.disabled");
+		return false;
 	}
 
 	public static boolean isAbsorptionHealthLegacyControl() {
-		return legacyControlEnabled("mattmc.dev.rustGalGui.absorption.legacyControl");
-	}
-
-	public static boolean isHungerDisabledForDiagnostics() {
-		return Boolean.getBoolean("mattmc.dev.rustGalGui.hunger.disabled");
+		return false;
 	}
 
 	public static boolean isHungerLegacyControl() {
-		return legacyControlEnabled("mattmc.dev.rustGalGui.hunger.legacyControl");
-	}
-
-	public static boolean isAirDisabledForDiagnostics() {
-		return Boolean.getBoolean("mattmc.dev.rustGalGui.air.disabled");
+		return false;
 	}
 
 	public static boolean isAirLegacyControl() {
-		return legacyControlEnabled("mattmc.dev.rustGalGui.air.legacyControl");
-	}
-
-	public static boolean isMountHealthDisabledForDiagnostics() {
-		return Boolean.getBoolean("mattmc.dev.rustGalGui.mountHealth.disabled");
+		return false;
 	}
 
 	public static boolean isMountHealthLegacyControl() {
-		return legacyControlEnabled("mattmc.dev.rustGalGui.mountHealth.legacyControl");
-	}
-
-	public static GuiExecutionRoute currentExecutionRoute() {
-		return selectExecutionRoute(
-			VulkanicAPI.isVulkanBackendSelected(),
-			isWholeFrameVulkanEnabled(),
-			isMigratedGuiDisabledForDiagnostics(),
-			isMigratedGuiLegacyControl()
-		);
-	}
-
-	public static GuiExecutionRoute selectExecutionRouteForTests(
-		boolean vulkanBackendSelected,
-		boolean wholeFrameVulkanEnabled,
-		boolean diagnosticsDisabled,
-		boolean diagnosticLegacyControl
-	) {
-		return selectExecutionRoute(vulkanBackendSelected, wholeFrameVulkanEnabled, diagnosticsDisabled, diagnosticLegacyControl);
-	}
-
-	private static GuiExecutionRoute selectExecutionRoute(
-		boolean vulkanBackendSelected,
-		boolean wholeFrameVulkanEnabled,
-		boolean diagnosticsDisabled,
-		boolean diagnosticLegacyControl
-	) {
-		if (diagnosticsDisabled) {
-			return GuiExecutionRoute.DISABLED;
-		}
-		if (diagnosticLegacyControl) {
-			return vulkanBackendSelected ? GuiExecutionRoute.DISABLED : GuiExecutionRoute.JAVA_COMPATIBILITY;
-		}
-		if (wholeFrameVulkanEnabled) {
-			return GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME;
-		}
-		if (vulkanBackendSelected) {
-			return GuiExecutionRoute.DISABLED;
-		}
-		return GuiExecutionRoute.RUST_OPENGL_BORROWED_CONTEXT;
-	}
-
-	public static boolean shouldDrawJavaCompatibilityGui() {
-		return currentExecutionRoute().usesJavaCompatibility();
+		return false;
 	}
 
 	private static boolean legacyControlEnabled(String property) {
-		return Boolean.getBoolean(property) && !isWholeFrameVulkanEnabled();
+		return false;
 	}
 
 	public static void enqueueCrosshair(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics, int x, int y, int width, int height) {
@@ -2632,10 +2433,6 @@ public final class RustGalGuiRenderer {
 				9
 			);
 		}
-	}
-
-	public static ArmorIconState armorIconStateForTests(int armorValue, int iconIndex) {
-		return armorIconState(armorValue, iconIndex);
 	}
 
 	public static void enqueuePlayerHearts(
@@ -2950,11 +2747,6 @@ public final class RustGalGuiRenderer {
 	) {
 		long started = System.nanoTime();
 		GraphicsFrameBenchmark.beginPhase("rust-gal." + sprite.phaseName + ".java-producer");
-		GuiExecutionRoute route = currentExecutionRoute();
-		if (!route.usesRustGui()) {
-			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
-			throw new IllegalStateException("Rust VulkanicGAL GUI enqueue requested while route is " + route);
-		}
         boolean fullscreenPostEffect = sprite == GuiSprite.POST_EFFECT_INVERT
             || sprite == GuiSprite.POST_EFFECT_CREEPER
             || sprite == GuiSprite.POST_EFFECT_SPIDER;
@@ -2999,30 +2791,6 @@ public final class RustGalGuiRenderer {
 			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
 		}
 	}
-
-	/** Enqueues the explicit white/invert fullscreen blend used by enderman vision. */
-    public static void enqueuePostEffectInvert(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics) {
-		if (minecraft == null || guiGraphics == null || !isWholeFrameVulkanEnabled()) return;
-		enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.POST_EFFECT_INVERT,
-			"post-effect.invert", -1, -1.0F, GuiFillDirection.NONE,
-			0, 0, guiGraphics.guiWidth(), guiGraphics.guiHeight());
-    }
-
-    /** Queues creeper vision as a semantic effect marker for Rust admission. */
-    public static void enqueuePostEffectCreeper(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics) {
-        if (minecraft == null || guiGraphics == null || !isWholeFrameVulkanEnabled()) return;
-        enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.POST_EFFECT_CREEPER,
-            "post-effect.creeper", -1, -1.0F, GuiFillDirection.NONE,
-            0, 0, guiGraphics.guiWidth(), guiGraphics.guiHeight());
-    }
-
-    /** Queues spider vision as a semantic effect marker for Rust admission. */
-    public static void enqueuePostEffectSpider(Minecraft minecraft, net.minecraft.client.gui.GuiGraphics guiGraphics) {
-        if (minecraft == null || guiGraphics == null || !isWholeFrameVulkanEnabled()) return;
-        enqueueGuiSprite(minecraft, guiGraphics, GuiSprite.POST_EFFECT_SPIDER,
-            "post-effect.spider", -1, -1.0F, GuiFillDirection.NONE,
-            0, 0, guiGraphics.guiWidth(), guiGraphics.guiHeight());
-    }
 
 	public static void enqueueBossBar(
 		Minecraft minecraft,
@@ -3121,10 +2889,7 @@ public final class RustGalGuiRenderer {
 						+ " sprite_id=" + sprite.semanticId()
 						+ " path=" + location
 				);
-				if (RustGalVulkanWholeFrameMode.enabled()) {
-					throw new IllegalStateException("Rust Vulkan whole-frame GUI asset is unavailable: " + location);
-				}
-				continue;
+				throw new IllegalStateException("Rust Vulkan whole-frame GUI asset is unavailable: " + location);
 			}
 			try (InputStream input = resource.get().open()) {
 				byte[] bytes = input.readNBytes(MAX_GUI_ASSET_BYTES + 1);
@@ -3142,10 +2907,7 @@ public final class RustGalGuiRenderer {
 						+ " sha256=" + sha256Hex(bytes)
 				);
 			} catch (IOException error) {
-				if (RustGalVulkanWholeFrameMode.enabled()) {
-					throw new IllegalStateException("Failed to read Rust VulkanicGAL GUI asset: " + location, error);
-				}
-				LOGGER.warn("Failed to read Rust VulkanicGAL GUI sprite override {}", location, error);
+				throw new IllegalStateException("Failed to read Rust VulkanicGAL GUI asset: " + location, error);
 			}
 		}
 		return assets;
@@ -3157,10 +2919,6 @@ public final class RustGalGuiRenderer {
 		} catch (NoSuchAlgorithmException error) {
 			throw new IllegalStateException("SHA-256 digest is unavailable", error);
 		}
-	}
-
-	public static GuiSprite debugArmorSpriteForTests(ArmorIconState state) {
-		return armorIconSprite(state);
 	}
 
 	private static GuiSprite bossBarColorBackground(BossEvent.BossBarColor color) {

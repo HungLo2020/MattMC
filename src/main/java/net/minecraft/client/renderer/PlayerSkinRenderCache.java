@@ -118,16 +118,8 @@ public class PlayerSkinRenderCache {
 
 		@Nullable
 		public GpuTextureView textureView() {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-				return null;
-			}
+			return null;
 
-			if (this.textureView == null) {
-				this.textureView = PlayerSkinRenderCache.this.textureManager.getTexture(this.playerSkin.body().texturePath()).getTextureView();
-			}
-
-			return this.textureView;
 		}
 
 		public GlyphRenderTypes glyphRenderTypes() {

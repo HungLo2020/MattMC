@@ -7,12 +7,7 @@ import net.iris.api.v0.IrisApiConfig;
 import net.iris.api.v0.IrisProgram;
 import net.iris.api.v0.IrisTextVertexSink;
 import net.irisshaders.iris.gui.screen.ShaderPackScreen;
-import net.irisshaders.iris.pipeline.IrisPipelines;
-import net.irisshaders.iris.pipeline.VanillaRenderingPipeline;
-import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
-import net.irisshaders.iris.pipeline.programs.ShaderKey;
 import net.irisshaders.iris.shaderpack.loading.ProgramId;
-import net.irisshaders.iris.shadows.ShadowRenderingState;
 import net.irisshaders.iris.vertices.IrisTextVertexSinkImpl;
 import net.minecraft.client.gui.screens.Screen;
 
@@ -30,18 +25,13 @@ public class IrisApiV0Impl implements IrisApi {
 
 	@Override
 	public boolean isShaderPackInUse() {
-		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
-
-		if (pipeline == null) {
-			return false;
-		}
-
-		return !(pipeline instanceof VanillaRenderingPipeline);
+		return Iris.isPackInUseQuick();
 	}
 
 	@Override
 	public boolean isRenderingShadowPass() {
-		return ShadowRenderingState.areShadowsCurrentlyBeingRendered();
+		// Rust renders the pack's shadow pass internally; Java never runs one.
+		return false;
 	}
 
 	@Override
@@ -66,17 +56,14 @@ public class IrisApiV0Impl implements IrisApi {
 
 	@Override
 	public float getSunPathRotation() {
-		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
-
-		if (pipeline == null) {
-			return 0;
-		}
-
-		return pipeline.getSunPathRotation();
+		// Rust reads the pack's sunPathRotation constant for its own sky; it is
+		// not mirrored back to Java.
+		return 0;
 	}
 
 	@Override
 	public void assignPipeline(RenderPipeline pipeline, IrisProgram program) {
-		IrisPipelines.assignPipeline(pipeline, ShaderKey.findBestMatch(pipeline, ProgramId.fromAPI(program)));
+		// Rust selects pack programs from copied semantics; there is no Java
+		// pipeline-to-program table to update.
 	}
 }

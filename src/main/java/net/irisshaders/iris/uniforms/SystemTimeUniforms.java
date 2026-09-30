@@ -1,6 +1,5 @@
 package net.irisshaders.iris.uniforms;
 
-import net.irisshaders.iris.gl.uniform.UniformHolder;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.minecraft.world.level.dimension.DimensionType;
 
@@ -30,18 +29,6 @@ public final class SystemTimeUniforms {
 		Float.parseFloat(System.getProperty("mattmc.vulkan.deterministicTemporalParity.fovModifier", "1.0"));
 
 	private SystemTimeUniforms() {
-	}
-
-	/**
-	 * Makes system time uniforms available to the given program
-	 *
-	 * @param uniforms the program to make the uniforms available to
-	 */
-	public static void addSystemTimeUniforms(UniformHolder uniforms) {
-		uniforms
-			.uniform1i(UniformUpdateFrequency.PER_FRAME, "frameCounter", COUNTER)
-			.uniform1f(UniformUpdateFrequency.PER_FRAME, "frameTime", TIMER::getLastFrameTime)
-			.uniform1f(UniformUpdateFrequency.PER_FRAME, "frameTimeCounter", TIMER::getFrameTimeCounter);
 	}
 
 	public static boolean isDeterministicTemporalParityEnabled() {
@@ -77,23 +64,6 @@ public final class SystemTimeUniforms {
 
 	public static long deterministicTemporalWorldTime() {
 		return DETERMINISTIC_WORLD_TIME;
-	}
-
-	public static int deterministicTemporalWorldDayTime(DimensionType dimensionType) {
-		long dayTime = dimensionType.fixedTime().orElse(Math.floorMod(DETERMINISTIC_WORLD_TIME, 24000L));
-		return (int)dayTime;
-	}
-
-	public static int deterministicTemporalWorldDay() {
-		return (int)Math.floorDiv(DETERMINISTIC_WORLD_TIME, 24000L);
-	}
-
-	public static int deterministicTemporalMoonPhase(DimensionType dimensionType) {
-		return dimensionType.moonPhase(DETERMINISTIC_WORLD_TIME);
-	}
-
-	public static float deterministicTemporalTimeOfDay(DimensionType dimensionType) {
-		return dimensionType.timeOfDay(DETERMINISTIC_WORLD_TIME);
 	}
 
 	/**
@@ -171,13 +141,6 @@ public final class SystemTimeUniforms {
 
 			// Finally, update the "last start time" value.
 			lastStartTime = OptionalLong.of(frameStartTime);
-		}
-
-		public float getFrameTimeCounter() {
-			if (DETERMINISTIC_TEMPORAL_PARITY) {
-				return deterministicTemporalFrameTimeCounter();
-			}
-			return frameTimeCounter;
 		}
 
 		public float getLastFrameTime() {

@@ -58,14 +58,6 @@ public class DhRenderState
 		return errorReasons.isEmpty();
 	}
 	
-	public void canRenderOrThrow() throws IllegalStateException
-	{
-		String errorReasons = this.unableToRenderBecause();
-		if (!errorReasons.isEmpty())
-		{
-			throw new IllegalStateException(errorReasons);
-		}
-	}
 	
 	
 	

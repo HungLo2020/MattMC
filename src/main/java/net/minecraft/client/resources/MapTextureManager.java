@@ -70,8 +70,7 @@ public class MapTextureManager implements AutoCloseable {
 		}
 
 		private boolean semanticRustRoute() {
-			return net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
+			return true;
 		}
 
 		void replaceMapData(MapItemSavedData mapItemSavedData) {

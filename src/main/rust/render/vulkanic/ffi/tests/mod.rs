@@ -4375,13 +4375,14 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
 }
 
 #[test]
-fn whole_frame_world_primitive_ffi_rejects_bad_segment_size_and_non_vulkan() {
+fn whole_frame_world_primitive_ffi_accepts_any_backend_and_rejects_bad_segment_size() {
     let mut segments = vec![line_segment_request()];
     let sprites = vec![sprite_request()];
     let request = whole_frame_request(&segments, &sprites);
-    let error = unsafe { decode_whole_frame_submit(&request, test_capabilities()) }
-        .expect_err("non-Vulkan whole-frame submit must fail");
-    assert_eq!(error.code, StatusCode::UnsupportedFeature);
+    // The whole-frame shell runs on both Rust backends (borrowed OpenGL and
+    // windowed Vulkan); decode is backend-neutral.
+    unsafe { decode_whole_frame_submit(&request, test_capabilities()) }
+        .expect("whole-frame submit decodes on a non-Vulkan backend");
     segments[0].byte_size -= 4;
     let request = whole_frame_request(&segments, &sprites);
     let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }

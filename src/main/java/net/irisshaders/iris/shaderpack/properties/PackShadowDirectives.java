@@ -7,12 +7,15 @@ import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
 import net.irisshaders.iris.helpers.OptionalBoolean;
 import net.irisshaders.iris.shaderpack.parsing.DirectiveHolder;
-import net.irisshaders.iris.shadows.ShadowMatrices;
 import org.joml.Vector4f;
 
 import java.util.Optional;
 
 public class PackShadowDirectives {
+	/** Iris's default orthographic shadow depth range. */
+	private static final float DEFAULT_NEAR_PLANE = -100.05f;
+	private static final float DEFAULT_FAR_PLANE = 156.0f;
+
 	// Bump this up if you want more shadow color buffers!
 	// This is currently set at 2 for ShadersMod / OptiFine parity but can theoretically be bumped up to 8.
 	// TODO: Make this configurable?
@@ -61,8 +64,8 @@ public class PackShadowDirectives {
 		// shadowRenderDistanceMul to a nonzero value, since having a high shadow render distance will impact
 		// performance quite heavily on most systems.
 		this.distance = 160.0f;
-		this.nearPlane = ShadowMatrices.NEAR;
-		this.farPlane = ShadowMatrices.FAR;
+		this.nearPlane = DEFAULT_NEAR_PLANE;
+		this.farPlane = DEFAULT_FAR_PLANE;
 		this.voxelDistance = 0.0f;
 
 		// By default, shadows are not culled based on distance from the player. However, pack authors may
@@ -213,10 +216,6 @@ public class PackShadowDirectives {
 		}
 	}
 
-	public int getResolution() {
-		return resolution;
-	}
-
 	public Float getFov() {
 		return fov;
 	}
@@ -227,74 +226,6 @@ public class PackShadowDirectives {
 
 	public float getNearPlane() {
 		return nearPlane;
-	}
-
-	public float getFarPlane() {
-		return farPlane;
-	}
-
-	public float getVoxelDistance() {
-		return voxelDistance;
-	}
-
-	public float getDistanceRenderMul() {
-		return distanceRenderMul;
-	}
-
-	public float getEntityShadowDistanceMul() {
-		return entityShadowDistanceMul;
-	}
-
-	public boolean isDistanceRenderMulExplicit() {
-		return explicitRenderDistance;
-	}
-
-	public float getIntervalSize() {
-		return intervalSize;
-	}
-
-	public boolean shouldRenderTerrain() {
-		return shouldRenderTerrain;
-	}
-
-	public boolean shouldRenderTranslucent() {
-		return shouldRenderTranslucent;
-	}
-
-	public boolean shouldRenderEntities() {
-		return shouldRenderEntities;
-	}
-
-	public boolean shouldRenderPlayer() {
-		return shouldRenderPlayer;
-	}
-
-	public boolean shouldRenderBlockEntities() {
-		return shouldRenderBlockEntities;
-	}
-
-	public boolean shouldRenderLightBlockEntities() {
-		return shouldRenderLightBlockEntities;
-	}
-
-	public ShadowCullState getCullingState() {
-		return cullingState;
-	}
-
-	public OptionalBoolean isShadowEnabled() {
-		return shadowEnabled;
-	}
-
-	public OptionalBoolean isDhShadowEnabled() {
-		return dhShadowEnabled;
-	}
-
-	public ImmutableList<DepthSamplingSettings> getDepthSamplingSettings() {
-		return depthSamplingSettings;
-	}
-
-	public Int2ObjectMap<SamplingSettings> getColorSamplingSettings() {
-		return colorSamplingSettings;
 	}
 
 	public void acceptDirectives(DirectiveHolder directives) {

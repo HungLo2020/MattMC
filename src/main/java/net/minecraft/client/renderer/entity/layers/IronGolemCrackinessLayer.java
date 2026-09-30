@@ -37,27 +37,24 @@ public class IronGolemCrackinessLayer extends RenderLayer<IronGolemRenderState, 
 				ResourceLocation resourceLocation = (ResourceLocation)resourceLocations.get(level);
 				IronGolemModel model = this.getParentModel(ironGolemRenderState);
 				RenderType renderType = RenderType.entityCutoutNoCull(resourceLocation);
-				if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-					boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
-						model, ironGolemRenderState, poseStack.last(), renderType, resourceLocation,
-						IRON_GOLEM_CRACKS_IDENTITY, i,
-						LivingEntityRenderer.getOverlayCoords(ironGolemRenderState, 0.0F), -1,
-						ironGolemRenderState.outlineColor
-					);
-					if (queued) {
-						net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-							"rust-vulkan-whole-frame", resourceLocation, model.getClass().getName(),
-							ironGolemRenderState.entityId, true, true, false
-						);
-						return;
-					}
+				boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+					model, ironGolemRenderState, poseStack.last(), renderType, resourceLocation,
+					IRON_GOLEM_CRACKS_IDENTITY, i,
+					LivingEntityRenderer.getOverlayCoords(ironGolemRenderState, 0.0F), -1,
+					ironGolemRenderState.outlineColor
+				);
+				if (queued) {
 					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-						"rust-vulkan-unavailable", resourceLocation, model.getClass().getName(),
-						ironGolemRenderState.entityId, false, false, false
+						"rust-vulkan-whole-frame", resourceLocation, model.getClass().getName(),
+						ironGolemRenderState.entityId, true, true, false
 					);
-					throw new IllegalStateException("Rust whole-frame iron-golem-cracks route has no copied semantic mesh");
+					return;
 				}
-				renderColoredCutoutModel(model, resourceLocation, poseStack, submitNodeCollector, i, ironGolemRenderState, -1, 1);
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					"rust-vulkan-unavailable", resourceLocation, model.getClass().getName(),
+					ironGolemRenderState.entityId, false, false, false
+				);
+				throw new IllegalStateException("Rust whole-frame iron-golem-cracks route has no copied semantic mesh");
 			}
 		}
 	}

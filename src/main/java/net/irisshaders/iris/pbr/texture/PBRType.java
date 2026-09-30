@@ -54,12 +54,4 @@ public enum PBRType {
 		return defaultValue;
 	}
 
-	public String appendSuffix(String path) {
-		int extensionIndex = FilenameUtils.indexOfExtension(path);
-		if (extensionIndex != -1) {
-			return path.substring(0, extensionIndex) + suffix + path.substring(extensionIndex);
-		} else {
-			return path + suffix;
-		}
-	}
 }

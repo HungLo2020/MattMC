@@ -8,7 +8,6 @@ import net.minecraft.client.gui.render.state.TiledBlitRenderState;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.model.AtlasManager;
 import net.minecraft.resources.ResourceLocation;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -18,7 +17,7 @@ import static org.mockito.Mockito.*;
 class RustGalTiledCallsiteTest {
     @Test
     void vulkanNoErrorContextControlDoesNotQueryAJavaBackend() throws Exception {
-        String property = RustGalVulkanWholeFrameMode.propertyName();
+        String property = "mattmc.dev.rustGalVulkanWholeFrame";
         String previous = System.getProperty(property);
         String previousByteBuddy = System.getProperty("net.bytebuddy.experimental");
         System.setProperty(property, "true");
@@ -107,7 +106,7 @@ class RustGalTiledCallsiteTest {
     }
 
     private static void withGui(java.util.function.BiConsumer<GuiGraphics, GuiRenderState> test) {
-        String property = RustGalVulkanWholeFrameMode.propertyName();
+        String property = "mattmc.dev.rustGalVulkanWholeFrame";
         String previous = System.getProperty(property);
         // The bundled Mockito/Byte Buddy predates the project's Java 25
         // toolchain. This opt-in affects test instrumentation only.

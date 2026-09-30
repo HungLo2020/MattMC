@@ -127,10 +127,7 @@ public class PlayerGlyphProvider {
 		@Override
 		@Nullable
 		public GpuTextureView textureView() {
-			return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				? null
-				: ((PlayerSkinRenderCache.RenderInfo)this.skin.get()).textureView();
+			return null;
 		}
 
 		@Override

@@ -1,7 +1,6 @@
 package net.minecraft.client.renderer.feature;
 
 import net.blaze3d.vertex.PoseStack;
-import net.blaze3d.vertex.SheetedDecalTextureGenerator;
 import net.blaze3d.vertex.VertexConsumer;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.ArrayList;
@@ -23,74 +22,6 @@ import net.minecraft.client.resources.model.ModelBakery;
 @Environment(EnvType.CLIENT)
 public class ModelPartFeatureRenderer {
 	private final PoseStack poseStack = new PoseStack();
-
-	public void render(
-		SubmitNodeCollection submitNodeCollection,
-		MultiBufferSource.BufferSource bufferSource,
-		OutlineBufferSource outlineBufferSource,
-		MultiBufferSource.BufferSource bufferSource2
-	) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java model-part feature rendering is unavailable while Rust owns whole-frame presentation");
-		}
-		ModelPartFeatureRenderer.Storage storage = submitNodeCollection.getModelPartSubmits();
-
-		for (Entry<RenderType, List<SubmitNodeStorage.ModelPartSubmit>> entry : storage.modelPartSubmits.entrySet()) {
-			RenderType renderType = (RenderType)entry.getKey();
-			List<SubmitNodeStorage.ModelPartSubmit> list = (List<SubmitNodeStorage.ModelPartSubmit>)entry.getValue();
-			VertexConsumer vertexConsumer = bufferSource.getBuffer(renderType);
-
-			for (SubmitNodeStorage.ModelPartSubmit modelPartSubmit : list) {
-				// Iris: Set model storage before rendering
-				((net.irisshaders.iris.mixinterface.ModelStorage) (Object) modelPartSubmit).iris$set();
-				
-				VertexConsumer vertexConsumer2;
-				if (modelPartSubmit.sprite() != null) {
-					if (modelPartSubmit.hasFoil()) {
-						vertexConsumer2 = modelPartSubmit.sprite().wrap(ItemRenderer.getFoilBuffer(bufferSource, renderType, modelPartSubmit.sheeted(), true));
-					} else {
-						vertexConsumer2 = modelPartSubmit.sprite().wrap(vertexConsumer);
-					}
-				} else if (modelPartSubmit.hasFoil()) {
-					vertexConsumer2 = ItemRenderer.getFoilBuffer(bufferSource, renderType, modelPartSubmit.sheeted(), true);
-				} else {
-					vertexConsumer2 = vertexConsumer;
-				}
-
-				this.poseStack.last().set(modelPartSubmit.pose());
-				modelPartSubmit.modelPart()
-					.render(this.poseStack, vertexConsumer2, modelPartSubmit.lightCoords(), modelPartSubmit.overlayCoords(), modelPartSubmit.tintedColor());
-				if (modelPartSubmit.outlineColor() != 0 && (renderType.outline().isPresent() || renderType.isOutline())) {
-					outlineBufferSource.setColor(modelPartSubmit.outlineColor());
-					VertexConsumer vertexConsumer3 = outlineBufferSource.getBuffer(renderType);
-					modelPartSubmit.modelPart()
-						.render(
-							this.poseStack,
-							modelPartSubmit.sprite() == null ? vertexConsumer3 : modelPartSubmit.sprite().wrap(vertexConsumer3),
-							modelPartSubmit.lightCoords(),
-							modelPartSubmit.overlayCoords(),
-							modelPartSubmit.tintedColor()
-						);
-				}
-
-				if (modelPartSubmit.crumblingOverlay() != null) {
-					VertexConsumer vertexConsumer3 = new SheetedDecalTextureGenerator(
-						bufferSource2.getBuffer((RenderType)ModelBakery.DESTROY_TYPES.get(modelPartSubmit.crumblingOverlay().progress())),
-						modelPartSubmit.crumblingOverlay().cameraPose(),
-						1.0F
-					);
-					modelPartSubmit.modelPart()
-						.render(this.poseStack, vertexConsumer3, modelPartSubmit.lightCoords(), modelPartSubmit.overlayCoords(), modelPartSubmit.tintedColor());
-				}
-			}
-		}
-		
-		// Iris: Clear captured rendering state
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(0);
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);
-	}
 
 	@Environment(EnvType.CLIENT)
 	public static class Storage {

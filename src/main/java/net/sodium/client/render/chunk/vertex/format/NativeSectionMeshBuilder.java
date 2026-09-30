@@ -398,18 +398,6 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
         }
     }
 
-    public static FacingBuffer createFacingBuffer(ChunkVertexType vertexType, int initialCapacity) {
-        return new FacingBuffer(vertexType.getNativeFormat(),
-                NativeSectionMeshBuilder.create(Math.max(1, (initialCapacity + 3) >> 2)),
-				ModelQuadFacing.UNASSIGNED.ordinal(), true, true, FacingBuffer.activeSeparateAo());
-    }
-
-    public static FacingBuffer createEncodedFacingBuffer(ChunkVertexType vertexType, int initialCapacity) {
-        return new FacingBuffer(vertexType.getNativeFormat(),
-                NativeSectionMeshBuilder.create(Math.max(1, (initialCapacity + 3) >> 2)),
-				ModelQuadFacing.UNASSIGNED.ordinal(), true, false, FacingBuffer.activeSeparateAo());
-    }
-
     public void start(int sectionIndex) {
         check(invokeStart(this.state.getHandle()), "native section mesh builder start");
         this.sectionIndex = sectionIndex;
@@ -1372,12 +1360,12 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
 
         public FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
                 int facing) {
-			this(nativeFormat, sectionBuilder, facing, false, true, activeSeparateAo());
+			this(nativeFormat, sectionBuilder, facing, false, true, false);
         }
 
         public FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
                 int facing, boolean storeRawQuads) {
-			this(nativeFormat, sectionBuilder, facing, false, storeRawQuads, activeSeparateAo());
+			this(nativeFormat, sectionBuilder, facing, false, storeRawQuads, false);
         }
 
         public FacingBuffer(NativeChunkVertexFormat nativeFormat, NativeSectionMeshBuilder sectionBuilder,
@@ -1400,15 +1388,6 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             }
         }
 
-        public long prepareQuadAddress() {
-            this.flushPending();
-            return this.sectionBuilder.prepareQuadAddress(this.facing);
-        }
-
-        public void commitPreparedQuad() {
-            this.sectionBuilder.commitQuad(this.facing);
-        }
-
         public long prepareStagedQuad(int materialBits, byte blockEmission, byte renderType, boolean ignoreMidBlock,
                 int blockId, int localX, int localY, int localZ) {
             if (!this.matchesPendingMode(PENDING_NATIVE_QUADS, null, null)) {
@@ -1427,28 +1406,6 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
 
         public void commitStagedQuad() {
             this.pendingQuadCount++;
-        }
-
-        public long prepareStagedTranslucentQuad(int materialBits, TranslucentGeometryCollector collector,
-                ModelQuadFacing collectorFacing, byte blockEmission, byte renderType, boolean ignoreMidBlock,
-                int blockId, int localX, int localY, int localZ) {
-            if (!collector.supportsNativeBatching()) {
-                return this.prepareStagedQuad(materialBits, blockEmission, renderType, ignoreMidBlock,
-                        blockId, localX, localY, localZ);
-            }
-
-            if (!this.matchesPendingMode(PENDING_NATIVE_QUADS, collector, collectorFacing)) {
-                this.flushPending();
-            }
-
-            if (this.pendingQuadCount == this.stagingBuffers.capacity()) {
-                this.flushPending();
-            }
-
-            this.pendingKind = PENDING_NATIVE_QUADS;
-            this.pendingCollector = collector;
-            this.pendingCollectorFacing = collectorFacing;
-            return this.pendingQuadAddress();
         }
 
         public boolean commitStagedTranslucentQuad(long quadAddress, TranslucentGeometryCollector collector,
@@ -1520,16 +1477,6 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             return this.sectionBuilder;
         }
 
-        public void appendLightBlockQuad(int materialBits, byte blockEmission, int blockId, int localX, int localY,
-                int localZ) {
-            this.prepareLightBlockRecord();
-            long recordAddress = this.recordStagingBuffers.lightBlockRecordAddress()
-                    + (long) this.pendingQuadCount * NativeChunkMeshEncoder.LIGHT_BLOCK_RECORD_STRIDE;
-            NativeChunkMeshEncoder.writeLightBlockRecord(recordAddress, materialBits, blockEmission, blockId,
-                    localX, localY, localZ);
-            this.pendingQuadCount++;
-        }
-
         public void appendFluidFace(int materialBits, byte blockEmission, byte renderType, boolean ignoreMidBlock,
                 int blockId, int localX, int localY, int localZ, int faceKind, boolean flip, int packedNormal,
                 int originX, int originY, int originZ, float yOffset,
@@ -1546,17 +1493,6 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
                     u0, v0, u1, v1, u2, v2, u3, v3,
                     color0, color1, color2, color3, ao0, ao1, ao2, ao3,
                     light0, light1, light2, light3, primitiveKind);
-            this.pendingQuadCount++;
-        }
-
-        public void appendStaticModelBlock(int modelId, int materialBits, byte blockEmission, byte renderType,
-                int blockId, int localX, int localY, int localZ, int cullMask,
-                float offsetX, float offsetY, float offsetZ) {
-            this.prepareStaticModelBlockRecord();
-            long recordAddress = this.recordStagingBuffers.staticModelBlockRecordAddress()
-                    + (long) this.pendingQuadCount * NativeChunkMeshEncoder.STATIC_MODEL_BLOCK_RECORD_STRIDE;
-            NativeChunkMeshEncoder.writeStaticModelBlockRecord(recordAddress, modelId, materialBits, blockEmission,
-                    renderType, blockId, localX, localY, localZ, cullMask, offsetX, offsetY, offsetZ);
             this.pendingQuadCount++;
         }
 
@@ -1712,14 +1648,6 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             this.clearPending();
         }
 
-		private static boolean activeSeparateAo() {
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				return false;
-			}
-			return net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
-		}
-
         private long pendingQuadAddress() {
             return this.stagingBuffers.quadAddress() + (long) this.pendingQuadCount * this.nativeQuadStride;
         }
@@ -1736,34 +1664,6 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             this.pendingKind = PENDING_FLAT_QUAD_RECORDS;
             this.pendingCollector = collector;
             this.pendingCollectorFacing = collectorFacing;
-        }
-
-        private void prepareLightBlockRecord() {
-            if (!this.matchesPendingMode(PENDING_LIGHT_BLOCK_RECORDS, null, null)) {
-                this.flushPending();
-            }
-
-            if (this.pendingQuadCount == this.stagingBuffers.capacity()) {
-                this.flushPending();
-            }
-
-            this.pendingKind = PENDING_LIGHT_BLOCK_RECORDS;
-            this.pendingCollector = null;
-            this.pendingCollectorFacing = null;
-        }
-
-        private void prepareStaticModelBlockRecord() {
-            if (!this.matchesPendingMode(PENDING_STATIC_MODEL_BLOCK_RECORDS, null, null)) {
-                this.flushPending();
-            }
-
-            if (this.pendingQuadCount == this.stagingBuffers.capacity()) {
-                this.flushPending();
-            }
-
-            this.pendingKind = PENDING_STATIC_MODEL_BLOCK_RECORDS;
-            this.pendingCollector = null;
-            this.pendingCollectorFacing = null;
         }
 
         private void prepareFluidFaceRecord(TranslucentGeometryCollector collector,
@@ -1838,6 +1738,64 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             this.pendingCollectorFacing = null;
         }
 
+
+        public void appendLightBlockQuad(int materialBits, byte blockEmission, int blockId, int localX, int localY,
+                int localZ) {
+            this.prepareLightBlockRecord();
+            long recordAddress = this.recordStagingBuffers.lightBlockRecordAddress()
+                    + (long) this.pendingQuadCount * NativeChunkMeshEncoder.LIGHT_BLOCK_RECORD_STRIDE;
+            NativeChunkMeshEncoder.writeLightBlockRecord(recordAddress, materialBits, blockEmission, blockId,
+                    localX, localY, localZ);
+            this.pendingQuadCount++;
+        }
+
+        public void appendStaticModelBlock(int modelId, int materialBits, byte blockEmission, byte renderType,
+                int blockId, int localX, int localY, int localZ, int cullMask,
+                float offsetX, float offsetY, float offsetZ) {
+            this.prepareStaticModelBlockRecord();
+            long recordAddress = this.recordStagingBuffers.staticModelBlockRecordAddress()
+                    + (long) this.pendingQuadCount * NativeChunkMeshEncoder.STATIC_MODEL_BLOCK_RECORD_STRIDE;
+            NativeChunkMeshEncoder.writeStaticModelBlockRecord(recordAddress, modelId, materialBits, blockEmission,
+                    renderType, blockId, localX, localY, localZ, cullMask, offsetX, offsetY, offsetZ);
+            this.pendingQuadCount++;
+        }
+
+        public void commitPreparedQuad() {
+            this.sectionBuilder.commitQuad(this.facing);
+        }
+
+        public long prepareQuadAddress() {
+            this.flushPending();
+            return this.sectionBuilder.prepareQuadAddress(this.facing);
+        }
+
+        private void prepareLightBlockRecord() {
+            if (!this.matchesPendingMode(PENDING_LIGHT_BLOCK_RECORDS, null, null)) {
+                this.flushPending();
+            }
+
+            if (this.pendingQuadCount == this.stagingBuffers.capacity()) {
+                this.flushPending();
+            }
+
+            this.pendingKind = PENDING_LIGHT_BLOCK_RECORDS;
+            this.pendingCollector = null;
+            this.pendingCollectorFacing = null;
+        }
+
+        private void prepareStaticModelBlockRecord() {
+            if (!this.matchesPendingMode(PENDING_STATIC_MODEL_BLOCK_RECORDS, null, null)) {
+                this.flushPending();
+            }
+
+            if (this.pendingQuadCount == this.stagingBuffers.capacity()) {
+                this.flushPending();
+            }
+
+            this.pendingKind = PENDING_STATIC_MODEL_BLOCK_RECORDS;
+            this.pendingCollector = null;
+            this.pendingCollectorFacing = null;
+        }
     }
 
     private static final class State implements Runnable {
@@ -1864,5 +1822,17 @@ public final class NativeSectionMeshBuilder implements AutoCloseable {
             check(invokeDestroy(handle), "native section mesh builder destroy");
             this.handle = 0;
         }
+    }
+
+    public static FacingBuffer createEncodedFacingBuffer(ChunkVertexType vertexType, int initialCapacity) {
+        return new FacingBuffer(vertexType.getNativeFormat(),
+                NativeSectionMeshBuilder.create(Math.max(1, (initialCapacity + 3) >> 2)),
+				ModelQuadFacing.UNASSIGNED.ordinal(), true, false, false);
+    }
+
+    public static FacingBuffer createFacingBuffer(ChunkVertexType vertexType, int initialCapacity) {
+        return new FacingBuffer(vertexType.getNativeFormat(),
+                NativeSectionMeshBuilder.create(Math.max(1, (initialCapacity + 3) >> 2)),
+				ModelQuadFacing.UNASSIGNED.ordinal(), true, true, false);
     }
 }

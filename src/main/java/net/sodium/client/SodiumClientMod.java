@@ -75,7 +75,4 @@ public class SodiumClientMod {
         return MOD_VERSION;
     }
 
-    public static boolean allowDebuggingOptions() {
-        return PlatformRuntimeInformation.getInstance().isDevelopmentEnvironment();
-    }
 }

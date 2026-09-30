@@ -17,7 +17,7 @@ public class ShadowDistanceOption<T> extends OptionInstance<T> {
 	public AbstractWidget createButton(Options options, int x, int y, int width) {
 		AbstractWidget widget = super.createButton(options, x, y, width);
 
-		widget.active = IrisVideoSettings.isShadowDistanceSliderEnabled();
+		widget.active = true;
 
 		return widget;
 	}

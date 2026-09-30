@@ -52,10 +52,7 @@ public class GlyphStitcher implements AutoCloseable {
 	}
 
 	public void ensureRustSemanticRoute() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			for (FontTexture texture : this.textures) texture.ensureRustSemanticRoute();
-		}
+		for (FontTexture texture : this.textures) texture.ensureRustSemanticRoute();
 	}
 
 	@Nullable

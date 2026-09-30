@@ -15,7 +15,6 @@ import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
 import com.seibel.distanthorizons.core.render.renderer.generic.BeaconRenderHandler;
 import com.seibel.distanthorizons.core.render.renderer.generic.GenericObjectRenderer;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.util.PerfRecorder;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
 import com.seibel.distanthorizons.core.util.objects.quadTree.QuadNode;
 import com.seibel.distanthorizons.core.util.objects.quadTree.QuadTree;
@@ -701,9 +700,9 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 					// uploaded but the buffer is missing
 					color = Color.PINK;
 				}
-				else if (renderSection.bufferContainer.hasNonNullVbos())
+				else if (renderSection.bufferContainer.renderDataReady())
 				{
-					if (renderSection.bufferContainer.vboBufferCount() != 0)
+					if (!renderSection.bufferContainer.rustSemanticBuildHasNoDrawableGeometry())
 					{
 						color = Color.GREEN;
 					}

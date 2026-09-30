@@ -40,14 +40,6 @@ public class Contact {
         this.name = name;
     }
 
-    public void setRotationFactor(int rotationFactor) {
-        this.rotationFactor = rotationFactor;
-    }
-
-    public void setArmorColor(int armorColor) {
-        this.armorColor = armorColor;
-    }
-
     public void updateLocation() {
         this.x = this.entity.xo + (this.entity.getX() - this.entity.xo) * VoxelConstants.getMinecraft().getDeltaTracker().getGameTimeDeltaPartialTick(false);
         this.y = this.entity.getY() + this.yFudge;

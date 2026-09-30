@@ -143,113 +143,47 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 	}
 
 	private static void submitRays(PoseStack poseStack, float f, SubmitNodeCollector submitNodeCollector, RenderType renderType) {
-		boolean rustProcedural = net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute()
-			.usesRustWholeFrameVulkan();
-		boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		if (rustPresentation && (!Float.isFinite(f) || f < 0.0F || f > 1.0F)) {
+		if ((!Float.isFinite(f) || f < 0.0F || f > 1.0F)) {
 			throw new IllegalStateException("Rust whole-frame End Dragon ray route rejected non-finite or out-of-range death progress");
 		}
-		if (rustProcedural) {
-			float g = Math.min(f > 0.8F ? (f - 0.8F) / 0.2F : 0.0F, 1.0F);
-			int headColor = ARGB.colorFromFloat(1.0F - g, 1.0F, 1.0F, 1.0F);
-			RandomSource randomSource = RandomSource.create(432L);
-			Vector3f origin = new Vector3f();
-			Vector3f first = new Vector3f();
-			Vector3f second = new Vector3f();
-			Vector3f third = new Vector3f();
-			Quaternionf quaternion = new Quaternionf();
-			int rayCount = Mth.floor((f + f * f) / 2.0F * 60.0F);
-			for (int ray = 0; ray < rayCount; ray++) {
-				quaternion.rotationXYZ(randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2))
-					.rotateXYZ(randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2) + f * (float)(Math.PI / 2));
-				poseStack.mulPose(quaternion);
-				float length = randomSource.nextFloat() * 20.0F + 5.0F + g * 10.0F;
-				float radius = randomSource.nextFloat() * 2.0F + 1.0F + g * 2.0F;
-				first.set(-HALF_SQRT_3 * radius, length, -0.5F * radius);
-				second.set(HALF_SQRT_3 * radius, length, -0.5F * radius);
-				third.set(0.0F, length, radius);
-				float[] vertices = {
-					origin.x(), origin.y(), origin.z(), first.x(), first.y(), first.z(), second.x(), second.y(), second.z(), second.x(), second.y(), second.z(),
-					origin.x(), origin.y(), origin.z(), second.x(), second.y(), second.z(), third.x(), third.y(), third.z(), third.x(), third.y(), third.z(),
-					origin.x(), origin.y(), origin.z(), third.x(), third.y(), third.z(), first.x(), first.y(), first.z(), first.x(), first.y(), first.z()
-				};
-				float[] uvs = {0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1};
-				int[] colors = {headColor, 0xFFFF00FF, 0xFFFF00FF};
-				if (!submitNodeCollector.submitColoredQuadsSemantic(poseStack, renderType, vertices, uvs, colors, 15728880)) {
-					throw new IllegalStateException("Rust procedural ray route rejected semantic quads");
-				}
+		float g = Math.min(f > 0.8F ? (f - 0.8F) / 0.2F : 0.0F, 1.0F);
+		int headColor = ARGB.colorFromFloat(1.0F - g, 1.0F, 1.0F, 1.0F);
+		RandomSource randomSource = RandomSource.create(432L);
+		Vector3f origin = new Vector3f();
+		Vector3f first = new Vector3f();
+		Vector3f second = new Vector3f();
+		Vector3f third = new Vector3f();
+		Quaternionf quaternion = new Quaternionf();
+		int rayCount = Mth.floor((f + f * f) / 2.0F * 60.0F);
+		for (int ray = 0; ray < rayCount; ray++) {
+			quaternion.rotationXYZ(randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2))
+				.rotateXYZ(randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2), randomSource.nextFloat() * (float)(Math.PI * 2) + f * (float)(Math.PI / 2));
+			poseStack.mulPose(quaternion);
+			float length = randomSource.nextFloat() * 20.0F + 5.0F + g * 10.0F;
+			float radius = randomSource.nextFloat() * 2.0F + 1.0F + g * 2.0F;
+			first.set(-HALF_SQRT_3 * radius, length, -0.5F * radius);
+			second.set(HALF_SQRT_3 * radius, length, -0.5F * radius);
+			third.set(0.0F, length, radius);
+			float[] vertices = {
+				origin.x(), origin.y(), origin.z(), first.x(), first.y(), first.z(), second.x(), second.y(), second.z(), second.x(), second.y(), second.z(),
+				origin.x(), origin.y(), origin.z(), second.x(), second.y(), second.z(), third.x(), third.y(), third.z(), third.x(), third.y(), third.z(),
+				origin.x(), origin.y(), origin.z(), third.x(), third.y(), third.z(), first.x(), first.y(), first.z(), first.x(), first.y(), first.z()
+			};
+			float[] uvs = {0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1};
+			int[] colors = {headColor, 0xFFFF00FF, 0xFFFF00FF};
+			if (!submitNodeCollector.submitColoredQuadsSemantic(poseStack, renderType, vertices, uvs, colors, 15728880)) {
+				throw new IllegalStateException("Rust procedural ray route rejected semantic quads");
 			}
-			return;
 		}
-		if (rustPresentation) {
-			throw new IllegalStateException("Rust whole-frame End Dragon ray route is unavailable; Java custom geometry is not a fallback");
-		}
-		submitNodeCollector.submitCustomGeometrySemantic(
-			// Rust receives the same deterministic rays through semantic quads below;
-			// this Java producer is retained only for compatibility routes.
-			poseStack,
-			renderType,
-			(pose, vertexConsumer) -> {
-				float g = Math.min(f > 0.8F ? (f - 0.8F) / 0.2F : 0.0F, 1.0F);
-				int i = ARGB.colorFromFloat(1.0F - g, 1.0F, 1.0F, 1.0F);
-				int j = 16711935;
-				RandomSource randomSource = RandomSource.create(432L);
-				Vector3f vector3f = new Vector3f();
-				Vector3f vector3f2 = new Vector3f();
-				Vector3f vector3f3 = new Vector3f();
-				Vector3f vector3f4 = new Vector3f();
-				Quaternionf quaternionf = new Quaternionf();
-				int k = Mth.floor((f + f * f) / 2.0F * 60.0F);
-
-				for (int l = 0; l < k; l++) {
-					quaternionf.rotationXYZ(
-							randomSource.nextFloat() * (float) (Math.PI * 2), randomSource.nextFloat() * (float) (Math.PI * 2), randomSource.nextFloat() * (float) (Math.PI * 2)
-						)
-						.rotateXYZ(
-							randomSource.nextFloat() * (float) (Math.PI * 2),
-							randomSource.nextFloat() * (float) (Math.PI * 2),
-							randomSource.nextFloat() * (float) (Math.PI * 2) + f * (float) (Math.PI / 2)
-						);
-					pose.rotate(quaternionf);
-					float h = randomSource.nextFloat() * 20.0F + 5.0F + g * 10.0F;
-					float m = randomSource.nextFloat() * 2.0F + 1.0F + g * 2.0F;
-					vector3f2.set(-HALF_SQRT_3 * m, h, -0.5F * m);
-					vector3f3.set(HALF_SQRT_3 * m, h, -0.5F * m);
-					vector3f4.set(0.0F, h, m);
-					vertexConsumer.addVertex(pose, vector3f).setColor(i);
-					vertexConsumer.addVertex(pose, vector3f2).setColor(16711935);
-					vertexConsumer.addVertex(pose, vector3f3).setColor(16711935);
-					vertexConsumer.addVertex(pose, vector3f).setColor(i);
-					vertexConsumer.addVertex(pose, vector3f3).setColor(16711935);
-					vertexConsumer.addVertex(pose, vector3f4).setColor(16711935);
-					vertexConsumer.addVertex(pose, vector3f).setColor(i);
-					vertexConsumer.addVertex(pose, vector3f4).setColor(16711935);
-					vertexConsumer.addVertex(pose, vector3f2).setColor(16711935);
-				}
-			}
-		);
+		return;
 	}
 
 	public static void submitCrystalBeams(float f, float g, float h, float i, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int j) {
 		float k = Mth.sqrt(f * f + h * h);
 		float l = Mth.sqrt(f * f + g * g + h * h);
 		
-		boolean rustCrystalBeam = net.vulkanic.world.WorldRenderRoutePolicy.currentCrystalBeamRoute()
-			.usesRustWholeFrameVulkan();
-		boolean rustPresentation = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 		// Iris state is consulted only by the Java compatibility route.
 		int iris$previousEntity = 0;
-		if (!rustPresentation && !rustCrystalBeam
-			&& net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds() != null) {
-			iris$previousEntity = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
-			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(
-				net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds().applyAsInt(
-					new net.irisshaders.iris.shaderpack.materialmap.NamespacedId("minecraft", "end_crystal_beam")
-				)
-			);
-		}
 		
 		poseStack.pushPose();
 		poseStack.translate(0.0F, 2.0F, 0.0F);
@@ -278,55 +212,11 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 			|| beamColors.length != SEMANTIC_CRYSTAL_BEAM_QUADS * 4) {
 			throw new IllegalStateException("Rust whole-frame crystal-beam semantic payload count drifted");
 		}
-				if (rustCrystalBeam && submitNodeCollector.submitCrystalBeamSemantic(poseStack, BEAM, CRYSTAL_BEAM_LOCATION, beamVertices, beamUvs, beamColors, j)) {
+				if (submitNodeCollector.submitCrystalBeamSemantic(poseStack, BEAM, CRYSTAL_BEAM_LOCATION, beamVertices, beamUvs, beamColors, j)) {
 			poseStack.popPose();
 			return;
 		}
-		if (rustCrystalBeam) {
-			throw new IllegalStateException("Rust whole-frame End Crystal beam route rejected semantic quads");
-		}
-		if (rustPresentation) {
-			throw new IllegalStateException("Rust whole-frame End Crystal beam route is unavailable; Java custom geometry is not a fallback");
-		}
-		submitNodeCollector.submitCustomGeometrySemantic(
-			poseStack,
-			BEAM,
-			(pose, vertexConsumer) -> {
-				int jx = 8;
-				float kx = 0.0F;
-				float lx = 0.75F;
-				float mx = 0.0F;
-
-				for (int nx = 1; nx <= 8; nx++) {
-					float o = Mth.sin(nx * (float) (Math.PI * 2) / 8.0F) * 0.75F;
-					float p = Mth.cos(nx * (float) (Math.PI * 2) / 8.0F) * 0.75F;
-					float q = nx / 8.0F;
-					vertexConsumer.addVertex(pose, kx * 0.2F, lx * 0.2F, 0.0F)
-						.setColor(-16777216)
-						.setUv(mx, m)
-						.setOverlay(OverlayTexture.NO_OVERLAY)
-						.setLight(j)
-						.setNormal(pose, 0.0F, -1.0F, 0.0F);
-					vertexConsumer.addVertex(pose, kx, lx, l).setColor(-1).setUv(mx, n).setOverlay(OverlayTexture.NO_OVERLAY).setLight(j).setNormal(pose, 0.0F, -1.0F, 0.0F);
-					vertexConsumer.addVertex(pose, o, p, l).setColor(-1).setUv(q, n).setOverlay(OverlayTexture.NO_OVERLAY).setLight(j).setNormal(pose, 0.0F, -1.0F, 0.0F);
-					vertexConsumer.addVertex(pose, o * 0.2F, p * 0.2F, 0.0F)
-						.setColor(-16777216)
-						.setUv(q, m)
-						.setOverlay(OverlayTexture.NO_OVERLAY)
-						.setLight(j)
-						.setNormal(pose, 0.0F, -1.0F, 0.0F);
-					kx = o;
-					lx = p;
-					mx = q;
-				}
-			}
-		);
-		poseStack.popPose();
-		
-		// Iris: Restore previous entity ID (from MixinEnderDragonRenderer)
-		if (iris$previousEntity != 0) {
-			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(iris$previousEntity);
-		}
+		throw new IllegalStateException("Rust whole-frame End Crystal beam route rejected semantic quads");
 	}
 
 	public EnderDragonRenderState createRenderState() {

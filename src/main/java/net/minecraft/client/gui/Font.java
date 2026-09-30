@@ -53,14 +53,6 @@ public class Font {
 		return this.provider.glyphs(fontDescription);
 	}
 
-	private static void ensureJavaTextDrawAvailable() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException(
-				"Java Font buffer rendering is unavailable while Rust owns whole-frame Vulkan");
-		}
-	}
-
 	public String bidirectionalShaping(String string) {
 		try {
 			Bidi bidi = new Bidi(new ArabicShaping(8).shape(string), 127);
@@ -69,74 +61,6 @@ public class Font {
 		} catch (ArabicShapingException var3) {
 			return string;
 		}
-	}
-
-	public void drawInBatch(
-		String string, float f, float g, int i, boolean bl, Matrix4f matrix4f, MultiBufferSource multiBufferSource, Font.DisplayMode displayMode, int j, int k
-	) {
-		ensureJavaTextDrawAvailable();
-		Font.PreparedText preparedText = this.prepareText(string, f, g, i, bl, j);
-		preparedText.visit(Font.GlyphVisitor.forMultiBufferSource(multiBufferSource, matrix4f, displayMode, k));
-	}
-
-	public void drawInBatch(
-		Component component, float f, float g, int i, boolean bl, Matrix4f matrix4f, MultiBufferSource multiBufferSource, Font.DisplayMode displayMode, int j, int k
-	) {
-		ensureJavaTextDrawAvailable();
-		Font.PreparedText preparedText = this.prepareText(component.getVisualOrderText(), f, g, i, bl, j);
-		preparedText.visit(Font.GlyphVisitor.forMultiBufferSource(multiBufferSource, matrix4f, displayMode, k));
-	}
-
-	public void drawInBatch(
-		FormattedCharSequence formattedCharSequence,
-		float f,
-		float g,
-		int i,
-		boolean bl,
-		Matrix4f matrix4f,
-		MultiBufferSource multiBufferSource,
-		Font.DisplayMode displayMode,
-		int j,
-		int k
-	) {
-		ensureJavaTextDrawAvailable();
-		Font.PreparedText preparedText = this.prepareText(formattedCharSequence, f, g, i, bl, j);
-		preparedText.visit(Font.GlyphVisitor.forMultiBufferSource(multiBufferSource, matrix4f, displayMode, k));
-	}
-
-	public void drawInBatch8xOutline(
-		FormattedCharSequence formattedCharSequence, float f, float g, int i, int j, Matrix4f matrix4f, MultiBufferSource multiBufferSource, int k
-	) {
-		ensureJavaTextDrawAvailable();
-		Font.PreparedTextBuilder preparedTextBuilder = new Font.PreparedTextBuilder(0.0F, 0.0F, j, false);
-
-		for (int l = -1; l <= 1; l++) {
-			for (int m = -1; m <= 1; m++) {
-				if (l != 0 || m != 0) {
-					float[] fs = new float[]{f};
-					int n = l;
-					int o = m;
-					formattedCharSequence.accept((lx, style, mx) -> {
-						boolean bl = style.isBold();
-						BakedGlyph bakedGlyph = this.getGlyph(mx, style);
-						preparedTextBuilder.x = fs[0] + n * bakedGlyph.info().getShadowOffset();
-						preparedTextBuilder.y = g + o * bakedGlyph.info().getShadowOffset();
-						fs[0] += bakedGlyph.info().getAdvance(bl);
-						return preparedTextBuilder.accept(lx, style.withColor(j), bakedGlyph);
-					});
-				}
-			}
-		}
-
-		Font.GlyphVisitor glyphVisitor = Font.GlyphVisitor.forMultiBufferSource(multiBufferSource, matrix4f, Font.DisplayMode.NORMAL, k);
-
-		for (TextRenderable textRenderable : preparedTextBuilder.glyphs) {
-			glyphVisitor.acceptGlyph(textRenderable);
-		}
-
-		Font.PreparedTextBuilder preparedTextBuilder2 = new Font.PreparedTextBuilder(f, g, i, false);
-		formattedCharSequence.accept(preparedTextBuilder2);
-		preparedTextBuilder2.visit(Font.GlyphVisitor.forMultiBufferSource(multiBufferSource, matrix4f, Font.DisplayMode.POLYGON_OFFSET, k));
 	}
 
 	BakedGlyph getGlyph(int i, Style style) {
@@ -223,25 +147,6 @@ public class Font {
 
 	@Environment(EnvType.CLIENT)
 	public interface GlyphVisitor {
-		static Font.GlyphVisitor forMultiBufferSource(MultiBufferSource multiBufferSource, Matrix4f matrix4f, Font.DisplayMode displayMode, int i) {
-			Font.ensureJavaTextDrawAvailable();
-			return new Font.GlyphVisitor() {
-				@Override
-				public void acceptGlyph(TextRenderable textRenderable) {
-					this.render(textRenderable);
-				}
-
-				@Override
-				public void acceptEffect(TextRenderable textRenderable) {
-					this.render(textRenderable);
-				}
-
-				private void render(TextRenderable textRenderable) {
-					VertexConsumer vertexConsumer = multiBufferSource.getBuffer(textRenderable.renderType(displayMode));
-					textRenderable.render(matrix4f, vertexConsumer, i, false);
-				}
-			};
-		}
 
 		void acceptGlyph(TextRenderable textRenderable);
 

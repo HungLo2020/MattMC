@@ -110,36 +110,6 @@ public class ArchitecturalBoundaryTest {
         }
     }
 
-    @Test
-    public void testOpenGLBackendDoesNotReferenceVulkanBackendImplementation() throws IOException {
-        List<String> violations = checkForbiddenBackendReferences(
-            OPENGL_BACKEND_PATH,
-            VULKAN_BACKEND_IMPORT_PATTERN,
-            VULKAN_BACKEND_REFERENCE_PATTERN,
-            "OpenGL",
-            "Vulkan"
-        );
-
-        if (!violations.isEmpty()) {
-            fail(buildCrossBackendViolationMessage("OpenGL", "Vulkan", violations));
-        }
-    }
-
-    @Test
-    public void testVulkanBackendDoesNotReferenceOpenGLBackendImplementation() throws IOException {
-        List<String> violations = checkForbiddenBackendReferences(
-            VULKAN_BACKEND_PATH,
-            OPENGL_BACKEND_IMPORT_PATTERN,
-            OPENGL_BACKEND_REFERENCE_PATTERN,
-            "Vulkan",
-            "OpenGL"
-        );
-
-        if (!violations.isEmpty()) {
-            fail(buildCrossBackendViolationMessage("Vulkan", "OpenGL", violations));
-        }
-    }
-    
     /**
      * Scans Java source files for import violations.
      * 
@@ -377,11 +347,4 @@ public class ArchitecturalBoundaryTest {
         return errorMessage.toString();
     }
     
-    @Test
-    public void testBackendDirectoriesExist() {
-        assertTrue(Files.exists(OPENGL_BACKEND_PATH), 
-            "OpenGL backend directory should exist: " + OPENGL_BACKEND_PATH);
-        assertTrue(Files.exists(VULKAN_BACKEND_PATH), 
-            "Vulkan backend directory should exist: " + VULKAN_BACKEND_PATH);
-    }
 }

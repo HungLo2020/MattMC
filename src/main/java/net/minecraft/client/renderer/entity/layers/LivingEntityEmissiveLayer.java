@@ -47,8 +47,7 @@ public class LivingEntityEmissiveLayer<S extends LivingEntityRenderState, M exte
 				int j = ARGB.white(h);
 				ResourceLocation texture = (ResourceLocation)this.textureProvider.apply(livingEntityRenderState);
 				RenderType renderType = (RenderType)this.bufferProvider.apply(texture);
-				boolean rustWholeFrame = net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan();
-				if (rustWholeFrame && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
+				if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
 					this.model, livingEntityRenderState, poseStack.last(), renderType, texture, this.semanticIdentity,
 					i, LivingEntityRenderer.getOverlayCoords(livingEntityRenderState, 0.0F), j, livingEntityRenderState.outlineColor
 				)) {
@@ -58,26 +57,11 @@ public class LivingEntityEmissiveLayer<S extends LivingEntityRenderState, M exte
 					);
 					return;
 				}
-				if (rustWholeFrame) {
-					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-						"rust-vulkan-unavailable", texture, this.model.getClass().getName(), livingEntityRenderState.entityId,
-						false, false, false
-					);
-					throw new IllegalStateException("Rust whole-frame emissive layer has no semantic mesh: " + this.semanticIdentity);
-				}
-				submitNodeCollector.order(1)
-					.submitModelSemanticTexture(
-						this.model,
-						livingEntityRenderState,
-						poseStack,
-						renderType,
-						i,
-						LivingEntityRenderer.getOverlayCoords(livingEntityRenderState, 0.0F),
-						j,
-						texture,
-						livingEntityRenderState.outlineColor,
-						null
-					);
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+					"rust-vulkan-unavailable", texture, this.model.getClass().getName(), livingEntityRenderState.entityId,
+					false, false, false
+				);
+				throw new IllegalStateException("Rust whole-frame emissive layer has no semantic mesh: " + this.semanticIdentity);
 			}
 		}
 	}

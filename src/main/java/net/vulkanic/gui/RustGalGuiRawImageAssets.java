@@ -73,9 +73,6 @@ public final class RustGalGuiRawImageAssets {
 	}
 
 	private static void registerDynamicTextureBinding(ResourceLocation identity, DynamicTexture texture) {
-		if (!RustGalGuiRenderer.currentExecutionRoute().usesRustGui()) {
-			throw new IllegalStateException("semantic dynamic-texture registration requires an admitted Rust GUI route");
-		}
 		if (identity == null || texture == null) throw new IllegalArgumentException("dynamic texture identity and source are required");
 		synchronized (LOCK) {
 			if (!DYNAMIC_TEXTURES.containsKey(identity) && DYNAMIC_TEXTURES.size() >= MAX_CACHED_ASSET_ENTRIES) {
@@ -116,9 +113,6 @@ public final class RustGalGuiRawImageAssets {
 	/** Copies a registered DynamicTexture into the semantic cache without staging pixels. */
 	@Nullable
 	public static Asset prepareDynamicTexture(DynamicTexture texture) {
-		if (!RustGalGuiRenderer.currentExecutionRoute().usesRustGui()) {
-			throw new IllegalStateException("semantic dynamic-texture staging requires an admitted Rust GUI route");
-		}
 		ResourceLocation identity;
 		synchronized (LOCK) {
 			identity = DYNAMIC_TEXTURE_IDS.get(texture);
@@ -277,14 +271,6 @@ public final class RustGalGuiRawImageAssets {
 		return new SemanticRawImageSnapshot(asset.identity(), asset.width(), asset.height(), 1L, revision, asset.pixels());
 	}
 
-	/** Stages an early vanilla-pack image before the reload manager publishes its stack. */
-	public static boolean stageVanillaResource(ResourceLocation source, ResourceProvider provider) {
-		Asset asset = loadVanillaResource(source, provider);
-		if (asset == null) return false;
-		stage(asset);
-		return true;
-	}
-
 	/** Loads and caches an early vanilla-pack image without publishing it to Rust. */
 	@Nullable
 	public static Asset loadVanillaResource(ResourceLocation source, ResourceProvider provider) {
@@ -331,15 +317,36 @@ public final class RustGalGuiRawImageAssets {
 
 	/** Stages a bounded caller-owned RGBA8 image without creating a Java texture. */
 	public static boolean stageCpuRgba8(ResourceLocation source, int width, int height, byte[] pixels) {
+		return stageCpuRgba8(source, width, height, pixels, false);
+	}
+
+	/**
+	 * Stages a bounded caller-owned RGBA8 image; {@code linearClamp} samples it
+	 * with linear filtering and clamped addressing instead of the defaults.
+	 */
+	public static boolean stageCpuRgba8(ResourceLocation source, int width, int height, byte[] pixels, boolean linearClamp) {
 		if (source == null || pixels == null || width <= 0 || height <= 0
 			|| (long) width * height > MAX_DECODED_PIXELS
 			|| pixels.length != Math.multiplyExact(Math.multiplyExact(width, height), 4)) return false;
-		Asset asset = new Asset(assetId(source.toString()), source.toString(), width, height, pixels);
+		Asset asset = linearClamp
+			? new Asset(assetId(source.toString()), source.toString(), width, height, pixels, 2, 2)
+			: new Asset(assetId(source.toString()), source.toString(), width, height, pixels);
 		synchronized (LOCK) {
 			if (!cachePutLocked(CACHE, source, asset)) return false;
 		}
 		stage(asset);
 		return true;
+	}
+
+	/** Retires an image staged by {@link #stageCpuRgba8}; Rust drops it on the next generation. */
+	public static void releaseCpuRgba8(ResourceLocation source) {
+		if (source == null) return;
+		Asset removed;
+		synchronized (LOCK) {
+			removed = CACHE.remove(source);
+			if (removed != null) STAGED_ASSETS.remove(removed.assetId());
+		}
+		if (removed != null) RustGalFrameCoordinator.releaseGuiRawImage(removed.assetId());
 	}
 
 	/**

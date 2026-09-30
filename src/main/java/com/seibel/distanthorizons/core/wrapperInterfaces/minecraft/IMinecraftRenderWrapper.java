@@ -27,7 +27,6 @@ public interface IMinecraftRenderWrapper extends IBindable
 	
 	Vec3d getCameraExactPosition();
 	
-	Color getFogColor(float partialTicks);
 	
 	/** Unless you really need to know if the player is blind, use {@link IMinecraftRenderWrapper#isFogStateSpecial()} instead */
 	boolean isFogStateSpecial();

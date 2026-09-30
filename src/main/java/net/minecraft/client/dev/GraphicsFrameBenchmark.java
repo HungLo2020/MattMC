@@ -1787,32 +1787,14 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static String blockDisplayRouteControl() {
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBlockDisplay.disabled")) {
-			return "disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldBlockDisplay.legacyControl")) {
-			return "legacy";
-		}
 		return "rust";
 	}
 
 	private static String fallingBlockRouteControl() {
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.disabled")) {
-			return "disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldFallingBlock.legacyControl")) {
-			return "legacy";
-		}
 		return "rust";
 	}
 
 	private static String pistonRouteControl() {
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldPiston.disabled")) {
-			return "disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldPiston.legacyControl")) {
-			return "legacy";
-		}
 		return "rust";
 	}
 
@@ -3000,58 +2982,10 @@ public final class GraphicsFrameBenchmark {
 	}
 
 	private static String rustGalGuiControl() {
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.mountHealth.disabled")) {
-			return "mount-health-disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.mountHealth.legacyControl")) {
-			return "mount-health-legacy";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.air.disabled")) {
-			return "air-disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.air.legacyControl")) {
-			return "air-legacy";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.hunger.disabled")) {
-			return "hunger-disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.hunger.legacyControl")) {
-			return "hunger-legacy";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.absorption.disabled")) {
-			return "absorption-disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.absorption.legacyControl")) {
-			return "absorption-legacy";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.playerHealth.disabled")) {
-			return "player-health-disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.playerHealth.legacyControl")) {
-			return "player-health-legacy";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.armor.disabled")) {
-			return "armor-disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.armor.legacyControl")) {
-			return "armor-legacy";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.disabled")) {
-			return "all-disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalGui.legacyControl")) {
-			return "all-legacy";
-		}
 		return "rust";
 	}
 
 	private static String terrainParticleRouteControl() {
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.disabled")) {
-			return "disabled";
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl")) {
-			return "legacy";
-		}
 		return "rust";
 	}
 

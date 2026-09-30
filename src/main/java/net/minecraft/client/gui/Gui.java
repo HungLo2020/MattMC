@@ -234,22 +234,7 @@ public class Gui {
 	}
 
 	public void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
-		// Iris HUD visibility is compatibility-renderer state. Rust whole-frame
-		// Vulkan receives semantic GUI elements directly and must not query Iris
-		// screen/runtime internals while assembling that frame.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& this.minecraft.screen instanceof net.irisshaders.iris.gui.screen.HudHideable) {
-			return;
-		}
 		
-		// GL debug groups are legacy Iris renderer state. Whole-frame Vulkan
-		// submits semantic HUD commands directly to Rust and must not touch it.
-		boolean legacyIrisDebugGroup = !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-		if (legacyIrisDebugGroup) {
-			net.irisshaders.iris.gl.GLDebug.pushGroup(1000, "GUI");
-		}
 		
 		if (!(this.minecraft.screen instanceof LevelLoadingScreen)) {
 			if (!this.minecraft.options.hideGui) {
@@ -277,31 +262,19 @@ public class Gui {
 		
 		// VoxelMap: Render minimap overlay (after boss bar, before debug overlay)
 		if (!this.minecraft.options.hideGui) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-				// The semantic producer owns fail-closed admission on Rust Vulkan;
-				// swallowing its boundary error would make an unavailable overlay
-				// indistinguishable from a Java fallback.
-				if (net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.isRegistered(VOXELMAP_MINIMAP_HUD_ELEMENT)) {
-					net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.renderAll(guiGraphics, deltaTracker);
-				} else {
-					// Some stripped test/client boots do not load VoxelMap's Fabric
-					// initializer. Keep the semantic callsite live without reopening
-					// the Java GPU overlay path.
-					net.voxelmap.VoxelConstants.renderOverlay(guiGraphics);
-				}
+			// The semantic producer owns fail-closed admission on Rust Vulkan;
+			// swallowing its boundary error would make an unavailable overlay
+			// indistinguishable from a Java fallback.
+			if (net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.isRegistered(VOXELMAP_MINIMAP_HUD_ELEMENT)) {
+				net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.renderAll(guiGraphics, deltaTracker);
 			} else {
-				try {
-					net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.renderAll(guiGraphics, deltaTracker);
-				} catch (Exception e) {
-					// Silently ignore errors to avoid crashing the game
-				}
+				// Some stripped test/client boots do not load VoxelMap's Fabric
+				// initializer. Keep the semantic callsite live without reopening
+				// the Java GPU overlay path.
+				net.voxelmap.VoxelConstants.renderOverlay(guiGraphics);
 			}
 		}
 		
-		if (legacyIrisDebugGroup) {
-			net.irisshaders.iris.gl.GLDebug.popGroup();
-		}
 	}
 
 	private void renderBossOverlay(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
@@ -520,13 +493,7 @@ public class Gui {
 				if (!this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)) {
 					guiGraphics.nextStratum();
 					int i = 15;
-					if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
-						// Dev-only measurement control: no migrated or legacy crosshair draw.
-					} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
-						guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_SPRITE, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
-					} else {
-						RustGalGuiRenderer.enqueueCrosshair(this.minecraft, guiGraphics, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
-					}
+					RustGalGuiRenderer.enqueueCrosshair(this.minecraft, guiGraphics, (guiGraphics.guiWidth() - i) / 2, (guiGraphics.guiHeight() - i) / 2, i, i);
 						if (this.minecraft.options.attackIndicator().get() == AttackIndicatorStatus.CROSSHAIR) {
 							DeterministicCameraCapture.forceCrosshairAttackTargetForDiagnostics(this.minecraft);
 							float f = this.minecraft.player.getAttackStrengthScale(0.0F);
@@ -539,23 +506,10 @@ public class Gui {
 							int j = guiGraphics.guiHeight() / 2 - 7 + 16;
 							int k = guiGraphics.guiWidth() / 2 - 8;
 							if (bl) {
-								if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
-									// Dev-only measurement control: no migrated or legacy attack indicator draw.
-								} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
-									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_FULL_SPRITE, k, j, 16, 16);
-								} else {
-									RustGalGuiRenderer.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, 16, true);
-								}
+								RustGalGuiRenderer.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, 16, true);
 							} else if (f < 1.0F) {
 								int l = crosshairAttackIndicatorFilledWidth(f);
-								if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
-									// Dev-only measurement control: no migrated or legacy attack indicator draw.
-								} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
-									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_BACKGROUND_SPRITE, k, j, 16, 4);
-									guiGraphics.blitSprite(RenderPipelines.CROSSHAIR, CROSSHAIR_ATTACK_INDICATOR_PROGRESS_SPRITE, 16, 4, 0, 0, k, j, l, 4);
-								} else {
-									RustGalGuiRenderer.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, l, false);
-								}
+								RustGalGuiRenderer.enqueueCrosshairAttackIndicator(this.minecraft, guiGraphics, k, j, f, l, false);
 							}
 						}
 				}
@@ -671,23 +625,11 @@ public class Gui {
 			int i = guiGraphics.guiWidth() / 2;
 			int j = 182;
 			int k = 91;
-			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
-				// Dev-only measurement control: no migrated or legacy hotbar base draw.
-			} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
-				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
-			} else {
-				RustGalGuiRenderer.enqueueHotbarBase(this.minecraft, guiGraphics, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
-			}
+			RustGalGuiRenderer.enqueueHotbarBase(this.minecraft, guiGraphics, i - 91, guiGraphics.guiHeight() - 22, 182, 22);
 			int selectedSlot = player.getInventory().getSelectedSlot();
 			int selectedSlotX = selectedHotbarHighlightX(guiGraphics.guiWidth(), selectedSlot);
 			int selectedSlotY = selectedHotbarHighlightY(guiGraphics.guiHeight());
-			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
-				// Dev-only measurement control: no migrated or legacy selected-slot highlight draw.
-			} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
-				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SELECTION_SPRITE, selectedSlotX, selectedSlotY, 24, 23);
-			} else {
-				RustGalGuiRenderer.enqueueHotbarSelection(this.minecraft, guiGraphics, selectedSlot, selectedSlotX, selectedSlotY, 24, 23);
-			}
+			RustGalGuiRenderer.enqueueHotbarSelection(this.minecraft, guiGraphics, selectedSlot, selectedSlotX, selectedSlotY, 24, 23);
 			if (!itemStack.isEmpty()) {
 				if (humanoidArm == HumanoidArm.LEFT) {
 					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_OFFHAND_LEFT_SPRITE, i - 91 - 29, guiGraphics.guiHeight() - 23, 29, 24);
@@ -723,14 +665,7 @@ public class Gui {
 					}
 
 					int p = hotbarAttackIndicatorFilledHeight(f);
-					if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
-						// Dev-only measurement control: no migrated or legacy attack indicator draw.
-					} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
-						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_BACKGROUND_SPRITE, o, n, 18, 18);
-						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_ATTACK_INDICATOR_PROGRESS_SPRITE, 18, 18, 0, 18 - p, o, n + 18 - p, 18, p);
-					} else {
-						RustGalGuiRenderer.enqueueHotbarAttackIndicator(this.minecraft, guiGraphics, o, n, f, p);
-					}
+					RustGalGuiRenderer.enqueueHotbarAttackIndicator(this.minecraft, guiGraphics, o, n, f, p);
 				}
 			}
 		}
@@ -1054,26 +989,7 @@ public class Gui {
 		if (m > 0) {
 			int n = i - (j - 1) * k - 10;
 
-			if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isArmorDisabledForDiagnostics()) {
-				// Dev-only measurement control: no migrated or legacy armor icon draw.
-			} else if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isArmorLegacyControl()) {
-				for (int o = 0; o < 10; o++) {
-					int p = l + o * 8;
-					if (o * 2 + 1 < m) {
-						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_FULL_SPRITE, p, n, 9, 9);
-					}
-
-					if (o * 2 + 1 == m) {
-						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_HALF_SPRITE, p, n, 9, 9);
-					}
-
-					if (o * 2 + 1 > m) {
-						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, ARMOR_EMPTY_SPRITE, p, n, 9, 9);
-					}
-				}
-			} else {
-				RustGalGuiRenderer.enqueueArmorIcons(this.minecraft, guiGraphics, m, l, n);
-			}
+			RustGalGuiRenderer.enqueueArmorIcons(this.minecraft, guiGraphics, m, l, n);
 		}
 	}
 
@@ -1085,14 +1001,8 @@ public class Gui {
 		int p = Mth.ceil(f / 2.0);
 		int q = Mth.ceil(o / 2.0);
 		int r = p * 2;
-		boolean playerHeartsDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isPlayerHealthDisabledForDiagnostics();
-		boolean playerHeartsLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isPlayerHealthLegacyControl();
-		boolean absorptionHeartsDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isAbsorptionHealthDisabledForDiagnostics();
-		boolean absorptionHeartsLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isAbsorptionHealthLegacyControl();
-		boolean migratePlayerHearts = !playerHeartsDisabled && !playerHeartsLegacy;
-		boolean migrateAbsorptionHearts = !absorptionHeartsDisabled && !absorptionHeartsLegacy;
-		List<PlayerHeartRequest> rustPlayerHearts = migratePlayerHearts ? new ArrayList<>() : List.of();
-		List<AbsorptionHeartRequest> rustAbsorptionHearts = migrateAbsorptionHearts ? new ArrayList<>() : List.of();
+		List<PlayerHeartRequest> rustPlayerHearts = new ArrayList<>();
+		List<AbsorptionHeartRequest> rustAbsorptionHearts = new ArrayList<>();
 		int rustHeartOrder = 0;
 
 		for (int s = p + q - 1; s >= 0; s--) {
@@ -1109,33 +1019,25 @@ public class Gui {
 			}
 
 			if (s < p) {
-				if (migratePlayerHearts) {
-					rustPlayerHearts.add(new PlayerHeartRequest(
-						PlayerHeartVariant.CONTAINER,
-						GuiHeartState.CONTAINER,
-						bl2,
-						heartFlash,
-						rustHeartOrder++,
-						v,
-						w
-					));
-				} else if (!playerHeartsDisabled) {
-					this.renderHeart(guiGraphics, Gui.HeartType.CONTAINER, v, w, bl2, heartFlash, false);
-				}
+				rustPlayerHearts.add(new PlayerHeartRequest(
+					PlayerHeartVariant.CONTAINER,
+					GuiHeartState.CONTAINER,
+					bl2,
+					heartFlash,
+					rustHeartOrder++,
+					v,
+					w
+				));
 			} else {
-				if (migrateAbsorptionHearts) {
-					rustAbsorptionHearts.add(new AbsorptionHeartRequest(
-						AbsorptionHeartVariant.CONTAINER,
-						GuiHeartState.CONTAINER,
-						bl2,
-						heartFlash,
-						rustHeartOrder++,
-						v,
-						w
-					));
-				} else if (!absorptionHeartsDisabled) {
-					this.renderHeart(guiGraphics, Gui.HeartType.CONTAINER, v, w, bl2, heartFlash, false);
-				}
+				rustAbsorptionHearts.add(new AbsorptionHeartRequest(
+					AbsorptionHeartVariant.CONTAINER,
+					GuiHeartState.CONTAINER,
+					bl2,
+					heartFlash,
+					rustHeartOrder++,
+					v,
+					w
+				));
 			}
 			int x = s * 2;
 			boolean bl3 = s >= p;
@@ -1143,25 +1045,21 @@ public class Gui {
 				int y = x - r;
 				if (y < o) {
 					boolean bl4 = y + 1 == o;
-					if (migrateAbsorptionHearts) {
-						rustAbsorptionHearts.add(new AbsorptionHeartRequest(
-							rustAbsorptionHeartVariant(heartType),
-							bl4 ? GuiHeartState.HALF : GuiHeartState.FULL,
-							bl2,
-							false,
-							rustHeartOrder++,
-							v,
-							w
-						));
-					} else if (!absorptionHeartsDisabled) {
-						this.renderHeart(guiGraphics, heartType == Gui.HeartType.WITHERED ? heartType : Gui.HeartType.ABSORBING, v, w, bl2, false, bl4);
-					}
+					rustAbsorptionHearts.add(new AbsorptionHeartRequest(
+						rustAbsorptionHeartVariant(heartType),
+						bl4 ? GuiHeartState.HALF : GuiHeartState.FULL,
+						bl2,
+						false,
+						rustHeartOrder++,
+						v,
+						w
+					));
 				}
 			}
 
 			if (heartFlash && x < n) {
 				boolean bl5 = x + 1 == n;
-				if (migratePlayerHearts && s < p) {
+				if (s < p) {
 					rustPlayerHearts.add(new PlayerHeartRequest(
 						rustHeartVariant(heartType),
 						bl5 ? GuiHeartState.HALF : GuiHeartState.FULL,
@@ -1171,14 +1069,14 @@ public class Gui {
 						v,
 						w
 					));
-				} else if (!playerHeartsDisabled) {
+				} else {
 					this.renderHeart(guiGraphics, heartType, v, w, bl2, true, bl5);
 				}
 			}
 
 			if (x < m) {
 				boolean bl5 = x + 1 == m;
-				if (migratePlayerHearts && s < p) {
+				if (s < p) {
 					rustPlayerHearts.add(new PlayerHeartRequest(
 						rustHeartVariant(heartType),
 						bl5 ? GuiHeartState.HALF : GuiHeartState.FULL,
@@ -1188,18 +1086,14 @@ public class Gui {
 						v,
 						w
 					));
-				} else if (!playerHeartsDisabled) {
+				} else {
 					this.renderHeart(guiGraphics, heartType, v, w, bl2, false, bl5);
 				}
 			}
 		}
 
-		if (migrateAbsorptionHearts) {
-			RustGalGuiRenderer.enqueueAbsorptionHearts(this.minecraft, guiGraphics, rustAbsorptionHearts);
-		}
-		if (migratePlayerHearts) {
-			RustGalGuiRenderer.enqueuePlayerHearts(this.minecraft, guiGraphics, rustPlayerHearts);
-		}
+		RustGalGuiRenderer.enqueueAbsorptionHearts(this.minecraft, guiGraphics, rustAbsorptionHearts);
+		RustGalGuiRenderer.enqueuePlayerHearts(this.minecraft, guiGraphics, rustPlayerHearts);
 	}
 
 	private static PlayerHeartVariant rustHeartVariant(Gui.HeartType heartType) {
@@ -1234,38 +1128,21 @@ public class Gui {
 				this.lastBubblePopSoundPlayed = 0;
 			}
 
-			boolean airDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isAirDisabledForDiagnostics();
-			boolean airLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isAirLegacyControl();
-			boolean migrateAir = !airDisabled && !airLegacy;
-			List<AirBubbleRequest> rustAirBubbles = migrateAir ? new ArrayList<>() : List.of();
+			List<AirBubbleRequest> rustAirBubbles = new ArrayList<>();
 			int airOrder = 0;
 			for (int q = 1; q <= 10; q++) {
 				int r = k - (q - 1) * 8 - 9;
 				if (q <= n) {
-					if (migrateAir) {
-						rustAirBubbles.add(new AirBubbleRequest(AirBubbleState.FULL, false, true, airOrder++, r, j));
-					} else if (!airDisabled) {
-						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_SPRITE, r, j, 9, 9);
-					}
+					rustAirBubbles.add(new AirBubbleRequest(AirBubbleState.FULL, false, true, airOrder++, r, j));
 				} else if (bl2 && q == o && bl) {
-					if (migrateAir) {
-						rustAirBubbles.add(new AirBubbleRequest(AirBubbleState.PARTIAL, true, true, airOrder++, r, j));
-					} else if (!airDisabled) {
-						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_POPPING_SPRITE, r, j, 9, 9);
-					}
+					rustAirBubbles.add(new AirBubbleRequest(AirBubbleState.PARTIAL, true, true, airOrder++, r, j));
 					this.playAirBubblePoppedSound(q, player, p);
 				} else if (q > 10 - p) {
 					int s = p == 10 && this.tickCount % 2 == 0 ? this.random.nextInt(2) : 0;
-					if (migrateAir) {
-						rustAirBubbles.add(new AirBubbleRequest(AirBubbleState.EMPTY, false, true, airOrder++, r, j + s));
-					} else if (!airDisabled) {
-						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, AIR_EMPTY_SPRITE, r, j + s, 9, 9);
-					}
+					rustAirBubbles.add(new AirBubbleRequest(AirBubbleState.EMPTY, false, true, airOrder++, r, j + s));
 				}
 			}
-			if (migrateAir) {
-				RustGalGuiRenderer.enqueueAirBubbles(this.minecraft, guiGraphics, rustAirBubbles);
-			}
+			RustGalGuiRenderer.enqueueAirBubbles(this.minecraft, guiGraphics, rustAirBubbles);
 		}
 	}
 
@@ -1297,10 +1174,7 @@ public class Gui {
 		float saturation = diagnosticFoodSaturation(foodData.getSaturationLevel());
 		boolean hungerEffect = diagnosticFoodHungerEffect(player);
 		boolean forceJitter = diagnosticFoodJitter();
-		boolean hungerDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isHungerDisabledForDiagnostics();
-		boolean hungerLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isHungerLegacyControl();
-		boolean migrateHunger = !hungerDisabled && !hungerLegacy;
-		List<HungerIconRequest> rustHungerIcons = migrateHunger ? new ArrayList<>() : List.of();
+		List<HungerIconRequest> rustHungerIcons = new ArrayList<>();
 		int rustHungerOrder = 0;
 
 		for (int l = 0; l < 10; l++) {
@@ -1327,55 +1201,41 @@ public class Gui {
 
 			int n = j - l * 8 - 9;
 			HungerIconVariant variant = hungerEffect ? HungerIconVariant.HUNGER_EFFECT : HungerIconVariant.NORMAL;
-			if (migrateHunger) {
+			rustHungerIcons.add(new HungerIconRequest(
+				variant,
+				HungerIconState.EMPTY,
+				jitterActive,
+				jitterOffset,
+				rustHungerOrder++,
+				n,
+				m
+			));
+			if (l * 2 + 1 < k) {
 				rustHungerIcons.add(new HungerIconRequest(
 					variant,
-					HungerIconState.EMPTY,
+					HungerIconState.FULL,
 					jitterActive,
 					jitterOffset,
 					rustHungerOrder++,
 					n,
 					m
 				));
-			} else if (!hungerDisabled) {
-				guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation, n, m, 9, 9);
-			}
-			if (l * 2 + 1 < k) {
-				if (migrateHunger) {
-					rustHungerIcons.add(new HungerIconRequest(
-						variant,
-						HungerIconState.FULL,
-						jitterActive,
-						jitterOffset,
-						rustHungerOrder++,
-						n,
-						m
-					));
-				} else if (!hungerDisabled) {
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation3, n, m, 9, 9);
-				}
 			}
 
 			if (l * 2 + 1 == k) {
-				if (migrateHunger) {
-					rustHungerIcons.add(new HungerIconRequest(
-						variant,
-						HungerIconState.HALF,
-						jitterActive,
-						jitterOffset,
-						rustHungerOrder++,
-						n,
-						m
-					));
-				} else if (!hungerDisabled) {
-					guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resourceLocation2, n, m, 9, 9);
-				}
+				rustHungerIcons.add(new HungerIconRequest(
+					variant,
+					HungerIconState.HALF,
+					jitterActive,
+					jitterOffset,
+					rustHungerOrder++,
+					n,
+					m
+				));
 			}
 		}
 
-		if (migrateHunger) {
-			RustGalGuiRenderer.enqueueHungerIcons(this.minecraft, guiGraphics, rustHungerIcons);
-		}
+		RustGalGuiRenderer.enqueueHungerIcons(this.minecraft, guiGraphics, rustHungerIcons);
 	}
 
 	private void renderVehicleHealth(GuiGraphics guiGraphics) {
@@ -1390,10 +1250,7 @@ public class Gui {
 			int k = guiGraphics.guiHeight() - 39;
 			int l = guiGraphics.guiWidth() / 2 + 91;
 			int m = k;
-			boolean mountHealthDisabled = RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics() || RustGalGuiRenderer.isMountHealthDisabledForDiagnostics();
-			boolean mountHealthLegacy = RustGalGuiRenderer.shouldDrawJavaCompatibilityGui() || RustGalGuiRenderer.isMountHealthLegacyControl();
-			boolean migrateMountHealth = !mountHealthDisabled && !mountHealthLegacy;
-			List<MountHeartRequest> rustMountHearts = migrateMountHealth ? new ArrayList<>() : List.of();
+			List<MountHeartRequest> rustMountHearts = new ArrayList<>();
 			int rustMountHeartOrder = 0;
 
 			for (int n = 0; i > 0; n += 20) {
@@ -1403,57 +1260,43 @@ public class Gui {
 
 				for (int p = 0; p < o; p++) {
 					int q = l - p * 8 - 9;
-					if (migrateMountHealth) {
+					rustMountHearts.add(new MountHeartRequest(
+						MountHeartVariant.VEHICLE,
+						MountHeartState.EMPTY,
+						true,
+						row,
+						rustMountHeartOrder++,
+						q,
+						m
+					));
+					if (p * 2 + 1 + n < j) {
 						rustMountHearts.add(new MountHeartRequest(
 							MountHeartVariant.VEHICLE,
-							MountHeartState.EMPTY,
+							MountHeartState.FULL,
 							true,
 							row,
 							rustMountHeartOrder++,
 							q,
 							m
 						));
-					} else if (!mountHealthDisabled) {
-						guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HEART_VEHICLE_CONTAINER_SPRITE, q, m, 9, 9);
-					}
-					if (p * 2 + 1 + n < j) {
-						if (migrateMountHealth) {
-							rustMountHearts.add(new MountHeartRequest(
-								MountHeartVariant.VEHICLE,
-								MountHeartState.FULL,
-								true,
-								row,
-								rustMountHeartOrder++,
-								q,
-								m
-							));
-						} else if (!mountHealthDisabled) {
-							guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HEART_VEHICLE_FULL_SPRITE, q, m, 9, 9);
-						}
 					}
 
 					if (p * 2 + 1 + n == j) {
-						if (migrateMountHealth) {
-							rustMountHearts.add(new MountHeartRequest(
-								MountHeartVariant.VEHICLE,
-								MountHeartState.HALF,
-								true,
-								row,
-								rustMountHeartOrder++,
-								q,
-								m
-							));
-						} else if (!mountHealthDisabled) {
-							guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, HEART_VEHICLE_HALF_SPRITE, q, m, 9, 9);
-						}
+						rustMountHearts.add(new MountHeartRequest(
+							MountHeartVariant.VEHICLE,
+							MountHeartState.HALF,
+							true,
+							row,
+							rustMountHeartOrder++,
+							q,
+							m
+						));
 					}
 				}
 
 				m -= 10;
 			}
-			if (migrateMountHealth) {
-				RustGalGuiRenderer.enqueueMountHearts(this.minecraft, guiGraphics, rustMountHearts);
-			}
+			RustGalGuiRenderer.enqueueMountHearts(this.minecraft, guiGraphics, rustMountHearts);
 		}
 	}
 
@@ -1518,21 +1361,9 @@ public class Gui {
 
 	private void renderVignette(GuiGraphics guiGraphics, @Nullable Entity entity) {
 		// Iris: Check if vignette should be rendered
-		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-			&& !net.vulkanic.gui.RustGalFrameCoordinator.copiedShaderPackVignetteEnabled()) {
+		if (!net.vulkanic.gui.RustGalFrameCoordinator.copiedShaderPackVignetteEnabled()) {
 			return;
 		}
-		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline =
-			 net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				? null
-				: net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
-		
-		if (pipeline != null && !pipeline.shouldRenderVignette()) {
-			return;
-		}
-		
 		WorldBorder worldBorder = this.minecraft.level.getWorldBorder();
 		float f = 0.0F;
 		if (entity != null) {

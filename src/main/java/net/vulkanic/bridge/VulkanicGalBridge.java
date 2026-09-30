@@ -294,6 +294,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		return currentContext != 0L && currentContext == window.handle();
 	}
 
+	/** Requests per-frame GPU timestamps from Vulkan contexts (F3 GPU usage, profiler recordings). */
+	public static void setGpuTimestampsRequested(boolean requested) {
+		int status = Native.setGpuTimestampsRequested(requested);
+		if (status != STATUS_OK) {
+			throw new IllegalStateException("Rust VulkanicGAL GPU timestamp request failed: status=" + status);
+		}
+	}
+
 	public static VulkanicGalBridge createBorrowedOpenGl(Window window) {
 		return createBorrowedOpenGl(window.handle());
 	}
@@ -5074,17 +5082,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			);
 		}
 
-		public GuiAffineQuadRecord withMaterialMode(int value) {
-			return new GuiAffineQuadRecord(stratum, assetId, x0, y0, x1, y1, x3, y3,
-				z, u0, v0, u1, v1, colorArgb, guiWidth, guiHeight, sequence,
-				clipMode, clipLeft, clipTop, clipWidth, clipHeight, value, itemRasterScale, itemRasterGeometry, itemRasterLayers);
-		}
-
-		public GuiAffineQuadRecord withItemRasterScale(int value) {
-			return new GuiAffineQuadRecord(stratum, assetId, x0, y0, x1, y1, x3, y3,
-				z, u0, v0, u1, v1, colorArgb, guiWidth, guiHeight, sequence,
-				clipMode, clipLeft, clipTop, clipWidth, clipHeight, materialMode, value, itemRasterGeometry, itemRasterLayers);
-		}
 
 		public GuiAffineQuadRecord withItemRasterGeometry(GuiItemRasterGeometryRecord value) {
 			if (itemRasterScale == 0) throw new IllegalArgumentException("item geometry requires an item raster");
@@ -5097,6 +5094,18 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return new GuiAffineQuadRecord(stratum, assetId, x0, y0, x1, y1, x3, y3,
 				z, u0, v0, u1, v1, colorArgb, guiWidth, guiHeight, sequence,
 				clipMode, clipLeft, clipTop, clipWidth, clipHeight, materialMode, itemRasterScale, itemRasterGeometry, value);
+		}
+
+		public GuiAffineQuadRecord withItemRasterScale(int value) {
+			return new GuiAffineQuadRecord(stratum, assetId, x0, y0, x1, y1, x3, y3,
+				z, u0, v0, u1, v1, colorArgb, guiWidth, guiHeight, sequence,
+				clipMode, clipLeft, clipTop, clipWidth, clipHeight, materialMode, value, itemRasterGeometry, itemRasterLayers);
+		}
+
+		public GuiAffineQuadRecord withMaterialMode(int value) {
+			return new GuiAffineQuadRecord(stratum, assetId, x0, y0, x1, y1, x3, y3,
+				z, u0, v0, u1, v1, colorArgb, guiWidth, guiHeight, sequence,
+				clipMode, clipLeft, clipTop, clipWidth, clipHeight, value, itemRasterScale, itemRasterGeometry, itemRasterLayers);
 		}
 	}
 
@@ -5479,19 +5488,19 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight, vertices, indices, itemFoil, itemRasterScale, value, blockItemRaster, itemCache);
 		}
 
+		public GuiMeshBatchRecord withItemCache(GuiItemCacheRecord value) {
+			return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, sequence,
+				alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
+				renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight,
+				vertices, indices, itemFoil, itemRasterScale, decalFoil, blockItemRaster, value);
+		}
+
 		/** Input vertices retain ORIGINAL model-space normals when this layout is present. */
 		public GuiMeshBatchRecord withBlockItemRaster(GuiBlockItemRasterRecord value) {
 			Objects.requireNonNull(value, "block item layout");
 			return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, sequence,
 				alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
 				0, 0, 0, clipMode, clipLeft, clipTop, clipWidth, clipHeight, vertices, indices, itemFoil, itemRasterScale, decalFoil, value, itemCache);
-		}
-
-		public GuiMeshBatchRecord withItemCache(GuiItemCacheRecord value) {
-			return new GuiMeshBatchRecord(stratum, layerIndex, materialMode, lightingMode, assetId, sequence,
-				alphaCutoff, modelTransform, guiPose, left, top, right, bottom, guiWidth, guiHeight,
-				renderWidth, renderHeight, guardPixels, clipMode, clipLeft, clipTop, clipWidth, clipHeight,
-				vertices, indices, itemFoil, itemRasterScale, decalFoil, blockItemRaster, value);
 		}
 	}
 
@@ -5973,14 +5982,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				itemFoil, decalFoil, modelSubmissionOrder, light);
 		}
 
-        public WorldMeshInstanceRecord withModelSubmissionOrder(Integer order) {
-            if (order != null && terrainPlacement != null)
-                throw new IllegalArgumentException("terrain placement cannot carry model submission order");
-            return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
-                winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
-                flags,blockEntityId,terrainPlacement,itemFoil,decalFoil,order,packedLight);
-        }
-
 		public WorldMeshInstanceRecord(int stratum, long meshKey, long meshGeneration, int meshSectionIndex,
 			int depthPolicy, int cullPolicy, int winding, int colorArgb, float[] transform,
 			int viewportWidth, int viewportHeight, int entityId, int entityColorArgb,
@@ -6019,11 +6020,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,null);
 		}
 
-		public WorldMeshInstanceRecord withTerrainPlacement(TerrainSectionPlacement placement) {
-			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
-				winding,colorArgb,TERRAIN_IDENTITY_TRANSFORM,viewportWidth,viewportHeight,
-				entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,Objects.requireNonNull(placement),itemFoil,decalFoil,modelSubmissionOrder,packedLight);
-		}
 		public WorldMeshInstanceRecord(
 			int stratum,
 			long meshKey,
@@ -6152,6 +6148,20 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		@Override
 		public float[] transform() {
 			return transform.clone();
+		}
+
+        public WorldMeshInstanceRecord withModelSubmissionOrder(Integer order) {
+            if (order != null && terrainPlacement != null)
+                throw new IllegalArgumentException("terrain placement cannot carry model submission order");
+            return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
+                winding,colorArgb,transform,viewportWidth,viewportHeight,entityId,entityColorArgb,outlineColorArgb,
+                flags,blockEntityId,terrainPlacement,itemFoil,decalFoil,order,packedLight);
+        }
+
+		public WorldMeshInstanceRecord withTerrainPlacement(TerrainSectionPlacement placement) {
+			return new WorldMeshInstanceRecord(stratum,meshKey,meshGeneration,meshSectionIndex,depthPolicy,cullPolicy,
+				winding,colorArgb,TERRAIN_IDENTITY_TRANSFORM,viewportWidth,viewportHeight,
+				entityId,entityColorArgb,outlineColorArgb,flags,blockEntityId,Objects.requireNonNull(placement),itemFoil,decalFoil,modelSubmissionOrder,packedLight);
 		}
 	}
 
@@ -6738,6 +6748,7 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		private static final MethodHandle CONTEXT_CREATE = downcall("mattmc_vulkanic_gal_context_create", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle CONTEXT_CREATE_BORROWED_OPENGL = downcall("mattmc_vulkanic_gal_context_create_borrowed_opengl", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle CONTEXT_CREATE_WINDOWED_VULKAN = downcall("mattmc_vulkanic_gal_context_create_windowed_vulkan", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+		private static final MethodHandle SET_GPU_TIMESTAMPS_REQUESTED = downcall("mattmc_vulkanic_gal_set_gpu_timestamps_requested", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
 		private static final MethodHandle CONTEXT_DESTROY = downcall("mattmc_vulkanic_gal_context_destroy", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 		private static final MethodHandle CAPABILITIES = downcall("mattmc_vulkanic_gal_capabilities", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 		private static final MethodHandle RESOURCE_BATCH = downcall("mattmc_vulkanic_gal_resource_batch", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
@@ -6806,6 +6817,14 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return (int) CONTEXT_CREATE_WINDOWED_VULKAN.invokeExact(request, out);
 			} catch (Throwable throwable) {
 				throw new IllegalStateException("Failed to call VulkanicGAL windowed Vulkan context create ABI", throwable);
+			}
+		}
+
+		static int setGpuTimestampsRequested(boolean requested) {
+			try {
+				return (int) SET_GPU_TIMESTAMPS_REQUESTED.invokeExact(requested ? 1 : 0);
+			} catch (Throwable throwable) {
+				throw new IllegalStateException("Failed to set Rust VulkanicGAL GPU timestamp request", throwable);
 			}
 		}
 
@@ -7320,12 +7339,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return array.asSlice((long)index * struct.byteSize(), struct.byteSize());
 		}
 
-		static byte[] directBytes(ByteBuffer buffer) {
-			ByteBuffer duplicate = buffer.duplicate();
-			byte[] bytes = new byte[duplicate.remaining()];
-			duplicate.get(bytes);
-			return bytes;
-		}
 	}
 
 	public static final class ResourceBatchBuilder {
@@ -7485,18 +7498,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 			return graphicsPipeline(id, label, layout, vertex, fragment, FORMAT_DEPTH32, COMPARE_LEQUAL);
 		}
 
-		public ResourceBatchBuilder graphicsPipelineNoDepth(long id, String label, long layout, long vertex, long fragment) {
-			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0);
-		}
-
-		public ResourceBatchBuilder graphicsPipelineInvertBlend(long id, String label, long layout, long vertex, long fragment) {
-			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0, CULL_NONE, BLEND_INVERT);
-		}
-
-		public ResourceBatchBuilder graphicsPipelineAlphaBlend(long id, String label, long layout, long vertex, long fragment) {
-			return graphicsPipeline(id, label, layout, vertex, fragment, 0, 0, CULL_NONE, BLEND_ALPHA);
-		}
-
 		private ResourceBatchBuilder graphicsPipeline(long id, String label, long layout, long vertex, long fragment, int depthFormat, int depthCompare) {
 			return graphicsPipeline(id, label, layout, vertex, fragment, depthFormat, depthCompare, CULL_BACK, BLEND_ALPHA);
 		}
@@ -7550,10 +7551,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 
 			public ResourceBatchBuilder renderPass(long id, String label, long target) {
 				return renderPass(id, label, target, FORMAT_DEPTH32);
-			}
-
-			public ResourceBatchBuilder frameRenderPass(long id, String label, long frameTarget) {
-				return renderPass(id, label, frameTarget, 0);
 			}
 
 			private ResourceBatchBuilder renderPass(long id, String label, long target, int depthFormat) {
@@ -7761,16 +7758,6 @@ public final class VulkanicGalBridge implements AutoCloseable {
 				return this;
 			}
 
-			public SubmissionBatchBuilder beginFramePass(long pass, long frameTarget) {
-				MemorySegment op = op(1);
-				Struct.COMMAND_OP.setLong(op, 2, pass);
-				Struct.COMMAND_OP.setLong(op, 3, frameTarget);
-				writeRange(op, Struct.COMMAND_OP, 12, 0, 0);
-				writeRange(op, Struct.COMMAND_OP, 13, 0, 0);
-				ops.add(op);
-				return this;
-			}
-
 		private MemorySegment attachment(long view, int load, int store, boolean clearColor) {
 			MemorySegment item = Struct.PASS_ATTACHMENT.allocate(arena);
 			item.set(ValueLayout.JAVA_INT, Struct.PASS_ATTACHMENT.offset(0), Struct.PASS_ATTACHMENT.byteSize());
@@ -7880,10 +7867,4 @@ public final class VulkanicGalBridge implements AutoCloseable {
 		segment.set(ValueLayout.JAVA_LONG, base + 8, count);
 	}
 
-	public static ByteBuffer directBytes(byte[] data) {
-		ByteBuffer buffer = ByteBuffer.allocateDirect(data.length).order(ByteOrder.nativeOrder());
-		buffer.put(data);
-		buffer.flip();
-		return buffer;
-	}
 }

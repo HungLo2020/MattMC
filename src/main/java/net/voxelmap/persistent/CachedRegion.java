@@ -681,25 +681,20 @@ public class CachedRegion {
         return this.width;
     }
 
+    /** Stages changed pixels to Rust and returns the semantic image identity, if any. */
     public ResourceLocation getTextureLocation() {
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-            || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            throw new IllegalStateException("Java VoxelMap persistent-region rendering is unavailable while Rust owns whole-frame presentation");
-        }
-        if (this.image != null) {
-            if (!this.refreshingImage) {
-                synchronized (this.image) {
-                    if (this.imageChanged) {
-                        this.imageChanged = false;
-                        this.image.uploadToTexture();
-                    }
-                }
-            }
-
-            return this.image.getTextureLocation();
-        } else {
+        if (this.image == null) {
             return null;
         }
+        if (!this.refreshingImage) {
+            synchronized (this.image) {
+                if (this.imageChanged) {
+                    this.imageChanged = false;
+                    this.image.stageToRust();
+                }
+            }
+        }
+        return this.image.getTextureLocation();
     }
 
     public CompressibleMapData getMapData() {

@@ -78,96 +78,6 @@ public final class PipelineDescriptor {
     }
 
     /**
-     * Creates a PipelineDescriptor from an existing Blaze3D RenderPipeline.
-     *
-     * @param pipeline the Blaze3D pipeline to wrap
-     * @return a descriptor for creating a compiled pipeline handle
-     */
-    public static PipelineDescriptor fromRenderPipeline(RenderPipeline pipeline) {
-        if (pipeline == null) {
-            throw new IllegalArgumentException("pipeline must not be null");
-        }
-        return new PipelineDescriptor(
-            pipeline,
-            PortableState.fromRenderPipeline(pipeline),
-            null,
-            List.of(),
-            List.of(),
-            null
-        );
-    }
-
-    /**
-     * Creates a PipelineDescriptor from a backend-agnostic portable snapshot.
-     *
-     * <p>This is the forward-compatible path for eventual non-OpenGL pipeline
-     * compilation backends.</p>
-     */
-    public static PipelineDescriptor fromPortableState(PortableState portableState) {
-        if (portableState == null) {
-            throw new IllegalArgumentException("portableState must not be null");
-        }
-        return new PipelineDescriptor(null, portableState, null, List.of(), List.of(), null);
-    }
-
-    /**
-     * Creates a PipelineDescriptor from portable state plus precompiled SPIR-V modules.
-     */
-    public static PipelineDescriptor fromPortableStateAndSpirvModules(
-        PortableState portableState,
-        List<VulkanicSpirvModule> spirvModules
-    ) {
-        if (portableState == null) {
-            throw new IllegalArgumentException("portableState must not be null");
-        }
-        return new PipelineDescriptor(null, portableState, null, spirvModules, List.of(), null);
-    }
-
-    /**
-     * Creates a PipelineDescriptor from RenderPipeline plus precompiled SPIR-V modules.
-     */
-    public static PipelineDescriptor fromRenderPipelineAndSpirvModules(
-        RenderPipeline pipeline,
-        List<VulkanicSpirvModule> spirvModules
-    ) {
-        if (pipeline == null) {
-            throw new IllegalArgumentException("pipeline must not be null");
-        }
-        return new PipelineDescriptor(
-            pipeline,
-            PortableState.fromRenderPipeline(pipeline),
-            null,
-            spirvModules,
-            List.of(),
-            null
-        );
-    }
-
-    /**
-     * Returns the underlying native descriptor object.
-     * Backend implementations cast this to the appropriate type.
-     *
-     * <p>May be null when created via {@link #fromPortableState(PortableState)}.</p>
-     */
-    public Object getNativeDescriptor() {
-        return nativeDescriptor;
-    }
-
-    /**
-     * Returns backend-agnostic pipeline metadata snapshot.
-     */
-    public PortableState getPortableState() {
-        return portableState;
-    }
-
-    /**
-     * Returns true when this descriptor carries a backend-native object.
-     */
-    public boolean hasNativeDescriptor() {
-        return nativeDescriptor != null;
-    }
-
-    /**
      * Returns descriptor-set-style resource binding layout derived from portable pipeline state.
      *
      * <p>Current mapping is set=0 with deterministic binding order:
@@ -187,34 +97,6 @@ public final class PipelineDescriptor {
     }
 
     /**
-     * Returns true when this descriptor carries explicit resource layout metadata.
-     */
-    public boolean hasExplicitResourceLayout() {
-        return explicitResourceLayout != null;
-    }
-
-    /**
-     * Returns precompiled SPIR-V modules associated with this descriptor.
-     */
-    public List<VulkanicSpirvModule> getSpirvModules() {
-        return spirvModules;
-    }
-
-    /**
-     * Returns true when this descriptor carries precompiled SPIR-V modules.
-     */
-    public boolean hasSpirvModules() {
-        return !spirvModules.isEmpty();
-    }
-
-    /**
-     * Returns push-constant range metadata for pipeline layout preparation.
-     */
-    public List<PushConstantRange> getPushConstantRanges() {
-        return pushConstantRanges;
-    }
-
-    /**
      * Returns explicit vertex input metadata when a caller is migrating a
      * GL-style vertex attribute layout that cannot be represented by
      * Blaze3D's fixed {@link VertexFormatElement} set.
@@ -222,78 +104,6 @@ public final class PipelineDescriptor {
     @Nullable
     public VertexInputState getVertexInputState() {
         return vertexInputState;
-    }
-
-    /**
-     * Returns a copy of this descriptor with push-constant range metadata attached.
-     */
-    public PipelineDescriptor withPushConstantRanges(List<PushConstantRange> ranges) {
-        return new PipelineDescriptor(
-            this.nativeDescriptor,
-            this.portableState,
-            this.explicitResourceLayout,
-            this.spirvModules,
-            ranges,
-            this.vertexInputState
-        );
-    }
-
-    /**
-     * Returns a copy of this descriptor with explicit Vulkan-style vertex input
-     * metadata attached.
-     */
-    public PipelineDescriptor withVertexInputState(VertexInputState vertexInputState) {
-        return new PipelineDescriptor(
-            this.nativeDescriptor,
-            this.portableState,
-            this.explicitResourceLayout,
-            this.spirvModules,
-            this.pushConstantRanges,
-            Objects.requireNonNull(vertexInputState, "vertexInputState must not be null")
-        );
-    }
-
-    /**
-     * Returns a copy of this descriptor with the portable vertex format updated.
-     *
-     * <p>This is used when a shared high-level pipeline is rendered through a
-     * context-dependent extended vertex format, such as Iris entity/terrain
-     * formats. The shader modules and resource layout stay unchanged, while
-     * Vulkan pipeline creation sees the same logical vertex layout as the
-     * submitted buffer.</p>
-     */
-    public PipelineDescriptor withPortableVertexFormat(VertexFormat vertexFormat) {
-        PortableState state = this.portableState;
-        PortableState updatedState = new PortableState(
-            state.location(),
-            state.vertexShader(),
-            state.fragmentShader(),
-            state.shaderDefineValues(),
-            state.shaderDefineFlags(),
-            state.samplers(),
-            state.uniforms(),
-            state.blendState(),
-            state.depthTestFunction(),
-            state.polygonMode(),
-            state.cull(),
-            state.cullFaceMode(),
-            state.writeColor(),
-            state.writeAlpha(),
-            state.writeDepth(),
-            state.colorLogic(),
-            Objects.requireNonNull(vertexFormat, "vertexFormat must not be null"),
-            state.vertexFormatMode(),
-            state.depthBiasScaleFactor(),
-            state.depthBiasConstant()
-        );
-        return new PipelineDescriptor(
-            this.nativeDescriptor,
-            updatedState,
-            this.explicitResourceLayout,
-            this.spirvModules,
-            this.pushConstantRanges,
-            this.vertexInputState
-        );
     }
 
     /**
@@ -319,165 +129,6 @@ public final class PipelineDescriptor {
             this.pushConstantRanges,
             this.vertexInputState
         ));
-    }
-
-    /**
-     * Returns deterministic cache key for this descriptor's portable state.
-     *
-     * <p>This key is backend-agnostic and intended for future pipeline cache lookup.
-     */
-    public String getStableCacheKey() {
-        String cached = stableCacheKey;
-        if (cached == null) {
-            if (vertexInputState == null) {
-                cached = portableState.stableCacheKey();
-            } else {
-                cached = sha256Hex(
-                    (portableState.stableCacheKey() + "|vertexInput=" + vertexInputSignature(vertexInputState))
-                        .getBytes(StandardCharsets.UTF_8)
-                );
-            }
-            stableCacheKey = cached;
-        }
-        return cached;
-    }
-
-    private static String vertexInputSignature(VertexInputState state) {
-        StringBuilder builder = new StringBuilder(256);
-        for (VertexInputBinding binding : state.bindings()) {
-            builder.append("b:")
-                .append(binding.binding()).append(':')
-                .append(binding.stride()).append(':')
-                .append(binding.inputRate().name()).append(';');
-        }
-        for (VertexInputAttribute attribute : state.attributes()) {
-            builder.append("a:")
-                .append(attribute.location()).append(':')
-                .append(attribute.binding()).append(':')
-                .append(attribute.format().name()).append(':')
-                .append(attribute.offset()).append(';');
-        }
-        return builder.toString();
-    }
-
-    /**
-     * Returns deterministic cache key for this descriptor's resolved resource layout.
-     */
-    public String getResourceLayoutCacheKey() {
-        String cached = resourceLayoutCacheKey;
-        if (cached == null) {
-            cached = resourceLayoutCacheKey(getResourceLayout());
-            resourceLayoutCacheKey = cached;
-        }
-        return cached;
-    }
-
-    /**
-     * Returns deterministic cache key for resource-layout metadata.
-     */
-    public static String resourceLayoutCacheKey(ResourceLayout layout) {
-        Objects.requireNonNull(layout, "layout must not be null");
-        StringBuilder builder = new StringBuilder(256);
-        for (ResourceBinding binding : layout.bindings()) {
-            builder.append(binding.set()).append(':')
-                .append(binding.binding()).append(':')
-                .append(binding.name()).append(':')
-                .append(binding.type()).append(':')
-                .append(binding.textureFormat() == null ? "" : binding.textureFormat().name())
-                .append(':');
-
-            List<String> stages = binding.stages().stream()
-                .map(Enum::name)
-                .sorted()
-                .toList();
-            builder.append(String.join(",", stages)).append(';');
-        }
-        return builder.toString();
-    }
-
-    /**
-     * Returns deterministic cache key for full pipeline compilation inputs.
-     *
-     * <p>Includes portable state, optional SPIR-V module payload identity, and
-     * push-constant range metadata.</p>
-     */
-    public String getPipelineCompilationKey() {
-        String cached = pipelineCompilationKey;
-        if (cached != null) {
-            return cached;
-        }
-
-        StringBuilder canonical = new StringBuilder(1024);
-        canonical.append("portable=").append(getStableCacheKey()).append(';');
-        canonical.append("explicitLayout=").append(explicitResourceLayout != null).append(';');
-
-        ResourceLayout layout = getResourceLayout();
-        canonical.append("resourceBindingCount=").append(layout.bindings().size()).append(';');
-        for (ResourceBinding binding : layout.bindings()) {
-            canonical.append("set=").append(binding.set()).append(';');
-            canonical.append("binding=").append(binding.binding()).append(';');
-            canonical.append("name=").append(binding.name()).append(';');
-            canonical.append("type=").append(binding.type().name()).append(';');
-            canonical.append("texFormat=").append(binding.textureFormat() == null ? "" : binding.textureFormat().name()).append(';');
-            List<String> stageNames = binding.stages().stream().map(Enum::name).sorted().toList();
-            canonical.append("stages=").append(String.join(",", stageNames)).append(';');
-        }
-
-        canonical.append("spirvCount=").append(spirvModules.size()).append(';');
-        for (VulkanicSpirvModule module : spirvModules) {
-            canonical.append("stage=").append(module.stage().name()).append(';');
-            canonical.append("entry=").append(module.entryPoint()).append(';');
-            canonical.append("source=").append(module.sourceName()).append(';');
-            canonical.append("compiler=").append(module.compilerName()).append(';');
-            canonical.append("size=").append(module.byteSize()).append(';');
-            canonical.append("bytesSha=").append(sha256Hex(module.spirvBytes())).append(';');
-        }
-
-        canonical.append("pushCount=").append(pushConstantRanges.size()).append(';');
-        for (PushConstantRange range : pushConstantRanges) {
-            canonical.append("offset=").append(range.offset()).append(';');
-            canonical.append("size=").append(range.size()).append(';');
-            List<String> stageNames = range.stages().stream()
-                .map(Enum::name)
-                .sorted()
-                .toList();
-            canonical.append("stages=").append(String.join(",", stageNames)).append(';');
-        }
-
-        canonical.append("vertexInputPresent=").append(vertexInputState != null).append(';');
-        if (vertexInputState != null) {
-            canonical.append("vertexBindingCount=").append(vertexInputState.bindings().size()).append(';');
-            for (VertexInputBinding binding : vertexInputState.bindings()) {
-                canonical.append("binding=").append(binding.binding()).append(';');
-                canonical.append("stride=").append(binding.stride()).append(';');
-                canonical.append("inputRate=").append(binding.inputRate().name()).append(';');
-            }
-            canonical.append("vertexAttributeCount=").append(vertexInputState.attributes().size()).append(';');
-            for (VertexInputAttribute attribute : vertexInputState.attributes()) {
-                canonical.append("location=").append(attribute.location()).append(';');
-                canonical.append("binding=").append(attribute.binding()).append(';');
-                canonical.append("format=").append(attribute.format().name()).append(';');
-                canonical.append("offset=").append(attribute.offset()).append(';');
-            }
-        }
-
-        cached = sha256Hex(canonical.toString().getBytes(StandardCharsets.UTF_8));
-        pipelineCompilationKey = cached;
-        return cached;
-    }
-
-    /**
-     * Returns a Blaze3D RenderPipeline representation for OpenGL compilation.
-     *
-     * <p>If this descriptor was created from a RenderPipeline, returns it directly.
-     * Otherwise reconstructs a semantically equivalent RenderPipeline from the
-     * portable snapshot.</p>
-     */
-    public RenderPipeline requireRenderPipeline() {
-        if (nativeDescriptor instanceof RenderPipeline renderPipeline) {
-            return renderPipeline;
-        }
-        return portableState.toRenderPipeline();
     }
 
     private ResourceLayout derivePortableResourceLayout() {
@@ -699,58 +350,6 @@ public final class PipelineDescriptor {
             vertexFormatMode = Objects.requireNonNull(vertexFormatMode, "vertexFormatMode must not be null");
         }
 
-        public static PortableState fromRenderPipeline(RenderPipeline pipeline) {
-            ShaderDefines shaderDefines = pipeline.getShaderDefines();
-            List<UniformBinding> uniformBindings = pipeline.getUniforms().stream()
-                .map(uniform -> new UniformBinding(uniform.name(), uniform.type(), uniform.textureFormat()))
-                .toList();
-            VertexFormat rawVertexFormat = extractRawVertexFormat(pipeline);
-
-            Optional<BlendState> blend = pipeline.getBlendFunction().map(function -> new BlendState(
-                function.sourceColor(),
-                function.destColor(),
-                function.sourceAlpha(),
-                function.destAlpha()
-            ));
-
-            return new PortableState(
-                pipeline.getLocation(),
-                pipeline.getVertexShader(),
-                pipeline.getFragmentShader(),
-                shaderDefines.values(),
-                shaderDefines.flags(),
-                pipeline.getSamplers(),
-                uniformBindings,
-                blend,
-                pipeline.getDepthTestFunction(),
-                pipeline.getPolygonMode(),
-                pipeline.isCull(),
-                VulkanicAPI.GL_BACK,
-                pipeline.isWriteColor(),
-                pipeline.isWriteAlpha(),
-                pipeline.isWriteDepth(),
-                pipeline.getColorLogic(),
-                rawVertexFormat,
-                pipeline.getVertexFormatMode(),
-                pipeline.getDepthBiasScaleFactor(),
-                pipeline.getDepthBiasConstant()
-            );
-        }
-
-        private static VertexFormat extractRawVertexFormat(RenderPipeline pipeline) {
-            try {
-                java.lang.reflect.Field vertexFormatField = RenderPipeline.class.getDeclaredField("vertexFormat");
-                vertexFormatField.setAccessible(true);
-                Object value = vertexFormatField.get(pipeline);
-                if (value instanceof VertexFormat vertexFormat) {
-                    return vertexFormat;
-                }
-            } catch (ReflectiveOperationException ignored) {
-            }
-
-            return pipeline.getVertexFormat();
-        }
-
         /**
          * Builds descriptor-set-style resource layout metadata for this pipeline.
          */
@@ -780,83 +379,6 @@ public final class PipelineDescriptor {
             return new ResourceLayout(bindings);
         }
 
-        /**
-         * Returns deterministic SHA-256 cache key over canonicalized portable pipeline state.
-         */
-        public String stableCacheKey() {
-            String canonical = canonicalSignature();
-            try {
-                MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                return HexFormat.of().formatHex(digest.digest(canonical.getBytes(StandardCharsets.UTF_8)));
-            } catch (NoSuchAlgorithmException e) {
-                throw new IllegalStateException("SHA-256 is not available", e);
-            }
-        }
-
-        private String canonicalSignature() {
-            StringBuilder builder = new StringBuilder(1024);
-
-            appendField(builder, "location", location.toString());
-            appendField(builder, "vertexShader", vertexShader.toString());
-            appendField(builder, "fragmentShader", fragmentShader.toString());
-
-            List<String> defineKeys = new ArrayList<>(shaderDefineValues.keySet());
-            Collections.sort(defineKeys);
-            appendField(builder, "defineValueCount", defineKeys.size());
-            for (String key : defineKeys) {
-                appendField(builder, "defineKey", key);
-                appendField(builder, "defineValue", shaderDefineValues.get(key));
-            }
-
-            List<String> defineFlags = new ArrayList<>(shaderDefineFlags);
-            Collections.sort(defineFlags);
-            appendField(builder, "defineFlagCount", defineFlags.size());
-            for (String flag : defineFlags) {
-                appendField(builder, "defineFlag", flag);
-            }
-
-            appendField(builder, "samplerCount", samplers.size());
-            for (String sampler : samplers) {
-                appendField(builder, "sampler", sampler);
-            }
-
-            appendField(builder, "uniformCount", uniforms.size());
-            for (UniformBinding uniform : uniforms) {
-                appendField(builder, "uniformName", uniform.name());
-                appendField(builder, "uniformType", uniform.type().name());
-                appendField(builder, "uniformTextureFormat",
-                    uniform.textureFormat() == null ? "" : uniform.textureFormat().name());
-            }
-
-            if (blendState.isPresent()) {
-                BlendState blend = blendState.get();
-                appendField(builder, "blendPresent", true);
-                appendField(builder, "blendSourceColor", blend.sourceColor().name());
-                appendField(builder, "blendDestColor", blend.destColor().name());
-                appendField(builder, "blendSourceAlpha", blend.sourceAlpha().name());
-                appendField(builder, "blendDestAlpha", blend.destAlpha().name());
-            } else {
-                appendField(builder, "blendPresent", false);
-            }
-
-            appendField(builder, "depthTestFunction", depthTestFunction.name());
-            appendField(builder, "polygonMode", polygonMode.name());
-            appendField(builder, "cull", cull);
-            appendField(builder, "cullFaceMode", cullFaceMode);
-            appendField(builder, "writeColor", writeColor);
-            appendField(builder, "writeAlpha", writeAlpha);
-            appendField(builder, "writeDepth", writeDepth);
-            appendField(builder, "colorLogic", colorLogic.name());
-            appendField(builder, "vertexFormat", vertexFormat.toString());
-            appendField(builder, "vertexFormatVertexSize", vertexFormat.getVertexSize());
-            appendField(builder, "vertexFormatElementsMask", vertexFormat.getElementsMask());
-            appendField(builder, "vertexFormatMode", vertexFormatMode.name());
-            appendField(builder, "depthBiasScaleFactor", depthBiasScaleFactor);
-            appendField(builder, "depthBiasConstant", depthBiasConstant);
-
-            return builder.toString();
-        }
-
         private static void appendField(StringBuilder builder, String key, Object value) {
             String text = String.valueOf(value);
             builder.append(key)
@@ -875,73 +397,6 @@ public final class PipelineDescriptor {
             }
         }
 
-        public RenderPipeline toRenderPipeline() {
-            RenderPipeline.Builder builder = RenderPipeline.builder()
-                .withLocation(location)
-                .withVertexShader(vertexShader)
-                .withFragmentShader(fragmentShader)
-                .withDepthTestFunction(depthTestFunction)
-                .withPolygonMode(polygonMode)
-                .withCull(cull)
-                .withColorWrite(writeColor, writeAlpha)
-                .withDepthWrite(writeDepth)
-                .withVertexFormat(vertexFormat, vertexFormatMode)
-                .withDepthBias(depthBiasScaleFactor, depthBiasConstant);
-
-            for (Map.Entry<String, String> defineEntry : shaderDefineValues.entrySet()) {
-                applyShaderDefine(builder, defineEntry.getKey(), defineEntry.getValue());
-            }
-
-            for (String defineFlag : shaderDefineFlags) {
-                builder.withShaderDefine(defineFlag);
-            }
-
-            for (String sampler : samplers) {
-                builder.withSampler(sampler);
-            }
-
-            for (UniformBinding uniform : uniforms) {
-                if (uniform.type() == UniformType.TEXEL_BUFFER) {
-                    if (uniform.textureFormat() == null) {
-                        throw new IllegalStateException(
-                            "Texel-buffer uniform '" + uniform.name() + "' requires a texture format");
-                    }
-                    builder.withUniform(uniform.name(), uniform.type(), uniform.textureFormat());
-                } else {
-                    builder.withUniform(uniform.name(), uniform.type());
-                }
-            }
-
-            if (blendState.isPresent()) {
-                builder.withBlend(blendState.get().toBlendFunction());
-            } else {
-                builder.withoutBlend();
-            }
-
-            if (colorLogic != LogicOp.NONE) {
-                builder.withColorLogic(colorLogic);
-            }
-
-            return builder.build();
-        }
-
-        private static void applyShaderDefine(RenderPipeline.Builder builder, String name, String value) {
-            try {
-                builder.withShaderDefine(name, Integer.parseInt(value));
-                return;
-            } catch (NumberFormatException ignored) {
-            }
-
-            try {
-                builder.withShaderDefine(name, Float.parseFloat(value));
-                return;
-            } catch (NumberFormatException ignored) {
-            }
-
-            throw new IllegalStateException(
-                "Cannot reconstruct shader define '" + name + "' with non-numeric value '" + value +
-                "'. RenderPipeline.Builder only supports int/float/value-less defines.");
-        }
     }
 
     public record UniformBinding(String name, UniformType type, @Nullable TextureFormat textureFormat) {
@@ -972,9 +427,6 @@ public final class PipelineDescriptor {
             destAlpha = Objects.requireNonNull(destAlpha, "destAlpha must not be null");
         }
 
-        public BlendFunction toBlendFunction() {
-            return new BlendFunction(sourceColor, destColor, sourceAlpha, destAlpha);
-        }
     }
 
     /**
@@ -993,15 +445,6 @@ public final class PipelineDescriptor {
             }
         }
 
-        public Optional<ResourceBinding> findByName(String name) {
-            Objects.requireNonNull(name, "name must not be null");
-            for (ResourceBinding binding : bindings) {
-                if (binding.name().equals(name)) {
-                    return Optional.of(binding);
-                }
-            }
-            return Optional.empty();
-        }
     }
 
     /**

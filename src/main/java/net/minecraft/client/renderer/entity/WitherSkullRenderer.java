@@ -88,7 +88,7 @@ public class WitherSkullRenderer extends EntityRenderer<WitherSkull, WitherSkull
 					texture,
 					false,
 					false,
-					!submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
+					false
 				);
 			}
 			submitNodeCollector.submitModelSemanticTexture(

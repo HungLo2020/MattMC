@@ -178,7 +178,6 @@ public class TrilocarisEntity extends WaterAnimal implements Bucketable {
             this.moveRelative(this.getSpeed(), travelVector);
             Vec3 delta = this.getDeltaMovement();
             this.move(MoverType.SELF, delta);
-            boolean pulldown = false;
             if (crawling) {
                 delta = delta.scale(0.8D);
                 if (this.jumping || horizontalCollision) {

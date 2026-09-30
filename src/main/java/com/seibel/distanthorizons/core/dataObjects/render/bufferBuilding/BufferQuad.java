@@ -90,11 +90,6 @@ public final class BufferQuad
 	
 	
 	
-	/** a rough but fast calculation */
-	double calculateDistance(double relativeX, double relativeY, double relativeZ)
-	{
-		return Math.pow(relativeX - this.x, 2) + Math.pow(relativeY - this.y, 2) + Math.pow(relativeZ - this.z, 2);
-	}
 	
 	/** compares this quad's position to the given quad */
 	public int compare(BufferQuad quad, BufferMergeDirectionEnum compareDirection)

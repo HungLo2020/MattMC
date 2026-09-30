@@ -30,10 +30,6 @@ public class NoData extends TranslucentData {
         return false;
     }
 
-    public static NoData forEmptySection(SectionPos sectionPos) {
-        return new NoData(sectionPos, SortType.EMPTY_SECTION);
-    }
-
     public static NoData forNoTranslucent(SectionPos sectionPos) {
         return new NoData(sectionPos, SortType.NO_TRANSLUCENT);
     }

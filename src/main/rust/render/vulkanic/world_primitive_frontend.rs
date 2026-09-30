@@ -25428,11 +25428,6 @@ impl WorldPrimitiveFrontend {
         raster_y_direction: RasterYDirection,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
         self.world_text.begin_submission();
-        if gal.capabilities().api != BackendApi::Vulkan {
-            return Err(GalError::unsupported_feature(
-                "Rust Fabulous material routing is available only on the Rust Vulkan backend",
-            ));
-        }
         validate_frame(&frame)?;
         if self.generation == 0 {
             self.generation = generation;
@@ -34651,11 +34646,6 @@ impl WorldPrimitiveFrontend {
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
         self.pending_terrain_external_item_entity_written = false;
         let vulkan_backend = gal.capabilities().api == BackendApi::Vulkan;
-        if !vulkan_backend && (frame.background.enabled || !frame.border_quads.is_empty()) {
-            return Err(GalError::unsupported_feature(
-                "OpenGL partial world primitive submit does not own background or world-border presentation",
-            ));
-        }
         if self.generation == 0 {
             self.generation = generation;
         }

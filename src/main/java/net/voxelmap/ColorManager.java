@@ -5,7 +5,6 @@ import net.voxelmap.interfaces.AbstractMapData;
 import net.voxelmap.util.BlockModel;
 import net.voxelmap.util.BlockRepository;
 import net.voxelmap.util.ColorUtils;
-import net.voxelmap.util.GLUtils;
 import net.voxelmap.util.MessageUtils;
 import net.voxelmap.util.MutableBlockPos;
 import net.minecraft.ResourceLocationException;
@@ -317,13 +316,7 @@ public class ColorManager {
         if (VoxelConstants.getMinecraft().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS) instanceof TextureAtlas blockAtlas) {
             this.terrainBuff = this.buildTerrainImageFromAtlas(blockAtlas);
             this.loadedTerrainImage = true;
-            return;
         }
-
-        GLUtils.readTextureContentsToBufferedImage(VoxelConstants.getMinecraft().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTexture(), image -> {
-            terrainBuff = image;
-            loadedTerrainImage = true;
-        });
     }
 
     private BufferedImage buildTerrainImageFromAtlas(TextureAtlas blockAtlas) {

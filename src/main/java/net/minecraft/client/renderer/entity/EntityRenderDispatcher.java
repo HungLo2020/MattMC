@@ -154,14 +154,11 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 	public <S extends EntityRenderState> void submit(
 		S entityRenderState, CameraRenderState cameraRenderState, double d, double e, double f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector
 	) {
-		boolean selectedVulkan = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| (selectedVulkan && net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan());
 		// Selected Vulkan never borrows Iris' Java entity tracking. This remains
 		// true when the current material family is unavailable and will fail closed
 		// later; semantic coverage uses submitSemantic explicitly.
 		this.submitInternal(entityRenderState, cameraRenderState, d, e, f, poseStack, submitNodeCollector,
-			!selectedVulkan && !rustWholeFrame);
+			false);
 	}
 
 	/**
@@ -236,11 +233,7 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			entityRenderer.submit(entityRenderState, poseStack, submitNodeCollector, cameraRenderState);
 			if (entityRenderState.displayFireAnimation) {
 				Quaternionf flameRotation = Mth.rotationAroundAxis(Mth.Y_AXIS, cameraRenderState.orientation, new Quaternionf());
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-					submitNodeCollector.submitFlameSemantic(poseStack, entityRenderState, flameRotation);
-				} else {
-					submitNodeCollector.submitFlameSemantic(poseStack, entityRenderState, flameRotation);
-				}
+				submitNodeCollector.submitFlameSemantic(poseStack, entityRenderState, flameRotation);
 			}
 
 			if (entityRenderState instanceof AvatarRenderState) {
@@ -251,21 +244,8 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			// the pass. A selected Rust whole-frame route owns that semantic pass
 			// instead, so retain the ordinary copied submit for Rust extraction.
 			if (!entityRenderState.shadowPieces.isEmpty()) {
-				net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = captureIrisRenderState
-					? net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() : null;
-				boolean rustWholeFrameShadowRoute = net.vulkanic.world.WorldRenderRoutePolicy
-					.currentEntityShadowRoute()
-					.usesRustWholeFrameVulkan();
-				boolean suppressShadows = !rustWholeFrameShadowRoute
-					&& pipeline != null
-					&& pipeline.shouldDisableVanillaEntityShadows();
-				
-				if (!suppressShadows) {
-					if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-						submitNodeCollector.submitShadowSemantic(poseStack, entityRenderState.shadowRadius, entityRenderState.shadowPieces);
-					} else {
-						submitNodeCollector.submitShadowSemantic(poseStack, entityRenderState.shadowRadius, entityRenderState.shadowPieces);
-					}
+				{
+					submitNodeCollector.submitShadowSemantic(poseStack, entityRenderState.shadowRadius, entityRenderState.shadowPieces);
 				}
 			}
 
@@ -274,11 +254,7 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			}
 
 			if (entityRenderState.hitboxesRenderState != null) {
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-					submitNodeCollector.submitHitboxSemantic(poseStack, entityRenderState, entityRenderState.hitboxesRenderState);
-				} else {
-						submitNodeCollector.submitHitboxSemantic(poseStack, entityRenderState, entityRenderState.hitboxesRenderState);
-				}
+				submitNodeCollector.submitHitboxSemantic(poseStack, entityRenderState, entityRenderState.hitboxesRenderState);
 			}
 
 			poseStack.popPose();

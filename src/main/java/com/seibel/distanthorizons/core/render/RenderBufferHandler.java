@@ -325,21 +325,6 @@ public class RenderBufferHandler implements AutoCloseable
 				semanticCandidateCount, semanticUnpublishedCount, this.semanticColumnPositionsView
 			);
 		}
-		if (VulkanicAPI.isShaderInputParityTracingEnabled())
-		{
-			VulkanicAPI.traceShaderInputParityOrdering(
-					"dh-render-list-summary",
-					"distant-horizons-render-buffer-handler",
-					"shadowPass=" + isShadowPass
-							+ ":frustumCulling=" + enableFrustumCulling
-							+ ":visitedNodes=" + visitedNodeCount
-							+ ":nullSections=" + nullSectionCount
-							+ ":nullBuffers=" + nullBufferCount
-							+ ":disabledSections=" + disabledSectionCount
-							+ ":addedBuffers=" + addedBufferCount
-							+ ":visibleBuffers=" + this.loadedNearToFarBuffers.size()
-							+ ":culledBuffers=" + (isShadowPass ? this.shadowCulledBufferCount : this.culledBufferCount));
-		}
 	}
 	
 	

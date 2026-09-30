@@ -25,23 +25,8 @@ public class RaidDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 		this.minecraft = minecraft;
 	}
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		BlockPos blockPos = this.getCamera().getBlockPosition();
-		debugValueAccess.forEachChunk(DebugSubscriptions.RAIDS, (chunkPos, list) -> {
-			for (BlockPos blockPos2 : list) {
-				if (blockPos.closerThan(blockPos2, 160.0)) {
-					highlightRaidCenter(poseStack, multiBufferSource, blockPos2);
-				}
-			}
-		});
-	}
-
 	/** Copies subscribed nearby raid centers into Rust-owned semantic boxes and text. */
 	public void collectRustSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
-		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) return;
 		DebugValueAccess access = this.minecraft.getConnection().createDebugValueAccess();
 		PoseStack transform = new PoseStack();
 		transform.translate(-camera.getPosition().x, -camera.getPosition().y, -camera.getPosition().z);
@@ -62,18 +47,6 @@ public class RaidDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 					Font.DisplayMode.SEE_THROUGH, -65536, -1, 0, 0);
 			}
 		});
-	}
-
-	private static void highlightRaidCenter(PoseStack poseStack, MultiBufferSource multiBufferSource, BlockPos blockPos) {
-		DebugRenderer.renderFilledUnitCube(poseStack, multiBufferSource, blockPos, 1.0F, 0.0F, 0.0F, 0.15F);
-		renderTextOverBlock(poseStack, multiBufferSource, "Raid center", blockPos, -65536);
-	}
-
-	private static void renderTextOverBlock(PoseStack poseStack, MultiBufferSource multiBufferSource, String string, BlockPos blockPos, int i) {
-		double d = blockPos.getX() + 0.5;
-		double e = blockPos.getY() + 1.3;
-		double f = blockPos.getZ() + 0.5;
-		DebugRenderer.renderFloatingText(poseStack, multiBufferSource, string, d, e, f, i, 0.04F, true, 0.0F, true);
 	}
 
 	private Camera getCamera() {

@@ -20,40 +20,6 @@ import org.joml.Matrix4f;
 
 @Environment(EnvType.CLIENT)
 public class NameTagFeatureRenderer {
-	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource, Font font) {
-		NameTagFeatureRenderer.Storage storage = submitNodeCollection.getNameTagSubmits();
-		storage.nameTagSubmitsSeethrough.sort(Comparator.comparing(SubmitNodeStorage.NameTagSubmit::distanceToCameraSq).reversed());
-
-		for (SubmitNodeStorage.NameTagSubmit nameTagSubmit : storage.nameTagSubmitsSeethrough) {
-			font.drawInBatch(
-				nameTagSubmit.text(),
-				nameTagSubmit.x(),
-				nameTagSubmit.y(),
-				nameTagSubmit.color(),
-				false,
-				nameTagSubmit.pose(),
-				bufferSource,
-				Font.DisplayMode.SEE_THROUGH,
-				nameTagSubmit.backgroundColor(),
-				nameTagSubmit.lightCoords()
-			);
-		}
-
-		for (SubmitNodeStorage.NameTagSubmit nameTagSubmit : storage.nameTagSubmitsNormal) {
-			font.drawInBatch(
-				nameTagSubmit.text(),
-				nameTagSubmit.x(),
-				nameTagSubmit.y(),
-				nameTagSubmit.color(),
-				false,
-				nameTagSubmit.pose(),
-				bufferSource,
-				Font.DisplayMode.NORMAL,
-				nameTagSubmit.backgroundColor(),
-				nameTagSubmit.lightCoords()
-			);
-		}
-	}
 
 	@Environment(EnvType.CLIENT)
 	public static class Storage {
@@ -77,9 +43,7 @@ public class NameTagFeatureRenderer {
 		public void add(PoseStack poseStack, @Nullable Vec3 vec3, int i, Component component, boolean bl, int j, double d, CameraRenderState cameraRenderState) {
 			if (vec3 != null) {
 				int submitCount = bl ? 2 : 1;
-				if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-					&& totalSubmitCount() + submitCount > MAX_RUST_SEMANTIC_SUBMITS) {
+				if (totalSubmitCount() + submitCount > MAX_RUST_SEMANTIC_SUBMITS) {
 					throw new IllegalStateException(
 						"Rust whole-frame world-text route exceeded bounded name-tag submit capacity "
 							+ MAX_RUST_SEMANTIC_SUBMITS

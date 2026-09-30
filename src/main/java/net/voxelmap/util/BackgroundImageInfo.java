@@ -29,8 +29,6 @@ public class BackgroundImageInfo {
         this.scale = width / (float) image.getWidth();
     }
 
-    public boolean isInRange(int x, int z) { return x >= left && x < right && z >= top && z < bottom; }
-
     public void unregister() {
         Minecraft.getInstance().getTextureManager().release(imageLocation);
     }

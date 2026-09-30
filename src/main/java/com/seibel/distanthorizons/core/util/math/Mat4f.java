@@ -121,15 +121,6 @@ public class Mat4f extends DhApiMat4f
 	public void multiplyTranslationMatrix(double x, double y, double z)
 	{ multiply(createTranslateMatrix((float) x, (float) y, (float) z)); }
 	
-	public static Mat4f createScaleMatrix(float x, float y, float z)
-	{
-		Mat4f matrix = new Mat4f();
-		matrix.m00 = x;
-		matrix.m11 = y;
-		matrix.m22 = z;
-		matrix.m33 = 1.0F;
-		return matrix;
-	}
 	
 	public static Mat4f createTranslateMatrix(float x, float y, float z)
 	{

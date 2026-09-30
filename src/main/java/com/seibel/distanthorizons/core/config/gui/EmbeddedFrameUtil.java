@@ -161,14 +161,5 @@ public final class EmbeddedFrameUtil
 		embeddedFrameSynthesizeWindowActivation(embeddedFrame, true);
 		embeddedFrame.setVisible(true);
 	}
-	public static void placeAtCenter(Frame embeddedFrame, int windowWidth, int windowHeight, int frameWidth, int frameHeight, float scale)
-	{
-		float scaleFactor = (100.0F - scale) / 100.0F;
-		float newWidth = frameWidth * scaleFactor;
-		float newHeight = frameHeight * scaleFactor;
-		float newX = (windowWidth - newWidth) / 2F;
-		float newY = (windowHeight - newHeight) / 2F;
-		embeddedFrameSetBounds(embeddedFrame, Math.round(newX), Math.round(newY), Math.round(newWidth), Math.round(newHeight));
-	}
 	
 }

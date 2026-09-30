@@ -31,29 +31,8 @@ public class PoiDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 		this.brainRenderer = brainDebugRenderer;
 	}
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		BlockPos blockPos = BlockPos.containing(d, e, f);
-		debugValueAccess.forEachBlock(DebugSubscriptions.POIS, (blockPos2, debugPoiInfo) -> {
-			if (blockPos.closerThan(blockPos2, 30.0)) {
-				highlightPoi(poseStack, multiBufferSource, blockPos2);
-				this.renderPoiInfo(poseStack, multiBufferSource, debugPoiInfo, debugValueAccess);
-			}
-		});
-		this.brainRenderer.getGhostPois(debugValueAccess).forEach((blockPos2, list) -> {
-			if (debugValueAccess.getBlockValue(DebugSubscriptions.POIS, blockPos2) == null) {
-				if (blockPos.closerThan(blockPos2, 30.0)) {
-					this.renderGhostPoi(poseStack, multiBufferSource, blockPos2, list);
-				}
-			}
-		});
-	}
-
 	/** Copies live and ghost POI diagnostics into Rust-owned semantic streams. */
 	public void collectRustSemantics(Minecraft minecraft, Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
-		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) return;
 		DebugValueAccess access = minecraft.getConnection().createDebugValueAccess();
 		BlockPos center = camera.getBlockPosition();
 		PoseStack transform = new PoseStack();
@@ -91,47 +70,6 @@ public class PoiDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 		pose.translate(pos.getX() + 0.5 - camera.getPosition().x, pos.getY() + 1.3 + line * 0.2 - camera.getPosition().y, pos.getZ() + 0.5 - camera.getPosition().z);
 		pose.mulPose(camera.rotation()); pose.scale(TEXT_SCALE, -TEXT_SCALE, TEXT_SCALE);
 		text.submitTextSemantic(0, pose, 0, 0, Component.literal(value).getVisualOrderText(), true, Font.DisplayMode.SEE_THROUGH, color, -1, 0, 0);
-	}
-
-	private static void highlightPoi(PoseStack poseStack, MultiBufferSource multiBufferSource, BlockPos blockPos) {
-		float f = 0.05F;
-		DebugRenderer.renderFilledBox(poseStack, multiBufferSource, blockPos, 0.05F, 0.2F, 0.2F, 1.0F, 0.3F);
-	}
-
-	private void renderGhostPoi(PoseStack poseStack, MultiBufferSource multiBufferSource, BlockPos blockPos, List<String> list) {
-		float f = 0.05F;
-		DebugRenderer.renderFilledBox(poseStack, multiBufferSource, blockPos, 0.05F, 0.2F, 0.2F, 1.0F, 0.3F);
-		DebugRenderer.renderTextOverBlock(poseStack, multiBufferSource, list.toString(), blockPos, 0, -256, 0.02F);
-		DebugRenderer.renderTextOverBlock(poseStack, multiBufferSource, "Ghost POI", blockPos, 1, -65536, 0.02F);
-	}
-
-	private void renderPoiInfo(PoseStack poseStack, MultiBufferSource multiBufferSource, DebugPoiInfo debugPoiInfo, DebugValueAccess debugValueAccess) {
-		int i = 0;
-		if (SharedConstants.DEBUG_BRAIN) {
-			List<String> list = this.getTicketHolderNames(debugPoiInfo, false, debugValueAccess);
-			if (list.size() < 4) {
-				renderTextOverPoi(poseStack, multiBufferSource, "Owners: " + list, debugPoiInfo, i, -256);
-			} else {
-				renderTextOverPoi(poseStack, multiBufferSource, list.size() + " ticket holders", debugPoiInfo, i, -256);
-			}
-
-			i++;
-			List<String> list2 = this.getTicketHolderNames(debugPoiInfo, true, debugValueAccess);
-			if (list2.size() < 4) {
-				renderTextOverPoi(poseStack, multiBufferSource, "Candidates: " + list2, debugPoiInfo, i, -23296);
-			} else {
-				renderTextOverPoi(poseStack, multiBufferSource, list2.size() + " potential owners", debugPoiInfo, i, -23296);
-			}
-
-			i++;
-		}
-
-		renderTextOverPoi(poseStack, multiBufferSource, "Free tickets: " + debugPoiInfo.freeTicketCount(), debugPoiInfo, i, -256);
-		renderTextOverPoi(poseStack, multiBufferSource, debugPoiInfo.poiType().getRegisteredName(), debugPoiInfo, ++i, -1);
-	}
-
-	private static void renderTextOverPoi(PoseStack poseStack, MultiBufferSource multiBufferSource, String string, DebugPoiInfo debugPoiInfo, int i, int j) {
-		DebugRenderer.renderTextOverBlock(poseStack, multiBufferSource, string, debugPoiInfo.pos(), i, j, 0.02F);
 	}
 
 	private List<String> getTicketHolderNames(DebugPoiInfo debugPoiInfo, boolean bl, DebugValueAccess debugValueAccess) {

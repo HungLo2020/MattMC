@@ -18,46 +18,4 @@ public enum VulkanicClearBuffer {
         this.legacyGlMaskBit = legacyGlMaskBit;
     }
 
-    public int toLegacyGlMaskBit() {
-        return legacyGlMaskBit;
-    }
-
-    public static Optional<VulkanicClearBuffer> fromLegacyGlMaskBit(int legacyGlMaskBit) {
-        for (VulkanicClearBuffer buffer : values()) {
-            if (buffer.legacyGlMaskBit == legacyGlMaskBit) {
-                return Optional.of(buffer);
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    public static int toLegacyGlMask(VulkanicClearBuffer... buffers) {
-        if (buffers == null || buffers.length == 0) {
-            return 0;
-        }
-
-        int mask = 0;
-        for (VulkanicClearBuffer buffer : buffers) {
-            if (buffer != null) {
-                mask |= buffer.legacyGlMaskBit;
-            }
-        }
-
-        return mask;
-    }
-
-    public static List<VulkanicClearBuffer> fromLegacyGlMask(int legacyGlMask) {
-        List<VulkanicClearBuffer> buffers = new ArrayList<>();
-        for (VulkanicClearBuffer buffer : values()) {
-            if ((legacyGlMask & buffer.legacyGlMaskBit) != 0) {
-                buffers.add(buffer);
-                legacyGlMask &= ~buffer.legacyGlMaskBit;
-            }
-        }
-        if (legacyGlMask != 0) {
-            return List.of();
-        }
-        return List.copyOf(buffers);
-    }
 }

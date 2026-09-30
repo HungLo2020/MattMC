@@ -16,7 +16,6 @@ import net.sodium.client.render.chunk.compile.ChunkSortOutput;
 import net.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.render.chunk.lists.ChunkRenderList;
-import net.sodium.client.render.chunk.lists.SortedRenderLists;
 import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.translucent_sorting.data.SharedIndexSorter;
@@ -363,60 +362,6 @@ public final class RustGalTerrainRenderer {
 		}
 	}
 
-	static void installTestingFluidSpriteAssetsForUnitTests() {
-		waterStillAsset = new FluidSpriteAsset(
-			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL,
-			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still"),
-			0.0F,
-			0.25F,
-			0.0F,
-			0.25F,
-			16,
-			16,
-			1,
-			1,
-			0,
-			0,
-			0,
-			List.of(),
-			new byte[] { 1 }, 1
-		);
-		waterFlowAsset = new FluidSpriteAsset(
-			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW,
-			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow"),
-			0.25F,
-			0.5F,
-			0.0F,
-			0.25F,
-			16,
-			16,
-			1,
-			1,
-			0,
-			0,
-			0,
-			List.of(),
-			new byte[] { 2 }, 1
-		);
-		waterOverlayAsset = new FluidSpriteAsset(
-			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY,
-			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_overlay"),
-			0.5F,
-			0.75F,
-			0.0F,
-			0.25F,
-			16,
-			16,
-			1,
-			1,
-			0,
-			0,
-			0,
-			List.of(),
-			new byte[] { 3 }, 1
-		);
-	}
-
 	private RustGalTerrainRenderer() {
 	}
 
@@ -428,18 +373,8 @@ public final class RustGalTerrainRenderer {
 	}
 
 	public static void acceptChunkBuildOutput(ChunkBuildOutput output) {
-		// Select the owner before constructing any layout.  The whole-frame
-		// Vulkan producer is compact and must not even query Iris's live vertex
-		// format; Iris-derived layout metadata is private to the OpenGL route.
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-				skippedRouteBuildOutputs.incrementAndGet();
-				return;
-			}
-			acceptChunkBuildOutput(output, TerrainMeshLayout.compact(copiedShaderPackSeparateAo));
-			return;
-		}
-		acceptChunkBuildOutput(output, TerrainMeshLayout.activeIrisCompatible());
+		acceptChunkBuildOutput(output, TerrainMeshLayout.compact(copiedShaderPackSeparateAo));
+		return;
 	}
 
 	/**
@@ -452,10 +387,6 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private static void acceptChunkBuildOutput(ChunkBuildOutput output, TerrainMeshLayout layout) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			skippedRouteBuildOutputs.incrementAndGet();
-			return;
-		}
 		if (output == null || output.info == null) {
 			return;
 		}
@@ -616,180 +547,6 @@ public final class RustGalTerrainRenderer {
 		);
 	}
 
-	public static void acceptChunkSortOutput(ChunkSortOutput output) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return;
-		}
-		if (output == null || output.isReusingUploadedIndexData()) {
-			return;
-		}
-		TerrainSectionAsset asset = sectionAsset(output.render.getPositionAsLong(), ChunkSectionLayer.TRANSLUCENT);
-		if (asset == null) {
-			return;
-		}
-		byte[] indexBytes = normalizeTranslucentSortedIndexBytes(
-			copySorterIndexBytes(output.getSorter()),
-			asset.vertexCount(),
-			asset.translucentSourceSegmentQuadCounts()
-		);
-		if (indexBytes.length == 0) {
-			recordEvent(
-				output.render.getPositionAsLong(),
-				ChunkSectionLayer.TRANSLUCENT,
-				output.submitTime,
-				asset.meshGeneration(),
-				asset.meshGeneration(),
-				atlasGeneration,
-				asset,
-				output.render.getOriginX(),
-				output.render.getOriginY(),
-				output.render.getOriginZ(),
-				0.0F,
-				0.0F,
-				0.0F,
-				"translucent-sort-missing",
-				0L,
-				0L,
-				0L,
-				0L,
-				0L,
-				currentCameraX(),
-				currentCameraY(),
-				currentCameraZ(),
-				output.render.getOriginX() + 8.0D,
-				output.render.getOriginY() + 8.0D,
-				output.render.getOriginZ() + 8.0D,
-				Math.max(0, asset.indexCount() / 6),
-				0L,
-				0L,
-				0
-			);
-			return;
-		}
-		long indexGeneration = translucentSortGenerations.incrementAndGet();
-		long sortedIndexHash = sortedIndexHash(indexBytes);
-		long sortedIndexSampleHash = sortedIndexSampleHash(indexBytes);
-		String sortedIndexSample = sortedIndexSample(indexBytes, INDEX_TYPE_U32, 12);
-		String sorterType = translucentSorterType(output.getSorter());
-		recordTranslucentSortPayloadEvent(
-			output.render.getPositionAsLong(),
-			output.submitTime,
-			asset,
-			output.render.getOriginX(),
-			output.render.getOriginY(),
-			output.render.getOriginZ(),
-			"translucent-source-sort",
-			indexGeneration,
-			currentCameraX(),
-			currentCameraY(),
-			currentCameraZ(),
-			output.render.getOriginX() + 8.0D,
-			output.render.getOriginY() + 8.0D,
-			output.render.getOriginZ() + 8.0D,
-			Math.max(0, indexBytes.length / (Integer.BYTES * 6)),
-			sortedIndexHash,
-			indexGeneration,
-			sorterType,
-			sortedIndexHash,
-			0L,
-			sortedIndexSampleHash,
-			0L,
-			sortedIndexSample
-		);
-		RustGalWorldPrimitiveRenderer.registerStaticTerrainSortedIndex(new VulkanicGalBridge.WorldMeshSortedIndexRecord(
-			asset.meshKey(),
-			asset.meshGeneration(),
-			indexGeneration,
-			INDEX_TYPE_U32,
-			indexBytes
-		));
-		registeredTranslucentSorts.incrementAndGet();
-		registeredTranslucentSortBytes.addAndGet(indexBytes.length);
-		recordEvent(
-			output.render.getPositionAsLong(),
-			ChunkSectionLayer.TRANSLUCENT,
-			output.submitTime,
-			asset.meshGeneration(),
-			indexGeneration,
-			atlasGeneration,
-			asset,
-			output.render.getOriginX(),
-			output.render.getOriginY(),
-			output.render.getOriginZ(),
-			0.0F,
-			0.0F,
-			0.0F,
-			"translucent-sort-registered"
-				+ ":authority=sodium-source-payload"
-				+ ":sourceHash=" + sortedIndexHash
-				+ ":copiedHash=" + sortedIndexHash
-				+ ":sourceSampleHash=" + sortedIndexSampleHash
-				+ ":copiedSampleHash=" + sortedIndexSampleHash
-				+ ":sample=" + sortedIndexSample
-				+ ":sorterType=" + sorterType,
-			0L,
-			0L,
-			0L,
-			0L,
-			indexGeneration,
-			currentCameraX(),
-			currentCameraY(),
-			currentCameraZ(),
-			output.render.getOriginX() + 8.0D,
-			output.render.getOriginY() + 8.0D,
-			output.render.getOriginZ() + 8.0D,
-			Math.max(0, indexBytes.length / (Integer.BYTES * 6)),
-			sortedIndexHash,
-			indexGeneration,
-			0,
-			sorterType,
-			sortedIndexHash,
-			sortedIndexHash,
-			sortedIndexSampleHash,
-			sortedIndexSampleHash,
-			sortedIndexSample
-		);
-	}
-
-	static void recordTranslucentSortCopyRegistered(VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex) {
-		if (sortedIndex == null) {
-			return;
-		}
-		TerrainAssetIdentity identity = SECTION_ASSETS_BY_MESH_KEY.get(sortedIndex.meshKey());
-		if (identity == null || identity.layerKey().layer() != ChunkSectionLayer.TRANSLUCENT) {
-			return;
-		}
-		LayerKey layerKey = identity.layerKey();
-		TerrainSectionAsset asset = identity.asset();
-		long hash = sortedIndexHash(sortedIndex.indexBytes());
-		long sampleHash = sortedIndexSampleHash(sortedIndex.indexBytes());
-		recordTranslucentSortPayloadEvent(
-			layerKey.sectionPos(),
-			0L,
-			asset,
-			asset.sectionOriginX(),
-			asset.sectionOriginY(),
-			asset.sectionOriginZ(),
-			"translucent-rust-sort-copy",
-			sortedIndex.indexGeneration(),
-			currentCameraX(),
-			currentCameraY(),
-			currentCameraZ(),
-			asset.sectionOriginX() + 8.0D,
-			asset.sectionOriginY() + 8.0D,
-			asset.sectionOriginZ() + 8.0D,
-			Math.max(0, sortedIndex.indexBytes().length / (Integer.BYTES * 6)),
-			hash,
-			sortedIndex.indexGeneration(),
-			"rust-route-cache",
-			0L,
-			hash,
-			0L,
-			sampleHash,
-			sortedIndexSample(sortedIndex.indexBytes(), sortedIndex.indexType(), 12)
-		);
-	}
-
 	private static void recordTranslucentSortPayloadEvent(
 		long sectionPos,
 		long sourceGeneration,
@@ -854,55 +611,6 @@ public final class RustGalTerrainRenderer {
 		);
 	}
 
-	public static void enqueueVisibleTerrain(SortedRenderLists renderLists, Camera camera, int viewportWidth, int viewportHeight) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan() || renderLists == null || camera == null) {
-			return;
-		}
-		RustGalWorldPrimitiveRenderer.seedStaticTerrainFrameCamera(
-			camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z());
-		TerrainSetScratch scratch = TERRAIN_SET_SCRATCH.get();
-		scratch.visibleSubmissions.clear();
-		LongOpenHashSet visibleSubmissions = scratch.visibleSubmissions;
-		String fault = activeFault();
-		boolean detailedDiagnostics = detailedTerrainDiagnosticsEnabled(fault);
-		boolean trackTerrainCounters = terrainCountersEnabled(fault);
-		Iterator<ChunkRenderList> iterator = renderLists.iterator();
-		while (iterator.hasNext()) {
-			ChunkRenderList renderList = iterator.next();
-			ByteIterator sectionIterator = renderList.sectionsWithGeometryIterator(false);
-			if (sectionIterator == null) {
-				continue;
-			}
-			while (sectionIterator.hasNext()) {
-				RenderSection section = renderList.getRegion().getSection(sectionIterator.nextByteAsInt());
-				if (section == null) {
-					continue;
-				}
-				enqueueSectionLayer(section, ChunkSectionLayer.SOLID, camera, viewportWidth, viewportHeight, 0,
-					visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
-				enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, camera, viewportWidth, viewportHeight, 0,
-					visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
-			}
-		}
-		int translucentDrawOrder = 0;
-		Iterator<ChunkRenderList> translucentIterator = renderLists.iterator();
-		while (translucentIterator.hasNext()) {
-			ChunkRenderList renderList = translucentIterator.next();
-			ByteIterator sectionIterator = renderList.sectionsWithGeometryIterator(true);
-			if (sectionIterator == null) {
-				continue;
-			}
-			while (sectionIterator.hasNext()) {
-				RenderSection section = renderList.getRegion().getSection(sectionIterator.nextByteAsInt());
-				if (section == null) {
-					continue;
-				}
-				enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight,
-					translucentDrawOrder++, visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
-			}
-		}
-	}
-
 	/**
 	 * Submits the explicitly owned whole-frame source's CPU-built sections.  It
 	 * intentionally accepts sections rather than Sodium render lists: those
@@ -917,8 +625,7 @@ public final class RustGalTerrainRenderer {
 	public static void enqueueWholeFrameTerrainSections(Iterable<RenderSection> sections,
 			Iterable<RenderSection> shadowCandidates, Camera camera,
 			int viewportWidth, int viewportHeight) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
-			|| sections == null || camera == null) {
+		if ((sections == null) || camera == null) {
 			return;
 		}
 		RustGalWorldPrimitiveRenderer.seedStaticTerrainFrameCamera(
@@ -1890,9 +1597,6 @@ public final class RustGalTerrainRenderer {
 	}
 
 	public static void injectAtlasTexturePayloadForDiagnostics(byte[] payload, String reason) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return;
-		}
 		byte[] copied = payload == null ? new byte[0] : payload.clone();
 		long generation;
 		synchronized (RustGalTerrainRenderer.class) {
@@ -3676,44 +3380,7 @@ public final class RustGalTerrainRenderer {
 	}
 
 	private static int activeTerrainVertexStride() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			return COMPACT_PREFIX_STRIDE;
-		}
-		try {
-			return WorldRenderingSettings.INSTANCE.getVertexFormat().getNativeFormat().stride();
-		} catch (RuntimeException error) {
-			return COMPACT_PREFIX_STRIDE;
-		}
-	}
-
-	private static int activeTerrainShaderBlockIdOffset(int vertexStride) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			return 0;
-		}
-		try {
-			int offset = WorldRenderingSettings.INSTANCE.getVertexFormat().getNativeFormat().blockIdOffset();
-			if (offset <= 0 || offset + Integer.BYTES > vertexStride) {
-				return 0;
-			}
-			return offset;
-		} catch (RuntimeException error) {
-			return 0;
-		}
-	}
-
-	private static int activeTerrainMidBlockOffset(int vertexStride) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			return 0;
-		}
-		try {
-			int offset = WorldRenderingSettings.INSTANCE.getVertexFormat().getNativeFormat().midBlockOffset();
-			if (offset <= 0 || offset + Integer.BYTES > vertexStride) {
-				return 0;
-			}
-			return offset;
-		} catch (RuntimeException error) {
-			return 0;
-		}
+		return COMPACT_PREFIX_STRIDE;
 	}
 
 	private record TerrainMeshLayout(int vertexStride, boolean separateAo, int shaderBlockIdOffset, int midBlockOffset) {
@@ -3724,16 +3391,6 @@ public final class RustGalTerrainRenderer {
 			return new TerrainMeshLayout(COMPACT_PREFIX_STRIDE, separateAo, 0, 0);
 		}
 
-		private static TerrainMeshLayout activeIrisCompatible() {
-			int stride = activeTerrainVertexStride();
-			boolean separateAo = false;
-			try {
-				separateAo = WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
-			} catch (RuntimeException ignored) {
-			}
-			return new TerrainMeshLayout(stride, separateAo, activeTerrainShaderBlockIdOffset(stride),
-				activeTerrainMidBlockOffset(stride));
-		}
 	}
 
 	// Iris stores (blockId + 1) << 1 with the low bit reserved for render type.
@@ -4036,16 +3693,6 @@ public final class RustGalTerrainRenderer {
 		return sample.toString();
 	}
 
-		private static String translucentSorterType(Sorter sorter) {
-			if (sorter == null) {
-				return "none";
-			}
-			if (sorter instanceof SharedIndexSorter) {
-				return "shared-index";
-			}
-			return sorter.getClass().getName();
-		}
-
 		private static String initialTranslucentSorterType(ChunkBuildOutput output) {
 			if (output == null || output.translucentData == null) {
 				return "initial-build-index";
@@ -4055,14 +3702,6 @@ public final class RustGalTerrainRenderer {
 				+ ":"
 				+ output.translucentData.getClass().getSimpleName();
 		}
-
-	private static long sortedIndexGeneration(long meshKey, long meshGeneration, byte[] indexBytes) {
-		long hash = fnv64("static-terrain-translucent-sort-v1");
-		hash = fnv64Long(hash, meshKey);
-		hash = fnv64Long(hash, meshGeneration);
-		hash = fnv64Bytes(hash, indexBytes);
-		return hash == 0L ? 1L : hash;
-	}
 
 	private static long meshKey(long sectionPos, ChunkSectionLayer layer) {
 		long hash = fnv64("static-terrain-section-v2");
@@ -4371,8 +4010,7 @@ public final class RustGalTerrainRenderer {
 					}
 					byte[] nextAtlasPayload = encodeSemanticAtlasPayload(semanticRawSnapshot);
 					List<byte[]> nextAtlasMipPayloads = encodeSemanticAtlasMipPayloads(semanticRawSnapshot);
-					var nextAnimationSource = WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
-						? atlas.semanticAnimationResource() : null;
+					var nextAnimationSource = atlas.semanticAnimationResource();
 					if (nextAnimationSource != null && (nextAnimationSource.source().generation() != semanticRawSnapshot.generation()
 						|| nextAnimationSource.source().width() != semanticRawSnapshot.width()
 						|| nextAnimationSource.source().height() != semanticRawSnapshot.height())) {
@@ -4416,15 +4054,6 @@ public final class RustGalTerrainRenderer {
 			} catch (RuntimeException | IOException error) {
 				throw new IllegalStateException("Failed to build Rust-owned block atlas payload for static terrain", error);
 			}
-		}
-	}
-
-	private static byte[] buildBaseAtlasPayload(TextureAtlas atlas) throws IOException {
-		BufferedImage image = new BufferedImage(atlas.width, atlas.height, BufferedImage.TYPE_INT_ARGB);
-		for (TextureAtlasSprite sprite : atlas.texturesByName.values()) copySprite(image, sprite);
-		try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-			ImageIO.write(image, "png", output);
-			return output.toByteArray();
 		}
 	}
 
@@ -4532,23 +4161,6 @@ public final class RustGalTerrainRenderer {
 		try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
 			ImageIO.write(copy, "png", output);
 			return output.toByteArray();
-		}
-	}
-
-	private static void copySprite(BufferedImage atlasImage, TextureAtlasSprite sprite) {
-		SpriteContents contents = sprite.contents();
-		int sourceX = 0;
-		int sourceY = 0;
-		if (contents.animatedTexture != null) {
-			int frame = contents.semanticFrameIndex();
-			sourceX = contents.animatedTexture.getFrameX(frame) * contents.width();
-			sourceY = contents.animatedTexture.getFrameY(frame) * contents.height();
-		}
-		for (int y = 0; y < sprite.contents().height(); y++) {
-			for (int x = 0; x < sprite.contents().width(); x++) {
-				atlasImage.setRGB(sprite.getX() + x, sprite.getY() + y,
-					contents.originalImage.getPixel(sourceX + x, sourceY + y));
-			}
 		}
 	}
 
@@ -5455,5 +5067,59 @@ public final class RustGalTerrainRenderer {
 				&& u >= u0 - epsilon && u <= u1 + epsilon
 				&& v >= v0 - epsilon && v <= v1 + epsilon;
 		}
+	}
+
+	static void installTestingFluidSpriteAssetsForUnitTests() {
+		waterStillAsset = new FluidSpriteAsset(
+			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL,
+			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still"),
+			0.0F,
+			0.25F,
+			0.0F,
+			0.25F,
+			16,
+			16,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			new byte[] { 1 }, 1
+		);
+		waterFlowAsset = new FluidSpriteAsset(
+			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW,
+			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow"),
+			0.25F,
+			0.5F,
+			0.0F,
+			0.25F,
+			16,
+			16,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			new byte[] { 2 }, 1
+		);
+		waterOverlayAsset = new FluidSpriteAsset(
+			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY,
+			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_overlay"),
+			0.5F,
+			0.75F,
+			0.0F,
+			0.25F,
+			16,
+			16,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			new byte[] { 3 }, 1
+		);
 	}
 }

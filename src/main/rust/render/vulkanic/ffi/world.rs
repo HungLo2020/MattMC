@@ -1065,7 +1065,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_gui(
     Vec<u8>,
 )> {
     let (generation, target, frame, sprites, affine, meshes, boundary, radius, effect, tiles) =
-        decode_whole_frame_submit_with_backend_policy(request, capabilities, true)?;
+        decode_whole_frame_submit_with_backend_policy(request, capabilities)?;
     if !tiles.is_empty() {
         return Err(GalError::invalid_argument(
             "tiled GUI requires the typed whole-frame submit path",
@@ -1091,7 +1091,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_tiled_gui(
     Vec<u8>,
     Vec<GuiTiledQuadRequest>,
 )> {
-    decode_whole_frame_submit_with_backend_policy(request, capabilities, true)
+    decode_whole_frame_submit_with_backend_policy(request, capabilities)
 }
 
 pub(crate) unsafe fn decode_world_primitive_submit(
@@ -1109,7 +1109,7 @@ pub(crate) unsafe fn decode_world_primitive_submit(
         gui_blur_radius,
         _post_effect_id,
         gui_tiled_quads,
-    ) = decode_whole_frame_submit_with_backend_policy(request, capabilities, false)?;
+    ) = decode_whole_frame_submit_with_backend_policy(request, capabilities)?;
     if !gui_sprites.is_empty()
         || !gui_affine_quads.is_empty()
         || !gui_mesh_batches.is_empty()
@@ -1185,7 +1185,6 @@ pub(crate) fn merge_experience_orb_instances(
 pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
     request: *const FfiWholeFrameSubmitRequest,
     capabilities: BackendCapabilities,
-    require_vulkan_whole_frame: bool,
 ) -> GalResult<(
     u64,
     Handle,
@@ -1222,11 +1221,6 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             "requested unsupported whole-frame feature bits 0x{:x}",
             request.negotiated_feature_bits & !supported
         )));
-    }
-    if require_vulkan_whole_frame && capabilities.api != BackendApi::Vulkan {
-        return Err(GalError::unsupported_feature(
-            "whole-frame world primitive submit requires the Rust Vulkan backend",
-        ));
     }
     if request.generation == 0 || request.frame_id == 0 || request.correlation_id == 0 {
         return Err(GalError::ffi(

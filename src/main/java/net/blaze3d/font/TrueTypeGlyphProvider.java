@@ -189,15 +189,7 @@ public class TrueTypeGlyphProvider implements GlyphProvider {
 
 				@Override
 				public void upload(int i, int j, GpuTexture gpuTexture) {
-					FT_Face fT_Face = TrueTypeGlyphProvider.this.validateFontOpen();
-
-					try (NativeImage nativeImage = new NativeImage(NativeImage.Format.LUMINANCE, Glyph.this.width, Glyph.this.height, false)) {
-						if (nativeImage.copyFromFont(fT_Face, Glyph.this.index)
-							&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-							&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-							net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(gpuTexture, nativeImage, 0, 0, i, j, Glyph.this.width, Glyph.this.height, 0, 0);
-						}
-					}
+					// Rust rasterizes glyph atlases from copyTo(); there is no Java GPU upload.
 				}
 
 				@Override

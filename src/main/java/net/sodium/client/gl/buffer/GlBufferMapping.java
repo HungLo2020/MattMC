@@ -19,19 +19,8 @@ public class GlBufferMapping {
         MemoryUtil.memCopy(MemoryUtil.memAddress(data), MemoryUtil.memAddress(this.map, writeOffset), data.remaining());
     }
 
-    public GlBuffer getBufferObject() {
-        return this.buffer;
-    }
-
     public void dispose() {
         this.disposed = true;
     }
 
-    public boolean isDisposed() {
-        return this.disposed;
-    }
-
-    public ByteBuffer getMemoryBuffer() {
-        return this.map;
-    }
 }

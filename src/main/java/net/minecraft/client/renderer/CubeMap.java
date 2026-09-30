@@ -10,7 +10,6 @@ import java.util.OptionalInt;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.CubeMapTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
@@ -28,10 +27,7 @@ public class CubeMap implements AutoCloseable {
 
 	public CubeMap(ResourceLocation resourceLocation) {
 		this.location = resourceLocation;
-		this.projectionMatrixUbo = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected())
-			? null
-			: new CachedPerspectiveProjectionMatrixBuffer("cubemap", 0.05F, 10.0F);
+		this.projectionMatrixUbo = null;
 	}
 
 	/** Semantic source identity for the Rust-owned panorama path. */
@@ -39,59 +35,12 @@ public class CubeMap implements AutoCloseable {
 		return this.location;
 	}
 
-	public void render(Minecraft minecraft, float f, float g) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException(
-				"Rust Vulkan panorama requires PanoramaRenderer to attach its semantic command to the active GuiRenderState; "
-					+ "Java cube-map rendering is not a fallback"
-			);
-		}
-		net.vulkanic.VulkanicAPI.setProjectionMatrix(
-			this.projectionMatrixUbo.getBuffer(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight(), 85.0F), ProjectionType.PERSPECTIVE
-		);
-		RenderPipeline renderPipeline = RenderPipelines.PANORAMA;
-		RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
-		GpuTextureView gpuTextureView = renderTarget.getColorTextureView();
-		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
-		matrix4fStack.pushMatrix();
-		matrix4fStack.rotationX((float) Math.PI);
-		matrix4fStack.rotateX(f * (float) (Math.PI / 180.0));
-		matrix4fStack.rotateY(g * (float) (Math.PI / 180.0));
-		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
-			.writeTransform(new Matrix4f(matrix4fStack), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
-		matrix4fStack.popMatrix();
-
-		try (RenderPass renderPass = gpuTextureView != null
-			? VulkanicAPI.createRenderPass(() -> "Cubemap", gpuTextureView, OptionalInt.empty())
-			: createFramebufferRenderPass(renderTarget)) {
-			renderPass.setPipeline(renderPipeline);
-			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
-			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
-			renderPass.bindSampler("Sampler0", minecraft.getTextureManager().getTexture(this.location).getTextureView());
-			renderPass.draw(0, 3);
-		}
-	}
-
-	private static RenderPass createFramebufferRenderPass(RenderTarget renderTarget) {
-		int framebuffer = VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture());
-		return VulkanicAPI.createRenderPass(() -> "Cubemap", framebuffer, renderTarget.getDepthTexture() != null);
-	}
-
 	public void registerTextures(TextureManager textureManager) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
-		textureManager.register(this.location, new CubeMapTexture(this.location));
+		return;
 	}
 
 	public void registerAndLoadTextures(TextureManager textureManager) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
-		textureManager.registerAndLoad(this.location, new CubeMapTexture(this.location));
+		return;
 	}
 
 	public void close() {

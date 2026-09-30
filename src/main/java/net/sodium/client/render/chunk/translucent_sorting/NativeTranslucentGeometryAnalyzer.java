@@ -151,77 +151,6 @@ public final class NativeTranslucentGeometryAnalyzer {
         }
     }
 
-    public static int[] topoGraphSort(TQuad[] quads, boolean failOnIntersection) {
-        return topoGraphSort(quads, quads.length, null, failOnIntersection);
-    }
-
-    public static int[] topoGraphSort(TQuad[] quads, int quadCount, int[] activeToRealIndex,
-            boolean failOnIntersection) {
-        if (quadCount < 0 || quadCount > quads.length) {
-            throw new IllegalArgumentException("Invalid translucent topo quad count: " + quadCount);
-        }
-        if (activeToRealIndex != null && activeToRealIndex.length < quadCount) {
-            throw new IllegalArgumentException("Active translucent topo index map is shorter than the quad count");
-        }
-
-        int[] quadIndexes = new int[quadCount];
-
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment recordsSegment = quadCount == 0
-                    ? MemorySegment.NULL
-                    : arena.allocate((long) quadCount * TOPO_RECORD_STRIDE, Integer.BYTES);
-            for (int quadIndex = 0; quadIndex < quadCount; quadIndex++) {
-                writeTopoRecord(recordsSegment.asSlice((long) quadIndex * TOPO_RECORD_STRIDE), quads[quadIndex]);
-            }
-
-            MemorySegment activeToRealIndexSegment = MemorySegment.NULL;
-            int activeToRealIndexLength = 0;
-            if (activeToRealIndex != null) {
-                activeToRealIndexSegment = arena.allocate(ValueLayout.JAVA_INT, activeToRealIndex.length);
-                activeToRealIndexLength = activeToRealIndex.length;
-                for (int index = 0; index < activeToRealIndex.length; index++) {
-                    activeToRealIndexSegment.setAtIndex(ValueLayout.JAVA_INT, index, activeToRealIndex[index]);
-                }
-            }
-
-            MemorySegment quadIndexesSegment = quadCount == 0
-                    ? MemorySegment.NULL
-                    : arena.allocate(ValueLayout.JAVA_INT, quadCount);
-            int status = invokeTopoGraphSort(recordsSegment, quadCount, activeToRealIndexSegment,
-                    activeToRealIndexLength, failOnIntersection ? 1 : 0, quadIndexesSegment, quadIndexes.length);
-            if (status == SORT_FAILED) {
-                return null;
-            }
-            check(status, "native translucent topo graph sort");
-
-            for (int index = 0; index < quadIndexes.length; index++) {
-                quadIndexes[index] = quadIndexesSegment.getAtIndex(ValueLayout.JAVA_INT, index);
-            }
-        }
-
-        return quadIndexes;
-    }
-
-    public static TopoQuadStore createTopoQuadStore(TQuad[] quads) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment recordsSegment = quads.length == 0
-                    ? MemorySegment.NULL
-                    : arena.allocate((long) quads.length * TOPO_RECORD_STRIDE, Integer.BYTES);
-            for (int quadIndex = 0; quadIndex < quads.length; quadIndex++) {
-                writeTopoRecord(recordsSegment.asSlice((long) quadIndex * TOPO_RECORD_STRIDE), quads[quadIndex]);
-            }
-
-            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
-            check(invokeTopoQuadStoreCreate(recordsSegment, quads.length, handleSegment),
-                    "native translucent topo quad store creation");
-            long handle = handleSegment.get(ValueLayout.JAVA_LONG, 0);
-            if (handle == 0) {
-                throw new IllegalStateException("Native translucent topo quad store creation returned a null handle");
-            }
-            return new TopoQuadStore(handle);
-        }
-    }
-
     boolean appendNativeQuad(long nativeQuadAddress, ModelQuadFacing facing, int packedNormal) {
         int status = invokeAppendNativeQuad(this.getHandle(), nativeQuadAddress, facing.ordinal(), packedNormal);
         if (status == SORT_FAILED) {
@@ -229,24 +158,6 @@ public final class NativeTranslucentGeometryAnalyzer {
         }
         check(status, "native translucent analyzer native quad append");
         return false;
-    }
-
-    int appendNativeQuadBatch(long nativeQuadAddress, int quadCount, ModelQuadFacing facing, long packedNormalsAddress,
-            long validityAddress) {
-        if (quadCount < 0) {
-            throw new IllegalArgumentException("Invalid native translucent quad count: " + quadCount);
-        }
-        if (quadCount == 0) {
-            return 0;
-        }
-
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment validCountSegment = arena.allocate(ValueLayout.JAVA_INT);
-            check(invokeAppendNativeQuadBatch(this.getHandle(), nativeQuadAddress, quadCount, facing.ordinal(),
-                    MemorySegment.ofAddress(packedNormalsAddress), validityAddress, validCountSegment),
-                    "native translucent analyzer batch append");
-            return validCountSegment.get(ValueLayout.JAVA_INT, 0);
-        }
     }
 
     Analysis analyze(SortBehavior.SortMode sortMode) {
@@ -291,27 +202,6 @@ public final class NativeTranslucentGeometryAnalyzer {
                 java.util.Arrays.copyOf(staticKeys, metrics[4]),
                 recordCount
         );
-    }
-
-    int[] staticTopoSort(boolean failOnIntersection) {
-        int[] quadIndexes = new int[this.getRecordCount()];
-
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment quadIndexesSegment = arena.allocate(ValueLayout.JAVA_INT, quadIndexes.length);
-            int status = invokeStaticTopoSort(this.getHandle(), failOnIntersection ? 1 : 0,
-                    quadIndexesSegment, quadIndexes.length);
-
-            if (status == SORT_FAILED) {
-                return null;
-            }
-            check(status, "native static translucent topo sort");
-
-            for (int index = 0; index < quadIndexes.length; index++) {
-                quadIndexes[index] = quadIndexesSegment.getAtIndex(ValueLayout.JAVA_INT, index);
-            }
-        }
-
-        return quadIndexes;
     }
 
     NativeTranslucentSortData createStaticTopoSortData(boolean failOnIntersection) {
@@ -462,17 +352,6 @@ public final class NativeTranslucentGeometryAnalyzer {
         }
     }
 
-    private static int invokeAppendNativeQuadBatch(long handle, long nativeQuadAddress, int quadCount, int facing,
-            MemorySegment packedNormals, long validityAddress, MemorySegment validCountOutput) {
-        try {
-            return (int) APPEND_NATIVE_QUAD_BATCH.invokeExact(handle, nativeQuadAddress, quadCount, facing,
-                    packedNormals, validityAddress, validCountOutput);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust translucent analyzer native batch append downcall failed",
-                    throwable);
-        }
-    }
-
     private static int invokeRecordCount(long handle, MemorySegment countOutput) {
         try {
             return (int) RECORD_COUNT.invokeExact(handle, countOutput);
@@ -514,34 +393,6 @@ public final class NativeTranslucentGeometryAnalyzer {
                     meshFacingCounts, meshFacingCountsLength, staticKeys, staticKeysLength);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust translucent analyzer downcall failed", throwable);
-        }
-    }
-
-    private static int invokeStaticTopoSort(long handle, int failOnIntersection, MemorySegment quadIndexes,
-            int quadIndexesLength) {
-        try {
-            return (int) STATIC_TOPO_SORT.invokeExact(handle, failOnIntersection, quadIndexes, quadIndexesLength);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust static translucent topo sort downcall failed", throwable);
-        }
-    }
-
-    private static int invokeTopoGraphSort(MemorySegment records, int recordCount,
-            MemorySegment activeToRealIndex, int activeToRealIndexLength, int failOnIntersection,
-            MemorySegment quadIndexes, int quadIndexesLength) {
-        try {
-            return (int)TOPO_GRAPH_SORT.invokeExact(records, recordCount, activeToRealIndex,
-                    activeToRealIndexLength, failOnIntersection, quadIndexes, quadIndexesLength);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust translucent topo graph sort downcall failed", throwable);
-        }
-    }
-
-    private static int invokeTopoQuadStoreCreate(MemorySegment records, int recordCount, MemorySegment outputHandle) {
-        try {
-            return (int)TOPO_QUAD_STORE_CREATE.invokeExact(records, recordCount, outputHandle);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust translucent topo quad store creation downcall failed", throwable);
         }
     }
 
@@ -665,6 +516,155 @@ public final class NativeTranslucentGeometryAnalyzer {
                 throw new IllegalStateException("Native translucent topo quad store has been closed");
             }
             return this.handle;
+        }
+    }
+
+    int appendNativeQuadBatch(long nativeQuadAddress, int quadCount, ModelQuadFacing facing, long packedNormalsAddress,
+            long validityAddress) {
+        if (quadCount < 0) {
+            throw new IllegalArgumentException("Invalid native translucent quad count: " + quadCount);
+        }
+        if (quadCount == 0) {
+            return 0;
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment validCountSegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeAppendNativeQuadBatch(this.getHandle(), nativeQuadAddress, quadCount, facing.ordinal(),
+                    MemorySegment.ofAddress(packedNormalsAddress), validityAddress, validCountSegment),
+                    "native translucent analyzer batch append");
+            return validCountSegment.get(ValueLayout.JAVA_INT, 0);
+        }
+    }
+
+    public static TopoQuadStore createTopoQuadStore(TQuad[] quads) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment recordsSegment = quads.length == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate((long) quads.length * TOPO_RECORD_STRIDE, Integer.BYTES);
+            for (int quadIndex = 0; quadIndex < quads.length; quadIndex++) {
+                writeTopoRecord(recordsSegment.asSlice((long) quadIndex * TOPO_RECORD_STRIDE), quads[quadIndex]);
+            }
+
+            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            check(invokeTopoQuadStoreCreate(recordsSegment, quads.length, handleSegment),
+                    "native translucent topo quad store creation");
+            long handle = handleSegment.get(ValueLayout.JAVA_LONG, 0);
+            if (handle == 0) {
+                throw new IllegalStateException("Native translucent topo quad store creation returned a null handle");
+            }
+            return new TopoQuadStore(handle);
+        }
+    }
+
+    int[] staticTopoSort(boolean failOnIntersection) {
+        int[] quadIndexes = new int[this.getRecordCount()];
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment quadIndexesSegment = arena.allocate(ValueLayout.JAVA_INT, quadIndexes.length);
+            int status = invokeStaticTopoSort(this.getHandle(), failOnIntersection ? 1 : 0,
+                    quadIndexesSegment, quadIndexes.length);
+
+            if (status == SORT_FAILED) {
+                return null;
+            }
+            check(status, "native static translucent topo sort");
+
+            for (int index = 0; index < quadIndexes.length; index++) {
+                quadIndexes[index] = quadIndexesSegment.getAtIndex(ValueLayout.JAVA_INT, index);
+            }
+        }
+
+        return quadIndexes;
+    }
+
+    public static int[] topoGraphSort(TQuad[] quads, boolean failOnIntersection) {
+        return topoGraphSort(quads, quads.length, null, failOnIntersection);
+    }
+
+    public static int[] topoGraphSort(TQuad[] quads, int quadCount, int[] activeToRealIndex,
+            boolean failOnIntersection) {
+        if (quadCount < 0 || quadCount > quads.length) {
+            throw new IllegalArgumentException("Invalid translucent topo quad count: " + quadCount);
+        }
+        if (activeToRealIndex != null && activeToRealIndex.length < quadCount) {
+            throw new IllegalArgumentException("Active translucent topo index map is shorter than the quad count");
+        }
+
+        int[] quadIndexes = new int[quadCount];
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment recordsSegment = quadCount == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate((long) quadCount * TOPO_RECORD_STRIDE, Integer.BYTES);
+            for (int quadIndex = 0; quadIndex < quadCount; quadIndex++) {
+                writeTopoRecord(recordsSegment.asSlice((long) quadIndex * TOPO_RECORD_STRIDE), quads[quadIndex]);
+            }
+
+            MemorySegment activeToRealIndexSegment = MemorySegment.NULL;
+            int activeToRealIndexLength = 0;
+            if (activeToRealIndex != null) {
+                activeToRealIndexSegment = arena.allocate(ValueLayout.JAVA_INT, activeToRealIndex.length);
+                activeToRealIndexLength = activeToRealIndex.length;
+                for (int index = 0; index < activeToRealIndex.length; index++) {
+                    activeToRealIndexSegment.setAtIndex(ValueLayout.JAVA_INT, index, activeToRealIndex[index]);
+                }
+            }
+
+            MemorySegment quadIndexesSegment = quadCount == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(ValueLayout.JAVA_INT, quadCount);
+            int status = invokeTopoGraphSort(recordsSegment, quadCount, activeToRealIndexSegment,
+                    activeToRealIndexLength, failOnIntersection ? 1 : 0, quadIndexesSegment, quadIndexes.length);
+            if (status == SORT_FAILED) {
+                return null;
+            }
+            check(status, "native translucent topo graph sort");
+
+            for (int index = 0; index < quadIndexes.length; index++) {
+                quadIndexes[index] = quadIndexesSegment.getAtIndex(ValueLayout.JAVA_INT, index);
+            }
+        }
+
+        return quadIndexes;
+    }
+
+    private static int invokeAppendNativeQuadBatch(long handle, long nativeQuadAddress, int quadCount, int facing,
+            MemorySegment packedNormals, long validityAddress, MemorySegment validCountOutput) {
+        try {
+            return (int) APPEND_NATIVE_QUAD_BATCH.invokeExact(handle, nativeQuadAddress, quadCount, facing,
+                    packedNormals, validityAddress, validCountOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent analyzer native batch append downcall failed",
+                    throwable);
+        }
+    }
+
+    private static int invokeStaticTopoSort(long handle, int failOnIntersection, MemorySegment quadIndexes,
+            int quadIndexesLength) {
+        try {
+            return (int) STATIC_TOPO_SORT.invokeExact(handle, failOnIntersection, quadIndexes, quadIndexesLength);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust static translucent topo sort downcall failed", throwable);
+        }
+    }
+
+    private static int invokeTopoGraphSort(MemorySegment records, int recordCount,
+            MemorySegment activeToRealIndex, int activeToRealIndexLength, int failOnIntersection,
+            MemorySegment quadIndexes, int quadIndexesLength) {
+        try {
+            return (int)TOPO_GRAPH_SORT.invokeExact(records, recordCount, activeToRealIndex,
+                    activeToRealIndexLength, failOnIntersection, quadIndexes, quadIndexesLength);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent topo graph sort downcall failed", throwable);
+        }
+    }
+
+    private static int invokeTopoQuadStoreCreate(MemorySegment records, int recordCount, MemorySegment outputHandle) {
+        try {
+            return (int)TOPO_QUAD_STORE_CREATE.invokeExact(records, recordCount, outputHandle);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent topo quad store creation downcall failed", throwable);
         }
     }
 }

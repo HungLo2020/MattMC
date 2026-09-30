@@ -20,10 +20,6 @@ public class MathUtil
 	 */
 	public static double clamp(double min, double value, double max) { return Math.min(max, Math.max(value, min)); }
 	
-	/**
-	 * Like Math.floorDiv, but reverse in that it is a ceilDiv
-	 */
-	public static int ceilDiv(int value, int divider) { return -Math.floorDiv(-value, divider); }
 	
 	// Why is this not in the standard library?! Come on Java!
 	public static byte min(byte a, byte b) { return a < b ? a : b; }

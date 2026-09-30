@@ -26,16 +26,6 @@ class ShieldModelSemanticAdmissionTest {
                 net.minecraft.client.resources.model.ModelBakery.NO_PATTERN_SHIELD.texture()));
         } finally { if(before==null)System.clearProperty(key);else System.setProperty(key,before); }
     }
-    @Test void onlyStaticPlainShieldPartFoilIsNormallyAdmitted() {
-        var plain=net.minecraft.client.resources.model.ModelBakery.NO_PATTERN_SHIELD.texture();
-        assertTrue(RustGalWorldPrimitiveRenderer.isAdmittedShieldPartFoil(plain,false));
-        assertFalse(RustGalWorldPrimitiveRenderer.isAdmittedShieldPartFoil(plain,true));
-        assertFalse(RustGalWorldPrimitiveRenderer.isAdmittedShieldPartFoil(null,false));
-        assertFalse(RustGalWorldPrimitiveRenderer.isAdmittedShieldPartFoil(
-            net.minecraft.client.resources.model.ModelBakery.SHIELD_BASE.texture(),false));
-        assertFalse(RustGalWorldPrimitiveRenderer.isAdmittedShieldPartFoil(
-            net.minecraft.resources.ResourceLocation.withDefaultNamespace("entity/unknown"),false));
-    }
     @Test void wholeShieldModelDoesNotRequirePrivateOptIn() throws Exception {
         var method=RustGalWorldPrimitiveRenderer.class.getDeclaredMethod("isSupportedModelMeshModel",net.minecraft.client.model.Model.class);
         method.setAccessible(true);

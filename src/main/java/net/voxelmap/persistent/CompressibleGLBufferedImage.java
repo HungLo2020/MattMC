@@ -2,28 +2,14 @@ package net.voxelmap.persistent;
 
 import net.voxelmap.VoxelConstants;
 import net.voxelmap.util.CompressionUtils;
-import net.blaze3d.platform.NativeImage;
-import net.blaze3d.platform.NativeImage.Format;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.zip.DataFormatException;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
-import org.apache.logging.log4j.Level;
-import org.lwjgl.system.MemoryUtil;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.gui.RustGalGuiRawImageAssets;
+import org.apache.logging.log4j.Level;
 
 public class CompressibleGLBufferedImage {
-    private static final HashMap<Integer, ByteBuffer> byteBuffers = new HashMap<>(4);
-    private static final int DEFAULT_SIZE = 256;
-    private static final ByteBuffer defaultSizeBuffer = ByteBuffer.allocateDirect(DEFAULT_SIZE * DEFAULT_SIZE * 4).order(ByteOrder.nativeOrder());
-    private static final VulkanicResourceBarriers TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
-        VulkanicResourceBarriers.Barrier.TEXTURE_FETCH
-    );
 
     private byte[] bytes;
     private final int width;
@@ -32,7 +18,7 @@ public class CompressibleGLBufferedImage {
     private boolean isCompressed;
     private final boolean compressNotDelete;
     private final ResourceLocation location = ResourceLocation.fromNamespaceAndPath("voxelmap", "mapimage/" + UUID.randomUUID());
-    private DynamicTexture texture;
+    private boolean staged;
 
     public CompressibleGLBufferedImage(int width, int height, int imageType) {
         this.width = width;
@@ -50,7 +36,26 @@ public class CompressibleGLBufferedImage {
     }
 
     public ResourceLocation getTextureLocation() {
-        return this.texture != null ? this.location : null;
+        return this.staged ? this.location : null;
+    }
+
+    /** Publishes the current CPU pixels as a Rust semantic GUI image. */
+    public void stageToRust() {
+        if (!VulkanicAPI.isOnRenderThread()) {
+            VoxelConstants.getLogger().log(Level.WARN, "Texture upload call from wrong thread", new Exception());
+            return;
+        }
+
+        if (this.isCompressed) {
+            this.decompress();
+        }
+
+        byte[] pixels;
+        synchronized (this.bufferLock) {
+            pixels = this.bytes.clone();
+        }
+        this.staged = RustGalGuiRawImageAssets.stageCpuRgba8(this.location, this.width, this.height, pixels, true);
+        this.compress();
     }
 
     public int getWidth() {
@@ -66,53 +71,10 @@ public class CompressibleGLBufferedImage {
             VoxelConstants.getLogger().log(Level.WARN, "Texture unload call from wrong thread", new Exception());
             return;
         }
-        if (this.texture != null) {
-            Minecraft.getInstance().getTextureManager().release(location);
-            this.texture = null;
+        if (this.staged) {
+            RustGalGuiRawImageAssets.releaseCpuRgba8(this.location);
+            this.staged = false;
         }
-    }
-
-    public void uploadToTexture() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            throw new IllegalStateException("Java VoxelMap persistent-image upload is unavailable while Rust owns whole-frame presentation");
-        }
-        if (!VulkanicAPI.isOnRenderThread()) {
-            VoxelConstants.getLogger().log(Level.WARN, "Texture upload call from wrong thread", new Exception());
-            return;
-        }
-
-        if (this.isCompressed) {
-            this.decompress();
-        }
-
-        if (this.texture == null) {
-            this.texture = new DynamicTexture(() -> "", new NativeImage(Format.RGBA, width, height, false));
-            this.texture.setClamp(true);
-            this.texture.setFilter(true, true);
-            Minecraft.getInstance().getTextureManager().register(location, texture);
-        }
-
-        ByteBuffer buffer = byteBuffers.get(this.width * this.height);
-        if (buffer == null) {
-            buffer = ByteBuffer.allocateDirect(this.width * this.height * 4).order(ByteOrder.nativeOrder());
-            byteBuffers.put(this.width * this.height, buffer);
-        }
-        buffer.clear();
-        synchronized (this.bufferLock) {
-            buffer.put(this.bytes);
-            buffer.position(0).limit(this.bytes.length);
-        }
-
-        int imageBytes = width * height * this.texture.getPixels().format().components();
-        ByteBuffer outBuffer = MemoryUtil.memByteBuffer(this.texture.getPixels().getPointer(), imageBytes);
-        MemoryUtil.memCopy(buffer, outBuffer);
-        this.texture.upload();
-        // Use DSA mipmap generation — avoids mutating the global GL texture bind state
-        // and requires only a single VulkanicAPI call instead of a bind + generate pair.
-        VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicCoreAPI.textureId(this.texture.getTexture()));
-        VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
-        this.compress();
     }
 
     public void setRGB(int x, int y, int color) {
@@ -155,9 +117,5 @@ public class CompressibleGLBufferedImage {
             }
 
         }
-    }
-
-    static {
-        byteBuffers.put(DEFAULT_SIZE * DEFAULT_SIZE, defaultSizeBuffer);
     }
 }

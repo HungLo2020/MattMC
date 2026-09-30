@@ -170,7 +170,6 @@ public class ParticleEngine {
 	}
 
 	public int enqueueRustGalBlockMarkers(Camera camera, float f) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
 		int enqueued = 0;
 		for (ParticleGroup<?> particleGroup : this.particles.values()) {
 			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
@@ -181,7 +180,6 @@ public class ParticleEngine {
 	}
 
 	public int enqueueRustGalTerrainParticles(Camera camera, float f) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
 		int enqueued = 0;
 		int terrainParticles = 0;
 		for (ParticleGroup<?> particleGroup : this.particles.values()) {
@@ -199,7 +197,6 @@ public class ParticleEngine {
 	}
 
 	public int enqueueRustGalParticles() {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
 		int enqueued = 0;
 		for (ParticleGroup<?> particleGroup : this.particles.values()) {
 			if (particleGroup instanceof QuadParticleGroup quadParticleGroup) {
@@ -215,7 +212,6 @@ public class ParticleEngine {
 	 * state from the current camera/frustum before handing it to Rust.
 	 */
 	public int enqueueRustGalParticles(Frustum frustum, Camera camera, float partialTick) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
 		net.minecraft.client.dev.GraphicsAuditLavaFixture.beginParticles();
 		int enqueued = 0;
 		int terrainParticles = 0;
@@ -256,7 +252,6 @@ public class ParticleEngine {
 	public int enqueueRustGalModelParticles(
 		Camera camera, float partialTick, SubmitNodeStorage submitNodeStorage, CameraRenderState cameraRenderState
 	) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return 0;
 		int enqueued = 0;
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.ModelMeshBatchCheckpoint checkpoint =
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.markModelMeshBatch();

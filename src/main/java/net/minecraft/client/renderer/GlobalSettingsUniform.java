@@ -17,30 +17,12 @@ public class GlobalSettingsUniform implements AutoCloseable {
 	private GpuBuffer buffer;
 
 	public GlobalSettingsUniform() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java global-settings UBO is unavailable on selected Vulkan");
-		}
-		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Global Settings UBO", 136, UBO_SIZE);
+		throw new IllegalStateException("Java global-settings UBO is unavailable on selected Vulkan");
 	}
 
 	public void update(int i, int j, double d, long l, DeltaTracker deltaTracker, int k) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			this.ensureRustSemanticRoute();
-			return;
-		}
-		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
-			ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, UBO_SIZE)
-				.putVec2(i, j)
-				.putFloat((float)d)
-				.putFloat(((float)(l % 24000L) + deltaTracker.getGameTimeDeltaPartialTick(false)) / 24000.0F)
-				.putInt(k)
-				.get();
-			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
-		}
-
-		VulkanicAPI.setGlobalSettingsUniform(this.buffer);
+		this.ensureRustSemanticRoute();
+		return;
 	}
 
 	public void close() {
@@ -51,7 +33,6 @@ public class GlobalSettingsUniform implements AutoCloseable {
 	}
 
 	public void ensureRustSemanticRoute() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) this.close();
+		this.close();
 	}
 }

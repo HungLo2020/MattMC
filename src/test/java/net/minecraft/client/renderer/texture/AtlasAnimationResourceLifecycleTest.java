@@ -10,7 +10,7 @@ import net.minecraft.client.resources.metadata.animation.FrameSize;
 import net.minecraft.resources.ResourceLocation;
 import net.sodium.client.render.texture.SpriteUtilImpl;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.vulkan.VulkanWholeFrameSemanticGpuDevice;
+import net.vulkanic.bridge.RustSemanticGpuDevice;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -69,7 +69,7 @@ class AtlasAnimationResourceLifecycleTest {
             if (shieldLifecycle) System.setProperty(shieldProperty, "true");
             else System.clearProperty(shieldProperty);
             config.set(null, net.sodium.client.gui.SodiumGameOptions.defaults());
-            device.set(null, new VulkanWholeFrameSemanticGpuDevice());
+            device.set(null, new RustSemanticGpuDevice());
             atlas = new TextureAtlas(location);
             assertEquals(0, atlas.width);
             assertEquals(0, atlas.height);
@@ -102,9 +102,6 @@ class AtlasAnimationResourceLifecycleTest {
             var tickers = TextureAtlas.class.getDeclaredField("animatedTextures");
             tickers.setAccessible(true);
             tickers.set(atlas, List.of(new TextureAtlasSprite.Ticker() {
-                @Override public void tickAndUpload(net.blaze3d.textures.GpuTexture texture) {
-                    fail("selected Vulkan must not invoke a stale Java uploader");
-                }
                 @Override public boolean tickSemantic() {
                     return fail("selected Vulkan must not advance a stale Java animation clock");
                 }

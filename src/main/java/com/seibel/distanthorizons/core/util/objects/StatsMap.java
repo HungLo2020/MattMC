@@ -25,11 +25,6 @@ public class StatsMap
 	{
 		longMap.put(key, longMap.getOrDefault(key, 0L) + value);
 	}
-	public void incBytesStat(String key, long bytes)
-	{
-		long b = bytesMap.getOrDefault(key, new UnitBytes(0)).value;
-		bytesMap.put(key, new UnitBytes(b + bytes));
-	}
 	
 	@Override
 	public String toString()

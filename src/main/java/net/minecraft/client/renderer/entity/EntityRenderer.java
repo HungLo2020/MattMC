@@ -119,12 +119,7 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 	public void submit(S entityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		if (entityRenderState.leashStates != null) {
 			for (EntityRenderState.LeashState leashState : entityRenderState.leashStates) {
-				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-					submitNodeCollector.submitLeashSemantic(poseStack, leashState);
-				} else {
-					submitNodeCollector.submitLeashSemantic(poseStack, leashState);
-				}
+				submitNodeCollector.submitLeashSemantic(poseStack, leashState);
 			}
 		}
 
@@ -141,20 +136,11 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 
 	protected void submitNameTag(S entityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		if (entityRenderState.nameTag != null) {
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				submitNodeCollector.submitNameTagSemantic(
-					poseStack, entityRenderState.nameTagAttachment, 0, entityRenderState.nameTag,
-					!entityRenderState.isDiscrete, entityRenderState.lightCoords,
-					entityRenderState.distanceToCameraSq, cameraRenderState
-				);
-			} else {
-				submitNodeCollector.submitNameTagSemantic(
-					poseStack, entityRenderState.nameTagAttachment, 0, entityRenderState.nameTag,
-					!entityRenderState.isDiscrete, entityRenderState.lightCoords,
-					entityRenderState.distanceToCameraSq, cameraRenderState
-				);
-			}
+			submitNodeCollector.submitNameTagSemantic(
+				poseStack, entityRenderState.nameTagAttachment, 0, entityRenderState.nameTag,
+				!entityRenderState.isDiscrete, entityRenderState.lightCoords,
+				entityRenderState.distanceToCameraSq, cameraRenderState
+			);
 		}
 	}
 

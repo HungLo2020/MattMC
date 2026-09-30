@@ -26,53 +26,6 @@ public abstract class NormalHelper {
 		return (packed & 0xFF000000) | (iz << 16) | (iy << 8) | ix;
 	}
 
-	public static void octahedronEncode(Vector2f output, float x, float y, float z) {
-		float nX = x, nY = y, nZ = z;
-
-		float invL1 = 1.0f / (Math.abs(nX) + Math.abs(nY) + Math.abs(nZ));
-		nX *= invL1;
-		nY *= invL1;
-		nZ *= invL1;
-
-		float oX, oY;
-		if (nZ >= 0.0f) {
-			oX = nX;
-			oY = nY;
-		} else {
-			float absNX = Math.abs(nX);
-			float absNY = Math.abs(nY);
-			oX = (1.0f - absNY) * (nX >= 0.0f ? 1.0f : -1.0f);
-			oY = (1.0f - absNX) * (nY >= 0.0f ? 1.0f : -1.0f);
-		}
-
-		output.set(oX, oY);
-	}
-
-	public static void tangentEncode(Vector2f output, Vector4f tangent) {
-		octahedronEncode(output, tangent.x, tangent.y, tangent.z);
-		float y_sign = output.y >= 0.0f ? 64.0f / 127.0f : -64.0f / 127.0f;
-		output.y *= 63.0f / 127.0f;
-		output.y = tangent.w >= 0.0f ? output.y : output.y + y_sign;
-	}
-
-	static Vector4f octahedron_tangent_decode(Vector2f p_oct) {
-		Vector2f oct_compressed = new Vector2f(p_oct);
-		oct_compressed.y = oct_compressed.y * 127.0f / 64.0f;
-		float r_sign = Math.abs(oct_compressed.y) >= 1.0f ? -1.0f : 1.0f;
-		oct_compressed.y = oct_compressed.y % 1.0f;
-		Vector3f res = octahedron_decode(oct_compressed.x, oct_compressed.y);
-		return new Vector4f(res.x, res.y, res.z, r_sign);
-	}
-
-	private static Vector3f octahedron_decode(float inX, float inY) {
-		Vector2f f = new Vector2f(inX, inY);
-		Vector3f n = new Vector3f(f.x, f.y, 1.0f - Math.abs(f.x) - Math.abs(f.y));
-		float t = Mth.clamp(-n.z, 0.0f, 1.0f);
-		n.x += n.x >= 0 ? -t : t;
-		n.y += n.y >= 0 ? -t : t;
-		return n.normalize();
-	}
-
 	/**
 	 * Computes the face normal of the given quad and saves it in the provided non-null vector.
 	 *
@@ -122,51 +75,6 @@ public abstract class NormalHelper {
 		saveTo.set(normX, normY, normZ);
 
 		saveTo.normalize();
-	}
-
-	/**
-	 * Computes the face normal of the given quad with a flipped order and saves it in the provided non-null vector.
-	 *
-	 * <p>Assumes counter-clockwise winding order, which is the norm. It will be read clockwise to flip it.
-	 * Expects convex quads with all points co-planar.
-	 */
-	public static void computeFaceNormalFlipped(@NotNull Vector3f saveTo, QuadView q) {
-		final float x0 = q.x(3);
-		final float y0 = q.y(3);
-		final float z0 = q.z(3);
-		final float x1 = q.x(2);
-		final float y1 = q.y(2);
-		final float z1 = q.z(2);
-		final float x2 = q.x(1);
-		final float y2 = q.y(1);
-		final float z2 = q.z(1);
-		final float x3 = q.x(0);
-		final float y3 = q.y(0);
-		final float z3 = q.z(0);
-
-		computeFaceNormalManual(saveTo, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3);
-	}
-
-	/**
-	 * Computes the face normal of the given tri and saves it in the provided non-null vector.
-	 *
-	 * <p>Assumes counter-clockwise winding order, which is the norm.
-	 */
-	public static void computeFaceNormalTri(@NotNull Vector3f saveTo, TriView t) {
-		final float x0 = t.x(0);
-		final float y0 = t.y(0);
-		final float z0 = t.z(0);
-		final float x1 = t.x(1);
-		final float y1 = t.y(1);
-		final float z1 = t.z(1);
-		final float x2 = t.x(2);
-		final float y2 = t.y(2);
-		final float z2 = t.z(2);
-
-		// note: subtraction order is significant here because of how the cross product works.
-		// If we're wrong our calculated normal will be pointing in the opposite direction of how it should.
-		// This current order is similar enough to the order in the quad variant.
-		computeFaceNormalManual(saveTo, x0, y0, z0, x1, y1, z1, x2, y2, z2, x0, y0, z0);
 	}
 
 	public static int computeTangentSmooth(float normalX, float normalY, float normalZ, TriView t) {

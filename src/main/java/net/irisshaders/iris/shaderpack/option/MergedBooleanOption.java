@@ -44,7 +44,4 @@ public class MergedBooleanOption {
 		return option;
 	}
 
-	public ImmutableSet<OptionLocation> getLocations() {
-		return locations;
-	}
 }

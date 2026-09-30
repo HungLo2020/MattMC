@@ -23,14 +23,6 @@ public class Std140Builder {
 		this.start = byteBuffer.position();
 	}
 
-	public static Std140Builder intoBuffer(ByteBuffer byteBuffer) {
-		return new Std140Builder(byteBuffer);
-	}
-
-	public static Std140Builder onStack(MemoryStack memoryStack, int i) {
-		return new Std140Builder(memoryStack.malloc(i));
-	}
-
 	public ByteBuffer get() {
 		return this.buffer.flip();
 	}
@@ -63,20 +55,6 @@ public class Std140Builder {
 	public Std140Builder putVec2(Vector2fc vector2fc) {
 		this.align(8);
 		vector2fc.get(this.buffer);
-		this.buffer.position(this.buffer.position() + 8);
-		return this;
-	}
-
-	public Std140Builder putIVec2(int i, int j) {
-		this.align(8);
-		this.buffer.putInt(i);
-		this.buffer.putInt(j);
-		return this;
-	}
-
-	public Std140Builder putIVec2(Vector2ic vector2ic) {
-		this.align(8);
-		vector2ic.get(this.buffer);
 		this.buffer.position(this.buffer.position() + 8);
 		return this;
 	}
@@ -125,22 +103,6 @@ public class Std140Builder {
 	public Std140Builder putVec4(Vector4fc vector4fc) {
 		this.align(16);
 		vector4fc.get(this.buffer);
-		this.buffer.position(this.buffer.position() + 16);
-		return this;
-	}
-
-	public Std140Builder putIVec4(int i, int j, int k, int l) {
-		this.align(16);
-		this.buffer.putInt(i);
-		this.buffer.putInt(j);
-		this.buffer.putInt(k);
-		this.buffer.putInt(l);
-		return this;
-	}
-
-	public Std140Builder putIVec4(Vector4ic vector4ic) {
-		this.align(16);
-		vector4ic.get(this.buffer);
 		this.buffer.position(this.buffer.position() + 16);
 		return this;
 	}

@@ -58,18 +58,24 @@ final class NativeMeshingCompatibilityFallback {
         return cache.getFluidRenderer().getEmittedQuadCount() - quadStart;
     }
 
+    private static void beginIrisBlock(BlockRenderer blockRenderer, BlockState blockState, BlockPos blockPos) {
+		return;
+    }
+
+    private static void beginIrisFluid(BlockRenderCache cache, BlockState blockState, FluidState fluidState,
+            BlockPos blockPos) {
+		return;
+    }
+
     private static void rejectRustWholeFrameFluidFallback() {
         rejectRustWholeFrameFallback("fluid");
     }
 
     private static void rejectRustWholeFrameFallback(String family) {
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            throw new IllegalStateException(
-                    "Rust whole-frame terrain cannot execute a Java " + family + " fallback; "
-                            + "the work must be admitted by the explicit semantic ABI"
-            );
-        }
+        throw new IllegalStateException(
+                "Rust whole-frame terrain cannot execute a Java " + family + " fallback; "
+                        + "the work must be admitted by the explicit semantic ABI"
+        );
     }
 
     static int runMeshAppenders(ChunkRenderContext renderContext, ChunkBuildBuffers buffers, LevelSlice slice,
@@ -83,32 +89,5 @@ final class NativeMeshingCompatibilityFallback {
         int emittedQuads = buffers.getFallbackConsumerEmittedQuadCount() - quadStart;
         fallbackStats.recordAppenderFallbackQuads(emittedQuads);
         return emittedQuads;
-    }
-
-    private static void beginIrisBlock(BlockRenderer blockRenderer, BlockState blockState, BlockPos blockPos) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			return;
-		}
-        var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
-        if (ids != null) {
-            ((net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface) blockRenderer).beginBlock(
-                    ids.getOrDefault(blockState, -1), (byte) 0, (byte) blockState.getLightEmission(),
-                    blockPos.getX(), blockPos.getY(), blockPos.getZ());
-        }
-    }
-
-    private static void beginIrisFluid(BlockRenderCache cache, BlockState blockState, FluidState fluidState,
-            BlockPos blockPos) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			return;
-		}
-        var ids = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
-        if (ids != null) {
-            ((net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface) cache.getFluidRenderer()).beginBlock(
-                    ids.getInt(fluidState.createLegacyBlock()), (byte) 1, (byte) blockState.getLightEmission(),
-                    blockPos.getX(), blockPos.getY(), blockPos.getZ());
-        }
     }
 }

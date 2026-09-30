@@ -61,11 +61,6 @@ public class ClientLanguage extends Language {
 		// Rust whole-frame GUI extraction uses the copied resource-manager
 		// language map and must not initialize or query Iris runtime classes.
 		String json = String.format(Locale.ROOT, "lang/%s.json", string);
-		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& net.irisshaders.iris.Iris.class.getResource("/assets/iris/" + json) != null) {
-			Language.loadFromJson(net.irisshaders.iris.Iris.class.getResourceAsStream("/assets/iris/" + json), map::put);
-		}
 		
 		for (Resource resource : list) {
 			try {
@@ -116,35 +111,6 @@ public class ClientLanguage extends Language {
 	
 	// Iris: From MixinClientLanguage - lookup shaderpack language entries
 	private String iris$lookupOverriddenEntry(String key) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			return null;
-		}
-		net.irisshaders.iris.shaderpack.ShaderPack pack = net.irisshaders.iris.Iris.getCurrentPack().orElse(null);
-		
-		if (pack == null) {
-			return null;
-		}
-		
-		net.irisshaders.iris.shaderpack.LanguageMap languageMap = pack.getLanguageMap();
-		
-		if (storage.containsKey(key)) {
-			// Don't allow shader packs to override existing MC translations
-			return null;
-		}
-		
-		for (String code : iris$languageCodes) {
-			Map<String, String> translations = languageMap.getTranslations(code);
-			
-			if (translations != null) {
-				String translation = translations.get(key);
-				
-				if (translation != null) {
-					return translation;
-				}
-			}
-		}
-		
 		return null;
 	}
 

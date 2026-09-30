@@ -43,39 +43,6 @@ public record VulkanicRenderPassDescriptor(
         return new VulkanicRenderPassDescriptor(label, colorAttachment, null);
     }
 
-    /**
-     * Convenience constructor for color + depth pass semantics using legacy optional clears.
-     */
-    public static VulkanicRenderPassDescriptor colorAndDepth(
-        Supplier<String> label,
-        VulkanicTextureView colorTarget,
-        OptionalInt clearColor,
-        @Nullable VulkanicTextureView depthTarget,
-        OptionalDouble clearDepth
-    ) {
-        Objects.requireNonNull(clearColor, "clearColor must not be null");
-        Objects.requireNonNull(clearDepth, "clearDepth must not be null");
-
-        ColorAttachment colorAttachment = new ColorAttachment(
-            colorTarget,
-            clearColor.isPresent() ? LoadOp.CLEAR : LoadOp.LOAD,
-            StoreOp.STORE,
-            clearColor
-        );
-
-        DepthAttachment depthAttachment = null;
-        if (depthTarget != null) {
-            depthAttachment = new DepthAttachment(
-                depthTarget,
-                clearDepth.isPresent() ? LoadOp.CLEAR : LoadOp.LOAD,
-                StoreOp.STORE,
-                clearDepth
-            );
-        }
-
-        return new VulkanicRenderPassDescriptor(label, colorAttachment, depthAttachment);
-    }
-
     public record ColorAttachment(
         VulkanicTextureView target,
         LoadOp loadOp,

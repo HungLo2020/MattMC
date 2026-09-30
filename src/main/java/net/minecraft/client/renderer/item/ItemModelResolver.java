@@ -58,16 +58,6 @@ public class ItemModelResolver {
 		@Nullable ItemOwner itemOwner,
 		int i
 	) {
-		// Iris display-item context is compatibility metadata only. Rust semantic
-		// item extraction must not publish into that runtime state.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			if (itemStack != null) {
-				((net.irisshaders.iris.mixinterface.ItemContextState) itemStackRenderState).setDisplayItem(itemStack.getItem(), itemStack.get(DataComponents.ITEM_MODEL));
-			} else {
-				((net.irisshaders.iris.mixinterface.ItemContextState) itemStackRenderState).setDisplayItem(null, null);
-			}
-		}
 		
 		ResourceLocation resourceLocation = (ResourceLocation)itemStack.get(DataComponents.ITEM_MODEL);
 		if (resourceLocation != null) {

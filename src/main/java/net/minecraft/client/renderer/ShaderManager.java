@@ -204,66 +204,17 @@ public class ShaderManager extends SimplePreparableReloadListener<ShaderManager.
 
 	protected void apply(ShaderManager.Configs configs, ResourceManager resourceManager, ProfilerFiller profilerFiller) {
 		ShaderManager.CompilationCache compilationCache = new ShaderManager.CompilationCache(configs);
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Java render-pipeline compilation/cache ownership ends at the
-			// whole-frame handoff. Keep the parsed source cache for ordinary
-			// resource bookkeeping, but do not ask the Java backend to compile,
-			// clear, or validate pipelines that Rust never consumes.
-			this.compilationCache.close();
-			this.compilationCache = compilationCache;
-			return;
-		}
-		Set<RenderPipeline> set = new HashSet(RenderPipelines.getStaticPipelines());
-		List<ResourceLocation> list = new ArrayList();
-		net.vulkanic.VulkanicAPI.clearBackendPipelineCache();
-
-		for (RenderPipeline renderPipeline : set) {
-			CompiledRenderPipeline compiledRenderPipeline = net.vulkanic.VulkanicAPI.precompileRenderPipeline(
-				renderPipeline,
-				compilationCache::getShaderSource
-			);
-			if (!compiledRenderPipeline.isValid()) {
-				list.add(renderPipeline.getLocation());
-			}
-		}
-
-		if (!list.isEmpty()) {
-			net.vulkanic.VulkanicAPI.clearBackendPipelineCache();
-			throw new RuntimeException(
-				"Failed to load required shader programs:\n" + (String)list.stream().map(resourceLocation -> " - " + resourceLocation).collect(Collectors.joining("\n"))
-			);
-		} else {
-			this.compilationCache.close();
-			this.compilationCache = compilationCache;
-		}
+		// Java render-pipeline compilation/cache ownership ends at the
+		// whole-frame handoff. Keep the parsed source cache for ordinary
+		// resource bookkeeping, but do not ask the Java backend to compile,
+		// clear, or validate pipelines that Rust never consumes.
+		this.compilationCache.close();
+		this.compilationCache = compilationCache;
+		return;
 	}
 
 	public String getName() {
 		return "Shader Loader";
-	}
-
-	private void tryTriggerRecovery(Exception exception) {
-		if (!this.compilationCache.triggeredRecovery) {
-			this.recoveryHandler.accept(exception);
-			this.compilationCache.triggeredRecovery = true;
-		}
-	}
-
-	@Nullable
-	public PostChain getPostChain(ResourceLocation resourceLocation, Set<ResourceLocation> set) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java post-chain loading is unavailable while Rust owns the selected Vulkan route");
-		}
-		try {
-			return this.compilationCache.getOrLoadPostChain(resourceLocation, set);
-		} catch (ShaderManager.CompilationException var4) {
-			LOGGER.error("Failed to load post chain: {}", resourceLocation, var4);
-			this.compilationCache.postChains.put(resourceLocation, Optional.empty());
-			this.tryTriggerRecovery(var4);
-			return null;
-		}
 	}
 
 	public void close() {
@@ -273,11 +224,8 @@ public class ShaderManager extends SimplePreparableReloadListener<ShaderManager.
 
 	/** Releases Java post-chain resources when Rust Vulkan takes ownership late. */
 	public void ensureRustSemanticRoute() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			this.compilationCache.close();
-			this.postChainProjectionMatrixBuffer.ensureRustSemanticRoute();
-		}
+		this.compilationCache.close();
+		this.postChainProjectionMatrixBuffer.ensureRustSemanticRoute();
 	}
 
 	public String getShader(ResourceLocation resourceLocation, ShaderType shaderType) {
@@ -292,27 +240,6 @@ public class ShaderManager extends SimplePreparableReloadListener<ShaderManager.
 
 		CompilationCache(final ShaderManager.Configs configs) {
 			this.configs = configs;
-		}
-
-		@Nullable
-		public PostChain getOrLoadPostChain(ResourceLocation resourceLocation, Set<ResourceLocation> set) throws ShaderManager.CompilationException {
-			Optional<PostChain> optional = (Optional<PostChain>)this.postChains.get(resourceLocation);
-			if (optional != null) {
-				return (PostChain)optional.orElse(null);
-			} else {
-				PostChain postChain = this.loadPostChain(resourceLocation, set);
-				this.postChains.put(resourceLocation, Optional.of(postChain));
-				return postChain;
-			}
-		}
-
-		private PostChain loadPostChain(ResourceLocation resourceLocation, Set<ResourceLocation> set) throws ShaderManager.CompilationException {
-			PostChainConfig postChainConfig = (PostChainConfig)this.configs.postChains.get(resourceLocation);
-			if (postChainConfig == null) {
-				throw new ShaderManager.CompilationException("Could not find post chain with id: " + resourceLocation);
-			} else {
-				return PostChain.load(postChainConfig, ShaderManager.this.textureManager, set, resourceLocation, ShaderManager.this.postChainProjectionMatrixBuffer);
-			}
 		}
 
 		public void close() {

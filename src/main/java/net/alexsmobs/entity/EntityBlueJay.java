@@ -300,11 +300,10 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
         AABB allyBox = this.getBoundingBox().inflate(64);
         allyBox = allyBox.setMinY(-64);
         allyBox = allyBox.setMaxY(320);
-        boolean any = false;
         for (LivingEntity entity : this.level().getEntitiesOfClass(LivingEntity.class, allyBox, HIGHLIGHTS_WITH_SONG)) {
             entity.addEffect(new MobEffectInstance(MobEffects.GLOWING, blueTime, 0, true, false));
         }
-        return any;
+        return false;
     }
 
     public boolean isMakingMonstersBlue(){

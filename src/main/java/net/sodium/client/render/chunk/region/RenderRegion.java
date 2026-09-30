@@ -1,31 +1,19 @@
 package net.sodium.client.render.chunk.region;
 
-import net.blaze3d.buffers.GpuBuffer;
-import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import net.sodium.client.gl.arena.GlBufferArena;
-import net.sodium.client.gl.arena.staging.StagingBuffer;
-import net.sodium.client.gl.buffer.GlBuffer;
-import net.sodium.client.gl.device.CommandList;
-import net.sodium.client.gl.device.MultiDrawBatch;
-import net.sodium.client.render.chunk.buffer.ChunkBufferArena;
-import net.sodium.client.render.chunk.buffer.GpuChunkBufferArena;
-import net.sodium.client.render.device.RenderTessellation;
-import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.RenderSection;
-import net.sodium.client.render.chunk.data.SectionRenderDataStorage;
 import net.sodium.client.render.chunk.lists.ChunkRenderList;
-import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
-import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.api.util.MathUtil;
 import net.minecraft.core.SectionPos;
 import org.apache.commons.lang3.Validate;
-import net.vulkanic.VulkanicAPI;
-
 import java.util.Arrays;
-import java.util.Map;
 
-public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRenderRegion {
+/**
+ * A fixed block of sections grouped for visibility and render-list
+ * traversal. Rust VulkanicGAL owns all terrain geometry; a region holds no
+ * GPU resources.
+ */
+public class RenderRegion {
     public static final int SECTION_VERTEX_COUNT_ESTIMATE = 756;
     public static final int SECTION_INDEX_COUNT_ESTIMATE = (SECTION_VERTEX_COUNT_ESTIMATE / 4) * 6;
     public static final int SECTION_BUFFER_ESTIMATE = SECTION_VERTEX_COUNT_ESTIMATE * ChunkMeshFormats.COMPACT.getVertexFormat().getStride() + SECTION_INDEX_COUNT_ESTIMATE * Integer.BYTES;
@@ -50,33 +38,18 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
         Validate.isTrue(MathUtil.isPowerOfTwo(REGION_LENGTH));
     }
 
-    private final StagingBuffer stagingBuffer;
     private final int x, y, z;
 
-    // Iris: Made non-final for shadow render list swapping (merged from MixinRenderRegion)
-    private ChunkRenderList renderList;
+    private final ChunkRenderList renderList;
 
     private final RenderSection[] sections = new RenderSection[RenderRegion.REGION_SIZE];
     private int sectionCount;
 
-    private final Map<TerrainRenderPass, SectionRenderDataStorage> sectionRenderData = new Reference2ReferenceOpenHashMap<>();
-    private DeviceResources resources;
-
-    // Iris: Made non-final for shadow batch swapping (merged from MixinRenderRegion)
-    private Map<TerrainRenderPass, MultiDrawBatch> cachedBatches = new Reference2ReferenceOpenHashMap<>();
-
-    // Iris: Shadow render list fields (merged from MixinRenderRegion)
-    private ChunkRenderList regularRenderList;
-    private ChunkRenderList shadowRenderList;
-    private Map<TerrainRenderPass, MultiDrawBatch> regularCachedBatches;
-    private Map<TerrainRenderPass, MultiDrawBatch> shadowCachedBatches;
-
-    public RenderRegion(int x, int y, int z, StagingBuffer stagingBuffer) {
+    public RenderRegion(int x, int y, int z) {
         this.x = x;
         this.y = y;
         this.z = z;
 
-        this.stagingBuffer = stagingBuffer;
         this.renderList = new ChunkRenderList(this);
     }
 
@@ -120,111 +93,12 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
         return this.getChunkZ() << 4;
     }
 
-    public void delete(CommandList commandList) {
-        for (var storage : this.sectionRenderData.values()) {
-            storage.delete();
-        }
-
-        this.sectionRenderData.clear();
-
-        if (this.resources != null) {
-            this.resources.delete(commandList);
-            this.resources = null;
-        }
-
+    public void delete() {
         Arrays.fill(this.sections, null);
-
-        for (var batch : this.cachedBatches.values()) {
-            batch.delete();
-        }
-        this.cachedBatches.clear();
-    }
-
-    public void clearAllCachedBatches() {
-        for (var batch : this.cachedBatches.values()) {
-            batch.clear();
-        }
-    }
-
-    public void clearCachedBatchFor(TerrainRenderPass pass) {
-        // Iris: Also clear shadow batches (merged from MixinRenderRegion)
-        if (this.regularCachedBatches != null) {
-            for(MultiDrawBatch batch : this.regularCachedBatches.values()) {
-                batch.clear();
-            }
-        }
-
-        if (this.shadowCachedBatches != null) {
-            for(MultiDrawBatch batch : this.shadowCachedBatches.values()) {
-                batch.clear();
-            }
-        }
-
-        var batch = this.cachedBatches.get(pass);
-        if (batch != null) {
-            batch.clear();
-        }
-    }
-
-    public MultiDrawBatch getCachedBatch(TerrainRenderPass pass) {
-        MultiDrawBatch batch = this.cachedBatches.get(pass);
-        if (batch != null) {
-            return batch;
-        }
-
-        batch = new MultiDrawBatch((ModelQuadFacing.COUNT * RenderRegion.REGION_SIZE) + 1);
-        this.cachedBatches.put(pass, batch);
-        return batch;
     }
 
     public boolean isEmpty() {
         return this.sectionCount == 0;
-    }
-
-    public SectionRenderDataStorage getStorage(TerrainRenderPass pass) {
-        return this.sectionRenderData.get(pass);
-    }
-
-    public SectionRenderDataStorage createStorage(TerrainRenderPass pass) {
-        var storage = this.sectionRenderData.get(pass);
-
-        if (storage == null) {
-            storage = new SectionRenderDataStorage(pass.isTranslucent());
-            this.sectionRenderData.put(pass, storage);
-        }
-
-        return storage;
-    }
-
-    public void refreshTesselation(CommandList commandList) {
-        if (this.resources != null) {
-            this.resources.deleteTessellation(commandList);
-            this.resources.deleteIndexedTessellation(commandList);
-        }
-
-        for (var storage : this.sectionRenderData.values()) {
-            storage.onBufferResized();
-        }
-    }
-
-    public void refreshIndexedTesselation(CommandList commandList) {
-        if (this.resources != null) {
-            this.resources.deleteIndexedTessellation(commandList);
-        }
-
-        this.sectionRenderData.get(DefaultTerrainRenderPasses.TRANSLUCENT).onIndexBufferResized();
-    }
-
-    public void addSection(RenderSection section) {
-        var sectionIndex = section.getSectionIndex();
-        var prev = this.sections[sectionIndex];
-
-        if (prev != null) {
-            throw new IllegalStateException("Section has already been added to the region");
-        }
-
-        this.sections[sectionIndex] = section;
-        this.sectionCount++;
     }
 
     public void removeSection(RenderSection section) {
@@ -237,10 +111,6 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
             throw new IllegalStateException("Tried to remove the wrong section");
         }
 
-        for (var storage : this.sectionRenderData.values()) {
-            storage.removeData(sectionIndex);
-        }
-
         this.sections[sectionIndex] = null;
         this.sectionCount--;
     }
@@ -249,194 +119,8 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
         return this.sections[id];
     }
 
-    public DeviceResources getResources() {
-        return this.resources;
-    }
-
-    public DeviceResources createResources(CommandList commandList) {
-        if (this.resources == null) {
-            this.resources = new DeviceResources(commandList, this.stagingBuffer);
-        }
-
-        return this.resources;
-    }
-
-    public void update(CommandList commandList) {
-        if (this.resources != null && this.resources.shouldDelete()) {
-            this.resources.delete(commandList);
-            this.resources = null;
-        }
-    }
 
     public ChunkRenderList getRenderList() {
         return this.renderList;
-    }
-
-    public static class DeviceResources {
-        private final ChunkBufferArena geometryArena;
-        private final ChunkBufferArena indexArena;
-        private RenderTessellation tessellation;
-        private RenderTessellation indexedTessellation;
-
-        /**
-         * The buffer arenas return offsets in terms of how many stride units big things
-         * are. This means that if the stride is the length of a vertex, the buffer
-         * arena works with vertices and returns vertex offsets. The arena working with
-         * indices has as stride of four corresponding to the length of an integer. The
-         * two can't easily be combined because integers and vertices require different
-         * amounts of data which makes the returned offsets incompatible.
-         */
-        public DeviceResources(CommandList commandList, StagingBuffer stagingBuffer) {
-            // Iris: From MixinRenderRegionArenas - use extended vertex format from WorldRenderingSettings
-            boolean rustVulkanOwned = VulkanicAPI.isVulkanBackendSelected()
-                    || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-            int stride = rustVulkanOwned
-                    ? ChunkMeshFormats.COMPACT.getVertexFormat().getStride()
-                    : net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat().getStride();
-
-            if (VulkanicAPI.isVulkanBackendSelected()
-                    || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-                this.geometryArena = new GpuChunkBufferArena(
-                    () -> "Sodium chunk geometry arena",
-                    GpuBuffer.USAGE_VERTEX,
-                    REGION_SIZE * SECTION_VERTEX_COUNT_ESTIMATE,
-                    stride
-                );
-                this.indexArena = new GpuChunkBufferArena(
-                    () -> "Sodium chunk index arena",
-                    GpuBuffer.USAGE_INDEX,
-                    REGION_SIZE * SECTION_INDEX_COUNT_ESTIMATE,
-                    Integer.BYTES
-                );
-            } else {
-                this.geometryArena = new GlBufferArena(commandList, REGION_SIZE * SECTION_VERTEX_COUNT_ESTIMATE, stride, stagingBuffer);
-                this.indexArena = new GlBufferArena(commandList, REGION_SIZE * SECTION_INDEX_COUNT_ESTIMATE, Integer.BYTES, stagingBuffer);
-            }
-        }
-
-        public void updateTessellation(CommandList commandList, RenderTessellation tessellation) {
-            if (this.tessellation != null) {
-                this.tessellation.delete(commandList);
-            }
-
-            this.tessellation = tessellation;
-        }
-
-        public void updateIndexedTessellation(CommandList commandList, RenderTessellation tessellation) {
-            if (this.indexedTessellation != null) {
-                this.indexedTessellation.delete(commandList);
-            }
-
-            this.indexedTessellation = tessellation;
-        }
-
-        public RenderTessellation getTessellation() {
-            return this.tessellation;
-        }
-
-        public RenderTessellation getIndexedTessellation() {
-            return this.indexedTessellation;
-        }
-
-        public void deleteTessellation(CommandList commandList) {
-            if (this.tessellation != null) {
-                this.tessellation.delete(commandList);
-                this.tessellation = null;
-            }
-        }
-
-        public void deleteIndexedTessellation(CommandList commandList) {
-            if (this.indexedTessellation != null) {
-                this.indexedTessellation.delete(commandList);
-                this.indexedTessellation = null;
-            }
-        }
-
-        public GlBuffer getGeometryBuffer() {
-            return this.geometryArena.legacyGlBuffer();
-        }
-
-        public GlBuffer getIndexBuffer() {
-            return this.indexArena.legacyGlBuffer();
-        }
-
-        public GpuBuffer getGeometryGpuBuffer(int usage) {
-            return this.geometryArena.gpuBufferView(() -> "Chunk geometry buffer", usage);
-        }
-
-        public GpuBuffer getIndexGpuBuffer(int usage) {
-            return this.indexArena.gpuBufferView(() -> "Chunk index buffer", usage);
-        }
-
-        public void delete(CommandList commandList) {
-            this.deleteTessellation(commandList);
-            this.deleteIndexedTessellation(commandList);
-            this.geometryArena.delete(commandList);
-            this.indexArena.delete(commandList);
-        }
-
-        public ChunkBufferArena getGeometryArena() {
-            return this.geometryArena;
-        }
-
-        public ChunkBufferArena getIndexArena() {
-            return this.indexArena;
-        }
-
-        public boolean shouldDelete() {
-            return this.geometryArena.isEmpty() && this.indexArena.isEmpty();
-        }
-    }
-
-    // Iris: ShadowRenderRegion interface implementation (merged from MixinRenderRegion)
-    @Override
-    public void swapToShadowRenderList() {
-        this.regularRenderList = this.renderList;
-        this.renderList = this.shadowRenderList;
-        this.regularCachedBatches = this.cachedBatches;
-        this.cachedBatches = this.shadowCachedBatches;
-        this.shadowCachedBatches = null;
-        this.ensureRenderList();
-    }
-
-    @Override
-    public void swapToRegularRenderList() {
-        this.shadowRenderList = this.renderList;
-        this.renderList = this.regularRenderList;
-        this.shadowCachedBatches = this.cachedBatches;
-        this.cachedBatches = this.regularCachedBatches;
-        this.regularCachedBatches = null;
-        this.ensureRenderList();
-    }
-
-    private void ensureRenderList() {
-        if (this.renderList == null) {
-            this.renderList = new ChunkRenderList(this);
-        }
-
-        if (this.cachedBatches == null) {
-            this.cachedBatches = new Reference2ReferenceOpenHashMap<>();
-        }
-    }
-
-    @Override
-    public void iris$forceClearAllBatches() {
-        if (this.regularCachedBatches != null) {
-            for(MultiDrawBatch batch : this.regularCachedBatches.values()) {
-                batch.clear();
-            }
-        }
-
-        if (this.shadowCachedBatches != null) {
-            for(MultiDrawBatch batch : this.shadowCachedBatches.values()) {
-                batch.clear();
-            }
-        }
-
-        if (this.cachedBatches != null) {
-            for(MultiDrawBatch batch : this.cachedBatches.values()) {
-                batch.clear();
-            }
-        }
     }
 }

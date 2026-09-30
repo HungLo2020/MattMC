@@ -31,10 +31,6 @@ public class LodVertexFormatElement
 		this.isPadding = isPadding;
 	}
 	
-	public final boolean getIsPadding()
-	{
-		return isPadding;
-	}
 	
 	public final LodVertexFormatElement.DataType getType()
 	{
@@ -51,11 +47,6 @@ public class LodVertexFormatElement
 		return this.byteSize;
 	}
 	
-	// added by Forge
-	public int getElementCount()
-	{
-		return count;
-	}
 	
 	
 	
@@ -90,10 +81,6 @@ public class LodVertexFormatElement
 			return this.name;
 		}
 		
-		public int getGlType()
-		{
-			return this.glType;
-		}
 	}
 	
 	

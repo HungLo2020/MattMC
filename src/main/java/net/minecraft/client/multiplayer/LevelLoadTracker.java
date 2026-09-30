@@ -50,8 +50,7 @@ public class LevelLoadTracker implements LevelLoadListener {
 
 	public void tickClientLoad() {
 		if (this.clientState != null) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& (++this.rustReadinessDiagnosticTicks % 120) == 0) {
+			if ((++this.rustReadinessDiagnosticTicks % 120) == 0) {
 				LOGGER.info(
 					"[MattMC graphics audit] Rust client load state={} server_progress={} server_view={} close_delay_ms={}",
 					this.clientState.getClass().getSimpleName(),
@@ -65,8 +64,7 @@ public class LevelLoadTracker implements LevelLoadListener {
 			// is the authoritative equivalent of the packet phase transition; do not
 			// leave the client permanently in WaitingForServer when the load packet is
 			// intentionally absent from a deterministic local fixture.
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& this.clientState instanceof LevelLoadTracker.WaitingForServer waiting
+			if ((this.clientState instanceof LevelLoadTracker.WaitingForServer waiting)
 				&& this.rustWholeFrameServerLoadReady()) {
 				this.clientState = new LevelLoadTracker.WaitingForPlayerChunk(
 					waiting.player(), waiting.level(), waiting.levelRenderer(), waiting.timeoutAfter());

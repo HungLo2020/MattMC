@@ -168,27 +168,6 @@ public final class NativeTranslucentSortData implements AutoCloseable {
         }
     }
 
-    public static NativeTranslucentSortData createStaticOrder(int quadCount, int[] quadIndexes) {
-        if (quadCount < 0 || quadIndexes.length > quadCount) {
-            throw new IllegalArgumentException("Invalid translucent static order size");
-        }
-
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment quadIndexesSegment = quadIndexes.length == 0
-                    ? MemorySegment.NULL
-                    : arena.allocate(ValueLayout.JAVA_INT, quadIndexes.length);
-            for (int index = 0; index < quadIndexes.length; index++) {
-                quadIndexesSegment.setAtIndex(ValueLayout.JAVA_INT, index, quadIndexes[index]);
-            }
-
-            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
-            check(invokeCreateStaticOrder(quadCount, quadIndexesSegment, quadIndexes.length, handleSegment),
-                    "native translucent explicit static order sort data creation");
-            return fromHandleSegment(handleSegment, quadCount,
-                    "Native translucent explicit static order sort data creation");
-        }
-    }
-
     public static NativeTranslucentSortData createDynamicTopo(TQuad[] quads) {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment recordsSegment = allocateRecords(arena, quads.length);
@@ -323,16 +302,6 @@ public final class NativeTranslucentSortData implements AutoCloseable {
         }
     }
 
-    private static int invokeCreateStaticOrder(int quadCount, MemorySegment quadIndexes, int quadIndexCount,
-            MemorySegment handleOutput) {
-        try {
-            return (int) CREATE_STATIC_ORDER.invokeExact(quadCount, quadIndexes, quadIndexCount, handleOutput);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust translucent explicit static order sort data creation downcall failed",
-                    throwable);
-        }
-    }
-
     private static int invokeCreateStaticSnr(MemorySegment meshFacingCounts, int meshFacingCountLen,
             MemorySegment sortKeys, int sortKeyLen, int quadCount, int doubleUnaligned, MemorySegment handleOutput) {
         try {
@@ -439,6 +408,37 @@ public final class NativeTranslucentSortData implements AutoCloseable {
 
             check(invokeDestroy(handle), "native translucent sort data destroy");
             this.handle = 0;
+        }
+    }
+
+    public static NativeTranslucentSortData createStaticOrder(int quadCount, int[] quadIndexes) {
+        if (quadCount < 0 || quadIndexes.length > quadCount) {
+            throw new IllegalArgumentException("Invalid translucent static order size");
+        }
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment quadIndexesSegment = quadIndexes.length == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(ValueLayout.JAVA_INT, quadIndexes.length);
+            for (int index = 0; index < quadIndexes.length; index++) {
+                quadIndexesSegment.setAtIndex(ValueLayout.JAVA_INT, index, quadIndexes[index]);
+            }
+
+            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
+            check(invokeCreateStaticOrder(quadCount, quadIndexesSegment, quadIndexes.length, handleSegment),
+                    "native translucent explicit static order sort data creation");
+            return fromHandleSegment(handleSegment, quadCount,
+                    "Native translucent explicit static order sort data creation");
+        }
+    }
+
+    private static int invokeCreateStaticOrder(int quadCount, MemorySegment quadIndexes, int quadIndexCount,
+            MemorySegment handleOutput) {
+        try {
+            return (int) CREATE_STATIC_ORDER.invokeExact(quadCount, quadIndexes, quadIndexCount, handleOutput);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust translucent explicit static order sort data creation downcall failed",
+                    throwable);
         }
     }
 }

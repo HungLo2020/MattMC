@@ -298,19 +298,4 @@ public abstract class TQuad {
         return true;
     }
 
-    public static boolean extentsIntersect(float[] extentsA, float[] extentsB) {
-        for (int axis = 0; axis < 3; axis++) {
-            var opposite = axis + 3;
-
-            if (extentsA[axis] <= extentsB[opposite]
-                    || extentsB[axis] <= extentsA[opposite]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public static boolean extentsIntersect(TQuad a, TQuad b) {
-        return extentsIntersect(a.extents, b.extents);
-    }
 }

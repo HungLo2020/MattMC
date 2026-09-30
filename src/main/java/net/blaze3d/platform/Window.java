@@ -1,6 +1,5 @@
 package net.blaze3d.platform;
 
-import net.blaze3d.TracyFrameCapture;
 import net.blaze3d.platform.cursor.CursorType;
 import net.blaze3d.systems.RenderSystem;
 import net.logging.LogUtils;
@@ -91,13 +90,6 @@ public final class Window implements AutoCloseable {
 		if (useNoApiClientWindow) {
 			GLFW.glfwWindowHint(GLFW.GLFW_CLIENT_API, GLFW.GLFW_NO_API);
 		} else {
-			// Iris: Enable OpenGL debug context if debug options are enabled
-			if (net.irisshaders.iris.Iris.getIrisConfig().areDebugOptionsEnabled()) {
-				GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_DEBUG_CONTEXT, GLFW.GLFW_TRUE);
-				GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_NO_ERROR, GLFW.GLFW_FALSE);
-				net.irisshaders.iris.Iris.logger.info("OpenGL debug context activated.");
-			}
-
 			GLFW.glfwWindowHint(139265, 196609);
 			GLFW.glfwWindowHint(139275, 221185);
 			GLFW.glfwWindowHint(139266, 3);
@@ -288,7 +280,6 @@ public final class Window implements AutoCloseable {
 				this.framebufferHeight = j;
 				if (this.getWidth() != k || this.getHeight() != m) {
 					try {
-						handleVulkanSwapchainFramebufferResize(i, j);
 						this.eventHandler.resizeDisplay();
 					} catch (Exception var10) {
 						CrashReport crashReport = CrashReport.forThrowable(var10, "Window resize");
@@ -304,13 +295,8 @@ public final class Window implements AutoCloseable {
 		}
 	}
 
-	static boolean handleVulkanSwapchainFramebufferResize(int framebufferWidth, int framebufferHeight) {
-		return net.vulkanic.VulkanicAPI.recreateVulkanSwapchainIfNeededOnFramebufferResize(framebufferWidth, framebufferHeight);
-	}
-
 	static boolean shouldRequestNoApiWindowClientForVulkanBackend() {
-		return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
+		return net.vulkanic.VulkanicAPI.usesRustVulkanPresenter();
 	}
 
 	private void refreshFramebufferSize() {
@@ -342,11 +328,11 @@ public final class Window implements AutoCloseable {
 		this.iconified = bl;
 	}
 
-	public void updateDisplay(@Nullable TracyFrameCapture tracyFrameCapture) {
-		RenderSystem.flipFrame(this, tracyFrameCapture);
+	public void updateDisplay() {
+		RenderSystem.flipFrame(this);
 		if (this.fullscreen != this.actuallyFullscreen) {
 			this.actuallyFullscreen = this.fullscreen;
-			this.updateFullscreen(this.vsync, tracyFrameCapture);
+			this.updateFullscreen(this.vsync);
 		}
 	}
 
@@ -419,14 +405,14 @@ public final class Window implements AutoCloseable {
 		this.setMode();
 	}
 
-	private void updateFullscreen(boolean bl, @Nullable TracyFrameCapture tracyFrameCapture) {
+	private void updateFullscreen(boolean bl) {
 		RenderSystem.assertOnRenderThread();
 
 		try {
 			this.setMode();
 			this.eventHandler.resizeDisplay();
 			this.updateVsync(bl);
-			this.updateDisplay(tracyFrameCapture);
+			this.updateDisplay();
 		} catch (Exception var4) {
 			LOGGER.error("Couldn't toggle fullscreen", (Throwable)var4);
 		}

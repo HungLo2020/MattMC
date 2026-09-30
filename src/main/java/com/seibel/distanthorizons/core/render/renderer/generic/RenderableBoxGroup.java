@@ -10,7 +10,6 @@ import com.seibel.distanthorizons.core.util.LodUtil;
 import org.jetbrains.annotations.Nullable;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.VulkanicBufferTarget;
 
 import java.awt.*;
 import java.io.Closeable;
@@ -29,34 +28,9 @@ public class RenderableBoxGroup
 	{
 		public static final AtomicInteger NEXT_ID_ATOMIC_INT = new AtomicInteger(0);
 
-		private static int createTrackedBufferId()
-		{
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException(
-					"Java Distant Horizons renderable-box buffers are unavailable while Rust owns whole-frame presentation");
-			}
-			if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
-			}
-			return VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext());
-		}
-
 		private static void deleteTrackedBufferId(int bufferId)
 		{
-			// A DH Java buffer can outlive the OpenGL compatibility route during a
-			// backend switch. Rust Vulkan owns a separate resource domain, so never
-			// pass the stale Java name through the VulkanicGAL deletion seam.
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				return;
-			}
-			if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
-			}
-			VulkanicAPI.deleteBuffer(VulkanicAPI.getCommandContext(), bufferId);
+			return;
 		}
 		
 		
@@ -262,101 +236,6 @@ public class RenderableBoxGroup
 		//===================//
 		// vertex attributes //
 		//===================//
-		
-		/** Does nothing if the vertex data is already up-to-date */
-		public void updateVertexAttributeData()
-		{
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Java DH box-group buffer uploads are unavailable on the Rust Vulkan route");
-			}
-			if (!this.vertexDataDirty)
-			{
-				return;
-			}
-			this.vertexDataDirty = false;
-			
-			if (this.instanceChunkPosVbo == 0)
-			{
-				this.instanceChunkPosVbo = createTrackedBufferId();
-				this.instanceSubChunkPosVbo = createTrackedBufferId();
-				this.instanceScaleVbo = createTrackedBufferId();
-				this.instanceColorVbo = createTrackedBufferId();
-				this.instanceMaterialVbo = createTrackedBufferId();
-			}
-			
-			// copy over the box list so we can upload without concurrent modification issues
-			this.uploadBoxList.clear();
-			synchronized (this.uploadBoxList)
-			{
-				this.uploadBoxList.addAll(this.boxList);
-			}
-			
-			
-			int boxCount = this.uploadBoxList.size();
-			this.uploadedBoxCount = boxCount;
-			
-			
-			
-			// transformation / scaling //
-			int[] chunkPosData = RenderBoxArrayCache.getCachedIntArray(boxCount * 3, 0);
-			float[] subChunkPosData = RenderBoxArrayCache.getCachedFloatArray(boxCount * 3, 1);
-			float[] scalingData = RenderBoxArrayCache.getCachedFloatArray(boxCount * 3, 2);
-			for (int i = 0; i < boxCount; i++)
-			{
-				DhApiRenderableBox box = this.uploadBoxList.get(i);
-				
-				int dataIndex = i * 3;
-				
-				chunkPosData[dataIndex] = LodUtil.getChunkPosFromDouble(box.minPos.x);
-				chunkPosData[dataIndex + 1] = LodUtil.getChunkPosFromDouble(box.minPos.y);
-				chunkPosData[dataIndex + 2] = LodUtil.getChunkPosFromDouble(box.minPos.z);
-				
-				subChunkPosData[dataIndex] = LodUtil.getSubChunkPosFromDouble(box.minPos.x);
-				subChunkPosData[dataIndex + 1] = LodUtil.getSubChunkPosFromDouble(box.minPos.y);
-				subChunkPosData[dataIndex + 2] = LodUtil.getSubChunkPosFromDouble(box.minPos.z);
-				
-				scalingData[dataIndex] = (float) (box.maxPos.x - box.minPos.x);
-				scalingData[dataIndex + 1] = (float) (box.maxPos.y - box.minPos.y);
-				scalingData[dataIndex + 2] = (float) (box.maxPos.z - box.minPos.z);
-				
-			}
-			
-			
-			// colors/materials //
-			float[] colorData = RenderBoxArrayCache.getCachedFloatArray(boxCount * 4, 3);
-			int[] materialData = RenderBoxArrayCache.getCachedIntArray(boxCount, 4);
-			for (int i = 0; i < boxCount; i++)
-			{
-				DhApiRenderableBox box = this.uploadBoxList.get(i);
-				Color color = box.color;
-				int colorIndex = i * 4;
-				colorData[colorIndex] = color.getRed() / 255.0f;
-				colorData[colorIndex + 1] = color.getGreen() / 255.0f;
-				colorData[colorIndex + 2] = color.getBlue() / 255.0f;
-				colorData[colorIndex + 3] = color.getAlpha() / 255.0f;
-				
-				materialData[i] = box.material;
-			}
-			
-			
-			// Upload transformation matrices
-			CommandContext ctx = VulkanicAPI.getCommandContext();
-			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceChunkPosVbo);
-			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, chunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceSubChunkPosVbo);
-			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, subChunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceScaleVbo);
-			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, scalingData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			
-			// Upload colors
-			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceColorVbo);
-			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, colorData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			
-			// Upload materials
-			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceMaterialVbo);
-			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, materialData, VulkanicAPI.GL_DYNAMIC_DRAW);
-		}
 		
 		
 		

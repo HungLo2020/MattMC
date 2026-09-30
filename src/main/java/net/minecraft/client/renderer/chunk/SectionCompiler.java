@@ -57,8 +57,6 @@ public class SectionCompiler {
 		// semantic block/fluid extraction.  The legacy compiler still runs for
 		// visibility and block-entity bookkeeping, but must not build a second
 		// Java terrain mesh that is discarded at the upload boundary.
-		boolean rustWholeFrameTerrain = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 
 		for (BlockPos blockPos3 : BlockPos.betweenClosed(blockPos, blockPos2)) {
 			BlockState blockState = renderSectionRegion.getBlockState(blockPos3);
@@ -74,27 +72,7 @@ public class SectionCompiler {
 			}
 
 			FluidState fluidState = blockState.getFluidState();
-			if (!rustWholeFrameTerrain && !fluidState.isEmpty()) {
-				ChunkSectionLayer chunkSectionLayer = ItemBlockRenderTypes.getRenderLayer(fluidState);
-				BufferBuilder bufferBuilder = this.getOrBeginLayer(map, sectionBufferBuilderPack, chunkSectionLayer);
-				this.blockRenderer.renderLiquid(blockPos3, renderSectionRegion, bufferBuilder, blockState, fluidState);
-			}
 
-			if (!rustWholeFrameTerrain && blockState.getRenderShape() == RenderShape.MODEL) {
-				ChunkSectionLayer chunkSectionLayer = ItemBlockRenderTypes.getChunkRenderType(blockState);
-				BufferBuilder bufferBuilder = this.getOrBeginLayer(map, sectionBufferBuilderPack, chunkSectionLayer);
-				randomSource.setSeed(blockState.getSeed(blockPos3));
-				this.blockRenderer.getBlockModel(blockState).collectParts(randomSource, list);
-				poseStack.pushPose();
-				poseStack.translate(
-					(float)SectionPos.sectionRelative(blockPos3.getX()),
-					(float)SectionPos.sectionRelative(blockPos3.getY()),
-					(float)SectionPos.sectionRelative(blockPos3.getZ())
-				);
-				this.blockRenderer.renderBatched(blockState, blockPos3, renderSectionRegion, poseStack, bufferBuilder, true, list);
-				poseStack.popPose();
-				list.clear();
-			}
 		}
 
 		for (Entry<ChunkSectionLayer, BufferBuilder> entry : map.entrySet()) {
@@ -112,19 +90,6 @@ public class SectionCompiler {
 		ModelBlockRenderer.clearCache();
 		results.visibilitySet = visGraph.resolve();
 		return results;
-	}
-
-	private BufferBuilder getOrBeginLayer(
-		Map<ChunkSectionLayer, BufferBuilder> map, SectionBufferBuilderPack sectionBufferBuilderPack, ChunkSectionLayer chunkSectionLayer
-	) {
-		BufferBuilder bufferBuilder = (BufferBuilder)map.get(chunkSectionLayer);
-		if (bufferBuilder == null) {
-			ByteBufferBuilder byteBufferBuilder = sectionBufferBuilderPack.buffer(chunkSectionLayer);
-			bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-			map.put(chunkSectionLayer, bufferBuilder);
-		}
-
-		return bufferBuilder;
 	}
 
 	private <E extends BlockEntity> void handleBlockEntity(SectionCompiler.Results results, E blockEntity) {

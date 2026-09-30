@@ -41,58 +41,8 @@ public class ChunkDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 		this.minecraft = minecraft;
 	}
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		double g = Util.getNanos();
-		if (g - this.lastUpdateTime > 3.0E9) {
-			this.lastUpdateTime = g;
-			IntegratedServer integratedServer = this.minecraft.getSingleplayerServer();
-			if (integratedServer != null) {
-				this.data = new ChunkDebugRenderer.ChunkData(integratedServer, d, f);
-			} else {
-				this.data = null;
-			}
-		}
-
-		if (this.data != null) {
-			Map<ChunkPos, String> map = (Map<ChunkPos, String>)this.data.serverData.getNow(null);
-			double h = this.minecraft.gameRenderer.getMainCamera().getPosition().y * 0.85;
-
-			for (Entry<ChunkPos, String> entry : this.data.clientData.entrySet()) {
-				ChunkPos chunkPos = (ChunkPos)entry.getKey();
-				String string = (String)entry.getValue();
-				if (map != null) {
-					string = string + (String)map.get(chunkPos);
-				}
-
-				String[] strings = string.split("\n");
-				int i = 0;
-
-				for (String string2 : strings) {
-					DebugRenderer.renderFloatingText(
-						poseStack,
-						multiBufferSource,
-						string2,
-						SectionPos.sectionToBlockCoord(chunkPos.x, 8),
-						h + i,
-						SectionPos.sectionToBlockCoord(chunkPos.z, 8),
-						-1,
-						0.15F,
-						true,
-						0.0F,
-						true
-					);
-					i -= 2;
-				}
-			}
-		}
-	}
-
 	/** Copies bounded client/server chunk diagnostics into Rust-owned semantic text. */
 	public void collectRustSemantics(Camera camera, SubmitNodeStorage text) {
-		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) return;
 		double now = Util.getNanos();
 		if (now - this.lastUpdateTime > 3.0E9) {
 			this.lastUpdateTime = now;

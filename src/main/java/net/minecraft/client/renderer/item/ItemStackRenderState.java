@@ -415,20 +415,12 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		}
 
 		void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, int k) {
-			boolean selectedVulkan = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-			boolean rustWholeFrameHandoff = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 			boolean indexedItemScope = RustGalWorldPrimitiveRenderer.isIndexedItemSubmissionActive();
 			// Text/coverage traversals replay the same producer callbacks, but their
 			// collectors must receive semantics without a second native submission.
-			if (!submitNodeCollector.isSemanticCoverageOnly()
-				&& (selectedVulkan || rustWholeFrameHandoff || indexedItemScope)) {
+			if (!submitNodeCollector.isSemanticCoverageOnly()) {
 				WorldRenderRoutePolicy.Route ownership = ItemEntityRenderOwnershipPolicy.currentOwnershipRoute();
-				if (rustWholeFrameHandoff && !selectedVulkan && !indexedItemScope) {
-					throw new IllegalStateException(
-						"Rust whole-frame item route requires Vulkan selection; Java special-item rendering is unavailable during handoff"
-					);
-				}
-				if (selectedVulkan && !ownership.usesRustWholeFrameVulkan()) {
+				if (!ownership.usesRustWholeFrameVulkan()) {
 					throw new IllegalStateException(
 						"Rust whole-frame item route is unavailable; selected Vulkan cannot fall through to Java item rendering"
 					);
@@ -566,15 +558,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			// Iris: Save block entity state before rendering (from ItemStackStateLayerMixin).
 			// Rust semantic/item submission owns its material identity explicitly and
 			// must not publish or read the Java/Iris captured-rendering singleton.
-			boolean captureIrisRenderState = !submitNodeCollector.isSemanticCoverageOnly()
-				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-			int lastBState = captureIrisRenderState
-				? net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity()
-				: 0;
-			if (captureIrisRenderState) {
-				iris$setupId(ItemStackRenderState.this.iris_displayStack, ItemStackRenderState.this.iris_displayModelId);
-			}
+			int lastBState = 0;
 			
 			poseStack.pushPose();
 			this.transform.apply(ItemStackRenderState.this.displayContext.leftHand(), poseStack.last());
@@ -604,29 +588,8 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 
 			poseStack.popPose();
 			
-			// Iris: Restore state after rendering (from ItemStackStateLayerMixin)
-			if (captureIrisRenderState) {
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(lastBState);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
-			}
 		}
 		
-		// Iris: Helper method from ItemStackStateLayerMixin
-		private void iris$setupId(net.minecraft.world.item.Item item, net.minecraft.resources.ResourceLocation modelId) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) return;
-			if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getItemIds() == null) return;
-
-			if (item instanceof net.minecraft.world.item.BlockItem blockItem && !(item instanceof net.minecraft.world.item.SolidBucketItem)) {
-				if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds() == null) return;
-
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(1);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds().getOrDefault(blockItem.getBlock().defaultBlockState(), 0));
-			} else {
-				net.minecraft.resources.ResourceLocation location = modelId != null ? modelId : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item);
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new net.irisshaders.iris.shaderpack.materialmap.NamespacedId(location.getNamespace(), location.getPath())));
-			}
-		}
 		
 		// Fabric Rendering API support (from ItemLayerRenderStateMixin)
 		@Override

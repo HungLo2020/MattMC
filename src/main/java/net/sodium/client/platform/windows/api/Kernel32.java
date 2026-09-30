@@ -50,58 +50,6 @@ public class Kernel32 {
         return JNI.callP(PFN_GetCommandLineW);
     }
 
-    public static long getModuleHandleByNames(String[] names) {
-        for (String name : names) {
-            var handle = getModuleHandleByName(name);
-
-            if (handle != MemoryUtil.NULL) {
-                return handle;
-            }
-        }
-
-        throw new RuntimeException("Could not obtain handle of module");
-    }
-
-    public static long getModuleHandleByName(String name) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            ByteBuffer lpFunctionNameBuf = stack.malloc(16, MemoryUtil.memLengthUTF16(name, true));
-            MemoryUtil.memUTF16(name, true, lpFunctionNameBuf);
-
-            PointerBuffer phModule = stack.callocPointer(1);
-
-            int result;
-            result = JNI.callPPI(GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                    MemoryUtil.memAddress(lpFunctionNameBuf), MemoryUtil.memAddress(phModule), PFN_GetModuleHandleExW);
-
-            if (result == 0) {
-                var error = getLastError();
-
-                return switch (error) {
-                    case 126 /* ERROR_MOD_NOT_FOUND */ -> MemoryUtil.NULL;
-                    default -> throw new RuntimeException("GetModuleHandleEx failed, error=" + error);
-                };
-            }
-
-            return phModule.get(0);
-        }
-    }
-
-    public static String getModuleFileName(long phModule) {
-        ByteBuffer lpFileName = MemoryUtil.memAlignedAlloc(16, MAX_PATH);
-
-        try {
-            int length = JNI.callPPI(phModule, MemoryUtil.memAddress(lpFileName), lpFileName.capacity(), PFN_GetModuleFileNameW);
-
-            if (length == 0) {
-                throw new RuntimeException("GetModuleFileNameW failed, error=" + getLastError());
-            }
-
-            return MemoryUtil.memUTF16(lpFileName, length);
-        } finally {
-            MemoryUtil.memAlignedFree(lpFileName);
-        }
-    }
-
     public static int getLastError() {
         return JNI.callI(PFN_GetLastError);
     }

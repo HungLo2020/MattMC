@@ -44,11 +44,6 @@ public class GuiRenderState {
 		}
 	}
 
-	/** Whether this frame requested the vanilla screen-background blur boundary. */
-	public boolean hasBlurBeforeStratum() {
-		return this.firstStratumAfterBlur != Integer.MAX_VALUE;
-	}
-
 	/**
 	 * Returns the source stratum index at which the screen-background blur must
 	 * run, or {@code -1} when no blur boundary was requested. This is semantic
@@ -166,16 +161,8 @@ public class GuiRenderState {
 		return false;
 	}
 
-	public void submitBlitToCurrentLayer(BlitRenderState blitRenderState) {
-		this.current.submitGuiElement(blitRenderState);
-	}
-
 	public void submitGlyphToCurrentLayer(GuiElementRenderState guiElementRenderState) {
 		this.current.submitGlyph(guiElementRenderState);
-	}
-
-	public Set<Object> getItemModelIdentities() {
-		return this.itemModelIdentities;
 	}
 
 	public void forEachElement(Consumer<GuiElementRenderState> consumer, GuiRenderState.TraverseRange traverseRange) {
@@ -238,18 +225,6 @@ public class GuiRenderState {
 			}
 		}, GuiRenderState.TraverseRange.ALL);
 		this.current = node;
-	}
-
-	public void sortElements(Comparator<GuiElementRenderState> comparator) {
-		this.traverse(node -> {
-			if (node.elementStates != null) {
-				if (SharedConstants.DEBUG_SHUFFLE_UI_RENDERING_ORDER) {
-					Collections.shuffle(node.elementStates);
-				}
-
-				node.elementStates.sort(comparator);
-			}
-		}, GuiRenderState.TraverseRange.ALL);
 	}
 
 	/**

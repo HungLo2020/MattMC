@@ -134,7 +134,4 @@ public enum ModelQuadFacing {
         return bitmap == OPPOSING_X || bitmap == OPPOSING_Y || bitmap == OPPOSING_Z;
     }
 
-    public static boolean bitmapHasUnassigned(int bitmap) {
-        return (bitmap & UNASSIGNED_MASK) != 0;
-    }
 }

@@ -57,8 +57,6 @@ public class ColorUtil
 	
 	/** Returns a value between 0 and 255 */
 	public static int getRed(int color) { return (color >> 16) & 0xFF; }
-	/** @param newRed should be a value between 0 and 255 */
-	public static int setRed(int color, int newRed) { return (getAlpha(color) << 24) | (newRed << 16) | (getGreen(color) << 8) | getBlue(color); }
 	
 	/** Returns a value between 0 and 255 */
 	public static int getGreen(int color) { return (color >> 8) & 0xFF; }
@@ -97,11 +95,6 @@ public class ColorUtil
 				| ((getGreen(argb) * getGreen(rgb) / 255) << 8) | (getBlue(argb) * getBlue(rgb) / 255));
 	}
 	
-	/** Multiply 2 ARGB colors */
-	public static int multiplyARGBwithARGB(int color1, int color2)
-	{
-		return ((getAlpha(color1) * getAlpha(color2) / 255) << 24) | ((getRed(color1) * getRed(color2) / 255) << 16) | ((getGreen(color1) * getGreen(color2) / 255) << 8) | (getBlue(color1) * getBlue(color2) / 255);
-	}
 	
 	/**
 	 * Below 2 functions are from: https://stackoverflow.com/questions/13806483/increase-or-decrease-color-saturation
@@ -197,8 +190,6 @@ public class ColorUtil
 	}
 	
 	public static Color toColorObjRGB(int color) { return new Color(getRed(color), getGreen(color), getBlue(color)); }
-	public static Color toColorObjARGB(int color) { return new Color(getRed(color), getGreen(color), getBlue(color), getAlpha(color)); }
 	
-	public static int toColorInt(Color color) { return argbToInt(color.getAlpha(), color.getRed(), color.getGreen(), color.getBlue()); }
 	
 }

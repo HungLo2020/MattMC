@@ -22,20 +22,6 @@ public enum AlphaTestFunction {
 		this.expression = expression;
 	}
 
-	public static Optional<AlphaTestFunction> fromGlId(int glId) {
-		return switch (glId) {
-			case VulkanicAPI.GL_NEVER -> Optional.of(NEVER);
-			case VulkanicAPI.GL_LESS -> Optional.of(LESS);
-			case VulkanicAPI.GL_EQUAL -> Optional.of(EQUAL);
-			case VulkanicAPI.GL_LEQUAL -> Optional.of(LEQUAL);
-			case VulkanicAPI.GL_GREATER -> Optional.of(GREATER);
-			case VulkanicAPI.GL_NOTEQUAL -> Optional.of(NOTEQUAL);
-			case VulkanicAPI.GL_GEQUAL -> Optional.of(GEQUAL);
-			case VulkanicAPI.GL_ALWAYS -> Optional.of(ALWAYS);
-			default -> Optional.empty();
-		};
-	}
-
 	public static Optional<AlphaTestFunction> fromString(String name) {
 		if ("GL_ALWAYS".equals(name)) {
 			// shaders.properties states that GL_ALWAYS is the name to use, but I haven't verified that this actually
@@ -57,7 +43,4 @@ public enum AlphaTestFunction {
 		return glId;
 	}
 
-	public String getExpression() {
-		return expression;
-	}
 }

@@ -13,7 +13,7 @@ import net.sodium.client.render.chunk.compile.pipeline.BlockRenderer;
 import net.sodium.client.render.chunk.compile.pipeline.NativeStaticBlockModelRegistry;
 import net.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
-import net.sodium.client.render.chunk.data.SectionRenderDataStorage;
+import net.sodium.client.render.chunk.data.SectionVisibleFaces;
 import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.terrain.material.DefaultMaterials;
@@ -79,7 +79,6 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         cache.init(this.renderContext);
 
         LevelSlice slice = cache.getWorldSlice();
-        boolean rustStaticTerrainRoute = WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata();
 
         int minX = this.render.getOriginX();
         int minY = this.render.getOriginY();
@@ -110,7 +109,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         boolean forceJavaProducers = NativeMeshingDiagnostics.forceJavaProducers();
         boolean forceJavaModels = NativeMeshingDiagnostics.forceJavaModels();
         boolean forceJavaFluids = NativeMeshingDiagnostics.forceJavaFluids();
-        if (rustStaticTerrainRoute && (forceJavaProducers || forceJavaModels || forceJavaFluids)) {
+        if ((forceJavaProducers || forceJavaModels || forceJavaFluids)) {
             throw new IllegalStateException(
                     "Rust whole-frame terrain cannot enable Java mesh-production overrides");
         }
@@ -158,8 +157,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                         // compatibility path, but do not discard native lava faces
                         // before Rust can consume them as generic translucent fluid.
                         boolean rustFluidSupported = nativeFluidSupported && (builtInWater || builtInLava);
-                        boolean nativeUnsupportedFluidForRustTerrain = rustStaticTerrainRoute
-                                && !fluidState.isEmpty()
+                        boolean nativeUnsupportedFluidForRustTerrain = !fluidState.isEmpty()
                                 && nativeFluidSupported
                                 && !rustFluidSupported;
                         boolean useJavaFluid = !fluidState.isEmpty()
@@ -290,7 +288,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         profiler.popPush("meshing");
 
         Map<TerrainRenderPass, BuiltSectionMeshParts> meshes = new Reference2ReferenceOpenHashMap<>();
-        var visibleSlices = SectionRenderDataStorage.getVisibleFaces(
+        var visibleSlices = SectionVisibleFaces.getVisibleFaces(
                 (int) this.absoluteCameraPos.x(), (int) this.absoluteCameraPos.y(), (int) this.absoluteCameraPos.z(),
                 this.render.getChunkX(), this.render.getChunkY(), this.render.getChunkZ());
 

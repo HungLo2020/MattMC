@@ -7,7 +7,6 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.DhApiRenderProxy;
 import com.seibel.distanthorizons.coreapi.ModInfo;
-import net.irisshaders.iris.compat.dh.DHCompatInternal;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -24,10 +23,7 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforeRenderLevel(Camera camera, Matrix4f positionMatrix, Matrix4f projectionMatrix) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            return;
-        }
-        seedRenderState(positionMatrix, projectionMatrix);
+        return;
 
         // handled here and in MixinChunkSectionsToRender (now DistantHorizonsChunkRenderHook)
     }
@@ -59,38 +55,6 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforePrepareChunkRenders(Matrix4fc modelViewMatrix, double camX, double camY, double camZ) {
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            return;
-        }
-        ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
-        
-        LevelRenderer levelRenderer = Minecraft.getInstance().levelRenderer;
-        ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(
-            ClientApi.RENDER_STATE.clientLevelWrapper,
-            levelRenderer.level
-        );
-        
-        // only crash during development
-        if (ModInfo.IS_DEV_BUILD) {
-            try {
-                ClientApi.RENDER_STATE.canRenderOrThrow();
-            } catch (Exception ex) {
-                LOGGER.error("[DH-RENDER-HOOK] canRenderOrThrow() failed: " + ex.getMessage(), ex);
-                throw ex;
-            }
-	        }
-
-		        try {
-		            net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("distant-horizons.lod-render");
-			            boolean deferTransparentRendering = !net.vulkanic.world.WorldRenderRoutePolicy
-			                .currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan()
-			                && DHCompatInternal.shouldUseShaderOverrides();
-		            DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(deferTransparentRendering);
-		            ClientApi.INSTANCE.renderLods();
-		        } catch (Exception ex) {
-	            LOGGER.error("[DH-RENDER-HOOK] renderLods() failed: " + ex.getMessage(), ex);
-	        } finally {
-	            net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("distant-horizons.lod-render");
-	        }
+        return;
 	    }
 	}

@@ -55,78 +55,6 @@ public class ChunkRenderList {
         this.addedSectionsAreSorted = addedSectionsAreSorted;
     }
 
-    public void prepareForRender(SectionPos cameraPos) {
-        int relativeCameraSectionX = this.getRelativeCameraSectionX(cameraPos);
-        int relativeCameraSectionY = this.getRelativeCameraSectionY(cameraPos);
-        int relativeCameraSectionZ = this.getRelativeCameraSectionZ(cameraPos);
-
-        // invalidate batch cache if the render list changed
-        if (this.needsRenderPreparation(relativeCameraSectionX, relativeCameraSectionY, relativeCameraSectionZ)) {
-            this.commitRenderPreparation(relativeCameraSectionX, relativeCameraSectionY, relativeCameraSectionZ);
-
-            if (!this.addedSectionsAreSorted) {
-                this.sortSections(relativeCameraSectionX, relativeCameraSectionY, relativeCameraSectionZ);
-            }
-        }
-    }
-
-    private void sortSections(int relativeCameraSectionX, int relativeCameraSectionY, int relativeCameraSectionZ) {
-        this.sectionsWithGeometryCount = NativeRenderListSorter.sortSections(this.sectionsWithGeometryMap,
-                this.sectionsWithGeometry, relativeCameraSectionX, relativeCameraSectionY, relativeCameraSectionZ);
-    }
-
-    int getRelativeCameraSectionX(SectionPos cameraPos) {
-        // The relative coordinates are clamped to one section larger than the region bounds to also capture cache invalidation that happens
-        // when the camera moves from outside the region to inside the region (when seen on all axes independently).
-        // This type of cache invalidation stems from different facings of sections being rendered if the camera is aligned with them on an axis.
-        // For sorting only the position clamped to inside the region is used.
-        return Mth.clamp(cameraPos.getX() - this.region.getChunkX(), -1, RenderRegion.REGION_WIDTH);
-    }
-
-    int getRelativeCameraSectionY(SectionPos cameraPos) {
-        return Mth.clamp(cameraPos.getY() - this.region.getChunkY(), -1, RenderRegion.REGION_HEIGHT);
-    }
-
-    int getRelativeCameraSectionZ(SectionPos cameraPos) {
-        return Mth.clamp(cameraPos.getZ() - this.region.getChunkZ(), -1, RenderRegion.REGION_LENGTH);
-    }
-
-    boolean needsRenderPreparation(int relativeCameraSectionX, int relativeCameraSectionY,
-            int relativeCameraSectionZ) {
-        return this.prevSectionsWithGeometryCount != this.sectionsWithGeometryCount ||
-                relativeCameraSectionX != this.lastRelativeCameraSectionX ||
-                relativeCameraSectionY != this.lastRelativeCameraSectionY ||
-                relativeCameraSectionZ != this.lastRelativeCameraSectionZ ||
-                !Arrays.equals(this.sectionsWithGeometryMap, this.prevSectionsWithGeometryMap);
-    }
-
-    boolean needsNativeSectionSort() {
-        return !this.addedSectionsAreSorted;
-    }
-
-    long[] getSectionsWithGeometryMap() {
-        return this.sectionsWithGeometryMap;
-    }
-
-    void commitRenderPreparation(int relativeCameraSectionX, int relativeCameraSectionY,
-            int relativeCameraSectionZ) {
-        this.region.clearAllCachedBatches();
-        this.prevSectionsWithGeometryCount = this.sectionsWithGeometryCount;
-        System.arraycopy(this.sectionsWithGeometryMap, 0, this.prevSectionsWithGeometryMap, 0,
-                this.sectionsWithGeometryMap.length);
-        this.lastRelativeCameraSectionX = relativeCameraSectionX;
-        this.lastRelativeCameraSectionY = relativeCameraSectionY;
-        this.lastRelativeCameraSectionZ = relativeCameraSectionZ;
-    }
-
-    void applyNativeSortedSections(ByteBuffer sortedSections, int offset, int count) {
-        for (int index = 0; index < count; index++) {
-            this.sectionsWithGeometry[index] = sortedSections.get(offset + index);
-        }
-
-        this.sectionsWithGeometryCount = count;
-    }
-
     public void add(RenderSection render) {
         if (this.size >= RenderRegion.REGION_SIZE) {
             throw new ArrayIndexOutOfBoundsException("Render list is full");
@@ -176,58 +104,6 @@ public class ChunkRenderList {
         return new ByteArrayIterator(this.sectionsWithEntities, this.sectionsWithEntitiesCount);
     }
 
-    public int getSectionsWithGeometryCount() {
-        return this.sectionsWithGeometryCount;
-    }
-
-    public void copySectionsWithGeometry(ByteBuffer output) {
-        if (output.capacity() < this.sectionsWithGeometryCount) {
-            throw new IllegalArgumentException("Output buffer is too small for section render list");
-        }
-
-        for (int index = 0; index < this.sectionsWithGeometryCount; index++) {
-            output.put(index, this.sectionsWithGeometry[index]);
-        }
-    }
-
-    public String diagnosticGeometryStateSignature(boolean reverse) {
-        CRC32 orderCrc = new CRC32();
-        updateCrcInt(orderCrc, this.sectionsWithGeometryCount);
-        updateCrcBool(orderCrc, reverse);
-        if (reverse) {
-            for (int index = this.sectionsWithGeometryCount - 1; index >= 0; index--) {
-                updateCrcInt(orderCrc, this.sectionsWithGeometry[index] & 0xFF);
-            }
-        } else {
-            for (int index = 0; index < this.sectionsWithGeometryCount; index++) {
-                updateCrcInt(orderCrc, this.sectionsWithGeometry[index] & 0xFF);
-            }
-        }
-
-        CRC32 mapCrc = new CRC32();
-        for (long bits : this.sectionsWithGeometryMap) {
-            updateCrcLong(mapCrc, bits);
-        }
-
-        return String.format(
-            Locale.ROOT,
-            "sec=%d;ord=%s;map=%s;rev=%s;rel=%d,%d,%d;vf=%d;sorted=%s",
-            this.sectionsWithGeometryCount,
-            Long.toHexString(orderCrc.getValue()),
-            Long.toHexString(mapCrc.getValue()),
-            Boolean.toString(reverse),
-            this.lastRelativeCameraSectionX,
-            this.lastRelativeCameraSectionY,
-            this.lastRelativeCameraSectionZ,
-            this.lastVisibleFrame,
-            Boolean.toString(this.addedSectionsAreSorted)
-        );
-    }
-
-    private static void updateCrcBool(CRC32 crc, boolean value) {
-        updateCrcInt(crc, value ? 1 : 0);
-    }
-
     private static void updateCrcInt(CRC32 crc, int value) {
         crc.update(value & 0xFF);
         crc.update((value >>> 8) & 0xFF);
@@ -240,14 +116,6 @@ public class ChunkRenderList {
         updateCrcInt(crc, (int) (value >>> 32));
     }
 
-    public int getSectionsWithSpritesCount() {
-        return this.sectionsWithSpritesCount;
-    }
-
-    public int getSectionsWithEntitiesCount() {
-        return this.sectionsWithEntitiesCount;
-    }
-
     public int getLastVisibleFrame() {
         return this.lastVisibleFrame;
     }
@@ -258,5 +126,9 @@ public class ChunkRenderList {
 
     public int size() {
         return this.size;
+    }
+
+    public int getSectionsWithGeometryCount() {
+        return this.sectionsWithGeometryCount;
     }
 }

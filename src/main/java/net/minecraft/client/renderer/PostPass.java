@@ -5,7 +5,6 @@ import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140Builder;
 import net.blaze3d.buffers.Std140SizeCalculator;
-import net.blaze3d.framegraph.FrameGraphBuilder;
 import net.blaze3d.framegraph.FramePass;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.pipeline.RenderTarget;
@@ -45,111 +44,10 @@ public class PostPass implements AutoCloseable {
 		this.name = renderPipeline.getLocation().toString();
 		this.outputTargetId = resourceLocation;
 		this.inputs = list;
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			// Rust owns post-process source admission and execution for whole-frame
-			// Vulkan; Java custom uniforms and sampler metadata are not allocated.
-			this.infoUbo = null;
-			return;
-		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			this.infoUbo = null;
-			return;
-		}
-
-		for (Entry<String, List<UniformValue>> entry : map.entrySet()) {
-			List<UniformValue> list2 = (List<UniformValue>)entry.getValue();
-			if (!list2.isEmpty()) {
-				Std140SizeCalculator std140SizeCalculator = new Std140SizeCalculator();
-
-				for (UniformValue uniformValue : list2) {
-					uniformValue.addSize(std140SizeCalculator);
-				}
-
-				int i = std140SizeCalculator.get();
-
-				try (MemoryStack memoryStack = MemoryStack.stackPush()) {
-					Std140Builder std140Builder = Std140Builder.onStack(memoryStack, i);
-
-					for (UniformValue uniformValue2 : list2) {
-						uniformValue2.writeTo(std140Builder);
-					}
-
-					this.customUniforms
-						.put((String)entry.getKey(), net.vulkanic.VulkanicAPI.createBuffer(() -> this.name + " / " + (String)entry.getKey(), 128, std140Builder.get()));
-				}
-			}
-		}
-
-		this.infoUbo = new MappableRingBuffer(() -> this.name + " SamplerInfo", 130, (list.size() + 1) * UBO_SIZE_PER_SAMPLER);
-	}
-
-	public void addToFrame(FrameGraphBuilder frameGraphBuilder, Map<ResourceLocation, ResourceHandle<RenderTarget>> map, GpuBufferSlice gpuBufferSlice) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java post-pass rendering is unavailable while Rust owns whole-frame presentation");
-		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java Vulkan post-pass rendering is unavailable until the Rust whole-frame route is admitted");
-		}
-		FramePass framePass = frameGraphBuilder.addPass(this.name);
-
-		for (PostPass.Input input : this.inputs) {
-			input.addToPass(framePass, map);
-		}
-
-		ResourceHandle<RenderTarget> resourceHandle = (ResourceHandle<RenderTarget>)map.computeIfPresent(
-			this.outputTargetId, (resourceLocation, resourceHandlex) -> framePass.readsAndWrites(resourceHandlex)
-		);
-		if (resourceHandle == null) {
-			throw new IllegalStateException("Missing handle for target " + this.outputTargetId);
-		} else {
-			framePass.executes(
-				() -> {
-					RenderTarget renderTarget = resourceHandle.get();
-					net.vulkanic.VulkanicAPI.backupProjectionMatrix();
-					net.vulkanic.VulkanicAPI.setProjectionMatrix(gpuBufferSlice, ProjectionType.ORTHOGRAPHIC);
-					CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.createCommandEncoder();
-					List<Pair<String, GpuTextureView>> list = this.inputs.stream().map(inputxx -> Pair.of(inputxx.samplerName(), inputxx.texture(map))).toList();
-
-					try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(this.infoUbo.currentBuffer(), false, true)) {
-						Std140Builder std140Builder = Std140Builder.intoBuffer(mappedView.data());
-						std140Builder.putVec2(renderTarget.width, renderTarget.height);
-
-						for (Pair<String, GpuTextureView> pair : list) {
-							std140Builder.putVec2(pair.getSecond().getWidth(0), pair.getSecond().getHeight(0));
-						}
-					}
-
-					try (RenderPass renderPass = commandEncoder.createRenderPass(
-							() -> "Post pass " + this.name,
-							renderTarget.getColorTextureView(),
-							OptionalInt.empty(),
-							renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
-							OptionalDouble.empty()
-						)) {
-						renderPass.setPipeline(this.pipeline);
-						net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
-						renderPass.setUniform("SamplerInfo", this.infoUbo.currentBuffer());
-
-						for (Entry<String, GpuBuffer> entry : this.customUniforms.entrySet()) {
-							renderPass.setUniform((String)entry.getKey(), (GpuBuffer)entry.getValue());
-						}
-
-						for (Pair<String, GpuTextureView> pair2 : list) {
-							renderPass.bindSampler(pair2.getFirst() + "Sampler", pair2.getSecond());
-						}
-
-						renderPass.draw(0, 3);
-					}
-
-					this.infoUbo.rotate();
-					net.vulkanic.VulkanicAPI.restoreProjectionMatrix();
-
-					for (PostPass.Input inputx : this.inputs) {
-						inputx.cleanup(map);
-					}
-				}
-			);
-		}
+		// Rust owns post-process source admission and execution for whole-frame
+		// Vulkan; Java custom uniforms and sampler metadata are not allocated.
+		this.infoUbo = null;
+		return;
 	}
 
 	public void close() {
@@ -192,30 +90,12 @@ public class PostPass implements AutoCloseable {
 
 		@Override
 		public void cleanup(Map<ResourceLocation, ResourceHandle<RenderTarget>> map) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-				throw new IllegalStateException("Java post-pass target cleanup is unavailable on the Rust Vulkan route");
-			}
-			if (this.bilinear) {
-				this.getHandle(map).get().setFilterMode(FilterMode.NEAREST);
-			}
+			throw new IllegalStateException("Java post-pass target cleanup is unavailable on the Rust Vulkan route");
 		}
 
 		@Override
 		public GpuTextureView texture(Map<ResourceLocation, ResourceHandle<RenderTarget>> map) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-				throw new IllegalStateException("Java post-pass target textures are unavailable on the Rust Vulkan route");
-			}
-			ResourceHandle<RenderTarget> resourceHandle = this.getHandle(map);
-			RenderTarget renderTarget = resourceHandle.get();
-			renderTarget.setFilterMode(this.bilinear ? FilterMode.LINEAR : FilterMode.NEAREST);
-			GpuTextureView gpuTextureView = this.depthBuffer ? renderTarget.getDepthTextureView() : renderTarget.getColorTextureView();
-			if (gpuTextureView == null) {
-				throw new IllegalStateException("Missing " + (this.depthBuffer ? "depth" : "color") + "texture for target " + this.targetId);
-			} else {
-				return gpuTextureView;
-			}
+			throw new IllegalStateException("Java post-pass target textures are unavailable on the Rust Vulkan route");
 		}
 	}
 
@@ -227,11 +107,7 @@ public class PostPass implements AutoCloseable {
 
 		@Override
 		public GpuTextureView texture(Map<ResourceLocation, ResourceHandle<RenderTarget>> map) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-				throw new IllegalStateException("Java post-pass texture inputs are unavailable on the Rust Vulkan route");
-			}
-			return this.texture.getTextureView();
+			throw new IllegalStateException("Java post-pass texture inputs are unavailable on the Rust Vulkan route");
 		}
 	}
 }

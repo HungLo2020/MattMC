@@ -113,14 +113,7 @@ public class SubterranodonFlightGoal extends Goal {
         Vec3 targetVec;
         // TODO AC-TODO.md: Mob restriction API removed in 1.21 - hasRestriction()/getRestrictCenter() no longer exist
         // Using fallback logic for now
-        if (false) { // entity.hasRestriction() && entity.getRestrictCenter() != null
-            float maxRot = 360;
-            Vec3 center = Vec3.ZERO; // Vec3.atCenterOf(entity.getRestrictCenter());
-            float xRotOffset = (float) Math.toRadians(entity.getRandom().nextFloat() * (maxRot - (maxRot / 2)) * 0.5F);
-            float yRotOffset = (float) Math.toRadians(entity.getRandom().nextFloat() * maxRot - (maxRot / 2));
-            Vec3 distVec = new Vec3(0, 0, 15 + entity.getRandom().nextInt(15)).xRot(xRotOffset).yRot(yRotOffset);
-            targetVec = center.add(distVec);
-        } else {
+        {
             float maxRot = entity.horizontalCollision ? 360 : 90;
             float xRotOffset = (float) Math.toRadians(entity.getRandom().nextFloat() * (maxRot - (maxRot / 2)) * 0.5F);
             float yRotOffset = (float) Math.toRadians(entity.getRandom().nextFloat() * maxRot - (maxRot / 2));

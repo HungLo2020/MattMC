@@ -1,6 +1,5 @@
 package net.sodium.client.render.chunk.vertex;
 
-import net.irisshaders.iris.vertices.sodium.terrain.FormatAnalyzer;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gui.SodiumGameOptions;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
@@ -678,39 +677,6 @@ class NativeChunkMeshEncoderTest {
         org.junit.jupiter.api.Assertions.assertFalse(chunkBuildBuffers.contains(".assemble("));
     }
 
-
-    @Test
-    void writesXhfpExtendedAttributesNatively() {
-        ChunkVertexType vertexType = FormatAnalyzer.createFormat(true, true, true, true);
-        NativeChunkVertexFormat format = vertexType.getNativeFormat();
-        NativeSectionMeshBuilder.FacingBuffer builder = NativeSectionMeshBuilder.createFacingBuffer(vertexType, 16);
-        ByteBuffer output = null;
-
-        try {
-            builder.start(6);
-            pushQuad(builder, 0.25F, DefaultMaterials.SOLID.bits());
-
-            output = nativeOrder(MemoryUtil.memCalloc(4 * format.stride()));
-            int[] segments = new int[ModelQuadFacing.COUNT << 1];
-
-            NativeChunkMeshEncoder.assemble(
-                    new long[] {0, 0, 0, 0, 0, 0, builder.logicalAddress()},
-                    new int[] {0, 0, 0, 0, 0, 0, builder.count()},
-                    output, segments, format, builder.sectionIndex(), ModelQuadFacing.ALL, false, false, false);
-
-            assertEquals(4, segments[ModelQuadFacing.UNASSIGNED.ordinal() << 1]);
-            assertEquals(ModelQuadFacing.UNASSIGNED.ordinal(), segments[(ModelQuadFacing.UNASSIGNED.ordinal() << 1) + 1]);
-            assertEquals(((41 + 1) << 1) | 1, output.getInt(format.blockIdOffset()));
-            assertEquals(encodeOld(0.5F, 0.5F), output.getInt(format.midUvOffset()));
-            assertEquals((7 << 24) | packMidBlock(4.5F - 0.25F, 5.5F - 0.25F, 6.5F - 0.25F),
-                    output.getInt(format.midBlockOffset()));
-            assertNotEquals(0, output.getInt(format.normalOffset()));
-            assertNotEquals(0, output.getInt(format.tangentOffset()));
-        } finally {
-            free(output);
-            builder.destroy();
-        }
-    }
 
     @Test
     void modifiedTranslucentUpdatesUseBatchedScatteredNativeEncoding() {

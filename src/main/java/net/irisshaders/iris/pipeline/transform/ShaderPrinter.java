@@ -20,11 +20,6 @@ public class ShaderPrinter {
 	private static boolean outputLocationCleared = false;
 	private static int programCounter = 0;
 
-	public static void resetPrintState() {
-		outputLocationCleared = false;
-		programCounter = 0;
-	}
-
 	public static void deleteIfClearing() {
 		if (!outputLocationCleared) {
 			try {
@@ -46,10 +41,6 @@ public class ShaderPrinter {
 			}
 			outputLocationCleared = true;
 		}
-	}
-
-	public static ProgramPrintBuilder printProgram(String name) {
-		return new ProgramPrintBuilder(name);
 	}
 
 	public static class ProgramPrintBuilder {
@@ -81,32 +72,6 @@ public class ShaderPrinter {
 				sources.add(prefix + name + extension);
 				sources.add(content);
 			}
-		}
-
-		public ProgramPrintBuilder addSource(PatchShaderType type, String source) {
-			if (sources == null) {
-				return this;
-			}
-			addItem(type.extension, source);
-			return this;
-		}
-
-		public ProgramPrintBuilder addSources(Map<PatchShaderType, String> sources) {
-			if (sources == null) {
-				return this;
-			}
-			for (Map.Entry<PatchShaderType, String> entry : sources.entrySet()) {
-				addSource(entry.getKey(), entry.getValue());
-			}
-			return this;
-		}
-
-		public ProgramPrintBuilder addJson(String json) {
-			if (sources == null) {
-				return this;
-			}
-			addItem(".json", json);
-			return this;
 		}
 
 		public void print() {

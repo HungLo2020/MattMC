@@ -91,32 +91,6 @@ public enum ProgramId {
 		this.defaultBlendOverride = defaultBlendOverride;
 	}
 
-	public static ProgramId fromAPI(IrisProgram program) {
-		return switch (program) {
-			case BASIC -> Basic;
-			case TEXTURED -> Textured;
-			case TERRAIN -> Terrain;
-			case TERRAIN_SOLID -> TerrainSolid;
-			case TERRAIN_CUTOUT -> TerrainCutout;
-			case TRANSLUCENT -> Water;
-			case SKY_BASIC -> SkyBasic;
-			case SKY_TEXTURED -> SkyTextured;
-			case ARMOR_GLINT -> ArmorGlint;
-			case ENTITIES -> Entities;
-			case ENTITIES_TRANSLUCENT -> EntitiesTrans;
-			case CLOUDS -> Clouds;
-			case BLOCK -> Block;
-			case BLOCK_TRANSLUCENT -> BlockTrans;
-			case HAND -> Hand;
-			case HAND_TRANSLUCENT -> HandWater;
-			case PARTICLES -> Particles;
-			case PARTICLES_TRANSLUCENT -> ParticlesTrans;
-			case EMISSIVE_ENTITIES -> SpiderEyes;
-			case BEACON_BEAM -> BeaconBeam;
-			case LINES -> Line;
-		};
-	}
-
 	public ProgramGroup getGroup() {
 		return group;
 	}

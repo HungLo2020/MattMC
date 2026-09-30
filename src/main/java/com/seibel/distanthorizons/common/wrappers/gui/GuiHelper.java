@@ -31,10 +31,6 @@ public class GuiHelper
 		return Component.translatable(text, args);
 	}
 	
-	public static void SetX(AbstractWidget w, int x)
-	{
-		w.setX(x);
-	}
 	
 	public static void SetY(AbstractWidget w, int y)
 	{

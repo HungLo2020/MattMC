@@ -39,7 +39,6 @@ class ModelPartSemanticColorMappingTest {
         try(var nativeCalls=mockStatic(RustGalWorldPrimitiveRenderer.class);
             var policy=mockStatic(WorldRenderRoutePolicy.class);
             var api=mockStatic(net.vulkanic.VulkanicAPI.class)) {
-            api.when(net.vulkanic.VulkanicAPI::isVulkanBackendSelected).thenReturn(true);
             policy.when(()->WorldRenderRoutePolicy.currentModelMeshRoute(true)).thenReturn(WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME);
             var storage=new SubmitNodeStorage();
             int[] expectedOrder = {0};
@@ -70,7 +69,6 @@ class ModelPartSemanticColorMappingTest {
         try (var nativeCalls=mockStatic(RustGalWorldPrimitiveRenderer.class);
              var policy=mockStatic(WorldRenderRoutePolicy.class);
              var api=mockStatic(net.vulkanic.VulkanicAPI.class)) {
-            api.when(net.vulkanic.VulkanicAPI::isVulkanBackendSelected).thenReturn(true);
             policy.when(()->WorldRenderRoutePolicy.currentModelMeshRoute(true)).thenReturn(WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME);
             nativeCalls.when(()->RustGalWorldPrimitiveRenderer.enqueueAtlasGlintModelMesh(
                 model,state,pose.last(),type,sprite,15728880,overlay,-1,0,null)).thenReturn(true);

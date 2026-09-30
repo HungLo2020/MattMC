@@ -35,12 +35,6 @@ public class Std140SizeCalculator {
 		return this;
 	}
 
-	public Std140SizeCalculator putIVec2() {
-		this.align(8);
-		this.size += 8;
-		return this;
-	}
-
 	public Std140SizeCalculator putVec3() {
 		this.align(16);
 		this.size += 16;
@@ -54,12 +48,6 @@ public class Std140SizeCalculator {
 	}
 
 	public Std140SizeCalculator putVec4() {
-		this.align(16);
-		this.size += 16;
-		return this;
-	}
-
-	public Std140SizeCalculator putIVec4() {
 		this.align(16);
 		this.size += 16;
 		return this;

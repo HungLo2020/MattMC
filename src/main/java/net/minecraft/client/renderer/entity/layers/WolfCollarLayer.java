@@ -27,37 +27,22 @@ public class WolfCollarLayer extends RenderLayer<WolfRenderState, WolfModel> {
 			int j = dyeColor.getTextureDiffuseColor();
 			WolfModel model = this.getParentModel(wolfRenderState);
 			RenderType renderType = RenderType.entityCutoutNoCull(WOLF_COLLAR_LOCATION);
-			if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-				boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
-					model, wolfRenderState, poseStack.last(), renderType, WOLF_COLLAR_LOCATION,
-					WOLF_COLLAR_IDENTITY, i, OverlayTexture.NO_OVERLAY, j, wolfRenderState.outlineColor
-				);
-				if (queued) {
-					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-						"rust-vulkan-whole-frame", WOLF_COLLAR_LOCATION, model.getClass().getName(),
-						wolfRenderState.entityId, true, true, false
-					);
-					return;
-				}
+			boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+				model, wolfRenderState, poseStack.last(), renderType, WOLF_COLLAR_LOCATION,
+				WOLF_COLLAR_IDENTITY, i, OverlayTexture.NO_OVERLAY, j, wolfRenderState.outlineColor
+			);
+			if (queued) {
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-					"rust-vulkan-unavailable", WOLF_COLLAR_LOCATION, model.getClass().getName(),
-					wolfRenderState.entityId, false, false, false
+					"rust-vulkan-whole-frame", WOLF_COLLAR_LOCATION, model.getClass().getName(),
+					wolfRenderState.entityId, true, true, false
 				);
-				throw new IllegalStateException("Rust whole-frame wolf-collar route has no copied semantic mesh");
+				return;
 			}
-			submitNodeCollector.order(1)
-				.submitModelSemanticTexture(
-					model,
-					wolfRenderState,
-					poseStack,
-					renderType,
-					i,
-					OverlayTexture.NO_OVERLAY,
-					j,
-					WOLF_COLLAR_LOCATION,
-					wolfRenderState.outlineColor,
-					null
-				);
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-unavailable", WOLF_COLLAR_LOCATION, model.getClass().getName(),
+				wolfRenderState.entityId, false, false, false
+			);
+			throw new IllegalStateException("Rust whole-frame wolf-collar route has no copied semantic mesh");
 		}
 	}
 }

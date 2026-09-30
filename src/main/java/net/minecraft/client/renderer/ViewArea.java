@@ -73,30 +73,6 @@ public class ViewArea {
 		return this.level;
 	}
 
-	public void repositionCamera(SectionPos sectionPos) {
-		for (int i = 0; i < this.sectionGridSizeX; i++) {
-			int j = sectionPos.x() - this.viewDistance;
-			int k = j + Math.floorMod(i - j, this.sectionGridSizeX);
-
-			for (int l = 0; l < this.sectionGridSizeZ; l++) {
-				int m = sectionPos.z() - this.viewDistance;
-				int n = m + Math.floorMod(l - m, this.sectionGridSizeZ);
-
-				for (int o = 0; o < this.sectionGridSizeY; o++) {
-					int p = this.level.getMinSectionY() + o;
-					SectionRenderDispatcher.RenderSection renderSection = this.sections[this.getSectionIndex(i, o, l)];
-					long q = renderSection.getSectionNode();
-					if (q != SectionPos.asLong(k, p, n)) {
-						renderSection.setSectionNode(SectionPos.asLong(k, p, n));
-					}
-				}
-			}
-		}
-
-		this.cameraSectionPos = sectionPos;
-		this.levelRenderer.getSectionOcclusionGraph().invalidate();
-	}
-
 	public SectionPos getCameraSectionPos() {
 		return this.cameraSectionPos;
 	}

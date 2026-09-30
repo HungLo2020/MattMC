@@ -49,21 +49,6 @@ public class StringUtil
 		return stringBuilder.toString();
 	}
 	
-	/**
-	 * Converts the given byte array into a hex string representation. <br>
-	 * source: https://stackoverflow.com/a/9855338
-	 */
-	public static String byteArrayToHexString(byte[] bytes)
-	{
-		char[] hexChars = new char[bytes.length * 2];
-		for (int i = 0; i < bytes.length; i++)
-		{
-			int v = bytes[i] & 0xFF;
-			hexChars[i * 2] = HEX_ARRAY[v >>> 4];
-			hexChars[i * 2 + 1] = HEX_ARRAY[v & 0x0F];
-		}
-		return new String(hexChars);
-	}
 	
 	/**
 	 * Returns a shortened version of the given string that is no longer than maxLength. <br>

@@ -454,20 +454,7 @@ public class LodQuadBuilder
 	// buffer setup //
 	//==============//
 	
-	public ArrayList<ByteBuffer> makeOpaqueVertexBuffers() { return this.makeVertexBuffers(this.opaqueQuads, DEFAULT_DIRECTION_RENDER_ORDER); }
-	public ArrayList<ByteBuffer> makeTransparentVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER); }
-	public ArrayList<ByteBuffer> makeTransparentUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
-	public ArrayList<ByteBuffer> makeTransparentWaterUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
 
-	/**
-	 * Creates the normal DH CPU vertex buffers plus one semantic identity per
-	 * emitted quad. The sidecar is opt-in so the legacy GL route does not pay
-	 * for data it cannot consume.
-	 */
-	public VertexBufferBuild makeOpaqueVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.opaqueQuads, DEFAULT_DIRECTION_RENDER_ORDER); }
-	public VertexBufferBuild makeTransparentVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER); }
-	public VertexBufferBuild makeTransparentUpVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
-	public VertexBufferBuild makeTransparentWaterUpVertexBuffersWithSemanticMaterials() { return this.makeVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
 
 	/**
 	 * Builds the Rust semantic transport directly into exact-size Java-owned
@@ -479,109 +466,6 @@ public class LodQuadBuilder
 	public SemanticVertexBufferBuild makeTransparentRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER, quad -> true); }
 	public SemanticVertexBufferBuild makeTransparentUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
 	public SemanticVertexBufferBuild makeTransparentWaterUpRustSemanticBuffers() { return this.makeSemanticVertexBufferBuild(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
-
-	private ArrayList<ByteBuffer> makeVertexBuffers(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder)
-	{
-		return this.makeVertexBuffers(quadList, directionRenderOrder, quad -> true);
-	}
-	private ArrayList<ByteBuffer> makeVertexBuffers(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder, Predicate<BufferQuad> quadFilter)
-	{
-		ArrayList<ByteBuffer> byteBufferList = new ArrayList<>(3);
-		
-		ByteBuffer buffer = null;
-		for (int directionIndex : directionRenderOrder)
-		{
-			// ignore empty directions
-			if (quadList[directionIndex].isEmpty())
-			{
-				continue;
-			}
-			
-			// put all the quads in this direction into the buffer
-			for (int quadIndex = 0; quadIndex < quadList[directionIndex].size(); quadIndex++)
-			{
-				BufferQuad quad = quadList[directionIndex].get(quadIndex);
-				if (!quadFilter.test(quad))
-				{
-					continue;
-				}
-
-				// if this is the first iteration or the buffer is full, 
-				// create a new buffer
-				if (buffer == null || !buffer.hasRemaining())
-				{
-					buffer = MemoryUtil.memAlloc(LodBufferContainer.FULL_SIZED_BUFFER);
-					byteBufferList.add(buffer);
-				}
-				
-				this.putQuad(buffer, quad);
-			}
-		}
-		
-		// rewind all the buffers so they can be read from
-		for (int i = 0; i < byteBufferList.size(); i++)
-		{
-			buffer = byteBufferList.get(i);
-			buffer.limit(buffer.position());
-			buffer.rewind();
-		}
-		
-		return byteBufferList;
-	}
-
-	private VertexBufferBuild makeVertexBufferBuild(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder)
-	{
-		return this.makeVertexBufferBuild(quadList, directionRenderOrder, quad -> true);
-	}
-
-	private VertexBufferBuild makeVertexBufferBuild(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder, Predicate<BufferQuad> quadFilter)
-	{
-		ArrayList<ByteBuffer> vertexBuffers = new ArrayList<>(3);
-		ArrayList<int[]> semanticMaterialIds = new ArrayList<>(3);
-		ArrayList<byte[]> semanticVariantStates = new ArrayList<>(3);
-		ArrayList<long[]> semanticVariantPositions = new ArrayList<>(3);
-		ByteBuffer buffer = null;
-		int[] materialIds = null;
-		byte[] variantStates = null;
-		long[] variantPositions = null;
-		for (int directionIndex : directionRenderOrder)
-		{
-			for (BufferQuad quad : quadList[directionIndex])
-			{
-				if (!quadFilter.test(quad))
-				{
-					continue;
-				}
-				if (buffer == null || !buffer.hasRemaining())
-				{
-					buffer = MemoryUtil.memAlloc(LodBufferContainer.FULL_SIZED_BUFFER);
-					vertexBuffers.add(buffer);
-					materialIds = new int[LodBufferContainer.MAX_QUADS_PER_BUFFER];
-					variantStates = new byte[LodBufferContainer.MAX_QUADS_PER_BUFFER];
-					variantPositions = new long[LodBufferContainer.MAX_QUADS_PER_BUFFER];
-					semanticMaterialIds.add(materialIds);
-					semanticVariantStates.add(variantStates);
-					semanticVariantPositions.add(variantPositions);
-				}
-				int quadIndex = buffer.position() / LodBufferContainer.QUADS_BYTE_SIZE;
-				materialIds[quadIndex] = quad.semanticMaterialId;
-				variantStates[quadIndex] = quad.semanticVariantState;
-				variantPositions[quadIndex] = quad.semanticVariantPosition;
-				this.putQuad(buffer, quad);
-			}
-		}
-		for (int index = 0; index < vertexBuffers.size(); index++)
-		{
-			buffer = vertexBuffers.get(index);
-			int quadCount = buffer.position() / LodBufferContainer.QUADS_BYTE_SIZE;
-			buffer.limit(buffer.position());
-			buffer.rewind();
-			semanticMaterialIds.set(index, Arrays.copyOf(semanticMaterialIds.get(index), quadCount));
-			semanticVariantStates.set(index, Arrays.copyOf(semanticVariantStates.get(index), quadCount));
-			semanticVariantPositions.set(index, Arrays.copyOf(semanticVariantPositions.get(index), quadCount));
-		}
-		return new VertexBufferBuild(vertexBuffers, semanticMaterialIds, semanticVariantStates, semanticVariantPositions);
-	}
 
 	private SemanticVertexBufferBuild makeSemanticVertexBufferBuild(
 		ArrayList<BufferQuad>[] quadList,
@@ -1002,17 +886,5 @@ public class LodQuadBuilder
 		return i;
 	}
 	
-	/** Returns how many GpuBuffers will be needed to render opaque quads in this builder. */
-	public int getCurrentNeededOpaqueVertexBufferCount() { return MathUtil.ceilDiv(this.getCurrentOpaqueQuadsCount(), LodBufferContainer.MAX_QUADS_PER_BUFFER); }
-	/** Returns how many GpuBuffers will be needed to render transparent quads in this builder. */
-	public int getCurrentNeededTransparentVertexBufferCount()
-	{
-		if (!this.doTransparency)
-		{
-			return 0;
-		}
-		
-		return MathUtil.ceilDiv(this.getCurrentTransparentQuadsCount(), LodBufferContainer.MAX_QUADS_PER_BUFFER);
-	}
 	
 }

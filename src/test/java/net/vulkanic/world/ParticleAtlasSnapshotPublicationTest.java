@@ -3,7 +3,7 @@ package net.vulkanic.world;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.vulkan.VulkanWholeFrameSemanticGpuDevice;
+import net.vulkanic.bridge.RustSemanticGpuDevice;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,7 +16,7 @@ class ParticleAtlasSnapshotPublicationTest {
         String oldFlag = System.getProperty(flag);
         try {
         System.setProperty(flag, "true");
-        device.set(null, new VulkanWholeFrameSemanticGpuDevice());
+        device.set(null, new RustSemanticGpuDevice());
         var source = new TextureAtlas(TextureAtlas.LOCATION_PARTICLES);
         var replacement = new TextureAtlas(TextureAtlas.LOCATION_PARTICLES);
         var asset = new VulkanicGalBridge.WorldMeshTextureAssetRecord(101, new byte[]{1});

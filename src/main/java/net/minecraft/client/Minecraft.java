@@ -13,7 +13,6 @@ import net.minecraft.client.auth.ProfileResult;
 import net.minecraft.hooks.GameHooks;
 import net.minecraft.hooks.HookRegistry;
 
-import net.blaze3d.TracyFrameCapture;
 import net.blaze3d.pipeline.MainTarget;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.platform.ClientShutdownWatchdog;
@@ -325,7 +324,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private final BlockColors blockColors;
 	private final RenderTarget mainRenderTarget;
 	@Nullable
-	private final TracyFrameCapture tracyFrameCapture;
 	private final SoundManager soundManager;
 	private final MusicManager musicManager;
 	private final FontManager fontManager;
@@ -447,13 +445,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.fixerUpper = DataFixers.getDataFixer();
 		this.gameThread = Thread.currentThread();
 		
-		// Whole-frame Vulkan does not borrow Iris's renderer lifecycle or GPU
-		// initialization. The normal Java route retains its original ordering.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && !iris$initialized) {
-			iris$initialized = true;
-			new net.irisshaders.iris.Iris().onEarlyInitialize();
-		}
 		
 		this.options = new Options(this, this.gameDirectory);
 		this.debugEntries = new DebugScreenEntryList(this.gameDirectory);
@@ -672,10 +663,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.window.setAllowCursorChanges(this.options.allowCursorChanges().get());
 		this.window.setDefaultErrorCallback();
 		this.resizeDisplay();
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			this.gameRenderer.preloadUiShader(this.vanillaPackResources.asProvider());
-		}
 		this.profileKeyPairManager = this.offlineDeveloperMode
 			? ProfileKeyPairManager.EMPTY_KEY_MANAGER
 			: ProfileKeyPairManager.create(this.userApiService, this.user, path);
@@ -703,37 +690,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.quickPlayLog = QuickPlayLog.of(gameConfig.quickPlay.logPath());
 		this.framerateLimitTracker = new FramerateLimitTracker(this.options, this);
 		this.fpsPieProfiler = new ContinuousProfiler(Util.timeSource, () -> this.fpsPieRenderTicks, this.framerateLimitTracker::isHeavilyThrottled);
-		if (TracyCompat.isAvailable() && gameConfig.game.captureTracyImages
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			this.tracyFrameCapture = new TracyFrameCapture();
-		} else {
-			this.tracyFrameCapture = null;
-		}
 
 		this.packetProcessor = new PacketProcessor(this.gameThread);
 		
-		// These are Java/Iris texture objects, not Rust semantic assets.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.irisshaders.iris.platform.IrisPlatformHelpers.getInstance().isModLoaded("fabric-resource-loader-v0")) {
-			try {
-				this.textureManager.register(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("iris", "textures/gui/widgets.png"), new net.irisshaders.iris.targets.backed.NativeImageBackedCustomTexture(new net.irisshaders.iris.shaderpack.texture.CustomTextureData.PngData(new net.irisshaders.iris.shaderpack.texture.TextureFilteringData(false, false), org.apache.commons.io.IOUtils.toByteArray(net.irisshaders.iris.Iris.class.getResourceAsStream("/assets/iris/textures/gui/widgets.png")))));
-			} catch (java.io.IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
 		
-		// VoxelMap still owns Java offscreen textures and render passes. Keep it
-		// unavailable in a Rust-owned frame until it emits explicit semantics.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			try {
-				VoxelMapInitializer.initialize();
-			} catch (Exception e) {
-				LOGGER.error("Failed to initialize VoxelMap", e);
-			}
-		}
 
 		// TACZ MVP: Register client controls using MattMC's direct key mapping list.
 		TaczKeyMappings.register(this);
@@ -756,6 +716,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void onResourceLoadFinished(@Nullable Minecraft.GameLoadCookie gameLoadCookie) {
+		try {
+			VoxelMapInitializer.initialize();
+		} catch (Exception e) {
+			LOGGER.error("Failed to initialize VoxelMap", e);
+		}
 		if (!this.gameLoadFinished) {
 			this.gameLoadFinished = true;
 			this.onGameLoadFinished(gameLoadCookie);
@@ -801,7 +766,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private boolean addInitialScreens(List<Function<Runnable, Screen>> list) {
-		boolean bl = false;
 
 		BanDetails banDetails = this.multiplayerBan();
 		if (banDetails != null) {
@@ -818,7 +782,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		ProfileResult profileResult = (ProfileResult)this.profileFuture.join();
 		// Profile result is always null in offline mode
 
-		return bl;
+		return false;
 	}
 
 	private static boolean countryEqualsISO3(Object object) {
@@ -1275,9 +1239,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			this.mapTextureManager.close();
 			this.textureManager.close();
 			this.resourceManager.close();
-			if (this.tracyFrameCapture != null) {
-				this.tracyFrameCapture.close();
-			}
 
 			FreeTypeUtil.destroy();
 			Util.shutdownExecutors();
@@ -1286,7 +1247,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			LOGGER.error("Shutdown failure!", var5);
 			throw var5;
 		} finally {
-			RenderSystem.cleanupRendererBootstrapResources();
 			this.virtualScreen.close();
 			this.window.close();
 		}
@@ -1378,6 +1338,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		if (!this.debugEntries.isCurrentlyEnabled(DebugScreenEntries.GPU_UTILIZATION) && !this.metricsRecorder.isRecording()) {
 			bl2 = false;
 			this.gpuUtilization = 0.0;
+			TimerQuery.getInstance().stopRequesting();
 		} else {
 			bl2 = (this.currentFrameProfile == null || this.currentFrameProfile.isDone()) && !TimerQuery.getInstance().isRecording();
 			if (bl2) {
@@ -1387,56 +1348,27 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.gpu-profile-setup");
 
 			RenderTarget renderTarget = this.getMainRenderTarget();
-			boolean rustWholeFrameShell = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabledForBackend(VulkanicAPI.isVulkanBackendSelected());
-			if (rustWholeFrameShell) {
-				profilerFiller.push("rustVulkanWholeFrame");
-				startTime = Util.getNanos();
-				if (!this.noRender) {
-					net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
-					if (!net.minecraft.client.dev.DeterministicCameraCapture.holdPresentedFrameForExternalScreenshot(this)
-						&& !net.minecraft.client.gui.screens.TitleScreen.holdGraphicsAuditPresentedTitleFrame()) {
-						net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering.rust-vulkan-whole-frame");
-						boolean rendered = this.gameRenderer.renderRustVulkanWholeFrameShell(this.deltaTracker, bl);
-						net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering.rust-vulkan-whole-frame");
-						if (!rendered) {
-							throw new IllegalStateException(
-								"Rust Vulkan whole-frame presentation was selected but its semantic shell was not admitted"
-							);
-						}
-						net.minecraft.client.dev.GraphicsFrameBenchmark.recordRenderedFrame();
-						// The Rust coordinator already advances deterministic capture
-						// at its post-present boundary. Do not count this frame twice.
+			profilerFiller.push("rustVulkanWholeFrame");
+			startTime = Util.getNanos();
+			if (!this.noRender) {
+				net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
+				if (!net.minecraft.client.dev.DeterministicCameraCapture.holdPresentedFrameForExternalScreenshot(this)
+					&& !net.minecraft.client.gui.screens.TitleScreen.holdGraphicsAuditPresentedTitleFrame()) {
+					net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering.rust-vulkan-whole-frame");
+					boolean rendered = this.gameRenderer.renderRustVulkanWholeFrameShell(this.deltaTracker, bl);
+					net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering.rust-vulkan-whole-frame");
+					if (!rendered) {
+						throw new IllegalStateException(
+							"Rust Vulkan whole-frame presentation was selected but its semantic shell was not admitted"
+						);
 					}
-				}
-				net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.rustVulkanWholeFrame", Util.getNanos() - startTime);
-				profilerFiller.popPush("blit");
-			} else {
-				net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("command.recording.clear");
-				VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
-				net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("command.recording.clear");
-				profilerFiller.push("gameRenderer");
-				startTime = Util.getNanos();
-				boolean holdExternalFrame = false;
-				if (!this.noRender) {
-					net.minecraft.client.dev.DeterministicCameraCapture.beforeRender(this);
-					holdExternalFrame = net.minecraft.client.dev.DeterministicCameraCapture.holdPresentedFrameForExternalScreenshot(this);
-					if (!holdExternalFrame) {
-						net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.rendering");
-						this.gameRenderer.render(this.deltaTracker, bl);
-						net.minecraft.client.dev.GraphicsFrameBenchmark.recordRenderedFrame();
-						net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.rendering");
-						net.minecraft.client.dev.DeterministicCameraCapture.afterRender(this);
-					}
-				}
-				net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.gameRenderer", Util.getNanos() - startTime);
-
-				profilerFiller.popPush("blit");
-				if (!holdExternalFrame && !this.window.isMinimized()) {
-					net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.blit");
-					renderTarget.blitToScreen();
-					net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.blit");
+					net.minecraft.client.dev.GraphicsFrameBenchmark.recordRenderedFrame();
+					// The Rust coordinator already advances deterministic capture
+					// at its post-present boundary. Do not count this frame twice.
 				}
 			}
+			net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.rustVulkanWholeFrame", Util.getNanos() - startTime);
+			profilerFiller.popPush("blit");
 
 		this.frameTimeNs = Util.getNanos() - l;
 		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadFrame(Util.getNanos() - frameStart);
@@ -1447,26 +1379,19 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		profilerFiller.popPush("updateDisplay");
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.tracy-frame-capture");
-		if (this.tracyFrameCapture != null && !net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
-			this.tracyFrameCapture.upload();
-			this.tracyFrameCapture.capture(renderTarget);
-		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.tracy-frame-capture");
 
 			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("api.present.update-display");
-				this.window.updateDisplay(this.tracyFrameCapture);
+				this.window.updateDisplay();
 				net.minecraft.client.dev.GraphicsAuditResourceReload.observe(this);
 			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("api.present.update-display");
 			int k = this.framerateLimitTracker.getFramerateLimit();
 			if (DEBUG_FPS_LIMIT_LOGS < 20) {
 				DEBUG_FPS_LIMIT_LOGS++;
 				net.blaze3d.textures.GpuTexture mainColorTexture = renderTarget.getColorTexture();
-				boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-				int mainColorTextureId = mainColorTexture == null || rustWholeFrame
-					? 0 : net.vulkanic.VulkanicCoreAPI.textureId(mainColorTexture);
+				int mainColorTextureId = 0;
 				String mainColorTextureLabel = mainColorTexture == null ? "null"
-					: rustWholeFrame ? "rust-semantic-frame-target" : mainColorTexture.getLabel();
+					: "rust-semantic-frame-target";
 			LOGGER.info(
 				"FPS limit debug#{}: limit={} reason={} iconified={} minimized={} levelPresent={} screen={} overlay={} mainColorTexId={} mainColorTexLabel={}",
 				DEBUG_FPS_LIMIT_LOGS,
@@ -2054,15 +1979,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.keyboardHandler.tick();
 		profilerFiller.pop();
 		
-		// Iris owns Java shader-pack state.  Whole-frame Vulkan has no Iris
-		// renderer/runtime to toggle, so leave those controls unavailable rather
-		// than constructing or borrowing its GPU state.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-				profilerFiller.push("iris_keybinds");
-			net.irisshaders.iris.Iris.handleKeybinds(this);
-			profilerFiller.pop();
-		}
 		
 		// VoxelMap: Client tick hook
 		profilerFiller.push("voxelmap_tick");
@@ -2291,11 +2207,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void setLevel(ClientLevel clientLevel) {
-		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on level change
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
-		}
 		
 		this.level = clientLevel;
 		this.updateLevelInEngines(clientLevel);
@@ -2388,11 +2299,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	public void clearClientLevel(Screen screen) {
 		net.vulkanic.gui.RustGalFrameCoordinator.cancelPending("world-unload");
 		net.vulkanic.world.RustGalTerrainRenderer.invalidateForWorldUnload();
-		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on leave
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
-		}
 		
 		ClientPacketListener clientPacketListener = this.getConnection();
 		if (clientPacketListener != null) {
@@ -2442,21 +2348,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void updateLevelInEngines(@Nullable ClientLevel clientLevel) {
-		// Iris: From MixinMinecraft_PipelineManagement - reset pipeline on dimension change
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			if (net.irisshaders.iris.Iris.getCurrentDimension() != net.irisshaders.iris.Iris.lastDimension) {
-				net.irisshaders.iris.Iris.logger.info("Reloading pipeline on dimension change: " + net.irisshaders.iris.Iris.lastDimension + " => " + net.irisshaders.iris.Iris.getCurrentDimension());
-				// Destroy pipelines when changing dimensions.
-				net.irisshaders.iris.Iris.getPipelineManager().destroyPipeline();
-
-				// NB: We need create the pipeline immediately, so that it is ready by the time that Sodium starts trying to
-				// initialize its world renderer.
-				if (clientLevel != null) {
-					net.irisshaders.iris.Iris.getPipelineManager().preparePipeline(net.irisshaders.iris.Iris.getCurrentDimension());
-				}
-			}
-		}
 		
 		// Call registered level hooks before updating engines
 		for (net.minecraft.hooks.MinecraftLevelHooks hook : net.minecraft.hooks.HookRegistry.getMinecraftLevelHooks()) {
@@ -2880,85 +2771,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public Component grabPanoramixScreenshot(File file) {
-		int i = 4;
-		int j = 4096;
-		int k = 4096;
-		int l = this.window.getWidth();
-		int m = this.window.getHeight();
-		RenderTarget renderTarget = this.getMainRenderTarget();
-		float f = this.player.getXRot();
-		float g = this.player.getYRot();
-		float h = this.player.xRotO;
-		float n = this.player.yRotO;
-		this.gameRenderer.setRenderBlockOutline(false);
-
-		MutableComponent var13;
-		try {
-			this.gameRenderer.setPanoramicMode(true);
-			this.window.setWidth(4096);
-			this.window.setHeight(4096);
-			renderTarget.resize(4096, 4096);
-
-			for (int o = 0; o < 6; o++) {
-				switch (o) {
-					case 0:
-						this.player.setYRot(g);
-						this.player.setXRot(0.0F);
-						break;
-					case 1:
-						this.player.setYRot((g + 90.0F) % 360.0F);
-						this.player.setXRot(0.0F);
-						break;
-					case 2:
-						this.player.setYRot((g + 180.0F) % 360.0F);
-						this.player.setXRot(0.0F);
-						break;
-					case 3:
-						this.player.setYRot((g - 90.0F) % 360.0F);
-						this.player.setXRot(0.0F);
-						break;
-					case 4:
-						this.player.setYRot(g);
-						this.player.setXRot(-90.0F);
-						break;
-					case 5:
-					default:
-						this.player.setYRot(g);
-						this.player.setXRot(90.0F);
-				}
-
-				this.player.yRotO = this.player.getYRot();
-				this.player.xRotO = this.player.getXRot();
-				this.gameRenderer.renderLevel(DeltaTracker.ONE);
-
-				try {
-					Thread.sleep(10L);
-				} catch (InterruptedException var18) {
-				}
-
-				Screenshot.grab(file, "panorama_" + o + ".png", renderTarget, 4, component -> {});
-			}
-
-			Component component = Component.literal(file.getName())
-				.withStyle(ChatFormatting.UNDERLINE)
-				.withStyle(style -> style.withClickEvent(new OpenFile(file.getAbsoluteFile())));
-			return Component.translatable("screenshot.success", new Object[]{component});
-		} catch (Exception var19) {
-			LOGGER.error("Couldn't save image", (Throwable)var19);
-			var13 = Component.translatable("screenshot.failure", new Object[]{var19.getMessage()});
-		} finally {
-			this.player.setXRot(f);
-			this.player.setYRot(g);
-			this.player.xRotO = h;
-			this.player.yRotO = n;
-			this.gameRenderer.setRenderBlockOutline(true);
-			this.window.setWidth(l);
-			this.window.setHeight(m);
-			renderTarget.resize(l, m);
-			this.gameRenderer.setPanoramicMode(false);
-		}
-
-		return var13;
+		// Panorama faces are square 4096x4096 offscreen renders; the Rust
+		// renderer presents only at the window's swapchain size so far.
+		return Component.translatable("screenshot.failure", "panorama capture is not supported by the Rust renderer yet");
 	}
 
 	public SplashManager getSplashManager() {

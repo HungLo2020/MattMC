@@ -60,27 +60,10 @@ public abstract class ArrowRenderer<T extends AbstractArrow, S extends ArrowRend
 				"rust-vulkan-unavailable", textureLocation, false, false, false
 			);
 			throw new IllegalStateException("Rust whole-frame Arrow route has no semantic mesh for " + textureLocation);
-		} else if (disposition == ArrowSubmitDisposition.JAVA_COMPATIBILITY) {
-			submitNodeCollector.submitModelSemantic(
-				this.model,
-				arrowRenderState,
-				poseStack,
-				RenderType.entityCutout(textureLocation),
-				arrowRenderState.lightCoords,
-				OverlayTexture.NO_OVERLAY,
-				arrowRenderState.outlineColor,
-				null
-			);
-			RustGalWorldPrimitiveRenderer.recordArrowRouteDecision(
-				"java-legacy", textureLocation, false, false, !submitNodeCollector.isSemanticCoverageOnly()
-			);
 		} else {
 			RustGalWorldPrimitiveRenderer.recordArrowRouteDecision("disabled", textureLocation, false, false, false);
 		}
 		poseStack.popPose();
-		if (disposition == ArrowSubmitDisposition.JAVA_COMPATIBILITY) {
-			super.submit(arrowRenderState, poseStack, submitNodeCollector, cameraRenderState);
-		}
 	}
 
 	static ArrowSubmitDisposition classifyArrowSubmit(

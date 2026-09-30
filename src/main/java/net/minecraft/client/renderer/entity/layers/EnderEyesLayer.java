@@ -28,25 +28,22 @@ public class EnderEyesLayer extends EyesLayer<EndermanRenderState, EndermanModel
 	@Override
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int light,
 		EndermanRenderState state, float limbAngle, float limbDistance) {
-		if (net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
-			boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
-				this.getParentModel(), state, poseStack.last(), ENDERMAN_EYES,
-				semanticTexture(), ENDERMAN_EYES_IDENTITY, light, OverlayTexture.NO_OVERLAY, -1
-			);
-			if (queued) {
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-					"rust-vulkan-whole-frame", semanticTexture(), this.getParentModel().getClass().getName(),
-					state.entityId, true, true, false
-				);
-				return;
-			}
+		boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
+			this.getParentModel(), state, poseStack.last(), ENDERMAN_EYES,
+			semanticTexture(), ENDERMAN_EYES_IDENTITY, light, OverlayTexture.NO_OVERLAY, -1
+		);
+		if (queued) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-				"rust-vulkan-unavailable", semanticTexture(), this.getParentModel().getClass().getName(),
-				state.entityId, false, false, false
+				"rust-vulkan-whole-frame", semanticTexture(), this.getParentModel().getClass().getName(),
+				state.entityId, true, true, false
 			);
-			throw new IllegalStateException("Rust whole-frame enderman-eyes route has no copied semantic mesh");
+			return;
 		}
-		super.submit(poseStack, submitNodeCollector, light, state, limbAngle, limbDistance);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+			"rust-vulkan-unavailable", semanticTexture(), this.getParentModel().getClass().getName(),
+			state.entityId, false, false, false
+		);
+		throw new IllegalStateException("Rust whole-frame enderman-eyes route has no copied semantic mesh");
 	}
 
 	@Override

@@ -66,14 +66,13 @@ public class DhApiRenderProxy implements IDhApiRenderProxy
 	@Override
 	public DhApiResult<Integer> getDhDepthTextureId()
 	{
-		int activeTexture = LodRenderer.INSTANCE.getActiveDepthTextureId();
-		return (activeTexture == -1) ? DhApiResult.createFail("DH's depth texture hasn't been created and/or bound yet.", -1) : DhApiResult.createSuccess(activeTexture);
+		// Rust VulkanicGAL owns DH's targets; there is no GL texture name to share.
+		return DhApiResult.createFail("DH's depth texture is owned by the Rust renderer.", -1);
 	}
 	@Override
 	public DhApiResult<Integer> getDhColorTextureId()
 	{
-		int activeTexture = LodRenderer.INSTANCE.getActiveColorTextureId();
-		return (activeTexture == -1) ? DhApiResult.createFail("DH's color texture hasn't been created and/or bound yet.", -1) : DhApiResult.createSuccess(activeTexture);
+		return DhApiResult.createFail("DH's color texture is owned by the Rust renderer.", -1);
 	}
 	
 	

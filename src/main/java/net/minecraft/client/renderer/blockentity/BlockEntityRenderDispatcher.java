@@ -99,15 +99,12 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 	public <S extends BlockEntityRenderState> void submit(
 		S blockEntityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState
 	) {
-		boolean selectedVulkan = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| (selectedVulkan && net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan());
 		// A selected Vulkan frame never borrows Iris' Java render tracking, even
 		// when this particular block-entity family is unavailable and will be
 		// rejected later by the feature dispatcher. Semantic coverage calls use
 		// submitSemantic, which already disables capture explicitly.
 		this.submitInternal(blockEntityRenderState, poseStack, submitNodeCollector, cameraRenderState,
-			!selectedVulkan && !rustWholeFrame);
+			false);
 	}
 
 	/**
@@ -143,19 +140,12 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 				int intId = blockStateIds.applyAsInt(blockEntityRenderState.blockState);
 				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(intId);
 			}
-			boolean rustPresenterActive = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-			boolean rustBlockEntityItemScope = !captureIrisRenderState
-				&& !submitNodeCollector.isSemanticCoverageOnly()
-				&& rustPresenterActive
-				&& (net.vulkanic.world.WorldRenderRoutePolicy.currentModelPartMeshRoute(true).usesRustWholeFrameVulkan()
-					|| net.vulkanic.world.WorldRenderRoutePolicy.currentItemEntityMeshRoute(true).usesRustWholeFrameVulkan());
+			boolean rustBlockEntityItemScope = (!captureIrisRenderState
+				&& !submitNodeCollector.isSemanticCoverageOnly());
 			if (rustBlockEntityItemScope) {
 				net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginBlockEntityItemSubmission();
 			}
-			boolean rustBlockEntitySemanticScope = !captureIrisRenderState
-				&& rustPresenterActive
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
+			boolean rustBlockEntitySemanticScope = !captureIrisRenderState;
 			if (rustBlockEntitySemanticScope) {
 				int blockEntityId = Block.BLOCK_STATE_REGISTRY.getId(blockEntityRenderState.blockState);
 				if (blockEntityId < 0) {

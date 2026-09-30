@@ -61,23 +61,11 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	private FogParameters parameters = FogParameters.NONE;
 
 	public FogRenderer() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Rust consumes copied fog parameters; Java UBOs and shader-fog
-			// publication are compatibility-only on the whole-frame route.
-			this.regularBuffer = null;
-			this.emptyBuffer = null;
-			return;
-		}
-		this.regularBuffer = new MappableRingBuffer(() -> "Fog UBO", 130, FOG_UBO_SIZE);
-
-		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
-			ByteBuffer byteBuffer = memoryStack.malloc(FOG_UBO_SIZE);
-			this.updateBuffer(byteBuffer, 0, new Vector4f(0.0F), Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
-		this.emptyBuffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Empty fog", 128, byteBuffer.flip());
-		}
-
-		VulkanicAPI.setShaderFog(this.getBuffer(FogRenderer.FogMode.NONE));
+		// Rust consumes copied fog parameters; Java UBOs and shader-fog
+		// publication are compatibility-only on the whole-frame route.
+		this.regularBuffer = null;
+		this.emptyBuffer = null;
+		return;
 	}
 
 	public void close() {
@@ -88,38 +76,18 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	}
 
 	public void ensureRustSemanticRoute() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) this.close();
+		this.close();
 	}
 
 	public void endFrame() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
-		if (this.regularBuffer != null) this.regularBuffer.rotate();
-	}
-
-	public GpuBufferSlice getBuffer(FogRenderer.FogMode fogMode) {
-		if (this.emptyBuffer == null || this.regularBuffer == null) {
-			throw new IllegalStateException("Java fog UBO rendering is unavailable on selected Vulkan");
-		}
-		if (!fogEnabled) {
-			return this.emptyBuffer.slice(0, FOG_UBO_SIZE);
-		} else {
-			return switch (fogMode) {
-				case NONE -> this.emptyBuffer.slice(0, FOG_UBO_SIZE);
-				case WORLD -> this.regularBuffer.currentBuffer().slice(0, FOG_UBO_SIZE);
-			};
-		}
+		return;
 	}
 
 	// VoxelMap: Made accessible
 	public Vector4f computeFogColor(Camera camera, float f, ClientLevel clientLevel, int i, float g, boolean bl) {
 		return this.computeFogColor(
 			camera, f, clientLevel, i, g, bl,
-			!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+			false
 		);
 	}
 
@@ -209,59 +177,6 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 
 	public static boolean toggleFog() {
 		return fogEnabled = !fogEnabled;
-	}
-
-	public Vector4f setupFog(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java fog UBO rendering is unavailable on selected Vulkan");
-		}
-		FogComputation fog = this.computeFogParameters(camera, i, bl, deltaTracker, f, clientLevel, true, true);
-		FogParameters fogParameters = fog.parameters();
-		Vector4f vector4f = new Vector4f(
-			fogParameters.red(), fogParameters.green(), fogParameters.blue(), fogParameters.alpha()
-		);
-
-		try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
-			this.updateBuffer(
-				mappedView.data(),
-				0,
-				vector4f,
-				fogParameters.environmentalStart(),
-				fogParameters.environmentalEnd(),
-				fogParameters.renderStart(),
-				fogParameters.renderEnd(),
-				fog.skyEnd(),
-				fog.cloudEnd()
-			);
-		}
-
-		if (TRACE_FOG_STATE) {
-			LOGGER.info(
-				"FogStateTrace backend={} renderer={} fogType={} dhCancel={} cameraNotInFluid={} specialFog={} wrapperSpecial={} enableVanillaFog={} color=({},{},{},{}) envStart={} envEnd={} renderStart={} renderEnd={} skyEnd={} cloudEnd={}",
-				VulkanicAPI.getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
-				Integer.toHexString(System.identityHashCode(this)),
-				fog.fogType(),
-				fog.dhFogCancelState().cancelFog(),
-				fog.dhFogCancelState().cameraNotInFluid(),
-				fog.dhFogCancelState().specialFog(),
-				fog.dhFogCancelState().wrapperSpecialFog(),
-				fog.dhFogCancelState().enableVanillaFog(),
-				vector4f.x,
-				vector4f.y,
-				vector4f.z,
-				vector4f.w,
-				fogParameters.environmentalStart(),
-				fogParameters.environmentalEnd(),
-				fogParameters.renderStart(),
-				fogParameters.renderEnd(),
-				fog.skyEnd(),
-				fog.cloudEnd()
-			);
-		}
-
-			// Fog color capture is handled by computeFogColor's explicit legacy flag.
-			return vector4f;
 	}
 
 	/**
@@ -382,15 +297,6 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 		}
 	}
 
-	private void updateBuffer(ByteBuffer byteBuffer, int i, Vector4f vector4f, float f, float g, float h, float j, float k, float l) {
-		byteBuffer.position(i);
-		Std140Builder.intoBuffer(byteBuffer).putVec4(vector4f).putFloat(f).putFloat(g).putFloat(h).putFloat(j).putFloat(k).putFloat(l);
-	}
-	
-	// DH: Helper method to determine if vanilla fog should be cancelled
-	private static boolean shouldCancelDhFog(Camera camera, Entity entity) {
-		return getDhFogCancelState(camera, entity).cancelFog();
-	}
 
 	private static DhFogCancelState getDhFogCancelState(Camera camera, Entity entity) {
 		boolean cameraNotInFluid = camera.getFluidInCamera() == FogType.NONE;

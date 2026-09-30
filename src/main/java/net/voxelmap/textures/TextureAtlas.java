@@ -20,7 +20,6 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureContents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.vulkanic.gui.RustGalGuiRawImageAssets;
 
 public class TextureAtlas extends AbstractTexture {
@@ -51,13 +50,9 @@ public class TextureAtlas extends AbstractTexture {
         Minecraft.getInstance().getTextureManager().register(resourceLocation, this);
     }
 
-    @Override
     public void setFilter(boolean linearFilter, boolean mipmap) {
         this.linearFilter = linearFilter;
         this.mipmap = mipmap;
-        if (texture != null) {
-            super.setFilter(linearFilter, mipmap);
-        }
     }
 
     private void initMissingImage() {
@@ -109,50 +104,8 @@ public class TextureAtlas extends AbstractTexture {
 
         VoxelConstants.getLogger().info("Created: {}x{} {}-atlas", new Object[] { this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), this.basePath });
 
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			this.finishSemanticStitch();
-			return;
-		}
-		if (RustGalVulkanWholeFrameMode.enabled()) {
-            this.finishSemanticStitch();
-            return;
-        }
-
-        texture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-atlas", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.RGBA8, this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), 1, 1);
-        textureView = net.vulkanic.VulkanicAPI.createTextureView(texture);
-        super.setFilter(linearFilter, mipmap);
-        HashMap<Object, Sprite> tempMapRegisteredSprites = Maps.newHashMap(this.mapRegisteredSprites);
-        for (Sprite icon : this.stitcher.getStitchSlots()) {
-            Object iconName = icon.getIconName();
-            tempMapRegisteredSprites.remove(iconName);
-            this.mapUploadedSprites.put(iconName, icon);
-            this.mapRegisteredSprites.remove(iconName);
-
-            try {
-                if (icon.getTextureData() != null) {
-                    net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(texture, icon.getTextureData(), 0, 0, icon.getOriginX(), icon.getOriginY(), icon.getIconWidth(), icon.getIconHeight(), 0, 0);
-                }
-            } catch (Throwable var10) {
-                CrashReport crashReport = CrashReport.forThrowable(var10, "Stitching texture atlas");
-                CrashReportCategory crashReportCategory = crashReport.addCategory("Texture being stitched together");
-                crashReportCategory.setDetail("Atlas path", this.basePath);
-                crashReportCategory.setDetail("Sprite", icon);
-                throw new ReportedException(crashReport);
-            }
-        }
-
-        for (Sprite icon : tempMapRegisteredSprites.values()) {
-            if (icon.getTextureData() != null) {
-                icon.copyFrom(this.missingImage);
-                this.mapRegisteredSprites.remove(icon.getIconName());
-            }
-        }
-
-        this.missingImage.initSprite(this.getHeight(), this.getWidth(), 0, 0);
-        this.failedImage.initSprite(this.getHeight(), this.getWidth(), 0, 0);
-        if (VoxelConstants.DEBUG) {
-            saveDebugImage();
-        }
+		this.finishSemanticStitch();
+		return;
     }
 
     public void stitchNew() {
@@ -168,60 +121,8 @@ public class TextureAtlas extends AbstractTexture {
 
         this.stitcher.doStitchNew();
 
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			this.finishSemanticStitch();
-			return;
-		}
-		if (RustGalVulkanWholeFrameMode.enabled()) {
-            this.finishSemanticStitch();
-            return;
-        }
-
-        if (texture == null || oldWidth != this.stitcher.getCurrentImageWidth() || oldHeight != this.stitcher.getCurrentImageHeight()) {
-            if (texture != null) {
-                texture.close();
-                texture = null;
-            }
-            VoxelConstants.getLogger().info("Resized to: {}x{} {}-atlas", new Object[] { this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), this.basePath });
-            texture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-atlas", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.RGBA8, this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), 1, 1);
-            textureView = net.vulkanic.VulkanicAPI.createTextureView(texture);
-            super.setFilter(linearFilter, mipmap);
-        }
-
-        HashMap<Object, Sprite> tempMapRegisteredSprites = Maps.newHashMap(this.mapRegisteredSprites);
-        for (Sprite icon : this.stitcher.getStitchSlots()) {
-            Object iconName = icon.getIconName();
-            tempMapRegisteredSprites.remove(iconName);
-            this.mapUploadedSprites.put(iconName, icon);
-            this.mapRegisteredSprites.remove(iconName);
-
-            try {
-                if (icon.getTextureData() != null) {
-                    net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(texture, icon.getTextureData(), 0, 0, icon.getOriginX(), icon.getOriginY(), icon.getIconWidth(), icon.getIconHeight(), 0, 0);
-                }
-            } catch (Throwable var11) {
-                CrashReport crashReport = CrashReport.forThrowable(var11, "Stitching texture atlas");
-                CrashReportCategory crashReportCategory = crashReport.addCategory("Texture being stitched together");
-                crashReportCategory.setDetail("Atlas path", this.basePath);
-                crashReportCategory.setDetail("Sprite", icon);
-                throw new ReportedException(crashReport);
-            }
-        }
-
-        for (Sprite icon : tempMapRegisteredSprites.values()) {
-            if (icon.getTextureData() != null) {
-                icon.copyFrom(this.missingImage);
-                this.mapRegisteredSprites.remove(icon.getIconName());
-            }
-        }
-
-        this.missingImage.initSprite(this.getHeight(), this.getWidth(), 0, 0);
-        this.failedImage.initSprite(this.getHeight(), this.getWidth(), 0, 0);
-        if (VoxelConstants.DEBUG) {
-            if (oldWidth != this.stitcher.getCurrentImageWidth() || oldHeight != this.stitcher.getCurrentImageHeight()) {
-                saveDebugImage();
-            }
-        }
+		this.finishSemanticStitch();
+		return;
     }
 
     /** Builds a bounded CPU atlas for Rust Vulkan; no Java GPU texture is created. */
@@ -255,10 +156,6 @@ public class TextureAtlas extends AbstractTexture {
         this.semanticTexture = new DynamicTexture(() -> "Rust semantic " + this.basePath + " atlas", atlas);
         this.semanticTexture.setFilter(this.linearFilter, this.mipmap);
         RustGalGuiRawImageAssets.registerDynamicTexture(this.resourceLocation, this.semanticTexture);
-    }
-
-    public void saveDebugImage() {
-        ImageUtils.saveImage(this.basePath.replaceAll("/", "_"), this.getTexture(), 0, this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight());
     }
 
     public Sprite getIconAt(float x, float y) {

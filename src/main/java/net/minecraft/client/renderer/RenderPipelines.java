@@ -745,7 +745,4 @@ public class RenderPipelines {
 		return renderPipeline;
 	}
 
-	public static List<RenderPipeline> getStaticPipelines() {
-		return PIPELINES_BY_LOCATION.values().stream().toList();
-	}
 }

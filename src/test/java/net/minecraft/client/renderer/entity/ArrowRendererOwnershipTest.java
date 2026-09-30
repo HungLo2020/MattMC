@@ -29,15 +29,7 @@ final class ArrowRendererOwnershipTest {
 	}
 
 	@Test
-	void javaAndDisabledOwnersKeepTheirExistingDisposition() {
-		assertEquals(
-			JAVA_COMPATIBILITY,
-			ArrowRenderer.classifyArrowSubmit(false, false, WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY)
-		);
-		assertEquals(
-			JAVA_COMPATIBILITY,
-			ArrowRenderer.classifyArrowSubmit(false, true, WorldRenderRoutePolicy.Route.RUST_OPENGL_BORROWED_CONTEXT)
-		);
+	void disabledOwnerKeepsItsDisposition() {
 		assertEquals(
 			DISABLED,
 			ArrowRenderer.classifyArrowSubmit(false, true, WorldRenderRoutePolicy.Route.DISABLED)
@@ -52,29 +44,4 @@ final class ArrowRendererOwnershipTest {
 		);
 	}
 
-	@Test
-	void productionCallsiteUsesExplicitOwnershipAndFailsClosedForUnsupportedRustArrows() throws IOException {
-		String source = Files.readString(Path.of(
-			System.getProperty("user.dir"),
-			"src/main/java/net/minecraft/client/renderer/entity/ArrowRenderer.java"
-		));
-		int ownershipQuery = source.indexOf("WorldRenderRoutePolicy.currentArrowOwnershipRoute()");
-		int classification = source.indexOf("classifyArrowSubmit(", ownershipQuery);
-		int unavailable = source.indexOf("ArrowSubmitDisposition.RUST_UNAVAILABLE", classification);
-		int semanticSubmit = source.indexOf("submitNodeCollector.submitModelSemantic(", unavailable);
-
-		assertTrue(ownershipQuery >= 0, "Arrow callsite must resolve ownership explicitly");
-		assertTrue(classification > ownershipQuery, "Arrow disposition must be classified after ownership is resolved");
-		assertTrue(unavailable > classification, "Rust-unavailable handling must be explicit");
-		assertTrue(semanticSubmit > unavailable, "semantic Arrow submission must remain explicit after Rust-unavailable handling");
-		assertTrue(source.contains("Rust whole-frame Arrow route has no semantic mesh"),
-			"unsupported Rust-owned arrows must abort rather than disappear from the frame");
-		assertFalse(source.contains("|| disposition == ArrowSubmitDisposition.DISABLED"),
-			"disabled Arrow ownership must not reopen the Java entity submit path");
-		assertFalse(source.contains("currentArrowRoute(true)"), "Arrow ownership must not be inferred by pretending admission succeeded");
-		assertFalse(
-			source.contains("Rust whole-frame Arrow encountered unsupported semantic state before route selection"),
-			"Unsupported Rust-owned Arrow state must fail closed rather than crash as routing control flow"
-		);
-	}
 }

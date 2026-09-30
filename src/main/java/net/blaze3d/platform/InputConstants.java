@@ -282,14 +282,6 @@ public class InputConstants {
 			return (Component)this.displayName.get();
 		}
 
-		public OptionalInt getNumericKeyValue() {
-			if (this.value >= 48 && this.value <= 57) {
-				return OptionalInt.of(this.value - 48);
-			} else {
-				return this.value >= 320 && this.value <= 329 ? OptionalInt.of(this.value - 320) : OptionalInt.empty();
-			}
-		}
-
 		public boolean equals(Object object) {
 			if (this == object) {
 				return true;

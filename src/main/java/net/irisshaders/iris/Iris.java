@@ -3,24 +3,14 @@ package net.irisshaders.iris;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import net.irisshaders.iris.helpers.StringPair;
-import net.blaze3d.opengl.GlDebug;
 import net.blaze3d.platform.InputConstants;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.sodium.api.vertex.serializer.VertexSerializerRegistry;
-import net.irisshaders.iris.compat.dh.DHCompat;
 import net.irisshaders.iris.config.IrisConfig;
-import net.irisshaders.iris.gl.GLDebug;
-import net.irisshaders.iris.gl.buffer.ShaderStorageBufferHolder;
 import net.irisshaders.iris.gl.shader.ShaderCompileException;
-import net.irisshaders.iris.gl.shader.StandardMacros;
 import net.irisshaders.iris.gui.debug.DebugLoadFailedGridScreen;
 import net.irisshaders.iris.gui.screen.ShaderPackScreen;
 import net.irisshaders.iris.helpers.OptionalBoolean;
-import net.irisshaders.iris.pbr.texture.PBRTextureManager;
-import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
-import net.irisshaders.iris.pipeline.PipelineManager;
-import net.irisshaders.iris.pipeline.VanillaRenderingPipeline;
-import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.shaderpack.DimensionId;
 import net.irisshaders.iris.shaderpack.ShaderPack;
@@ -32,10 +22,6 @@ import net.irisshaders.iris.shaderpack.option.values.MutableOptionValues;
 import net.irisshaders.iris.shaderpack.option.values.OptionValues;
 import net.irisshaders.iris.shaderpack.programs.ProgramSet;
 import net.irisshaders.iris.vertices.IrisVertexFormats;
-import net.irisshaders.iris.vertices.sodium.EntityToTerrainVertexSerializer;
-import net.irisshaders.iris.vertices.sodium.GlyphExtVertexSerializer;
-import net.irisshaders.iris.vertices.sodium.IrisEntityToTerrainVertexSerializer;
-import net.irisshaders.iris.vertices.sodium.ModelToEntityVertexSerializer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
@@ -48,7 +34,6 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
 
@@ -100,7 +85,6 @@ public class Iris {
 	private static String currentPackName;
 	private static Optional<Exception> storedError = Optional.empty();
 	private static boolean initialized;
-	private static PipelineManager pipelineManager;
 	private static IrisConfig irisConfig;
 	private static FileSystem zipFileSystem;
 	private static final KeyMapping.Category irisKeybindCategory = KeyMapping.Category.register(ResourceLocation.fromNamespaceAndPath("iris", "keybinds"));
@@ -124,41 +108,6 @@ public class Iris {
 	}
 
 	/**
-	 * Called once RenderSystem#initRenderer has completed. This means that we can safely access OpenGL.
-	 */
-	public static void onRenderSystemInit() {
-		if (VulkanicAPI.isVulkanBackendSelected() || RustGalVulkanWholeFrameMode.enabled()) {
-			// Rust Vulkan owns shader-pack discovery, resources, and execution.
-			// The backend may still invoke this legacy lifecycle callback, but no
-			// Java Iris/PBR GPU initialization is permitted on that route.
-			return;
-		}
-		if (!initialized) {
-			Iris.logger.warn("Iris::onRenderSystemInit was called, but Iris::onEarlyInitialize was not called." +
-				" Trying to avoid a crash but this is an odd state.");
-			return;
-		}
-
-		VulkanicAPI.setMaxShaderCompilerThreads(10);
-
-		PBRTextureManager.INSTANCE.init();
-
-		VertexSerializerRegistry.instance().registerSerializer(DefaultVertexFormat.NEW_ENTITY, IrisVertexFormats.TERRAIN, new EntityToTerrainVertexSerializer());
-		VertexSerializerRegistry.instance().registerSerializer(IrisVertexFormats.ENTITY, IrisVertexFormats.TERRAIN, new IrisEntityToTerrainVertexSerializer());
-		VertexSerializerRegistry.instance().registerSerializer(DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP, IrisVertexFormats.GLYPH, new GlyphExtVertexSerializer());
-		VertexSerializerRegistry.instance().registerSerializer(DefaultVertexFormat.NEW_ENTITY, IrisVertexFormats.ENTITY, new ModelToEntityVertexSerializer());
-
-		// Only load the shader pack when we can access OpenGL
-		if (!IrisPlatformHelpers.getInstance().isModLoaded("distanthorizons")) {
-			loadShaderpack();
-		}
-	}
-
-	public static void duringRenderSystemInit() {
-		setDebug(irisConfig.areDebugOptionsEnabled());
-	}
-
-	/**
 	 * Called when the title screen is initialized for the first time.
 	 */
 	public static void onLoadingComplete() {
@@ -168,11 +117,7 @@ public class Iris {
 			return;
 		}
 
-		// Initialize the pipeline now so that we don't increase world loading time. Just going to guess that
-		// the player is in the overworld.
-		// See: https://github.com/IrisShaders/Iris/issues/323
 		lastDimension = DimensionId.OVERWORLD;
-		Iris.getPipelineManager().preparePipeline(DimensionId.OVERWORLD);
 	}
 
 	public static void handleKeybinds(Minecraft minecraft) {
@@ -200,10 +145,6 @@ public class Iris {
 				minecraft.player.displayClientMessage(Component.literal("No cheating; wireframe only in singleplayer!"), false);
 			}
 		}
-	}
-
-	public static boolean shouldActivateWireframe() {
-		return irisConfig.areDebugOptionsEnabled() && wireframeKeybind.isDown();
 	}
 
 	public static void toggleShaders(Minecraft minecraft, boolean enabled) throws IOException {
@@ -329,14 +270,8 @@ public class Iris {
 		resetShaderPackOptions = false;
 
 		try {
-			ShaderPack pack = new ShaderPack(shaderPackPath, changedConfigs, rustVulkanRoute()
-				? vulkanMenuEnvironmentDefines()
-				: StandardMacros.createStandardEnvironmentDefines(), isZip);
-			if (rustVulkanRoute()) {
-				vulkanMenuPack = pack;
-			} else {
-				currentPack = pack;
-			}
+			ShaderPack pack = new ShaderPack(shaderPackPath, changedConfigs, vulkanMenuEnvironmentDefines(), isZip);
+			vulkanMenuPack = pack;
 
 			MutableOptionValues changedConfigsValues = pack.getShaderPackOptions().getOptionValues().mutableCopy();
 
@@ -440,14 +375,9 @@ public class Iris {
 			Iris.logger.fatal("Failed to save config!", e);
 		}
 
-		int success;
-		if (enable) {
-			success = GLDebug.setupDebugMessageCallback();
-		} else {
-			GLDebug.reloadDebugState();
-			GlDebug.enableDebugCallback(Minecraft.getInstance().options.glDebugVerbosity, false, new HashSet<>(VulkanicAPI.getBackendEnabledExtensions()));
-			success = 1;
-		}
+		// Rust VulkanicGAL owns graphics-API debug output; this toggles Iris's
+		// verbose logging and persists the preference.
+		int success = 1;
 
 		logger.info("Debug functionality is " + (enable ? "enabled, logging will be more verbose!" : "disabled."));
 		if (Minecraft.getInstance().player != null) {
@@ -580,148 +510,23 @@ public class Iris {
 	}
 
 	public static void reload() throws IOException {
-		if (VulkanicAPI.isVulkanBackendSelected() || RustGalVulkanWholeFrameMode.enabled()) {
-			// Rust owns shader-pack discovery and GPU resources on this route. A
-			// keybind or resource reload may still reach Iris.reload(), but it must
-			// not dereference the skipped Java initialization or enter Java pipeline
-			// destruction/loading. Rust observes the persisted configuration on its
-			// own generation boundary.
-			if (irisConfig != null) {
-				irisConfig.initialize();
-			}
-			currentPack = null;
-			fallback = false;
-			if (irisConfig != null) {
-				// Parse the selected pack for the options screen and persist queued
-				// option edits to <pack>.txt, which Rust reads as copied config.
-				reloadVulkanMenuPack();
-			}
-			net.vulkanic.gui.RustGalFrameCoordinator.requestShaderPackSourceRefresh();
-			return;
+		// Rust owns shader-pack discovery and GPU resources on this route. A
+		// keybind or resource reload may still reach Iris.reload(), but it must
+		// not dereference the skipped Java initialization or enter Java pipeline
+		// destruction/loading. Rust observes the persisted configuration on its
+		// own generation boundary.
+		if (irisConfig != null) {
+			irisConfig.initialize();
 		}
-		// allows shaderpacks to be changed at runtime
-		irisConfig.initialize();
-
-		// Destroy all allocated resources
-		destroyEverything();
-
-		// Load the new shaderpack
-		loadShaderpack();
-
-		// Very important - we need to re-create the pipeline straight away.
-		// https://github.com/IrisShaders/Iris/issues/1330
-		if (Minecraft.getInstance().level != null) {
-			Iris.getPipelineManager().preparePipeline(Iris.getCurrentDimension());
-		}
-	}
-
-	/**
-	 * Destroys and deallocates all created OpenGL resources. Useful as part of a reload.
-	 */
-	private static void destroyEverything() {
 		currentPack = null;
-
-		getPipelineManager().destroyPipeline();
-
-		// Close the zip filesystem that the shaderpack was loaded from
-		//
-		// This prevents a FileSystemAlreadyExistsException when reloading shaderpacks.
-		if (zipFileSystem != null) {
-			try {
-				zipFileSystem.close();
-			} catch (NoSuchFileException e) {
-				logger.warn("Failed to close the shaderpack zip when reloading because it was deleted, proceeding anyways.");
-			} catch (IOException e) {
-				logger.error("Failed to close zip file system?", e);
-			}
+		fallback = false;
+		if (irisConfig != null) {
+			// Parse the selected pack for the options screen and persist queued
+			// option edits to <pack>.txt, which Rust reads as copied config.
+			reloadVulkanMenuPack();
 		}
-	}
-
-	public static NamespacedId getCurrentDimension() {
-		ClientLevel level = Minecraft.getInstance().level;
-
-		if (level != null) {
-			NamespacedId dimensionId = new NamespacedId(level.dimension().location().getNamespace(), level.dimension().location().getPath());
-
-			ShaderPack pack = getCurrentPack().orElse(null);
-
-			// If there is an exact match in dimension.properties, don't override using dimension type effects
-			if (pack != null && pack.getDimensionMap().containsKey(dimensionId)) {
-				return dimensionId;
-			}
-
-			// Check if the dimension type of the current level has custom effects set (end sky or nether).
-			// This is minecraft:overworld by default, but can also be minecraft:the_nether or minecraft:the_end.
-			// The appropriate shader for the dimension should be used by default in order to prevent buggy results.
-			// More information at https://minecraft.wiki/w/Dimension_type
-			// https://github.com/IrisShaders/Iris/issues/2200
-			ResourceLocation effects = level.dimensionType().effectsLocation();
-
-			if (Level.END.location().equals(effects)) {
-				return DimensionId.END;
-			}
-
-			if (Level.NETHER.location().equals(effects)) {
-				return DimensionId.NETHER;
-			}
-
-			return dimensionId;
-		} else {
-			// This prevents us from reloading the shaderpack unless we need to. Otherwise, if the player is in the
-			// nether and quits the game, we might end up reloading the shaders on exit and on entry to the level
-			// because the code thinks that the dimension changed.
-			return lastDimension;
-		}
-	}
-
-	private static WorldRenderingPipeline createPipeline(NamespacedId dimensionId) {
-		if (VulkanicAPI.isVulkanBackendSelected() || RustGalVulkanWholeFrameMode.enabled()) {
-			// A shader-pack pipeline owns Java/Iris programs, framebuffers, and
-			// mutable sampler state. Rust Vulkan consumes copied pack semantics
-			// through its own runtime; do not construct the Java pipeline even if
-			// a pack remains selected in Iris's configuration.
-			return new VanillaRenderingPipeline();
-		}
-		if (currentPack == null) {
-			// Completely disables shader-based rendering
-			return new VanillaRenderingPipeline();
-		}
-
-		ProgramSet programs = currentPack.getProgramSet(dimensionId);
-
-		// We use DeferredWorldRenderingPipeline on 1.16, and NewWorldRendering pipeline on 1.17 when rendering shaders.
-		try {
-			return new IrisRenderingPipeline(programs);
-		} catch (Exception e) {
-			handleException(e);
-
-			ShaderStorageBufferHolder.forceDeleteBuffers();
-			logger.error("Failed to create shader rendering pipeline, disabling shaders!", e);
-			// TODO: This should be reverted if a dimension change causes shaders to compile again
-			fallback = true;
-
-			return new VanillaRenderingPipeline();
-		}
-	}
-
-	@NotNull
-	public static PipelineManager getPipelineManager() {
-		if (pipelineManager == null) {
-			pipelineManager = new PipelineManager(Iris::createPipeline);
-		}
-
-		return pipelineManager;
-	}
-
-	public static Optional<Exception> getStoredError() {
-		Optional<Exception> stored = Iris.storedError;
-		storedError = Optional.empty();
-		return stored;
-	}
-
-	@NotNull
-	private static boolean rustVulkanRoute() {
-		return VulkanicAPI.isVulkanBackendSelected() || RustGalVulkanWholeFrameMode.enabled();
+		net.vulkanic.gui.RustGalFrameCoordinator.requestShaderPackSourceRefresh();
+		return;
 	}
 
 	private static void reloadVulkanMenuPack() {
@@ -738,9 +543,6 @@ public class Iris {
 	 * selected pack, loaded on first use.
 	 */
 	public static Optional<ShaderPack> getMenuPack() {
-		if (!rustVulkanRoute()) {
-			return getCurrentPack();
-		}
 		if (!vulkanMenuPackLoaded && irisConfig != null) {
 			reloadVulkanMenuPack();
 		}
@@ -771,39 +573,6 @@ public class Iris {
 		return IRIS_VERSION;
 	}
 
-	public static String getFormattedVersion() {
-		ChatFormatting color;
-		String version = getVersion();
-
-		if (IrisPlatformHelpers.getInstance().isDevelopmentEnvironment()) {
-			color = ChatFormatting.GOLD;
-			version = version + " (Development Environment)";
-		} else if (version.endsWith("-dirty") || version.contains("unknown") || version.endsWith("-nogit")) {
-			color = ChatFormatting.RED;
-		} else if (version.contains("+rev.")) {
-			color = ChatFormatting.LIGHT_PURPLE;
-		} else {
-			color = ChatFormatting.GREEN;
-		}
-
-		return color + version;
-	}
-
-	/**
-	 * Gets the current release target. Since 1.19.3, Mojang no longer stores this information, so we must manually provide it for snapshots.
-	 *
-	 * @return Release target
-	 */
-	public static String getReleaseTarget() {
-		// If this is a snapshot, you must change backupVersionNumber!
-		SharedConstants.tryDetectVersion();
-		return SharedConstants.getCurrentVersion().stable() ? SharedConstants.getCurrentVersion().name() : backupVersionNumber;
-	}
-
-	public static String getBackupVersionNumber() {
-		return backupVersionNumber;
-	}
-
 	public static Path getShaderpacksDirectory() {
 		if (shaderpacksDirectory == null) {
 			shaderpacksDirectory = IrisPlatformHelpers.getInstance().getGameDir().resolve("shaderpacks");
@@ -820,16 +589,9 @@ public class Iris {
 		return shaderpacksDirectoryManager;
 	}
 
-	public static boolean loadedIncompatiblePack() {
-		return DHCompat.lastPackIncompatible();
-	}
-
+	/** True while Rust is running a selected shader pack. */
 	public static boolean isPackInUseQuick() {
-		return getPipelineManager().getPipelineNullable() instanceof IrisRenderingPipeline;
-	}
-
-	public static void loadShaderpackWhenPossible() {
-		loadShaderPackWhenPossible = true;
+		return net.vulkanic.gui.RustGalFrameCoordinator.shaderPackSourceActive();
 	}
 
 	/**
@@ -847,8 +609,6 @@ public class Iris {
 		toggleShadersKeybind = IrisPlatformHelpers.getInstance().registerKeyBinding(new KeyMapping("iris.keybind.toggleShaders", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K, irisKeybindCategory));
 		shaderpackScreenKeybind = IrisPlatformHelpers.getInstance().registerKeyBinding(new KeyMapping("iris.keybind.shaderPackSelection", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O, irisKeybindCategory));
 		wireframeKeybind = IrisPlatformHelpers.getInstance().registerKeyBinding(new KeyMapping("iris.keybind.wireframe", InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), irisKeybindCategory));
-
-		DHCompat.run();
 
 		try {
 			if (!Files.exists(getShaderpacksDirectory())) {

@@ -6,11 +6,4 @@ public enum TaskQueueType {
     ALWAYS_DEFER,
     INITIAL_BUILD;
 
-    public boolean allowsUnlimitedUploadDuration() {
-        return this == ZERO_FRAME_DEFER;
-    }
-
-    public int queueSizeLimit() {
-        return this == INITIAL_BUILD ? 128 : Integer.MAX_VALUE;
-    }
 }

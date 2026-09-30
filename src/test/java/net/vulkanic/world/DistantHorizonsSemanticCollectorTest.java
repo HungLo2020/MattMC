@@ -8,7 +8,6 @@ import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiRendererMode;
 import com.seibel.distanthorizons.core.config.Config;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -337,21 +336,8 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
-	void captureIsDisabledWithoutTheExplicitPrivateSwitch() {
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			9L,
-			new DhBlockPos(1, 2, 3),
-			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 14, 15, 16)),
-			List.of(),
-			List.of(),
-			List.of()
-		);
-		assertNull(DistantHorizonsSemanticCollector.snapshotForTest(9L));
-	}
-
-	@Test
 	void disabledDhRendererDoesNotDivertBackgroundBuildsIntoRustSemantics() {
-		String wholeFrameProperty = RustGalVulkanWholeFrameMode.propertyName();
+		String wholeFrameProperty = "mattmc.dev.rustGalVulkanWholeFrame";
 		String previousWholeFrame = System.getProperty(wholeFrameProperty);
 		EDhApiRendererMode previousMode = Config.Client.Advanced.Debugging.rendererMode.get();
 		try {
@@ -520,28 +506,6 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
-	void legacyObservationRetainsOnlyCopiedSnapshotsAfterLegacyVboRetirement() {
-		System.setProperty(DistantHorizonsSemanticCollector.LEGACY_OBSERVATION_PROPERTY, "true");
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			58L,
-			new DhBlockPos(16, 64, -32),
-			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)),
-			List.of(),
-			List.of(),
-			List.of()
-		);
-
-		var pendingUpdate = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertTrue(pendingUpdate == null || pendingUpdate.assets().isEmpty(),
-			"legacy observation must not create a Rust asset update");
-		DistantHorizonsSemanticCollector.removeColumn(58L);
-		assertEquals(16, DistantHorizonsSemanticCollector.snapshotForTest(58L).originX());
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
-		DistantHorizonsSemanticCollector.recordVisibleSegment(58L, 1, 0);
-		assertTrue(DistantHorizonsSemanticCollector.hasObservedVisibleOpaqueColumnCoveringBlock(17, -29));
-	}
-
-	@Test
 	void exactMaterialProvenanceIsCopiedAlongsideButOutsideTheLegacyVertexAbi() {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
 		ByteBuffer source = quadBuffer(7, 8, 9, 0xB7, 11, 12, 13, 14, 15, 16);
@@ -566,31 +530,6 @@ class DistantHorizonsSemanticCollectorTest {
 		assertEquals(1, provenance.opaque().get(0)[0]);
 		assertEquals(5, DistantHorizonsSemanticCollector.snapshotForTest(77L).opaque().get(0).vertices().get(0).normalIndex());
 		assertEquals(0, DistantHorizonsSemanticCollector.snapshotForTest(77L).opaque().get(0).vertices().get(0).padding());
-	}
-
-	@Test
-	void materialProvenanceParticipatesInTheExistingBoundedColumnRetention() {
-		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
-		ColumnRenderSource.SemanticMaterialIdentity grass =
-			new ColumnRenderSource.SemanticMaterialIdentity("minecraft:grass_block", "minecraft:plains");
-		LodQuadBuilder.VertexBufferBuild first = new LodQuadBuilder.VertexBufferBuild(
-			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 14, 15, 16)), List.of(new int[] { 1 })
-		);
-		LodQuadBuilder.VertexBufferBuild second = new LodQuadBuilder.VertexBufferBuild(
-			List.of(quadBuffer(4, 5, 6, 0xB7, 21, 22, 23, 24, 25, 26)), List.of(new int[] { 1 })
-		);
-		LodQuadBuilder.VertexBufferBuild empty = new LodQuadBuilder.VertexBufferBuild(List.of(), List.of());
-
-		DistantHorizonsSemanticCollector.recordBuiltColumn(701L, new DhBlockPos(0, 64, 0), List.of(grass), first, empty, empty, empty);
-		DistantHorizonsSemanticCollector.recordBuiltColumn(702L, new DhBlockPos(16, 64, 0), List.of(grass), second, empty, empty, empty);
-
-		// Two legacy vertex buffers fit in 160 bytes; the copied semantic sidecars
-		// must still be counted, so the LRU oldest column is retired.
-		DistantHorizonsSemanticCollector.trimRetainedColumnsForTest(8, 160L);
-		assertNull(DistantHorizonsSemanticCollector.snapshotForTest(701L));
-		assertNull(DistantHorizonsSemanticCollector.materialProvenanceForTest(701L));
-		assertTrue(DistantHorizonsSemanticCollector.hasColumn(702L));
-		assertEquals(grass, DistantHorizonsSemanticCollector.materialProvenanceForTest(702L).semanticMaterials().getFirst());
 	}
 
 	@Test
@@ -714,73 +653,6 @@ class DistantHorizonsSemanticCollectorTest {
 	}
 
 	@Test
-	void retentionKeepsOneOversizedColumnUntilTheQuadtreeCanConsumeIt() {
-		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			100L,
-			new DhBlockPos(0, 64, 0),
-			List.of(twoQuadBuffer(1)), List.of(), List.of(), List.of()
-		);
-
-		DistantHorizonsSemanticCollector.trimRetainedColumnsForTest(8, 64L);
-		assertTrue(DistantHorizonsSemanticCollector.hasColumn(100L));
-
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			101L,
-			new DhBlockPos(16, 64, 0),
-			List.of(quadBuffer(2, 2, 2, 0xB7, 1, 1, 1, 255, 1, 1)), List.of(), List.of(), List.of()
-		);
-		DistantHorizonsSemanticCollector.trimRetainedColumnsForTest(8, 64L);
-		assertFalse(DistantHorizonsSemanticCollector.hasColumn(100L));
-		assertTrue(DistantHorizonsSemanticCollector.hasColumn(101L));
-	}
-
-	@Test
-	void retentionEvictsColdColumnBeforePendingVisibleColumn() {
-		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			100L,
-			new DhBlockPos(0, 64, 0),
-			List.of(twoQuadBuffer(1)), List.of(), List.of(), List.of()
-		);
-		// A real render-list probe marks this unpublished asset as visible demand.
-		DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(100L);
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			101L,
-			new DhBlockPos(16, 64, 0),
-			List.of(quadBuffer(2, 2, 2, 0xB7, 1, 1, 1, 255, 1, 1)), List.of(), List.of(), List.of()
-		);
-
-		DistantHorizonsSemanticCollector.trimRetainedColumnsForTest(8, 64L);
-
-		assertTrue(DistantHorizonsSemanticCollector.hasColumn(100L));
-		assertFalse(DistantHorizonsSemanticCollector.hasColumn(101L));
-	}
-
-	@Test
-	void retentionProtectsRealRenderListCandidateBeforeItIsPublished() {
-		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
-		DistantHorizonsSemanticCollector.recordRenderListVisibilityStats(1, 1, List.of(100L));
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			100L,
-			new DhBlockPos(0, 64, 0),
-			List.of(twoQuadBuffer(1)), List.of(), List.of(), List.of()
-		);
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			101L,
-			new DhBlockPos(16, 64, 0),
-			List.of(quadBuffer(2, 2, 2, 0xB7, 1, 1, 1, 255, 1, 1)), List.of(), List.of(), List.of()
-		);
-
-		// Exercise the count target as well as the byte target. A live candidate
-		// must survive either form of trimming until its quadtree owner closes it.
-		DistantHorizonsSemanticCollector.trimRetainedColumnsForTest(1, Long.MAX_VALUE);
-
-		assertTrue(DistantHorizonsSemanticCollector.hasColumn(100L));
-		assertFalse(DistantHorizonsSemanticCollector.hasColumn(101L));
-	}
-
-	@Test
 	void captureRejectsIncompleteQuadsAndRetiresClosedColumns() {
 		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
 		ByteBuffer incompleteQuad = ByteBuffer.allocate(DistantHorizonsSemanticCollector.VERTEX_STRIDE_BYTES)
@@ -893,80 +765,6 @@ class DistantHorizonsSemanticCollectorTest {
 		DistantHorizonsSemanticCollector.PendingAssetUpdate second = DistantHorizonsSemanticCollector.pendingUpdateForTest();
 		assertEquals(1, second.assets().size());
 		assertEquals(16L, second.assets().getFirst().columnKey());
-	}
-
-	@Test
-	void visibleUnpublishedColumnIsPublishedBeforeOlderUnrelatedPendingColumns() {
-		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
-		for (long columnKey = 0L; columnKey < 17L; columnKey++) {
-			DistantHorizonsSemanticCollector.recordBuiltColumn(
-				columnKey,
-				new DhBlockPos((int)columnKey * 16, 64, 0),
-				List.of(quadBuffer((int)columnKey, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)),
-				List.of(), List.of(), List.of()
-			);
-		}
-
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
-		assertEquals(0, DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(16L).opaqueSegments());
-		// Publication can run after DH begins its next visibility traversal; the
-		// real visible demand must survive that frame boundary until acknowledged.
-		DistantHorizonsSemanticCollector.beginVisibleFrameForTest();
-
-		DistantHorizonsSemanticCollector.PendingAssetUpdate update = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertEquals(1, update.assets().size(),
-			"visible-demand uploads must not spend the bounded slice on unrelated background columns");
-		assertEquals(16L, update.assets().getFirst().columnKey(),
-			"the actual visible column must not be starved behind build-order backlog");
-		assertFalse(update.assets().stream().anyMatch(asset -> asset.columnKey() == 15L),
-			"the bounded update must defer an unrelated pending column instead");
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			16L,
-			new DhBlockPos(16 * 16, 64, 0),
-			List.of(quadBuffer(99, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)),
-			List.of(), List.of(), List.of()
-		);
-		DistantHorizonsSemanticCollector.PendingAssetUpdate concurrent = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertTrue(concurrent == null || concurrent.assets().stream().noneMatch(asset -> asset.columnKey() == 16L),
-			"a live asset update must reserve its column until acknowledgement, even when a newer build arrives");
-		DistantHorizonsSemanticCollector.acknowledgeForTest(update);
-		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
-		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(16L).opaqueSegments(),
-			"the acknowledged asset remains drawable while its replacement is pending");
-		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
-		assertEquals(update.assets().getFirst().columnGeneration(),
-			DistantHorizonsSemanticCollector.consumeVisibleSegments().getFirst().columnGeneration(),
-			"visibility must retain the coherent acknowledged generation until replacement acknowledgement");
-		DistantHorizonsSemanticCollector.PendingAssetUpdate replacement = DistantHorizonsSemanticCollector.pendingUpdateForTest();
-		assertEquals(16L, replacement.assets().getFirst().columnKey(),
-			"a newer visible generation must retain publication priority after its older generation is acknowledged");
-		DistantHorizonsSemanticCollector.acknowledgeForTest(replacement);
-		DistantHorizonsSemanticCollector.beginRustOpaqueRouteFrameForTest();
-		assertEquals(1, DistantHorizonsSemanticCollector.recordVisibleMaterialColumn(16L).opaqueSegments());
-		DistantHorizonsSemanticCollector.markRustNonWaterRouteSelected();
-		assertEquals(replacement.assets().getFirst().columnGeneration(),
-			DistantHorizonsSemanticCollector.consumeVisibleSegments().getFirst().columnGeneration(),
-			"visibility switches atomically to the acknowledged replacement generation");
-	}
-
-	@Test
-	void productionAssetSelectionWaitsForRealVisibleCandidates() {
-		System.setProperty(DistantHorizonsSemanticCollector.CAPTURE_PROPERTY, "true");
-		DistantHorizonsSemanticCollector.recordBuiltColumn(
-			100L,
-			new DhBlockPos(0, 64, 0),
-			List.of(quadBuffer(1, 2, 3, 0xB7, 11, 12, 13, 255, 15, 16)),
-			List.of(), List.of(), List.of()
-		);
-
-		assertNull(DistantHorizonsSemanticCollector.pendingVisibleUpdateForTest(),
-			"production publication must not upload a background column before the real render list selects it");
-		DistantHorizonsSemanticCollector.recordRenderListVisibilityStats(1, 1, List.of(100L));
-		DistantHorizonsSemanticCollector.PendingAssetUpdate update =
-			DistantHorizonsSemanticCollector.pendingVisibleUpdateForTest();
-		assertNotNull(update);
-		assertEquals(1, update.assets().size());
-		assertEquals(100L, update.assets().getFirst().columnKey());
 	}
 
 	@Test

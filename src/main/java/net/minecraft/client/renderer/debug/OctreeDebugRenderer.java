@@ -10,7 +10,6 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.Octree;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeStorage;
-import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.util.Mth;
 import net.minecraft.util.debug.DebugValueAccess;
@@ -27,19 +26,9 @@ public class OctreeDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 		this.minecraft = minecraft;
 	}
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		Octree octree = this.minecraft.levelRenderer.getSectionOcclusionGraph().getOctree();
-		MutableInt mutableInt = new MutableInt(0);
-		octree.visitNodes((node, bl, i, bl2) -> this.renderNode(node, poseStack, multiBufferSource, d, e, f, i, bl, mutableInt, bl2), frustum, 32);
-	}
-
 	/** Traverses the same frustum-filtered octree and emits Rust semantic edges/text. */
 	public void collectRustSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text, Frustum frustum) {
-		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()
-			|| frustum == null) return;
+		if (frustum == null) return;
 		MutableInt sequence = new MutableInt(0);
 		this.minecraft.levelRenderer.getSectionOcclusionGraph().getOctree().visitNodes(
 			(node, visible, depth, inside) -> this.collectNode(node, camera, geometry, text, depth, visible, sequence, inside), frustum, 32);
@@ -68,43 +57,6 @@ public class OctreeDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(new org.joml.Matrix4f(), edges, color, 1.0F)) {
 			throw new IllegalStateException("Rust whole-frame octree route rejected semantic AABB edges");
 		}
-	}
-
-	private void renderNode(
-		Octree.Node node,
-		PoseStack poseStack,
-		MultiBufferSource multiBufferSource,
-		double d,
-		double e,
-		double f,
-		int i,
-		boolean bl,
-		MutableInt mutableInt,
-		boolean bl2
-	) {
-		AABB aABB = node.getAABB();
-		double g = aABB.getXsize();
-		long l = Math.round(g / 16.0);
-		if (l == 1L) {
-			mutableInt.add(1);
-			double h = aABB.getCenter().x;
-			double j = aABB.getCenter().y;
-			double k = aABB.getCenter().z;
-			int m = bl2 ? -16711936 : -1;
-			DebugRenderer.renderFloatingText(poseStack, multiBufferSource, String.valueOf(mutableInt.getValue()), h, j, k, m, 0.3F);
-		}
-
-		VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.lines());
-		long n = l + 5L;
-		ShapeRenderer.renderLineBox(
-			poseStack.last(),
-			vertexConsumer,
-			aABB.deflate(0.1 * i).move(-d, -e, -f),
-			getColorComponent(n, 0.3F),
-			getColorComponent(n, 0.8F),
-			getColorComponent(n, 0.5F),
-			bl ? 0.4F : 1.0F
-		);
 	}
 
 	private static float getColorComponent(long l, float f) {

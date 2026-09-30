@@ -17,22 +17,8 @@ import net.minecraft.util.debug.DebugValueAccess;
 public class EntityBlockIntersectionDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 	private static final float PADDING = 0.02F;
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		debugValueAccess.forEachBlock(DebugSubscriptions.ENTITY_BLOCK_INTERSECTIONS, (blockPos, debugEntityBlockIntersection) -> {
-			float fx = ARGB.redFloat(debugEntityBlockIntersection.color());
-			float g = ARGB.greenFloat(debugEntityBlockIntersection.color());
-			float h = ARGB.blueFloat(debugEntityBlockIntersection.color());
-			float i = ARGB.alphaFloat(debugEntityBlockIntersection.color());
-			DebugRenderer.renderFilledBox(poseStack, multiBufferSource, blockPos, 0.02F, fx, g, h, i);
-		});
-	}
-
 	/** Copies subscribed entity/block intersections into Rust-owned semantic boxes. */
 	public void collectRustSemantics(Minecraft minecraft, Camera camera, SubmitNodeStorage geometry) {
-		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) return;
 		DebugValueAccess access = minecraft.getConnection().createDebugValueAccess();
 		PoseStack transform = new PoseStack();
 		transform.translate(-camera.getPosition().x, -camera.getPosition().y, -camera.getPosition().z);

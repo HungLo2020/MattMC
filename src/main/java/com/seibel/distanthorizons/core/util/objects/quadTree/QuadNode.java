@@ -3,8 +3,6 @@ package com.seibel.distanthorizons.core.util.objects.quadTree;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.util.objects.quadTree.iterators.QuadNodeDirectChildIterator;
-import com.seibel.distanthorizons.core.util.objects.quadTree.iterators.QuadNodeDirectChildPosIterator;
 import com.seibel.distanthorizons.core.util.objects.quadTree.iterators.QuadTreeNodeIterator;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import com.seibel.distanthorizons.core.logging.DhLogger;
@@ -80,20 +78,6 @@ public class QuadNode<T>
 		return count;
 	}
 	
-	/** @return the number of children that have non-null values */
-	public int getNonNullChildCount()
-	{
-		int count = 0;
-		for (int i = 0; i < 4; i++)
-		{
-			QuadNode<T> child = this.getChildByIndex(i);
-			if (child != null && (child.value != null || child.getNonNullChildCount() != 0))
-			{
-				count++;
-			}
-		}
-		return count;
-	}
 	
 	
 	
@@ -280,9 +264,6 @@ public class QuadNode<T>
 	public Iterator<QuadNode<T>> getNodeIterator(@Nullable QuadTree.INodeIteratorStoppingFunc<T> stopIteratingFunc) { return new QuadTreeNodeIterator<>(this, false, stopIteratingFunc); }
 	public Iterator<QuadNode<T>> getLeafNodeIterator() { return new QuadTreeNodeIterator<>(this, true, null); }
 	
-	/** positions can point to null children */
-	public LongIterator getChildPosIterator() { return new QuadNodeDirectChildPosIterator<>(this); }
-	public Iterator<QuadNode<T>> getChildNodeIterator() { return new QuadNodeDirectChildIterator<>(this); }
 	
 	
 	

@@ -27,10 +27,6 @@ public final class RustGalDeterministicTiming {
 		return ENABLED ? PARTIAL_TICK : deltaTracker.getGameTimeDeltaPartialTick(true);
 	}
 
-	public static float deterministicPartialTick() {
-		return PARTIAL_TICK;
-	}
-
 	public static float fovModifier() {
 		return FOV_MODIFIER;
 	}

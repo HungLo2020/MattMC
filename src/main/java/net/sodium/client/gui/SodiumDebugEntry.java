@@ -1,7 +1,6 @@
 package net.sodium.client.gui;
 
 import net.sodium.client.SodiumClientMod;
-import net.sodium.client.render.SodiumWorldRenderer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
 import net.minecraft.client.gui.components.debug.DebugScreenEntry;
@@ -31,11 +30,5 @@ public class SodiumDebugEntry implements DebugScreenEntry {
     @Override
     public void display(DebugScreenDisplayer debugScreenDisplayer, @Nullable Level level, @Nullable LevelChunk levelChunk, @Nullable LevelChunk levelChunk2) {
         debugScreenDisplayer.addLine("%sSodium Renderer (%s)".formatted(getVersionColor(), SodiumClientMod.getVersion()));
-
-        var renderer = SodiumWorldRenderer.instanceNullable();
-
-        if (renderer != null) {
-            debugScreenDisplayer.addToGroup(DEBUG_GROUP, renderer.getDebugStrings());
-        }
     }
 }

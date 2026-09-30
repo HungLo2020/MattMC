@@ -46,10 +46,6 @@ public class MathUtil {
         return bits ^ ((bits >> 31) & 0x7FFFFFFF);
     }
 
-    public static float comparableIntToFloat(int i) {
-        return Float.intBitsToFloat(i ^ ((i >> 31) & 0x7FFFFFFF));
-    }
-
     public static double exponentialMovingAverage(double oldValue, double newValue, double newValueContribution) {
         return newValueContribution * newValue + (1 - newValueContribution) * oldValue;
     }
@@ -58,11 +54,4 @@ public class MathUtil {
         return (long) (newValueContribution * newValue) + (long) ((1 - newValueContribution) * oldValue);
     }
 
-    public static double floatDoubleDot(Vector3fc a, Vector3dc b) {
-        return fma(a.x(), b.x(), fma(a.y(), b.y(), a.z() * b.z()));
-    }
-
-    public static double floatDoubleDot(Vector3fc a, double bx, double by, double bz) {
-        return fma(a.x(), bx, fma(a.y(), by, a.z() * bz));
-    }
 }

@@ -1,7 +1,6 @@
 package net.vulkanic.world;
 
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 
 /**
  * Ownership and admission policy for dedicated standalone model producers that
@@ -22,20 +21,7 @@ public final class StandaloneModelRenderOwnershipPolicy {
 	}
 
 	public static WorldRenderRoutePolicy.Route currentOwnershipRoute() {
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.disabled")) {
-			return WorldRenderRoutePolicy.Route.DISABLED;
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.legacyControl")) {
-			return VulkanicAPI.isVulkanBackendSelected()
-				? WorldRenderRoutePolicy.Route.DISABLED
-				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
-		}
-		boolean vulkanBackendSelected = VulkanicAPI.isVulkanBackendSelected();
-		return RustGalVulkanWholeFrameMode.enabled()
-			? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
-			: vulkanBackendSelected
-				? WorldRenderRoutePolicy.Route.DISABLED
-				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+		return WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME;
 	}
 
 	public static Disposition classify(

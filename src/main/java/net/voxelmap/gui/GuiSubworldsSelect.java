@@ -56,7 +56,7 @@ public class GuiSubworldsSelect extends GuiScreenMinimap implements BooleanConsu
     @Override
     public void init() {
         ArrayList<String> knownSubworldNames = new ArrayList<>(this.waypointManager.getKnownSubworldNames());
-        if (!this.multiworld && !this.waypointManager.isMultiworld() && !VoxelConstants.isRealmServer()) {
+        if (!this.multiworld && !this.waypointManager.isMultiworld()) {
             ConfirmScreen confirmScreen = new ConfirmScreen(this, Component.translatable("voxelmap.worldmap.multiworld.isThisMultiworld"), Component.translatable("voxelmap.worldmap.multiworld.explanation"), Component.translatable("gui.yes"), Component.translatable("gui.no"));
             VoxelConstants.getMinecraft().setScreen(confirmScreen);
         } else {

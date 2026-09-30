@@ -34,14 +34,14 @@ final class AtlasAnimationVisibility {
         return id != null && used.add(id);
     }
 
+    int pendingCount() { return used.size(); }
+    int[] snapshotUses() { return used.stream().mapToInt(Integer::intValue).toArray(); }
+    void clearUses() { used.clear(); }
+
     /** Detaches one tick's owned event payload; later draws form the next set. */
     int[] takeUses() {
         int[] result = snapshotUses();
         clearUses();
         return result;
     }
-
-    int pendingCount() { return used.size(); }
-    int[] snapshotUses() { return used.stream().mapToInt(Integer::intValue).toArray(); }
-    void clearUses() { used.clear(); }
 }

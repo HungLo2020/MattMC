@@ -129,19 +129,12 @@ public abstract class AbstractSignRenderer implements BlockEntityRenderer<SignBl
 				float f = -this.font.width(formattedCharSequence) / 2;
 				float lineY = m * signRenderState.textLineHeight - j;
 				int outlineColor = bl2 ? i : 0;
-				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-					// Rust whole-frame owns sign text through the copied world-text
-					// contract; do not admit this block-entity text as an implicit
-					// Java/Iris text draw.
-					submitNodeCollector.submitTextSemantic(
-						poseStack, f, lineY, formattedCharSequence, false, Font.DisplayMode.POLYGON_OFFSET, l, k, 0, outlineColor
-					);
-				} else {
-					submitNodeCollector.submitTextSemantic(
-						poseStack, f, lineY, formattedCharSequence, false, Font.DisplayMode.POLYGON_OFFSET, l, k, 0, outlineColor
-					);
-				}
+				// Rust whole-frame owns sign text through the copied world-text
+				// contract; do not admit this block-entity text as an implicit
+				// Java/Iris text draw.
+				submitNodeCollector.submitTextSemantic(
+					poseStack, f, lineY, formattedCharSequence, false, Font.DisplayMode.POLYGON_OFFSET, l, k, 0, outlineColor
+				);
 			}
 
 			poseStack.popPose();

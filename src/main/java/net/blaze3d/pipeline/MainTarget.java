@@ -1,7 +1,6 @@
 package net.blaze3d.pipeline;
 
 import com.google.common.collect.ImmutableList;
-import net.blaze3d.GpuOutOfMemoryException;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.AddressMode;
 import net.blaze3d.textures.FilterMode;
@@ -30,8 +29,7 @@ public class MainTarget extends RenderTarget {
 	}
 
 	private void createFrameBuffer(int i, int j) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
+		{
 			// MainTarget overrides RenderTarget.createBuffers, so the base
 			// selected-Vulkan guard must protect this entry point. Rust owns the
 			// acquired presentation images; retain only dimensions for semantic
@@ -42,81 +40,10 @@ public class MainTarget extends RenderTarget {
 			this.filterMode = FilterMode.NEAREST;
 			return;
 		}
-		MainTarget.Dimension dimension = this.allocateAttachments(i, j);
-		if (this.colorTexture != null && this.depthTexture != null) {
-			this.colorTexture.setTextureFilter(FilterMode.NEAREST, false);
-			this.colorTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
-			this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);
-			this.depthTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
-			this.width = dimension.width;
-			this.height = dimension.height;
-		} else {
-			throw new IllegalStateException("Missing color and/or depth textures");
-		}
 	}
 
 	private MainTarget.Dimension listWithFallbackDimensions(int i, int j) {
 		return MainTarget.Dimension.listWithFallback(i, j).get(0);
-	}
-
-	private MainTarget.Dimension allocateAttachments(int i, int j) {
-		RenderSystem.assertOnRenderThread();
-
-		for (MainTarget.Dimension dimension : MainTarget.Dimension.listWithFallback(i, j)) {
-			if (this.colorTexture != null) {
-				this.colorTexture.close();
-				this.colorTexture = null;
-			}
-
-			if (this.colorTextureView != null) {
-				this.colorTextureView.close();
-				this.colorTextureView = null;
-			}
-
-			if (this.depthTexture != null) {
-				this.depthTexture.close();
-				this.depthTexture = null;
-			}
-
-			if (this.depthTextureView != null) {
-				this.depthTextureView.close();
-				this.depthTextureView = null;
-			}
-
-			this.colorTexture = this.allocateColorAttachment(dimension);
-			this.depthTexture = this.allocateDepthAttachment(dimension);
-			if (this.colorTexture != null && this.depthTexture != null) {
-				this.colorTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.colorTexture);
-				this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
-				return dimension;
-			}
-		}
-
-		throw new RuntimeException(
-			"Unrecoverable GL_OUT_OF_MEMORY ("
-				+ (this.colorTexture == null ? "missing color" : "have color")
-				+ ", "
-				+ (this.depthTexture == null ? "missing depth" : "have depth")
-				+ ")"
-		);
-	}
-
-	@Nullable
-	private GpuTexture allocateColorAttachment(MainTarget.Dimension dimension) {
-		try {
-			return net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Color", 15, TextureFormat.BGRA8, dimension.width, dimension.height, 1, 1);
-		} catch (GpuOutOfMemoryException var3) {
-			return null;
-		}
-	}
-
-	@Nullable
-	private GpuTexture allocateDepthAttachment(MainTarget.Dimension dimension) {
-		try {
-			return net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH24_STENCIL8, dimension.width, dimension.height, 1, 1);
-		} catch (GpuOutOfMemoryException var3) {
-			return null;
-		}
 	}
 
 	@Environment(EnvType.CLIENT)

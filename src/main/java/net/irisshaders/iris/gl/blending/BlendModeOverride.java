@@ -11,14 +11,6 @@ public class BlendModeOverride {
 		this.blendMode = blendMode;
 	}
 
-	public static void restore() {
-		BlendModeStorage.restoreBlend();
-	}
-
-	public void apply() {
-		BlendModeStorage.overrideBlend(this.blendMode);
-	}
-
 	@Nullable
 	public BlendMode blendMode() {
 		return this.blendMode;

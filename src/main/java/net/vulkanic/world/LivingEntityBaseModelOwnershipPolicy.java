@@ -1,7 +1,6 @@
 package net.vulkanic.world;
 
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 
 /**
  * Ownership policy for the bounded living-entity base-model family that already
@@ -23,51 +22,7 @@ public final class LivingEntityBaseModelOwnershipPolicy {
 	}
 
 	public static WorldRenderRoutePolicy.Route currentOwnershipRoute(boolean migratedFamily) {
-		boolean vulkanBackendSelected = VulkanicAPI.isVulkanBackendSelected();
-		return selectOwnership(
-			migratedFamily,
-			vulkanBackendSelected,
-			RustGalVulkanWholeFrameMode.enabled(),
-			Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.disabled"),
-			Boolean.getBoolean("mattmc.dev.rustGalWorldModelMesh.legacyControl")
-		);
-	}
-
-	static WorldRenderRoutePolicy.Route selectOwnershipForTests(
-		boolean migratedFamily,
-		boolean vulkanBackendSelected,
-		boolean wholeFrameVulkanEnabled,
-		boolean disabled,
-		boolean legacyControl
-	) {
-		return selectOwnership(migratedFamily, vulkanBackendSelected, wholeFrameVulkanEnabled, disabled, legacyControl);
-	}
-
-	private static WorldRenderRoutePolicy.Route selectOwnership(
-		boolean migratedFamily,
-		boolean vulkanBackendSelected,
-		boolean wholeFrameVulkanEnabled,
-		boolean disabled,
-		boolean legacyControl
-	) {
-		if (!migratedFamily) {
-			return vulkanBackendSelected
-				? WorldRenderRoutePolicy.Route.DISABLED
-				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
-		}
-		if (disabled) {
-			return WorldRenderRoutePolicy.Route.DISABLED;
-		}
-		if (legacyControl) {
-			return vulkanBackendSelected
-				? WorldRenderRoutePolicy.Route.DISABLED
-				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
-		}
-		return wholeFrameVulkanEnabled
-			? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
-			: vulkanBackendSelected
-				? WorldRenderRoutePolicy.Route.DISABLED
-				: WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY;
+		return migratedFamily ? WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME : WorldRenderRoutePolicy.Route.DISABLED;
 	}
 
 	public static Disposition classify(

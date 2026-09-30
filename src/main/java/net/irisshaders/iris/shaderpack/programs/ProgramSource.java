@@ -42,36 +42,12 @@ public class ProgramSource {
 			PackRenderTargetDirectives.BASELINE_SUPPORTED_RENDER_TARGETS, defaultBlendModeOverride);
 	}
 
-	public ProgramSource withDirectiveOverride(ProgramDirectives overrideDirectives) {
-		return new ProgramSource(name, vertexSource, geometrySource, tessControlSource, tessEvalSource, fragmentSource, overrideDirectives, parent);
-	}
-
 	public String getName() {
 		return name;
 	}
 
-	public Optional<String> getVertexSource() {
-		return Optional.ofNullable(vertexSource);
-	}
-
-	public Optional<String> getGeometrySource() {
-		return Optional.ofNullable(geometrySource);
-	}
-
-	public Optional<String> getTessControlSource() {
-		return Optional.ofNullable(tessControlSource);
-	}
-
-	public Optional<String> getTessEvalSource() {
-		return Optional.ofNullable(tessEvalSource);
-	}
-
 	public Optional<String> getFragmentSource() {
 		return Optional.ofNullable(fragmentSource);
-	}
-
-	public ProgramDirectives getDirectives() {
-		return this.directives;
 	}
 
 	public ProgramSet getParent() {

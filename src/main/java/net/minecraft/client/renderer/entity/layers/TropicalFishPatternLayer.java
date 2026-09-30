@@ -43,10 +43,7 @@ public class TropicalFishPatternLayer extends RenderLayer<TropicalFishRenderStat
 
 	public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, TropicalFishRenderState tropicalFishRenderState, float f, float g) {
 		if (tropicalFishRenderState == null || tropicalFishRenderState.pattern == null) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame tropical-fish pattern route requires copied pattern semantics");
-			}
-			return;
+			throw new IllegalStateException("Rust whole-frame tropical-fish pattern route requires copied pattern semantics");
 		}
 		Pattern pattern = tropicalFishRenderState.pattern;
 
@@ -71,28 +68,23 @@ public class TropicalFishPatternLayer extends RenderLayer<TropicalFishRenderStat
 			case CLAYFISH -> CLAYFISH_TEXTURE;
 			default -> throw new MatchException(null, null);
 		};
-		if (net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
-			boolean eligible = net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaTropicalFishPatternModelMeshEligible(
-				entityModel, tropicalFishRenderState, RenderType.entityCutoutNoCull(resourceLocation), resourceLocation,
-				LivingEntityRenderer.getOverlayCoords(tropicalFishRenderState, 0.0F), tropicalFishRenderState.outlineColor);
-			if (eligible && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
-				entityModel, tropicalFishRenderState, poseStack.last(), RenderType.entityCutoutNoCull(resourceLocation),
-				resourceLocation, ResourceLocation.withDefaultNamespace("tropical_fish_pattern"), i,
-				LivingEntityRenderer.getOverlayCoords(tropicalFishRenderState, 0.0F), tropicalFishRenderState.patternColor,
-				tropicalFishRenderState.outlineColor)) {
-				return;
-			}
-			// Whole-frame Vulkan owns this layer; an unavailable copied pattern is
-			// recorded as absent rather than reaching Java's renderer.
-			 net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-				"rust-vulkan-unavailable", resourceLocation, entityModel.getClass().getName(), tropicalFishRenderState.entityId,
-				false, false, false);
-			throw new IllegalStateException(
-				"Rust whole-frame tropical-fish pattern route has no semantic mesh for " + resourceLocation
-			);
+		boolean eligible = net.vulkanic.world.RustGalWorldPrimitiveRenderer.isVanillaTropicalFishPatternModelMeshEligible(
+			entityModel, tropicalFishRenderState, RenderType.entityCutoutNoCull(resourceLocation), resourceLocation,
+			LivingEntityRenderer.getOverlayCoords(tropicalFishRenderState, 0.0F), tropicalFishRenderState.outlineColor);
+		if (eligible && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+			entityModel, tropicalFishRenderState, poseStack.last(), RenderType.entityCutoutNoCull(resourceLocation),
+			resourceLocation, ResourceLocation.withDefaultNamespace("tropical_fish_pattern"), i,
+			LivingEntityRenderer.getOverlayCoords(tropicalFishRenderState, 0.0F), tropicalFishRenderState.patternColor,
+			tropicalFishRenderState.outlineColor)) {
+			return;
 		}
-		coloredCutoutModelCopyLayerRender(
-			entityModel, resourceLocation, poseStack, submitNodeCollector, i, tropicalFishRenderState, tropicalFishRenderState.patternColor, 1
+		// Whole-frame Vulkan owns this layer; an unavailable copied pattern is
+		// recorded as absent rather than reaching Java's renderer.
+		 net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+			"rust-vulkan-unavailable", resourceLocation, entityModel.getClass().getName(), tropicalFishRenderState.entityId,
+			false, false, false);
+		throw new IllegalStateException(
+			"Rust whole-frame tropical-fish pattern route has no semantic mesh for " + resourceLocation
 		);
 	}
 }

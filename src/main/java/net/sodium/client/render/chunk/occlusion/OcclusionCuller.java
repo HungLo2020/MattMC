@@ -73,24 +73,6 @@ public class OcclusionCuller {
         this.level = level;
     }
 
-    public void findVisible(RenderSectionVisitor visitor,
-                            Viewport viewport,
-                            float searchDistance,
-                            boolean useOcclusionCulling,
-                            int frame)
-    {
-        final var queues = this.queue;
-        queues.reset();
-
-        this.init(visitor, queues.write(), viewport, searchDistance, useOcclusionCulling, frame);
-
-        while (queues.flip()) {
-            processQueue(visitor, viewport, searchDistance, useOcclusionCulling, frame, queues.read(), queues.write());
-        }
-
-        this.addNearbySections(visitor, viewport, searchDistance, frame);
-    }
-
     private static void processQueue(RenderSectionVisitor visitor,
                                      Viewport viewport,
                                      float searchDistance,
@@ -252,42 +234,11 @@ public class OcclusionCuller {
     // This exposes no render-list or backend ownership.
     public static final float CHUNK_SECTION_SIZE_NEARBY = CHUNK_SECTION_RADIUS + 2.0f /* bigger model extent */ + 0.125f /* epsilon */;
     
-    public static boolean isWithinNearbySectionFrustum(Viewport viewport, RenderSection section) {
-        return viewport.isBoxVisible(section.getCenterX(), section.getCenterY(), section.getCenterZ(),
-                CHUNK_SECTION_SIZE_NEARBY, CHUNK_SECTION_SIZE_NEARBY, CHUNK_SECTION_SIZE_NEARBY);
-    }
 
     // This method visits sections near the origin that are not in the path of the graph traversal
     // but have bounding boxes that may intersect with the frustum. It does this additional check
     // for all neighboring, even diagonally neighboring, sections around the origin to render them
     // if their extended bounding box is visible, and they may render large models that extend
-    // outside the 16x16x16 base volume of the section.
-    private void addNearbySections(RenderSectionVisitor visitor, Viewport viewport, float searchDistance, int frame) {
-        var origin = viewport.getChunkCoord();
-        var originX = origin.getX();
-        var originY = origin.getY();
-        var originZ = origin.getZ();
-
-        for (var dx = -1; dx <= 1; dx++) {
-            for (var dy = -1; dy <= 1; dy++) {
-                for (var dz = -1; dz <= 1; dz++) {
-                    if (dx == 0 && dy == 0 && dz == 0) {
-                        continue;
-                    }
-
-                    var section = this.getRenderSection(originX + dx, originY + dy, originZ + dz);
-
-                    // additionally render not yet visited but visible sections
-                    if (section != null && section.getLastVisibleFrame() != frame && isWithinNearbySectionFrustum(viewport, section)) {
-                        // reset state on first visit, but don't enqueue
-                        section.setLastVisibleFrame(frame);
-
-                        visitor.visit(section);
-                    }
-                }
-            }
-        }
-    }
 
     private void init(RenderSectionVisitor visitor,
                       WriteQueue<RenderSection> queue,
@@ -440,14 +391,6 @@ public class OcclusionCuller {
         return connections;
     }
 
-	public static int getVisibilityConnectionsForCamera(long visibilityData, int incoming,
-			double cameraDeltaX, double cameraDeltaY, double cameraDeltaZ) {
-		check(VERIFY_STATUS, "native occlusion verification");
-		int connections = invokeCameraConnections(visibilityData, incoming, cameraDeltaX, cameraDeltaY, cameraDeltaZ);
-		if (connections < 0) check(connections, "native camera occlusion connection calculation");
-		return connections;
-	}
-
 	/**
 	 * Batches the CPU-only portal calculation used by independent semantic
 	 * terrain producers. The section objects contribute immutable visibility and
@@ -515,11 +458,6 @@ public class OcclusionCuller {
             throw new IllegalStateException("Rust occlusion connection downcall failed", throwable);
         }
     }
-
-	private static int invokeCameraConnections(long visibilityData, int incoming, double x, double y, double z) {
-		try { return (int)CAMERA_CONNECTIONS.invokeExact(visibilityData, incoming, x, y, z); }
-		catch (Throwable throwable) { throw new IllegalStateException("Rust camera occlusion connection downcall failed", throwable); }
-	}
 
     private static int invokeConnectionsBatch(long visibilityDataAddress, int visibilityDataCount,
             long incomingAddress, int incomingCount, long cameraDeltaAddress, int cameraDeltaCount,
@@ -605,4 +543,17 @@ public class OcclusionCuller {
         }
     }
 
+
+	public static int getVisibilityConnectionsForCamera(long visibilityData, int incoming,
+			double cameraDeltaX, double cameraDeltaY, double cameraDeltaZ) {
+		check(VERIFY_STATUS, "native occlusion verification");
+		int connections = invokeCameraConnections(visibilityData, incoming, cameraDeltaX, cameraDeltaY, cameraDeltaZ);
+		if (connections < 0) check(connections, "native camera occlusion connection calculation");
+		return connections;
+	}
+
+	private static int invokeCameraConnections(long visibilityData, int incoming, double x, double y, double z) {
+		try { return (int)CAMERA_CONNECTIONS.invokeExact(visibilityData, incoming, x, y, z); }
+		catch (Throwable throwable) { throw new IllegalStateException("Rust camera occlusion connection downcall failed", throwable); }
+	}
 }

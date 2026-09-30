@@ -268,19 +268,6 @@ public class CloudRenderHandler
 			return;
 		}
 		
-		// Rust copies the cloud boxes as bounded semantic primitives and does not
-		// require Java's instanced GL capability or initialization state.
-		if (!WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan()
-			&& !this.renderer.getInstancedRenderingAvailable())
-		{
-			if (!this.disabledWarningLogged)
-			{
-				this.disabledWarningLogged = true;
-				LOGGER.warn("Instanced rendering unavailable, cloud rendering disabled.");
-			}
-			boxGroup.setActive(false);
-			return;
-		}
 		
 		
 		

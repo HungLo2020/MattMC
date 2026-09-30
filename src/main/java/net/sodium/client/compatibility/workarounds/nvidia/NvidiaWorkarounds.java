@@ -1,6 +1,5 @@
 package net.sodium.client.compatibility.workarounds.nvidia;
 
-import net.sodium.client.compatibility.environment.GlContextInfo;
 import net.sodium.client.compatibility.environment.OsUtils;
 import net.sodium.client.compatibility.environment.OsUtils.OperatingSystem;
 import net.sodium.client.compatibility.environment.probe.GraphicsAdapterProbe;
@@ -12,7 +11,6 @@ import net.sodium.client.platform.windows.WindowsFileVersion;
 import net.sodium.client.platform.windows.api.d3dkmt.D3DKMT;
 import org.jetbrains.annotations.Nullable;
 import net.vulkanic.CommandContext;
-import net.vulkanic.GraphicsFeature;
 import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,41 +100,6 @@ public class NvidiaWorkarounds {
 
     private static void undoEnvironmentChanges$Windows() {
         WindowsCommandLine.resetCommandLine();
-    }
-
-    public static void applyContextChanges(GlContextInfo context) {
-        // The context may not have been initialized with the NVIDIA ICD, even if we think there is an NVIDIA
-        // graphics adapter in use. Because enabling these workarounds have the potential to severely hurt performance
-        // on other drivers, make sure we exit now.
-        if (GraphicsAdapterVendor.fromContext(context) != GraphicsAdapterVendor.NVIDIA) {
-            return;
-        }
-
-        LOGGER.info("Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...");
-
-        if (Workarounds.isWorkaroundEnabled(Workarounds.Reference.NVIDIA_THREADED_OPTIMIZATIONS_BROKEN)) {
-            if (OsUtils.getOs() == OperatingSystem.WIN) {
-                applyContextChanges$Windows();
-            }
-        }
-    }
-
-    private static void applyContextChanges$Windows() {
-        // On Windows, the NVIDIA drivers do not have any environment variable to control whether
-        // "Threaded Optimizations" are enabled. But we can enable the "GL_DEBUG_OUTPUT_SYNCHRONOUS" option to
-        // achieve the same effect.
-        var capabilities = VulkanicAPI.getGraphicsCapabilities();
-
-        if (capabilities.supports(GraphicsFeature.DEBUG_OUTPUT_CONTROL)) {
-            LOGGER.info("Enabling GL_DEBUG_OUTPUT_SYNCHRONOUS to force the NVIDIA driver to disable threaded " +
-                    "command submission");
-            CommandContext ctx = VulkanicAPI.getCommandContext();
-            VulkanicAPI.setDebugOutputSynchronousEnabled(ctx, true);
-        } else {
-            LOGGER.error("GL_KHR_debug does not appear to be supported, unable to disable threaded " +
-                    "command submission!");
-            logWarning();
-        }
     }
 
     private static void logWarning() {

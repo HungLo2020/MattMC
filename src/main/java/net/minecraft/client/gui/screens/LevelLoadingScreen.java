@@ -214,18 +214,9 @@ public class LevelLoadingScreen extends Screen {
 		int extent = gridSize * stride - gap;
 		int originX = centerX - extent / 2;
 		int originY = centerY - extent / 2;
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")) {
-			guiGraphics.guiRenderState.submitGuiElement(new net.vulkanic.gui.RustGalLoadingGridRenderState(
-				colors, gridSize, originX, originY, cellSize, stride, guiGraphics.guiWidth(), guiGraphics.guiHeight()));
-			return;
-		}
-		for (int x = 0; x < gridSize; x++) for (int z = 0; z < gridSize; z++) {
-			int left = originX + x * stride;
-			int top = originY + z * stride;
-			guiGraphics.fill(left, top, left + cellSize, top + cellSize, ARGB.opaque(colors[x * gridSize + z]));
-		}
+		guiGraphics.guiRenderState.submitGuiElement(new net.vulkanic.gui.RustGalLoadingGridRenderState(
+			colors, gridSize, originX, originY, cellSize, stride, guiGraphics.guiWidth(), guiGraphics.guiHeight()));
+		return;
 	}
 
 	private static String escapeCapturePath(Path path) {
@@ -233,37 +224,33 @@ public class LevelLoadingScreen extends Screen {
 	}
 
 	private void drawProgressBar(GuiGraphics guiGraphics, int i, int j, int k, int l, float f) {
-		if (net.vulkanic.gui.RustGalGuiRenderer.currentExecutionRoute().usesRustGui()) {
-			// Keep the loading bar on the same explicit Rust GUI route as the
-			// chunk-status grid.  Constructing the rectangle state here is semantic
-			// input only; it is not submitted to Java's renderer.
-			int guiWidth = guiGraphics.guiWidth();
-			int guiHeight = guiGraphics.guiHeight();
-			java.util.List<net.vulkanic.gui.RustGalGuiElementRenderState> background =
-				net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueUniformRectangle(
-					new net.minecraft.client.gui.render.state.ColoredRectangleRenderState(
-						RenderPipelines.GUI, TextureSetup.noTexture(), new org.joml.Matrix3x2f(guiGraphics.pose()),
-						i, j, i + k, j + l, -16777216, -16777216, null
-					), guiWidth, guiHeight
-				);
-			int filledWidth = Math.round(Mth.clamp(f, 0.0F, 1.0F) * k);
-			java.util.List<net.vulkanic.gui.RustGalGuiElementRenderState> fill = filledWidth == 0
-				? java.util.List.of()
-				: net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueUniformRectangle(
-					new net.minecraft.client.gui.render.state.ColoredRectangleRenderState(
-						RenderPipelines.GUI, TextureSetup.noTexture(), new org.joml.Matrix3x2f(guiGraphics.pose()),
-						i, j, i + filledWidth, j + l, -16711936, -16711936, null
-					), guiWidth, guiHeight
-				);
-			if (background == null || fill == null) {
-				throw new IllegalStateException("Rust OpenGL loading progress semantic admission failed");
-			}
-			for (net.vulkanic.gui.RustGalGuiElementRenderState element : background) guiGraphics.guiRenderState.submitGuiElement(element);
-			for (net.vulkanic.gui.RustGalGuiElementRenderState element : fill) guiGraphics.guiRenderState.submitGuiElement(element);
-			return;
+		// Keep the loading bar on the same explicit Rust GUI route as the
+		// chunk-status grid.  Constructing the rectangle state here is semantic
+		// input only; it is not submitted to Java's renderer.
+		int guiWidth = guiGraphics.guiWidth();
+		int guiHeight = guiGraphics.guiHeight();
+		java.util.List<net.vulkanic.gui.RustGalGuiElementRenderState> background =
+			net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueUniformRectangle(
+				new net.minecraft.client.gui.render.state.ColoredRectangleRenderState(
+					RenderPipelines.GUI, TextureSetup.noTexture(), new org.joml.Matrix3x2f(guiGraphics.pose()),
+					i, j, i + k, j + l, -16777216, -16777216, null
+				), guiWidth, guiHeight
+			);
+		int filledWidth = Math.round(Mth.clamp(f, 0.0F, 1.0F) * k);
+		java.util.List<net.vulkanic.gui.RustGalGuiElementRenderState> fill = filledWidth == 0
+			? java.util.List.of()
+			: net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueUniformRectangle(
+				new net.minecraft.client.gui.render.state.ColoredRectangleRenderState(
+					RenderPipelines.GUI, TextureSetup.noTexture(), new org.joml.Matrix3x2f(guiGraphics.pose()),
+					i, j, i + filledWidth, j + l, -16711936, -16711936, null
+				), guiWidth, guiHeight
+			);
+		if (background == null || fill == null) {
+			throw new IllegalStateException("Rust OpenGL loading progress semantic admission failed");
 		}
-		guiGraphics.fill(i, j, i + k, j + l, -16777216);
-		guiGraphics.fill(i, j, i + Math.round(f * k), j + l, -16711936);
+		for (net.vulkanic.gui.RustGalGuiElementRenderState element : background) guiGraphics.guiRenderState.submitGuiElement(element);
+		for (net.vulkanic.gui.RustGalGuiElementRenderState element : fill) guiGraphics.guiRenderState.submitGuiElement(element);
+		return;
 	}
 
 	public static void renderChunks(GuiGraphics guiGraphics, int i, int j, int k, int l, ChunkLoadStatusView chunkLoadStatusView) {
@@ -276,54 +263,13 @@ public class LevelLoadingScreen extends Screen {
 			int r = m / 2 + 1;
 			guiGraphics.fill(i - r, j - r, i + r, j + r, -65536);
 		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")) {
-			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics") && rustGalLoadingGridProducerDiagnostics++ < 4) {
-				System.out.println("[MattMC graphics audit] loading-grid semantic producer grid=" + n + " stride=" + m);
-			}
-			int[] semanticColors = new int[n * n];
-			for (int r = 0; r < n; r++) for (int s = 0; s < n; s++) semanticColors[r * n + s] = COLORS.getInt(chunkLoadStatusView.get(r, s));
-			guiGraphics.guiRenderState.submitGuiElement(new net.vulkanic.gui.RustGalLoadingGridRenderState(semanticColors, n, p, q, k, m, guiGraphics.guiWidth(), guiGraphics.guiHeight()));
-			return;
+		if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics") && rustGalLoadingGridProducerDiagnostics++ < 4) {
+			System.out.println("[MattMC graphics audit] loading-grid semantic producer grid=" + n + " stride=" + m);
 		}
-		int[] colors = new int[n * n];
-		for (int r = 0; r < n; r++) {
-			for (int s = 0; s < n; s++) {
-				colors[r * n + s] = COLORS.getInt(chunkLoadStatusView.get(r, s));
-			}
-		}
-		var rustGrid = net.vulkanic.gui.RustGalGuiRenderer.tryEnqueueLoadingGrid(
-			colors, n, p, q, k, m, guiGraphics.guiWidth(), guiGraphics.guiHeight());
-		if (rustGrid != null) {
-			for (var element : rustGrid) guiGraphics.guiRenderState.submitGuiElement(element);
-			return;
-		}
-
-		for (int r = 0; r < n; r++) {
-			if (m != k) {
-				for (int s = 0; s < n; s++) {
-					ChunkStatus chunkStatus = chunkLoadStatusView.get(r, s);
-					int t = p + r * m;
-					int u = q + s * m;
-					guiGraphics.fill(t, u, t + k, u + k, ARGB.opaque(COLORS.getInt(chunkStatus)));
-				}
-				continue;
-			}
-			int s = 0;
-			while (s < n) {
-				int color = ARGB.opaque(COLORS.getInt(chunkLoadStatusView.get(r, s)));
-				int runEnd = s + 1;
-				while (runEnd < n
-					&& ARGB.opaque(COLORS.getInt(chunkLoadStatusView.get(r, runEnd))) == color) {
-					runEnd++;
-				}
-				int t = p + r * m;
-				int u = q + s * m;
-				guiGraphics.fill(t, u, t + (runEnd - s) * m, u + k, color);
-				s = runEnd;
-			}
-		}
+		int[] semanticColors = new int[n * n];
+		for (int r = 0; r < n; r++) for (int s = 0; s < n; s++) semanticColors[r * n + s] = COLORS.getInt(chunkLoadStatusView.get(r, s));
+		guiGraphics.guiRenderState.submitGuiElement(new net.vulkanic.gui.RustGalLoadingGridRenderState(semanticColors, n, p, q, k, m, guiGraphics.guiWidth(), guiGraphics.guiHeight()));
+		return;
 	}
 
 	@Override
@@ -333,20 +279,10 @@ public class LevelLoadingScreen extends Screen {
 				guiGraphics.blitSprite(RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND, this.getNetherPortalSprite(), 0, 0, guiGraphics.guiWidth(), guiGraphics.guiHeight());
 				break;
 			case END_PORTAL:
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-					float gameTime = Minecraft.getInstance().level == null
-						? 0.0F
-						: (float)Minecraft.getInstance().level.getGameTime() + f;
-					guiGraphics.submitRustEndPortal(gameTime);
-					break;
-				}
-				TextureManager textureManager = Minecraft.getInstance().getTextureManager();
-				TextureSetup textureSetup = TextureSetup.doubleTexture(
-					textureManager.getTexture(AbstractEndPortalRenderer.END_SKY_LOCATION).getTextureView(),
-					textureManager.getTexture(AbstractEndPortalRenderer.END_PORTAL_LOCATION).getTextureView()
-				);
-				guiGraphics.fill(RenderPipelines.END_PORTAL, textureSetup, 0, 0, this.width, this.height);
+				float gameTime = Minecraft.getInstance().level == null
+					? 0.0F
+					: (float)Minecraft.getInstance().level.getGameTime() + f;
+				guiGraphics.submitRustEndPortal(gameTime);
 				break;
 			case OTHER:
 				this.renderPanorama(guiGraphics, f);

@@ -165,22 +165,6 @@ public final class PipelineResourcePlanner {
             return new ResolvedResource(Objects.requireNonNull(samplerBinding, "samplerBinding must not be null"), null, null, null);
         }
 
-        public static ResolvedResource uniformBuffer(VulkanicBufferSlice slice) {
-            return new ResolvedResource(null, Objects.requireNonNull(slice, "slice must not be null"), null, null);
-        }
-
-        public static ResolvedResource storageImage(PipelineResourceBindings.StorageImageBinding storageImageBinding) {
-            return new ResolvedResource(
-                null,
-                null,
-                Objects.requireNonNull(storageImageBinding, "storageImageBinding must not be null"),
-                null
-            );
-        }
-
-        public static ResolvedResource texelBuffer(PipelineResourceBindings.TexelBufferBinding texelBufferBinding) {
-            return new ResolvedResource(null, null, null, Objects.requireNonNull(texelBufferBinding, "texelBufferBinding must not be null"));
-        }
     }
 
     @FunctionalInterface

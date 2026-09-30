@@ -55,12 +55,6 @@ public class CapeLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 			PlayerSkin playerSkin = avatarRenderState.skin;
 			if (playerSkin.cape() != null) {
 				if (!this.hasLayer(avatarRenderState.chestEquipment, EquipmentClientInfo.LayerType.WINGS)) {
-					// Iris: Set cape item context
-					if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-						&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-						&& WorldRenderingSettings.INSTANCE.getItemIds() != null) {
-						CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(CAPE_LOCATION));
-					}
 					
 					poseStack.pushPose();
 					if (this.hasLayer(avatarRenderState.chestEquipment, EquipmentClientInfo.LayerType.HUMANOID)) {
@@ -68,37 +62,24 @@ public class CapeLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 					}
 					var texture = playerSkin.cape().texturePath();
 					var renderType = RenderType.entitySolid(texture);
-					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-						boolean eligible = !avatarRenderState.isInvisible
-							&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
-								this.model, renderType, texture, OverlayTexture.NO_OVERLAY, avatarRenderState.outlineColor, null);
-						if (eligible && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
-							this.model, avatarRenderState, poseStack.last(), renderType, texture,
-							net.vulkanic.world.RustGalWorldPrimitiveRenderer.entityIdentity(avatarRenderState),
-							i, OverlayTexture.NO_OVERLAY, -1, avatarRenderState.outlineColor)) {
-							net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-								"rust-vulkan-whole-frame", texture, this.model.getClass().getName(), avatarRenderState.entityId, true, true, false);
-						} else {
-							 net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-								"rust-vulkan-unavailable", texture, this.model.getClass().getName(), avatarRenderState.entityId, false, false, false);
-							throw new IllegalStateException(
-								"Rust whole-frame cape route has no semantic mesh for " + texture
-							);
-						}
+					boolean eligible = !avatarRenderState.isInvisible
+						&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.isStandaloneModelMeshEligible(
+							this.model, renderType, texture, OverlayTexture.NO_OVERLAY, avatarRenderState.outlineColor, null);
+					if (eligible && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+						this.model, avatarRenderState, poseStack.last(), renderType, texture,
+						net.vulkanic.world.RustGalWorldPrimitiveRenderer.entityIdentity(avatarRenderState),
+						i, OverlayTexture.NO_OVERLAY, -1, avatarRenderState.outlineColor)) {
+						net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+							"rust-vulkan-whole-frame", texture, this.model.getClass().getName(), avatarRenderState.entityId, true, true, false);
 					} else {
-						submitNodeCollector.submitModelSemanticTexture(
-							this.model, avatarRenderState, poseStack, renderType, i,
-							OverlayTexture.NO_OVERLAY, -1, texture,
-							avatarRenderState.outlineColor, null);
+						 net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+							"rust-vulkan-unavailable", texture, this.model.getClass().getName(), avatarRenderState.entityId, false, false, false);
+						throw new IllegalStateException(
+							"Rust whole-frame cape route has no semantic mesh for " + texture
+						);
 					}
 					poseStack.popPose();
 					
-					// Iris: Clear cape item context
-					if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-						&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-						CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
-					}
 				}
 			}
 		}

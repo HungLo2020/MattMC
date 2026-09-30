@@ -41,7 +41,6 @@ import net.irisshaders.iris.shaderpack.properties.ShaderProperties;
 import net.irisshaders.iris.shaderpack.texture.CustomTextureData;
 import net.irisshaders.iris.shaderpack.texture.TextureFilteringData;
 import net.irisshaders.iris.shaderpack.texture.TextureStage;
-import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -75,7 +74,6 @@ import java.util.stream.Collectors;
 
 public class ShaderPack {
 	private static final Gson GSON = new Gson();
-	public final CustomUniforms.Builder customUniforms;
 	private final ProgramSet base;
 	private final Map<NamespacedId, ProgramSetInterface> overrides;
 	private final IdMap idMap;
@@ -370,7 +368,6 @@ public class ShaderPack {
 
 		this.irisCustomImages = shaderProperties.getIrisCustomImages();
 
-		this.customUniforms = shaderProperties.getCustomUniforms();
 
 		shaderProperties.getIrisCustomTextures().forEach((name, texture) -> {
 			try {
@@ -573,60 +570,8 @@ public class ShaderPack {
 		}
 	}
 
-	public ProgramSet getProgramSet(NamespacedId dimension) {
-		ProgramSetInterface overrides;
-
-		overrides = this.overrides.computeIfAbsent(dimension, dim -> {
-			if (dimensionMap.containsKey(dimension)) {
-				String name = dimensionMap.get(dimension);
-				if (dimensionIds.contains(name)) {
-					return new ProgramSet(AbsolutePackPath.fromAbsolutePath("/" + name), sourceProvider, shaderProperties, this);
-				} else {
-					Iris.logger.error("Attempted to load dimension folder " + name + " for dimension " + dimension + ", but it does not exist!");
-					return ProgramSetInterface.Empty.INSTANCE;
-				}
-			} else {
-				return ProgramSetInterface.Empty.INSTANCE;
-			}
-		});
-
-		// NB: If a dimension overrides directory is present, none of the files from the parent directory are "merged"
-		//     into the override. Rather, we act as if the overrides directory contains a completely different set of
-		//     shader programs unrelated to that of the base shader pack.
-		//
-		//     This makes sense because if base defined a composite pass and the override didn't, it would make it
-		//     impossible to "un-define" the composite pass. It also removes a lot of complexity related to "merging"
-		//     program sets. At the same time, this might be desired behavior by shader pack authors. It could make
-		//     sense to bring it back as a configurable option, and have a more maintainable set of code backing it.
-		if (overrides instanceof ProgramSet) {
-			return (ProgramSet) overrides;
-		} else {
-			return base;
-		}
-	}
-
-	public IdMap getIdMap() {
-		return idMap;
-	}
-
-	public EnumMap<TextureStage, Object2ObjectMap<String, CustomTextureData>> getCustomTextureDataMap() {
-		return customTextureDataMap;
-	}
-
 	public List<ImageInformation> getIrisCustomImages() {
 		return irisCustomImages;
-	}
-
-	public Object2ObjectMap<String, CustomTextureData> getIrisCustomTextureDataMap() {
-		return irisCustomTextureDataMap;
-	}
-
-	public CustomTextureData getCustomNoiseTexture() {
-		return customNoiseTexture;
-	}
-
-	public LanguageMap getLanguageMap() {
-		return languageMap;
 	}
 
 	public ShaderPackOptions getShaderPackOptions() {
@@ -645,7 +590,4 @@ public class ShaderPack {
 		return bufferObjects;
 	}
 
-	public Map<NamespacedId, String> getDimensionMap() {
-		return dimensionMap;
-	}
 }

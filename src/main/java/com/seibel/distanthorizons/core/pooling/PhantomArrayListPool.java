@@ -579,25 +579,6 @@ public class PhantomArrayListPool
 		}
 		return longByteSize;
 	}
-	private static <T extends Collection<?>> long estimateRefMemoryUsage(ConcurrentLinkedQueue<SoftReference<T>> pool, long elementSizeInBytes)
-	{
-		long longByteSize = 0;
-		for (SoftReference<T> arrayRef : pool)
-		{
-			// Object overhead + capacity of underlying array * size of Long (8 bytes)
-			long overhead = Byte.SIZE * 4;
-			T array = arrayRef.get();
-			if (array == null)
-			{
-				continue;
-			}
-			
-			long elementCount = getCollectionCount(array);
-			long arraySize = elementCount * elementSizeInBytes;
-			longByteSize += overhead + arraySize;
-		}
-		return longByteSize;
-	}
 	private static long getCollectionCount(@NotNull Collection<?> array)
 	{
 		long elementCount;

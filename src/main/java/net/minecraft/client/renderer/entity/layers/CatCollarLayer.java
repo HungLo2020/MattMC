@@ -33,8 +33,7 @@ public class CatCollarLayer extends RenderLayer<CatRenderState, CatModel> {
 			int j = dyeColor.getTextureDiffuseColor();
 			CatModel catModel = catRenderState.isBaby ? this.babyModel : this.adultModel;
 			RenderType renderType = RenderType.entityCutoutNoCull(CAT_COLLAR_LOCATION);
-			if (!catRenderState.isInvisible
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+			if (!catRenderState.isInvisible) {
 				boolean queued = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 					catModel, catRenderState, poseStack.last(), renderType, CAT_COLLAR_LOCATION,
 					CAT_COLLAR_IDENTITY, i, LivingEntityRenderer.getOverlayCoords(catRenderState, 0.0F), j,

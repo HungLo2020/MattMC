@@ -375,10 +375,7 @@ public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodiu
 
                 // Iris: From MixinDefaultFluidRenderer - modify brightness for directional shading
                 float br = dir.getAxis() == Direction.Axis.Z ? 0.8F : 0.6F;
-				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-						? net.vulkanic.world.RustGalTerrainRenderer.copiedShaderPackDisableDirectionalShading()
-						: net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading()) {
+				if (net.vulkanic.world.RustGalTerrainRenderer.copiedShaderPackDisableDirectionalShading()) {
                     br = 1.0f;
                 }
 

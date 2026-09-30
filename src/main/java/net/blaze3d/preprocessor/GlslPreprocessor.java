@@ -122,16 +122,6 @@ public abstract class GlslPreprocessor {
 	@Nullable
 	public abstract String applyImport(boolean bl, String string);
 
-	public static String injectDefines(String string, ShaderDefines shaderDefines) {
-		if (shaderDefines.isEmpty()) {
-			return string;
-		} else {
-			int i = string.indexOf(10);
-			int j = i + 1;
-			return string.substring(0, j) + shaderDefines.asSourceDirectives() + "#line 1 0\n" + string.substring(j);
-		}
-	}
-
 	@Environment(EnvType.CLIENT)
 	static final class Context {
 		int glslVersion;

@@ -105,10 +105,6 @@ public class SectionRenderDispatcher {
 		}
 	}
 
-	public void setCameraPosition(Vec3 vec3) {
-		this.cameraPosition = vec3;
-	}
-
 	public void uploadAllPendingUploads() {
 		Runnable runnable;
 		while ((runnable = (Runnable)this.toUpload.poll()) != null) {
@@ -119,10 +115,6 @@ public class SectionRenderDispatcher {
 		while ((sectionMesh = (SectionMesh)this.toClose.poll()) != null) {
 			sectionMesh.close();
 		}
-	}
-
-	public void rebuildSectionSync(SectionRenderDispatcher.RenderSection renderSection, RenderRegionCache renderRegionCache) {
-		renderSection.compileSync(renderRegionCache);
 	}
 
 	public void schedule(SectionRenderDispatcher.RenderSection.CompileTask compileTask) {
@@ -138,10 +130,6 @@ public class SectionRenderDispatcher {
 
 	public void clearCompileQueue() {
 		this.compileQueue.clear();
-	}
-
-	public boolean isQueueEmpty() {
-		return this.compileQueue.size() == 0 && this.toUpload.isEmpty();
 	}
 
 	public void dispose() {
@@ -211,75 +199,21 @@ public class SectionRenderDispatcher {
 		}
 
 		public CompletableFuture<Void> upload(Map<ChunkSectionLayer, MeshData> map, CompiledSectionMesh compiledSectionMesh) {
-			if (SectionRenderDispatcher.this.closed
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				// Rust whole-frame terrain owns semantic extraction and its explicit
-				// mesh staging. Dispose the legacy CPU result without opening a Java
-				// Vulkan upload path or retaining a hidden fallback buffer.
-				map.values().forEach(MeshData::close);
-				return CompletableFuture.completedFuture(null);
-			} else {
-				return CompletableFuture.runAsync(() -> map.forEach((chunkSectionLayer, meshData) -> {
-					Zone zone = Profiler.get().zone("Upload Section Layer");
-
-					try {
-						compiledSectionMesh.uploadMeshLayer(chunkSectionLayer, meshData, this.sectionNode);
-						meshData.close();
-					} catch (Throwable var8) {
-						if (zone != null) {
-							try {
-								zone.close();
-							} catch (Throwable var7) {
-								var8.addSuppressed(var7);
-							}
-						}
-
-						throw var8;
-					}
-
-					if (zone != null) {
-						zone.close();
-					}
-				}), SectionRenderDispatcher.this.mainThreadUploadExecutor);
-			}
+			// Rust whole-frame terrain owns semantic extraction and its explicit
+			// mesh staging. Dispose the legacy CPU result without opening a Java
+			// Vulkan upload path or retaining a hidden fallback buffer.
+			map.values().forEach(MeshData::close);
+			return CompletableFuture.completedFuture(null);
 		}
 
 		public CompletableFuture<Void> uploadSectionIndexBuffer(
 			CompiledSectionMesh compiledSectionMesh, ByteBufferBuilder.Result result, ChunkSectionLayer chunkSectionLayer
 		) {
-			if (SectionRenderDispatcher.this.closed
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				// The semantic Rust terrain route does not consume Java section index
-				// buffers. Close the temporary CPU result and fail closed at this
-				// compatibility boundary.
-				result.close();
-				return CompletableFuture.completedFuture(null);
-			} else {
-				return CompletableFuture.runAsync(() -> {
-					Zone zone = Profiler.get().zone("Upload Section Indices");
-
-					try {
-						compiledSectionMesh.uploadLayerIndexBuffer(chunkSectionLayer, result, this.sectionNode);
-						result.close();
-					} catch (Throwable var8) {
-						if (zone != null) {
-							try {
-								zone.close();
-							} catch (Throwable var7) {
-								var8.addSuppressed(var7);
-							}
-						}
-
-						throw var8;
-					}
-
-					if (zone != null) {
-						zone.close();
-					}
-				}, SectionRenderDispatcher.this.mainThreadUploadExecutor);
-			}
+			// The semantic Rust terrain route does not consume Java section index
+			// buffers. Close the temporary CPU result and fail closed at this
+			// compatibility boundary.
+			result.close();
+			return CompletableFuture.completedFuture(null);
 		}
 
 		public void setSectionNode(long l) {
@@ -316,36 +250,16 @@ public class SectionRenderDispatcher {
 			this.playerChanged = bl | (bl2 && this.playerChanged);
 		}
 
-		public void setNotDirty() {
-			this.dirty = false;
-			this.playerChanged = false;
-		}
-
 		public boolean isDirty() {
 			return this.dirty;
-		}
-
-		public boolean isDirtyFromPlayer() {
-			return this.dirty && this.playerChanged;
 		}
 
 		public long getNeighborSectionNode(Direction direction) {
 			return SectionPos.offset(this.sectionNode, direction);
 		}
 
-		public void resortTransparency(SectionRenderDispatcher sectionRenderDispatcher) {
-			if (this.getSectionMesh() instanceof CompiledSectionMesh compiledSectionMesh) {
-				this.lastResortTransparencyTask = new SectionRenderDispatcher.RenderSection.ResortTransparencyTask(compiledSectionMesh);
-				sectionRenderDispatcher.schedule(this.lastResortTransparencyTask);
-			}
-		}
-
 		public boolean hasTranslucentGeometry() {
 			return this.getSectionMesh().hasTranslucentGeometry();
-		}
-
-		public boolean transparencyResortingScheduled() {
-			return this.lastResortTransparencyTask != null && !this.lastResortTransparencyTask.isCompleted.get();
 		}
 
 		protected void cancelTasks() {
@@ -358,24 +272,6 @@ public class SectionRenderDispatcher {
 				this.lastResortTransparencyTask.cancel();
 				this.lastResortTransparencyTask = null;
 			}
-		}
-
-		public SectionRenderDispatcher.RenderSection.CompileTask createCompileTask(RenderRegionCache renderRegionCache) {
-			this.cancelTasks();
-			RenderSectionRegion renderSectionRegion = renderRegionCache.createRegion(SectionRenderDispatcher.this.level, this.sectionNode);
-			boolean bl = this.sectionMesh.get() != CompiledSectionMesh.UNCOMPILED;
-			this.lastRebuildTask = new SectionRenderDispatcher.RenderSection.RebuildTask(renderSectionRegion, bl);
-			return this.lastRebuildTask;
-		}
-
-		public void rebuildSectionAsync(RenderRegionCache renderRegionCache) {
-			SectionRenderDispatcher.RenderSection.CompileTask compileTask = this.createCompileTask(renderRegionCache);
-			SectionRenderDispatcher.this.schedule(compileTask);
-		}
-
-		public void compileSync(RenderRegionCache renderRegionCache) {
-			SectionRenderDispatcher.RenderSection.CompileTask compileTask = this.createCompileTask(renderRegionCache);
-			compileTask.doTask(SectionRenderDispatcher.this.fixedBuffers);
 		}
 
 		void setSectionMesh(SectionMesh sectionMesh) {

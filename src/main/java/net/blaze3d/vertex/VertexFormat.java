@@ -2,7 +2,6 @@ package net.blaze3d.vertex;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import net.blaze3d.GraphicsWorkarounds;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
@@ -19,17 +18,13 @@ import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class VertexFormat implements net.irisshaders.iris.pipeline.programs.VertexFormatExtension {
+public class VertexFormat {
 	public static final int UNKNOWN_ELEMENT = -1;
 	private final List<VertexFormatElement> elements;
 	private final List<String> names;
 	private final int vertexSize;
 	private final int elementsMask;
 	private final int[] offsetsByElement = new int[32];
-	@Nullable
-	private GpuBuffer immediateDrawVertexBuffer;
-	@Nullable
-	private GpuBuffer immediateDrawIndexBuffer;
 
 	VertexFormat(List<VertexFormatElement> list, List<String> list2, IntList intList, int i) {
 		this.elements = list;
@@ -65,10 +60,6 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 		return this.elements;
 	}
 
-	public List<String> getElementAttributeNames() {
-		return this.names;
-	}
-
 	public int[] getOffsetsByElement() {
 		return this.offsetsByElement;
 	}
@@ -94,19 +85,6 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 		}
 	}
 
-	public int getShaderAttributeLocation(int attributeOrdinal) {
-		VertexFormatElement element = this.elements.get(attributeOrdinal);
-		String name = this.names.get(attributeOrdinal);
-		return switch (name) {
-			case "mc_Entity" -> 11;
-			case "mc_midTexCoord" -> this.names.contains("mc_Entity") ? 12 : this.names.contains("iris_Entity") ? 7 : attributeOrdinal;
-			case "at_tangent" -> this.names.contains("mc_Entity") ? 13 : this.names.contains("iris_Entity") ? 9 : attributeOrdinal;
-			case "at_midBlock" -> this.names.contains("mc_Entity") ? 14 : attributeOrdinal;
-			case "iris_Entity" -> 6;
-			default -> element.usage() == VertexFormatElement.Usage.GENERIC ? element.index() : attributeOrdinal;
-		};
-	}
-
 	public boolean equals(Object object) {
 		return this == object || object instanceof VertexFormat vertexFormat
                 && this.elementsMask == vertexFormat.elementsMask
@@ -117,58 +95,6 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 
 	public int hashCode() {
 		return this.elementsMask * 31 + Arrays.hashCode(this.offsetsByElement);
-	}
-
-	private static GpuBuffer uploadToBuffer(@Nullable GpuBuffer gpuBuffer, ByteBuffer byteBuffer, int i, Supplier<String> supplier) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java immediate vertex uploads are unavailable on selected Vulkan");
-		}
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| GraphicsWorkarounds.get(net.vulkanic.VulkanicAPI.getDevice()).alwaysCreateFreshImmediateBuffer()) {
-			if (gpuBuffer != null) {
-				gpuBuffer.close();
-			}
-
-			return net.vulkanic.VulkanicAPI.createBuffer(supplier, i, byteBuffer);
-		} else {
-			if (gpuBuffer == null) {
-				gpuBuffer = net.vulkanic.VulkanicAPI.createBuffer(supplier, i, byteBuffer);
-			} else {
-				CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.createCommandEncoder();
-				if (gpuBuffer.size() < byteBuffer.remaining()) {
-					gpuBuffer.close();
-					gpuBuffer = net.vulkanic.VulkanicAPI.createBuffer(supplier, i, byteBuffer);
-				} else {
-					commandEncoder.writeToBuffer(gpuBuffer.slice(), byteBuffer);
-				}
-			}
-
-			return gpuBuffer;
-		}
-	}
-
-	public GpuBuffer uploadImmediateVertexBuffer(ByteBuffer byteBuffer) {
-		this.immediateDrawVertexBuffer = uploadToBuffer(this.immediateDrawVertexBuffer, byteBuffer, 40, () -> "Immediate vertex buffer for " + this);
-		return this.immediateDrawVertexBuffer;
-	}
-
-	public GpuBuffer uploadImmediateIndexBuffer(ByteBuffer byteBuffer) {
-		this.immediateDrawIndexBuffer = uploadToBuffer(this.immediateDrawIndexBuffer, byteBuffer, 72, () -> "Immediate index buffer for " + this);
-		return this.immediateDrawIndexBuffer;
-	}
-	
-	// Iris: VertexFormatExtension implementation
-	@Override
-	public void bindAttributesIris(boolean isFallback, int programId) {
-		com.google.common.collect.ImmutableSet<String> ATTRIBUTE_LIST = com.google.common.collect.ImmutableSet.of("Position", "Color", "Normal", "UV0", "UV1", "UV2");
-		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
-		int j = 0;
-
-		for (String string : this.getElementAttributeNames()) {
-			VulkanicAPI.setAttributeLocation(ctx, programId, this.getShaderAttributeLocation(j), ATTRIBUTE_LIST.contains(string) && !isFallback ? "iris_" + string : string);
-			j++;
-		}
 	}
 
 	@Environment(EnvType.CLIENT)

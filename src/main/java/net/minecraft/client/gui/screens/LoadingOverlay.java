@@ -25,7 +25,6 @@ import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.VulkanicCoreAPI;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -87,11 +86,7 @@ public class LoadingOverlay extends Overlay {
 			// not admit a Java texture or fallback if this early preload is absent.
 		}
 		LOGGER.info("Rust semantic loading-overlay logo preload={}", semanticLogoLoaded);
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			return;
-		}
-		textureManager.registerAndLoad(MOJANG_STUDIOS_LOGO_LOCATION, new LoadingOverlay.LogoTexture());
+		return;
 	}
 
 	private static int replaceAlpha(int i, int j) {
@@ -99,11 +94,6 @@ public class LoadingOverlay extends Overlay {
 	}
 
 	private static void touchBackendSeamForMigrationGuardrails() {
-		if (KEEP_BACKEND_SEAM_REFERENCE
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			net.vulkanic.VulkanicAPI.createCommandEncoder();
-		}
 	}
 
 	@Override
@@ -182,8 +172,6 @@ public class LoadingOverlay extends Overlay {
 		}
 
 		if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")
-			&& (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
 			&& RUST_SEMANTIC_RENDER_DIAGNOSTICS++ < 24) {
 			System.out.println("[MattMC graphics audit] loading-overlay semantic producer"
 				+ " fade-out=" + g + " fade-in=" + h + " alpha=" + o
@@ -191,44 +179,6 @@ public class LoadingOverlay extends Overlay {
 				+ " screen=" + (this.minecraft.screen == null ? "null" : this.minecraft.screen.getClass().getSimpleName()));
 		}
 
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && DEBUG_RENDER_LOGS < 12) {
-			DEBUG_RENDER_LOGS++;
-			int logoTextureId = 0;
-			int logoMinFilter = 0;
-			int logoMagFilter = 0;
-			int logoWrapS = 0;
-			int logoWrapT = 0;
-			try {
-				var logoTexture = this.minecraft.getTextureManager().getTexture(MOJANG_STUDIOS_LOGO_LOCATION);
-				logoTextureId = VulkanicCoreAPI.textureId(logoTexture.getTexture());
-				var ctx = VulkanicAPI.getCommandContext();
-				VulkanicAPI.bindTexture2D(ctx, logoTextureId);
-				logoMinFilter = VulkanicAPI.getTexParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER);
-				logoMagFilter = VulkanicAPI.getTexParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER);
-				logoWrapS = VulkanicAPI.getTexParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S);
-				logoWrapT = VulkanicAPI.getTexParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T);
-			} catch (Throwable ignored) {
-			}
-			LOGGER.info(
-				"LoadingOverlay render#{} instance={} fadeInStart={} fadeOutStart={} alpha={} progress={} reloadDone={} gameLoadFinished={} screen={} scissor={} logoTexId={} minFilter={} magFilter={} wrapS={} wrapT={}",
-				DEBUG_RENDER_LOGS,
-				System.identityHashCode(this),
-				this.fadeInStart,
-				this.fadeOutStart,
-				o,
-				this.currentProgress,
-				this.reload.isDone(),
-				this.minecraft.isGameLoadFinished(),
-				this.minecraft.screen == null ? "null" : this.minecraft.screen.getClass().getSimpleName(),
-				guiGraphics.scissorStack.peek(),
-				logoTextureId,
-				logoMinFilter,
-				logoMagFilter,
-				logoWrapS,
-				logoWrapT
-			);
-		}
 	}
 
 	private void renderCompatibleScreen(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {

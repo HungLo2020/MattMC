@@ -34,26 +34,6 @@ public class ImageUtils {
         TextureUtil.writeAsPNG(Paths.get(""), name, texture, maxMipmapLevel, i -> i);
     }
 
-    public static BufferedImage validateImage(BufferedImage image) {
-        if (image.getType() != 6) {
-            BufferedImage temp = new BufferedImage(image.getWidth(), image.getHeight(), 6);
-            Graphics2D g2 = temp.createGraphics();
-            g2.drawImage(image, 0, 0, image.getWidth(), image.getHeight(), null);
-            g2.dispose();
-            image = temp;
-        }
-
-        return image;
-    }
-
-    public static NativeImage createNativeImageFromResourceLocation(ResourceLocation resourceLocation) {
-        try {
-            return TextureContents.load(Minecraft.getInstance().getResourceManager(), resourceLocation).image();
-        } catch (Exception var5) {
-            return null;
-        }
-    }
-
     public static BufferedImage createBufferedImageFromResourceLocation(ResourceLocation resourceLocation) {
         try {
             AbstractTexture texture = Minecraft.getInstance().getTextureManager().getTexture(resourceLocation);
@@ -176,32 +156,6 @@ public class ImageUtils {
         return temp;
     }
 
-    public static BufferedImage addCharacter(BufferedImage image, String character) {
-        Graphics2D g2 = image.createGraphics();
-        g2.setColor(new Color(0, 0, 0, 255));
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setFont(new Font("Arial", Font.PLAIN, image.getHeight()));
-        FontMetrics fm = g2.getFontMetrics();
-        int x = (image.getWidth() - fm.stringWidth("?")) / 2;
-        int y = fm.getAscent() + (image.getHeight() - (fm.getAscent() + fm.getDescent())) / 2;
-        g2.drawString("?", x, y);
-        g2.dispose();
-        return image;
-    }
-
-    public static BufferedImage eraseArea(BufferedImage image, int x, int y, int w, int h, int imageWidth, int imageHeight) {
-        float scaleX = ((float) image.getWidth(null) / imageWidth);
-        float scaleY = ((float) image.getHeight(null) / imageHeight);
-        x = (int) (x * scaleX);
-        y = (int) (y * scaleY);
-        w = (int) (w * scaleX);
-        h = (int) (h * scaleY);
-        int[] blankPixels = new int[w * h];
-        Arrays.fill(blankPixels, 0);
-        image.setRGB(x, y, w, h, blankPixels, 0, w);
-        return image;
-    }
-
     public static BufferedImage loadImage(ResourceLocation resourceLocation, int x, int y, int w, int h) {
         return loadImage(resourceLocation, x, y, w, h, 64, 32);
     }
@@ -277,37 +231,6 @@ public class ImageUtils {
             g2.dispose();
             return tmp;
         }
-    }
-
-    public static BufferedImage flipHorizontal(BufferedImage image) {
-        AffineTransform tx = AffineTransform.getScaleInstance(-1.0, 1.0);
-        tx.translate(-image.getWidth(null), 0.0);
-        AffineTransformOp op = new AffineTransformOp(tx, 1);
-        return op.filter(image, null);
-    }
-
-    public static BufferedImage into128(BufferedImage base) {
-        BufferedImage frame = new BufferedImage(128, 128, base.getType());
-        Graphics gfx = frame.getGraphics();
-        gfx.drawImage(base, 64 - base.getWidth() / 2, 64 - base.getHeight() / 2, base.getWidth(), base.getHeight(), null);
-        gfx.dispose();
-        return frame;
-    }
-
-    public static BufferedImage intoSquare(BufferedImage base) {
-        int dim = Math.max(base.getWidth(), base.getHeight());
-        int t = 1;
-
-        while (Math.pow(2.0, t - 1) < dim) {
-            ++t;
-        }
-
-        int size = (int) Math.pow(2.0, t);
-        BufferedImage frame = new BufferedImage(size, size, base.getType());
-        Graphics gfx = frame.getGraphics();
-        gfx.drawImage(base, (size - base.getWidth()) / 2, (size - base.getHeight()) / 2, base.getWidth(), base.getHeight(), null);
-        gfx.dispose();
-        return frame;
     }
 
     public static BufferedImage pad(BufferedImage base) {
@@ -604,54 +527,6 @@ public class ImageUtils {
         return image.getSubimage(left, top, right - left + 1, bottom - top + 1);
     }
 
-    public static BufferedImage trimCentered(BufferedImage image) {
-        int height = image.getHeight();
-        int width = image.getWidth();
-        int left = -1;
-        int right = width;
-        int top = -1;
-        int bottom = height;
-        boolean foundColor = false;
-        int color;
-
-        while (!foundColor && left < width / 2 - 1 && top < height / 2 - 1) {
-            ++left;
-            --right;
-            ++top;
-            --bottom;
-
-            for (int y = top; y < bottom; ++y) {
-                color = image.getRGB(left, y);
-                if (color >> 24 != 0) {
-                    foundColor = true;
-                }
-            }
-
-            for (int y = top; y < bottom; ++y) {
-                color = image.getRGB(right, y);
-                if (color >> 24 != 0) {
-                    foundColor = true;
-                }
-            }
-
-            for (int x = left; x < right; ++x) {
-                color = image.getRGB(x, top);
-                if (color >> 24 != 0) {
-                    foundColor = true;
-                }
-            }
-
-            for (int x = left; x < right; ++x) {
-                color = image.getRGB(x, bottom);
-                if (color >> 24 != 0) {
-                    foundColor = true;
-                }
-            }
-        }
-
-        return image.getSubimage(left, top, right - left + 1, bottom - top + 1);
-    }
-
     public static BufferedImage colorify(BufferedImage image, float r, float g, float b) {
         BufferedImage temp = new BufferedImage(image.getWidth(), image.getHeight(), 3);
         Graphics2D gfx = temp.createGraphics();
@@ -682,35 +557,4 @@ public class ImageUtils {
         return colorify(image, rgb >> 16 & 0xFF, rgb >> 8 & 0xFF, rgb & 0xFF);
     }
 
-    public static float percentageOfEdgePixelsThatAreSolid(BufferedImage image) {
-        float edgePixels = (image.getWidth() * 2 + image.getHeight() * 2 - 2);
-        float edgePixelsWithColor = 0.0F;
-        int color;
-
-        for (int t = 0; t < image.getHeight(); ++t) {
-            color = image.getRGB(0, t);
-            if (color >> 24 != 0) {
-                ++edgePixelsWithColor;
-            }
-
-            color = image.getRGB(image.getWidth() - 1, t);
-            if (color >> 24 != 0) {
-                ++edgePixelsWithColor;
-            }
-        }
-
-        for (int t = 1; t < image.getWidth() - 1; ++t) {
-            color = image.getRGB(t, 0);
-            if (color >> 24 != 0) {
-                ++edgePixelsWithColor;
-            }
-
-            color = image.getRGB(t, image.getHeight() - 1);
-            if (color >> 24 != 0) {
-                ++edgePixelsWithColor;
-            }
-        }
-
-        return edgePixelsWithColor / edgePixels;
-    }
 }

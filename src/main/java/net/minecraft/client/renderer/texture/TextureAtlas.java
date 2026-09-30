@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable, net.irisshaders.iris.pbr.texture.TextureAtlasExtension {
+public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	@Deprecated
 	public static final ResourceLocation LOCATION_BLOCKS = ResourceLocation.withDefaultNamespace("textures/atlas/blocks.png");
@@ -63,58 +63,29 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	private TextureAtlas.SemanticRawSnapshot semanticRawSnapshot;
 	@Nullable
 	private net.vulkanic.world.AtlasAnimationResource semanticAnimationResource;
-	
-	// Iris PBR: From texture.pbr.MixinTextureAtlas - PBR atlas holder
-	@Nullable
-	private net.irisshaders.iris.pbr.texture.PBRAtlasHolder iris$pbrHolder;
 
 	public TextureAtlas(ResourceLocation resourceLocation) {
 		this.location = resourceLocation;
 		this.maxSupportedTextureSize = net.vulkanic.VulkanicAPI.getBackendMaxTextureSize();
 	}
 
-	private void createTexture(int i, int j, int k) {
-		LOGGER.info("Created: {}x{}x{} {}-atlas", i, j, k, this.location);
-		this.close();
-		this.texture = net.vulkanic.VulkanicAPI.createTexture(this.location::toString, 7, TextureFormat.RGBA8, i, j, 1, k + 1);
-		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
-		this.width = i;
-		this.height = j;
-		this.mipLevel = k;
-	}
-
 	private void refreshVulkanMipmaps() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			// Selected Vulkan atlases are CPU-owned semantic snapshots. Never
-			// re-enter Iris' legacy texture/mipmap state, even if a stale Java
-			// texture survived a resource reload race.
-			return;
-		}
-		if (this.texture == null || this.texture.getMipLevels() <= 1) {
-			return;
-		}
+		// Selected Vulkan atlases are CPU-owned semantic snapshots. Never
+		// re-enter Iris' legacy texture/mipmap state, even if a stale Java
+		// texture survived a resource reload race.
+		return;
 	}
 
 	public void upload(SpriteLoader.Preparations preparations) {
-		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-		if (rustWholeFrame) {
-			// Semantic GUI consumers retain only the stitched CPU source. Do not
-			// allocate a Java texture/view merely to provide metadata that Rust
-			// already receives as an explicit raw-image asset.
-			this.close();
-			this.width = preparations.width();
-			this.height = preparations.height();
-			this.mipLevel = preparations.mipLevel();
-		} else {
-			this.createTexture(preparations.width(), preparations.height(), preparations.mipLevel());
-		}
+		// Semantic GUI consumers retain only the stitched CPU source. Do not
+		// allocate a Java texture/view merely to provide metadata that Rust
+		// already receives as an explicit raw-image asset.
+		this.close();
+		this.width = preparations.width();
+		this.height = preparations.height();
+		this.mipLevel = preparations.mipLevel();
 		this.clearTextureData();
-		this.semanticSnapshotUsesRustAnimationClock = rustWholeFrame;
-		if (!rustWholeFrame) {
-			this.setFilter(false, this.mipLevel > 1);
-		}
+		this.semanticSnapshotUsesRustAnimationClock = true;
 		this.texturesByName = Map.copyOf(preparations.regions());
 		this.semanticSnapshotGeneration++;
 		this.semanticReloadGeneration++;
@@ -130,19 +101,8 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 			for (TextureAtlasSprite textureAtlasSprite : preparations.regions().values()) {
 				list.add(textureAtlasSprite.contents());
 
-				if (!rustWholeFrame) {
-					try {
-						textureAtlasSprite.uploadFirstFrame(this.texture);
-					} catch (Throwable var10) {
-						CrashReport crashReport = CrashReport.forThrowable(var10, "Stitching texture atlas");
-						CrashReportCategory crashReportCategory = crashReport.addCategory("Texture being stitched together");
-						crashReportCategory.setDetail("Atlas path", this.location);
-						crashReportCategory.setDetail("Sprite", textureAtlasSprite);
-						throw new ReportedException(crashReport);
-					}
-				}
 
-				TextureAtlasSprite.Ticker ticker = rustWholeFrame ? null : textureAtlasSprite.createTicker();
+				TextureAtlasSprite.Ticker ticker = null;
 				if (ticker != null) {
 					list2.add(ticker);
 				}
@@ -150,10 +110,9 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 			this.sprites = List.copyOf(list);
 			this.animatedTextures = List.copyOf(list2);
-			if (rustWholeFrame && (LOCATION_BLOCKS.equals(this.location)
+			if ((LOCATION_BLOCKS.equals(this.location)
 				|| LOCATION_PARTICLES.equals(this.location)
-				|| net.vulkanic.world.AtlasAnimationResource.shieldLifecycleEnabled()
-					&& net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(this.location))) {
+				|| net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(this.location))) {
 				// The incarnation starts with atlas upload, before any resource lookup
 				// or world publication can lose its semantic sprite-use events.
 				this.semanticAnimationTickEpoch = Math.max(
@@ -185,29 +144,15 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 			}
 		}
 		
-		if (!rustWholeFrame) {
-			// Call hooks after atlas upload
-			for (TextureAtlasHooks hook : HookRegistry.getTextureAtlasHooks()) {
-				hook.onAtlasUpload(this, this.location, preparations);
-			}
-
-			// Iris PBR: From texture.pbr.MixinTextureAtlas - track texture after upload
-			net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(texture), this);
-		}
 	}
 
 	@Override
 	public void dumpContents(ResourceLocation resourceLocation, Path path) throws IOException {
 		String string = resourceLocation.toDebugFileName();
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Rust-owned atlases have no Java GPU image to read back. Preserve the
-			// useful CPU diagnostic (sprite placement) without reopening a Java view.
-			dumpSpriteNames(path, string, this.texturesByName);
-			return;
-		}
-		TextureUtil.writeAsPNG(path, string, this.getTexture(), this.mipLevel, i -> i);
+		// Rust-owned atlases have no Java GPU image to read back. Preserve the
+		// useful CPU diagnostic (sprite placement) without reopening a Java view.
 		dumpSpriteNames(path, string, this.texturesByName);
+		return;
 	}
 
 	private static void dumpSpriteNames(Path path, String string, Map<ResourceLocation, TextureAtlasSprite> map) {
@@ -252,33 +197,18 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 	}
 
 	public void cycleAnimationFrames() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Vulkan animation clocks belong to Rust. Even a stale OpenGL ticker
-			// must not select Java frames after backend selection changes. Live
-			// block-atlas events progress independently of which draw consumes them.
-			if (this.semanticAnimationResource != null
-				&& this.semanticAnimationResource.tickDeliveryEnabled()) {
-				this.semanticAnimationResource.enqueueNextTick(
-					net.sodium.client.SodiumClientMod.options().performance.animateOnlyVisibleTextures);
-				long producedTick = this.semanticAnimationResource.producedTickForDiagnostics();
-				this.semanticAnimationTickEpoch = Math.max(this.semanticAnimationTickEpoch, producedTick);
-				SEMANTIC_ANIMATION_TICK_EPOCHS.merge(this.location, producedTick, Long::max);
-			}
-			return;
+		// Vulkan animation clocks belong to Rust. Even a stale OpenGL ticker
+		// must not select Java frames after backend selection changes. Live
+		// block-atlas events progress independently of which draw consumes them.
+		if (this.semanticAnimationResource != null
+			&& this.semanticAnimationResource.tickDeliveryEnabled()) {
+			this.semanticAnimationResource.enqueueNextTick(
+				net.sodium.client.SodiumClientMod.options().performance.animateOnlyVisibleTextures);
+			long producedTick = this.semanticAnimationResource.producedTickForDiagnostics();
+			this.semanticAnimationTickEpoch = Math.max(this.semanticAnimationTickEpoch, producedTick);
+			SEMANTIC_ANIMATION_TICK_EPOCHS.merge(this.location, producedTick, Long::max);
 		}
-		if (this.texture != null) {
-			for (TextureAtlasSprite.Ticker ticker : this.animatedTextures) {
-				ticker.tickAndUpload(this.texture);
-			}
-			if (!this.animatedTextures.isEmpty()) {
-				this.refreshVulkanMipmaps();
-			}
-		}
-		// Iris PBR: From texture.pbr.MixinTextureAtlas - cycle PBR animation frames
-		if (iris$pbrHolder != null) {
-			iris$pbrHolder.cycleAnimationFrames();
-		}
+		return;
 	}
 
 	@Override
@@ -491,24 +421,5 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 	public int getHeight() {
 		return this.height;
-	}
-	
-	// Iris PBR: From texture.pbr.MixinTextureAtlas - PBR holder interface implementation
-	@Override
-	@Nullable
-	public net.irisshaders.iris.pbr.texture.PBRAtlasHolder getPBRHolder() {
-		return iris$pbrHolder;
-	}
-	
-	@Override
-	public net.irisshaders.iris.pbr.texture.PBRAtlasHolder getOrCreatePBRHolder() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java Iris PBR atlas state is unavailable on the Rust Vulkan route");
-		}
-		if (iris$pbrHolder == null) {
-			iris$pbrHolder = new net.irisshaders.iris.pbr.texture.PBRAtlasHolder();
-		}
-		return iris$pbrHolder;
 	}
 }

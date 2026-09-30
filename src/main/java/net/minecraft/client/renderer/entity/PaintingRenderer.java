@@ -116,73 +116,10 @@ public class PaintingRenderer extends EntityRenderer<Painting, PaintingRenderSta
 		TextureAtlasSprite textureAtlasSprite,
 		TextureAtlasSprite textureAtlasSprite2
 	) {
-		if (net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
-			if (renderPaintingSemantic(poseStack, submitNodeCollector, renderType, is, i, j, textureAtlasSprite, textureAtlasSprite2)) {
-				return;
-			}
-			throw new IllegalStateException("Rust whole-frame painting route rejected semantic quads");
+		if (renderPaintingSemantic(poseStack, submitNodeCollector, renderType, is, i, j, textureAtlasSprite, textureAtlasSprite2)) {
+			return;
 		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Rust whole-frame painting route is unavailable; Java custom geometry is not a fallback");
-		}
-		submitNodeCollector.submitCustomGeometrySemantic(poseStack, renderType, (pose, vertexConsumer) -> {
-			float f = -i / 2.0F;
-			float g = -j / 2.0F;
-			float h = 0.03125F;
-			float k = textureAtlasSprite2.getU0();
-			float l = textureAtlasSprite2.getU1();
-			float m = textureAtlasSprite2.getV0();
-			float n = textureAtlasSprite2.getV1();
-			float o = textureAtlasSprite2.getU0();
-			float p = textureAtlasSprite2.getU1();
-			float q = textureAtlasSprite2.getV0();
-			float r = textureAtlasSprite2.getV(0.0625F);
-			float s = textureAtlasSprite2.getU0();
-			float t = textureAtlasSprite2.getU(0.0625F);
-			float u = textureAtlasSprite2.getV0();
-			float v = textureAtlasSprite2.getV1();
-			double d = 1.0 / i;
-			double e = 1.0 / j;
-
-			for (int w = 0; w < i; w++) {
-				for (int x = 0; x < j; x++) {
-					float y = f + (w + 1);
-					float z = f + w;
-					float aa = g + (x + 1);
-					float ab = g + x;
-					int ac = is[w + x * i];
-					float ad = textureAtlasSprite.getU((float)(d * (i - w)));
-					float ae = textureAtlasSprite.getU((float)(d * (i - (w + 1))));
-					float af = textureAtlasSprite.getV((float)(e * (j - x)));
-					float ag = textureAtlasSprite.getV((float)(e * (j - (x + 1))));
-					this.vertex(pose, vertexConsumer, y, ab, ae, af, -0.03125F, 0, 0, -1, ac);
-					this.vertex(pose, vertexConsumer, z, ab, ad, af, -0.03125F, 0, 0, -1, ac);
-					this.vertex(pose, vertexConsumer, z, aa, ad, ag, -0.03125F, 0, 0, -1, ac);
-					this.vertex(pose, vertexConsumer, y, aa, ae, ag, -0.03125F, 0, 0, -1, ac);
-					this.vertex(pose, vertexConsumer, y, aa, l, m, 0.03125F, 0, 0, 1, ac);
-					this.vertex(pose, vertexConsumer, z, aa, k, m, 0.03125F, 0, 0, 1, ac);
-					this.vertex(pose, vertexConsumer, z, ab, k, n, 0.03125F, 0, 0, 1, ac);
-					this.vertex(pose, vertexConsumer, y, ab, l, n, 0.03125F, 0, 0, 1, ac);
-					this.vertex(pose, vertexConsumer, y, aa, o, q, -0.03125F, 0, 1, 0, ac);
-					this.vertex(pose, vertexConsumer, z, aa, p, q, -0.03125F, 0, 1, 0, ac);
-					this.vertex(pose, vertexConsumer, z, aa, p, r, 0.03125F, 0, 1, 0, ac);
-					this.vertex(pose, vertexConsumer, y, aa, o, r, 0.03125F, 0, 1, 0, ac);
-					this.vertex(pose, vertexConsumer, y, ab, o, q, 0.03125F, 0, -1, 0, ac);
-					this.vertex(pose, vertexConsumer, z, ab, p, q, 0.03125F, 0, -1, 0, ac);
-					this.vertex(pose, vertexConsumer, z, ab, p, r, -0.03125F, 0, -1, 0, ac);
-					this.vertex(pose, vertexConsumer, y, ab, o, r, -0.03125F, 0, -1, 0, ac);
-					this.vertex(pose, vertexConsumer, y, aa, t, u, 0.03125F, -1, 0, 0, ac);
-					this.vertex(pose, vertexConsumer, y, ab, t, v, 0.03125F, -1, 0, 0, ac);
-					this.vertex(pose, vertexConsumer, y, ab, s, v, -0.03125F, -1, 0, 0, ac);
-					this.vertex(pose, vertexConsumer, y, aa, s, u, -0.03125F, -1, 0, 0, ac);
-					this.vertex(pose, vertexConsumer, z, aa, t, u, -0.03125F, 1, 0, 0, ac);
-					this.vertex(pose, vertexConsumer, z, ab, t, v, -0.03125F, 1, 0, 0, ac);
-					this.vertex(pose, vertexConsumer, z, ab, s, v, 0.03125F, 1, 0, 0, ac);
-					this.vertex(pose, vertexConsumer, z, aa, s, u, 0.03125F, 1, 0, 0, ac);
-				}
-			}
-		});
+		throw new IllegalStateException("Rust whole-frame painting route rejected semantic quads");
 	}
 
 	/** Copies the six painting faces as explicit atlas quads for Rust Vulkan. */

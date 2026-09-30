@@ -40,32 +40,4 @@ public enum VulkanicTextureFormat {
         this.pixelSize = pixelSize;
     }
 
-    /** Returns the size in bytes of a single pixel in this format. */
-    public int pixelSize() {
-        return pixelSize;
-    }
-
-    /** Returns true if this format has a color component. */
-    public boolean hasColorAspect() {
-        return this == RGBA8
-            || this == RGBA16F
-            || this == RGBA8_SNORM
-            || this == R11F_G11F_B10F
-            || this == RED16F
-            || this == RED32F
-            || this == BGRA8
-            || this == RED8
-            || this == RED8I
-            || this == RED8UI;
-    }
-
-    /** Returns true if this format has a depth component. */
-    public boolean hasDepthAspect() {
-        return this == DEPTH32 || this == DEPTH24_STENCIL8 || this == DEPTH32F_STENCIL8;
-    }
-
-    /** Returns true if this format has a stencil component. */
-    public boolean hasStencilAspect() {
-        return this == DEPTH24_STENCIL8 || this == DEPTH32F_STENCIL8;
-    }
 }

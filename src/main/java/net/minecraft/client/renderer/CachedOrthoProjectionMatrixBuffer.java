@@ -35,47 +35,9 @@ public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 		this.zFar = g;
 		this.invertY = bl;
 		this.useZeroToOneDepthWhenVulkan = bl2;
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			this.buffer = null;
-			this.bufferSlice = null;
-			return;
-		}
-		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
-		this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
-		net.vulkanic.VulkanicAPI.labelProjectionMatrix(this.bufferSlice, this.label);
-	}
-
-	public GpuBufferSlice getBuffer(float f, float g) {
-		if (this.buffer == null || this.bufferSlice == null) {
-			throw new IllegalStateException("Java cached orthographic UBO rendering is unavailable on selected Vulkan");
-		}
-		if (this.width != f || this.height != g) {
-			Matrix4f matrix4f = this.createProjectionMatrix(f, g);
-
-			try (MemoryStack memoryStack = MemoryStack.stackPush()) {
-				ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, RenderSystem.PROJECTION_MATRIX_UBO_SIZE).putMat4f(matrix4f).get();
-				net.vulkanic.VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
-			}
-
-			this.width = f;
-			this.height = g;
-		}
-
-		net.vulkanic.VulkanicAPI.labelProjectionMatrix(this.bufferSlice, this.label);
-		return this.bufferSlice;
-	}
-
-	private Matrix4f createProjectionMatrix(float f, float g) {
-		return new Matrix4f().setOrtho(
-			0.0F,
-			f,
-			this.invertY ? g : 0.0F,
-			this.invertY ? 0.0F : g,
-			this.zNear,
-			this.zFar,
-			this.useZeroToOneDepthWhenVulkan && net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-		);
+		this.buffer = null;
+		this.bufferSlice = null;
+		return;
 	}
 
 	public void close() {
@@ -88,8 +50,7 @@ public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 
 	/** Releases a compatibility projection UBO if Rust Vulkan ownership starts late. */
 	public void ensureRustSemanticRoute() {
-		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) && this.buffer != null) {
+		if (this.buffer != null) {
 			this.close();
 		}
 	}

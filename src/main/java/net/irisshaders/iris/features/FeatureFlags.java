@@ -1,6 +1,5 @@
 package net.irisshaders.iris.features;
 
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.commons.lang3.StringUtils;
 
@@ -11,15 +10,15 @@ import java.util.function.BooleanSupplier;
 public enum FeatureFlags {
 	SEPARATE_HARDWARE_SAMPLERS(() -> true, () -> true),
 	HIGHER_SHADOWCOLOR(() -> true, () -> true),
-	CUSTOM_IMAGES(() -> true, () -> rustVulkanRoute() || IrisRenderSystem.supportsImageLoadStore()),
-	PER_BUFFER_BLENDING(() -> true, () -> !rustVulkanRoute() && IrisRenderSystem.supportsBufferBlending()),
-	COMPUTE_SHADERS(() -> true, () -> !rustVulkanRoute() && IrisRenderSystem.supportsCompute()),
-	TESSELLATION_SHADERS(() -> true, () -> !rustVulkanRoute() && IrisRenderSystem.supportsTesselation()),
+	CUSTOM_IMAGES(() -> true, () -> true),
+	PER_BUFFER_BLENDING(() -> true, () -> false),
+	COMPUTE_SHADERS(() -> true, () -> false),
+	TESSELLATION_SHADERS(() -> true, () -> false),
 	ENTITY_TRANSLUCENT(() -> true, () -> true),
 	REVERSED_CULLING(() -> true, () -> true),
 	BLOCK_EMISSION_ATTRIBUTE(() -> true, () -> true),
 	CAN_DISABLE_WEATHER(() -> true, () -> true),
-	SSBO(() -> true, () -> !rustVulkanRoute() && IrisRenderSystem.supportsSSBO()),
+	SSBO(() -> true, () -> false),
 	UNKNOWN(() -> false, () -> false);
 
 	private final BooleanSupplier irisRequirement;
@@ -74,16 +73,6 @@ public enum FeatureFlags {
 
 	public String getHumanReadableName() {
 		return StringUtils.capitalize(name().replace("_", " ").toLowerCase());
-	}
-
-	/**
-	 * On the Rust Vulkan route the hardware features are the ones Rust's shader
-	 * runtime implements (matching the IRIS_FEATURE_ defines it provides), not
-	 * a Java GPU capability query.
-	 */
-	private static boolean rustVulkanRoute() {
-		return net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 	}
 
 	public boolean isUsable() {

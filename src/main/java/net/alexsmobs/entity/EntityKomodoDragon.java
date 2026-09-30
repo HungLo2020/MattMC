@@ -422,7 +422,7 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
 
     @Override
     public boolean canTargetItem(ItemStack stack) {
-        return stack.is(AMTagRegistry.KOMODO_DRAGON_TAMEABLES) || (stack.has(net.minecraft.core.component.DataComponents.FOOD) && true);
+        return stack.is(AMTagRegistry.KOMODO_DRAGON_TAMEABLES) || (stack.has(net.minecraft.core.component.DataComponents.FOOD));
     }
 
     public boolean isSaddled() {

@@ -14,7 +14,6 @@ import net.sodium.client.render.chunk.RenderSectionFlags;
 import net.sodium.client.render.chunk.compile.ChunkBuildOutput;
 import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
 import net.sodium.client.render.chunk.lists.ChunkRenderList;
-import net.sodium.client.render.chunk.lists.SortedRenderLists;
 import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.vertex.format.NativeSectionMeshBuilder;
@@ -704,162 +703,6 @@ public final class StaticTerrainParityDiagnostics {
         }
     }
 
-    static void recordVisibleLists(
-            String stage,
-            String layer,
-            SortedRenderLists renderLists,
-            double cameraX,
-            double cameraY,
-            double cameraZ,
-            int viewportWidth,
-            int viewportHeight
-    ) {
-        if (!ENABLED || renderLists == null) {
-            return;
-        }
-
-        int eventIndex = EVENTS.incrementAndGet();
-        boolean writeEvent = eventIndex <= MAX_VISIBLE_LIST_EVENTS;
-
-        int regionCount = 0;
-        int sectionCount = 0;
-        long orderedHash = 0xcbf29ce484222325L;
-        long setXor = 0L;
-        long setSum = 0L;
-        StringBuilder samples = new StringBuilder();
-        samples.append("[");
-
-        Iterator<ChunkRenderList> renderListIterator = renderLists.iterator();
-        while (renderListIterator.hasNext()) {
-            ChunkRenderList renderList = renderListIterator.next();
-            regionCount++;
-            ByteIterator sectionIterator = renderList.sectionsWithGeometryIterator(false);
-            if (sectionIterator == null) {
-                continue;
-            }
-            while (sectionIterator.hasNext()) {
-                int localSectionIndex = sectionIterator.nextByteAsInt() & 0xFF;
-                RenderSection section = renderList.getRegion().getSection(localSectionIndex);
-                if (section == null) {
-                    continue;
-                }
-                SectionPos position = section.getPosition();
-                long sectionKey = position.asLong();
-                int flags = section.getFlags();
-                long sectionHash = 0xcbf29ce484222325L;
-                sectionHash = mix(sectionHash, sectionKey);
-                sectionHash = mix(sectionHash, flags);
-                sectionHash = mix(sectionHash, section.getOriginX());
-                sectionHash = mix(sectionHash, section.getOriginY());
-                sectionHash = mix(sectionHash, section.getOriginZ());
-                orderedHash = mix(orderedHash, sectionHash);
-                setXor ^= sectionHash;
-                setSum += Long.rotateLeft(sectionHash, (int) (sectionKey & 31L));
-                if (sectionCount < MAX_SAMPLES) {
-                    if (samples.length() > 1) {
-                        samples.append(", ");
-                    }
-                    samples.append("{");
-                    appendField(samples, "sectionKey", sectionKey).append(", ");
-                    appendField(samples, "x", section.getChunkX()).append(", ");
-                    appendField(samples, "y", section.getChunkY()).append(", ");
-                    appendField(samples, "z", section.getChunkZ()).append(", ");
-                    appendField(samples, "originX", section.getOriginX()).append(", ");
-                    appendField(samples, "originY", section.getOriginY()).append(", ");
-                    appendField(samples, "originZ", section.getOriginZ()).append(", ");
-                    appendField(samples, "flags", flags);
-                    samples.append("}");
-                }
-                sectionCount++;
-            }
-        }
-        samples.append("]");
-
-        Minecraft minecraft = Minecraft.getInstance();
-        long gameTime = minecraft.level == null ? -1L : minecraft.level.getGameTime();
-        long hash = mix(mix(0xcbf29ce484222325L, setXor), setSum);
-        if ("solid".equals(layer) && sectionCount > 0) {
-            if (latestSolidSectionCount == sectionCount && latestSolidHash == hash) {
-                stableSolidFrames++;
-            } else {
-                stableSolidFrames = 1;
-            }
-            latestSolidSectionCount = sectionCount;
-            latestSolidHash = hash;
-            latestSolidGameTime = gameTime;
-        }
-        // Continue observing every rendered frame after the bounded receipt
-        // budget is consumed. Capture readiness is derived from these values;
-        // returning before this point made a small source-probe budget freeze
-        // readiness at the initially empty terrain list.
-        // The baseline receipt must describe a stable draw list, rather than
-        // the first partially populated world-render frame.
-        boolean readyCoverage = "java-opengl-draw".equals(stage)
-                && sectionCount > 0
-                && isSolidVisibleListStable(READY_VISIBLE_LIST_FRAMES, 1);
-        boolean writeReadyEvent = readyCoverage
-                && READY_VISIBLE_LIST_EVENTS.incrementAndGet() <= MAX_READY_VISIBLE_LIST_EVENTS;
-        if (!writeEvent && !writeReadyEvent) {
-            return;
-        }
-        // A bounded startup trace alone cannot certify the settled terrain
-        // domain.  Retain the later stable baseline observation too, without
-        // changing any render-list or rendering behavior.
-        if (writeEvent || writeReadyEvent) {
-            String backend = backendName();
-
-            StringBuilder json = new StringBuilder(2048);
-            json.append("{");
-            appendField(json, "schema", "mattmc-static-terrain-parity-visible-list-v1").append(", ");
-            appendField(json, "eventIndex", eventIndex).append(", ");
-            appendField(json, "backend", backend).append(", ");
-            appendField(json, "stage", stage).append(", ");
-            appendField(json, "layer", layer).append(", ");
-            appendField(json, "gameTime", gameTime).append(", ");
-            appendField(json, "nanoTime", System.nanoTime()).append(", ");
-            json.append("\"camera\": { ");
-            appendField(json, "x", cameraX).append(", ");
-            appendField(json, "y", cameraY).append(", ");
-            appendField(json, "z", cameraZ);
-            json.append(" }, ");
-            json.append("\"viewport\": { ");
-            appendField(json, "width", viewportWidth).append(", ");
-            appendField(json, "height", viewportHeight);
-            json.append(" }, ");
-            appendField(json, "regionCount", regionCount).append(", ");
-            appendField(json, "visibleSectionCount", sectionCount).append(", ");
-            appendField(json, "visibleSectionHash", String.format(Locale.ROOT, "%016x", hash)).append(", ");
-            appendField(json, "orderedSectionHash", String.format(Locale.ROOT, "%016x", orderedHash)).append(", ");
-            json.append("\"samples\": ").append(samples);
-            json.append("}\n");
-
-            try {
-                writeLine(json.toString());
-            } catch (IOException ignored) {
-                // Diagnostics must never alter render behavior.
-            }
-
-            if (writeEvent) {
-                recordVisibleCoverage(stage, layer, renderLists, cameraX, cameraY, cameraZ, viewportWidth, viewportHeight);
-            }
-        }
-        if (readyCoverage) {
-            recordVisibleCoverage("java-opengl-draw-ready", layer, renderLists, cameraX, cameraY, cameraZ, viewportWidth, viewportHeight);
-        }
-    }
-
-	/** Records Java OpenGL terrain readiness without enabling the heavier parity event stream. */
-	static void recordJavaOpenGlSubmittedWork(int loadedChunks, int renderDistance) {
-		if (loadedChunks <= 0
-			|| (!net.minecraft.client.dev.GraphicsFrameBenchmark.needsSubmittedWorkIdentity()
-				&& !net.minecraft.client.dev.DeterministicCameraCapture.isActiveForDiagnostics())) {
-			return;
-		}
-		String identity = loadedChunks + ":" + renderDistance;
-		net.minecraft.client.dev.GraphicsFrameBenchmark.recordSubmittedWorkIdentity("sodium-terrain", identity);
-		net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentity("sodium-terrain", identity);
-	}
-
     /**
      * Records the explicit Rust whole-frame source's final CPU section domain.
      * This intentionally accepts only immutable semantic {@link RenderSection}
@@ -1226,24 +1069,6 @@ public final class StaticTerrainParityDiagnostics {
                     builder -> builder.append(records, 1, records.length() - 1)
             );
         }
-    }
-
-    public static boolean isSolidVisibleListStable(int requiredFrames, int minimumSections) {
-        if (!ENABLED) {
-            return true;
-        }
-        // Deterministic parity captures intentionally pin game time.  Readiness
-        // must therefore be based on consecutive rendered frames with the same
-        // visible terrain list, rather than on advancing simulation ticks.
-        return latestSolidSectionCount >= minimumSections && stableSolidFrames >= Math.max(1, requiredFrames);
-    }
-
-    public static String solidVisibleListSummary() {
-        return "sections=" + latestSolidSectionCount
-                + ",hash=" + String.format(Locale.ROOT, "%016x", latestSolidHash)
-                + ",stableFrames=" + stableSolidFrames
-                + ",readyFrames=" + stableSolidFrames
-                + ",gameTime=" + latestSolidGameTime;
     }
 
     /**
@@ -2171,101 +1996,6 @@ public final class StaticTerrainParityDiagnostics {
         return new AppearanceSource(layer, stride, separateAo, samples);
     }
 
-    private static void recordVisibleCoverage(
-            String stage,
-            String layer,
-            SortedRenderLists renderLists,
-            double cameraX,
-            double cameraY,
-            double cameraZ,
-            int viewportWidth,
-            int viewportHeight
-    ) {
-        if (!ENABLED || renderLists == null) {
-            return;
-        }
-        String normalizedLayer = normalizeLayer(layer);
-        Minecraft minecraft = Minecraft.getInstance();
-        long gameTime = minecraft.level == null ? -1L : minecraft.level.getGameTime();
-        int sectionCount = 0;
-        int recordCount = 0;
-        int missingCoverage = 0;
-        int animatedSections = 0;
-        long vertexTotal = 0L;
-        long indexTotal = 0L;
-        long primitiveTotal = 0L;
-        StringBuilder records = new StringBuilder();
-        records.append("[");
-        Iterator<ChunkRenderList> renderListIterator = renderLists.iterator();
-        while (renderListIterator.hasNext()) {
-            ChunkRenderList renderList = renderListIterator.next();
-            ByteIterator sectionIterator = renderList.sectionsWithGeometryIterator(false);
-            if (sectionIterator == null) {
-                continue;
-            }
-            while (sectionIterator.hasNext()) {
-                int localSectionIndex = sectionIterator.nextByteAsInt() & 0xFF;
-                RenderSection section = renderList.getRegion().getSection(localSectionIndex);
-                if (section == null) {
-                    continue;
-                }
-                sectionCount++;
-                boolean animated = (section.getFlags() & RenderSectionFlags.MASK_HAS_ANIMATED_SPRITES) != 0;
-                if (animated) {
-                    animatedSections++;
-                }
-                MeshCoverage coverage = SOURCE_MESHES.get(new CoverageKey(section.getPosition().asLong(), normalizedLayer));
-                if (coverage == null) {
-                    missingCoverage++;
-                } else {
-                    vertexTotal += coverage.vertexCount();
-                    indexTotal += coverage.indexCount();
-                    primitiveTotal += coverage.primitiveCount();
-                }
-                if (recordCount < MAX_COVERAGE_SAMPLES) {
-                    appendCoverageRecord(
-                            records,
-                            section.getPosition().asLong(),
-                            section.getChunkX(),
-                            section.getChunkY(),
-                            section.getChunkZ(),
-                            section.getOriginX(),
-                            section.getOriginY(),
-                            section.getOriginZ(),
-                            section.getFlags(),
-                            animated,
-                            coverage,
-                            "java-opengl-draw".equals(stage),
-                            "java-opengl-draw".equals(stage) ? "java-opengl-terrain-layer" : "rust-vulkan-source-visible",
-                            0L,
-                            0L
-                    );
-                    recordCount++;
-                }
-            }
-        }
-        records.append("]");
-        writeCoverageEvent(
-                stage + "-coverage",
-                normalizedLayer,
-                gameTime,
-                0,
-                animatedSections,
-                cameraX,
-                cameraY,
-                cameraZ,
-                viewportWidth,
-                viewportHeight,
-                sectionCount,
-                vertexTotal,
-                indexTotal,
-                primitiveTotal,
-                missingCoverage,
-                "java-opengl-draw".equals(stage) ? sectionCount - missingCoverage : 0,
-                builder -> builder.append(records, 1, records.length() - 1)
-        );
-    }
-
     private static void writeCoverageEvent(
             String stage,
             String layer,
@@ -2623,9 +2353,7 @@ public final class StaticTerrainParityDiagnostics {
     }
 
     private static String backendName() {
-        return Boolean.getBoolean("mattmc.dev.rustGalVulkanWholeFrame")
-                ? "rust-vulkan-whole-frame"
-                : "java-opengl";
+        return "rust-vulkan-whole-frame";
     }
 
     private static long semanticMeshKey(long sectionKey, String layer) {

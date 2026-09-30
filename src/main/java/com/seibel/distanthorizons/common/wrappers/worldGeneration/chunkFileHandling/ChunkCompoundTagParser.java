@@ -499,23 +499,6 @@ public class ChunkCompoundTagParser
 		});
 	}
 	
-	private static void logParsingWarningOnce(String message) { logParsingWarningOnce(message, null); }
-	private static void logParsingWarningOnce(String message, Exception e)
-	{
-		if (message == null)
-		{
-			return;
-		}
-		
-		LOGGED_ERROR_MESSAGE_MAP.computeIfAbsent(message, (newMessage) ->
-		{
-			LOGGER.warn("Parsing error: ["+newMessage+"]. " +
-					"This can probably be ignored, although if your world looks wrong, optimizing it via the single player menu then deleting your DH database(s) should fix the problem.",
-					e);
-			
-			return newMessage;
-		});
-	}
 	
 	private static RuntimeException logErrorAndReturnException(String message)
 	{

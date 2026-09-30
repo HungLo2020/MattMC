@@ -35,8 +35,6 @@ public class DhLodUnit
 	
 	/** @return the size of this LOD unit in Minecraft blocks */
 	public int toBlockWidth() { return BitShiftUtil.pow(this.numberOfLodSectionsWide, this.detailLevel); }
-	/** @return the LOD Unit relative to the given block width and detail level */
-	public static DhLodUnit fromBlockWidth(int blockWidth, byte targetDetailLevel) { return new DhLodUnit(targetDetailLevel, Math.floorDiv(blockWidth, BitShiftUtil.powerOfTwo(targetDetailLevel))); }
 	
 	/**
 	 * if the targetDetailLevel and this object's detail are the same,

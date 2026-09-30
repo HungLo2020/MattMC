@@ -37,17 +37,11 @@ public final class AtlasAnimationResource implements AutoCloseable {
         return Boolean.getBoolean("mattmc.dev.rustGalAtlasAnimation");
     }
 
-    /** Shield resources and their GUI/held consumers share Vulkan frame ownership. */
-    public static boolean shieldLifecycleEnabled() {
-        return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-    }
-
     /** Capture-only route provenance; resource/native identities have separate receipts. */
     public static String shieldAdmissionReceipt() {
-        boolean normal = shieldLifecycleEnabled();
         boolean privateFlags = System.getProperty("mattmc.dev.rustGalShieldAtlas") != null
             || System.getProperty("mattmc.dev.rustGalShieldAtlasAnimation") != null;
-        return "{\"schema\":\"rust-owned-shield-atlas-v1\",\"normalRoute\":" + normal
+        return "{\"schema\":\"rust-owned-shield-atlas-v1\",\"normalRoute\":" + true
             + ",\"privateFlagsPresent\":" + privateFlags + "}";
     }
 
@@ -55,7 +49,7 @@ public final class AtlasAnimationResource implements AutoCloseable {
     public boolean tickDeliveryEnabled() {
         return net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS.equals(atlas)
             || net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES.equals(atlas)
-            || shieldLifecycleEnabled() && net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(atlas)
+            || net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(atlas)
             || privateTickDeliveryEnabled();
     }
 

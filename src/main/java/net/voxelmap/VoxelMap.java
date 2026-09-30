@@ -78,11 +78,6 @@ public class VoxelMap implements PreparableReloadListener {
         this.colorManager.onResourceManagerReload(resourceManager);
     }
 
-    public void onTickInGame(GuiGraphics guiGraphics) {
-        this.map.onTickInGame(guiGraphics);
-        flushPendingPlayerMessage();
-    }
-
     /**
      * Advances VoxelMap state without Java GPU drawing while Rust owns the
      * frame. Messages queued during waypoint loading still belong to

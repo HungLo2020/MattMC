@@ -38,7 +38,6 @@ public class HookRegistry {
     private static final List<WindowHooks> windowHooks = new ArrayList<>();
     private static final List<LightTextureHooks> lightTextureHooks = new ArrayList<>();
     private static final List<MinecraftLevelHooks> minecraftLevelHooks = new ArrayList<>();
-    private static final List<ChunkRenderLayerHooks> chunkRenderLayerHooks = new ArrayList<>();
     private static final List<LevelRendererHooks> levelRendererHooks = new ArrayList<>();
 
     /**
@@ -671,27 +670,6 @@ public class HookRegistry {
     }
 
     /**
-     * Register a ChunkRenderLayerHooks implementation.
-     * Should be called during mod initialization.
-     *
-     * @param hook The hook implementation to register
-     */
-    public static void registerChunkRenderLayerHook(ChunkRenderLayerHooks hook) {
-        if (hook != null) {
-            chunkRenderLayerHooks.add(hook);
-        }
-    }
-
-    /**
-     * Get all registered ChunkRenderLayerHooks implementations.
-     *
-     * @return List of registered ChunkRenderLayerHooks
-     */
-    public static List<ChunkRenderLayerHooks> getChunkRenderLayerHooks() {
-        return new ArrayList<>(chunkRenderLayerHooks);
-    }
-
-    /**
      * Register a LevelRendererHooks implementation.
      * Should be called during mod initialization.
      *
@@ -746,7 +724,6 @@ public class HookRegistry {
         windowHooks.clear();
         lightTextureHooks.clear();
         minecraftLevelHooks.clear();
-        chunkRenderLayerHooks.clear();
         levelRendererHooks.clear();
     }
 }

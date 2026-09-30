@@ -1665,32 +1665,8 @@ public class Options {
 	}
 
 	public CloudStatus getCloudsType() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Rust cloud semantics consume the copied gameplay setting and source
-			// pack snapshot; do not query Iris' renderer pipeline here.
-			return this.cloudStatus.get();
-		}
-		// Iris: Override clouds type if shader pack specifies
-		if (renderDistance.get() >= 4) {
-			net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = 
-				net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
-			if (pipeline != null) {
-				net.irisshaders.iris.shaderpack.properties.CloudSetting setting = pipeline.getCloudSetting();
-				
-				switch (setting) {
-					case OFF:
-						return CloudStatus.OFF;
-					case FAST:
-						return CloudStatus.FAST;
-					case FANCY:
-						return CloudStatus.FANCY;
-					case DEFAULT:
-						break;
-				}
-			}
-		}
-		
+		// Rust cloud semantics consume the copied gameplay setting and source
+		// pack snapshot; do not query Iris' renderer pipeline here.
 		return this.cloudStatus.get();
 	}
 

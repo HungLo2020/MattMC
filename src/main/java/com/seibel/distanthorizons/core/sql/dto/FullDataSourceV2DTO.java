@@ -314,32 +314,6 @@ public class FullDataSourceV2DTO
 	// (de)serializing //
 	//=================//
 	
-	public static void writeDataSourceDataArrayToBlobV1(
-			LongArrayList[] inputDataArray, ByteArrayList outputByteArray, 
-			EDhApiDataCompressionMode compressionModeEnum) throws IOException
-	{
-		try (DhDataOutputStream compressedOut = DhDataOutputStream.create(compressionModeEnum, outputByteArray))
-		{
-			// write the data
-			int dataArrayLength = FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH;
-			for (int xz = 0; xz < dataArrayLength; xz++)
-			{
-				LongArrayList dataColumn = inputDataArray[xz];
-				
-				// write column length
-				short columnLength = (dataColumn != null) ? (short) dataColumn.size() : 0;
-				// a short is used instead of an int because at most we store 4096 vertical slices and a 
-				// short fits that with less wasted spaces vs an int (short has max value of 32,767 vs int's max of 2 billion)
-				compressedOut.writeShort(columnLength);
-				
-				// write column data (will be skipped if no data was present)
-				for (int y = 0; y < columnLength; y++)
-				{
-					compressedOut.writeLong(dataColumn.getLong(y));
-				}
-			}
-		}
-	}
 	private static void readBlobToDataSourceDataArrayV1(
 			ByteArrayList inputCompressedDataByteArray, LongArrayList[] outputDataLongArray, 
 			EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException

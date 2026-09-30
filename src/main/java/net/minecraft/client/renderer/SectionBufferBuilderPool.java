@@ -23,12 +23,10 @@ public class SectionBufferBuilderPool {
 
 	public static SectionBufferBuilderPool allocate(int i) {
 		int j = Math.max(1, (int)(Runtime.getRuntime().maxMemory() * 0.3) / SectionBufferBuilderPack.TOTAL_BUFFERS_SIZE);
-		boolean rustWholeFrameVulkan = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
 		// Rust owns semantic terrain extraction on Vulkan; the legacy Java
 		// compiler still needs one reusable pack for bookkeeping, but allocating
 		// a heap-sized staging pool would reserve memory for discarded meshes.
-		int k = rustWholeFrameVulkan ? 1 : Math.max(1, Math.min(i, j));
+		int k = 1;
 		List<SectionBufferBuilderPack> list = new ArrayList(k);
 
 		try {
@@ -37,7 +35,7 @@ public class SectionBufferBuilderPool {
 				// meshes. Keep the single legacy pack only for visibility/bookkeeping;
 				// allocating full Java staging buffers here would retain a large,
 				// discarded upload pool on every Vulkan startup.
-				list.add(new SectionBufferBuilderPack(rustWholeFrameVulkan));
+				list.add(new SectionBufferBuilderPack(true));
 			}
 		} catch (OutOfMemoryError var7) {
 			LOGGER.warn("Allocated only {}/{} buffers", list.size(), k);

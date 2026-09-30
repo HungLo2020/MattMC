@@ -50,76 +50,12 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 		return this.blockModelShaper;
 	}
 
-	public void renderBreakingTexture(
-		BlockState blockState, BlockPos blockPos, BlockAndTintGetter blockAndTintGetter, PoseStack poseStack, VertexConsumer vertexConsumer
-	) {
-		ensureJavaBlockRoute();
-		if (blockState.getRenderShape() == RenderShape.MODEL) {
-			BlockStateModel blockStateModel = this.blockModelShaper.getBlockModel(blockState);
-			// FRAPI: Use Sodium FRAPI renderer for breaking texture (merged from BlockRenderDispatcherMixin)
-			((net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer) modelRenderer).render(blockAndTintGetter, blockStateModel, blockState, blockPos, poseStack, layer -> vertexConsumer, true, blockState.getSeed(blockPos), OverlayTexture.NO_OVERLAY);
-		}
-	}
-
-	public void renderBatched(
-		BlockState blockState,
-		BlockPos blockPos,
-		BlockAndTintGetter blockAndTintGetter,
-		PoseStack poseStack,
-		VertexConsumer vertexConsumer,
-		boolean bl,
-		List<BlockModelPart> list
-	) {
-		ensureJavaBlockRoute();
-		try {
-			this.modelRenderer.tesselateBlock(blockAndTintGetter, list, blockState, blockPos, poseStack, vertexConsumer, bl, OverlayTexture.NO_OVERLAY);
-		} catch (Throwable var11) {
-			CrashReport crashReport = CrashReport.forThrowable(var11, "Tesselating block in world");
-			CrashReportCategory crashReportCategory = crashReport.addCategory("Block being tesselated");
-			CrashReportCategory.populateBlockDetails(crashReportCategory, blockAndTintGetter, blockPos, blockState);
-			throw new ReportedException(crashReport);
-		}
-	}
-
-	public void renderLiquid(BlockPos blockPos, BlockAndTintGetter blockAndTintGetter, VertexConsumer vertexConsumer, BlockState blockState, FluidState fluidState) {
-		ensureJavaBlockRoute();
-		try {
-			this.liquidBlockRenderer.tesselate(blockAndTintGetter, blockPos, vertexConsumer, blockState, fluidState);
-		} catch (Throwable var9) {
-			CrashReport crashReport = CrashReport.forThrowable(var9, "Tesselating liquid in world");
-			CrashReportCategory crashReportCategory = crashReport.addCategory("Block being tesselated");
-			CrashReportCategory.populateBlockDetails(crashReportCategory, blockAndTintGetter, blockPos, blockState);
-			throw new ReportedException(crashReport);
-		}
-	}
-
 	public ModelBlockRenderer getModelRenderer() {
 		return this.modelRenderer;
 	}
 
 	public BlockStateModel getBlockModel(BlockState blockState) {
 		return this.blockModelShaper.getBlockModel(blockState);
-	}
-
-	public void renderSingleBlock(BlockState blockState, PoseStack poseStack, MultiBufferSource multiBufferSource, int i, int j) {
-		ensureJavaBlockRoute();
-		RenderShape renderShape = blockState.getRenderShape();
-		if (renderShape != RenderShape.INVISIBLE) {
-			BlockStateModel blockStateModel = this.getBlockModel(blockState);
-			int k = this.blockColors.getColor(blockState, null, null, 0);
-			float f = (k >> 16 & 0xFF) / 255.0F;
-			float g = (k >> 8 & 0xFF) / 255.0F;
-			float h = (k & 0xFF) / 255.0F;
-			// FRAPI: Use Sodium FRAPI renderer (merged from BlockRenderDispatcherMixin)
-			net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer.render(poseStack.last(), layer -> multiBufferSource.getBuffer(net.fabricmc.fabric.api.renderer.v1.render.RenderLayerHelper.getEntityBlockLayer(layer)), blockStateModel, f, g, h, i, j, net.minecraft.world.level.EmptyBlockAndTintGetter.INSTANCE, BlockPos.ZERO, blockState);
-		}
-	}
-
-	private static void ensureJavaBlockRoute() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java block geometry rendering is unavailable while Rust owns Vulkan presentation");
-		}
 	}
 
 	public void onResourceManagerReload(ResourceManager resourceManager) {

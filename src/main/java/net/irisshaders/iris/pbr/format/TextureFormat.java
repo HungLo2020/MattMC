@@ -42,12 +42,6 @@ public interface TextureFormat {
 	 */
 	boolean canInterpolateValues(PBRType pbrType);
 
-	default void setupTextureParameters(PBRType pbrType, AbstractTexture texture) {
-		if (!canInterpolateValues(pbrType)) {
-			texture.getTexture().iris$markMipmapNonLinear();
-		}
-	}
-
 	@Nullable
 	CustomMipmapGenerator getMipmapGenerator(PBRType pbrType);
 

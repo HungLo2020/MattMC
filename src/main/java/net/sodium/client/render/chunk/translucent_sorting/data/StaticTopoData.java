@@ -41,15 +41,15 @@ public class StaticTopoData extends PresentTranslucentData {
         return fromNativeSortData(quads.length, sortData, sectionPos);
     }
 
-    public static StaticTopoData fromNativeOrder(int quadCount, int[] quadIndexes, SectionPos sectionPos) {
-        return fromNativeSortData(quadCount, NativeTranslucentSortData.createStaticOrder(quadCount, quadIndexes),
-                sectionPos);
-    }
-
     public static StaticTopoData fromNativeSortData(int quadCount, NativeTranslucentSortData sortData,
             SectionPos sectionPos) {
         var staticTopoData = new StaticTopoData(sectionPos, quadCount);
         staticTopoData.sorterOnce = sortData.createStaticSorter();
         return staticTopoData;
+    }
+
+    public static StaticTopoData fromNativeOrder(int quadCount, int[] quadIndexes, SectionPos sectionPos) {
+        return fromNativeSortData(quadCount, NativeTranslucentSortData.createStaticOrder(quadCount, quadIndexes),
+                sectionPos);
     }
 }

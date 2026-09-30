@@ -84,19 +84,6 @@ public final class VulkanicGalExecutionRequest {
             );
         }
 
-        public static LegacyCompatibilityMetadata indexedDraw(
-            String operation,
-            VulkanicPrimitiveMode mode,
-            VulkanicIndexType indexType
-        ) {
-            return new LegacyCompatibilityMetadata(
-                operation,
-                OptionalInt.of(Objects.requireNonNull(mode, "mode").toGlModeConstant()),
-                OptionalInt.of(Objects.requireNonNull(indexType, "indexType").toGlTypeConstant()),
-                List.of()
-            );
-        }
-
         public static LegacyCompatibilityMetadata targets(String operation, int... targets) {
             List<Integer> targetList = java.util.Arrays.stream(targets).boxed().toList();
             return new LegacyCompatibilityMetadata(operation, OptionalInt.empty(), OptionalInt.empty(), targetList);
@@ -301,24 +288,6 @@ public final class VulkanicGalExecutionRequest {
             );
         }
 
-        public static GraphicsDrawCommand multiIndexedBaseVertex(
-            VulkanicPrimitiveMode mode,
-            VulkanicIndexType indexType,
-            List<IndexedDraw> indexedDraws
-        ) {
-            return new GraphicsDrawCommand(
-                DrawCommandKind.MULTI_INDEXED_BASE_VERTEX,
-                mode,
-                0,
-                0,
-                0L,
-                0,
-                indexType,
-                1,
-                0,
-                indexedDraws
-            );
-        }
     }
 
     public record GraphicsDrawRequest(
@@ -346,120 +315,6 @@ public final class VulkanicGalExecutionRequest {
             legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
         }
 
-        public static GraphicsDrawRequest legacyArrays(
-            String operation,
-            VulkanicPrimitiveMode mode,
-            int firstVertex,
-            int vertexCount,
-            int instanceCount
-        ) {
-            GraphicsDrawCommand command = GraphicsDrawCommand.arrays(mode, firstVertex, vertexCount, instanceCount);
-            return legacyDraw(operation, command, LegacyCompatibilityMetadata.draw(operation, mode));
-        }
-
-        public static GraphicsDrawRequest legacyIndexed(
-            String operation,
-            VulkanicPrimitiveMode mode,
-            int indexCount,
-            VulkanicIndexType indexType,
-            long indexByteOffset,
-            int instanceCount,
-            int baseVertex
-        ) {
-            GraphicsDrawCommand command = GraphicsDrawCommand.indexed(mode, indexCount, indexType, indexByteOffset, instanceCount, baseVertex);
-            return legacyDraw(operation, command, LegacyCompatibilityMetadata.indexedDraw(operation, mode, indexType));
-        }
-
-        public static GraphicsDrawRequest legacyMultiIndexedBaseVertex(
-            String operation,
-            VulkanicPrimitiveMode mode,
-            VulkanicIndexType indexType,
-            List<IndexedDraw> draws
-        ) {
-            GraphicsDrawCommand command = GraphicsDrawCommand.multiIndexedBaseVertex(mode, indexType, draws);
-            return legacyDraw(operation, command, LegacyCompatibilityMetadata.indexedDraw(operation, mode, indexType));
-        }
-
-        private static GraphicsDrawRequest legacyDraw(
-            String operation,
-            GraphicsDrawCommand command,
-            LegacyCompatibilityMetadata metadata
-        ) {
-            VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot drawCommand = switch (command.kind()) {
-                case ARRAYS -> VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.arrays(
-                    command.firstVertex(),
-                    command.vertexCount(),
-                    command.instanceCount()
-                );
-                case INDEXED -> VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.indexed(
-                    (int) (command.indexByteOffset() / command.indexType().bytesPerIndex()),
-                    command.indexCount(),
-                    command.baseVertex(),
-                    command.instanceCount()
-                );
-                case MULTI_INDEXED_BASE_VERTEX -> VulkanicLegacyCompatibilityAdapter.DrawCommandSnapshot.indexed(
-                    command.indexedDraws().get(0).firstIndex(),
-                    command.indexedDraws().stream().mapToInt(IndexedDraw::indexCount).sum(),
-                    command.indexedDraws().get(0).baseVertex(),
-                    1
-                );
-            };
-            Optional<VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot> indexBuffer =
-                command.kind() == DrawCommandKind.ARRAYS
-                    ? Optional.empty()
-                    : Optional.of(new VulkanicLegacyCompatibilityAdapter.IndexBufferSnapshot(
-                        "legacy-current-index-buffer",
-                        0,
-                        command.indexType().bytesPerIndex()
-                    ));
-            VulkanicPassResourceModel.PassExecutionPlan resourcePlan =
-                VulkanicLegacyCompatibilityAdapter.planDraw(new VulkanicLegacyCompatibilityAdapter.DrawSnapshot(
-                    operation,
-                    List.of(),
-                    indexBuffer,
-                    List.of(),
-                    List.of(),
-                    drawCommand,
-                    false,
-                    false
-                ));
-            return new GraphicsDrawRequest(
-                SemanticIdentity.legacy(operation),
-                PipelineSnapshot.legacyCurrent(),
-                FramebufferSnapshot.active(),
-                VertexInputSnapshot.currentLegacy(),
-                List.of(),
-                DynamicStateSnapshot.currentLegacy(),
-                GraphicsCompatibilitySnapshot.unresolvedLegacy(),
-                command,
-                resourcePlan,
-                metadata
-            );
-        }
-
-        public GraphicsDrawRequest withCompatibilitySnapshot(GraphicsCompatibilitySnapshot snapshot) {
-            Objects.requireNonNull(snapshot, "snapshot");
-            VulkanicPassResourceModel.PassExecutionPlan capturedPlan =
-                snapshot.resourceUses().isEmpty()
-                    ? this.resourcePlan
-                    : new VulkanicPassResourceModel.PassExecutionPlan(
-                        this.resourcePlan.request(),
-                        snapshot.resourceUses(),
-                        this.resourcePlan.finalResourceUsages()
-                    );
-            return new GraphicsDrawRequest(
-                semanticIdentity,
-                pipeline,
-                framebuffer,
-                snapshot.vertexInput(),
-                snapshot.descriptorBindings(),
-                dynamicState,
-                snapshot,
-                command,
-                capturedPlan,
-                legacyMetadata
-            );
-        }
     }
 
     public record ComputeDispatchCommand(
@@ -515,17 +370,6 @@ public final class VulkanicGalExecutionRequest {
             );
         }
 
-        public ComputeCompatibilitySnapshot withResourceBindingPlan(PipelineResourcePlanner.Plan bindingPlan) {
-            Objects.requireNonNull(bindingPlan, "bindingPlan");
-            return new ComputeCompatibilitySnapshot(
-                Optional.of(bindingPlan.descriptor()),
-                resourceUses,
-                Optional.of(bindingPlan),
-                descriptorBindings,
-                sharedCompatibilityState,
-                source
-            );
-        }
     }
 
     public record ComputeDispatchRequest(
@@ -547,15 +391,6 @@ public final class VulkanicGalExecutionRequest {
             command = Objects.requireNonNull(command, "command");
             resourcePlan = Objects.requireNonNull(resourcePlan, "resourcePlan");
             legacyMetadata = Objects.requireNonNull(legacyMetadata, "legacyMetadata");
-        }
-
-        public static ComputeDispatchRequest legacyDirect(String operation, int workX, int workY, int workZ) {
-            ComputeDispatchCommand command = ComputeDispatchCommand.direct(workX, workY, workZ);
-            return legacy(operation, command);
-        }
-
-        public static ComputeDispatchRequest legacyIndirect(String operation, long offset) {
-            return legacy(operation, ComputeDispatchCommand.indirect(offset));
         }
 
         private static ComputeDispatchRequest legacy(String operation, ComputeDispatchCommand command) {
@@ -583,42 +418,6 @@ public final class VulkanicGalExecutionRequest {
             );
         }
 
-        public ComputeDispatchRequest withResourceBindingPlan(PipelineResourcePlanner.Plan bindingPlan) {
-            Objects.requireNonNull(bindingPlan, "bindingPlan");
-            ComputeCompatibilitySnapshot capturedSnapshot = compatibilitySnapshot.withResourceBindingPlan(bindingPlan);
-            return new ComputeDispatchRequest(
-                semanticIdentity,
-                pipeline,
-                capturedSnapshot.descriptorBindings().isEmpty() ? descriptors : capturedSnapshot.descriptorBindings(),
-                Optional.of(bindingPlan),
-                capturedSnapshot,
-                command,
-                resourcePlan,
-                legacyMetadata
-            );
-        }
-
-        public ComputeDispatchRequest withCompatibilitySnapshot(ComputeCompatibilitySnapshot snapshot) {
-            Objects.requireNonNull(snapshot, "snapshot");
-            VulkanicPassResourceModel.PassExecutionPlan capturedPlan =
-                snapshot.resourceUses().isEmpty()
-                    ? this.resourcePlan
-                    : new VulkanicPassResourceModel.PassExecutionPlan(
-                        this.resourcePlan.request(),
-                        snapshot.resourceUses(),
-                        this.resourcePlan.finalResourceUsages()
-                    );
-            return new ComputeDispatchRequest(
-                semanticIdentity,
-                pipeline,
-                snapshot.descriptorBindings(),
-                snapshot.resourceBindingPlan(),
-                snapshot,
-                command,
-                capturedPlan,
-                legacyMetadata
-            );
-        }
     }
 
     public record ClearRequest(

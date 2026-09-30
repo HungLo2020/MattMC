@@ -39,39 +39,9 @@ public class WorldRenderingSettings {
 		hasVillagerConversionId = false;
 	}
 
-	public boolean isReloadRequired() {
-		return reloadRequired;
-	}
-
-	public void clearReloadRequired() {
-		reloadRequired = false;
-	}
-
 	@Nullable
 	public Object2IntMap<BlockState> getBlockStateIds() {
 		return blockStateIds;
-	}
-
-	public void setBlockStateIds(Object2IntMap<BlockState> blockStateIds) {
-		if (this.blockStateIds != null && this.blockStateIds.equals(blockStateIds)) {
-			return;
-		}
-
-		this.reloadRequired = true;
-		this.blockStateIds = blockStateIds;
-	}
-
-	public Map<Block, BlockRenderType> getBlockTypeIds() {
-		return blockTypeIds;
-	}
-
-	public void setBlockTypeIds(Map<Block, BlockRenderType> blockTypeIds) {
-		if (this.blockTypeIds != null && this.blockTypeIds.equals(blockTypeIds)) {
-			return;
-		}
-
-		this.reloadRequired = true;
-		this.blockTypeIds = blockTypeIds;
 	}
 
 	@Nullable
@@ -79,93 +49,21 @@ public class WorldRenderingSettings {
 		return entityIds;
 	}
 
-	public void setEntityIds(Object2IntFunction<NamespacedId> entityIds) {
-		// note: no reload needed, entities are rebuilt every frame.
-		this.entityIds = entityIds;
-		this.hasVillagerConversionId = entityIds.containsKey(new NamespacedId("minecraft", "zombie_villager_converting"));
-	}
-
 	@Nullable
 	public Object2IntFunction<NamespacedId> getItemIds() {
 		return itemIds;
-	}
-
-	public void setItemIds(Object2IntFunction<NamespacedId> itemIds) {
-		// note: no reload needed, entities are rebuilt every frame.
-		this.itemIds = itemIds;
 	}
 
 	public float getAmbientOcclusionLevel() {
 		return ambientOcclusionLevel;
 	}
 
-	public void setAmbientOcclusionLevel(float ambientOcclusionLevel) {
-		if (ambientOcclusionLevel == this.ambientOcclusionLevel) {
-			return;
-		}
-
-		this.reloadRequired = true;
-		this.ambientOcclusionLevel = ambientOcclusionLevel;
-	}
-
-	public boolean shouldDisableDirectionalShading() {
-		return disableDirectionalShading;
-	}
-
-	public void setDisableDirectionalShading(boolean disableDirectionalShading) {
-		if (disableDirectionalShading == this.disableDirectionalShading) {
-			return;
-		}
-
-		this.reloadRequired = true;
-		this.disableDirectionalShading = disableDirectionalShading;
-	}
-
 	public boolean shouldUseSeparateAo() {
 		return useSeparateAo;
 	}
 
-	public void setUseSeparateAo(boolean useSeparateAo) {
-		if (useSeparateAo == this.useSeparateAo) {
-			return;
-		}
-
-		this.reloadRequired = true;
-		this.useSeparateAo = useSeparateAo;
-	}
-
 	public ChunkVertexType getVertexFormat() {
 		return chunkVertexFormat;
-	}
-
-	public void setVertexFormat(ChunkVertexType chunkVertexFormat) {
-		if (chunkVertexFormat == this.chunkVertexFormat) {
-			return;
-		}
-
-		this.reloadRequired = true;
-		this.chunkVertexFormat = chunkVertexFormat;
-	}
-
-	public boolean shouldVoxelizeLightBlocks() {
-		return voxelizeLightBlocks;
-	}
-
-	public void setVoxelizeLightBlocks(boolean voxelizeLightBlocks) {
-		if (voxelizeLightBlocks == this.voxelizeLightBlocks) {
-			return;
-		}
-
-		this.reloadRequired = true;
-		this.voxelizeLightBlocks = voxelizeLightBlocks;
-	}
-
-	public boolean shouldSeparateEntityDraws() {
-		return separateEntityDraws;
-	}
-
-	public void setSeparateEntityDraws(boolean separateEntityDraws) {
-		this.separateEntityDraws = separateEntityDraws;
 	}
 
 	public boolean hasVillagerConversionId() {

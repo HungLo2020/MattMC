@@ -103,8 +103,7 @@ public class VillagerProfessionLayer<S extends LivingEntityRenderState & Village
 		S state,
 		int order
 	) {
-		boolean rustWholeFrame = net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan();
-		if (rustWholeFrame && net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
+		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMesh(
 			model, state, poseStack.last(), RenderType.entityCutoutNoCull(texture), texture, semanticIdentity,
 			light, LivingEntityRenderer.getOverlayCoords(state, 0.0F), -1, state.outlineColor
 		)) {
@@ -113,13 +112,10 @@ public class VillagerProfessionLayer<S extends LivingEntityRenderState & Village
 			);
 			return;
 		}
-		if (rustWholeFrame) {
-			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-				"rust-vulkan-unavailable", texture, model.getClass().getName(), state.entityId, false, false, false
-			);
-			throw new IllegalStateException("Rust whole-frame villager profession layer has no semantic mesh: " + semanticIdentity);
-		}
-		renderColoredCutoutModel(model, texture, poseStack, submitNodeCollector, light, state, -1, order);
+		net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+			"rust-vulkan-unavailable", texture, model.getClass().getName(), state.entityId, false, false, false
+		);
+		throw new IllegalStateException("Rust whole-frame villager profession layer has no semantic mesh: " + semanticIdentity);
 	}
 
 	private ResourceLocation getResourceLocation(String string, ResourceLocation resourceLocation) {

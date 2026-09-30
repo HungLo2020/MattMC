@@ -35,68 +35,6 @@ public final class CommandUtils {
     private CommandUtils() {
     }
 
-    public static boolean checkForWaypoints(net.minecraft.network.chat.Component chat, GuiMessageTag indicator) {
-        if (indicator != null && indicator.logTag() != null && indicator.logTag().equals("ModifiedbyVoxelMap")) {
-            return true;
-        }
-
-
-        String message = chat.getString();
-        ArrayList<String> waypointStrings = getWaypointStrings(message);
-        if (waypointStrings.isEmpty()) {
-            return true;
-        } else {
-            ArrayList<Component> textComponents = new ArrayList<>();
-            int count = 0;
-
-            for (String waypointString : waypointStrings) {
-                int waypointStringLocation = message.indexOf(waypointString);
-                if (waypointStringLocation > count) {
-                    textComponents.add(Component.literal(message.substring(count, waypointStringLocation)));
-                }
-
-                MutableComponent clickableWaypoint = Component.literal(waypointString);
-                Style chatStyle = clickableWaypoint.getStyle();
-                chatStyle = chatStyle.withClickEvent(new ClickEvent.RunCommand("/newWaypoint " + waypointString.substring(1, waypointString.length() - 1)));
-                chatStyle = chatStyle.withColor(ChatFormatting.AQUA);
-                Component hover = Component.literal(I18n.get("voxelmap.minimap.waypointShare.tooltip1") + "\n" + I18n.get("voxelmap.minimap.waypointShare.tooltip2"));
-                chatStyle = chatStyle.withHoverEvent(new HoverEvent.ShowText(hover));
-                clickableWaypoint.setStyle(chatStyle);
-                textComponents.add(clickableWaypoint);
-                count = waypointStringLocation + waypointString.length();
-            }
-
-            if (count < message.length() - 1) {
-                textComponents.add(Component.literal(message.substring(count)));
-            }
-
-            MutableComponent finalTextComponent = Component.literal("");
-
-            for (Component textComponent : textComponents) {
-                finalTextComponent.append(textComponent);
-            }
-
-            VoxelConstants.getMinecraft().gui.getChat().addMessage(finalTextComponent, null, new GuiMessageTag(Color.MAGENTA.getRGB(), null, null, "ModifiedbyVoxelMap"));
-            return false;
-        }
-    }
-
-    public static ArrayList<String> getWaypointStrings(String message) {
-        ArrayList<String> list = new ArrayList<>();
-        if (message.contains("[") && message.contains("]")) {
-            Matcher matcher = pattern.matcher(message);
-
-            while (matcher.find()) {
-                String match = matcher.group();
-                if (createWaypointFromChat(match.substring(1, match.length() - 1)) != null) {
-                    list.add(match);
-                }
-            }
-        }
-
-        return list;
-    }
-
     private static Waypoint createWaypointFromChat(String details) {
         Waypoint waypoint = null;
         String[] pairs = details.split(",");

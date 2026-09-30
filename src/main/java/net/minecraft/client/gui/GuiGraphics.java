@@ -204,9 +204,7 @@ public class GuiGraphics {
 	}
 
 	public void fill(RenderPipeline renderPipeline, TextureSetup textureSetup, int i, int j, int k, int l) {
-		if ((net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-			&& textureSetup != null
+		if ((textureSetup != null)
 			&& (textureSetup.texure0() != null || textureSetup.texure1() != null || textureSetup.texure2() != null)) {
 			// A textured fill carries Java GpuTextureView state directly. Semantic
 			// Vulkan GUI producers must use a resource identity (for example the
@@ -552,10 +550,7 @@ public class GuiGraphics {
 	) {
 		if (k > 0 && l > 0) {
 			if (o > 0 && p > 0) {
-				GpuTextureView gpuTextureView = (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-					|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-					? null
-					: this.minecraft.getTextureManager().getTexture(textureAtlasSprite.atlasLocation()).getTextureView();
+				GpuTextureView gpuTextureView = null;
 				this.submitTiledBlit(
 					renderPipeline,
 					gpuTextureView,
@@ -604,10 +599,7 @@ public class GuiGraphics {
 	public void blitTiled(RenderPipeline renderPipeline, ResourceLocation resourceLocation,
 		int x, int y, float u, float v, int width, int height, int textureWidth, int textureHeight, int color) {
 		if (width <= 0 || height <= 0 || textureWidth <= 0 || textureHeight <= 0) return;
-		GpuTextureView gpuTextureView = (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-			? null
-			: this.minecraft.getTextureManager().getTexture(resourceLocation).getTextureView();
+		GpuTextureView gpuTextureView = null;
 		// TiledBlitRenderState's UV interval describes one tile, not the
 		// complete destination rectangle. Partial edge tiles interpolate it.
 		this.submitTiledBlit(renderPipeline, gpuTextureView, resourceLocation, textureWidth, textureHeight,
@@ -616,10 +608,7 @@ public class GuiGraphics {
 	}
 
 	private void innerBlit(RenderPipeline renderPipeline, ResourceLocation resourceLocation, int i, int j, int k, int l, float f, float g, float h, float m, int n) {
-		GpuTextureView gpuTextureView = (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-			? null
-			: this.minecraft.getTextureManager().getTexture(resourceLocation).getTextureView();
+		GpuTextureView gpuTextureView = null;
 		this.submitBlit(renderPipeline, gpuTextureView, resourceLocation, i, k, j, l, f, g, h, m, n);
 	}
 
@@ -641,8 +630,7 @@ public class GuiGraphics {
 		float m,
 		int n
 	) {
-		TextureSetup textureSetup = semanticTexture != null && (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+		TextureSetup textureSetup = (semanticTexture != null)
 			? TextureSetup.noTexture()
 			: TextureSetup.singleTexture(gpuTextureView);
 		this.guiRenderState
@@ -657,8 +645,7 @@ public class GuiGraphics {
 		RenderPipeline renderPipeline, GpuTextureView gpuTextureView, ResourceLocation semanticTexture,
 		int i, int j, int k, int l, int m, int n, float f, float g, float h, float o, int p
 	) {
-		TextureSetup textureSetup = semanticTexture != null && (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
+		TextureSetup textureSetup = (semanticTexture != null)
 			? TextureSetup.noTexture()
 			: TextureSetup.singleTexture(gpuTextureView);
 		this.guiRenderState
@@ -707,10 +694,7 @@ public class GuiGraphics {
 		if (semanticTexture == null || width <= 0 || height <= 0 || tileWidth <= 0 || tileHeight <= 0) {
 			throw new IllegalArgumentException("invalid Rust semantic tiled blit");
 		}
-		TextureSetup textureSetup = (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-			? TextureSetup.noTexture()
-			: TextureSetup.singleTexture(this.minecraft.getTextureManager().getTexture(semanticTexture).getTextureView());
+		TextureSetup textureSetup = TextureSetup.noTexture();
 		this.guiRenderState.submitGuiElement(new TiledBlitRenderState(
 			pipeline,
 			textureSetup,
@@ -766,10 +750,7 @@ public class GuiGraphics {
 			|| !Float.isFinite(u0) || !Float.isFinite(v0) || !Float.isFinite(u1) || !Float.isFinite(v1)) {
 			throw new IllegalArgumentException("invalid Rust semantic blit");
 		}
-		TextureSetup textureSetup = (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-			? TextureSetup.noTexture()
-			: TextureSetup.singleTexture(this.minecraft.getTextureManager().getTexture(semanticTexture).getTextureView());
+		TextureSetup textureSetup = TextureSetup.noTexture();
 		this.guiRenderState.submitGuiElement(new BlitRenderState(
 			pipeline,
 			textureSetup,
@@ -1128,97 +1109,38 @@ public class GuiGraphics {
 	}
 
 	public void submitMapRenderState(MapRenderState mapRenderState) {
-		if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Map textures are registered CPU DynamicTextures. Copy their semantic
-			// identity into the ordinary Rust GUI blit stream; no Java texture view
-			// or PIP renderer is needed on the whole-frame route.
-			this.submitRustSemanticBlit(mapRenderState.texture, 0, 0, 128, 128, 0.0F, 0.0F, 1.0F, 1.0F, -1);
-			for (MapRenderState.MapDecorationRenderState decoration : mapRenderState.decorations) {
-				if (!decoration.renderOnFrame || decoration.atlasSprite == null) continue;
+		// Map textures are registered CPU DynamicTextures. Copy their semantic
+		// identity into the ordinary Rust GUI blit stream; no Java texture view
+		// or PIP renderer is needed on the whole-frame route.
+		this.submitRustSemanticBlit(mapRenderState.texture, 0, 0, 128, 128, 0.0F, 0.0F, 1.0F, 1.0F, -1);
+		for (MapRenderState.MapDecorationRenderState decoration : mapRenderState.decorations) {
+			if (!decoration.renderOnFrame || decoration.atlasSprite == null) continue;
+			this.pose.pushMatrix();
+			this.pose.translate(decoration.x / 2.0F + 64.0F, decoration.y / 2.0F + 64.0F);
+			this.pose.rotate((float)(Math.PI / 180.0) * decoration.rot * 360.0F / 16.0F);
+			this.pose.scale(4.0F, 4.0F);
+			this.pose.translate(-0.125F, 0.125F);
+			TextureAtlasSprite sprite = decoration.atlasSprite;
+			this.submitRustSemanticBlit(
+				sprite.atlasLocation(), -1, -1, 2, 2,
+				sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(), -1
+			);
+			this.pose.popMatrix();
+			if (decoration.name != null) {
+				Font font = this.minecraft.font;
+				float textWidth = font.width(decoration.name);
+				float scale = Mth.clamp(25.0F / textWidth, 0.0F, 6.0F / 9.0F);
 				this.pose.pushMatrix();
-				this.pose.translate(decoration.x / 2.0F + 64.0F, decoration.y / 2.0F + 64.0F);
-				this.pose.rotate((float)(Math.PI / 180.0) * decoration.rot * 360.0F / 16.0F);
-				this.pose.scale(4.0F, 4.0F);
-				this.pose.translate(-0.125F, 0.125F);
-				TextureAtlasSprite sprite = decoration.atlasSprite;
-				this.submitRustSemanticBlit(
-					sprite.atlasLocation(), -1, -1, 2, 2,
-					sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1(), -1
-				);
+				this.pose.translate(decoration.x / 2.0F + 64.0F - textWidth * scale / 2.0F, decoration.y / 2.0F + 64.0F + 4.0F);
+				this.pose.scale(scale, scale);
+				this.guiRenderState.submitText(new GuiTextRenderState(
+					font, decoration.name.getVisualOrderText(), new Matrix3x2f(this.pose),
+					0, 0, -1, Integer.MIN_VALUE, false, this.scissorStack.peek()
+				));
 				this.pose.popMatrix();
-				if (decoration.name != null) {
-					Font font = this.minecraft.font;
-					float textWidth = font.width(decoration.name);
-					float scale = Mth.clamp(25.0F / textWidth, 0.0F, 6.0F / 9.0F);
-					this.pose.pushMatrix();
-					this.pose.translate(decoration.x / 2.0F + 64.0F - textWidth * scale / 2.0F, decoration.y / 2.0F + 64.0F + 4.0F);
-					this.pose.scale(scale, scale);
-					this.guiRenderState.submitText(new GuiTextRenderState(
-						font, decoration.name.getVisualOrderText(), new Matrix3x2f(this.pose),
-						0, 0, -1, Integer.MIN_VALUE, false, this.scissorStack.peek()
-					));
-					this.pose.popMatrix();
-				}
-			}
-			return;
-		}
-		Minecraft minecraft = Minecraft.getInstance();
-		TextureManager textureManager = minecraft.getTextureManager();
-		ResourceLocation mapTexture = mapRenderState.texture;
-		GpuTextureView gpuTextureView = (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-			? null : textureManager.getTexture(mapTexture).getTextureView();
-		this.submitBlit(RenderPipelines.GUI_TEXTURED, gpuTextureView, mapTexture,
-			0, 0, 128, 128, 0.0F, 1.0F, 0.0F, 1.0F, -1);
-
-		for (MapRenderState.MapDecorationRenderState mapDecorationRenderState : mapRenderState.decorations) {
-			if (mapDecorationRenderState.renderOnFrame) {
-				this.pose.pushMatrix();
-				this.pose.translate(mapDecorationRenderState.x / 2.0F + 64.0F, mapDecorationRenderState.y / 2.0F + 64.0F);
-				this.pose.rotate((float) (Math.PI / 180.0) * mapDecorationRenderState.rot * 360.0F / 16.0F);
-				this.pose.scale(4.0F, 4.0F);
-				this.pose.translate(-0.125F, 0.125F);
-				TextureAtlasSprite textureAtlasSprite = mapDecorationRenderState.atlasSprite;
-				if (textureAtlasSprite != null) {
-					ResourceLocation atlasTexture = textureAtlasSprite.atlasLocation();
-					GpuTextureView gpuTextureView2 = (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-						|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-						? null : textureManager.getTexture(atlasTexture).getTextureView();
-					this.submitBlit(
-						RenderPipelines.GUI_TEXTURED,
-						gpuTextureView2,
-						atlasTexture,
-						-1,
-						-1,
-						1,
-						1,
-						textureAtlasSprite.getU0(),
-						textureAtlasSprite.getU1(),
-						textureAtlasSprite.getV1(),
-						textureAtlasSprite.getV0(),
-						-1
-					);
-				}
-
-				this.pose.popMatrix();
-				if (mapDecorationRenderState.name != null) {
-					Font font = minecraft.font;
-					float f = font.width(mapDecorationRenderState.name);
-					float g = Mth.clamp(25.0F / f, 0.0F, 6.0F / 9.0F);
-					this.pose.pushMatrix();
-					this.pose.translate(mapDecorationRenderState.x / 2.0F + 64.0F - f * g / 2.0F, mapDecorationRenderState.y / 2.0F + 64.0F + 4.0F);
-					this.pose.scale(g, g);
-					this.guiRenderState
-						.submitText(
-							new GuiTextRenderState(
-								font, mapDecorationRenderState.name.getVisualOrderText(), new Matrix3x2f(this.pose), 0, 0, -1, Integer.MIN_VALUE, false, this.scissorStack.peek()
-							)
-						);
-					this.pose.popMatrix();
-				}
 			}
 		}
+		return;
 	}
 
 	public void submitEntityRenderState(

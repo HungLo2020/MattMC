@@ -19,19 +19,4 @@ public enum TextureFormat {
 		this.pixelSize = j;
 	}
 
-	public int pixelSize() {
-		return this.pixelSize;
-	}
-
-	public boolean hasColorAspect() {
-		return this == RGBA8 || this == BGRA8 || this == RED8;
-	}
-
-	public boolean hasDepthAspect() {
-		return this == DEPTH32 || this == DEPTH24_STENCIL8 || this == DEPTH32F_STENCIL8;
-	}
-
-	public boolean hasStencilAspect() {
-		return this == DEPTH24_STENCIL8 || this == DEPTH32F_STENCIL8;
-	}
 }

@@ -33,7 +33,6 @@ public class RenderSection {
     private int incomingDirections;
     private int lastVisibleFrame = -1;
     // Iris: Shadow rendering tracking
-    private int lastVisibleFrameShadow;
 
     private int adjacentMask;
     public RenderSection
@@ -82,50 +81,12 @@ public class RenderSection {
         this.region = region;
     }
 
-    public RenderSection getAdjacent(int direction) {
-        return switch (direction) {
-            case GraphDirection.DOWN -> this.adjacentDown;
-            case GraphDirection.UP -> this.adjacentUp;
-            case GraphDirection.NORTH -> this.adjacentNorth;
-            case GraphDirection.SOUTH -> this.adjacentSouth;
-            case GraphDirection.WEST -> this.adjacentWest;
-            case GraphDirection.EAST -> this.adjacentEast;
-            default -> null;
-        };
-    }
-
-    public void setAdjacentNode(int direction, RenderSection node) {
-        if (node == null) {
-            this.adjacentMask &= ~GraphDirectionSet.of(direction);
-        } else {
-            this.adjacentMask |= GraphDirectionSet.of(direction);
-        }
-
-        switch (direction) {
-            case GraphDirection.DOWN -> this.adjacentDown = node;
-            case GraphDirection.UP -> this.adjacentUp = node;
-            case GraphDirection.NORTH -> this.adjacentNorth = node;
-            case GraphDirection.SOUTH -> this.adjacentSouth = node;
-            case GraphDirection.WEST -> this.adjacentWest = node;
-            case GraphDirection.EAST -> this.adjacentEast = node;
-            default -> { }
-        }
-    }
-
     public int getAdjacentMask() {
         return this.adjacentMask;
     }
 
     public TranslucentData getTranslucentData() {
         return this.translucentData;
-    }
-
-    public void setTranslucentData(TranslucentData translucentData) {
-        if (translucentData == null) {
-            throw new IllegalArgumentException("new translucentData cannot be null");
-        }
-
-        this.translucentData = translucentData;
     }
 
     /**
@@ -181,10 +142,6 @@ public class RenderSection {
 
         // changes to data if it moves from built to not built don't matter, so only build state changes matter
         return wasBuilt;
-    }
-
-    public void setLastMeshResultSize(long size) {
-        this.lastMeshResultSize = size;
     }
 
     public long getLastMeshResultSize() {
@@ -279,10 +236,6 @@ public class RenderSection {
         return this.chunkZ;
     }
 
-    public boolean isDisposed() {
-        return this.disposed;
-    }
-
     @Override
     public String toString() {
         return String.format("RenderSection at chunk (%d, %d, %d) from (%d, %d, %d) to (%d, %d, %d)",
@@ -304,19 +257,10 @@ public class RenderSection {
     }
 
     public void setLastVisibleFrame(int frame) {
-        // Iris: Track shadow frames separately
-        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-            this.lastVisibleFrameShadow = frame;
-        } else {
-            this.lastVisibleFrame = frame;
-        }
+        this.lastVisibleFrame = frame;
     }
 
     public int getLastVisibleFrame() {
-        // Iris: Return shadow frame when rendering shadows
-        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-            return this.lastVisibleFrameShadow;
-        }
         return this.lastVisibleFrame;
     }
 
@@ -353,44 +297,8 @@ public class RenderSection {
         return this.animatedSprites;
     }
 
-    /**
-     * Returns the collection of block entities contained by this rendered chunk.
-     */
-    public BlockEntity @Nullable[] getCulledBlockEntities() {
-        return this.culledBlockEntities;
-    }
-
-    /**
-     * Returns the collection of block entities contained by this rendered chunk, which are not part of its culling
-     * volume. These entities should always be rendered regardless of the render being visible in the frustum.
-     */
-    public BlockEntity @Nullable[] getGlobalBlockEntities() {
-        return this.globalBlockEntities;
-    }
-
     public @Nullable ChunkJob getRunningJob() {
         return this.runningJob;
-    }
-
-    public void setRunningJob(@Nullable ChunkJob token) {
-        this.runningJob = token;
-    }
-
-    public int getPendingUpdate() {
-        return this.pendingUpdateType;
-    }
-
-    public long getPendingUpdateSince() {
-        return this.pendingUpdateSince;
-    }
-
-    public void setPendingUpdate(int type, long now) {
-        this.pendingUpdateType = type;
-        this.pendingUpdateSince = now;
-    }
-
-    public void clearPendingUpdate() {
-        this.pendingUpdateType = 0;
     }
 
     public void prepareTrigger(boolean isDirectTrigger) {
@@ -399,19 +307,4 @@ public class RenderSection {
         }
     }
 
-    public int getLastUploadFrame() {
-        return this.lastUploadFrame;
-    }
-
-    public void setLastUploadFrame(int lastSortFrame) {
-        this.lastUploadFrame = lastSortFrame;
-    }
-
-    public int getLastSubmittedFrame() {
-        return this.lastSubmittedFrame;
-    }
-
-    public void setLastSubmittedFrame(int lastSubmittedFrame) {
-        this.lastSubmittedFrame = lastSubmittedFrame;
-    }
 }

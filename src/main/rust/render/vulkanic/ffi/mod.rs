@@ -33,7 +33,7 @@ use super::gui_mesh_frontend::{
 use super::handles::{Handle, HandleKind};
 use super::metrics::Metrics;
 use super::resources::{
-    AccessFlags, BackendApi, BackendCapabilities, BackendFeature, BackendLimits, BlendMode,
+    AccessFlags, BackendCapabilities, BackendFeature, BackendLimits, BlendMode,
     BufferDesc, BufferUsage, ColorFormat, CompareOp, ComputePipelineDesc, CullMode, Extent3d,
     FrameTargetDesc, GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc,
     PipelineStageFlags, PrimitiveTopology, QueueClass, RenderPassDesc, RenderTargetDesc,

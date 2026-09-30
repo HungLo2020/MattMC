@@ -67,7 +67,7 @@ public class EvokerFangsRenderer extends EntityRenderer<EvokerFangs, EvokerFangs
 				if (eligible) {
 					RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
 						ownership == WorldRenderRoutePolicy.Route.DISABLED ? "disabled" : "java-legacy", TEXTURE_LOCATION,
-						false, false, !submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
+						false, false, false
 					);
 				}
 				submitNodeCollector.submitModelSemanticTexture(

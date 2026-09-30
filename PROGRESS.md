@@ -49,39 +49,49 @@ DH scalar block + column-frame ring; generic boxes grouped by DH group ordinal
 (flags 16-31); encoder env switches cached + pass-kind memo; terrain validation
 cached per (stratum,key,generation) (cleared on pack/material/texture change);
 generic validation without geometry. Release: frontend 17.5 ms median, admit 2.1.
-**Memory (real config, RSS 14.5 GB = java heap memfd 7.9 + anon 5.3 + nvidia 1.1):**
-Rust heap 4.25 -> 2.34 GB. Sodium section builders pre-sized 32K quads x 7 facings
-x 3 passes per worker (1.15 GB) -> 2048 growing. DH columns kept CPU payload until
-first visible (0.83 GB) -> off-screen columns upload 8 MB/frame, then release.
-Found by that change: shadow-caster sweep skipped columns whose chunk arrived after
-the cursor (caster set timing-dependent, 2776 vs 4714 sections) -> deferred retry.
-Left: mesh vertex 756 MB + semantic 529 MB CPU copies. RSS peaks now land 9.1 vs
-Frozen 9.5, water 10.8 vs 9.7 (were 12.0/12.8, guard failures).
-**Screen effects (Rust GUI):** in-wall used alpha .1 white (vanilla: opaque .1 grey,
-mirrored, central window of the z=-.5 quad under itemFov) -> in-wall pair 84-119 ->
-1.6 MAE; underwater overlay now honors copied `underwaterOverlay`; fire = vanilla's two
-yawed quads projected (8 affine strips); all in new stratum GUI_SCREEN_EFFECT (50,
-below post effect/HUD; dynamic layers >=10000 were drawn over the Rust hotbar).
+**Memory (real config):** Rust heap 4.25 -> 2.34 GB (Sodium builders 2048 growing; DH off-screen
+columns release CPU payload after upload; shadow-caster sweep retries late chunks). Left: mesh
+vertex 756 MB + semantic 529 MB CPU copies. RSS peaks land 9.1 vs Frozen 9.5, water 10.8 vs 9.7.
+
+**Screen effects:** in-wall = opaque .1 grey, mirrored window under itemFov (84-119 -> 1.6);
+underwater honors `underwaterOverlay`; fire = projected strips; stratum GUI_SCREEN_EFFECT 50.
 **Tour (real config, DH r128, shaders; nether/end/walk/F5):** walk crashed "shadow
 candidate section bound exceeded" (full sweep > 4096) -> own 12288 bound, nearest kept.
 End fell back all visit (End sky quads: depth disabled) -> skytextured box (selector 2,
 36-vertex primitive, CUSTOM_SKY). MC_RENDER_STAGE_* now Iris ordinals (were stale:
 translucent 15/rain 19/entities 23/HAND); hand = HAND_SOLID/_TRANSLUCENT. 1-frame
 fallbacks remain on dimension change (DH depth snapshot / shadowtex0).
-**Robustness (09-30):** a failed recording (GUI validation) consumed the plan without
-discarding DH targets -> every later frame "already awaiting" (1309 fallbacks); now
-discarded on failure and stale ones at entry; stale occupancy submissions are dropped
-before append (vanilla fallback crashed "colored-light ... awaiting"). Spectator/empty
-GUI emitted an empty load/store pass -> rejected every frame; such passes are stripped.
-Real-config tours (shaders+DH r128): F1/F3/inventory/pause/chat/F5 and RD 16->6->10
-mid-game: 0 crashes, only startup fallbacks. Regressions 09-30: day 2.38, glass 7.42,
-down 7.16, gun 2.20, pane 2.38, DH land 5.04 (Frozen run-to-run ~0.6), up 2.55; off
-0.26-0.43 = water animation phase only (non-water 0.03).
+**Robustness (09-30):** failed recordings discard DH targets (was "already awaiting" forever);
+stale occupancy submissions dropped; empty GUI load/store passes stripped. Tours (shaders+DH
+r128, F1/F3/inventory/pause/chat/F5, RD 16->6->10): 0 crashes. off 0.26-0.43 = water phase.
 **DH water:** dh_water now writes depth like DH TRANSPARENT (dhDepthTex0 vs 1): streaks
 gone, w-north 4.41 -> 4.13. Rings also appear without DH (RD8): deferred 09-26 water gap.
 **Scenarios:** r128 needs a pregenerated DB; water poses flake on DH payload churn.
-**Perf (bench.sh, g4src, RD10, DH r32, moving):** 39.8 fps vs Frozen 9.5; RSS 12.3 vs 12.6.
+**Perf baseline 09-30 (bench.sh, g4src copy, shaders, RD10, 720p; Frozen forced OpenGL - the
+09-29 "Frozen 9.5 fps" ran Frozen's Java Vulkan backend, invalid):** fps Cur/Frz DH move
+38.8/215.6, DH static 43.8/242.5, noDH move 44.0/278.9, noDH static 55.9/226.7; RSS 12.3-12.5
+vs 6.2-7.1 GB.
 
+**Step 2 — Rust-only route (09-30).** Java OpenGL/Vulkan backends, `blaze3d/opengl`, Sodium GL
+renderer/regions/arenas, Iris GL pipeline/programs/samplers/shadows/PBR, DH GL renderers and
+`VulkanicCoreAPI` are deleted (~600 files, −158k lines); route predicates/enums folded away
+(scratch `fold/`: Fold2, Shake, DeadGuards, CutAt, Restore). `VulkanicAPI.initialize` only
+records the backend; `RustSemanticGpuDevice` is the sole device; both backends run the whole-
+frame shell (GL: borrowed context + `glfwSwapBuffers`; GL acquire now returns one stable
+default-framebuffer target id (was per-frame -> 32-pass cap at menu); joins the world, then Rust
+GL rejects "program is missing uniform block for binding 1" — accepted incomplete). Iris = pack
+config/menus;
+`Iris.isPackInUseQuick`/API report the Rust shader route. Tests: Rust 1896 pass; Java 991, only
+the 28 pre-existing Mockito/JDK25 failures (obsolete route/source-contract tests removed).
+Regressions after deletion: day 2.39, glass 7.49, down 7.15, off 0.14-0.25, gun 2.20, pane 2.38,
+DH generic 4.88/4.96/3.09, 0 VUIDs; real config shaders on/off: joins, route active, no crash.
+bench.sh after deletion (Current, moving): DH 38.8 -> 45.0 fps, noDH 44.0 -> 45.9; RSS ~12.5 GB.
+Ported while pruning: VoxelMap world map (regions staged as Rust raw images, released on
+unload), VoxelMap init (packet bridge was null on Rust), F3 GPU% (`TimerQuery` on Rust Vulkan
+timestamps via `mattmc_vulkanic_gal_set_gpu_timestamps_requested`), pack `weatherParticles`,
+Tracy frame marks. **Unported (tracked):** panorama screenshot (needs Rust offscreen 4096²
+target), Iris shadow-distance slider + color space (Rust uses pack constants), Java mesher
+fallback for non-native block models/custom fluids (fail-closed), world-map region mipmaps.
 ## Current gate (2026-09-25)
 
 Canonical pair: `Origin`, 1280x720, `150.5,100,530.5,105,10`, RD 4, DH off, one two-mode
@@ -140,14 +150,9 @@ alternations right after a teleport, shaders on/off): all correct. **Iris
 screen button labels:** `SmoothedFloat` fades now use wall-clock deltas (the
 Iris shader timer never advances on the Rust route). Pre-existing Java failures:
 `CloudSemanticAdmissionTest`/`NativeParticleCollectionTest` (stale source-text asserts).
-**Perf (09-27/28).** Matrix `--profile performance --workload-profile settled-static|
-moving-camera --world Origin`. Static on 31->48 fps (Frozen 205), off 166->176
-(Frozen 355); moving off 296 vs 422, on 34 vs 286. Done: geometry pages+multidraw
-(`MATTMC_RUST_DISABLE_SOURCE_TERRAIN_MULTIDRAW`/`_PAGES`), identity-keyed terrain
-batch plans, translucent-order cell reuse, coverage memo keyed on own meshes,
-memoized programs (epoch), `FullscreenPipelineCache`, primitive Java residency
-maps/section asset rows. Left: entities ~4.5 ms, terrain+shadow ~3.6, GAL 2.2,
-Java ~5; 100 fps needs Java/Rust pipelining or persistent recorded plans.
+**Perf (09-27/28)** superseded by the 09-30 bench.sh baseline above. Done: geometry pages+
+multidraw, identity-keyed terrain batch plans, translucent-order cell reuse, memoized programs,
+`FullscreenPipelineCache`. Left: entities ~4.5 ms, terrain+shadow ~3.6, GAL 2.2, Java ~5.
 **Teleport/validation/voxels (2026-09-28).** Tour (6 teleports, F2, 40 s walk,
 validation on): 0 VUIDs, no post-arm fallback. Fixed: F2 restores PRESENT_SRC;
 colored-light voxels update every frame (sampled volumes in ShaderRead); an
@@ -173,23 +178,16 @@ stages flip every target access once (incl. `sampler2D` params; pack PNGs not
 flipped). Water pose 152.5,66,499.5,180,25: 16.6 -> 9.74/10.78/9.20.
 **Colored light + shadowtex1 (2026-09-26).** `IRIS_FEATURE_<X>` is defined
 for pack-requested `iris.features.optional` flags Rust supports
-(`CUSTOM_IMAGES`), so the floodfill block light compiles in. `shadowtex1` is
-now Iris's pre-translucent shadow depth copy (split shadow pass, own texture),
-not an alias of shadowtex0: underwater receivers take the caustic path. Water
-pair 10.79/13.10/10.62 (Current's water brighter). **Suspected Frozen behavior:** isolated
-pre-color, SSR/sky reflection and fresnel all match at 1/4 scale, but on Frozen
-the `color` read in gbuffers_water `main` just before the reflection mix is
-0.77x its value one statement earlier. That happens only when GetReflection's
-arithmetic-only Step 3 (GetSky/GGX, no texture reads/discard/writes to `main`
-locals) is compiled in; renaming parameters or using a temporary for the
-swizzled `inout` changes nothing. Rust keeps `color` unchanged. Deterministic
-across repeats. Diagnostic ZIPs in the session scratchpad. **User: water gap deferred (2026-09-26).**
+(`CUSTOM_IMAGES`): floodfill compiles in. `shadowtex1` = Iris's pre-translucent shadow
+depth copy (own texture): underwater receivers take the caustic path. Water
+pair 10.79/13.10/10.62 (Current's water brighter). **Suspected Frozen behavior:** Frozen's
+gbuffers_water `color` drops to 0.77x before the reflection mix (GetReflection Step 3 only).
+**User: water gap deferred (2026-09-26).**
 **Shader menu (09-26):** works on Vulkan (`Iris.reload` parses a CPU-only menu
 pack, persists `<pack>.txt`; Rust applies saved options). The selected pack runs
 whenever Iris config enables one (`MATTMC_RUST_SELECTED_SOURCE_EXECUTION` only
 overrides); stderr reports `[MattMC shaders] shader route active|vanilla fallback`.
-Source geometry (~0.9 GiB at RD 10) is device-local with staged uploads, cap 2 GiB
-(profile only the release Rust profile). F2 screenshots: Rust copies the completed
+Source geometry (~0.9 GiB at RD 10): device-local, staged, cap 2 GiB. F2 screenshots: Rust copies the completed
 frame target before present; Java only encodes the PNG. Resize re-arms the route.
 
 ## Retained architecture

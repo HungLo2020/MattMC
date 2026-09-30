@@ -86,29 +86,8 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension, Bl
 	private VertexFormat iris$extendFormat(VertexFormat format) {
 		injectNormalAndUV1 = false;
 
-		if (ImmediateState.skipExtension.get()
-			|| !ImmediateState.isRenderingLevel
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| !Iris.isPackInUseQuick()) {
-			return format;
-		}
-
-		if (format == DefaultVertexFormat.BLOCK || format == IrisVertexFormats.TERRAIN) {
-			extending = true;
-			injectNormalAndUV1 = false;
-			return IrisVertexFormats.TERRAIN;
-		} else if (format == DefaultVertexFormat.NEW_ENTITY || format == IrisVertexFormats.ENTITY) {
-			extending = true;
-			injectNormalAndUV1 = false;
-			return IrisVertexFormats.ENTITY;
-		} else if (format == DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP || format == IrisVertexFormats.GLYPH) {
-			extending = true;
-			injectNormalAndUV1 = true;
-			return IrisVertexFormats.GLYPH;
-		}
-
 		return format;
+
 	}
 
 	@Nullable

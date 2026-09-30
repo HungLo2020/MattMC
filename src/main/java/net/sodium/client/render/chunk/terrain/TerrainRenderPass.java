@@ -24,14 +24,6 @@ public class TerrainRenderPass {
         return this.isTranslucent;
     }
 
-    public boolean supportsFragmentDiscard() {
-        return this.fragmentDiscard;
-    }
-
-    public RenderPipeline getPipeline() {
-        return renderType.pipeline();
-    }
-
     public RenderTarget getTarget() {
         return (isTranslucent && Minecraft.useShaderTransparency())
             ? Minecraft.getInstance().levelRenderer.getTranslucentTarget()

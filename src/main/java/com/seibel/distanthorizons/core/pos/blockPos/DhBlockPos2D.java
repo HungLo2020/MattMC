@@ -28,7 +28,6 @@ public class DhBlockPos2D
 		this.z = blockPos.getZ();
 	}
 	
-	public static DhBlockPos2D fromPos2D(Pos2D pos) { return new DhBlockPos2D(pos.getX(), pos.getY()); }
 	
 	
 	
@@ -53,8 +52,6 @@ public class DhBlockPos2D
 	public double dist(DhBlockPos2D other) { return this.dist(other.x, other.z); }
 	public double dist(int x, int z) { return Math.sqrt(Math.pow(this.x - x, 2) + Math.pow(this.z - z, 2)); }
 	
-	public long distSquared(DhBlockPos2D other) { return this.distSquared(other.x, other.z); }
-	public long distSquared(int x, int z) { return MathUtil.pow2((long) this.x - x) + MathUtil.pow2((long) this.z - z); }
 	
 	
 	

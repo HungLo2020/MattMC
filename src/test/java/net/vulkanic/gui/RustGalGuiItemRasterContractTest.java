@@ -7,7 +7,7 @@ class RustGalGuiItemRasterContractTest {
     @Test void redstoneFixtureUsesUnblendedCutoutLayersNotTranslucentItemLayers() {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();
-        String key=net.vulkanic.bridge.RustGalVulkanWholeFrameMode.propertyName();
+        String key="mattmc.dev.rustGalVulkanWholeFrame";
         String previous=System.getProperty(key);
         try {
             System.setProperty(key,"true");

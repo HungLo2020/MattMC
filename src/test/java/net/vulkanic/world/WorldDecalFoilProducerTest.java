@@ -4,7 +4,6 @@ import java.util.List;
 import net.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.block.model.ItemTransform;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -17,28 +16,6 @@ class WorldDecalFoilProducerTest {
     @org.junit.jupiter.api.BeforeAll static void bootstrap() {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();
-    }
-    @Test void normalProducerRequiresRustOwnershipAndIgnoresLegacyFlag() {
-        String key="mattmc.dev.rustGalWorldDecalFoil", old=System.getProperty(key);
-        try (var mode=mockStatic(RustGalVulkanWholeFrameMode.class)) {
-            System.setProperty(key,"true");
-            mode.when(RustGalVulkanWholeFrameMode::enabled).thenReturn(false);
-            assertFalse(RustGalWorldPrimitiveRenderer.worldDecalFoilEnabled());
-            mode.when(RustGalVulkanWholeFrameMode::enabled).thenReturn(true);
-            assertTrue(RustGalWorldPrimitiveRenderer.worldDecalFoilEnabled());
-            assertTrue(RustGalWorldPrimitiveRenderer.worldDecalFoilAdmissionReceipt().contains("\"privateFlagsPresent\":true"));
-            System.setProperty(key,"false");
-            assertTrue(RustGalWorldPrimitiveRenderer.worldDecalFoilEnabled());
-            System.clearProperty(key);
-            assertTrue(RustGalWorldPrimitiveRenderer.worldDecalFoilEnabled());
-            assertEquals("{\"schema\":\"rust-owned-world-decal-foil-v1\",\"normalRoute\":true,\"privateFlagsPresent\":false}",
-                RustGalWorldPrimitiveRenderer.worldDecalFoilAdmissionReceipt());
-            assertEquals("empty-quads",RustGalWorldPrimitiveRenderer.itemEntityMeshIneligibility(
-                net.minecraft.world.item.ItemDisplayContext.GROUND,15728640,0,0,new int[0],null,null,
-                ItemStackRenderState.FoilType.SPECIAL));
-            mode.when(RustGalVulkanWholeFrameMode::enabled).thenReturn(false);
-            assertFalse(RustGalWorldPrimitiveRenderer.worldDecalFoilEnabled());
-        } finally {if(old==null) System.clearProperty(key);else System.setProperty(key,old);}
     }
     @Test void firstPersonComposedSemanticsMatchActualVanillaPoseForBothHands() throws Exception {
         var copy=RustGalWorldPrimitiveRenderer.class.getDeclaredMethod("copiedFirstPersonDecalFoil",

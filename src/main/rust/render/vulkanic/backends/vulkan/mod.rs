@@ -1,5 +1,6 @@
 mod device;
 mod lowering;
+pub(crate) use lowering::set_gpu_timestamps_requested;
 #[cfg(test)]
 pub(in crate::render::vulkanic) mod renderdoc;
 mod resources;

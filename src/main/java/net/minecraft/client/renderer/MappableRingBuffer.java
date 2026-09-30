@@ -16,53 +16,11 @@ public class MappableRingBuffer implements AutoCloseable {
 	private int current = 0;
 
 	public MappableRingBuffer(Supplier<String> supplier, int i, int j) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java GUI ring buffers are unavailable on selected Vulkan");
-		}
-		if ((i & 1) == 0 && (i & 2) == 0) {
-			throw new IllegalArgumentException("MappableRingBuffer requires at least one of USAGE_MAP_READ or USAGE_MAP_WRITE");
-		} else {
-			for (int k = 0; k < 3; k++) {
-				int l = k;
-				this.buffers[k] = net.vulkanic.VulkanicAPI.createBuffer(() -> (String)supplier.get() + " #" + l, i, j);
-				this.fences[k] = null;
-			}
-
-			this.size = j;
-		}
+		throw new IllegalStateException("Java GUI ring buffers are unavailable on selected Vulkan");
 	}
 
 	public int size() {
 		return this.size;
-	}
-
-	public GpuBuffer currentBuffer() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java ring-buffer access is unavailable on selected Vulkan");
-		}
-		GpuFence gpuFence = this.fences[this.current];
-		if (gpuFence != null) {
-			gpuFence.awaitCompletion(Long.MAX_VALUE);
-			gpuFence.close();
-			this.fences[this.current] = null;
-		}
-
-		return this.buffers[this.current];
-	}
-
-	public void rotate() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java GUI ring-buffer rotation is unavailable on selected Vulkan");
-		}
-		if (this.fences[this.current] != null) {
-			this.fences[this.current].close();
-		}
-
-		this.fences[this.current] = net.vulkanic.VulkanicAPI.createCommandEncoder().createFence();
-		this.current = (this.current + 1) % 3;
 	}
 
 	public void close() {

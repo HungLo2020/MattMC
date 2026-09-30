@@ -83,11 +83,6 @@ public class FullDataSourceV1
 	
 	public long getPos() { return this.pos; }
 	
-	public void resizeDataStructuresForRepopulation(long pos)
-	{
-		// no data structures need to be changed, only the source's position 
-		this.pos = pos;
-	}
 	
 	public byte getDataDetailLevel() { return (byte) (DhSectionPos.getDetailLevel(this.pos) - SECTION_SIZE_OFFSET); }
 	
@@ -115,19 +110,6 @@ public class FullDataSourceV1
 	// stream handling // 
 	//=================//
 	
-	/**
-	 * Clears and then overwrites any data in this object with the data from the given file and stream.
-	 * This is expected to be used with an existing {@link FullDataSourceV1} and can be used in place of a constructor to reuse an existing {@link FullDataSourceV1} object.
-	 */
-	public void repopulateFromStream(FullDataSourceV1DTO dto, DhDataInputStream inputStream, IDhLevel level) throws IOException, InterruptedException, DataCorruptedException
-	{
-		// clear/overwrite the old data
-		this.resizeDataStructuresForRepopulation(dto.pos);
-		this.mapping.clear(dto.pos);
-		
-		// set the new data
-		this.populateFromStream(dto, inputStream, level);
-	}
 	
 	/**
 	 * Overwrites any data in this object with the data from the given file and stream.

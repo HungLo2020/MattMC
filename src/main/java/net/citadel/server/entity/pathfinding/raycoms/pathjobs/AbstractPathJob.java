@@ -926,11 +926,10 @@ public abstract class AbstractPathJob implements Callable<Path> {
 
         final boolean swimStart = isSwimming && !parent.isSwimming();
         final BlockState state = world.getBlockState(pos);
-        final boolean onRoad = false;
         final boolean onRails = pathingOptions.canUseRails() && world.getBlockState(corner ? pos.below() : pos).getBlock() instanceof BaseRailBlock;
         final boolean railsExit = !onRails && parent.isOnRails();
         //  Cost may have changed due to a jump up or drop
-        final double stepCost = computeCost(dPos, isSwimming, onRoad, onRails, railsExit, swimStart, corner, state, pos);
+        final double stepCost = computeCost(dPos, isSwimming, false, onRails, railsExit, swimStart, corner, state, pos);
         final double heuristic = computeHeuristic(pos);
         final double cost = parent.getCost() + stepCost;
         final double score = cost + heuristic;
@@ -1062,17 +1061,9 @@ public abstract class AbstractPathJob implements Callable<Path> {
 
     private int checkDrop(@Nullable final MNode parent, final BlockPos pos, final boolean isSwimming) {
         final boolean canDrop = parent != null && !parent.isLadder();
-        boolean isChonker = true;
 
         if (pathingOptions.canClimb() && parent != null && pos.getY() > parent.pos.getY() + 1) {
             return pos.getY();
-        }
-        //  Nothing to stand on
-        if (!isChonker) {
-            if (!canDrop || isSwimming || ((parent.pos.getX() != pos.getX() || parent.pos.getZ() != pos.getZ()) && isPassableBBFull(parent.pos.below(), parent)
-                    && isWalkableSurface(world.getBlockState(parent.pos.below()), parent.pos.below()) == SurfaceType.DROPABLE)) {
-                return -1;
-            }
         }
 
         for (int i = 2; i <= 10; i++) {

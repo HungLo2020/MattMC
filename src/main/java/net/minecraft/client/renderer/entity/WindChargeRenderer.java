@@ -27,33 +27,16 @@ public class WindChargeRenderer extends EntityRenderer<AbstractWindCharge, Entit
 	public void submit(EntityRenderState entityRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		float uvOffsetU = this.xOffset(entityRenderState.ageInTicks) % 1.0F;
 		this.model.setupAnim(entityRenderState);
-		if (net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-			if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWindChargeModel(
-				this.model.root(), poseStack.last(), TEXTURE_LOCATION, uvOffsetU, 0.0F, entityRenderState.lightCoords
-			)) {
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
-					"rust-vulkan-whole-frame", TEXTURE_LOCATION, "WindChargeModel", true, true, false
-				);
-				super.submit(entityRenderState, poseStack, submitNodeCollector, cameraRenderState);
-				return;
-			}
-			throw new IllegalStateException("Rust whole-frame wind-charge route has no semantic mesh");
+		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueWindChargeModel(
+			this.model.root(), poseStack.last(), TEXTURE_LOCATION, uvOffsetU, 0.0F, entityRenderState.lightCoords
+		)) {
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordModelMeshRouteDecision(
+				"rust-vulkan-whole-frame", TEXTURE_LOCATION, "WindChargeModel", true, true, false
+			);
+			super.submit(entityRenderState, poseStack, submitNodeCollector, cameraRenderState);
+			return;
 		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Rust whole-frame wind-charge route is unavailable; Java model geometry is not a fallback");
-		}
-		submitNodeCollector.submitModelSemantic(
-			this.model,
-			entityRenderState,
-			poseStack,
-			RenderType.breezeWind(TEXTURE_LOCATION, uvOffsetU, 0.0F),
-			entityRenderState.lightCoords,
-			OverlayTexture.NO_OVERLAY,
-			entityRenderState.outlineColor,
-			null
-		);
-		super.submit(entityRenderState, poseStack, submitNodeCollector, cameraRenderState);
+		throw new IllegalStateException("Rust whole-frame wind-charge route has no semantic mesh");
 	}
 
 	protected float xOffset(float f) {

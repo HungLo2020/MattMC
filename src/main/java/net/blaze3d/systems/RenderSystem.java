@@ -1,6 +1,6 @@
 package net.blaze3d.systems;
 
-import net.blaze3d.TracyFrameCapture;
+import net.minecraft.util.profiling.TracyCompat;
 import net.blaze3d.buffers.Std140SizeCalculator;
 import net.blaze3d.platform.Window;
 import net.blaze3d.shaders.ShaderType;
@@ -27,16 +27,11 @@ public class RenderSystem {
 	// Sodium: Track WGL context for security checks (from RenderSystemMixin)
 	private static long wglPrevContext = MemoryUtil.NULL;
 
-	public static void cleanupRendererBootstrapResources() {
-		net.vulkanic.VulkanicAPI.cleanupRendererBootstrapResources();
-		wglPrevContext = MemoryUtil.NULL;
-	}
-
 	public static void assertOnRenderThread() {
 		net.vulkanic.VulkanicAPI.assertOnRenderThread();
 	}
 
-	public static void flipFrame(Window window, @Nullable TracyFrameCapture tracyFrameCapture) {
+	public static void flipFrame(Window window) {
 		// HOOK: Check if mods want to skip the first pollEvents call
 		boolean skipFirstPoll = false;
 		for (RenderHooks hook : HookRegistry.getRenderHooks()) {
@@ -50,76 +45,24 @@ public class RenderSystem {
 			net.vulkanic.VulkanicAPI.pollEvents();
 		}
 
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabledForBackend(net.vulkanic.VulkanicAPI.isVulkanBackendSelected())) {
-			Tesselator.getInstance().clear();
-			if (tracyFrameCapture != null) {
-				tracyFrameCapture.endFrame();
-			}
-			net.vulkanic.VulkanicAPI.resetDynamicUniforms();
-			Minecraft.getInstance().levelRenderer.endFrame();
-			net.vulkanic.VulkanicAPI.pollEvents();
-			return;
-		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java Vulkan frame presentation is unavailable until the Rust whole-frame presenter is admitted");
-		}
-
-		boolean vulkanBackendSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-		boolean vulkanFrameAcquired = false;
-		if (vulkanBackendSelected) {
-			vulkanFrameAcquired = net.vulkanic.VulkanicAPI.beginFrame() >= 0;
-		}
-		
 		Tesselator.getInstance().clear();
-		if (vulkanBackendSelected) {
-			if (vulkanFrameAcquired) {
-				net.vulkanic.VulkanicAPI.endFrame();
-			}
-		} else {
+		TracyCompat.markFrame();
+		Minecraft.getInstance().levelRenderer.endFrame();
+		if (!net.vulkanic.VulkanicAPI.usesRustVulkanPresenter()) {
+			// Rust renders into the borrowed context's default framebuffer;
+			// the GLFW window owns the swap.
 			GLFW.glfwSwapBuffers(window.handle());
 		}
-		if (tracyFrameCapture != null) {
-			tracyFrameCapture.endFrame();
-		}
-
-		net.vulkanic.VulkanicAPI.resetDynamicUniforms();
-		Minecraft.getInstance().levelRenderer.endFrame();
 		net.vulkanic.VulkanicAPI.pollEvents();
-		
-		// Sodium: Check for context replacement (from RenderSystemMixin)
-		if (wglPrevContext != MemoryUtil.NULL) {
-			var context = net.vulkanic.VulkanicAPI.getGraphicsContext();
+		return;
 
-			if (wglPrevContext != context) {
-				// Something has decided to replace the OpenGL context, which is not a good sign
-				LOGGER.warn("The OpenGL context appears to have been suddenly replaced! Something has likely just injected into the game process.");
-
-				// Likely, this indicates a module was injected into the current process. We should check that
-				// nothing problematic was just installed.
-				net.sodium.client.compatibility.checks.ModuleScanner.checkModules(() -> org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window(window.handle()));
-
-				// If we didn't find anything problematic (which would have thrown an exception), then let's just record
-				// the new context pointer and carry on.
-				wglPrevContext = context;
-			}
-		}
 	}
 
 	public static void initRenderer(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
-		net.vulkanic.VulkanicAPI.initializeNativeVulkanRuntimeOnRendererStartupIfSelected();
-		long rendererBootstrapWindowHandle = net.vulkanic.VulkanicAPI.prepareRendererBootstrapWindowHandle(l);
-		net.vulkanic.VulkanicAPI.setDevice(
-			net.vulkanic.VulkanicAPI.createRendererDevice(rendererBootstrapWindowHandle, i, bl, biFunction, bl2)
-		);
-		net.vulkanic.VulkanicAPI.initializeDynamicUniforms();
-		net.vulkanic.VulkanicAPI.onRendererDeviceInitialized(l, net.vulkanic.VulkanicAPI.getDevice());
-
-		// Capture the current WGL context so that we can detect it being replaced later.
-		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && Util.getPlatform() == Util.OS.WINDOWS) {
-			wglPrevContext = net.vulkanic.VulkanicAPI.getGraphicsContext();
-		} else {
-			wglPrevContext = MemoryUtil.NULL;
-		}
+		net.vulkanic.VulkanicAPI.prepareRendererBootstrapWindowHandle(l);
+		net.vulkanic.VulkanicAPI.setDevice(net.vulkanic.VulkanicAPI.createRendererDevice());
+		net.vulkanic.VulkanicAPI.onRendererDeviceInitialized(l);
+		wglPrevContext = MemoryUtil.NULL;
 	}
 
 	public static GpuDevice getDevice() {

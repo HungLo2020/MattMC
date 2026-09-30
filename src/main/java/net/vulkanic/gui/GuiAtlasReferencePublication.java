@@ -55,14 +55,6 @@ final class GuiAtlasReferencePublication {
         retainOnly(active);
     }
 
-    /** Retire declarations absent from the exact command batch about to submit. */
-    void retainUsed(LongStream assetIds) {
-        if (references.isEmpty()) return;
-        var active = new LongOpenHashSet();
-        assetIds.forEach(id -> retainIfPresent(active, id));
-        retainOnly(active);
-    }
-
     private void retainIfPresent(LongOpenHashSet active, long assetId) {
         if (references.containsKey(assetId)) active.add(assetId);
     }
@@ -86,5 +78,13 @@ final class GuiAtlasReferencePublication {
         publish.accept(candidate, snapshot);
         acceptedRevision = candidate;
         acceptedReferences = snapshot;
+    }
+
+    /** Retire declarations absent from the exact command batch about to submit. */
+    void retainUsed(LongStream assetIds) {
+        if (references.isEmpty()) return;
+        var active = new LongOpenHashSet();
+        assetIds.forEach(id -> retainIfPresent(active, id));
+        retainOnly(active);
     }
 }

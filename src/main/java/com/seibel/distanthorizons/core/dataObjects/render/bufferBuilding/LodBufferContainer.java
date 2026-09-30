@@ -3,8 +3,6 @@ package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
-import com.seibel.distanthorizons.core.render.glObject.GLProxy;
-import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.objects.StatsMap;
 import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
@@ -44,10 +42,6 @@ public class LodBufferContainer implements AutoCloseable
 	private boolean rustSemanticBuffersPublished = false;
 	private long rustSemanticColumnGeneration = 0L;
 	
-	public GLVertexBuffer[] vbos;
-	public GLVertexBuffer[] vbosTransparent;
-	public GLVertexBuffer[] vbosTransparentUp;
-	public GLVertexBuffer[] vbosTransparentWaterUp;
 	
 	private CompletableFuture<LodBufferContainer> uploadFuture = null;
 	
@@ -61,10 +55,6 @@ public class LodBufferContainer implements AutoCloseable
 	{
 		this.pos = pos;
 		this.minCornerBlockPos = minCornerBlockPos;
-		this.vbos = new GLVertexBuffer[0];
-		this.vbosTransparent = new GLVertexBuffer[0];
-		this.vbosTransparentUp = new GLVertexBuffer[0];
-		this.vbosTransparentWaterUp = new GLVertexBuffer[0];
 	}
 	
 	
@@ -93,98 +83,10 @@ public class LodBufferContainer implements AutoCloseable
 		{
 			return makeAndPublishRustSemanticBuffers(builder, future);
 		}
-		ArrayList<ByteBuffer> opaqueBuffers;
-		ArrayList<ByteBuffer> transparentBuffers;
-		ArrayList<ByteBuffer> transparentUpBuffers;
-		ArrayList<ByteBuffer> transparentWaterUpBuffers;
-		{
-			// make the buffers
-			boolean captureSemanticMaterials = net.vulkanic.world.DistantHorizonsSemanticCollector.enabled();
-			LodQuadBuilder.VertexBufferBuild opaqueBuild = captureSemanticMaterials
-				? builder.makeOpaqueVertexBuffersWithSemanticMaterials()
-				: new LodQuadBuilder.VertexBufferBuild(builder.makeOpaqueVertexBuffers(), List.of());
-			LodQuadBuilder.VertexBufferBuild transparentBuild = captureSemanticMaterials
-				? builder.makeTransparentVertexBuffersWithSemanticMaterials()
-				: new LodQuadBuilder.VertexBufferBuild(builder.makeTransparentVertexBuffers(), List.of());
-			LodQuadBuilder.VertexBufferBuild transparentUpBuild = captureSemanticMaterials
-				? builder.makeTransparentUpVertexBuffersWithSemanticMaterials()
-				: new LodQuadBuilder.VertexBufferBuild(builder.makeTransparentUpVertexBuffers(), List.of());
-			LodQuadBuilder.VertexBufferBuild transparentWaterUpBuild = captureSemanticMaterials
-				? builder.makeTransparentWaterUpVertexBuffersWithSemanticMaterials()
-				: new LodQuadBuilder.VertexBufferBuild(builder.makeTransparentWaterUpVertexBuffers(), List.of());
-			opaqueBuffers = new ArrayList<>(opaqueBuild.vertexBuffers());
-			transparentBuffers = new ArrayList<>(transparentBuild.vertexBuffers());
-			transparentUpBuffers = new ArrayList<>(transparentUpBuild.vertexBuffers());
-			transparentWaterUpBuffers = new ArrayList<>(transparentWaterUpBuild.vertexBuffers());
-			// Capture only copied CPU semantics before the legacy path uploads and
-			// frees these direct buffers. This is private diagnostic groundwork for
-			// a future Rust LOD route, never a GL/Vulkan handle bridge.
-			net.vulkanic.world.DistantHorizonsSemanticCollector.recordBuiltColumn(
-				this.pos,
-				this.minCornerBlockPos,
-				builder.semanticMaterials(),
-				builder.semanticQuadCoverage(),
-				LodQuadBuilder.semanticQuadCoverage(
-					opaqueBuild, transparentBuild, transparentUpBuild, transparentWaterUpBuild
-				),
-				opaqueBuild,
-				transparentBuild,
-				transparentUpBuild,
-				transparentWaterUpBuild
-			);
-		}
-		
-		this.vbos = resizeBuffer(this.vbos, opaqueBuffers.size());
-		this.vbosTransparent = resizeBuffer(this.vbosTransparent, transparentBuffers.size());
-		this.vbosTransparentUp = resizeBuffer(this.vbosTransparentUp, transparentUpBuffers.size());
-		this.vbosTransparentWaterUp = resizeBuffer(this.vbosTransparentWaterUp, transparentWaterUpBuffers.size());
-		
-		
-		// upload on MC's render thread
-		GLProxy.queueRunningOnRenderThread(() ->
-		{
-			try
-			{
-				// skip this event if requested
-				if (Thread.interrupted() 
-					|| this.uploadFuture.isCancelled())
-				{
-					throw new InterruptedException();
-				}
-				
-				EDhApiGpuUploadMethod gpuUploadMethod = GLProxy.getInstance().getGpuUploadMethod();
-				
-				// upload on the render thread
-				uploadBuffersDirect(this.vbos, opaqueBuffers, gpuUploadMethod);
-				uploadBuffersDirect(this.vbosTransparent, transparentBuffers, gpuUploadMethod);
-				uploadBuffersDirect(this.vbosTransparentUp, transparentUpBuffers, gpuUploadMethod);
-				uploadBuffersDirect(this.vbosTransparentWaterUp, transparentWaterUpBuffers, gpuUploadMethod);
-				this.buffersUploaded = true;
-				
-				// success
-				this.uploadFuture.complete(this);
-				this.uploadFuture = null;
-			}
-			catch (InterruptedException ignore) 
-			{
-				this.uploadFuture.complete(this);
-				this.uploadFuture = null;
-			}
-			catch (Exception e)
-			{
-				LOGGER.error("Unexpected issue uploading buffer ["+this.minCornerBlockPos +"], error: ["+e.getMessage()+"].", e);
-				
-				this.uploadFuture.completeExceptionally(e);
-				this.uploadFuture = null;
-			}
-			finally
-			{
-				// all the buffers must be manually freed to prevent memory leaks
-				
-				freeBuffers(opaqueBuffers, transparentBuffers, transparentUpBuffers, transparentWaterUpBuffers);
-			}
-		});
-		
+		// DH rendering is off: Rust is the only LOD consumer, so there is
+		// nothing to build or upload for this column.
+		this.uploadFuture = null;
+		future.complete(this);
 		return future;
 	}
 
@@ -218,84 +120,6 @@ public class LodBufferContainer implements AutoCloseable
 		return future;
 	}
 
-	private static void freeBuffers(
-		List<ByteBuffer> opaqueBuffers,
-		List<ByteBuffer> transparentBuffers,
-		List<ByteBuffer> transparentUpBuffers,
-		List<ByteBuffer> transparentWaterUpBuffers
-	)
-	{
-		for (ByteBuffer buffer : opaqueBuffers) MemoryUtil.memFree(buffer);
-		for (ByteBuffer buffer : transparentBuffers) MemoryUtil.memFree(buffer);
-		for (ByteBuffer buffer : transparentUpBuffers) MemoryUtil.memFree(buffer);
-		for (ByteBuffer buffer : transparentWaterUpBuffers) MemoryUtil.memFree(buffer);
-	}
-	private static GLVertexBuffer[] resizeBuffer(GLVertexBuffer[] vbos, int newSize)
-	{
-		if (vbos.length == newSize)
-		{
-			return vbos;
-		}
-		
-		GLVertexBuffer[] newVbos = new GLVertexBuffer[newSize];
-		System.arraycopy(vbos, 0, newVbos, 0, Math.min(vbos.length, newSize));
-		if (newSize < vbos.length)
-		{
-			for (int i = newSize; i < vbos.length; i++)
-			{
-				if (vbos[i] != null)
-				{
-					vbos[i].close();
-				}
-			}
-		}
-		return newVbos;
-	}
-	private static void uploadBuffersDirect(
-			GLVertexBuffer[] vbos, ArrayList<ByteBuffer> byteBuffers, 
-			EDhApiGpuUploadMethod uploadMethod) throws InterruptedException
-	{
-		int vboIndex = 0;
-		for (int i = 0; i < byteBuffers.size(); i++)
-		{
-			if (vboIndex >= vbos.length)
-			{
-				throw new RuntimeException("Too many vertex buffers!!");
-			}
-			
-			
-			// get or create the VBO
-			if (vbos[vboIndex] == null)
-			{
-				vbos[vboIndex] = new GLVertexBuffer(uploadMethod.useBufferStorage);
-			}
-			GLVertexBuffer vbo = vbos[vboIndex];
-			
-			
-			ByteBuffer buffer = byteBuffers.get(i);
-			int size = buffer.limit() - buffer.position();
-			
-			try
-			{
-				vbo.bind();
-				vbo.uploadBuffer(buffer, size / LodUtil.LOD_VERTEX_FORMAT.getByteSize(), uploadMethod, FULL_SIZED_BUFFER);
-			}
-			catch (Exception e)
-			{
-				vbos[vboIndex] = null;
-				vbo.close();
-				LOGGER.error("Failed to upload buffer. Error: ["+e.getMessage()+"].", e);
-			}
-			
-			vboIndex++;
-		}
-		
-		if (vboIndex < vbos.length)
-		{
-			throw new RuntimeException("Too few vertex buffers!!");
-		}
-	}
-	
 	
 	
 	//================//
@@ -303,35 +127,8 @@ public class LodBufferContainer implements AutoCloseable
 	//================//
 	
 	/** can be used when debugging */
-	public boolean hasNonNullVbos() { return this.vbos != null || this.vbosTransparent != null || this.vbosTransparentUp != null || this.vbosTransparentWaterUp != null; }
 	
 	/** can be used when debugging */
-	public int vboBufferCount() 
-	{
-		int count = 0;
-		
-		if (this.vbos != null)
-		{
-			count += this.vbos.length;
-		}
-		
-		if (this.vbosTransparent != null)
-		{
-			count += this.vbosTransparent.length;
-		}
-
-		if (this.vbosTransparentUp != null)
-		{
-			count += this.vbosTransparentUp.length;
-		}
-
-		if (this.vbosTransparentWaterUp != null)
-		{
-			count += this.vbosTransparentWaterUp.length;
-		}
-		
-		return count;
-	}
 	
 	public boolean uploadInProgress() { return this.uploadFuture != null; }
 	public boolean renderDataReady() { return this.buffersUploaded || this.rustSemanticBuffersPublished; }
@@ -355,23 +152,6 @@ public class LodBufferContainer implements AutoCloseable
 	{
 		statsMap.incStat("RenderBuffers");
 		statsMap.incStat("SimpleRenderBuffers");
-		for (GLVertexBuffer vertexBuffer : vbos)
-		{
-			if (vertexBuffer != null)
-			{
-				statsMap.incStat("VBOs");
-				if (vertexBuffer.getSize() == FULL_SIZED_BUFFER)
-				{
-					statsMap.incStat("FullsizedVBOs");
-				}
-				
-				if (vertexBuffer.getSize() == 0)
-				{
-					GLProxy.LOGGER.warn("VBO with size 0");
-				}
-				statsMap.incBytesStat("TotalUsage", vertexBuffer.getSize());
-			}
-		}
 	}
 	
 	
@@ -411,41 +191,6 @@ public class LodBufferContainer implements AutoCloseable
 			// when this old lifecycle marker closes asynchronously.
 			net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(this.pos);
 		}
-		
-		GLProxy.queueRunningOnRenderThread(() ->
-		{
-			for (GLVertexBuffer buffer : this.vbos)
-			{
-				if (buffer != null)
-				{
-					buffer.destroyAsync();
-				}
-			}
-			
-			for (GLVertexBuffer buffer : this.vbosTransparent)
-			{
-				if (buffer != null)
-				{
-					buffer.destroyAsync();
-				}
-			}
-
-			for (GLVertexBuffer buffer : this.vbosTransparentUp)
-			{
-				if (buffer != null)
-				{
-					buffer.destroyAsync();
-				}
-			}
-
-			for (GLVertexBuffer buffer : this.vbosTransparentWaterUp)
-			{
-				if (buffer != null)
-				{
-					buffer.destroyAsync();
-				}
-			}
-		});
 	}
 	
 }

@@ -390,6 +390,8 @@ public interface OrderedSubmitNodeCollector {
 	}
 
 	void submitParticleGroup(SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer);
+
+	/** Semantic particle groups require a collector that copies them for Rust. */
 	default void submitParticleGroupSemantic(SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer) {
 		throw new IllegalStateException(
 			"semantic particle submission requires an explicit Rust collector for "

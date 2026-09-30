@@ -4,7 +4,6 @@ import net.blaze3d.vertex.PoseStack;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-import net.irisshaders.iris.helpers.EntityState;
 import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
@@ -81,17 +80,6 @@ public class EquipmentLayerRenderer {
 			for (EquipmentClientInfo.Layer layer : list) {
 				int n = getColorForLayer(layer, l);
 				if (n != 0) {
-					// Iris: Set item context before rendering
-					if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-						&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-						&& layer.usePlayerTexture() && WorldRenderingSettings.INSTANCE.getItemIds() != null) {
-						ResourceLocation location = itemStack.get(DataComponents.ITEM_MODEL);
-						if (location == null) {
-							location = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
-						}
-						CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new NamespacedId(location.getNamespace(), location.getPath())));
-					}
 					
 					ResourceLocation resourceLocation2 = layer.usePlayerTexture() && resourceLocation != null
 						? resourceLocation
@@ -117,13 +105,6 @@ public class EquipmentLayerRenderer {
 
 			ArmorTrim armorTrim = (ArmorTrim)itemStack.get(DataComponents.TRIM);
 			if (armorTrim != null) {
-				// Iris: Set trim item context
-				if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-					&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					&& WorldRenderingSettings.INSTANCE.getItemIds() != null) {
-					EntityState.interposeItemId(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new NamespacedId("minecraft", "trim_" + armorTrim.material().value().assets().base().suffix())));
-				}
 				
 				TextureAtlasSprite textureAtlasSprite = (TextureAtlasSprite)this.trimSpriteLookup
 					.apply(new EquipmentLayerRenderer.TrimSpriteKey(armorTrim, layerType, resourceKey));
@@ -133,20 +114,8 @@ public class EquipmentLayerRenderer {
 				}
 				submitNodeCollector.order(m++).submitModelSemantic(model, object, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, textureAtlasSprite, j, null);
 				
-				// Iris: Restore item context after trim
-				if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-					&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-					EntityState.restoreItemId();
-				}
 			}
 			
-			// Iris: Clear item context at end
-			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
-			}
 		}
 	}
 

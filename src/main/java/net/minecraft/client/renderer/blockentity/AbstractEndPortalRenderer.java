@@ -36,76 +36,23 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 	}
 
 	public void submit(S endPortalRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
-		boolean rustWholeFrame = (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && !rustWholeFrame) {
-			throw new IllegalStateException("Selected Vulkan cannot execute Java End Portal geometry while the Rust portal route is unavailable");
-		}
-		if (rustWholeFrame && submitNodeCollector.isSemanticCoverageOnly()) {
+		if (submitNodeCollector.isSemanticCoverageOnly()) {
 			// The whole-frame route keeps end-portal custom geometry unavailable
 			// until its copied material primitive is admitted; do not count this
 			// already-owned route as a hidden Java callback during source coverage.
 			return;
 		}
-		if (rustWholeFrame) {
-			boolean[] faces = new boolean[Direction.values().length];
-			for (Direction direction : endPortalRenderState.facesToShow) faces[direction.ordinal()] = true;
-			float gameTime = net.minecraft.client.Minecraft.getInstance().level.getGameTime()
-				+ net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(
-					net.minecraft.client.Minecraft.getInstance().getDeltaTracker()
-				);
-			if (submitNodeCollector.submitEndPortalSemantic(
-				poseStack, faces, this.getOffsetDown(), this.getOffsetUp(), gameTime, 15728880
-			)) return;
-			throw new IllegalStateException("Rust whole-frame End Portal route unavailable for semantic cube");
-		}
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Rust whole-frame End Portal route is unavailable; Java custom geometry is not a fallback");
-		}
-		// Iris: Cancel default rendering when shader pack is loaded (from MixinTheEndPortalRenderer)
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !rustWholeFrame && net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
-			// Custom rendering is handled by the renderType override which returns RenderType.entitySolid()
-			return;
-		}
+		boolean[] faces = new boolean[Direction.values().length];
+		for (Direction direction : endPortalRenderState.facesToShow) faces[direction.ordinal()] = true;
+		float gameTime = net.minecraft.client.Minecraft.getInstance().level.getGameTime()
+			+ net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(
+				net.minecraft.client.Minecraft.getInstance().getDeltaTracker()
+			);
+		if (submitNodeCollector.submitEndPortalSemantic(
+			poseStack, faces, this.getOffsetDown(), this.getOffsetUp(), gameTime, 15728880
+		)) return;
+		throw new IllegalStateException("Rust whole-frame End Portal route unavailable for semantic cube");
 		
-		submitNodeCollector.submitCustomGeometrySemantic(
-			poseStack, this.renderType(), (pose, vertexConsumer) -> this.renderCube(endPortalRenderState.facesToShow, pose.pose(), vertexConsumer)
-		);
-	}
-
-	private void renderCube(EnumSet<Direction> enumSet, Matrix4f matrix4f, VertexConsumer vertexConsumer) {
-		float f = this.getOffsetDown();
-		float g = this.getOffsetUp();
-		this.renderFace(enumSet, matrix4f, vertexConsumer, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F, 1.0F, 1.0F, 1.0F, Direction.SOUTH);
-		this.renderFace(enumSet, matrix4f, vertexConsumer, 0.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, Direction.NORTH);
-		this.renderFace(enumSet, matrix4f, vertexConsumer, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 1.0F, 1.0F, 0.0F, Direction.EAST);
-		this.renderFace(enumSet, matrix4f, vertexConsumer, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F, 0.0F, Direction.WEST);
-		this.renderFace(enumSet, matrix4f, vertexConsumer, 0.0F, 1.0F, f, f, 0.0F, 0.0F, 1.0F, 1.0F, Direction.DOWN);
-		this.renderFace(enumSet, matrix4f, vertexConsumer, 0.0F, 1.0F, g, g, 1.0F, 1.0F, 0.0F, 0.0F, Direction.UP);
-	}
-
-	private void renderFace(
-		EnumSet<Direction> enumSet,
-		Matrix4f matrix4f,
-		VertexConsumer vertexConsumer,
-		float f,
-		float g,
-		float h,
-		float i,
-		float j,
-		float k,
-		float l,
-		float m,
-		Direction direction
-	) {
-		if (enumSet.contains(direction)) {
-			vertexConsumer.addVertex(matrix4f, f, h, j);
-			vertexConsumer.addVertex(matrix4f, g, h, k);
-			vertexConsumer.addVertex(matrix4f, g, i, l);
-			vertexConsumer.addVertex(matrix4f, f, i, m);
-		}
 	}
 
 	protected float getOffsetUp() {
@@ -117,12 +64,6 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 	}
 
 	protected RenderType renderType() {
-		// Iris: Use entitySolid render type when shader pack is loaded (from MixinTheEndPortalRenderer)
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
-			return net.minecraft.client.renderer.RenderType.entitySolid(net.minecraft.client.renderer.blockentity.TheEndPortalRenderer.END_PORTAL_LOCATION);
-		}
 		return RenderType.endPortal();
 	}
 }

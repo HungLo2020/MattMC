@@ -104,8 +104,7 @@ public final class RustGalGuiItemRenderer {
 	public static List<RustGalGuiElementRenderState> tryEnqueueSpecialItem(
 		GuiItemRenderState item, int guiWidth, int guiHeight, @Nullable Integer dynamicLayerOrder
 	) {
-		if (RustGalGuiRenderer.currentExecutionRoute() != RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME
-			|| !item.itemStackRenderState().hasSpecialRenderer()) return List.of();
+		if (!item.itemStackRenderState().hasSpecialRenderer()) return List.of();
 		final ItemStackRenderState.SpecialRender[] selected = new ItemStackRenderState.SpecialRender[1];
 		final boolean[] foil = new boolean[1];
 		item.itemStackRenderState().forEachSemanticLayer(layer -> {
@@ -959,8 +958,7 @@ public final class RustGalGuiItemRenderer {
 		// This is a normal producer route for Rust's exclusive Vulkan frame. An
 		// unsupported item remains Java-owned before selection; selected items
 		// never enter Java's PIP renderer in the same frame.
-		return !STANDARD_3D_ROUTE_DISABLED
-			&& RustGalGuiRenderer.currentExecutionRoute() == RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME;
+		return !STANDARD_3D_ROUTE_DISABLED;
 	}
 
 	/**
@@ -1005,9 +1003,6 @@ public final class RustGalGuiItemRenderer {
 		int guiHeight,
 		@Nullable Integer dynamicLayerOrder
 	) {
-		if (RustGalGuiRenderer.currentExecutionRoute() != RustGalGuiRenderer.GuiExecutionRoute.RUST_VULKAN_WHOLE_FRAME) {
-			return List.of();
-		}
 		if (item.itemStackRenderState().displayContext() != ItemDisplayContext.GUI) {
 			recordDiagnostic("display-context");
 			return List.of();

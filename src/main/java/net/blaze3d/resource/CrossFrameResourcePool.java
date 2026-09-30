@@ -66,8 +66,7 @@ public class CrossFrameResourcePool implements GraphicsResourceAllocator, AutoCl
 
 	/** Releases pooled Java physical resources before Rust owns Vulkan frames. */
 	public void ensureRustSemanticRoute() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) this.clear();
+		this.clear();
 	}
 
 	@VisibleForTesting

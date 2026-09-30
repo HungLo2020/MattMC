@@ -44,20 +44,7 @@ public final class VoxelConstants {
     @NotNull
     public static Minecraft getMinecraft() { return Minecraft.getInstance(); }
 
-    public static boolean isSystemMacOS() { return InputQuirks.REPLACE_CTRL_KEY_WITH_CMD_KEY; }
-
-    public static boolean isFabulousGraphicsOrBetter() { return Minecraft.useShaderTransparency(); }
-
     public static boolean isSinglePlayer() { return getMinecraft().isLocalServer(); }
-    public static boolean isRealmServer() {
-        // VoxelMap: Realms not supported in MattMC (ServerData.Type doesn't have REALM)
-        return false;
-        /* Original code:
-        ClientPacketListener playNetworkHandler = getMinecraft().getConnection();
-        ServerData serverInfo = playNetworkHandler != null ? getMinecraft().getConnection().getServerData() : null;
-        return serverInfo != null && serverInfo.isRealm();
-        */
-    }
 
     @NotNull
     public static Logger getLogger() { return LOGGER; }
@@ -142,30 +129,15 @@ public final class VoxelConstants {
             return; // Failed to initialize, skip rendering
         }
 
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-            && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            throw new IllegalStateException("Selected Vulkan VoxelMap overlay is unavailable before Rust whole-frame admission");
-        }
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            if (getVoxelMapInstance().getMap() == null) {
-                return;
-            }
-            getVoxelMapInstance().onTickSemantic();
-            if (!getVoxelMapInstance().getMap().renderRustSemanticOverlay(guiGraphics)) {
-                throw new IllegalStateException("Rust whole-frame Vulkan VoxelMap overlay is unavailable for the current waypoint/settings state");
-            }
+        if (getVoxelMapInstance().getMap() == null) {
             return;
         }
-
-        try {
-            VoxelConstants.getVoxelMapInstance().onTickInGame(guiGraphics);
-        } catch (RuntimeException e) {
-            VoxelConstants.getLogger().log(org.apache.logging.log4j.Level.ERROR, "Error while render overlay", e);
+        getVoxelMapInstance().onTickSemantic();
+        if (!getVoxelMapInstance().getMap().renderRustSemanticOverlay(guiGraphics)) {
+            throw new IllegalStateException("Rust whole-frame Vulkan VoxelMap overlay is unavailable for the current waypoint/settings state");
         }
-    }
+        return;
 
-    public static boolean onChat(Component chat, GuiMessageTag indicator) {
-        return CommandUtils.checkForWaypoints(chat, indicator);
     }
 
     public static boolean onSendChatMessage(String message) {
@@ -180,55 +152,9 @@ public final class VoxelConstants {
         }
     }
 
-    public static void onRenderWaypoints(float gameTimeDeltaPartialTick, PoseStack poseStack, BufferSource bufferSource, Camera camera) {
-        if (!initialized) {
-            return; // Not initialized yet, skip rendering
-        }
-        
-        try {
-            WaypointManager manager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
-            if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-                throw new IllegalStateException("Selected Vulkan VoxelMap waypoint rendering is unavailable before Rust whole-frame admission");
-            }
-            if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-                // Beacon-only mode has a bounded semantic representation today:
-                // world-space vertical line segments. Sign/icon/text semantics
-                // remain fail-closed in assertRustWholeFrameWaypointsSupported.
-                if (manager.options.showBeacons && !manager.options.showWaypoints) {
-                    net.minecraft.world.phys.Vec3 cameraPos = camera.getPosition();
-                    double bottom = getClientWorld().getMinY() - cameraPos.y;
-                    for (net.voxelmap.util.Waypoint waypoint : manager.getWaypoints()) {
-                        if (waypoint == null || !waypoint.isActive()) continue;
-                        float x = (float)(waypoint.getX() + 0.5 - cameraPos.x);
-                        float z = (float)(waypoint.getZ() + 0.5 - cameraPos.z);
-                        float[] submitted = {x, (float)bottom, z, x, (float)(bottom + getClientWorld().getHeight()), z};
-                        if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueVoxelMapBeaconSegments(
-                            poseStack.last().pose(), submitted, waypointColor(waypoint), 2.0F)) {
-                            throw new IllegalStateException("Rust VoxelMap beacon semantic route rejected active beams");
-                        }
-                    }
-                    return;
-                }
-                // Sign/icon/text semantics were submitted during Rust world
-                // text extraction; never reopen VoxelMap's Java BufferSource.
-                return;
-            }
-            manager.renderWaypoints(gameTimeDeltaPartialTick, poseStack, bufferSource, camera);
-        } catch (RuntimeException e) {
-            if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-                // Whole-frame Vulkan has no Java BufferSource fallback. Preserve
-                // the failure so admission cannot turn into a silent omission.
-                throw e;
-            }
-            VoxelConstants.getLogger().log(org.apache.logging.log4j.Level.ERROR, "Error while render waypoints", e);
-        }
-    }
-
     /** Lifecycle hook retained for callers that validate VoxelMap ownership. */
     public static void assertRustWholeFrameWaypointsSupported() {
-        if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() || !initialized || getVoxelMapInstance().getMap() == null) {
+        if (!initialized || getVoxelMapInstance().getMap() == null) {
             return;
         }
         // Beacon-only and sign/icon/label semantics are copied by the explicit
@@ -238,11 +164,7 @@ public final class VoxelConstants {
 
     /** Submits copied VoxelMap 3D icon/background/text semantics before Rust world-text extraction. */
     public static void submitRustWaypointSemantics(SubmitNodeCollector collector, PoseStack poseStack, Camera camera) {
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() || !initialized || collector == null || camera == null) return;
-		// During backend bootstrap the presenter may not yet have admitted the
-		// textured-billboard route. Defer this semantic producer to the next frame
-		// rather than manufacturing a Java fallback or rejecting the whole client.
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) return;
+		if (!initialized || collector == null || camera == null) return;
         WaypointManager manager = getVoxelMapInstance().getWaypointManager();
         if (!manager.options.waypointsAllowed || !manager.options.showWaypoints) return;
         net.minecraft.world.phys.Vec3 cameraPos = camera.getPosition();
@@ -270,7 +192,7 @@ public final class VoxelConstants {
 			float[] iconUvs = {0, 0, 0, 1, 1, 1, 1, 0};
 			if (!collector.submitTranslucentTexturedQuadSemantic(poseStack, (RenderType)null, iconSource, iconVertices, iconUvs, waypoint.getUnifiedColor(), 0x00F000F0)) {
                 throw new IllegalStateException("Rust whole-frame waypoint icon route rejected semantic quad (mode="
-					+ net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
+					+ true
 					+ ", route=" + net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute() + ")");
             }
             int halfWidth = Minecraft.getInstance().font.width(name) / 2;
@@ -287,13 +209,6 @@ public final class VoxelConstants {
             );
             poseStack.popPose();
         }
-    }
-
-    private static int waypointColor(net.voxelmap.util.Waypoint waypoint) {
-        int red = Math.clamp((int)(waypoint.red * 255.0F), 0, 255);
-        int green = Math.clamp((int)(waypoint.green * 255.0F), 0, 255);
-        int blue = Math.clamp((int)(waypoint.blue * 255.0F), 0, 255);
-        return (204 << 24) | (red << 16) | (green << 8) | blue;
     }
 
     public static void onShutDown() {
@@ -351,7 +266,4 @@ public final class VoxelConstants {
         VoxelConstants.modApiBridge = modApiBridge;
     }
 
-    public static ModApiBridge getModApiBridge() {
-        return modApiBridge;
-    }
 }

@@ -1,6 +1,5 @@
 package net.sodium.client.compatibility.environment.probe;
 
-import net.sodium.client.compatibility.environment.GlContextInfo;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.regex.Pattern;
@@ -55,19 +54,6 @@ public enum GraphicsAdapterVendor {
         } else {
             return UNKNOWN;
         }
-    }
-
-    @NotNull
-    public static GraphicsAdapterVendor fromContext(GlContextInfo context) {
-        var vendor = context.vendor();
-
-        return switch (vendor) {
-            case "NVIDIA Corporation" -> NVIDIA;
-            case "Intel", "Intel Open Source Technology Center" -> INTEL;
-            case "AMD", "ATI Technologies Inc." -> AMD;
-            default -> UNKNOWN;
-        };
-
     }
 
     private static boolean matchesPattern(Pattern pattern, String name) {

@@ -11,10 +11,7 @@ public class ChunkBuildContext {
 
     public ChunkBuildContext(ClientLevel level, ChunkVertexType vertexType) {
 		this(level, vertexType,
-			net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					? false
-					: net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo());
+			false);
 	}
 
 	/**

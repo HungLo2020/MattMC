@@ -24,7 +24,6 @@ import net.minecraft.client.renderer.texture.TextureManager;
 import net.logging.LogUtils;
 import net.sodium.client.render.vertex.VertexConsumerUtils;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.VulkanicCoreAPI;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -54,9 +53,7 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	public void add(
 		SingleQuadParticle.Layer layer, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p, float q, int r, int s
 	) {
-		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		if (rustWholeFrame && (layer == null || !Float.isFinite(f) || !Float.isFinite(g) || !Float.isFinite(h)
+		if ((layer == null || !Float.isFinite(f) || !Float.isFinite(g) || !Float.isFinite(h)
 			|| !Float.isFinite(i) || !Float.isFinite(j) || !Float.isFinite(k) || !Float.isFinite(l)
 			|| !Float.isFinite(m) || !Float.isFinite(n) || !Float.isFinite(o) || !Float.isFinite(p)
 			|| !Float.isFinite(q)
@@ -64,7 +61,7 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 			|| i * i + j * j + k * k + l * l <= 1.0e-8F)) {
 			throw new IllegalArgumentException("Rust whole-frame particle admission requires finite copied quad semantics");
 		}
-		if (rustWholeFrame && this.particleCount >= MAX_RUST_SEMANTIC_PARTICLES) {
+		if (this.particleCount >= MAX_RUST_SEMANTIC_PARTICLES) {
 			throw new IllegalStateException(
 				"Rust whole-frame particle route exceeded bounded semantic particle capacity "
 					+ MAX_RUST_SEMANTIC_PARTICLES
@@ -158,80 +155,7 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	@Nullable
 	@Override
 	public QuadParticleRenderState.PreparedBuffers prepare(ParticleFeatureRenderer.ParticleBufferCache particleBufferCache) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java particle buffer preparation is unavailable on Rust Vulkan");
-		}
-		int i = this.particleCount * 4;
-		net.minecraft.client.renderer.LightTexture lightTexture = net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture();
-		if (this.particleCount > 0 && debugParticlePrepareLogCount < 32) {
-			debugParticlePrepareLogCount++;
-			StringBuilder layerSummary = new StringBuilder();
-			for (Entry<SingleQuadParticle.Layer, QuadParticleRenderState.Storage> entry : this.particles.entrySet()) {
-				if (layerSummary.length() > 0) {
-					layerSummary.append(", ");
-				}
-				layerSummary
-					.append(entry.getKey().pipeline())
-					.append("[")
-					.append(entry.getValue().count())
-					.append("]");
-			}
-			LOGGER.info(
-				"QuadParticleRenderState prepare#{} particleCount={} layers={}",
-				debugParticlePrepareLogCount,
-				this.particleCount,
-				layerSummary
-			);
-		}
-
-		Object var13;
-		try (ByteBufferBuilder byteBufferBuilder = ByteBufferBuilder.exactlySized(i * DefaultVertexFormat.PARTICLE.getVertexSize())) {
-			BufferBuilder bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
-			Map<SingleQuadParticle.Layer, QuadParticleRenderState.PreparedLayer> map = new HashMap();
-			int j = 0;
-
-			for (Entry<SingleQuadParticle.Layer, QuadParticleRenderState.Storage> entry : this.particles.entrySet()) {
-				QuadParticleRenderState.Storage storage = (QuadParticleRenderState.Storage)entry.getValue();
-				if (storage.count() > 0 && debugParticleSampleLogCount < 48) {
-					debugParticleSampleLogCount++;
-					LOGGER.info(
-						"QuadParticleRenderState sample#{} layerPipeline={} {}",
-						debugParticleSampleLogCount,
-						entry.getKey().pipeline(),
-						storage.describeFirstParticle(lightTexture)
-					);
-				}
-				((QuadParticleRenderState.Storage)entry.getValue())
-					.forEachParticle((f, g, h, ix, jx, k, l, m, n, o, p, q, r, s) -> this.renderRotatedQuad(bufferBuilder, f, g, h, ix, jx, k, l, m, n, o, p, q, r, s));
-				if (storage.count() > 0) {
-					map.put(
-						(SingleQuadParticle.Layer)entry.getKey(), new QuadParticleRenderState.PreparedLayer(j, storage.count() * 6)
-					);
-				}
-
-				j += storage.count() * 4;
-			}
-
-			MeshData meshData = bufferBuilder.build();
-			if (meshData != null) {
-				particleBufferCache.write(meshData.vertexBuffer());
-				VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(meshData.drawState().indexCount());
-				GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
-					.writeTransform(
-						VulkanicAPI.getModelViewMatrix(),
-						new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
-						new Vector3f(),
-						VulkanicAPI.getTextureMatrix(),
-						VulkanicAPI.getShaderLineWidth()
-					);
-				return new QuadParticleRenderState.PreparedBuffers(meshData.drawState().indexCount(), gpuBufferSlice, map);
-			}
-
-			var13 = null;
-		}
-
-		return (QuadParticleRenderState.PreparedBuffers)var13;
+		throw new IllegalStateException("Java particle buffer preparation is unavailable on Rust Vulkan");
 	}
 
 	@Override
@@ -242,50 +166,7 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 		TextureManager textureManager,
 		boolean bl
 	) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java particle rendering is unavailable on Rust Vulkan");
-		}
-		VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
-		renderPass.setVertexBuffer(0, particleBufferCache.get());
-		renderPass.setIndexBuffer(autoStorageIndexBuffer.getBuffer(preparedBuffers.indexCount), autoStorageIndexBuffer.type());
-
-		for (Entry<SingleQuadParticle.Layer, QuadParticleRenderState.PreparedLayer> entry : preparedBuffers.layers.entrySet()) {
-			if (bl == ((SingleQuadParticle.Layer)entry.getKey()).translucent()) {
-				var lightTextureView = net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
-				var particleTexture = textureManager.getTexture(((SingleQuadParticle.Layer)entry.getKey()).textureAtlasLocation());
-				var liveParticleTexture = particleTexture.getTexture();
-				particleTexture.setFilter(false, false);
-				var particleTextureView = particleTexture.getTextureView();
-				lightTextureView.texture().flushModeChanges2D();
-				particleTextureView.texture().flushModeChanges2D();
-				if (debugParticleDrawLogCount < 64) {
-					debugParticleDrawLogCount++;
-					LOGGER.info(
-						"QuadParticleRenderState draw#{} translucentPass={} layerPipeline={} atlas={} texId={} label={} minFilter={} magFilter={} mipmaps={} indexCount={} vertexOffset={}",
-						debugParticleDrawLogCount,
-						bl,
-						((SingleQuadParticle.Layer)entry.getKey()).pipeline(),
-						((SingleQuadParticle.Layer)entry.getKey()).textureAtlasLocation(),
-						VulkanicCoreAPI.textureId(liveParticleTexture),
-						liveParticleTexture.getLabel(),
-						liveParticleTexture.getMinFilter(),
-						liveParticleTexture.getMagFilter(),
-						liveParticleTexture.usesMipmaps(),
-						((QuadParticleRenderState.PreparedLayer)entry.getValue()).indexCount,
-						((QuadParticleRenderState.PreparedLayer)entry.getValue()).vertexOffset
-					);
-				}
-				renderPass.setPipeline(((SingleQuadParticle.Layer)entry.getKey()).pipeline());
-				VulkanicAPI.bindDefaultUniforms(renderPass);
-				renderPass.setUniform("DynamicTransforms", preparedBuffers.dynamicTransforms);
-				renderPass.bindSampler("Sampler2", lightTextureView);
-				renderPass.bindSampler("Sampler0", particleTextureView);
-				renderPass.drawIndexed(
-					((QuadParticleRenderState.PreparedLayer)entry.getValue()).vertexOffset, 0, ((QuadParticleRenderState.PreparedLayer)entry.getValue()).indexCount, 1
-				);
-			}
-		}
+		throw new IllegalStateException("Java particle rendering is unavailable on Rust Vulkan");
 	}
 
 	// Sodium: Optimized particle rendering (merged from QuadParticleRenderStateMixin)
@@ -302,32 +183,6 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 		this.renderVertex(vertexConsumer, quaternionf, f, g, h, -1.0F, -1.0F, m, n, q, r, s);
 	}
 
-	// Sodium: Optimized vertex emission (merged from QuadParticleRenderStateMixin)
-	private void sodium$emitVertices(net.sodium.api.vertex.buffer.VertexBufferWriter writer, float x, float y, float z, float size, float u0, float u1, float v0, float v1, int color, int light, Quaternionf quaternion) {
-		try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
-			long buffer = stack.nmalloc(4 * net.sodium.api.vertex.format.common.ParticleVertex.STRIDE);
-			long ptr = buffer;
-
-			TEMP_VECTOR.set(1.0F, -1.0F, 0.0F).rotate(quaternion).mul(size).add(x, y, z);
-			net.sodium.api.vertex.format.common.ParticleVertex.put(ptr, TEMP_VECTOR.x, TEMP_VECTOR.y, TEMP_VECTOR.z, u1, v1, color, light);
-			ptr += net.sodium.api.vertex.format.common.ParticleVertex.STRIDE;
-
-			TEMP_VECTOR.set(1.0F, 1.0F, 0.0F).rotate(quaternion).mul(size).add(x, y, z);
-			net.sodium.api.vertex.format.common.ParticleVertex.put(ptr, TEMP_VECTOR.x, TEMP_VECTOR.y, TEMP_VECTOR.z, u1, v0, color, light);
-			ptr += net.sodium.api.vertex.format.common.ParticleVertex.STRIDE;
-
-			TEMP_VECTOR.set(-1.0F, 1.0F, 0.0F).rotate(quaternion).mul(size).add(x, y, z);
-			net.sodium.api.vertex.format.common.ParticleVertex.put(ptr, TEMP_VECTOR.x, TEMP_VECTOR.y, TEMP_VECTOR.z, u0, v0, color, light);
-			ptr += net.sodium.api.vertex.format.common.ParticleVertex.STRIDE;
-
-			TEMP_VECTOR.set(-1.0F, -1.0F, 0.0F).rotate(quaternion).mul(size).add(x, y, z);
-			net.sodium.api.vertex.format.common.ParticleVertex.put(ptr, TEMP_VECTOR.x, TEMP_VECTOR.y, TEMP_VECTOR.z, u0, v1, color, light);
-			ptr += net.sodium.api.vertex.format.common.ParticleVertex.STRIDE;
-
-			writer.push(stack, buffer, 4, net.sodium.api.vertex.format.common.ParticleVertex.FORMAT);
-		}
-	}
-
 	private void renderVertex(
 		VertexConsumer vertexConsumer, Quaternionf quaternionf, float f, float g, float h, float i, float j, float k, float l, float m, int n, int o
 	) {
@@ -338,12 +193,7 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	@Override
 	public void submit(SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		if (this.particleCount > 0) {
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				submitNodeCollector.submitParticleGroupSemantic(this);
-			} else {
-				submitNodeCollector.submitParticleGroup(this);
-			}
+			submitNodeCollector.submitParticleGroupSemantic(this);
 		}
 	}
 
@@ -424,45 +274,6 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 
 		public void clear() {
 			this.currentParticleIndex = 0;
-		}
-
-		public String describeFirstParticle(net.minecraft.client.renderer.LightTexture lightTexture) {
-			if (this.currentParticleIndex <= 0) {
-				return "empty";
-			}
-
-			int floatIndex = 0;
-			int intIndex = 0;
-			float x = this.floatValues[floatIndex++];
-			float y = this.floatValues[floatIndex++];
-			float z = this.floatValues[floatIndex++];
-			float qx = this.floatValues[floatIndex++];
-			float qy = this.floatValues[floatIndex++];
-			float qz = this.floatValues[floatIndex++];
-			float qw = this.floatValues[floatIndex++];
-			float size = this.floatValues[floatIndex++];
-			float u0 = this.floatValues[floatIndex++];
-			float u1 = this.floatValues[floatIndex++];
-			float v0 = this.floatValues[floatIndex++];
-			float v1 = this.floatValues[floatIndex];
-			int color = this.intValues[intIndex++];
-			int light = this.intValues[intIndex];
-			return "pos=(%.3f,%.3f,%.3f) quat=(%.3f,%.3f,%.3f,%.3f) size=%.3f uv=[%.6f,%.6f]-[%.6f,%.6f] color=%s %s".formatted(
-				x,
-				y,
-				z,
-				qx,
-				qy,
-				qz,
-				qw,
-				size,
-				u0,
-				u1,
-				v0,
-				v1,
-				String.format("0x%08X rgba=(%d,%d,%d,%d)", color, color & 255, color >> 8 & 255, color >> 16 & 255, color >>> 24),
-				lightTexture.debugDescribePackedLight(light)
-			);
 		}
 
 		private void grow() {

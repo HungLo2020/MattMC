@@ -65,14 +65,6 @@ public class SimpleEquipmentLayer<S extends LivingEntityRenderState, RM extends 
 		if (equippable != null && !equippable.assetId().isEmpty()) {
 			EM entityModel = livingEntityRenderState.isBaby ? this.babyModel : this.adultModel;
 			
-			// Iris: Set item context
-			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& WorldRenderingSettings.INSTANCE.getItemIds() != null) {
-				ResourceLocation location = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
-				CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new NamespacedId(location.getNamespace(), location.getPath())));
-			}
 			
 			this.equipmentRenderer
 				.renderLayers(
@@ -89,12 +81,6 @@ public class SimpleEquipmentLayer<S extends LivingEntityRenderState, RM extends 
 					this.order
 				);
 			
-			// Iris: Clear item context
-			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
-			}
 		}
 	}
 }

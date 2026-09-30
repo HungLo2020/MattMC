@@ -50,42 +50,4 @@ public enum DepthBufferFormat {
 		};
 	}
 
-	public static DepthBufferFormat fromGlEnumOrDefault(int glenum) {
-		DepthBufferFormat format = fromGlEnum(glenum);
-		// yolo, just assume it's GL_DEPTH_COMPONENT
-		return Objects.requireNonNullElse(format, DepthBufferFormat.DEPTH);
-	}
-
-	public int getGlInternalFormat() {
-		return switch (this) {
-			case DEPTH -> GL_DEPTH_COMPONENT;
-			case DEPTH16 -> GL_DEPTH_COMPONENT16;
-			case DEPTH24 -> GL_DEPTH_COMPONENT24;
-			case DEPTH32 -> GL_DEPTH_COMPONENT32;
-			case DEPTH32F -> GL_DEPTH_COMPONENT32F;
-			case DEPTH_STENCIL -> GL_DEPTH_STENCIL;
-			case DEPTH24_STENCIL8 -> GL_DEPTH24_STENCIL8;
-			case DEPTH32F_STENCIL8 -> GL_DEPTH32F_STENCIL8;
-		};
-
-	}
-
-	public int getGlType() {
-		return isCombinedStencil() ? GL_DEPTH_STENCIL : GL_DEPTH_COMPONENT;
-	}
-
-	public int getGlFormat() {
-		return switch (this) {
-			case DEPTH, DEPTH16 -> GL_UNSIGNED_SHORT;
-			case DEPTH24, DEPTH32 -> GL_UNSIGNED_INT;
-			case DEPTH32F -> GL_FLOAT;
-			case DEPTH_STENCIL, DEPTH24_STENCIL8 -> GL_UNSIGNED_INT_24_8;
-			case DEPTH32F_STENCIL8 -> GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
-		};
-
-	}
-
-	public boolean isCombinedStencil() {
-		return combinedStencil;
-	}
 }

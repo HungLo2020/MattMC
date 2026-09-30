@@ -7,7 +7,6 @@ import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.blending.AlphaTest;
 import net.irisshaders.iris.gl.blending.AlphaTestFunction;
 import net.irisshaders.iris.gl.blending.BlendMode;
@@ -31,7 +30,6 @@ import net.irisshaders.iris.shaderpack.option.OrderBackedProperties;
 import net.irisshaders.iris.shaderpack.option.ShaderPackOptions;
 import net.irisshaders.iris.shaderpack.preprocessor.PropertiesPreprocessor;
 import net.irisshaders.iris.shaderpack.texture.TextureStage;
-import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -55,7 +53,6 @@ import java.util.function.Consumer;
  * values in here & the values parsed from shader source code.
  */
 public class ShaderProperties {
-	final CustomUniforms.Builder customUniforms = new CustomUniforms.Builder();
 	private final Map<String, List<String>> profiles = new LinkedHashMap<>();
 	private final Map<String, List<String>> subScreenOptions = new HashMap<>();
 	private final Map<String, Integer> subScreenColumnCount = new HashMap<>();
@@ -312,13 +309,6 @@ public class ShaderProperties {
 			handlePassDirective("blend.", key, value, pass -> {
 				if (pass.contains(".")) {
 
-					// On the Rust Vulkan route this parse only feeds the options
-					// screen; Rust decides whether the pack's blending is admitted.
-					boolean rustVulkanRoute = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-					if (!rustVulkanRoute && !IrisRenderSystem.supportsBufferBlending()) {
-						throw new RuntimeException("Buffer blending is not supported on this platform, however it was attempted to be used!");
-					}
 
 					String[] parts = pass.split("\\.");
 					int index = PackRenderTargetDirectives.LEGACY_RENDER_TARGETS.indexOf(parts[1]);
@@ -577,25 +567,7 @@ public class ShaderProperties {
 			handleTwoArgDirective("flip.", key, value, (pass, buffer) -> handleBooleanValue(key, value, shouldFlip -> explicitFlips.computeIfAbsent(pass, _pass -> new Object2BooleanOpenHashMap<>())
 				.put(buffer, shouldFlip)));
 
-			handlePassDirective("variable.", key, value, pass -> {
-				String[] parts = pass.split("\\.");
-				if (parts.length != 2) {
-					Iris.logger.warn("Custom variables should take the form of `variable.<type>.<name> = <expression>. Ignoring " + key);
-					return;
-				}
-
-				customUniforms.addVariable(parts[0], parts[1], value, false);
-			});
-
-			handlePassDirective("uniform.", key, value, pass -> {
-				String[] parts = pass.split("\\.");
-				if (parts.length != 2) {
-					Iris.logger.warn("Custom uniforms should take the form of `uniform.<type>.<name> = <expression>. Ignoring " + key);
-					return;
-				}
-
-				customUniforms.addVariable(parts[0], parts[1], value, true);
-			});
+			// variable.* / uniform.* custom uniforms are parsed and evaluated by Rust.
 
 			// TODO: Buffer size directives
 			// TODO: Conditional program enabling directives
@@ -757,10 +729,6 @@ public class ShaderProperties {
 		return oldHandLight;
 	}
 
-	public OptionalBoolean getDynamicHandLight() {
-		return dynamicHandLight;
-	}
-
 	public OptionalBoolean getOldLighting() {
 		return oldLighting;
 	}
@@ -821,28 +789,8 @@ public class ShaderProperties {
 		return vignette;
 	}
 
-	public OptionalBoolean getBackFaceSolid() {
-		return backFaceSolid;
-	}
-
-	public OptionalBoolean getBackFaceCutout() {
-		return backFaceCutout;
-	}
-
-	public OptionalBoolean getBackFaceCutoutMipped() {
-		return backFaceCutoutMipped;
-	}
-
-	public OptionalBoolean getBackFaceTranslucent() {
-		return backFaceTranslucent;
-	}
-
 	public OptionalBoolean getRainDepth() {
 		return rainDepth;
-	}
-
-	public OptionalBoolean getBeaconBeamDepth() {
-		return beaconBeamDepth;
 	}
 
 	public OptionalBoolean getSeparateAo() {
@@ -991,7 +939,4 @@ public class ShaderProperties {
 		return supportsColorCorrection;
 	}
 
-	public CustomUniforms.Builder getCustomUniforms() {
-		return customUniforms;
-	}
 }

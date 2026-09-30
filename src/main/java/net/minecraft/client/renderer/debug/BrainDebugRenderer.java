@@ -61,27 +61,8 @@ public class BrainDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 		this.minecraft = minecraft;
 	}
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		this.doRender(poseStack, multiBufferSource, d, e, f, debugValueAccess);
-		if (!this.minecraft.player.isSpectator()) {
-			this.updateLastLookedAtUuid();
-		}
-	}
-
-	private void doRender(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess) {
-		debugValueAccess.forEachEntity(DebugSubscriptions.BRAINS, (entity, debugBrainDump) -> {
-			if (this.minecraft.player.closerThan(entity, 30.0)) {
-				this.renderBrainInfo(poseStack, multiBufferSource, entity, debugBrainDump, d, e, f);
-			}
-		});
-	}
-
 	/** Copies the complete brain-debug label set into Rust-owned semantic text. */
 	public void collectRustSemantics(Camera camera, SubmitNodeStorage text) {
-		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) return;
 		DebugValueAccess access = this.minecraft.getConnection().createDebugValueAccess();
 		if (this.minecraft.player != null && !this.minecraft.player.isSpectator()) this.updateLastLookedAtUuid();
 		access.forEachEntity(DebugSubscriptions.BRAINS, (entity, dump) -> {
@@ -112,81 +93,6 @@ public class BrainDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
 		pose.mulPose(camera.rotation()); pose.scale(scale, -scale, scale);
 		text.submitTextSemantic(0, pose, -0.5F, 0.0F, Component.literal(value).getVisualOrderText(), true, Font.DisplayMode.SEE_THROUGH, color, -1, 0, 0);
 		return line + 1;
-	}
-
-	private void renderBrainInfo(
-		PoseStack poseStack, MultiBufferSource multiBufferSource, Entity entity, DebugBrainDump debugBrainDump, double d, double e, double f
-	) {
-		boolean bl = this.isMobSelected(entity);
-		int i = 0;
-		DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, debugBrainDump.name(), -1, 0.03F);
-		i++;
-		if (bl) {
-			DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, debugBrainDump.profession() + " " + debugBrainDump.xp() + " xp", -1, 0.02F);
-			i++;
-		}
-
-		if (bl) {
-			int j = debugBrainDump.health() < debugBrainDump.maxHealth() ? -23296 : -1;
-			DebugRenderer.renderTextOverMob(
-				poseStack,
-				multiBufferSource,
-				entity,
-				i,
-				"health: " + String.format(Locale.ROOT, "%.1f", debugBrainDump.health()) + " / " + String.format(Locale.ROOT, "%.1f", debugBrainDump.maxHealth()),
-				j,
-				0.02F
-			);
-			i++;
-		}
-
-		if (bl && !debugBrainDump.inventory().equals("")) {
-			DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, debugBrainDump.inventory(), -98404, 0.02F);
-			i++;
-		}
-
-		if (bl) {
-			for (String string : debugBrainDump.behaviors()) {
-				DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, string, -16711681, 0.02F);
-				i++;
-			}
-		}
-
-		if (bl) {
-			for (String string : debugBrainDump.activities()) {
-				DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, string, -16711936, 0.02F);
-				i++;
-			}
-		}
-
-		if (debugBrainDump.wantsGolem()) {
-			DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, "Wants Golem", -23296, 0.02F);
-			i++;
-		}
-
-		if (bl && debugBrainDump.angerLevel() != -1) {
-			DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, "Anger Level: " + debugBrainDump.angerLevel(), -98404, 0.02F);
-			i++;
-		}
-
-		if (bl) {
-			for (String string : debugBrainDump.gossips()) {
-				if (string.startsWith(debugBrainDump.name())) {
-					DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, string, -1, 0.02F);
-				} else {
-					DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, string, -23296, 0.02F);
-				}
-
-				i++;
-			}
-		}
-
-		if (bl) {
-			for (String string : Lists.reverse(debugBrainDump.memories())) {
-				DebugRenderer.renderTextOverMob(poseStack, multiBufferSource, entity, i, string, -3355444, 0.02F);
-				i++;
-			}
-		}
 	}
 
 	private boolean isMobSelected(Entity entity) {

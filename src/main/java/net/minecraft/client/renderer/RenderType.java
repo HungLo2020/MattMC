@@ -16,8 +16,6 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
@@ -765,16 +763,8 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 		return LINES;
 	}
 
-	public static RenderType secondaryBlockOutline() {
-		return SECONDARY_BLOCK_OUTLINE;
-	}
-
 	public static RenderType lineStrip() {
 		return LINE_STRIP;
-	}
-
-	public static RenderType debugLineStrip(double d) {
-		return (RenderType)DEBUG_LINE_STRIP.apply(d);
 	}
 
 	public static RenderType debugFilledBox() {
@@ -783,18 +773,6 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 
 	public static RenderType debugQuads() {
 		return DEBUG_QUADS;
-	}
-
-	public static RenderType debugTriangleFan() {
-		return DEBUG_TRIANGLE_FAN;
-	}
-
-	public static RenderType debugStructureQuads() {
-		return DEBUG_STRUCTURE_QUADS;
-	}
-
-	public static RenderType debugSectionQuads() {
-		return DEBUG_SECTION_QUADS;
 	}
 
 	private static Function<ResourceLocation, RenderType> createWeather(RenderPipeline renderPipeline) {
@@ -816,14 +794,6 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 
 	public static RenderType weather(ResourceLocation resourceLocation, boolean bl) {
 		return (RenderType)(bl ? WEATHER_DEPTH_WRITE : WEATHER_NO_DEPTH_WRITE).apply(resourceLocation);
-	}
-
-	public static RenderType blockScreenEffect(ResourceLocation resourceLocation) {
-		return (RenderType)BLOCK_SCREEN_EFFECT.apply(resourceLocation);
-	}
-
-	public static RenderType fireScreenEffect(ResourceLocation resourceLocation) {
-		return (RenderType)FIRE_SCREEN_EFFECT.apply(resourceLocation);
 	}
 
 	public RenderType(String string, int i, boolean bl, boolean bl2, Runnable runnable, Runnable runnable2) {
@@ -902,8 +872,9 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 				i,
 				bl,
 				bl2,
-				() -> compositeState.states.forEach(RenderStateShard::setupRenderState),
-				() -> compositeState.states.forEach(RenderStateShard::clearRenderState)
+				// Rust applies render-state semantics; there is no Java GL state to set.
+				() -> {},
+				() -> {}
 			);
 			this.state = compositeState;
 			this.renderPipeline = renderPipeline;
@@ -943,105 +914,7 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 
 		@Override
 		public void draw(MeshData meshData) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-				throw new IllegalStateException("Java immediate RenderType drawing is unavailable on selected Vulkan");
-			}
-			this.setupRenderState();
-			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
-				.writeTransform(
-					VulkanicAPI.getModelViewMatrix(),
-					new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
-					new Vector3f(),
-					VulkanicAPI.getTextureMatrix(),
-					VulkanicAPI.getShaderLineWidth()
-				);
-			MeshData var3 = meshData;
-
-			try {
-				GpuBuffer gpuBuffer = this.renderPipeline.getVertexFormat().uploadImmediateVertexBuffer(meshData.vertexBuffer());
-				GpuBuffer gpuBuffer2;
-				VertexFormat.IndexType indexType;
-				if (meshData.indexBuffer() == null) {
-					VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(meshData.drawState().mode());
-					gpuBuffer2 = autoStorageIndexBuffer.getBuffer(meshData.drawState().indexCount());
-					indexType = autoStorageIndexBuffer.type();
-				} else {
-					gpuBuffer2 = this.renderPipeline.getVertexFormat().uploadImmediateIndexBuffer(meshData.indexBuffer());
-					indexType = meshData.drawState().indexType();
-				}
-
-				RenderTarget renderTarget = this.state.outputState.getRenderTarget();
-				GpuTextureView outputColorOverride = VulkanicAPI.getOutputColorTextureOverride();
-				GpuTextureView outputDepthOverride = VulkanicAPI.getOutputDepthTextureOverride();
-				int drawFramebuffer = outputColorOverride == null && outputDepthOverride == null
-					? VulkanicAPI.getDrawFramebufferBinding()
-					: 0;
-
-				try (RenderPass renderPass = drawFramebuffer != 0
-						? VulkanicAPI.createRenderPass(() -> "Immediate draw for " + this.getName(), drawFramebuffer, renderTarget.useDepth)
-						: VulkanicAPI.createRenderPass(
-							() -> "Immediate draw for " + this.getName(),
-							outputColorOverride != null ? outputColorOverride : renderTarget.getColorTextureView(),
-							OptionalInt.empty(),
-							renderTarget.useDepth ? (outputDepthOverride != null ? outputDepthOverride : renderTarget.getDepthTextureView()) : null,
-							OptionalDouble.empty()
-						)) {
-					renderPass.setPipeline(this.renderPipeline);
-					ScissorState scissorState = VulkanicAPI.getScissorStateForRenderTypeDraws();
-					if (scissorState.enabled()) {
-						renderPass.enableScissor(scissorState.x(), scissorState.y(), scissorState.width(), scissorState.height());
-					}
-
-					VulkanicAPI.bindDefaultUniforms(renderPass);
-					renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
-					renderPass.setVertexBuffer(0, gpuBuffer);
-
-					for (int i = 0; i < 12; i++) {
-						GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(i);
-						int textureId = IrisRenderSystem.getTextureBinding(i);
-						if (textureView != null && textureId > 0 && net.vulkanic.VulkanicCoreAPI.textureId(textureView) != textureId) {
-							textureView = null;
-						}
-						if (textureView == null) {
-							if (textureId > 0) {
-								textureView = TextureTracker.INSTANCE.getTextureView(textureId);
-							}
-							if (textureView == null && i == 2) {
-								textureView = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
-							}
-						}
-						if (textureView != null) {
-							renderPass.bindSampler("Sampler" + i, textureView);
-						}
-					}
-
-					renderPass.setIndexBuffer(gpuBuffer2, indexType);
-					renderPass.drawIndexed(0, 0, meshData.drawState().indexCount(), 1);
-					net.minecraft.client.dev.GraphicsAuditEquipmentGeometry.observeCompletedDraw(
-						this.state.textureState.cutoutTexture().orElse(null), this.renderPipeline,
-						meshData.drawState().vertexCount(), meshData.drawState().indexCount(), VulkanicAPI.getModelViewMatrix());
-					net.minecraft.client.dev.GraphicsAuditWolfInputs.observeCompletedDraw(
-						this.state.textureState.cutoutTexture().orElse(null), this.renderPipeline,
-						meshData.drawState().vertexCount(), meshData.drawState().indexCount(), VulkanicAPI.getModelViewMatrix());
-				}
-			} catch (Throwable var17) {
-				if (meshData != null) {
-					try {
-						var3.close();
-					} catch (Throwable var14) {
-						var17.addSuppressed(var14);
-					}
-				}
-
-				throw var17;
-			}
-
-			if (meshData != null) {
-				meshData.close();
-			}
-
-			this.clearRenderState();
+			throw new IllegalStateException("Java immediate RenderType drawing is unavailable on selected Vulkan");
 		}
 
 		@Override

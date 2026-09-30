@@ -19,14 +19,6 @@ public class DynamicMoveableTexture extends DynamicTexture {
         return this.getPixels().getHeight();
     }
 
-    public int getIndex() {
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-            || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            throw new IllegalStateException("Java VoxelMap texture handles are unavailable while Rust owns whole-frame presentation");
-        }
-        return net.vulkanic.VulkanicCoreAPI.textureId(this.getTexture());
-    }
-
     public void moveX(int offset) {
         synchronized (this.bufferLock) {
             long pointer = this.getPixels().getPointer();

@@ -51,18 +51,12 @@ public class DhApi
 			"Please refer to the example API project or the DH Developer Wiki for additional information " +
 			"and suggested setup. \n" + // DH Dev note: no links were included to prevent link rot. 
 			"";
-	public static String readMe() { return READ_ME; }
 	
 	/**
 	 * This is just a humorous way to reference the {@link DhApi#READ_ME} constant string and hopefully peak a few people's attention
 	 * vs the relatively boring "readMe".
 	 */
 	public static final String HEY_YOU_YOURE_FINALLY_AWAKE = READ_ME;
-	/** 
-	 * This is just a humorous way to reference the {@link DhApi#READ_ME} constant string and hopefully peak a few people's attention
-	 * vs the relatively boring "readMe".
-	 */
-	public static String heyYou_YoureFinallyAwake() { return READ_ME; } 
 	
 	
 	
@@ -147,40 +141,8 @@ public class DhApi
 	
 	// getters //
 	
-	/** 
-	 * This version should only be updated when breaking changes are introduced to the Distant Horizons API.
-	 * @since API 1.0.0
-	 */
-	public static int getApiMajorVersion() { return ModInfo.API_MAJOR_VERSION; }
-	/** 
-	 * This version should be updated whenever new methods are added to the Distant Horizons API. 
-	 * @since API 1.0.0 
-	 */
-	public static int getApiMinorVersion() { return ModInfo.API_MINOR_VERSION; }
-	/** 
-	 * This version should be updated whenever non-breaking fixes are added to the Distant Horizons API. 
-	 * @since API 1.0.0 
-	 */
-	public static int getApiPatchVersion() { return ModInfo.API_PATCH_VERSION; }
 	
-	/**
-	 * Returns the mod's semantic version number in the format: Major.Minor.Patch
-	 * with optional extensions "-a" for alpha, "-b" for beta, and -dev for unstable development builds. <br>
-	 * Examples: "1.6.9-a", "1.7.0-a-dev", "2.1.0-b", "3.0.0", "3.1.4-dev"
-	 * @since API 1.0.0
-	 */
-	public static String getModVersion() { return ModInfo.VERSION; }
-	/** 
-	 * Returns true if the mod is a development version, false if it is a release version. 
-	 * @since API 1.0.0 
-	 */
-	public static boolean getIsDevVersion() { return ModInfo.IS_DEV_BUILD; }
 	
-	/** 
-	 * Returns the network protocol version. 
-	 * @since API 1.0.0 
-	 */
-	public static int getNetworkProtocolVersion() { return ModInfo.PROTOCOL_VERSION; }
 	
 	
 	// methods //

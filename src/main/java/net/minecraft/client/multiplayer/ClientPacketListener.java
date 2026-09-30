@@ -577,21 +577,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			this.seenInsecureChatWarning = true;
 		}
 		
-		// Iris owns this diagnostic/compatibility lifecycle only for legacy
-		// renderers. Rust whole-frame Vulkan obtains shader-pack and Distant
-		// Horizons admission from copied semantic configuration instead.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected() && this.minecraft.player != null) {
-			net.irisshaders.iris.Iris.getStoredError().ifPresent(e ->
-				this.minecraft.player.displayClientMessage(net.minecraft.network.chat.Component.translatable(e instanceof net.irisshaders.iris.gl.shader.ShaderCompileException ? "iris.load.failure.shader" : "iris.load.failure.generic").append(net.minecraft.network.chat.Component.literal("Copy Info").withStyle(arg -> arg.withUnderlined(true).withColor(net.minecraft.ChatFormatting.BLUE).withClickEvent(new net.minecraft.network.chat.ClickEvent.CopyToClipboard(e.getMessage())).withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(net.minecraft.network.chat.Component.translatable("chat.copy.click"))))), false));
-
-			if (net.irisshaders.iris.Iris.loadedIncompatiblePack()) {
-				this.minecraft.gui.setTimes(10, 70, 140);
-				net.irisshaders.iris.Iris.logger.warn("Incompatible pack for DH!");
-				this.minecraft.player.displayClientMessage(net.minecraft.network.chat.Component.literal("This pack doesn't have DH support.").withStyle(net.minecraft.ChatFormatting.BOLD, net.minecraft.ChatFormatting.RED), false);
-				this.minecraft.player.displayClientMessage(net.minecraft.network.chat.Component.literal("Distant Horizons (DH) chunks won't show up. This isn't a bug, get another shader.").withStyle(net.minecraft.ChatFormatting.RED), false);
-			}
-		}
 		
 		// DH: Fire client connected and level load events
 		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.onClientOnlyConnected();
@@ -1428,7 +1413,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		int i = clientboundContainerSetSlotPacket.getSlot();
 		this.minecraft.getTutorial().onGetItem(itemStack);
 		// Creative inventory screen removed - JEI panel integrated into all inventories
-		boolean bl = false;
 
 		if (clientboundContainerSetSlotPacket.getContainerId() == 0) {
 			if (InventoryMenu.isHotbarSlot(i) && !itemStack.isEmpty()) {
@@ -1439,8 +1423,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			}
 
 			player.inventoryMenu.setItem(i, clientboundContainerSetSlotPacket.getStateId(), itemStack);
-		} else if (clientboundContainerSetSlotPacket.getContainerId() == player.containerMenu.containerId
-			&& (clientboundContainerSetSlotPacket.getContainerId() != 0 || !bl)) {
+		} else if (clientboundContainerSetSlotPacket.getContainerId() == player.containerMenu.containerId) {
 			player.containerMenu.setItem(i, clientboundContainerSetSlotPacket.getStateId(), itemStack);
 		}
 		// Creative inventory screen removed - no special handling needed

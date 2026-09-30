@@ -106,52 +106,7 @@ public class WeatherEffectRenderer {
 
 	public void render(MultiBufferSource multiBufferSource, Vec3 vec3, WeatherRenderState weatherRenderState) {
 		net.minecraft.client.dev.DeterministicCameraCapture.recordWeatherSemanticFingerprint(weatherSemanticFingerprint(weatherRenderState, vec3));
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java weather rendering is unavailable while Rust owns whole-frame presentation");
-		}
-		net.vulkanic.world.WorldRenderRoutePolicy.Route weatherRoute = net.vulkanic.world.WorldRenderRoutePolicy.currentWeatherRoute();
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !weatherRoute.usesRustWholeFrameVulkan()) {
-			throw new IllegalStateException("Java Vulkan weather rendering is unavailable until the Rust whole-frame weather route is admitted");
-		}
-		if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			&& weatherRoute == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
-			&& weatherRenderState != null
-			&& (!weatherRenderState.rainColumns.isEmpty() || !weatherRenderState.snowColumns.isEmpty())) {
-			throw new IllegalStateException("Rust whole-frame weather route is unavailable while Rust owns presentation");
-		}
-		boolean rustWeather = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& weatherRoute.usesRustWholeFrameVulkan();
-		// Iris: Allow shaders to disable weather rendering (from MixinWeatherRenderer)
-		if (!rustWeather && !net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderWeather).orElse(true)) {
-			return;
-		}
-		
-		if (!weatherRenderState.rainColumns.isEmpty()) {
-			// Iris: Allow shaders to write to depth buffer (from MixinWeatherRenderer)
-			boolean useShaderTransparency = Minecraft.useShaderTransparency();
-			if (!rustWeather && net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldWriteRainAndSnowToDepthBuffer).orElse(false)) {
-				useShaderTransparency = true;
-			}
-			RenderType renderType = RenderType.weather(RAIN_LOCATION, useShaderTransparency);
-			this.renderInstances(
-				multiBufferSource.getBuffer(renderType), weatherRenderState.rainColumns, vec3, 1.0F, weatherRenderState.radius, weatherRenderState.intensity
-			);
-		}
-
-		if (!weatherRenderState.snowColumns.isEmpty()) {
-			// Iris: Allow shaders to write to depth buffer (from MixinWeatherRenderer)
-			boolean useShaderTransparency = Minecraft.useShaderTransparency();
-			if (!rustWeather && net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldWriteRainAndSnowToDepthBuffer).orElse(false)) {
-				useShaderTransparency = true;
-			}
-			RenderType renderType = RenderType.weather(SNOW_LOCATION, useShaderTransparency);
-			this.renderInstances(
-				multiBufferSource.getBuffer(renderType), weatherRenderState.snowColumns, vec3, 0.8F, weatherRenderState.radius, weatherRenderState.intensity
-			);
-		}
+		throw new IllegalStateException("Java weather rendering is unavailable while Rust owns whole-frame presentation");
 	}
 
 	/** Bounded diagnostic fingerprint of vanilla-extracted weather semantics; no renderer state. */
@@ -194,49 +149,9 @@ public class WeatherEffectRenderer {
 		return new WeatherEffectRenderer.ColumnInstance(j, m, k, l, h, p + o, q);
 	}
 
-	private void renderInstances(VertexConsumer vertexConsumer, List<WeatherEffectRenderer.ColumnInstance> list, Vec3 vec3, float f, int i, float g) {
-		for (WeatherEffectRenderer.ColumnInstance columnInstance : list) {
-			float h = (float)(columnInstance.x + 0.5 - vec3.x);
-			float j = (float)(columnInstance.z + 0.5 - vec3.z);
-			float k = (float)Mth.lengthSquared(h, j);
-			float l = Mth.lerp(k / (i * i), f, 0.5F) * g;
-			int m = ARGB.white(l);
-			int n = (columnInstance.z - Mth.floor(vec3.z) + 16) * 32 + columnInstance.x - Mth.floor(vec3.x) + 16;
-			float o = this.columnSizeX[n] / 2.0F;
-			float p = this.columnSizeZ[n] / 2.0F;
-			float q = h - o;
-			float r = h + o;
-			float s = (float)(columnInstance.topY - vec3.y);
-			float t = (float)(columnInstance.bottomY - vec3.y);
-			float u = j - p;
-			float v = j + p;
-			float w = columnInstance.uOffset + 0.0F;
-			float x = columnInstance.uOffset + 1.0F;
-			float y = columnInstance.bottomY * 0.25F + columnInstance.vOffset;
-			float z = columnInstance.topY * 0.25F + columnInstance.vOffset;
-			vertexConsumer.addVertex(q, s, u).setUv(w, y).setColor(m).setLight(columnInstance.lightCoords);
-			vertexConsumer.addVertex(r, s, v).setUv(x, y).setColor(m).setLight(columnInstance.lightCoords);
-			vertexConsumer.addVertex(r, t, v).setUv(x, z).setColor(m).setLight(columnInstance.lightCoords);
-			vertexConsumer.addVertex(q, t, u).setUv(w, z).setColor(m).setLight(columnInstance.lightCoords);
-		}
-	}
-
 	public void tickRainParticles(ClientLevel clientLevel, Camera camera, int i, ParticleStatus particleStatus) {
-		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		// The route policy is the single admission authority.  In particular, a
-		// disabled/incomplete weather capability must not be silently admitted just
-		// because the presenter shell is active.
-		// Admission is equivalent to currentWeatherRoute().usesRustWholeFrameVulkan().
-		boolean rustWeather = net.vulkanic.world.WorldRenderRoutePolicy.currentWeatherRoute()
-			.usesRustWholeFrameVulkan();
-		if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected() || rustWholeFrame) && !rustWeather) {
-			return;
-		}
-		// A Rust whole-frame selection must not borrow Iris runtime state even when
-		// this optional weather capability is temporarily unavailable. Borrowed
-		// OpenGL remains the only route allowed to apply Iris particle policy.
-		// Iris: Allow shaders to disable weather particles (from MixinWeatherRenderer)
-		if (!rustWeather && !net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderWeatherParticles).orElse(true)) {
+		// A selected pack may disable weather particles (shaders.properties weatherParticles).
+		if (!net.vulkanic.gui.RustGalFrameCoordinator.copiedShaderPackWeatherParticlesEnabled()) {
 			particleStatus = ParticleStatus.MINIMAL;
 		}
 		

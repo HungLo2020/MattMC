@@ -37,7 +37,4 @@ public class ChunkJobResult<OUTPUT> {
         return this.output;
     }
 
-    public JobEffort getJobEffort() {
-        return this.jobEffort;
-    }
 }

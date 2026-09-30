@@ -38,17 +38,4 @@ public class BuiltSectionMeshParts {
         return this.primitiveMetadata;
     }
 
-    public int[] computeVertexCounts() {
-        var vertexCounts = new int[ModelQuadFacing.COUNT];
-
-        for (int i = 0; i < this.vertexSegments.length; i += 2) {
-            var vertexCount = this.vertexSegments[i];
-            if (vertexCount == 0) {
-                continue; // Skip non-present segments
-            }
-            vertexCounts[this.vertexSegments[i + 1]] = vertexCount;
-        }
-
-        return vertexCounts;
-    }
 }

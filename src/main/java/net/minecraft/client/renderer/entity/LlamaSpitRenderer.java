@@ -78,7 +78,7 @@ public class LlamaSpitRenderer extends EntityRenderer<LlamaSpit, LlamaSpitRender
 					LLAMA_SPIT_LOCATION,
 					false,
 					false,
-					!submitNodeCollector.isSemanticCoverageOnly() && ownership.usesJavaCompatibility()
+					false
 				);
 			}
 			submitNodeCollector.submitModelSemanticTexture(

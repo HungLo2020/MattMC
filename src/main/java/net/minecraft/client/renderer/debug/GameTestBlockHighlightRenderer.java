@@ -37,28 +37,8 @@ public class GameTestBlockHighlightRenderer {
 		this.markers.clear();
 	}
 
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java game-test block highlights are unavailable while Rust owns whole-frame presentation or Vulkan is selected");
-		}
-		long l = Util.getMillis();
-		this.markers.entrySet().removeIf(entry -> l > ((GameTestBlockHighlightRenderer.Marker)entry.getValue()).removeAtTime);
-		this.markers.forEach((blockPos, marker) -> this.renderMarker(poseStack, multiBufferSource, blockPos, marker));
-	}
-
 	/** Copies active game-test markers into the explicit Rust debug and text streams. */
 	public void collectRustSemantics(PoseStack poseStack, SubmitNodeStorage geometryStorage, SubmitNodeStorage textStorage) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() && !this.markers.isEmpty()) {
-				throw new IllegalStateException("Rust whole-frame game-test highlight route is unavailable while Rust owns presentation");
-			}
-			return;
-		}
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()
-			&& this.markers.values().stream().anyMatch(marker -> !marker.text.isEmpty())) {
-			throw new IllegalStateException("Rust whole-frame game-test label route is unavailable while Rust owns presentation");
-		}
 		long now = Util.getMillis();
 		this.markers.entrySet().removeIf(entry -> now > entry.getValue().removeAtTime);
 		if (this.markers.isEmpty()) return;
@@ -104,26 +84,8 @@ public class GameTestBlockHighlightRenderer {
 		}
 	}
 
-	private void renderMarker(PoseStack poseStack, MultiBufferSource multiBufferSource, BlockPos blockPos, GameTestBlockHighlightRenderer.Marker marker) {
-		DebugRenderer.renderFilledBox(poseStack, multiBufferSource, blockPos, 0.02F, marker.getR(), marker.getG(), marker.getB(), marker.getA() * 0.75F);
-		if (!marker.text.isEmpty()) {
-			double d = blockPos.getX() + 0.5;
-			double e = blockPos.getY() + 1.2;
-			double f = blockPos.getZ() + 0.5;
-			DebugRenderer.renderFloatingText(poseStack, multiBufferSource, marker.text, d, e, f, -1, 0.01F, true, 0.0F, true);
-		}
-	}
-
 	@Environment(EnvType.CLIENT)
 	record Marker(int color, String text, long removeAtTime) {
-
-		public float getR() {
-			return ARGB.redFloat(this.color);
-		}
-
-		public float getG() {
-			return ARGB.greenFloat(this.color);
-		}
 
 		public float getB() {
 			return ARGB.blueFloat(this.color);

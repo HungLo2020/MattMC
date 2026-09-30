@@ -44,7 +44,4 @@ public class MergedStringOption {
 		return option;
 	}
 
-	public ImmutableSet<OptionLocation> getLocations() {
-		return locations;
-	}
 }

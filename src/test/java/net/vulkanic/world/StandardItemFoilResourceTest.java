@@ -38,26 +38,6 @@ class StandardItemFoilResourceTest {
         assertTrue(extraction.contains("float sourceU = quad.getTexU(vertexIndex)"));
     }
 
-    @Test void unsupportedProjectedFoilRejectsBeforeTextureOrGpuAccess() {
-        assertEquals("special-foil-native-projection-unavailable",
-            RustGalWorldPrimitiveRenderer.itemEntityMeshIneligibility(
-                net.minecraft.world.item.ItemDisplayContext.GROUND, 15728640, 0, 0,
-                new int[0], null, null,
-                net.minecraft.client.renderer.item.ItemStackRenderState.FoilType.SPECIAL));
-    }
-
-    @Test void firstPersonProjectedFoilAlsoRejectsBeforeResourceAccess() throws Exception {
-        var state = new net.minecraft.client.renderer.item.ItemStackRenderState();
-        var context = state.getClass().getDeclaredField("displayContext");
-        context.setAccessible(true);
-        context.set(state, net.minecraft.world.item.ItemDisplayContext.FIRST_PERSON_RIGHT_HAND);
-        state.newLayer().setFoilType(net.minecraft.client.renderer.item.ItemStackRenderState.FoilType.SPECIAL);
-        var check = RustGalWorldPrimitiveRenderer.class.getDeclaredMethod("firstPersonItemMeshIneligibility",
-            state.getClass(), int.class, String.class);
-        check.setAccessible(true);
-        assertEquals("special-foil-native-projection-unavailable", check.invoke(null, state, 15728640, "minecraft:compass"));
-    }
-
     @Test void defaultStandaloneFoilCopiesVerifiedTridentAndArmorContracts() throws Exception {
         var model = new net.minecraft.client.model.TridentModel(
             net.minecraft.client.model.TridentModel.createLayer().bakeRoot());

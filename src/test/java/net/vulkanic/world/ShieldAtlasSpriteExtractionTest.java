@@ -24,10 +24,8 @@ class ShieldAtlasSpriteExtractionTest {
         var declaration = new SemanticAtlasAnimationSource(7, 1, 1, 1,
             List.of(new SemanticAtlasAnimationSource.Sprite(1, name, 0, 0, animation)));
         try (var game = mockStatic(Minecraft.class);
-             var mode = mockStatic(net.vulkanic.bridge.RustGalVulkanWholeFrameMode.class);
              var resource = new AtlasAnimationResource(Sheets.SHIELD_SHEET,
                  RustGalWorldPrimitiveRenderer.shieldAtlasTextureId(), declaration)) {
-            mode.when(net.vulkanic.bridge.RustGalVulkanWholeFrameMode::enabled).thenReturn(true);
             System.clearProperty(atlasKey); System.clearProperty(clockKey);
             var minecraft = mock(Minecraft.class, RETURNS_DEEP_STUBS);
             game.when(Minecraft::getInstance).thenReturn(minecraft);
@@ -44,9 +42,7 @@ class ShieldAtlasSpriteExtractionTest {
             assertTrue(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
             // Legacy flags cannot create ownership when the Vulkan frame is absent.
             System.setProperty(clockKey, "true"); System.setProperty(atlasKey, "true");
-            mode.when(net.vulkanic.bridge.RustGalVulkanWholeFrameMode::enabled).thenReturn(false);
             assertFalse(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
-            mode.when(net.vulkanic.bridge.RustGalVulkanWholeFrameMode::enabled).thenReturn(true);
             when(atlas.getSprite(name)).thenReturn(mock(TextureAtlasSprite.class));
             assertFalse(RustGalWorldPrimitiveRenderer.ownedShieldSprite(sprite));
             when(atlas.getSprite(name)).thenReturn(sprite);
@@ -66,9 +62,7 @@ class ShieldAtlasSpriteExtractionTest {
 
     @Test void staticPathRejectsStaleSpritesAndAnyUnboundAtlasAnimationBeforePixelCopy() {
         String key = "mattmc.dev.rustGalShieldAtlas", before = System.getProperty(key);
-        try (var game = mockStatic(Minecraft.class);
-             var mode = mockStatic(net.vulkanic.bridge.RustGalVulkanWholeFrameMode.class)) {
-            mode.when(net.vulkanic.bridge.RustGalVulkanWholeFrameMode::enabled).thenReturn(true);
+        try (var game = mockStatic(Minecraft.class)) {
             System.clearProperty(key);
             assertThrows(IllegalStateException.class,
                 () -> RustGalWorldPrimitiveRenderer.requireShieldAtlasSpritePayload(null));

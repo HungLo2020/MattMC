@@ -52,6 +52,12 @@ impl OpenGlObjects {
         self.frame_target_framebuffers.insert(frame_id, framebuffer);
     }
 
+    /// Drops the default-framebuffer binding recorded for a presented or
+    /// cancelled frame. GL executes at submit, so nothing reads it afterwards.
+    pub(super) fn retire_frame_target(&mut self, frame_id: u64) {
+        self.frame_target_framebuffers.remove(&frame_id);
+    }
+
     pub(super) fn create(
         &mut self,
         handle: Handle,

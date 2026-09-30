@@ -39,7 +39,6 @@ public class Pos2D
 	public Pos2D subtract(int value) { return new Pos2D(this.x - value, this.y - value); }
 	
 	public double dist(Pos2D other) { return Math.sqrt(Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2)); }
-	public long distSquared(Pos2D other) { return MathUtil.pow2((long) this.x - other.x) + MathUtil.pow2((long) this.y - other.y); }
 	
 	/**
 	 * Returns the maximum distance along either the X or Z axis <br><br>

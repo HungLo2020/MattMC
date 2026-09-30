@@ -30,8 +30,7 @@ public final class RustGalPanoramaRenderer {
 		CubeMap cubeMap, float pitchDegrees, float yawDegrees, int guiWidth, int guiHeight,
 		VulkanicGalBridge.GuiProjectionRecord projection, GuiRenderState renderState
 	) {
-		if (!RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| renderState == null
+		if ((renderState == null)
 			|| guiWidth <= 0 || guiHeight <= 0
 			|| guiWidth > Integer.MAX_VALUE - 2 || guiHeight > Integer.MAX_VALUE - 2
 			|| !Float.isFinite(pitchDegrees) || !Float.isFinite(yawDegrees)) {
@@ -99,6 +98,21 @@ public final class RustGalPanoramaRenderer {
 		);
 	}
 
+	static float[] cubeRay(Matrix4f matrix, float clipX, float clipY, float projectionX, float projectionY) {
+		float x = clipX / projectionX, y = clipY / projectionY, z = -1.0F;
+		// Frozen's panorama vertex shader uses
+		// transpose(mat3(ModelViewMat)) * viewDirection. JOML exposes columns
+		// as m00/m10/m20 etc., so this transpose multiplication takes the
+		// corresponding row terms. Using the direct matrix multiplication here
+		// reverses the semantic panorama camera rotation.
+		float dx = matrix.m00() * x + matrix.m01() * y + matrix.m02() * z;
+		float dy = matrix.m10() * x + matrix.m11() * y + matrix.m12() * z;
+		float dz = matrix.m20() * x + matrix.m21() * y + matrix.m22() * z;
+		return new float[] {dx, dy, dz};
+	}
+
+	private static float[] identity() { return new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
+
 	static float[] cubeUv(Matrix4f matrix, float clipX, float clipY, float projectionX, float projectionY) {
 		float[] ray = cubeRay(matrix, clipX, clipY, projectionX, projectionY);
 		float dx = ray[0], dy = ray[1], dz = ray[2];
@@ -119,19 +133,4 @@ public final class RustGalPanoramaRenderer {
 		}
 		return new float[] {Math.clamp(u, 0.0F, 1.0F), (face + Math.clamp(v, 0.0F, 1.0F)) / 6.0F};
 	}
-
-	static float[] cubeRay(Matrix4f matrix, float clipX, float clipY, float projectionX, float projectionY) {
-		float x = clipX / projectionX, y = clipY / projectionY, z = -1.0F;
-		// Frozen's panorama vertex shader uses
-		// transpose(mat3(ModelViewMat)) * viewDirection. JOML exposes columns
-		// as m00/m10/m20 etc., so this transpose multiplication takes the
-		// corresponding row terms. Using the direct matrix multiplication here
-		// reverses the semantic panorama camera rotation.
-		float dx = matrix.m00() * x + matrix.m01() * y + matrix.m02() * z;
-		float dy = matrix.m10() * x + matrix.m11() * y + matrix.m12() * z;
-		float dz = matrix.m20() * x + matrix.m21() * y + matrix.m22() * z;
-		return new float[] {dx, dy, dz};
-	}
-
-	private static float[] identity() { return new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
 }

@@ -19,36 +19,6 @@ import net.minecraft.client.renderer.SubmitNodeStorage;
 
 @Environment(EnvType.CLIENT)
 public class CustomFeatureRenderer {
-	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java custom feature rendering is unavailable while Rust owns whole-frame presentation");
-		}
-		CustomFeatureRenderer.Storage storage = submitNodeCollection.getCustomGeometrySubmits();
-
-		for (Entry<RenderType, List<SubmitNodeStorage.CustomGeometrySubmit>> entry : storage.customGeometrySubmits.entrySet()) {
-			VertexConsumer vertexConsumer = bufferSource.getBuffer((RenderType)entry.getKey());
-
-			for (SubmitNodeStorage.CustomGeometrySubmit customGeometrySubmit : (List<SubmitNodeStorage.CustomGeometrySubmit>)entry.getValue()) {
-				// Iris: Set model storage before rendering
-				((net.irisshaders.iris.mixinterface.ModelStorage) (Object) customGeometrySubmit).iris$set();
-				SubmitNodeCollector.CustomGeometryRenderer renderer = customGeometrySubmit.customGeometryRenderer();
-				if (renderer instanceof SubmitNodeCollector.ImmediateCustomGeometryRenderer immediateRenderer) {
-					bufferSource.endBatch((RenderType)entry.getKey());
-					immediateRenderer.render(customGeometrySubmit.pose(), (RenderType)entry.getKey(), bufferSource);
-					vertexConsumer = bufferSource.getBuffer((RenderType)entry.getKey());
-				} else {
-					renderer.render(customGeometrySubmit.pose(), vertexConsumer);
-				}
-			}
-		}
-		
-		// Iris: Clear captured rendering state
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(0);
-		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);
-	}
-
 	@Environment(EnvType.CLIENT)
 	public static class Storage {
 		final Map<RenderType, List<SubmitNodeStorage.CustomGeometrySubmit>> customGeometrySubmits = new HashMap();

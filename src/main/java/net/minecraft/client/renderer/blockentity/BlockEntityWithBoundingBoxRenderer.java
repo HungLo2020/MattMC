@@ -7,7 +7,6 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityWithBoundingBoxRenderState;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
@@ -111,48 +110,19 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 					float g = 0.9F;
 					float h = 0.5F;
 					BlockPos blockPos2 = blockPos.offset(vec3i);
-					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						&& net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) {
-						// Coverage traversal admits this family but must not stage a
-						// second copy into the live Rust pending frame.
-						if (!submitNodeCollector.isSemanticCoverageOnly()) {
-							boolean queued = blockEntityWithBoundingBoxRenderState.blockState.is(Blocks.STRUCTURE_BLOCK)
-								? net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStructureBlockBoxSegments(
+					// Coverage traversal admits this family but must not stage a
+					// second copy into the live Rust pending frame.
+					if (!submitNodeCollector.isSemanticCoverageOnly()) {
+						boolean queued = blockEntityWithBoundingBoxRenderState.blockState.is(Blocks.STRUCTURE_BLOCK)
+							? net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStructureBlockBoxSegments(
+								poseStack.last().pose(), blockPos, vec3i, 1.0F)
+							: blockEntityWithBoundingBoxRenderState.blockState.is(Blocks.TEST_INSTANCE_BLOCK)
+								? net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueTestInstanceBoxSegments(
 									poseStack.last().pose(), blockPos, vec3i, 1.0F)
-								: blockEntityWithBoundingBoxRenderState.blockState.is(Blocks.TEST_INSTANCE_BLOCK)
-									? net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueTestInstanceBoxSegments(
-										poseStack.last().pose(), blockPos, vec3i, 1.0F)
-									: net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(
-										poseStack.last().pose(), boxEdges(blockPos.getX(), blockPos.getY(), blockPos.getZ(),
-											blockPos2.getX(), blockPos2.getY(), blockPos2.getZ()), 0xffe5e5e5, 1.0F);
-							if (!queued) throw new IllegalStateException("Rust debug-line route rejected bounding-box semantic edges");
-						}
-					} else {
-						if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-							|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-							throw new IllegalStateException("Rust whole-frame bounding-box route is unavailable; Java debug geometry is not a fallback");
-						}
-						submitNodeCollector.submitCustomGeometrySemantic(
-						poseStack,
-						RenderType.lines(),
-						(pose, vertexConsumer) -> ShapeRenderer.renderLineBox(
-							pose,
-							vertexConsumer,
-							blockPos.getX(),
-							blockPos.getY(),
-							blockPos.getZ(),
-							blockPos2.getX(),
-							blockPos2.getY(),
-							blockPos2.getZ(),
-							0.9F,
-							0.9F,
-							0.9F,
-							1.0F,
-							0.5F,
-							0.5F,
-							0.5F
-						)
-						);
+								: net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(
+									poseStack.last().pose(), boxEdges(blockPos.getX(), blockPos.getY(), blockPos.getZ(),
+										blockPos2.getX(), blockPos2.getY(), blockPos2.getZ()), 0xffe5e5e5, 1.0F);
+						if (!queued) throw new IllegalStateException("Rust debug-line route rejected bounding-box semantic edges");
 					}
 					this.submitInvisibleBlocks(blockEntityWithBoundingBoxRenderState, blockPos, vec3i, submitNodeCollector, poseStack);
 				}
@@ -168,68 +138,31 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 		PoseStack poseStack
 	) {
 		if (blockEntityWithBoundingBoxRenderState.invisibleBlocks != null) {
-			boolean rustLines = (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan();
 			BlockPos blockPos2 = blockEntityWithBoundingBoxRenderState.blockPos;
 			BlockPos blockPos3 = blockPos2.offset(blockPos);
-			if (rustLines) {
-				// The coverage collector is an admission probe, not a producer;
-				// acknowledge this already-admitted line family without enqueueing.
-				if (submitNodeCollector.isSemanticCoverageOnly()) return;
-				int air = 0, structureVoid = 0, barrier = 0, light = 0;
-				for (int i = 0; i < vec3i.getX(); i++) for (int j = 0; j < vec3i.getY(); j++) for (int k = 0; k < vec3i.getZ(); k++) {
-					int l = k * vec3i.getX() * vec3i.getY() + j * vec3i.getX() + i;
-					var type = blockEntityWithBoundingBoxRenderState.invisibleBlocks[l];
-					if (type == null) continue;
-					if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR) air++;
-					else if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.STRUCUTRE_VOID) structureVoid++;
-					else if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.BARRIER) barrier++;
-					else if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.LIGHT) light++;
-					float f = type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0.05F : 0.0F;
-					double d = blockPos3.getX() + i - blockPos2.getX() + 0.45F - f, e = blockPos3.getY() + j - blockPos2.getY() + 0.45F - f, g = blockPos3.getZ() + k - blockPos2.getZ() + 0.45F - f;
-					double h = blockPos3.getX() + i - blockPos2.getX() + 0.55F + f, m = blockPos3.getY() + j - blockPos2.getY() + 0.55F + f, n = blockPos3.getZ() + k - blockPos2.getZ() + 0.55F + f;
-						int color = type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0xff7f7fff
-						: type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.STRUCUTRE_VOID ? 0xffffbfbf
-						: type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.BARRIER ? 0xffff0000 : 0xffffff00;
-					if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(poseStack.last().pose(), boxEdges((float)d, (float)e, (float)g, (float)h, (float)m, (float)n), color, 1.0F)) throw new IllegalStateException("Rust debug-line route rejected invisible-block edges");
-				}
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordStructureInvisibleCells(
-					blockPos, vec3i, air, structureVoid, barrier, light);
-				return;
+			// The coverage collector is an admission probe, not a producer;
+			// acknowledge this already-admitted line family without enqueueing.
+			if (submitNodeCollector.isSemanticCoverageOnly()) return;
+			int air = 0, structureVoid = 0, barrier = 0, light = 0;
+			for (int i = 0; i < vec3i.getX(); i++) for (int j = 0; j < vec3i.getY(); j++) for (int k = 0; k < vec3i.getZ(); k++) {
+				int l = k * vec3i.getX() * vec3i.getY() + j * vec3i.getX() + i;
+				var type = blockEntityWithBoundingBoxRenderState.invisibleBlocks[l];
+				if (type == null) continue;
+				if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR) air++;
+				else if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.STRUCUTRE_VOID) structureVoid++;
+				else if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.BARRIER) barrier++;
+				else if (type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.LIGHT) light++;
+				float f = type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0.05F : 0.0F;
+				double d = blockPos3.getX() + i - blockPos2.getX() + 0.45F - f, e = blockPos3.getY() + j - blockPos2.getY() + 0.45F - f, g = blockPos3.getZ() + k - blockPos2.getZ() + 0.45F - f;
+				double h = blockPos3.getX() + i - blockPos2.getX() + 0.55F + f, m = blockPos3.getY() + j - blockPos2.getY() + 0.55F + f, n = blockPos3.getZ() + k - blockPos2.getZ() + 0.55F + f;
+					int color = type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0xff7f7fff
+					: type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.STRUCUTRE_VOID ? 0xffffbfbf
+					: type == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.BARRIER ? 0xffff0000 : 0xffffff00;
+				if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueDebugLineSegments(poseStack.last().pose(), boxEdges((float)d, (float)e, (float)g, (float)h, (float)m, (float)n), color, 1.0F)) throw new IllegalStateException("Rust debug-line route rejected invisible-block edges");
 			}
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame invisible-block route is unavailable; Java debug geometry is not a fallback");
-			}
-			submitNodeCollector.submitCustomGeometrySemantic(poseStack, RenderType.lines(), (pose, vertexConsumer) -> {
-				for (int i = 0; i < vec3i.getX(); i++) {
-					for (int j = 0; j < vec3i.getY(); j++) {
-						for (int k = 0; k < vec3i.getZ(); k++) {
-							int l = k * vec3i.getX() * vec3i.getY() + j * vec3i.getX() + i;
-							BlockEntityWithBoundingBoxRenderState.InvisibleBlockType invisibleBlockType = blockEntityWithBoundingBoxRenderState.invisibleBlocks[l];
-							if (invisibleBlockType != null) {
-								float f = invisibleBlockType == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR ? 0.05F : 0.0F;
-								double d = blockPos3.getX() + i - blockPos2.getX() + 0.45F - f;
-								double e = blockPos3.getY() + j - blockPos2.getY() + 0.45F - f;
-								double g = blockPos3.getZ() + k - blockPos2.getZ() + 0.45F - f;
-								double h = blockPos3.getX() + i - blockPos2.getX() + 0.55F + f;
-								double m = blockPos3.getY() + j - blockPos2.getY() + 0.55F + f;
-								double n = blockPos3.getZ() + k - blockPos2.getZ() + 0.55F + f;
-								if (invisibleBlockType == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.AIR) {
-									ShapeRenderer.renderLineBox(pose, vertexConsumer, d, e, g, h, m, n, 0.5F, 0.5F, 1.0F, 1.0F, 0.5F, 0.5F, 1.0F);
-								} else if (invisibleBlockType == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.STRUCUTRE_VOID) {
-									ShapeRenderer.renderLineBox(pose, vertexConsumer, d, e, g, h, m, n, 1.0F, 0.75F, 0.75F, 1.0F, 1.0F, 0.75F, 0.75F);
-								} else if (invisibleBlockType == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.BARRIER) {
-									ShapeRenderer.renderLineBox(pose, vertexConsumer, d, e, g, h, m, n, 1.0F, 0.0F, 0.0F, 1.0F, 1.0F, 0.0F, 0.0F);
-								} else if (invisibleBlockType == BlockEntityWithBoundingBoxRenderState.InvisibleBlockType.LIGHT) {
-									ShapeRenderer.renderLineBox(pose, vertexConsumer, d, e, g, h, m, n, 1.0F, 1.0F, 0.0F, 1.0F, 1.0F, 1.0F, 0.0F);
-								}
-							}
-						}
-					}
-				}
-			});
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordStructureInvisibleCells(
+				blockPos, vec3i, air, structureVoid, barrier, light);
+			return;
 		}
 	}
 
@@ -237,37 +170,6 @@ public class BlockEntityWithBoundingBoxRenderer<T extends BlockEntity & Bounding
 		return new float[] {x0,y0,z0,x1,y0,z0, x1,y0,z0,x1,y0,z1, x1,y0,z1,x0,y0,z1, x0,y0,z1,x0,y0,z0,
 			x0,y1,z0,x1,y1,z0, x1,y1,z0,x1,y1,z1, x1,y1,z1,x0,y1,z1, x0,y1,z1,x0,y1,z0,
 			x0,y0,z0,x0,y1,z0, x1,y0,z0,x1,y1,z0, x1,y0,z1,x1,y1,z1, x0,y0,z1,x0,y1,z1};
-	}
-
-	private void renderStructureVoids(
-		BlockEntityWithBoundingBoxRenderState blockEntityWithBoundingBoxRenderState, BlockPos blockPos, Vec3i vec3i, VertexConsumer vertexConsumer, Matrix4f matrix4f
-	) {
-		if (blockEntityWithBoundingBoxRenderState.structureVoids != null) {
-			BlockPos blockPos2 = blockEntityWithBoundingBoxRenderState.blockPos;
-			DiscreteVoxelShape discreteVoxelShape = new BitSetDiscreteVoxelShape(vec3i.getX(), vec3i.getY(), vec3i.getZ());
-
-			for (int i = 0; i < vec3i.getX(); i++) {
-				for (int j = 0; j < vec3i.getY(); j++) {
-					for (int k = 0; k < vec3i.getZ(); k++) {
-						int l = k * vec3i.getX() * vec3i.getY() + j * vec3i.getX() + i;
-						if (blockEntityWithBoundingBoxRenderState.structureVoids[l]) {
-							discreteVoxelShape.fill(i, j, k);
-						}
-					}
-				}
-			}
-
-			discreteVoxelShape.forAllFaces((direction, ix, jx, kx) -> {
-				float f = 0.48F;
-				float g = ix + blockPos.getX() - blockPos2.getX() + 0.5F - 0.48F;
-				float h = jx + blockPos.getY() - blockPos2.getY() + 0.5F - 0.48F;
-				float lx = kx + blockPos.getZ() - blockPos2.getZ() + 0.5F - 0.48F;
-				float m = ix + blockPos.getX() - blockPos2.getX() + 0.5F + 0.48F;
-				float n = jx + blockPos.getY() - blockPos2.getY() + 0.5F + 0.48F;
-				float o = kx + blockPos.getZ() - blockPos2.getZ() + 0.5F + 0.48F;
-				ShapeRenderer.renderFace(matrix4f, vertexConsumer, direction, g, h, lx, m, n, o, 0.75F, 0.75F, 1.0F, 0.2F);
-			});
-		}
 	}
 
 	@Override

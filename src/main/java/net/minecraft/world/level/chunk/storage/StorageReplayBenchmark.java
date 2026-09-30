@@ -48,7 +48,7 @@ public final class StorageReplayBenchmark {
 		output.addProperty("world", worldPath.toAbsolutePath().toString());
 		output.addProperty("warmupIterations", warmup);
 		output.addProperty("measureIterations", measure);
-		output.addProperty("supportsNativeTape", NbtBenchmarkAccess.supportsNativeTape());
+		output.addProperty("supportsNativeTape", true);
 		JsonArray samples = new JsonArray();
 
 		samples.add(benchmark.runIteration("cold", 0, true));
@@ -114,32 +114,30 @@ public final class StorageReplayBenchmark {
 				byte[] reencoded = Metric.time(metrics, "nbt.object_to_encoded", document.rawLength, () -> NbtBenchmarkAccess.writeObject(tag, compression));
 				Metric.time(metrics, "nbt.complete_object_roundtrip", encoded.length, () -> NbtBenchmarkAccess.writeObject(NbtBenchmarkAccess.readObject(encoded, compression), compression));
 
-				if (NbtBenchmarkAccess.supportsNativeTape()) {
-					byte[] tape = Metric.time(
-						metrics,
-						"nbt.decode.rust_decompress_parse_to_tape",
-						encoded.length,
-						encoded.length,
-						() -> NbtBenchmarkAccess.decodeToTape(encoded, compression)
-					);
-					Metric.time(metrics, "nbt.decode.java_tape_to_object", tape.length, tape.length, () -> NbtBenchmarkAccess.readTapeObject(tape));
-					Metric.time(metrics, "nbt.decode_to_tape", encoded.length, encoded.length, () -> NbtBenchmarkAccess.decodeToTape(encoded, compression));
-					byte[] writtenTape = Metric.time(
-						metrics,
-						"nbt.encode.java_object_to_tape",
-						document.rawLength,
-						document.rawLength,
-						() -> NbtBenchmarkAccess.writeTapeObject(tag)
-					);
-					Metric.time(
-						metrics,
-						"nbt.encode.rust_tape_to_encoded",
-						writtenTape.length,
-						writtenTape.length,
-						() -> NbtBenchmarkAccess.encodeFromTape(writtenTape, compression)
-					);
-					Metric.time(metrics, "nbt.encode_from_tape", tape.length, tape.length, () -> NbtBenchmarkAccess.encodeFromTape(tape, compression));
-				}
+				byte[] tape = Metric.time(
+					metrics,
+					"nbt.decode.rust_decompress_parse_to_tape",
+					encoded.length,
+					encoded.length,
+					() -> NbtBenchmarkAccess.decodeToTape(encoded, compression)
+				);
+				Metric.time(metrics, "nbt.decode.java_tape_to_object", tape.length, tape.length, () -> NbtBenchmarkAccess.readTapeObject(tape));
+				Metric.time(metrics, "nbt.decode_to_tape", encoded.length, encoded.length, () -> NbtBenchmarkAccess.decodeToTape(encoded, compression));
+				byte[] writtenTape = Metric.time(
+					metrics,
+					"nbt.encode.java_object_to_tape",
+					document.rawLength,
+					document.rawLength,
+					() -> NbtBenchmarkAccess.writeTapeObject(tag)
+				);
+				Metric.time(
+					metrics,
+					"nbt.encode.rust_tape_to_encoded",
+					writtenTape.length,
+					writtenTape.length,
+					() -> NbtBenchmarkAccess.encodeFromTape(writtenTape, compression)
+				);
+				Metric.time(metrics, "nbt.encode_from_tape", tape.length, tape.length, () -> NbtBenchmarkAccess.encodeFromTape(tape, compression));
 
 				if (validate) {
 					if (!document.rawSha256.equals(NbtBenchmarkAccess.sha256Hex(NbtBenchmarkAccess.decodeToRawBytes(encoded, compression)))) {

@@ -31,7 +31,7 @@ public class ChunkBuildBuffers {
     private final boolean separateAo;
 
     public ChunkBuildBuffers(ChunkVertexType vertexType) {
-		this(vertexType, usesSeparateAo());
+		this(vertexType, false);
 	}
 
 	/**
@@ -106,17 +106,6 @@ public class ChunkBuildBuffers {
                 this.separateAo);
     }
 
-    public int appendStaticModelSnapshot(TerrainRenderPass pass, long recordAddress, int recordCount,
-            int sectionIndex, boolean storeRawQuads) {
-        if (recordCount == 0) {
-            return 0;
-        }
-
-        var builder = this.builders.get(pass);
-        return builder.getSectionBuilder().appendStaticModelBatchEncoded(recordAddress, recordCount,
-                this.nativeFormat, sectionIndex, this.separateAo, storeRawQuads);
-    }
-
     public int[] appendCompactNativeSectionSnapshotAllPasses(long snapshotAddress, int sectionIndex,
             TranslucentGeometryCollector collector) {
         if (snapshotAddress == 0L) {
@@ -155,10 +144,6 @@ public class ChunkBuildBuffers {
     }
 
     private static boolean usesSeparateAo() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			return false;
-		}
-        return net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
+		return false;
     }
 }

@@ -123,31 +123,6 @@ public class BeaconRenderHandler
 		}
 	}
 	
-	public void updateBeaconColor(BeaconBeamDTO newBeam)
-	{
-		try
-		{
-			this.updateLock.lock();
-			
-			DhBlockPos pos = newBeam.blockPos;
-			for (int i = 0; i < this.fullBeaconBoxList.size(); i++)
-			{
-				DhApiRenderableBox box = this.fullBeaconBoxList.get(i);
-				if (box.minPos.x == pos.getX()
-						&& box.minPos.y == pos.getY() + 1 // plus 1 because the beam starts above the beacon
-						&& box.minPos.z == pos.getZ())
-				{
-					box.color = newBeam.color;
-					this.beaconBoxGroup.triggerBoxChange();
-					break;
-				}
-			}
-		}
-		finally
-		{
-			this.updateLock.unlock();
-		}
-	}
 	
 	
 	private void beforeRender(DhApiRenderParam renderEventParam) 

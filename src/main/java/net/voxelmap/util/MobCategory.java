@@ -18,28 +18,6 @@ public enum MobCategory {
     TAMEABLE,
     PLAYER;
 
-    public static MobCategory forEntity(Entity entity) {
-        if (isHostile(entity)) {
-            return HOSTILE;
-        } else if (isPlayer(entity)) {
-            return PLAYER;
-        } else if (isOwnable(entity)) {
-            return TAMEABLE;
-        } else {
-            return NEUTRAL;
-        }
-    }
-
-    public static MobCategory forEntityType(EntityType<?> entityType) {
-        if (entityType.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER) {
-            return HOSTILE;
-        } else if (entityType == EntityType.PLAYER) {
-            return PLAYER;
-        } else {
-            return NEUTRAL;
-        }
-    }
-
     public static boolean isHostile(Entity entity) {
         if (entity instanceof ZombifiedPiglin zombifiedPiglinEntity) {
             return zombifiedPiglinEntity.getPersistentAngerTarget() != null && zombifiedPiglinEntity.getPersistentAngerTarget().equals(VoxelConstants.getPlayer().getUUID());
@@ -67,15 +45,8 @@ public enum MobCategory {
         }
     }
 
-    public static boolean isOwnable(Entity entity) {
-        return entity instanceof OwnableEntity;
-    }
-
     public static boolean isPlayer(Entity entity) {
         return entity instanceof RemotePlayer;
     }
 
-    public static boolean isNeutral(Entity entity) {
-        return !isPlayer(entity) && !isHostile(entity);
-    }
 }

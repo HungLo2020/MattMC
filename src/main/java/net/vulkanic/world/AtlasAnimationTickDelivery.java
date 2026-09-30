@@ -66,7 +66,6 @@ final class AtlasAnimationTickDelivery {
     }
 
     int pendingCount() { return pending.size(); }
-    long pendingVisibilityBytes() { return pendingBytes; }
     boolean lastQueuedTickNamedSpriteForDiagnostics(int spriteId) {
         return lastQueuedEvent != null
             && java.util.Arrays.binarySearch(lastQueuedEvent.visible, spriteId) >= 0;
@@ -91,4 +90,6 @@ final class AtlasAnimationTickDelivery {
             && java.util.Arrays.binarySearch(lastNonemptyQueuedEvent.visible, spriteId) >= 0
             ? lastNonemptyQueuedEvent.tick : -1;
     }
+
+    long pendingVisibilityBytes() { return pendingBytes; }
 }

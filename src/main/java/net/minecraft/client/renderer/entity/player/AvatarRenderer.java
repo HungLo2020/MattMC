@@ -140,43 +140,23 @@ public class AvatarRenderer<AvatarlikeEntity extends Avatar & ClientAvatarEntity
 	protected void submitNameTag(
 		AvatarRenderState avatarRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState
 	) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Selected Vulkan avatar name tags are unavailable before Rust whole-frame admission");
-		}
 		poseStack.pushPose();
 		int i = avatarRenderState.showExtraEars ? -10 : 0;
 		if (avatarRenderState.scoreText != null) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				submitNodeCollector.submitNameTagSemantic(
-					poseStack, avatarRenderState.nameTagAttachment, i, avatarRenderState.scoreText,
-					!avatarRenderState.isDiscrete, avatarRenderState.lightCoords,
-					avatarRenderState.distanceToCameraSq, cameraRenderState
-				);
-			} else {
-				submitNodeCollector.submitNameTagSemantic(
-					poseStack, avatarRenderState.nameTagAttachment, i, avatarRenderState.scoreText,
-					!avatarRenderState.isDiscrete, avatarRenderState.lightCoords,
-					avatarRenderState.distanceToCameraSq, cameraRenderState
-				);
-			}
+			submitNodeCollector.submitNameTagSemantic(
+				poseStack, avatarRenderState.nameTagAttachment, i, avatarRenderState.scoreText,
+				!avatarRenderState.isDiscrete, avatarRenderState.lightCoords,
+				avatarRenderState.distanceToCameraSq, cameraRenderState
+			);
 			poseStack.translate(0.0F, 9.0F * 1.15F * 0.025F, 0.0F);
 		}
 
 		if (avatarRenderState.nameTag != null) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				submitNodeCollector.submitNameTagSemantic(
-					poseStack, avatarRenderState.nameTagAttachment, i, avatarRenderState.nameTag,
-					!avatarRenderState.isDiscrete, avatarRenderState.lightCoords,
-					avatarRenderState.distanceToCameraSq, cameraRenderState
-				);
-			} else {
-				submitNodeCollector.submitNameTagSemantic(
-					poseStack, avatarRenderState.nameTagAttachment, i, avatarRenderState.nameTag,
-					!avatarRenderState.isDiscrete, avatarRenderState.lightCoords,
-					avatarRenderState.distanceToCameraSq, cameraRenderState
-				);
-			}
+			submitNodeCollector.submitNameTagSemantic(
+				poseStack, avatarRenderState.nameTagAttachment, i, avatarRenderState.nameTag,
+				!avatarRenderState.isDiscrete, avatarRenderState.lightCoords,
+				avatarRenderState.distanceToCameraSq, cameraRenderState
+			);
 		}
 
 		poseStack.popPose();
@@ -281,34 +261,17 @@ public class AvatarRenderer<AvatarlikeEntity extends Avatar & ClientAvatarEntity
 		playerModel.rightSleeve.visible = bl;
 		playerModel.leftArm.zRot = -0.1F;
 		playerModel.rightArm.zRot = 0.1F;
-		boolean rustWholeFrame = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		if (rustWholeFrame) {
-			if (!net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-				throw new IllegalStateException("Rust whole-frame player-hand route is not admitted; Java hand geometry is not a fallback");
-			}
-			if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.ensureStandaloneModelTextureAsset(resourceLocation)) {
-				throw new IllegalStateException("Rust whole-frame player-hand route could not publish the copied skin texture");
-			}
-			boolean queuedArm = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
-				new net.minecraft.client.model.Model.Simple(modelPart, ignored -> RenderType.entityTranslucent(resourceLocation)),
-				net.minecraft.util.Unit.INSTANCE, poseStack.last(), RenderType.entityTranslucent(resourceLocation), resourceLocation,
-				net.minecraft.resources.ResourceLocation.withDefaultNamespace("player_hand"), i, OverlayTexture.NO_OVERLAY, -1, 0);
-			if (!queuedArm) {
-				throw new IllegalStateException("Rust whole-frame player-hand route rejected the semantic skin mesh");
-			}
-			return;
+		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.ensureStandaloneModelTextureAsset(resourceLocation)) {
+			throw new IllegalStateException("Rust whole-frame player-hand route could not publish the copied skin texture");
 		}
-		// Java OpenGL, including Iris's dedicated solid/translucent hand passes,
-		// owns this legacy ModelPart submission.  It must remain a ModelPart rather
-		// than being promoted to a generic direct-texture model: Iris captures and
-		// replays the former in its hand pipeline.  The Rust whole-frame branch
-		// above is the separate explicit copied skin-mesh route, so this does not
-		// reopen a Java draw path after Rust presentation has been selected.
-		submitNodeCollector.submitModelPart(
-			modelPart, poseStack, RenderType.entityTranslucent(resourceLocation), i,
-			OverlayTexture.NO_OVERLAY, null, false, false, -1, null, 0
-		);
+		boolean queuedArm = net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneTranslucentModelMesh(
+			new net.minecraft.client.model.Model.Simple(modelPart, ignored -> RenderType.entityTranslucent(resourceLocation)),
+			net.minecraft.util.Unit.INSTANCE, poseStack.last(), RenderType.entityTranslucent(resourceLocation), resourceLocation,
+			net.minecraft.resources.ResourceLocation.withDefaultNamespace("player_hand"), i, OverlayTexture.NO_OVERLAY, -1, 0);
+		if (!queuedArm) {
+			throw new IllegalStateException("Rust whole-frame player-hand route rejected the semantic skin mesh");
+		}
+		return;
 	}
 
 	protected void setupRotations(AvatarRenderState avatarRenderState, PoseStack poseStack, float f, float g) {

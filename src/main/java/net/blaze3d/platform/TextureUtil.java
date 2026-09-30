@@ -51,58 +51,7 @@ public class TextureUtil {
 
 	public static void writeAsPNG(Path path, String string, GpuTexture gpuTexture, int i, IntUnaryOperator intUnaryOperator) {
 		RenderSystem.assertOnRenderThread();
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java texture readback is unavailable on the Rust Vulkan route");
-		}
-		int j = 0;
-
-		for (int k = 0; k <= i; k++) {
-			j += gpuTexture.getFormat().pixelSize() * gpuTexture.getWidth(k) * gpuTexture.getHeight(k);
-		}
-
-		GpuBuffer gpuBuffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Texture output buffer", 9, j);
-		CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.createCommandEncoder();
-		Runnable runnable = () -> {
-			try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(gpuBuffer, true, false)) {
-				int jx = 0;
-
-				for (int k = 0; k <= i; k++) {
-					int lx = gpuTexture.getWidth(k);
-					int mx = gpuTexture.getHeight(k);
-
-					try (NativeImage nativeImage = new NativeImage(lx, mx, false)) {
-						for (int n = 0; n < mx; n++) {
-							for (int o = 0; o < lx; o++) {
-								int p = mappedView.data().getInt(jx + (o + n * lx) * gpuTexture.getFormat().pixelSize());
-								nativeImage.setPixelABGR(o, n, intUnaryOperator.applyAsInt(p));
-							}
-						}
-
-						Path path2 = path.resolve(string + "_" + k + ".png");
-						nativeImage.writeToFile(path2);
-						LOGGER.debug("Exported png to: {}", path2.toAbsolutePath());
-					} catch (IOException var19) {
-						LOGGER.debug("Unable to write: ", (Throwable)var19);
-					}
-
-					jx += gpuTexture.getFormat().pixelSize() * lx * mx;
-				}
-			}
-
-			gpuBuffer.close();
-		};
-		AtomicInteger atomicInteger = new AtomicInteger();
-		int l = 0;
-
-		for (int m = 0; m <= i; m++) {
-			commandEncoder.copyTextureToBuffer(gpuTexture, gpuBuffer, l, () -> {
-				if (atomicInteger.getAndIncrement() == i) {
-					runnable.run();
-				}
-			}, m);
-			l += gpuTexture.getFormat().pixelSize() * gpuTexture.getWidth(m) * gpuTexture.getHeight(m);
-		}
+		throw new IllegalStateException("Java texture readback is unavailable on the Rust Vulkan route");
 	}
 
 	public static Path getDebugTexturePath(Path path) {

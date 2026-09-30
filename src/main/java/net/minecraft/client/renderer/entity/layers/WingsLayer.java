@@ -48,18 +48,6 @@ public class WingsLayer<S extends HumanoidRenderState, M extends EntityModel<S>>
 			ResourceLocation resourceLocation = getPlayerElytraTexture(humanoidRenderState);
 			ElytraModel elytraModel = humanoidRenderState.isBaby ? this.elytraBabyModel : this.elytraModel;
 			
-			// Iris: Set elytra item context
-			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& WorldRenderingSettings.INSTANCE.getItemIds() != null) {
-				if (humanoidRenderState instanceof AvatarRenderState state && state.skin.cape() != null && state.showCape) {
-					CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(ELYTRA_CAPE_LOCATION));
-				} else {
-					ResourceLocation location = BuiltInRegistries.ITEM.getKey(Items.ELYTRA);
-					CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new NamespacedId(location.getNamespace(), location.getPath())));
-				}
-			}
 			
 			poseStack.pushPose();
 			poseStack.translate(0.0F, 0.0F, 0.125F);
@@ -79,12 +67,6 @@ public class WingsLayer<S extends HumanoidRenderState, M extends EntityModel<S>>
 				);
 			poseStack.popPose();
 			
-			// Iris: Clear elytra item context
-			if (!net.minecraft.client.renderer.entity.EntityRenderDispatcher.isSemanticSubmission()
-				&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
-			}
 		}
 	}
 

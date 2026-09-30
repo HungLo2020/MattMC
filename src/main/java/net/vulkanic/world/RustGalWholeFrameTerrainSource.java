@@ -193,8 +193,7 @@ public final class RustGalWholeFrameTerrainSource {
 
 	public void enqueue(Camera camera, Frustum frustum, int viewportWidth, int viewportHeight,
 			float terrainSelectionDistance) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
-				|| this.level == null || camera == null || frustum == null) {
+		if ((this.level == null) || camera == null || frustum == null) {
 			return;
 		}
 		// Backend selection can settle after LevelRenderer's initial level-change
@@ -497,11 +496,6 @@ public final class RustGalWholeFrameTerrainSource {
 		}
 	}
 
-	/** True once all client-resident nearby surface sections have been attempted. */
-	public static boolean isWholeFrameSurfaceQueueDrained() {
-		return wholeFrameSurfaceQueueDrained;
-	}
-
 	private RenderSection replaceRetainedSection(long key, RenderSection section) {
 		RenderSection previous = this.sections.put(key, section);
 		if (previous != null && previous.getFlags() != 0) {
@@ -537,6 +531,11 @@ public final class RustGalWholeFrameTerrainSource {
 	 * Deterministic parity capture uses this stronger condition so it never
 	 * presents a partial semantic terrain set as a settled frame.
 	 */
+	/** Sections currently tracked by the Rust terrain source (F3 statistics). */
+	public int sectionCount() {
+		return this.sections.size();
+	}
+
 	public static boolean isWholeFrameTerrainQueueDrained() {
 		return wholeFrameTerrainQueueDrained;
 	}
@@ -880,18 +879,6 @@ public final class RustGalWholeFrameTerrainSource {
 			this.pending.addLast(SectionPos.of(sectionX, sectionY, sectionZ));
 			this.recordPortalBuildLifecycle(key, "enqueued");
 		}
-	}
-
-	private boolean isCandidate(SectionPos section, Frustum frustum) {
-		return this.isCandidate(section, frustum, false);
-	}
-
-	private boolean isCandidate(SectionPos section, Frustum frustum, boolean bootstrapOrigin) {
-		return section != null
-			&& !this.level.isOutsideBuildHeight(section.minBlockY())
-			&& this.isChunkLoaded(section.getX(), section.getZ())
-			&& this.isInsideCurrentWindow(section)
-			&& (bootstrapOrigin || this.isVisible(section, frustum));
 	}
 
 	private boolean isChunkLoaded(int chunkX, int chunkZ) {

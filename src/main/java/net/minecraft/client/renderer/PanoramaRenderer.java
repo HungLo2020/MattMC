@@ -33,11 +33,7 @@ public class PanoramaRenderer {
 				(float)this.minecraft.getWindow().getHeight() / this.minecraft.getWindow().getGuiScale()),
 			guiGraphics.guiRenderState
 		)) {
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()) {
-				throw new IllegalStateException("Rust Vulkan whole-frame panorama asset is unavailable; Java panorama rendering is not a fallback");
-			}
-			this.cubeMap.render(this.minecraft, 10.0F, -this.spin);
+			throw new IllegalStateException("Rust Vulkan whole-frame panorama asset is unavailable; Java panorama rendering is not a fallback");
 		}
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, PANORAMA_OVERLAY, 0, 0, 0.0F, 0.0F, i, j, 16, 128, 16, 128);
 	}
@@ -52,15 +48,6 @@ public class PanoramaRenderer {
 	}
 
 	public void registerTextures(TextureManager textureManager) {
-		// The Rust whole-frame route copies the cubemap through its semantic asset
-		// collector.  Do not even enter the Java texture manager on selected Vulkan;
-		// CubeMap also guards its lower-level registration methods, but keeping this
-		// callsite fenced prevents future panorama variants from reintroducing a
-		// Java GPU allocation before semantic submission.
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			return;
-		}
-		this.cubeMap.registerTextures(textureManager);
+		return;
 	}
 }

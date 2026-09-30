@@ -57,23 +57,6 @@ final class WeatherSemanticContractTest {
 
 
 	@Test
-	void rustWholeFrameSkyExtractionIsOrderedBeforeSubmissionAndJavaSkyDrawsAreFenced() throws Exception {
-		String gameRenderer = Files.readString(Path.of(
-			"src/main/java/net/minecraft/client/renderer/GameRenderer.java"));
-		int shell = gameRenderer.indexOf("renderRustVulkanWholeFrameShell");
-		int sky = gameRenderer.indexOf("enqueueRustGalSkyForWholeFrame", shell);
-		assertTrue(shell >= 0 && sky > shell,
-			"Rust whole-frame shell must extract sky semantics before submitting the frame");
-
-		String skyRenderer = Files.readString(Path.of(
-			"src/main/java/net/minecraft/client/renderer/SkyRenderer.java"));
-		int draw = skyRenderer.indexOf("public void renderSunMoonAndStars");
-		int fence = skyRenderer.indexOf("ensureJavaSkyRenderingAvailable();", draw);
-		assertTrue(draw >= 0 && fence > draw,
-			"all Java celestial drawing must be fenced when Rust owns presentation");
-	}
-
-	@Test
 	void skyAdmissionRejectsMissingCopiedSkyTypeBeforeFieldUse() throws Exception {
 		String source = Files.readString(Path.of(
 			"src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java"));

@@ -41,12 +41,6 @@ import net.minecraft.client.entity.ClientAvatarState;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.gui.render.GuiRenderer;
-import net.minecraft.client.gui.render.pip.GuiBannerResultRenderer;
-import net.minecraft.client.gui.render.pip.GuiBookModelRenderer;
-import net.minecraft.client.gui.render.pip.GuiEntityRenderer;
-import net.minecraft.client.gui.render.pip.GuiProfilerChartRenderer;
-import net.minecraft.client.gui.render.pip.GuiSignRenderer;
-import net.minecraft.client.gui.render.pip.GuiSkinRenderer;
 import net.minecraft.client.gui.render.state.GuiRenderState;
 import net.minecraft.client.gui.screens.debug.DebugOptionsScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -184,22 +178,12 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	public GameRenderer(Minecraft minecraft, ItemInHandRenderer itemInHandRenderer, RenderBuffers renderBuffers, BlockRenderDispatcher blockRenderDispatcher) {
 		this.minecraft = minecraft;
 		this.itemInHandRenderer = itemInHandRenderer;
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			// Rust whole-frame extraction owns copied matrices and frame settings;
-			// these Java compatibility UBOs are never consumed on that route.
-			this.globalSettingsUniform = null;
-			this.levelProjectionMatrixBuffer = null;
-			this.handProjectionMatrixBuffer = null;
-		} else {
-			this.globalSettingsUniform = new GlobalSettingsUniform();
-			this.levelProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("level");
-			this.handProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("hand");
-		}
-		this.hud3dProjectionMatrixBuffer = (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected())
-			? null
-			: new CachedPerspectiveProjectionMatrixBuffer("3d hud", 0.05F, 100.0F);
+		// Rust whole-frame extraction owns copied matrices and frame settings;
+		// these Java compatibility UBOs are never consumed on that route.
+		this.globalSettingsUniform = null;
+		this.levelProjectionMatrixBuffer = null;
+		this.handProjectionMatrixBuffer = null;
+		this.hud3dProjectionMatrixBuffer = null;
 		this.lightTexture = new LightTexture(this, minecraft);
 		this.renderBuffers = renderBuffers;
 		this.guiRenderState = new GuiRenderState();
@@ -219,27 +203,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			this.guiRenderState,
 			bufferSource,
 			this.submitNodeStorage,
-			this.featureRenderDispatcher,
-			List.of(
-				new GuiEntityRenderer(bufferSource, minecraft.getEntityRenderDispatcher()),
-				new GuiSkinRenderer(bufferSource),
-				new GuiBookModelRenderer(bufferSource),
-				new GuiBannerResultRenderer(bufferSource, atlasManager),
-				new GuiSignRenderer(bufferSource, atlasManager),
-				new GuiProfilerChartRenderer(bufferSource)
-			)
+			this.featureRenderDispatcher
 		);
 		
-		// Iris hardware diagnostics are compatibility-only. Whole-frame Vulkan
-		// must not touch Iris runtime state merely while constructing the renderer.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			net.irisshaders.iris.Iris.logger.info("Hardware information:");
-			net.irisshaders.iris.Iris.logger.info("CPU: " + GLX._getCpuInfo());
-			GpuDevice.GpuDeviceInfo gpuDeviceInfo = VulkanicAPI.getBackendDeviceInfo();
-			net.irisshaders.iris.Iris.logger.info("GPU: " + gpuDeviceInfo.rendererDisplayString() + " (" + gpuDeviceInfo.driverDisplayString() + ")");
-			net.irisshaders.iris.Iris.logger.info("OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.version") + ")");
-		}
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
 		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());
 		this.panorama = new PanoramaRenderer(this.cubeMap);
@@ -355,57 +321,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	private void setPostEffect(ResourceLocation resourceLocation) {
 		this.postEffectId = resourceLocation;
 		this.effectActive = true;
-	}
-
-	public void processBlurEffect() {
-		if (net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanEnabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java GUI blur post-process is unavailable while Rust owns whole-frame Vulkan");
-		}
-		PostChain postChain = this.minecraft.getShaderManager().getPostChain(BLUR_POST_CHAIN_ID, LevelTargetBundle.MAIN_TARGETS);
-		if (postChain != null) {
-			postChain.process(this.minecraft.getMainRenderTarget(), this.resourcePool);
-		}
-	}
-
-	public void preloadUiShader(ResourceProvider resourceProvider) {
-		BiFunction<ResourceLocation, ShaderType, String> biFunction = (resourceLocation, shaderType) -> {
-			ResourceLocation resourceLocation2 = shaderType.idConverter().idToFile(resourceLocation);
-
-			try {
-				Reader reader = resourceProvider.getResourceOrThrow(resourceLocation2).openAsReader();
-
-				String var5;
-				try {
-					var5 = IOUtils.toString(reader);
-				} catch (Throwable var8) {
-					if (reader != null) {
-						try {
-							reader.close();
-						} catch (Throwable var7) {
-							var8.addSuppressed(var7);
-						}
-					}
-
-					throw var8;
-				}
-
-				if (reader != null) {
-					reader.close();
-				}
-
-				return var5;
-			} catch (IOException var9) {
-				LOGGER.error("Coudln't preload {} shader {}: {}", shaderType, resourceLocation, var9);
-				return null;
-			}
-		};
-		VulkanicAPI.precompileRenderPipeline(RenderPipelines.GUI, biFunction);
-		VulkanicAPI.precompileRenderPipeline(RenderPipelines.GUI_TEXTURED, biFunction);
-		VulkanicAPI.precompileRenderPipeline(net.voxelmap.util.VoxelMapPipelines.GUI_TEXTURED_LESS_OR_EQUAL_DEPTH_PIPELINE, biFunction);
-		if (TracyCompat.isAvailable()) {
-			VulkanicAPI.precompileRenderPipeline(RenderPipelines.TRACY_BLIT, biFunction);
-		}
 	}
 
 	public void tick() {
@@ -671,79 +586,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		}
 	}
 
-	private void renderItemInHand(float f, boolean bl, Matrix4f matrix4f) {
-		if (!this.panoramicMode) {
-			this.featureRenderDispatcher.renderAllFeatures();
-			this.renderBuffers.bufferSource().endBatch();
-			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
-			PoseStack poseStack = new PoseStack();
-			boolean taczHandPath = this.useTaczHandModelViewPath();
-			poseStack.pushPose();
-			matrix4fStack.pushMatrix();
-			if (taczHandPath) {
-				PoseStack modelViewPoseStack = new PoseStack();
-				this.bobHurt(modelViewPoseStack, f);
-				if (this.minecraft.options.bobView().get()) {
-					this.bobView(modelViewPoseStack, f);
-				}
-				matrix4fStack.set(modelViewPoseStack.last().pose());
-			} else {
-				poseStack.mulPose(matrix4f.invert(new Matrix4f()));
-				matrix4fStack.mul(matrix4f);
-				this.bobHurt(poseStack, f);
-				if (this.minecraft.options.bobView().get()) {
-					this.bobView(poseStack, f);
-				}
-			}
-
-			if (this.minecraft.options.getCameraType().isFirstPerson()
-				&& !bl
-				&& !this.minecraft.options.hideGui
-				&& this.minecraft.gameMode.getPlayerMode() != GameType.SPECTATOR) {
-				this.lightTexture.turnOnLightLayer();
-				// Java Iris/OpenGL keeps its existing hand ownership. Vulkan and
-				// Rust whole-frame ownership must still invoke this semantic
-				// callsite: ItemInHandRenderer routes eligible items into Rust and
-				// never performs a Java GPU draw on that path.
-				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| !javaIrisShaderPackActive()) {
-					this.itemInHandRenderer
-						.renderHandsWithItems(
-							f,
-							poseStack,
-							this.minecraft.gameRenderer.getSubmitNodeStorage(),
-							this.minecraft.player,
-							this.minecraft.getEntityRenderDispatcher().getPackedLightCoords(this.minecraft.player, f)
-						);
-				}
-				this.lightTexture.turnOffLightLayer();
-			}
-
-			matrix4fStack.popMatrix();
-			poseStack.popPose();
-		}
-	}
-
-	private boolean useTaczHandModelViewPath() {
-		return !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !javaIrisShaderPackActive()
-			&& this.minecraft.player != null
-			&& this.minecraft.player.getMainHandItem().getItem() instanceof TaczMvpGunItem;
-	}
-
-	/**
-	 * Iris runtime state belongs only to the Java OpenGL compatibility route.
-	 * Keeping the ownership check here prevents a future first-person callsite
-	 * from borrowing Iris state after Rust has selected whole-frame Vulkan.
-	 */
-	private static boolean javaIrisShaderPackActive() {
-		return !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& net.irisshaders.iris.Iris.isPackInUseQuick();
-	}
-
 	public Matrix4f getProjectionMatrix(float f) {
 		Matrix4f matrix4f = new Matrix4f();
 		return matrix4f.perspective(
@@ -768,195 +610,17 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		net.minecraft.client.dev.GraphicsAuditHandFoilTiming.beginFrame();
 		net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.beginFrame();
 		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.beginFrame();
-		boolean rustWholeFrame = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		if (rustWholeFrame) {
-			// Minecraft's render loop selects the Rust whole-frame shell for this
-			// route. Keep this legacy entry point fail-closed as well so a
-			// mod or future callsite cannot accidentally reopen Java world,
-			// PostChain, GUI, or presenter work beside the Rust frame.
-			throw new IllegalStateException("Java GameRenderer.render is unavailable while Rust Vulkan owns the whole frame");
-		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java GameRenderer.render is unavailable until the Rust Vulkan whole-frame route is admitted");
-		}
-		// Rust owns timing and frame submission in whole-frame mode. Keep the
-		// legacy Iris counters entirely out of that renderer route.
-		float realTickDelta = rustWholeFrame
-			? net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker)
-			: (SystemTimeUniforms.isDeterministicTemporalParityEnabled()
-				? SystemTimeUniforms.deterministicTemporalPartialTick()
-				: deltaTracker.getGameTimeDeltaPartialTick(true));
-		long shaderFrameStartNanos = net.minecraft.Util.getNanos();
-		if (!rustWholeFrame) {
-			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta(realTickDelta);
-			net.irisshaders.iris.uniforms.SystemTimeUniforms.COUNTER.beginFrame();
-			net.irisshaders.iris.uniforms.SystemTimeUniforms.TIMER.beginFrame(shaderFrameStartNanos);
-		}
-		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginShaderPackFrame(shaderFrameStartNanos, realTickDelta);
-		
-		if (!this.minecraft.isWindowActive()
-			&& this.minecraft.options.pauseOnLostFocus
-			&& (!this.minecraft.options.touchscreen().get() || !this.minecraft.mouseHandler.isRightPressed())) {
-			if (Util.getMillis() - this.lastActiveTime > 500L) {
-				this.minecraft.pauseGame(false);
-			}
-		} else {
-			this.lastActiveTime = Util.getMillis();
-		}
-
-		if (!this.minecraft.noRender) {
-			// Iris: From MixinGameRenderer - modify blur for shader pack screen
-			int blurRadius = this.minecraft.options.getMenuBackgroundBlurriness();
-			if (this.minecraft.screen instanceof net.irisshaders.iris.gui.screen.ShaderPackScreen sps) {
-				float f = Math.min(this.minecraft.options.getMenuBackgroundBlurriness(), sps.blurTransition.getAsFloat());
-				blurRadius = (int) f;
-			}
-			
-			this.globalSettingsUniform
-				.update(
-					this.minecraft.getWindow().getWidth(),
-					this.minecraft.getWindow().getHeight(),
-					this.minecraft.options.glintStrength().get(),
-					this.minecraft.level == null ? 0L : this.minecraft.level.getGameTime(),
-					deltaTracker,
-					blurRadius
-				);
-			ProfilerFiller profilerFiller = Profiler.get();
-			boolean bl2 = this.minecraft.isGameLoadFinished();
-			int i = (int)this.minecraft.mouseHandler.getScaledXPos(this.minecraft.getWindow());
-			int j = (int)this.minecraft.mouseHandler.getScaledYPos(this.minecraft.getWindow());
-			if (bl2 && bl && this.minecraft.level != null) {
-				profilerFiller.push("world");
-				this.renderLevel(deltaTracker);
-				this.tryTakeScreenshotIfNeeded();
-				this.minecraft.levelRenderer.doEntityOutline();
-				if (this.postEffectId != null && this.effectActive
-					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-						throw new IllegalStateException("Java post-effect processing is unavailable while Vulkan is selected");
-					}
-					VulkanicAPI.resetTextureMatrix();
-					PostChain postChain = this.minecraft.getShaderManager().getPostChain(this.postEffectId, LevelTargetBundle.MAIN_TARGETS);
-					if (postChain != null) {
-						postChain.process(this.minecraft.getMainRenderTarget(), this.resourcePool);
-					}
-				}
-
-				profilerFiller.pop();
-			}
-
-			this.fogRenderer.endFrame();
-			RenderTarget renderTarget = this.minecraft.getMainRenderTarget();
-			VulkanicAPI.createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
-			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
-			this.guiRenderState.reset();
-			profilerFiller.push("guiExtraction");
-			GuiGraphics guiGraphics = new GuiGraphics(this.minecraft, this.guiRenderState);
-			if (bl2 && bl && this.minecraft.level != null) {
-				// VoxelMap may queue chat status from its world-loading callback.
-				// Flush it before Gui.renderChat collects semantic text so Rust's
-				// exclusive presenter sees the message in this frame.
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-					net.voxelmap.VoxelConstants.getVoxelMapInstance().flushPendingPlayerMessage();
-				}
-				this.minecraft.gui.render(guiGraphics, deltaTracker);
-			}
-
-			if (this.minecraft.getOverlay() != null) {
-				try {
-					this.minecraft.getOverlay().render(guiGraphics, i, j, deltaTracker.getGameTimeDeltaTicks());
-				} catch (Throwable var15) {
-					CrashReport crashReport = CrashReport.forThrowable(var15, "Rendering overlay");
-					CrashReportCategory crashReportCategory = crashReport.addCategory("Overlay render details");
-					crashReportCategory.setDetail("Overlay name", () -> this.minecraft.getOverlay().getClass().getCanonicalName());
-					throw new ReportedException(crashReport);
-				}
-			} else if (bl2 && this.minecraft.screen != null) {
-				try {
-					this.minecraft.screen.renderWithTooltipAndSubtitles(guiGraphics, i, j, deltaTracker.getGameTimeDeltaTicks());
-				} catch (Throwable var14) {
-					CrashReport crashReport = CrashReport.forThrowable(var14, "Rendering screen");
-					CrashReportCategory crashReportCategory = crashReport.addCategory("Screen render details");
-					crashReportCategory.setDetail("Screen name", () -> this.minecraft.screen.getClass().getCanonicalName());
-					this.minecraft.mouseHandler.fillMousePositionDetails(crashReportCategory, this.minecraft.getWindow());
-					throw new ReportedException(crashReport);
-				}
-
-				if (SharedConstants.DEBUG_CURSOR_POS) {
-					this.minecraft.mouseHandler.drawDebugMouseInfo(this.minecraft.font, guiGraphics);
-				}
-
-				try {
-					if (this.minecraft.screen != null) {
-						this.minecraft.screen.handleDelayedNarration();
-					}
-				} catch (Throwable var13) {
-					CrashReport crashReport = CrashReport.forThrowable(var13, "Narrating screen");
-					CrashReportCategory crashReportCategory = crashReport.addCategory("Screen details");
-					crashReportCategory.setDetail("Screen name", () -> this.minecraft.screen.getClass().getCanonicalName());
-					throw new ReportedException(crashReport);
-				}
-			}
-
-			if (bl2 && bl && this.minecraft.level != null) {
-				this.minecraft.gui.renderSavingIndicator(guiGraphics, deltaTracker);
-			}
-
-			if (bl2) {
-				Zone zone = profilerFiller.zone("toasts");
-
-				try {
-					this.minecraft.getToastManager().render(guiGraphics);
-				} catch (Throwable var16) {
-					if (zone != null) {
-						try {
-							zone.close();
-						} catch (Throwable var12) {
-							var16.addSuppressed(var12);
-						}
-					}
-
-					throw var16;
-				}
-
-				if (zone != null) {
-					zone.close();
-				}
-			}
-
-			if (!(this.minecraft.screen instanceof DebugOptionsScreen)) {
-				this.minecraft.gui.renderDebugOverlay(guiGraphics);
-			}
-
-				this.minecraft.gui.renderDeferredSubtitles();
-				profilerFiller.popPush("guiRendering");
-
-				// Call GUI render hooks to allow mods to render custom overlays
-				for (net.minecraft.hooks.GuiRenderHooks hook : net.minecraft.hooks.HookRegistry.getGuiRenderHooks()) {
-					hook.onBeforeGuiRender(this.minecraft, this.guiRenderState, this.renderBuffers, deltaTracker, bl);
-				}
-
-				this.guiRenderer.render(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
-				this.guiRenderer.incrementFrameNumber();
-				profilerFiller.pop();
-
-				guiGraphics.applyCursor(this.minecraft.getWindow());
-			this.submitNodeStorage.endFrame();
-			this.featureRenderDispatcher.endFrame();
-			this.resourcePool.endFrame();
-		}
+		// Minecraft's render loop selects the Rust whole-frame shell for this
+		// route. Keep this legacy entry point fail-closed as well so a
+		// mod or future callsite cannot accidentally reopen Java world,
+		// PostChain, GUI, or presenter work beside the Rust frame.
+		throw new IllegalStateException("Java GameRenderer.render is unavailable while Rust Vulkan owns the whole frame");
 	}
 
 	public boolean renderRustVulkanWholeFrameShell(DeltaTracker deltaTracker, boolean bl) {
 		net.minecraft.client.dev.GraphicsAuditHandFoilTiming.beginFrame();
 		net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.beginFrame();
 		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.beginFrame();
-		if (!net.vulkanic.gui.RustGalGuiRenderer.isWholeFrameVulkanActive()) {
-			return false;
-		}
-		if (!VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Rust Vulkan whole-frame shell requires Vulkan backend selection");
-		}
 		ProfilerFiller profilerFiller = Profiler.get();
 		boolean gameLoadFinished = this.minecraft.isGameLoadFinished();
 		float f = net.vulkanic.bridge.RustGalDeterministicTiming.partialTick(deltaTracker);
@@ -1021,7 +685,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		if (this.levelProjectionMatrixBuffer != null) this.levelProjectionMatrixBuffer.ensureRustSemanticRoute();
 		if (this.handProjectionMatrixBuffer != null) this.handProjectionMatrixBuffer.ensureRustSemanticRoute();
 		if (this.hud3dProjectionMatrixBuffer != null) this.hud3dProjectionMatrixBuffer.ensureRustSemanticRoute();
-		this.lighting.ensureRustSemanticRoute();
 		this.cubeMap.ensureRustSemanticRoute();
 		this.fogRenderer.ensureRustSemanticRoute();
 		this.lightTexture().ensureRustSemanticRoute();
@@ -1431,52 +1094,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		return true;
 	}
 
-	private void tryTakeScreenshotIfNeeded() {
-		if (!this.hasWorldScreenshot && this.minecraft.isLocalServer()) {
-			long l = Util.getMillis();
-			if (l - this.lastScreenshotAttempt >= 1000L) {
-				this.lastScreenshotAttempt = l;
-				IntegratedServer integratedServer = this.minecraft.getSingleplayerServer();
-				if (integratedServer != null && !integratedServer.isStopped()) {
-					integratedServer.getWorldScreenshotFile().ifPresent(path -> {
-						if (Files.isRegularFile(path, new LinkOption[0])) {
-							this.hasWorldScreenshot = true;
-						} else {
-							this.takeAutoScreenshot(path);
-						}
-					});
-				}
-			}
-		}
-	}
-
-	private void takeAutoScreenshot(Path path) {
-		if (this.minecraft.levelRenderer.countRenderedSections() > 10 && this.minecraft.levelRenderer.hasRenderedAllSections()) {
-			Screenshot.takeScreenshot(this.minecraft.getMainRenderTarget(), nativeImage -> Util.ioPool().execute(() -> {
-				int i = nativeImage.getWidth();
-				int j = nativeImage.getHeight();
-				int k = 0;
-				int l = 0;
-				if (i > j) {
-					k = (i - j) / 2;
-					i = j;
-				} else {
-					l = (j - i) / 2;
-					j = i;
-				}
-
-				try (NativeImage nativeImage2 = new NativeImage(64, 64, false)) {
-					nativeImage.resizeSubRectTo(k, l, i, j, nativeImage2);
-					nativeImage2.writeToFile(path);
-				} catch (IOException var16) {
-					LOGGER.warn("Couldn't save auto screenshot", (Throwable)var16);
-				} finally {
-					nativeImage.close();
-				}
-			}));
-		}
-	}
-
 	public boolean shouldRenderBlockOutline() { // Made public for Iris shader integration
 		if (!this.renderBlockOutline) {
 			return false;
@@ -1503,158 +1120,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		}
 	}
 
-	public void renderLevel(DeltaTracker deltaTracker) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java GameRenderer.renderLevel is unavailable while Rust owns whole-frame presentation");
-		}
-		// Iris: Save shaders state (merged from MixinModelViewBobbing)
-		areShadersOn = net.irisshaders.iris.Iris.isPackInUseQuick();
-		
-		float f = SystemTimeUniforms.isDeterministicTemporalParityEnabled()
-			? SystemTimeUniforms.deterministicTemporalPartialTick()
-			: deltaTracker.getGameTimeDeltaPartialTick(true);
-		LocalPlayer localPlayer = this.minecraft.player;
-		this.lightTexture.updateLightTexture(f);
-		if (this.minecraft.getCameraEntity() == null) {
-			this.minecraft.setCameraEntity(localPlayer);
-		}
-		this.pick(f);
-		DeterministicCameraCapture.forceBlockOutlineTargetForDiagnostics(this.minecraft);
-		ProfilerFiller profilerFiller = Profiler.get();
-		profilerFiller.push("center");
-		boolean bl = this.shouldRenderBlockOutline();
-		profilerFiller.popPush("camera");
-		Entity entity = (Entity)(this.minecraft.getCameraEntity() == null ? localPlayer : this.minecraft.getCameraEntity());
-		float g = this.minecraft.level.tickRateManager().isEntityFrozen(entity) ? 1.0F : f;
-		TaczCameraRecoil.apply(this.minecraft);
-		this.mainCamera
-			.setup(this.minecraft.level, entity, !this.minecraft.options.getCameraType().isFirstPerson(), this.minecraft.options.getCameraType().isMirrored(), g);
-		this.extractCamera(f);
-		this.renderDistance = this.minecraft.options.getEffectiveRenderDistance() * 16;
-		float h = this.getFov(this.mainCamera, f, true);
-		Matrix4f matrix4f = this.getProjectionMatrix(h);
-		PoseStack poseStack = new PoseStack();
-		
-		// Iris: Separate view bobbing for shaders (merged from MixinModelViewBobbing)
-		if (areShadersOn) {
-			poseStack.pushPose();
-			poseStack.last().pose().identity();
-		}
-		
-		this.bobHurt(poseStack, this.mainCamera.getPartialTickTime());
-		if (this.minecraft.options.bobView().get()) {
-			// Iris: Skip bobView when shaders are active (merged from MixinModelViewBobbing)
-			if (!areShadersOn) {
-				this.bobView(poseStack, this.mainCamera.getPartialTickTime());
-			}
-		}
-		// Apply screen shake from ShakesScreen entities
-		this.applyScreenShake(poseStack, this.mainCamera.getPartialTickTime());
-
-		matrix4f.mul(poseStack.last().pose());
-		// Iris: Disable screen effect scale when shaders are on (merged from MixinModelViewBobbing)
-		float i = areShadersOn ? 0.0f : this.minecraft.options.screenEffectScale().get().floatValue();
-		float j = Mth.lerp(f, localPlayer.oPortalEffectIntensity, localPlayer.portalEffectIntensity);
-		float k = localPlayer.getEffectBlendFactor(MobEffects.NAUSEA, f);
-		float l = Math.max(j, k) * (i * i);
-		if (l > 0.0F) {
-			float m = 5.0F / (l * l + 5.0F) - l * 0.04F;
-			m *= m;
-			Vector3f vector3f = new Vector3f(0.0F, Mth.SQRT_OF_TWO / 2.0F, Mth.SQRT_OF_TWO / 2.0F);
-			float n = (this.spinningEffectTime + f * this.spinningEffectSpeed) * (float) (Math.PI / 180.0);
-			matrix4f.rotate(n, vector3f);
-			matrix4f.scale(1.0F / m, 1.0F, 1.0F);
-			matrix4f.rotate(-n, vector3f);
-		}
-
-		VulkanicAPI.setProjectionMatrix(this.levelProjectionMatrixBuffer.getBuffer(matrix4f), ProjectionType.PERSPECTIVE);
-		Quaternionf quaternionf = this.mainCamera.rotation().conjugate(new Quaternionf());
-		Matrix4f matrix4f2 = new Matrix4f();
-		
-		// Iris: Apply bobbing to model view when shaders are on (merged from MixinModelViewBobbing)
-		if (areShadersOn) {
-			PoseStack stack = new PoseStack();
-			stack.last().pose().set(matrix4f2);
-
-			float tickDelta = this.mainCamera.getPartialTickTime();
-
-			this.bobHurt(stack, tickDelta);
-			if (this.minecraft.options.bobView().get()) {
-				this.bobView(stack, tickDelta);
-			}
-			// Apply screen shake from ShakesScreen entities
-			this.applyScreenShake(stack, tickDelta);
-
-			matrix4f2.set(stack.last().pose());
-
-			float i2 = this.minecraft.options.screenEffectScale().get().floatValue();
-			float j2 = Mth.lerp(f, localPlayer.oPortalEffectIntensity, localPlayer.portalEffectIntensity);
-			float k2 = localPlayer.getEffectBlendFactor(MobEffects.NAUSEA, f);
-			float l2 = Math.max(j2, k2) * i2 * i2;
-			if (l2 > 0.0F) {
-				float m2 = 5.0F / (l2 * l2 + 5.0F) - l2 * 0.04F;
-				m2 *= m2;
-				Vector3f vector3f2 = new Vector3f(0.0F, Mth.SQRT_OF_TWO / 2.0F, Mth.SQRT_OF_TWO / 2.0F);
-				float n2 = (this.spinningEffectTime + f * this.spinningEffectSpeed) * ((float)Math.PI / 180F);
-				matrix4f2.rotate(n2, vector3f2);
-				matrix4f2.scale(1.0F / m2, 1.0F, 1.0F);
-				matrix4f2.rotate(-n2, vector3f2);
-			}
-
-			matrix4f2.rotate(quaternionf);
-		} else {
-			matrix4f2.rotation(quaternionf);
-		}
-		profilerFiller.popPush("fog");
-		boolean bl2 = this.minecraft.level.effects().isFoggyAt(this.mainCamera.getBlockPosition().getX(), this.mainCamera.getBlockPosition().getZ())
-			|| this.minecraft.gui.getBossOverlay().shouldCreateWorldFog();
-		Vector4f vector4f = this.fogRenderer
-			.setupFog(this.mainCamera, this.minecraft.options.getEffectiveRenderDistance(), bl2, deltaTracker, this.getDarkenWorldAmount(f), this.minecraft.level);
-		GpuBufferSlice gpuBufferSlice = this.fogRenderer.getBuffer(FogRenderer.FogMode.WORLD);
-		profilerFiller.popPush("level");
-		this.minecraft
-			.levelRenderer
-			.renderLevel(
-				this.resourcePool, deltaTracker, bl, this.mainCamera, matrix4f2, matrix4f, this.getProjectionMatrixForCulling(h), gpuBufferSlice, vector4f, !bl2
-			);
-		profilerFiller.popPush("hand");
-		boolean bl3 = this.minecraft.getCameraEntity() instanceof LivingEntity && ((LivingEntity)this.minecraft.getCameraEntity()).isSleeping();
-		float itemFov = this.getFov(this.mainCamera, f, false);
-		Matrix4f handProjection = new Matrix4f().scale(1.0F, 1.0F, HAND_DEPTH_SCALE);
-		handProjection.mul(this.getProjectionMatrix(itemFov));
-		VulkanicAPI.setProjectionMatrix(
-			this.handProjectionMatrixBuffer.getBuffer(handProjection),
-			ProjectionType.PERSPECTIVE
-		);
-		net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginFirstPersonFrame(handProjection, matrix4f2);
-		VulkanicAPI.createCommandEncoder().clearDepthTexture(this.minecraft.getMainRenderTarget().getDepthTexture(), 1.0);
-		this.renderItemInHand(f, bl3, matrix4f2);
-		VulkanicAPI.setProjectionMatrix(
-			this.hud3dProjectionMatrixBuffer.getBuffer(this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(), itemFov),
-			ProjectionType.PERSPECTIVE
-		);
-		profilerFiller.popPush("screenEffects");
-		MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
-		this.screenEffectRenderer.renderScreenEffect(bl3, f, this.submitNodeStorage);
-		this.featureRenderDispatcher.renderAllFeatures();
-		bufferSource.endBatch();
-		profilerFiller.pop();
-		VulkanicAPI.setShaderFog(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
-		if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)
-			&& this.minecraft.options.getCameraType().isFirstPerson()
-			&& !this.minecraft.options.hideGui) {
-			this.minecraft.getDebugOverlay().render3dCrosshair(this.mainCamera);
-		}
-		
-		// Iris finalization belongs only to the Java OpenGL compatibility route;
-		// Rust owns the selected Vulkan frame and its color-space/presentation graph.
-		if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(net.irisshaders.iris.pipeline.WorldRenderingPipeline::finalizeGameRendering);
-		}
-	}
-
 	private void extractCamera(float f) {
 		CameraRenderState cameraRenderState = this.levelRenderState.cameraRenderState;
 		cameraRenderState.initialized = this.mainCamera.isInitialized();
@@ -1662,11 +1127,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		cameraRenderState.blockPos = this.mainCamera.getBlockPosition();
 		cameraRenderState.entityPos = this.mainCamera.getEntity().getPosition(f);
 		cameraRenderState.orientation = new Quaternionf(this.mainCamera.rotation());
-	}
-
-	private Matrix4f getProjectionMatrixForCulling(float f) {
-		float g = Math.max(f, this.minecraft.options.fov().get().intValue());
-		return this.getProjectionMatrix(g);
 	}
 
 	public void resetData() {

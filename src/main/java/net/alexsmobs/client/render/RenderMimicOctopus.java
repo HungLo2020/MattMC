@@ -335,32 +335,10 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, MimicOct
             System.arraycopy(colors, 0, beamColors, colors.length, colors.length);
             boolean accepted = collector.submitGuardianBeamSemantic(
                 poseStack, BEAM_RENDER_TYPE, GUARDIAN_BEAM_TEXTURE, beamVertices, beamUvs, beamColors, light);
-			boolean vulkanSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
-			boolean rustPresentation = vulkanSelected
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-			boolean rustWholeFrame = rustPresentation
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentGuardianBeamRoute().usesRustWholeFrameVulkan();
 			// Selected Vulkan admission remains explicit: vulkanSelected && !rustWholeFrame.
-			if (!accepted && rustWholeFrame) {
+			if (!accepted) {
 				throw new IllegalStateException("Rust whole-frame Mimic Octopus beam route rejected semantic quads");
 			}
-			if (rustPresentation && !rustWholeFrame) {
-				throw new IllegalStateException("Mimic Octopus beam is unavailable until the Rust Vulkan billboard route is admitted");
-			}
-			if (!rustPresentation) {
-                collector.submitCustomGeometrySemantic(poseStack, BEAM_RENDER_TYPE, (pose, consumer) -> {
-                    Matrix4f matrix = pose.pose();
-                    Matrix3f normal = pose.normal();
-                    vertex(consumer, matrix, normal, vertices[0], vertices[1], vertices[2], 255, 255, 255, 0.0F, 0.0F);
-                    vertex(consumer, matrix, normal, vertices[3], vertices[4], vertices[5], 255, 255, 255, 1.0F, 0.0F);
-                    vertex(consumer, matrix, normal, vertices[6], vertices[7], vertices[8], 255, 255, 255, 1.0F, 1.0F);
-                    vertex(consumer, matrix, normal, vertices[9], vertices[10], vertices[11], 255, 255, 255, 0.0F, 1.0F);
-                    vertex(consumer, matrix, normal, crossed[0], crossed[1], crossed[2], 255, 255, 255, 0.0F, 0.0F);
-                    vertex(consumer, matrix, normal, crossed[3], crossed[4], crossed[5], 255, 255, 255, 1.0F, 0.0F);
-                    vertex(consumer, matrix, normal, crossed[6], crossed[7], crossed[8], 255, 255, 255, 1.0F, 1.0F);
-                    vertex(consumer, matrix, normal, crossed[9], crossed[10], crossed[11], 255, 255, 255, 0.0F, 1.0F);
-                });
-            }
         }
 
         public ResourceLocation getFor(EntityMimicOctopus.MimicState state) {

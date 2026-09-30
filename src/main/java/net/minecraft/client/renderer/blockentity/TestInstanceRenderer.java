@@ -5,7 +5,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.OrderedSubmitNodeCollector;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.state.BeaconRenderState;
@@ -69,8 +68,7 @@ public class TestInstanceRenderer implements BlockEntityRenderer<TestInstanceBlo
 		for (ErrorMarker errorMarker : testInstanceRenderState.errorMarkers) {
 			this.submitErrorMarker(poseStack, submitNodeCollector, errorMarker, cameraRenderState);
 		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !submitNodeCollector.isSemanticCoverageOnly()
+		if (!submitNodeCollector.isSemanticCoverageOnly()
 			&& testInstanceRenderState.blockEntityWithBoundingBoxRenderState.box != null) {
 			var renderableBox = testInstanceRenderState.blockEntityWithBoundingBoxRenderState.box;
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordTestInstanceComposition(
@@ -102,21 +100,8 @@ public class TestInstanceRenderer implements BlockEntityRenderer<TestInstanceBlo
 			boxUvs[quad * 8 + 6] = 0.0F; boxUvs[quad * 8 + 7] = 1.0F;
 		}
 		int[] boxColors = {0x5fff0000, 0x5fff0000, 0x5fff0000, 0x5fff0000, 0x5fff0000, 0x5fff0000};
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
-			if (!submitNodeCollector.order(1).submitColoredQuadsSemantic(poseStack, RenderType.debugFilledBox(), boxVertices, boxUvs, boxColors, 15728880)) {
-				throw new IllegalStateException("Rust whole-frame error-marker route rejected semantic box quads");
-			}
-		} else {
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame error-marker route is unavailable; Java debug geometry is not a fallback");
-			}
-			submitNodeCollector.order(1).submitCustomGeometrySemantic(poseStack, RenderType.debugFilledBox(), (pose, vertexConsumer) -> {
-			PoseStack poseStackx = new PoseStack();
-			poseStackx.last().set(pose);
-			ShapeRenderer.addChainedFilledBoxVertices(poseStackx, vertexConsumer, fx, g, h, ix, j, k, 1.0F, 0.0F, 0.0F, 0.375F);
-			});
+		if (!submitNodeCollector.order(1).submitColoredQuadsSemantic(poseStack, RenderType.debugFilledBox(), boxVertices, boxUvs, boxColors, 15728880)) {
+			throw new IllegalStateException("Rust whole-frame error-marker route rejected semantic box quads");
 		}
 		FormattedCharSequence formattedCharSequence = errorMarker.text().getVisualOrderText();
 		int i = this.font.width(formattedCharSequence);
@@ -126,18 +111,10 @@ public class TestInstanceRenderer implements BlockEntityRenderer<TestInstanceBlo
 		poseStack.mulPose(cameraRenderState.orientation);
 		poseStack.scale(0.01F, -0.01F, 0.01F);
 		OrderedSubmitNodeCollector ordered = submitNodeCollector.order(2);
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			ordered.submitTextSemantic(
-				poseStack, -i / 2.0F, 0.0F, formattedCharSequence, false,
-				Font.DisplayMode.SEE_THROUGH, 15728880, -1, 0, 0
-			);
-		} else {
-			ordered.submitTextSemantic(
-				poseStack, -i / 2.0F, 0.0F, formattedCharSequence, false,
-				Font.DisplayMode.SEE_THROUGH, 15728880, -1, 0, 0
-			);
-		}
+		ordered.submitTextSemantic(
+			poseStack, -i / 2.0F, 0.0F, formattedCharSequence, false,
+			Font.DisplayMode.SEE_THROUGH, 15728880, -1, 0, 0
+		);
 		poseStack.popPose();
 	}
 

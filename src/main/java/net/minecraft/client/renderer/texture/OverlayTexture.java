@@ -1,8 +1,6 @@
 package net.minecraft.client.renderer.texture;
 
 import net.blaze3d.platform.NativeImage;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
@@ -34,24 +32,14 @@ public class OverlayTexture implements AutoCloseable {
 			}
 		}
 
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			// DynamicTexture is CPU-only on this route; publish the completed
-			// overlay pixels to the semantic asset registry instead of touching a
-			// Java texture or compatibility encoder.
-			ensureSemanticAsset();
-		} else {
-			this.texture.setClamp(true);
-			this.texture.upload();
-		}
+		// DynamicTexture is CPU-only on this route; publish the completed
+		// overlay pixels to the semantic asset registry instead of touching a
+		// Java texture or compatibility encoder.
+		ensureSemanticAsset();
 	}
 
 	/** Publishes the overlay after a late Vulkan selection without retaining a Java GPU image. */
 	public void ensureSemanticAsset() {
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
 		if (!this.semanticPublished) {
 			net.vulkanic.gui.RustGalGuiRawImageAssets.registerDynamicTexture(SEMANTIC_IDENTITY, this.texture);
 			this.semanticPublished = true;
@@ -59,25 +47,15 @@ public class OverlayTexture implements AutoCloseable {
 	}
 
 	public void close() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			if (this.semanticPublished) {
-				net.vulkanic.gui.RustGalGuiRawImageAssets.unregisterDynamicTexture(SEMANTIC_IDENTITY, this.texture);
-				this.semanticPublished = false;
-			}
+		if (this.semanticPublished) {
+			net.vulkanic.gui.RustGalGuiRawImageAssets.unregisterDynamicTexture(SEMANTIC_IDENTITY, this.texture);
+			this.semanticPublished = false;
 		}
 		this.texture.close();
 	}
 
 	public void setupOverlayColor() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
-		var textureView = this.texture.getTextureView();
-		var ctx = VulkanicAPI.getCommandContext();
-		VulkanicAPI.bindTextureUnit(ctx, 1, textureView);
-		TextureTracker.INSTANCE.onSetShaderTexture(1, textureView);
+		return;
 	}
 
 	public static int u(float f) {
@@ -97,11 +75,6 @@ public class OverlayTexture implements AutoCloseable {
 	}
 
 	public void teardownOverlayColor() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
-		IrisRenderSystem.bindTextureToUnit(1, 0);
-		TextureTracker.INSTANCE.onSetShaderTexture(1, null);
+		return;
 	}
 }

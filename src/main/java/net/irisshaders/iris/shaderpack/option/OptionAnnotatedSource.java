@@ -456,10 +456,6 @@ public final class OptionAnnotatedSource {
 		return stringOptions;
 	}
 
-	public ImmutableMap<Integer, String> getDiagnostics() {
-		return diagnostics;
-	}
-
 	public ImmutableMap<String, IntList> getBooleanDefineReferences() {
 		return booleanDefineReferences;
 	}

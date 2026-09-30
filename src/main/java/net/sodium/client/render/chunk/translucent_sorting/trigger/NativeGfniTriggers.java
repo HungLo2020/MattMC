@@ -186,36 +186,6 @@ public final class NativeGfniTriggers implements AutoCloseable {
         }
     }
 
-    public static int getGeometryPlaneCount(long handle) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment countSegment = arena.allocate(ValueLayout.JAVA_INT);
-            check(invokeGeometryPlanesCount(handle, countSegment), "native geometry plane count query");
-            return countSegment.get(ValueLayout.JAVA_INT, 0);
-        }
-    }
-
-    public static void addAlignedGeometryPlane(long handle, int direction, float distance) {
-        check(invokeGeometryPlanesAddAligned(handle, direction, distance),
-                "native aligned geometry plane insertion");
-    }
-
-    public static void addDoubleSidedAlignedGeometryPlane(long handle, int axis, float distance) {
-        check(invokeGeometryPlanesAddDoubleSidedAligned(handle, axis, distance),
-                "native double-sided aligned geometry plane insertion");
-    }
-
-    public static void addUnalignedGeometryPlane(long handle, float normalX, float normalY, float normalZ,
-            float distance) {
-        check(invokeGeometryPlanesAddUnaligned(handle, normalX, normalY, normalZ, distance),
-                "native unaligned geometry plane insertion");
-    }
-
-    public static void addDoubleSidedUnalignedGeometryPlane(long handle, float normalX, float normalY, float normalZ,
-            float distance) {
-        check(invokeGeometryPlanesAddDoubleSidedUnaligned(handle, normalX, normalY, normalZ, distance),
-                "native double-sided unaligned geometry plane insertion");
-    }
-
     @Override
     public void close() {
         this.cleanable.clean();
@@ -332,51 +302,6 @@ public final class NativeGfniTriggers implements AutoCloseable {
         }
     }
 
-    private static int invokeGeometryPlanesCount(long handle, MemorySegment outputCount) {
-        try {
-            return (int) GEOMETRY_PLANES_COUNT.invokeExact(handle, outputCount);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust geometry plane count downcall failed", throwable);
-        }
-    }
-
-    private static int invokeGeometryPlanesAddAligned(long handle, int direction, float distance) {
-        try {
-            return (int) GEOMETRY_PLANES_ADD_ALIGNED.invokeExact(handle, direction, distance);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust aligned geometry plane insertion downcall failed", throwable);
-        }
-    }
-
-    private static int invokeGeometryPlanesAddDoubleSidedAligned(long handle, int axis, float distance) {
-        try {
-            return (int) GEOMETRY_PLANES_ADD_DOUBLE_SIDED_ALIGNED.invokeExact(handle, axis, distance);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust double-sided aligned geometry plane insertion downcall failed",
-                    throwable);
-        }
-    }
-
-    private static int invokeGeometryPlanesAddUnaligned(long handle, float normalX, float normalY, float normalZ,
-            float distance) {
-        try {
-            return (int) GEOMETRY_PLANES_ADD_UNALIGNED.invokeExact(handle, normalX, normalY, normalZ, distance);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust unaligned geometry plane insertion downcall failed", throwable);
-        }
-    }
-
-    private static int invokeGeometryPlanesAddDoubleSidedUnaligned(long handle, float normalX, float normalY,
-            float normalZ, float distance) {
-        try {
-            return (int) GEOMETRY_PLANES_ADD_DOUBLE_SIDED_UNALIGNED.invokeExact(handle, normalX, normalY, normalZ,
-                    distance);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust double-sided unaligned geometry plane insertion downcall failed",
-                    throwable);
-        }
-    }
-
     private static int invokeCatchup(long handle, long sectionPos, double startX, double startY, double startZ,
             double endX, double endY, double endZ, long outputAddress, int outputCapacity,
             MemorySegment outputState, int outputStateLen) {
@@ -435,6 +360,35 @@ public final class NativeGfniTriggers implements AutoCloseable {
 
             check(invokeDestroy(handle), "native GFNI trigger destruction");
             this.handle = 0;
+        }
+    }
+
+    public static void addAlignedGeometryPlane(long handle, int direction, float distance) {
+        check(invokeGeometryPlanesAddAligned(handle, direction, distance),
+                "native aligned geometry plane insertion");
+    }
+
+    public static int getGeometryPlaneCount(long handle) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment countSegment = arena.allocate(ValueLayout.JAVA_INT);
+            check(invokeGeometryPlanesCount(handle, countSegment), "native geometry plane count query");
+            return countSegment.get(ValueLayout.JAVA_INT, 0);
+        }
+    }
+
+    private static int invokeGeometryPlanesAddAligned(long handle, int direction, float distance) {
+        try {
+            return (int) GEOMETRY_PLANES_ADD_ALIGNED.invokeExact(handle, direction, distance);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust aligned geometry plane insertion downcall failed", throwable);
+        }
+    }
+
+    private static int invokeGeometryPlanesCount(long handle, MemorySegment outputCount) {
+        try {
+            return (int) GEOMETRY_PLANES_COUNT.invokeExact(handle, outputCount);
+        } catch (Throwable throwable) {
+            throw new IllegalStateException("Rust geometry plane count downcall failed", throwable);
         }
     }
 }

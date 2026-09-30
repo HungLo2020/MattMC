@@ -55,38 +55,6 @@ public class ScreenEffectRenderer {
 		}
 	}
 
-	public void renderScreenEffect(boolean bl, float f, SubmitNodeCollector submitNodeCollector) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java screen-effect rendering is unavailable on selected Vulkan");
-		}
-		PoseStack poseStack = new PoseStack();
-		Player player = this.minecraft.player;
-		if (this.minecraft.options.getCameraType().isFirstPerson() && !bl) {
-			if (!player.noPhysics) {
-				BlockState blockState = getViewBlockingState(player);
-				if (blockState != null) {
-					renderTex(this.minecraft.getBlockRenderer().getBlockModelShaper().getParticleIcon(blockState), poseStack, this.bufferSource);
-				}
-			}
-
-			if (!this.minecraft.player.isSpectator()) {
-				if (this.minecraft.player.isEyeInFluid(FluidTags.WATER)) {
-					renderWater(this.minecraft, poseStack, this.bufferSource);
-				}
-
-				if (this.minecraft.player.isOnFire()) {
-					TextureAtlasSprite textureAtlasSprite = this.materials.get(ModelBakery.FIRE_1);
-					renderFire(poseStack, this.bufferSource, textureAtlasSprite);
-				}
-			}
-		}
-
-		if (!this.minecraft.options.hideGui) {
-			this.renderItemActivationAnimation(poseStack, f, submitNodeCollector);
-		}
-	}
-
 	/**
 	 * Extracts only the item-activation semantic draw for the Rust whole-frame
 	 * route. The legacy screen-effect method also writes directly to a
@@ -95,9 +63,6 @@ public class ScreenEffectRenderer {
 	 * SubmitNodeCollector contract and can therefore be admitted independently.
 	 */
 	public void renderRustVulkanItemActivation(float partialTick, SubmitNodeCollector submitNodeCollector) {
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Rust Vulkan item-activation extraction requires an active whole-frame shell");
-		}
 		if (this.minecraft.options.hideGui) {
 			return;
 		}
@@ -114,9 +79,6 @@ public class ScreenEffectRenderer {
 
 	/** Extracts the resource-pack-backed underwater overlay through Rust GUI tiling. */
 	public void renderRustVulkanScreenEffects(net.minecraft.client.gui.GuiGraphics guiGraphics, float itemFov) {
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Rust Vulkan screen-effect extraction requires an active whole-frame shell");
-		}
 		if (guiGraphics == null || this.minecraft.player == null
 			|| !this.minecraft.options.getCameraType().isFirstPerson()
 			|| this.minecraft.player.isSpectator()) {
@@ -273,14 +235,6 @@ public class ScreenEffectRenderer {
 			poseStack.mulPose(Axis.YP.rotationDegrees(900.0F * Mth.abs(Mth.sin(l))));
 			poseStack.mulPose(Axis.XP.rotationDegrees(6.0F * Mth.cos(g * 8.0F)));
 			poseStack.mulPose(Axis.ZP.rotationDegrees(6.0F * Mth.cos(g * 8.0F)));
-			boolean rustSemanticItem = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
-			if (!rustSemanticItem) {
-				// OpenGL compatibility owns the implicit lighting state. Rust Vulkan
-				// receives copied item/material semantics and must not borrow this Java
-				// GPU-side lighting setup while extracting the activation item.
-				this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
-			}
 			ItemStackRenderState itemStackRenderState = new ItemStackRenderState();
 			this.minecraft
 				.getItemModelResolver()
@@ -319,97 +273,4 @@ public class ScreenEffectRenderer {
 		return null;
 	}
 
-	private static void renderTex(TextureAtlasSprite textureAtlasSprite, PoseStack poseStack, MultiBufferSource multiBufferSource) {
-		ensureJavaCompatibilityRoute();
-		float f = 0.1F;
-		int i = ARGB.colorFromFloat(1.0F, 0.1F, 0.1F, 0.1F);
-		float g = -1.0F;
-		float h = 1.0F;
-		float j = -1.0F;
-		float k = 1.0F;
-		float l = -0.5F;
-		float m = textureAtlasSprite.getU0();
-		float n = textureAtlasSprite.getU1();
-		float o = textureAtlasSprite.getV0();
-		float p = textureAtlasSprite.getV1();
-		Matrix4f matrix4f = poseStack.last().pose();
-		VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.blockScreenEffect(textureAtlasSprite.atlasLocation()));
-		vertexConsumer.addVertex(matrix4f, -1.0F, -1.0F, -0.5F).setUv(n, p).setColor(i);
-		vertexConsumer.addVertex(matrix4f, 1.0F, -1.0F, -0.5F).setUv(m, p).setColor(i);
-		vertexConsumer.addVertex(matrix4f, 1.0F, 1.0F, -0.5F).setUv(m, o).setColor(i);
-		vertexConsumer.addVertex(matrix4f, -1.0F, 1.0F, -0.5F).setUv(n, o).setColor(i);
-	}
-
-	private static void renderWater(Minecraft minecraft, PoseStack poseStack, MultiBufferSource multiBufferSource) {
-		ensureJavaCompatibilityRoute();
-		// Iris: Disable underwater overlay rendering when shader pack requests it
-		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
-		if (pipeline != null && !pipeline.shouldRenderUnderwaterOverlay()) {
-			return;
-		}
-		
-		BlockPos blockPos = BlockPos.containing(minecraft.player.getX(), minecraft.player.getEyeY(), minecraft.player.getZ());
-		float f = LightTexture.getBrightness(minecraft.player.level().dimensionType(), minecraft.player.level().getMaxLocalRawBrightness(blockPos));
-		int i = ARGB.colorFromFloat(0.1F, f, f, f);
-		float g = 4.0F;
-		float h = -1.0F;
-		float j = 1.0F;
-		float k = -1.0F;
-		float l = 1.0F;
-		float m = -0.5F;
-		float n = -minecraft.player.getYRot() / 64.0F;
-		float o = minecraft.player.getXRot() / 64.0F;
-		Matrix4f matrix4f = poseStack.last().pose();
-		VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.blockScreenEffect(UNDERWATER_LOCATION));
-		vertexConsumer.addVertex(matrix4f, -1.0F, -1.0F, -0.5F).setUv(4.0F + n, 4.0F + o).setColor(i);
-		vertexConsumer.addVertex(matrix4f, 1.0F, -1.0F, -0.5F).setUv(0.0F + n, 4.0F + o).setColor(i);
-		vertexConsumer.addVertex(matrix4f, 1.0F, 1.0F, -0.5F).setUv(0.0F + n, 0.0F + o).setColor(i);
-		vertexConsumer.addVertex(matrix4f, -1.0F, 1.0F, -0.5F).setUv(4.0F + n, 0.0F + o).setColor(i);
-	}
-
-	private static void renderFire(PoseStack poseStack, MultiBufferSource multiBufferSource, TextureAtlasSprite textureAtlasSprite) {
-		ensureJavaCompatibilityRoute();
-		VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.fireScreenEffect(textureAtlasSprite.atlasLocation()));
-		float f = textureAtlasSprite.getU0();
-		float g = textureAtlasSprite.getU1();
-		float h = (f + g) / 2.0F;
-		float i = textureAtlasSprite.getV0();
-		float j = textureAtlasSprite.getV1();
-		float k = (i + j) / 2.0F;
-		float l = textureAtlasSprite.uvShrinkRatio();
-		float m = Mth.lerp(l, f, h);
-		float n = Mth.lerp(l, g, h);
-		float o = Mth.lerp(l, i, k);
-		float p = Mth.lerp(l, j, k);
-		float q = 1.0F;
-
-		for (int r = 0; r < 2; r++) {
-			poseStack.pushPose();
-			float s = -0.5F;
-			float t = 0.5F;
-			float u = -0.5F;
-			float v = 0.5F;
-			float w = -0.5F;
-			poseStack.translate(-(r * 2 - 1) * 0.24F, -0.3F, 0.0F);
-			poseStack.mulPose(Axis.YP.rotationDegrees((r * 2 - 1) * 10.0F));
-			Matrix4f matrix4f = poseStack.last().pose();
-			vertexConsumer.addVertex(matrix4f, -0.5F, -0.5F, -0.5F).setUv(n, p).setColor(1.0F, 1.0F, 1.0F, 0.9F);
-			vertexConsumer.addVertex(matrix4f, 0.5F, -0.5F, -0.5F).setUv(m, p).setColor(1.0F, 1.0F, 1.0F, 0.9F);
-			vertexConsumer.addVertex(matrix4f, 0.5F, 0.5F, -0.5F).setUv(m, o).setColor(1.0F, 1.0F, 1.0F, 0.9F);
-			vertexConsumer.addVertex(matrix4f, -0.5F, 0.5F, -0.5F).setUv(n, o).setColor(1.0F, 1.0F, 1.0F, 0.9F);
-			poseStack.popPose();
-		}
-	}
-
-	/** Keeps every legacy screen overlay behind the OpenGL compatibility boundary. */
-	private static void ensureJavaCompatibilityRoute() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException(
-				"Java screen-effect rendering is unavailable on selected Vulkan; "
-				+ "Java underwater screen effect is unavailable on selected Vulkan "
-				+ "(Java underwater screen effect is unavailable while Rust owns whole-frame presentation)"
-			);
-		}
-	}
 }

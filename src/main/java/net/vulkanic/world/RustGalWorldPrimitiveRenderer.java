@@ -21,7 +21,6 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.block.MovingBlockRenderState;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
@@ -376,7 +375,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	private static final String DIAGNOSTIC_BORDER_SCROLL = System.getProperty("mattmc.dev.rustGalWorldBorder.scrollPhase", "").trim();
 	private static final String DIAGNOSTIC_BACKGROUND_SCENARIO = System.getProperty("mattmc.dev.rustGalWorldBackground.scenario", "auto").trim();
 	private static final boolean BLOCK_OUTLINE_DIAGNOSTICS = Boolean.getBoolean("mattmc.dev.blockOutlineDiagnostics");
-	private static final boolean CRACK_DISABLED_CONTROL = Boolean.getBoolean("mattmc.dev.rustGalWorldCrack.disabled");
+	private static final boolean CRACK_DISABLED_CONTROL = false;
 	private static final ResourceLocation FORCEFIELD_LOCATION = ResourceLocation.withDefaultNamespace("textures/misc/forcefield.png");
 	private static final ResourceLocation STONE_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("textures/block/stone.png");
 	private static final ResourceLocation DIRT_TEXTURE_LOCATION = ResourceLocation.withDefaultNamespace("textures/block/dirt.png");
@@ -861,9 +860,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static int enqueueDistantHorizonsGenericBoxes(
 		List<VulkanicGalBridge.WorldDistantHorizonsGenericBoxRecord> boxes
 	) {
-		if (!WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan()) {
-			return 0;
-		}
 		if (boxes == null || boxes.size() > MAX_DH_GENERIC_BOXES) {
 			throw new IllegalStateException("Rust DH generic-box bound exceeded " + MAX_DH_GENERIC_BOXES);
 		}
@@ -919,72 +915,15 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public static boolean shouldUseRustWholeFrameOutline() {
-		return WorldRenderRoutePolicy.currentBlockOutlineRoute().usesRustWholeFrameVulkan();
-	}
-
-	public static boolean shouldUseRustOpenGlOutline() {
-		return WorldRenderRoutePolicy.currentBlockOutlineRoute().usesRustOpenGl();
+		return true;
 	}
 
 	public static boolean shouldUseRustWholeFrameCrack() {
-		return WorldRenderRoutePolicy.currentCrackRoute().usesRustWholeFrameVulkan();
-	}
-
-	public static boolean shouldUseRustOpenGlCrack() {
-		return WorldRenderRoutePolicy.currentCrackRoute().usesRustOpenGl();
-	}
-
-	public static boolean shouldUseRustWholeFrameMaterial() {
-		return WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan();
-	}
-
-	public static boolean shouldSuppressJavaWeatherRender() {
-		return WorldRenderRoutePolicy.currentWeatherRoute().usesRustWholeFrameVulkan();
-	}
-
-	public static boolean shouldUseRustOpenGlMaterial() {
-		return WorldRenderRoutePolicy.currentMaterialRoute().usesRustOpenGl()
-			|| WorldRenderRoutePolicy.currentWeatherRoute().usesRustOpenGl();
-	}
-
-	private static boolean shouldUseRustOpenGlMeshInstances() {
-		return WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustOpenGl()
-			|| WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl()
-			|| WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustOpenGl()
-			|| WorldRenderRoutePolicy.currentPrimedTntRoute().usesRustOpenGl();
+		return true;
 	}
 
 	public static boolean shouldRouteTerrainParticle(BlockState blockState) {
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentMaterialRoute();
-		boolean disabled = Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.disabled");
-		boolean legacyControl = Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl");
-		if (disabled || legacyControl) {
-			// The collector has a direct whole-frame path that intentionally bypasses
-			// vanilla ParticleEngine.extract(). Keep these controls at the common
-			// semantic admission boundary so a diagnostic setting cannot be ignored
-			// by that path. Under Vulkan, refusing the route must remain an explicit
-			// unavailable capability rather than reopening Java rendering.
-			if (route.usesRustWholeFrameVulkan()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException(
-					"Rust whole-frame terrain particle route is unavailable under "
-						+ (disabled ? "disabled" : "legacy") + " control"
-				);
-			}
-			return false;
-		}
-		return (route.usesRustOpenGl() || route.usesRustWholeFrameVulkan())
-			&& terrainParticleTextureId(blockState) != 0;
-	}
-
-	public static boolean shouldUseRustOpenGlWorldPrimitives() {
-		return shouldUseRustOpenGlOutline()
-			|| shouldUseRustOpenGlCrack()
-			|| shouldUseRustOpenGlMaterial()
-			|| WorldRenderRoutePolicy.currentBlockDisplayRoute().usesRustOpenGl()
-			|| WorldRenderRoutePolicy.currentFallingBlockRoute().usesRustOpenGl()
-			|| WorldRenderRoutePolicy.currentPistonMovingBlockRoute().usesRustOpenGl()
-			|| WorldRenderRoutePolicy.currentPrimedTntRoute().usesRustOpenGl();
+		return terrainParticleTextureId(blockState) != 0;
 	}
 
 	/**
@@ -996,9 +935,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		List<SubmitNodeStorage.FlameSubmit> flameSubmits,
 		net.minecraft.client.resources.model.AtlasManager atlasManager
 	) {
-		if (!WorldRenderRoutePolicy.currentEntityFlameRoute().usesRustWholeFrameVulkan()) {
-			return 0;
-		}
 		if (flameSubmits == null || flameSubmits.isEmpty()) {
 			return 0;
 		}
@@ -1111,9 +1047,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * boundary.
 	 */
 	public static int collectEntityShadowSemantics(List<SubmitNodeStorage.ShadowSubmit> shadowSubmits) {
-		if (!WorldRenderRoutePolicy.currentEntityShadowRoute().usesRustWholeFrameVulkan()) {
-			return 0;
-		}
 		if (shadowSubmits == null || shadowSubmits.isEmpty()) {
 			return 0;
 		}
@@ -1234,9 +1167,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * rather than flattening the rope into a one-light approximation.
 	 */
 	public static int collectEntityLeashSemantics(List<SubmitNodeStorage.LeashSubmit> leashSubmits) {
-		if (!WorldRenderRoutePolicy.currentEntityLeashRoute().usesRustWholeFrameVulkan()) {
-			return 0;
-		}
 		if (leashSubmits == null || leashSubmits.isEmpty()) {
 			return 0;
 		}
@@ -1372,10 +1302,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	private record LeashVertex(float x0, float y0, float z0, float x1, float y1, float z1, int colorArgb, int packedLight) {
-	}
-
-	public static boolean crackDisabledForDiagnostics() {
-		return CRACK_DISABLED_CONTROL;
 	}
 
 	public static void reloadWorldAssets(ResourceManager resourceManager) {
@@ -2027,7 +1953,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * previous pack generation. It does not select a shader program or draw.
 	 */
 	private static void registerWorldSkyTextureAssetsLocked(ResourceManager resourceManager) {
-		if (resourceManager == null || !WorldRenderRoutePolicy.currentBackgroundRoute().usesRustWholeFrameVulkan()) {
+		if (resourceManager == null) {
 			return;
 		}
 		VulkanicGalBridge.WorldMeshTextureAssetRecord sun = readWorldSkyTextureAsset(
@@ -2114,40 +2040,6 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	public static void beginFrame(Matrix4f viewMatrix, Matrix4f projectionMatrix, int viewportWidth, int viewportHeight) {
 		beginFrame(viewMatrix, projectionMatrix, viewportWidth, viewportHeight, null, null);
-	}
-
-	/**
-	 * Refreshes the matrix/viewport portion of a borrowed OpenGL frame without
-	 * discarding semantic work collected by earlier world passes. Frame-graph
-	 * callbacks use this when their execution is deferred beyond extraction.
-	 */
-	public static void refreshBorrowedOpenGlFrameSeed(
-		Matrix4f viewMatrix,
-		Matrix4f projectionMatrix,
-		int viewportWidth,
-		int viewportHeight
-	) {
-		if (viewMatrix == null || projectionMatrix == null) {
-			throw new IllegalArgumentException("Rust borrowed OpenGL frame seed requires view and projection matrices");
-		}
-		synchronized (LOCK) {
-			// Deferred frame-graph callbacks can momentarily expose an incomplete
-			// matrix snapshot while the early level-render seed is still valid. A
-			// refresh must therefore be non-destructive: retain the known-good seed
-			// rather than clearing the viewport and crashing a selected producer.
-			float[] refreshedView = new float[16];
-			float[] refreshedProjection = new float[16];
-			viewMatrix.get(refreshedView);
-			projectionMatrix.get(refreshedProjection);
-			if (!isFinite(refreshedView) || !isFinite(refreshedProjection)
-				|| viewportWidth <= 0 || viewportHeight <= 0) {
-				return;
-			}
-			System.arraycopy(refreshedView, 0, PENDING_VIEW, 0, PENDING_VIEW.length);
-			System.arraycopy(refreshedProjection, 0, PENDING_PROJECTION, 0, PENDING_PROJECTION.length);
-			pendingViewportWidth = viewportWidth;
-			pendingViewportHeight = viewportHeight;
-		}
 	}
 
 	/**
@@ -2305,24 +2197,12 @@ public final class RustGalWorldPrimitiveRenderer {
 			// lists into the explicit text stream. They are no longer an omitted
 			// Java feature family, while every other non-zero count remains an
 			// ownership gap that Rust must report rather than silently draw.
-			int nameTagSubmits = WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()
-				? 0
-				: coverage.nameTagSubmits();
-			int textSubmits = WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()
-				? 0
-				: coverage.textSubmits();
-			int hitboxSubmits = WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()
-				? 0
-				: coverage.hitboxSubmits();
-			int shadowSubmits = WorldRenderRoutePolicy.currentEntityShadowRoute().usesRustWholeFrameVulkan()
-				? 0
-				: coverage.shadowSubmits();
-			int flameSubmits = WorldRenderRoutePolicy.currentEntityFlameRoute().usesRustWholeFrameVulkan()
-				? 0
-				: coverage.flameSubmits();
-			int leashSubmits = WorldRenderRoutePolicy.currentEntityLeashRoute().usesRustWholeFrameVulkan()
-				? 0
-				: coverage.leashSubmits();
+			int nameTagSubmits = 0;
+			int textSubmits = 0;
+			int hitboxSubmits = 0;
+			int shadowSubmits = 0;
+			int flameSubmits = 0;
+			int leashSubmits = 0;
 			pendingFeatureCoverage = new VulkanicGalBridge.WorldFeatureCoverageRecord(
 				modelSubmits, modelPartSubmits, blockModelSubmits,
 				ordinaryBlockSubmits, itemSubmits, coverage.customGeometrySubmits(),
@@ -3186,13 +3066,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		return Float.isFinite(value) ? Math.clamp(value, 0.0F, 1.0F) : 0.0F;
 	}
 
-	public static void reseedFrameMatrices(Matrix4f viewMatrix, Matrix4f projectionMatrix, int viewportWidth, int viewportHeight) {
-		synchronized (LOCK) {
-			seedFrameMatricesLocked(viewMatrix, projectionMatrix, viewportWidth, viewportHeight);
-			pendingDiagnosticCameraOriginValid = false;
-		}
-	}
-
 	private static void seedDiagnosticCameraOriginLocked(Camera camera) {
 		pendingDiagnosticCameraOriginValid = false;
 		if (camera == null) {
@@ -3301,15 +3174,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public static void enqueueWorldBackground(ClientLevel level, Camera camera, float partialTick, int fogColorArgb) {
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentBackgroundRoute();
-		if (!route.usesRustWholeFrameVulkan()) {
-			if (RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException(
-					"Rust whole-frame background route is unavailable; Java Vulkan fallback is unavailable"
-				);
-			}
-			return;
-		}
 		synchronized (LOCK) {
 			int viewportWidth = pendingViewportWidth;
 			int viewportHeight = pendingViewportHeight;
@@ -3356,15 +3220,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * once and admits these quads exactly once per frame.
 	 */
 	public static void enqueueWorldSky(SkyRenderState state, boolean visible, @Nullable Camera camera) {
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentBackgroundRoute();
-		if (!route.usesRustWholeFrameVulkan()) {
-			if (RustGalVulkanWholeFrameMode.enabled() && visible) {
-				throw new IllegalStateException(
-					"Rust whole-frame sky route rejected visible semantic work; Java Vulkan fallback is unavailable"
-				);
-			}
-			return;
-		}
 		if (state == null) {
 			throw new IllegalStateException("Rust whole-frame sky route requires copied sky state");
 		}
@@ -3717,19 +3572,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public static void enqueueBlockBreakingCracks(List<BlockBreakingRenderState> states, Camera camera) {
-		if (!shouldUseRustWholeFrameCrack()) {
-			if (RustGalVulkanWholeFrameMode.enabled()
-				&& states.stream().anyMatch(state -> state != null
-					&& state.progress >= 0
-					&& state.progress < 10
-					&& state.blockState != null
-					&& !state.blockState.isAir())) {
-				throw new IllegalStateException(
-					"Rust whole-frame crack route rejected visible semantic work; Java Vulkan fallback is unavailable"
-				);
-			}
-			return;
-		}
 		if (enqueueDiagnosticBlockBreakingCrack(camera)) {
 			return;
 		}
@@ -3800,115 +3642,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		float localV0,
 		float localV1
 	) {
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentMaterialRoute();
-		if (route.usesRustWholeFrameVulkan()) {
-			throw new IllegalStateException("Vulkan block markers require typed particle semantics; Java-expanded marker geometry is unavailable");
-		}
-		if (!route.usesRustOpenGl()) {
-			return false;
-		}
-		if (blockState == null || camera == null) {
-			throw new IllegalStateException("Rust VulkanicGAL BlockMarker route selected without block state or camera");
-		}
-		int textureId = blockMarkerTextureId(blockState);
-		if (textureId == 0) {
-			throw new IllegalStateException(
-				"Rust VulkanicGAL BlockMarker route selected for unsupported marker block "
-					+ blockState.getBlock().builtInRegistryHolder().key().location()
-			);
-		}
-		synchronized (LOCK) {
-			if (textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS
-				&& !WORLD_MESH_TEXTURES.containsKey(MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS)) {
-				throw new IllegalStateException(
-					"Rust VulkanicGAL BlockMarker route selected before the copied terrain atlas was registered"
-				);
-			}
-			int viewportWidth = pendingViewportWidth;
-			int viewportHeight = pendingViewportHeight;
-			ensureBoundedWorldPrimitiveViewportLocked("Rust VulkanicGAL BlockMarker requires a seeded bounded world primitive frame");
-			Vec3 cameraPos = camera.getPosition();
-			float centerX = (float)(Mth.lerp(partialTick, xo, x) - cameraPos.x());
-			float centerY = (float)(Mth.lerp(partialTick, yo, y) - cameraPos.y());
-			float centerZ = (float)(Mth.lerp(partialTick, zo, z) - cameraPos.z());
-			Quaternionf markerRotation = camera.rotation();
-			if (textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS) {
-				// Validate the actual camera-relative billboard payload, not an
-				// identity placeholder. This keeps malformed camera/position data
-				// from publishing NaNs while preserving dedicated marker assets'
-				// fixed UV contract.
-				validateParticleQuadSemantics(spriteId, centerX, centerY, centerZ,
-					markerRotation.x, markerRotation.y, markerRotation.z, markerRotation.w,
-					quadSize, localU0, localU1, localV0, localV1);
-			}
-			float[] vertices = MATERIAL_VERTEX_SCRATCH;
-			billboardVertices(markerRotation, centerX, centerY, centerZ, quadSize, vertices);
-			ProjectedBounds projectedBounds = projectBounds(vertices, viewportWidth, viewportHeight);
-			PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
-				STRATUM_WORLD_MATERIAL,
-				MATERIAL_ID_BLOCK_MARKER_CUTOUT,
-				textureId,
-				MATERIAL_MODE_CUTOUT,
-				DEPTH_POLICY_TEST_WRITE,
-				CULL_NONE,
-				WORLD_TOPOLOGY_TRIANGLES,
-				WORLD_WINDING_CCW,
-				colorArgb,
-				vertices[0],
-				vertices[1],
-				vertices[2],
-				vertices[3],
-				vertices[4],
-				vertices[5],
-				vertices[6],
-				vertices[7],
-				vertices[8],
-				vertices[9],
-				vertices[10],
-				vertices[11],
-				textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS ? localU1 : 1.0F,
-				textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS ? localV1 : 1.0F,
-				textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS ? localU1 : 1.0F,
-				textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS ? localV0 : 0.0F,
-				textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS ? localU0 : 0.0F,
-				textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS ? localV0 : 0.0F,
-				textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS ? localU0 : 0.0F,
-				textureId == MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS ? localV1 : 1.0F,
-				viewportWidth,
-				viewportHeight,
-				// The marker's copied PNG uses local UVs. The selected Rust source
-				// writer binds that semantic material asset per compatible batch;
-				// Java still supplies no atlas object or backend state.
-				MATERIAL_SOURCE_TEXTURED,
-				MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
-				colorArgb,
-				LightTexture.FULL_BRIGHT
-			));
-			recordBlockMarkerDiagnostic(
-				route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
-				textureId,
-				centerX,
-				centerY,
-				centerZ,
-				quadSize,
-				colorArgb,
-				viewportWidth,
-				viewportHeight,
-				projectedBounds
-			);
-			if (blockMarkerEnqueueDiagnosticLogs < 16) {
-				blockMarkerEnqueueDiagnosticLogs++;
-				auditMessage("Rust VulkanicGAL BlockMarker semantic request"
-					+ " route=" + (route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl")
-					+ " texture_id=" + textureId
-					+ " material_id=" + MATERIAL_ID_BLOCK_MARKER_CUTOUT
-					+ " viewport=" + viewportWidth + "x" + viewportHeight
-					+ " center=" + centerX + "," + centerY + "," + centerZ
-					+ " quad_size=" + quadSize
-					+ " result=queued");
-			}
-		}
-		return true;
+		throw new IllegalStateException("Vulkan block markers require typed particle semantics; Java-expanded marker geometry is unavailable");
 	}
 
 	/**
@@ -3916,12 +3650,11 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * Rust owns billboard geometry, sprite UVs, material policy and execution.
 	 */
 	public static boolean nativeExperienceOrbGeometryEnabled() {
-		return WorldRenderRoutePolicy.currentExperienceOrbRoute().usesRustWholeFrameVulkan();
+		return true;
 	}
 
 	public static void enqueueNativeExperienceOrb(PoseStack.Pose entityPose, ExperienceOrbRenderState state,
 		org.joml.Quaternionf cameraOrientation, int red, int blue) {
-		if (!nativeExperienceOrbGeometryEnabled()) throw new IllegalStateException("native orb route is not admitted");
 		synchronized (LOCK) {
 			ensureBoundedWorldPrimitiveViewportLocked("native orb requires a seeded frame");
 			if (WORLD_MESH_ASSETS.size() + STATIC_TERRAIN_MESH_RESIDENCY.size() + ORB_SEMANTICS.projectedResidentCount() > MAX_WORLD_MESH_ASSET_RESIDENCY)
@@ -3991,10 +3724,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		float solidRadius,
 		float glowRadius
 	) {
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentBeaconBeamRoute();
-		if (!route.usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		int textureId = BEACON_BEAM_TEXTURE_LOCATION.equals(textureIdentity)
 			? MATERIAL_TEXTURE_BEACON_BEAM
 			: END_GATEWAY_BEAM_TEXTURE_LOCATION.equals(textureIdentity)
@@ -4355,7 +4084,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static boolean enqueueEndPortal(
 		Matrix4f transform, boolean[] faces, float offsetDown, float offsetUp, float gameTime, int lightCoords
 	) {
-		if (!WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return false;
 		if (transform == null || faces == null || faces.length != Direction.values().length
 			|| !Float.isFinite(offsetDown) || !Float.isFinite(offsetUp)
 			|| offsetDown < 0.0F || offsetDown >= offsetUp || offsetUp > 1.0F || !Float.isFinite(gameTime)) {
@@ -4451,7 +4179,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		ModelPart modelRoot, PoseStack.Pose entityPose, ResourceLocation textureIdentity,
 		float uvOffsetU, float uvOffsetV, int packedLight
 	) {
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) return false;
 		if (modelRoot == null || entityPose == null || textureIdentity == null
 			|| !Float.isFinite(uvOffsetU) || !Float.isFinite(uvOffsetV)) {
 			throw new IllegalArgumentException("Rust Wind Charge route requires finite semantic inputs");
@@ -4510,7 +4237,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		Model<? super S> model, S state, PoseStack.Pose entityPose, ResourceLocation textureIdentity,
 		float uvOffsetU, float uvOffsetV, int textureWidth, int textureHeight, int packedLight, int tintedColor
 	) {
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) return false;
 		// Actual powered-entity parity remains unproven. Keep this diagnostic
 		// route normally unadmitted until paired Frozen/current evidence exists.
 		if (!Boolean.getBoolean("mattmc.dev.rustEnergySwirl")) return false;
@@ -4577,7 +4303,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			|| vertices.length % 12 != 0 || uvs.length != vertices.length / 12 * 8 || colors.length != vertices.length / 12) {
 			throw new IllegalArgumentException("Rust textured quad batches require aligned quad data");
 		}
-		if (!WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()) return false;
 		int initialMaterialQuadCount;
 		synchronized (LOCK) {
 			initialMaterialQuadCount = PENDING_MATERIAL_QUADS.size();
@@ -4833,9 +4558,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		Matrix4f transform, ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords,
 		int materialId, int materialMode, int depthPolicy, int sourceProgram, String semanticName
 	) {
-		if (!WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()
-			&& !RustGalVulkanWholeFrameMode.enabled()
-			&& !net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) return false;
 		ResourceLocation dragonTexture = ResourceLocation.withDefaultNamespace("textures/entity/enderdragon/dragon_fireball.png");
 		ResourceLocation fishingTexture = ResourceLocation.withDefaultNamespace("textures/entity/fishing_hook.png");
 		ResourceLocation mapBackgroundTexture = ResourceLocation.withDefaultNamespace("textures/map/map_background.png");
@@ -4940,7 +4662,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (localPos == null || size == null || size.getX() < 1 || size.getY() < 1 || size.getZ() < 1) {
 			throw new IllegalArgumentException("Rust block-entity box requires positive block bounds");
 		}
-		if (!WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) return false;
 		BlockPos maximum = localPos.offset(size);
 		synchronized (LOCK) {
 			ensureWorldQueueCapacityLocked(PENDING_SEGMENTS.size(), 12, MAX_WORLD_LINE_SEGMENTS, "line-segment");
@@ -5151,14 +4872,8 @@ public final class RustGalWorldPrimitiveRenderer {
 		synchronized (LOCK) { return List.copyOf(STRUCTURE_BLOCK_BOX_EXECUTION_DIAGNOSTICS); }
 	}
 
-	/** Copies VoxelMap beacon-only beams through their dedicated semantic route. */
-	public static boolean enqueueVoxelMapBeaconSegments(Matrix4f transform, float[] endpoints, int color, float lineWidth) {
-		return enqueueLineSegmentsForRoute(transform, endpoints, color, lineWidth, WorldRenderRoutePolicy.currentVoxelMapBeaconRoute());
-	}
-
 	/** Copies vanilla's three-axis 3D debug crosshair into explicit Rust line work. */
 	public static boolean enqueueThreeDimensionalDebugCrosshair(Camera camera, float guiScale) {
-		if (!WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) return false;
 		if (camera == null || !Float.isFinite(guiScale) || guiScale <= 0.0F) {
 			throw new IllegalArgumentException("Rust 3D debug crosshair requires a finite camera and GUI scale");
 		}
@@ -5224,9 +4939,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		int[] colors,
 		int lightCoords
 	) {
-		if (!WorldRenderRoutePolicy.currentGuardianBeamRoute().usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		ResourceLocation expected = ResourceLocation.withDefaultNamespace("textures/entity/guardian_beam.png");
 		if (transform == null || !expected.equals(textureIdentity) || vertices == null
 			|| (vertices.length != 24 && vertices.length != 36)
@@ -5352,7 +5064,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		Matrix4f transform, float[] vertices, float[] uvs, int[] colors, int lightCoords,
 		int[] vertexColors, int[] vertexLights, int depthPolicy
 	) {
-		if (!WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) return false;
 		if (transform == null || vertices == null || uvs == null || colors == null || vertices.length == 0
 			|| vertices.length % 12 != 0 || uvs.length != vertices.length / 12 * 8 || colors.length != vertices.length / 12) {
 			throw new IllegalArgumentException("Rust procedural quads require aligned quad data");
@@ -5529,7 +5240,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		SubmitNodeStorage.BlockSubmit blockSubmit,
 		boolean forceWholeFrameVulkan
 	) {
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentBlockDisplayRoute();
 		// The caller has already selected the route for this exact semantic
 		// submission. Do not re-read the asynchronous shell state here.
 		if (blockSubmit == null) {
@@ -5639,7 +5349,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				PENDING_MESH_PRODUCERS.add(blockSubmit.source() == SubmitNodeStorage.BlockSubmitSource.ORDINARY
 					? PendingMeshProducer.ORDINARY_BLOCK : PendingMeshProducer.BLOCK_DISPLAY);
 				recordBlockDisplayDiagnostic(
-					route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
+					"rust-vulkan-whole-frame",
 					blockState,
 					extraction.meshKey(),
 					meshGeneration,
@@ -5650,10 +5360,10 @@ public final class RustGalWorldPrimitiveRenderer {
 				);
 				recordWorldMeshSubmittedWorkIdentity(
 					"block-display",
-					(route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame:" : "rust-opengl:") + blockState.getBlockHolder().getRegisteredName()
+					("rust-vulkan-whole-frame:") + blockState.getBlockHolder().getRegisteredName()
 				);
 				auditMessage("Rust VulkanicGAL BlockDisplay mesh request"
-					+ " route=" + (route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl")
+					+ " route=" + ("rust-vulkan-whole-frame")
 					+ " mesh_key=" + extraction.meshKey()
 					+ " mesh_generation=" + meshGeneration
 					+ " vertices=" + extraction.asset().vertices().size()
@@ -5684,7 +5394,7 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	/** Copies a semantic BlockStateModel feature submission into the indexed mesh family. */
 	public static boolean enqueueBlockModelMesh(SubmitNodeStorage.BlockModelSubmit submit) {
-		if (submit == null || !WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return false;
+		if (submit == null) return false;
 		if (submit.pose() == null || !submit.pose().pose().isFinite()
 			|| !Float.isFinite(submit.r()) || !Float.isFinite(submit.g()) || !Float.isFinite(submit.b())) {
 			return false;
@@ -5980,8 +5690,7 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	/** Shared atlas consumer; animation requires the exact resource-owned clock. */
 	public static AtlasSpritePayload requireShieldAtlasSpritePayload(TextureAtlasSprite sprite) {
-		if (!net.vulkanic.world.AtlasAnimationResource.shieldLifecycleEnabled()
-			|| sprite == null || !net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(sprite.atlasLocation())) {
+		if ((sprite == null) || !net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(sprite.atlasLocation())) {
 			throw new IllegalStateException("Shield atlas consumer is not admitted");
 		}
 		var texture = Minecraft.getInstance().getTextureManager().getTexture(sprite.atlasLocation());
@@ -6034,7 +5743,7 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	/** Resource identity only: never infer an animation phase or inspect GPU state. */
 	public static boolean ownedShieldSprite(TextureAtlasSprite sprite) {
-		if (!AtlasAnimationResource.shieldLifecycleEnabled() || sprite == null
+		if ((sprite == null)
 			|| !net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(sprite.atlasLocation())) return false;
 		var texture = Minecraft.getInstance().getTextureManager().getTexture(sprite.atlasLocation());
 		if (!(texture instanceof TextureAtlas atlas) || atlas.getSprite(sprite.contents().name()) != sprite) return false;
@@ -6053,9 +5762,7 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	/** Publish before queued ticks are delivered, even when invisible; never render here. */
 	public static void ensureShieldAtlasAnimationAsset() {
-		if (!AtlasAnimationResource.shieldLifecycleEnabled()
-			|| !WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			|| Minecraft.getInstance() == null) return;
+		if (Minecraft.getInstance() == null) return;
 		var atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.SHIELD_PATTERNS);
 		if (atlas.semanticAnimationResource() != null) {
 			requireShieldAtlasAnimationPayload(atlas);
@@ -6064,7 +5771,7 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	private static VulkanicGalBridge.WorldMeshTextureAssetRecord requireShieldAtlasAnimationPayload(TextureAtlas atlas) {
 		var resource = atlas.semanticAnimationResource();
-		if (!AtlasAnimationResource.shieldLifecycleEnabled() || resource == null
+		if ((resource == null)
 			|| !net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(atlas.location())
 			|| !atlas.location().equals(resource.atlas()) || resource.semanticTextureId() != shieldAtlasTextureId()) {
 			throw new IllegalStateException("Shield atlas resource incarnation unavailable");
@@ -8317,14 +8024,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		) == null;
 	}
 
-	/** World and hand decal foil share the selected Rust frame owner. */
-	static boolean worldDecalFoilEnabled() {
-		return net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-	}
-
 	/** Capture-only route provenance; native resource/presentation proof is separate. */
 	public static String worldDecalFoilAdmissionReceipt() {
-		return "{\"schema\":\"rust-owned-world-decal-foil-v1\",\"normalRoute\":" + worldDecalFoilEnabled()
+		return "{\"schema\":\"rust-owned-world-decal-foil-v1\",\"normalRoute\":" + true
 			+ ",\"privateFlagsPresent\":" + (System.getProperty("mattmc.dev.rustGalWorldDecalFoil") != null) + "}";
 	}
 
@@ -8354,7 +8056,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		ItemStackRenderState.FoilType foilType
 	) {
 		if (displayContext == null) return "display-context";
-		if (foilType == ItemStackRenderState.FoilType.SPECIAL && !worldDecalFoilEnabled()) return "special-foil-native-projection-unavailable";
 		if (quads == null || quads.isEmpty()) return "empty-quads";
 		if (quads.size() > 4096) return "quad-limit";
 		if (renderType == null || modelMeshRenderSemantics(renderType) == null) return "render-type";
@@ -8417,8 +8118,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		boolean eligible = isItemEntityMeshEligible(
 			displayContext, packedLight, overlayCoords, entityOutlineColor, tintLayers, quads, renderType, foilType
 		);
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentItemEntityMeshRoute(eligible);
-		if (!route.usesRustWholeFrameVulkan()) {
+		if (!eligible) {
 			return false;
 		}
 		if (itemPose == null || !itemPose.pose().isFinite()) {
@@ -8563,7 +8263,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		ItemStackRenderState.FoilType foilType,
 		net.fabricmc.fabric.api.renderer.v1.mesh.MeshView mesh
 	) {
-		if (!WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return false;
 		if (mesh == null) return false;
 		if (vanillaQuads != null && vanillaQuads.size() > 4_096) return false;
 		List<BakedQuad> copied = new ArrayList<>(vanillaQuads == null ? List.of() : vanillaQuads);
@@ -8790,9 +8489,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			recordItemEntityRouteDecision("rust-vulkan-unavailable", false, ineligibility + ":" + itemIdentity,
 				true, false, false);
 		}
-		if (ineligibility != null
-			|| (!forceWholeFrameVulkan
-				&& !WorldRenderRoutePolicy.currentFirstPersonItemRoute(true).usesRustWholeFrameVulkan())) {
+		if (ineligibility != null) {
 			return false;
 		}
 		List<ItemStackRenderState.SemanticLayer> layers = new ArrayList<>();
@@ -8935,7 +8632,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		for (ItemStackRenderState.SemanticLayer layer : layers) {
 			if (layer == null) return "null-layer";
 			if (layer.hasSpecialRenderer()) return "special-renderer";
-			if (layer.foilType() == ItemStackRenderState.FoilType.SPECIAL && !worldDecalFoilEnabled()) return "special-foil-native-projection-unavailable";
+			if (layer.foilType() == ItemStackRenderState.FoilType.SPECIAL && false) return "special-foil-native-projection-unavailable";
 			if ((layer.foilType() == ItemStackRenderState.FoilType.STANDARD || layer.foilType() == ItemStackRenderState.FoilType.SPECIAL)
 				&& readTexturePayloadForResource(ItemRenderer.ENCHANTED_GLINT_ITEM) == null) {
 				return "glint-texture-unavailable";
@@ -9030,12 +8727,10 @@ public final class RustGalWorldPrimitiveRenderer {
 			|| !crumblingOverlay.cameraPose().normal().isFinite())) return "crumbling-semantics";
 		if (sprite.sodium$hasUnknownImageContents()) return "unknown-sprite-image";
 		if (sprite.contents().name() == null) return "missing-sprite-identity";
-		if (WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			&& itemSpriteUsesOwnedBlockAtlas(sprite)) {
+		if (itemSpriteUsesOwnedBlockAtlas(sprite)) {
 			String atlasFailure = itemSpriteTextureIneligibility(sprite);
 			if (atlasFailure != null) return atlasFailure;
-		} else if (WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			&& sprite.contents().isAnimated() && !ownedShieldSprite(sprite)) return "animated-item-atlas-native-contract-unavailable";
+		} else if (sprite.contents().isAnimated() && !ownedShieldSprite(sprite)) return "animated-item-atlas-native-contract-unavailable";
 		else if (!hasSemanticAtlasSnapshot(sprite)) return "atlas-texture-unavailable";
 		return "eligible";
 	}
@@ -9062,8 +8757,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		boolean eligible = isModelPartMeshEligible(
 			modelPart, renderType, sprite, overlayCoords, sheeted, hasFoil, outlineColor, crumblingOverlay
 		);
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentModelPartMeshRoute(eligible);
-		if (!route.usesRustWholeFrameVulkan()) {
+		if (!eligible) {
 			return false;
 		}
 		if (!eligible || entityPose == null || !entityPose.pose().isFinite()) {
@@ -9431,9 +9125,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		int outlineColor,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		ModelMeshRenderSemantics semantics = modelMeshRenderSemantics(renderType);
 		if (model == null || !isSupportedModelMeshModel(model) || entityPose == null || sprite == null
 			|| semantics == null) {
@@ -9670,7 +9361,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		int packedLight,
 		int outlineColor
 	) {
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) return false;
 		ModelMeshRenderSemantics semantics = modelMeshRenderSemantics(renderType);
 		if (!isStandaloneModelMeshEligible(model, renderType, textureIdentity, OverlayTexture.NO_OVERLAY, 0, null, true)
 			|| entityIdentity == null || entityPose == null || !entityPose.pose().isFinite() || semantics == null || outlineColor == 0) {
@@ -9711,9 +9401,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		int outlineColor,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		ModelMeshRenderSemantics semantics = modelMeshRenderSemantics(renderType);
 		if (!isStandaloneModelMeshEligible(model, renderType, textureIdentity, overlayCoords, 0, crumblingOverlay, true)
 			|| entityIdentity == null
@@ -9767,7 +9454,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		float offsetU
 	) {
 		int flags = encodeModelUvOffsetU(offsetU);
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) return false;
 		ModelMeshRenderSemantics semantics = modelMeshRenderSemantics(renderType);
 		if (semantics == null || semantics.materialId() != MATERIAL_ID_MODEL_BREEZE_WIND) {
 			throw new IllegalArgumentException("Rust scrolling model route requires Breeze wind material semantics");
@@ -9798,7 +9484,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		int tintedColor,
 		int outlineColor
 	) {
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) return false;
 		ModelMeshRenderSemantics semantics = modelMeshRenderSemantics(renderType);
 		if (!isStandaloneModelMeshEligible(model, renderType, textureIdentity, overlayCoords, 0, null, true)
 			|| entityIdentity == null || entityPose == null || !entityPose.pose().isFinite() || semantics == null
@@ -9825,7 +9510,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		int packedLight,
 		int overlayCoords
 	) {
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) return false;
 		String foilFailure = standaloneModelFoilIneligibility(model, state, renderType, textureIdentity);
 		if (foilFailure != null) throw new IllegalStateException(foilFailure);
 		boolean armor = renderType == RenderType.armorEntityGlint();
@@ -9859,8 +9543,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	static boolean isAdmittedShieldPartFoil(ResourceLocation spriteIdentity, boolean animated) {
-		return (!animated || AtlasAnimationResource.shieldLifecycleEnabled())
-			&& net.minecraft.client.resources.model.ModelBakery.NO_PATTERN_SHIELD.texture().equals(spriteIdentity);
+		return net.minecraft.client.resources.model.ModelBakery.NO_PATTERN_SHIELD.texture().equals(spriteIdentity);
 	}
 
 	static String atlasModelFoilIneligibility(Model<?> model, Object state, RenderType renderType, ResourceLocation spriteIdentity) {
@@ -9875,7 +9558,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	public static <S> boolean enqueueAtlasGlintModelMesh(Model<? super S> model, S state,
 		PoseStack.Pose entityPose, RenderType renderType, TextureAtlasSprite sprite, int packedLight,
 		int overlayCoords, int tintedColor, int outlineColor, ModelFeatureRenderer.CrumblingOverlay crumbling) {
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) return false;
 		String failure=atlasModelFoilIneligibility(model,state,renderType,sprite == null ? null : sprite.contents().name());
 		if (failure != null) throw new IllegalStateException(failure);
 		if (entityPose == null || !entityPose.pose().isFinite() || overlayCoords != OverlayTexture.NO_OVERLAY
@@ -10094,10 +9776,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		BlockRenderDispatcher blockRenderDispatcher,
 		SubmitNodeStorage.BlockSubmit blockSubmit
 	) {
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentPrimedTntRoute();
-		if (!route.usesRustOpenGl() && !route.usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		if (!isPrimedTntMeshEligible(blockSubmit)) {
 			throw new IllegalArgumentException("Primed TNT reached the Rust mesh route without eligible semantic inputs");
 		}
@@ -10181,7 +9859,7 @@ public final class RustGalWorldPrimitiveRenderer {
 					PENDING_MESH_PRODUCERS.add(PendingMeshProducer.PRIMED_TNT);
 				}
 				recordMovingBlockDiagnostic(
-					route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
+					"rust-vulkan-whole-frame",
 					"primed-tnt",
 					blockState,
 					extraction.meshKey(),
@@ -10193,7 +9871,7 @@ public final class RustGalWorldPrimitiveRenderer {
 				);
 				recordWorldMeshSubmittedWorkIdentity(
 					"primed-tnt",
-					(route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame:" : "rust-opengl:")
+					("rust-vulkan-whole-frame:")
 						+ blockState.getBlockHolder().getRegisteredName()
 				);
 			}
@@ -10278,7 +9956,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		String family,
 		String extractionLabel
 	) {
-		if (!route.usesRustOpenGl() && !route.usesRustWholeFrameVulkan()) {
+		if (!route.usesRustWholeFrameVulkan()) {
 			return false;
 		}
 		if (movingBlockSubmit == null || movingBlockSubmit.pose() == null || !movingBlockSubmit.pose().isFinite()) {
@@ -10480,19 +10158,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			throw new IllegalArgumentException("Rust VulkanicGAL " + source + " texture payload dimensions are invalid", error);
 		} finally {
 			if (reader != null) reader.dispose();
-		}
-	}
-
-	private static void validateWorldMeshSortedIndex(VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex) {
-		if (sortedIndex == null) {
-			throw new IllegalArgumentException("Rust VulkanicGAL sorted index asset must not be null");
-		}
-		int bytes = sortedIndex.indexByteLength();
-		int stride = sortedIndex.indexType() == VulkanicGalBridge.INDEX_U16 ? Short.BYTES
-			: sortedIndex.indexType() == VulkanicGalBridge.INDEX_U32 ? Integer.BYTES : 0;
-		if (bytes == 0 || bytes > MAX_WORLD_MESH_INDEX_BYTES || stride == 0 || bytes % stride != 0) {
-			throw new IllegalArgumentException("Rust VulkanicGAL sorted index payload must be non-empty, <= "
-				+ MAX_WORLD_MESH_INDEX_BYTES + " bytes, and aligned to its index type");
 		}
 	}
 
@@ -10739,9 +10404,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		List<VulkanicGalBridge.WorldMeshTextureAssetRecord> textures,
 		boolean retainCpuPayloadForDynamicSort
 	) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return;
-		}
 		 synchronized (LOCK) {
 			validateWorldMeshIdentity(asset, "static terrain");
 			// Preflight the complete batch before publishing any texture. A static
@@ -10947,10 +10609,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		VulkanicGalBridge.WorldMeshTextureAssetRecord texture,
 		String source
 	) {
-		boolean rustWholeFrame = WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			|| WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()
-			|| WorldRenderRoutePolicy.currentDistantHorizonsOpaqueRoute().usesRustWholeFrameVulkan();
-		if (!rustWholeFrame || texture == null) {
+		if (texture == null) {
 			return;
 		}
 		synchronized (LOCK) {
@@ -10976,36 +10635,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	public static void registerStaticTerrainSortedIndex(VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan() || sortedIndex == null) {
-			return;
-		}
-		validateWorldMeshSortedIndex(sortedIndex);
-		synchronized (LOCK) {
-			VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(sortedIndex.meshKey());
-			if (asset == null || asset.meshGeneration() != sortedIndex.meshGeneration()) {
-				return;
-			}
-			VulkanicGalBridge.WorldMeshSortedIndexRecord previous = WORLD_MESH_SORTED_INDICES.get(sortedIndex.meshKey());
-			if (previous != null && previous.indexGeneration() >= sortedIndex.indexGeneration()) {
-				return;
-			}
-			ensureWorldMeshRegistryCapacityLocked(WORLD_MESH_SORTED_INDICES, sortedIndex.meshKey(), MAX_WORLD_MESH_SORTED_INDEX_RESIDENCY, "sorted-index");
-			WORLD_MESH_SORTED_INDICES.put(sortedIndex.meshKey(), sortedIndex);
-			DIRTY_WORLD_MESH_SORTED_INDICES.add(sortedIndex.meshKey());
-			RustGalTerrainRenderer.recordTranslucentSortCopyRegistered(sortedIndex);
-			markWorldMeshAssetsChangedLocked();
-			auditMessage(
-				"Rust VulkanicGAL static terrain sorted index registered"
-					+ " mesh_key=" + sortedIndex.meshKey()
-					+ " mesh_generation=" + sortedIndex.meshGeneration()
-					+ " index_generation=" + sortedIndex.indexGeneration()
-					+ " index_bytes=" + sortedIndex.indexByteLength()
-					+ " route=rust-vulkan-whole-frame"
-			);
-		}
-	}
-
 	public static StaticTerrainSortedIndexSnapshot staticTerrainSortedIndexSnapshot(long meshKey) {
 		synchronized (LOCK) {
 			VulkanicGalBridge.WorldMeshSortedIndexRecord sortedIndex = WORLD_MESH_SORTED_INDICES.get(meshKey);
@@ -11025,9 +10654,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public static void removeStaticTerrainMeshAsset(long meshKey) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return;
-		}
 		synchronized (LOCK) {
 				DYNAMIC_WORLD_MESH_LIFETIME.forget(meshKey);
 				VulkanicGalBridge.WorldMeshAssetRecord removedAsset = WORLD_MESH_ASSETS.remove(meshKey);
@@ -11144,9 +10770,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		int viewportWidth, int viewportHeight, int depthPolicy, int cullPolicy,
 		boolean cameraSortedQuads, boolean shadowOnly
 	) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		if (shadowOnly && cameraSortedQuads) {
 			throw new IllegalArgumentException("shadow-only terrain cannot use camera-sorted indices");
 		}
@@ -11213,9 +10836,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	 */
 	public static boolean enqueueCachedStaticTerrainInstances(long[] meshKeys, long[] meshGenerations,
 		int count, int viewportWidth, int viewportHeight) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		if (meshKeys == null || meshGenerations == null || count < 0
 			|| count > meshKeys.length || count > meshGenerations.length) {
 			throw new IllegalArgumentException("cached static terrain key batch is not bounded");
@@ -11268,9 +10888,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		int depthPolicy, int cullPolicy, boolean cameraSortedQuads, boolean shadowOnly,
 		VulkanicGalBridge.TerrainSectionPlacement terrainPlacement
 	) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		if (shadowOnly && cameraSortedQuads) {
 			throw new IllegalArgumentException("shadow-only terrain cannot use camera-sorted indices");
 		}
@@ -11336,9 +10953,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * boundary instead of turning the persistent asset cache into a renderer.
 	 */
 	public static void reconcileStaticTerrainVisibility(Set<Long> visibleMeshKeys) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return;
-		}
 		if (visibleMeshKeys == null) {
 			throw new IllegalArgumentException("Rust static terrain visibility set is null");
 		}
@@ -12081,12 +11695,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				throw new IllegalStateException("cannot copy semantic model foil resource", error);
 			}
 		}
-		boolean ownedBlockAtlas = !glint && !crumbling && sprite != null
-			&& WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
+		boolean ownedBlockAtlas = (!glint && !crumbling && sprite != null)
 			&& itemSpriteUsesOwnedBlockAtlas(sprite);
-		boolean ownedShieldAtlas = !glint && !crumbling && sprite != null
-			&& WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			&& AtlasAnimationResource.shieldLifecycleEnabled()
+		boolean ownedShieldAtlas = (!glint && !crumbling && sprite != null)
 			&& net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(sprite.atlasLocation());
 		if (ownedShieldAtlas) {
 			var texture = Minecraft.getInstance().getTextureManager().getTexture(sprite.atlasLocation());
@@ -12100,8 +11711,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			String atlasFailure = itemSpriteTextureIneligibility(sprite);
 			if (atlasFailure != null) throw new IllegalStateException("ModelPart atlas is unavailable: " + atlasFailure);
 		}
-		if (!ownedBlockAtlas && !ownedShieldSprite(sprite) && !glint && sprite != null && sprite.contents().isAnimated()
-			&& WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+		if (!ownedBlockAtlas && !ownedShieldSprite(sprite) && !glint && sprite != null && sprite.contents().isAnimated()) {
 			throw new IllegalStateException("animated-item-atlas-native-contract-unavailable");
 		}
 		byte[] texturePayload = ownedAtlas ? null : glint
@@ -12244,12 +11854,9 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (modelRoot == null || textureIdentity == null || entityIdentity == null) {
 			throw new IllegalArgumentException("stable model extraction requires complete semantic identity");
 		}
-		boolean ownedBlockAtlas = sprite != null
-			&& WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
+		boolean ownedBlockAtlas = (sprite != null)
 			&& itemSpriteUsesOwnedBlockAtlas(sprite);
-		boolean ownedShieldAtlas = sprite != null
-			&& WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			&& AtlasAnimationResource.shieldLifecycleEnabled()
+		boolean ownedShieldAtlas = (sprite != null)
 			&& net.minecraft.client.renderer.Sheets.SHIELD_SHEET.equals(sprite.atlasLocation());
 		if (ownedShieldAtlas) {
 			var texture = Minecraft.getInstance().getTextureManager().getTexture(sprite.atlasLocation());
@@ -12263,8 +11870,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			String atlasFailure = itemSpriteTextureIneligibility(sprite);
 			if (atlasFailure != null) throw new IllegalStateException("stable model atlas is unavailable: " + atlasFailure);
 		}
-		if (!ownedBlockAtlas && !ownedShieldSprite(sprite) && sprite != null && sprite.contents().isAnimated()
-			&& WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
+		if (!ownedBlockAtlas && !ownedShieldSprite(sprite) && sprite != null && sprite.contents().isAnimated()) {
 			throw new IllegalStateException("animated-item-atlas-native-contract-unavailable");
 		}
 		boolean dynamicTexture = !ownedAtlas
@@ -12508,8 +12114,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			BakedQuadView quad = (BakedQuadView)(Object)bakedQuad;
 			TextureAtlasSprite sprite = quad.getSprite();
 			ResourceLocation spriteName = sprite.contents().name();
-			boolean blockAtlasBinding = WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-				&& itemSpriteUsesOwnedBlockAtlas(sprite);
+			boolean blockAtlasBinding = itemSpriteUsesOwnedBlockAtlas(sprite);
 			int textureId;
 			if (blockAtlasBinding) {
 				textureId = MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS;
@@ -12697,14 +12302,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		return ix | iy << 8 | iz << 16;
 	}
 
-	private static Vector3f unpackWorldMeshNormal(int packed) {
-		return new Vector3f(
-			(byte)(packed & 0xff) / 127.0F,
-			(byte)((packed >>> 8) & 0xff) / 127.0F,
-			(byte)((packed >>> 16) & 0xff) / 127.0F
-		);
-	}
-
 	private static byte[] readTexturePayload(ResourceLocation spriteName) {
 		if (MISSING_TEXTURE_LOCATION.equals(spriteName)) {
 			return missingTexturePayload();
@@ -12717,8 +12314,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	private static String itemSpriteTextureIneligibility(TextureAtlasSprite sprite) {
-		if (WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			&& itemSpriteUsesOwnedBlockAtlas(sprite)) {
+		if (itemSpriteUsesOwnedBlockAtlas(sprite)) {
 			var resource = sprite.semanticAnimationResource();
 			if (resource != null) {
 				try {
@@ -12731,8 +12327,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			return null;
 		}
-		if (WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			&& sprite.contents().isAnimated()) return "animated-item-atlas-native-contract-unavailable";
+		if (sprite.contents().isAnimated()) return "animated-item-atlas-native-contract-unavailable";
 		return readItemSpriteTexturePayload(sprite) == null ? "missing-texture-payload" : null;
 	}
 
@@ -12746,25 +12341,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (sprite == null || sprite.contents() == null) return null;
 		var contents = sprite.contents();
 		if (!contents.isAnimated()) return readTexturePayload(contents.name());
-		if (WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) return null;
-		if (contents.animatedTexture == null || contents.animatedTexture.frames.isEmpty()) return null;
-		int frame = contents.semanticFrameIndex();
-		int sourceX = contents.animatedTexture.getFrameX(frame) * contents.width();
-		int sourceY = contents.animatedTexture.getFrameY(frame) * contents.height();
-		if (sourceX < 0 || sourceY < 0 || sourceX + contents.width() > contents.originalImage.getWidth()
-			|| sourceY + contents.height() > contents.originalImage.getHeight()) return null;
-		try {
-			BufferedImage image = new BufferedImage(contents.width(), contents.height(), BufferedImage.TYPE_INT_ARGB);
-			for (int y = 0; y < contents.height(); y++) {
-				for (int x = 0; x < contents.width(); x++) {
-					image.setRGB(x, y, contents.originalImage.getPixel(sourceX + x, sourceY + y));
-				}
-			}
-			ByteArrayOutputStream output = new ByteArrayOutputStream(contents.width() * contents.height());
-			return ImageIO.write(image, "png", output) ? output.toByteArray() : null;
-		} catch (RuntimeException | IOException error) {
-			return null;
-		}
+		return null;
 	}
 
 	/**
@@ -13007,9 +12584,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * object or backend handle crosses into Rust.
 	 */
 	public static boolean ensureStandaloneModelTextureAsset(ResourceLocation identity) {
-		if (!WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		// Keep the pre-publication asset exactly aligned with
 		// extractModelPartMesh's later material extraction.  In particular,
 		// downloaded player skins are DynamicTextures which may share an identity
@@ -13420,43 +12994,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	private static void recordBlockMarkerDiagnostic(
-		String route,
-		int textureId,
-		float centerX,
-		float centerY,
-		float centerZ,
-		float quadSize,
-		int colorArgb,
-		int viewportWidth,
-		int viewportHeight,
-		ProjectedBounds projectedBounds
-	) {
-		if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
-			return;
-		}
-		if (BLOCK_MARKER_DIAGNOSTICS.size() >= 256) {
-			BLOCK_MARKER_DIAGNOSTICS.remove(0);
-		}
-		BLOCK_MARKER_DIAGNOSTICS.add(new BlockMarkerDiagnostic(
-			DeterministicCameraCapture.currentRenderedFrameIndex(),
-			route,
-			textureId,
-			centerX,
-			centerY,
-			centerZ,
-			quadSize,
-			colorArgb,
-			viewportWidth,
-			viewportHeight,
-			projectedBounds.valid(),
-			projectedBounds.left(),
-			projectedBounds.top(),
-			projectedBounds.right(),
-			projectedBounds.bottom()
-		));
-	}
-
 	public static List<BlockMarkerDiagnostic> blockMarkerDiagnostics() {
 		synchronized (LOCK) {
 			return List.copyOf(BLOCK_MARKER_DIAGNOSTICS);
@@ -13490,10 +13027,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			&& surface != VulkanicGalBridge.ParticleSurface.TERRAIN_TRANSLUCENT) {
 			throw new IllegalArgumentException("terrain particle requires a terrain surface");
 		}
-		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentMaterialRoute();
-		if (!route.usesRustOpenGl() && !route.usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		int textureId = terrainParticleTextureId(blockState);
 		if (textureId == 0) {
 			return false;
@@ -13504,7 +13037,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		// Block-atlas ownership already follows its resource lifetime. A terrain
 		// particle is another semantic sprite user, independent of private
 		// admission for the separate particle atlas.
-		boolean ownedAnimation = route.usesRustWholeFrameVulkan() && animationResource != null;
+		boolean ownedAnimation = animationResource != null;
 		if (ownedAnimation) animationResource.requireOpen();
 		synchronized (LOCK) {
 			if (PENDING_MATERIAL_QUADS.size() >= MAX_RUST_WORLD_MATERIAL_QUADS || !hasMaterialQuadCapacity(1)) {
@@ -13532,21 +13065,18 @@ public final class RustGalWorldPrimitiveRenderer {
 				rotation.x, rotation.y, rotation.z, rotation.w,
 				quadSize, localU0, localU1, localV0, localV1
 			);
-			boolean nativeTerrain = route.usesRustWholeFrameVulkan();
-			if (nativeTerrain) {
-				PENDING_PARTICLE_QUADS.add(new VulkanicGalBridge.WorldParticleQuadRecord(textureId,
-					surface,
-					PENDING_MATERIAL_QUADS.size(), new float[]{centerX,centerY,centerZ},
-					new float[]{rotation.x,rotation.y,rotation.z,rotation.w}, quadSize,
-					new float[]{localU0,localU1,localV0,localV1}, colorArgb,packedLight));
-				if (ownedAnimation) {
-					recordAtlasSpriteUse(animationResource, TextureAtlas.LOCATION_BLOCKS, spriteId);
-				}
-				// Normal Vulkan rendering ends at immutable semantics. The code
-				// below may observe projection for an explicitly requested audit,
-				// but supplies no geometry or raster policy to the Vulkan backend.
-				if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) return true;
+			PENDING_PARTICLE_QUADS.add(new VulkanicGalBridge.WorldParticleQuadRecord(textureId,
+				surface,
+				PENDING_MATERIAL_QUADS.size(), new float[]{centerX,centerY,centerZ},
+				new float[]{rotation.x,rotation.y,rotation.z,rotation.w}, quadSize,
+				new float[]{localU0,localU1,localV0,localV1}, colorArgb,packedLight));
+			if (ownedAnimation) {
+				recordAtlasSpriteUse(animationResource, TextureAtlas.LOCATION_BLOCKS, spriteId);
 			}
+			// Normal Vulkan rendering ends at immutable semantics. The code
+			// below may observe projection for an explicitly requested audit,
+			// but supplies no geometry or raster policy to the Vulkan backend.
+			if (!Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) return true;
 			// Java vertices serve only opt-in Vulkan diagnostics or OpenGL.
 			float[] vertices = MATERIAL_VERTEX_SCRATCH;
 			billboardVertices(rotation, centerX, centerY, centerZ, quadSize, vertices);
@@ -13562,46 +13092,9 @@ public final class RustGalWorldPrimitiveRenderer {
 				case TERRAIN_TRANSLUCENT -> MATERIAL_ID_TRANSLUCENT_TEXTURED;
 				default -> throw new IllegalArgumentException("invalid terrain surface");
 			};
-			if (!nativeTerrain) PENDING_MATERIAL_QUADS.add(new VulkanicGalBridge.WorldMaterialQuadRecord(
-				STRATUM_WORLD_MATERIAL,
-				materialId,
-				textureId,
-				materialMode,
-				DEPTH_POLICY_TEST_WRITE,
-				CULL_NONE,
-				WORLD_TOPOLOGY_TRIANGLES,
-				WORLD_WINDING_CCW,
-				colorArgb,
-				vertices[0],
-				vertices[1],
-				vertices[2],
-				vertices[3],
-				vertices[4],
-				vertices[5],
-				vertices[6],
-				vertices[7],
-				vertices[8],
-				vertices[9],
-				vertices[10],
-				vertices[11],
-				localU1,
-				localV1,
-				localU1,
-				localV0,
-				localU0,
-				localV0,
-				localU0,
-				localV1,
-				viewportWidth,
-				viewportHeight,
-				MATERIAL_SOURCE_PARTICLES,
-				MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS,
-				colorArgb,
-				packedLight
-			));
 			ProjectedBounds projectedBounds = projectBounds(vertices, viewportWidth, viewportHeight);
 			recordTerrainParticleDiagnostic(
-				route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl",
+				"rust-vulkan-whole-frame",
 				textureId,
 				spriteId == null ? "unknown" : spriteId.toString(),
 				centerX,
@@ -13622,7 +13115,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			if (terrainParticleEnqueueDiagnosticLogs < 24) {
 				terrainParticleEnqueueDiagnosticLogs++;
 				auditMessage("Rust VulkanicGAL TerrainParticle semantic request"
-					+ " route=" + (route.usesRustWholeFrameVulkan() ? "rust-vulkan-whole-frame" : "rust-opengl")
+					+ " route=" + ("rust-vulkan-whole-frame")
 					+ " texture_id=" + textureId
 					+ " material_id=" + materialId
 					+ " mode=" + materialMode
@@ -13653,9 +13146,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		float localU0, float localU1, float localV0, float localV1,
 		int colorArgb, int packedLight
 	) {
-		if (!WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()) {
-			return;
-		}
 		validateParticleQuadSemantics(null, centerX, centerY, centerZ, qx, qy, qz, qw,
 			quadSize, localU0, localU1, localV0, localV1);
 		 synchronized (LOCK) {
@@ -13700,8 +13190,7 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * atlas layer queued as a misleading partial particle group.
 	 */
 	public static boolean ensureParticleAtlasAvailable(ResourceLocation atlasLocation) {
-		if (!WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			|| !canUseParticleAtlas(atlasLocation)) return false;
+		if (!canUseParticleAtlas(atlasLocation)) return false;
 		int textureId = particleAtlasTextureId(atlasLocation);
 		synchronized (LOCK) {
 			return ensureParticleAtlasAssetLocked(atlasLocation, textureId);
@@ -13715,8 +13204,7 @@ public final class RustGalWorldPrimitiveRenderer {
 		float localU0, float localU1, float localV0, float localV1,
 		int colorArgb, int packedLight
 	) {
-		if (!WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			|| !canUseParticleAtlas(atlasLocation)) return false;
+		if (!canUseParticleAtlas(atlasLocation)) return false;
 		validateParticleQuadSemantics(atlasLocation, centerX, centerY, centerZ, qx, qy, qz, qw,
 			quadSize, localU0, localU1, localV0, localV1);
 		int textureId = particleAtlasTextureId(atlasLocation);
@@ -13790,8 +13278,7 @@ public final class RustGalWorldPrimitiveRenderer {
 
 	/** Publish before the first use: invisible resource ticks must not fill a stranded FIFO. */
 	public static void ensureParticleAtlasAnimationAsset() {
-		if (!WorldRenderRoutePolicy.currentMaterialRoute().usesRustWholeFrameVulkan()
-			|| Minecraft.getInstance() == null) return;
+		if (Minecraft.getInstance() == null) return;
 		var atlas = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(AtlasIds.PARTICLES);
 		if (atlas.semanticAnimationResource() == null) return;
 		synchronized (LOCK) {
@@ -14200,7 +13687,7 @@ public final class RustGalWorldPrimitiveRenderer {
 			}
 			ITEM_ENTITY_ROUTE_DECISIONS.add(new ItemEntityRouteDecision(
 				DeterministicCameraCapture.currentRenderedFrameIndex(), route, eligible, ineligibility,
-				WorldRenderRoutePolicy.currentItemEntityMeshRoute(true).usesRustWholeFrameVulkan(), rustSelected, rustQueued, javaDrawn
+				true, rustSelected, rustQueued, javaDrawn
 			));
 		}
 	}
@@ -14480,19 +13967,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		synchronized (LOCK) {
 			return List.copyOf(MODEL_PART_MESH_TRAVERSAL_DIAGNOSTICS);
 		}
-	}
-
-	private static void recordFallingBlockDiagnostic(
-		String route,
-		BlockState blockState,
-		long meshKey,
-		long meshGeneration,
-		VulkanicGalBridge.WorldMeshAssetRecord asset,
-		float[] transform,
-		int viewportWidth,
-		int viewportHeight
-	) {
-		recordMovingBlockDiagnostic(route, "falling-block", blockState, meshKey, meshGeneration, asset, transform, viewportWidth, viewportHeight);
 	}
 
 	private static void recordMovingBlockDiagnostic(
@@ -15336,82 +14810,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	public static boolean hasPendingMaterialQuads() {
-		synchronized (LOCK) {
-			return !PENDING_MATERIAL_QUADS.isEmpty() || !PENDING_PARTICLE_QUADS.isEmpty();
-		}
-	}
-
-	private static boolean materialUsesAlphaBlending(int mode) {
-		return mode == MATERIAL_MODE_TRANSLUCENT || mode == MATERIAL_MODE_TRANSLUCENT_CUTOUT;
-	}
-
-	/** Returns true only when copied semantics contain work requiring Fabulous attachments. */
-	public static boolean hasPendingFabulousTransparencyWork() {
-		synchronized (LOCK) {
-			if (PENDING_PARTICLE_QUADS.stream().anyMatch(VulkanicGalBridge.WorldParticleQuadRecord::translucent)) return true;
-			if (PENDING_MATERIAL_QUADS.stream().anyMatch(quad -> quad.materialMode() == MATERIAL_MODE_TRANSLUCENT)) {
-				return true;
-			}
-			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
-				VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(instance.meshKey());
-				if (asset != null && asset.sections().stream().anyMatch(section -> materialUsesAlphaBlending(section.materialMode()))) {
-					return true;
-				}
-			}
-			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_FIRST_PERSON_MESH_INSTANCES) {
-				VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(instance.meshKey());
-				if (asset != null && asset.sections().stream().anyMatch(section -> materialUsesAlphaBlending(section.materialMode()))) {
-					return true;
-				}
-			}
-			return false;
-		}
-	}
-
-	public static boolean hasPendingMeshInstances() {
-		synchronized (LOCK) {
-			return !PENDING_MESH_INSTANCES.isEmpty();
-		}
-	}
-
-	public static boolean renderOpenGlPendingMaterialQuads(Minecraft minecraft, String producerLabel) {
-		if (!shouldUseRustOpenGlMaterial()) {
-			return false;
-		}
-		PrimitiveFrame frame;
-		synchronized (LOCK) {
-			if (PENDING_MATERIAL_QUADS.isEmpty()) {
-				return false;
-			}
-			int viewportWidth = pendingViewportWidth;
-			int viewportHeight = pendingViewportHeight;
-			if (viewportWidth <= 0 || viewportHeight <= 0) {
-				throw new IllegalStateException("Rust OpenGL world material quads require a seeded world primitive frame");
-			}
-			frame = new PrimitiveFrame(
-				viewportWidth,
-				viewportHeight,
-				PENDING_VIEW.clone(),
-				PENDING_PROJECTION.clone(),
-				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
-				List.of(),
-				List.of(),
-				List.of(),
-				List.copyOf(PENDING_MATERIAL_QUADS),
-				List.of()
-			);
-			PENDING_MATERIAL_QUADS.clear();
-		}
-		auditMessage("Rust VulkanicGAL world material request"
-			+ " route=rust-opengl"
-			+ " producer=" + metricValue(producerLabel)
-			+ " quads=" + frame.materialQuads().size()
-			+ " " + materialMarkerSummary(frame.materialQuads(), frame.particleQuads())
-			+ " result=queued");
-		return RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, producerLabel);
-	}
-
 	/**
 	 * Collects vanilla's extracted rain/snow columns for the single Rust
 	 * whole-frame semantic submission. This never draws and uses no Java/Iris
@@ -15419,17 +14817,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	 */
 	public static void enqueueWorldWeather(WeatherRenderState state, Vec3 cameraPos, boolean depthWrite) {
 		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentWeatherRoute();
-		if (!route.usesRustWholeFrameVulkan()) {
-			if (RustGalVulkanWholeFrameMode.enabled()
-				&& state != null
-				&& state.intensity > 0.0F
-				&& (!state.rainColumns.isEmpty() || !state.snowColumns.isEmpty())) {
-				throw new IllegalStateException(
-					"Rust whole-frame weather route rejected visible semantic work; Java Vulkan fallback is unavailable"
-				);
-			}
-			return;
-		}
 		if (state == null || cameraPos == null) {
 			throw new IllegalStateException("Rust whole-frame weather route requires weather state and camera semantics");
 		}
@@ -15528,17 +14915,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	) {
 		WorldRenderRoutePolicy.Route route = WorldRenderRoutePolicy.currentCloudRoute();
 		recordCloudTraversalDiagnostic(route, cells == null ? 0 : cells.length, radius, fancy);
-		if (!route.usesRustWholeFrameVulkan()) {
-			if (RustGalVulkanWholeFrameMode.enabled()
-				&& cells != null
-				&& cells.length > 0
-				&& radius > 0) {
-				throw new IllegalStateException(
-					"Rust whole-frame cloud route rejected visible semantic work; Java Vulkan fallback is unavailable"
-				);
-			}
-			return;
-		}
 		long expectedCells = textureWidth > 0 && textureHeight > 0
 			? (long) textureWidth * textureHeight
 			: -1L;
@@ -16219,74 +15595,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		DeterministicCameraCapture.recordSubmittedWorkIdentity("weather", route + ":executed=" + quads);
 	}
 
-	/**
-	 * Copies vanilla's extracted rain/snow columns into the existing coarse
-	 * material-quad family for the explicitly selected borrowed OpenGL route.
-	 * Java provides game semantics only; Rust owns texture resources and draw
-	 * execution.
-	 */
-	public static boolean renderOpenGlWeather(
-		Minecraft minecraft,
-		WeatherRenderState state,
-		Vec3 cameraPos,
-		boolean depthWrite
-	) {
-		if (!WorldRenderRoutePolicy.currentWeatherRoute().usesRustOpenGl()) {
-			return false;
-		}
-		if (minecraft == null || state == null || cameraPos == null) {
-			throw new IllegalArgumentException("Rust VulkanicGAL weather requires Minecraft, weather state, and camera position");
-		}
-		PrimitiveFrame frame;
-		synchronized (LOCK) {
-			int viewportWidth = pendingViewportWidth;
-			int viewportHeight = pendingViewportHeight;
-			if (viewportWidth <= 0 || viewportHeight <= 0) {
-				throw new IllegalStateException("Rust OpenGL weather requires a seeded world primitive frame");
-			}
-			if (state.intensity <= 0.0F || (state.rainColumns.isEmpty() && state.snowColumns.isEmpty())) {
-				return false;
-			}
-			List<VulkanicGalBridge.WorldMaterialQuadRecord> quads = weatherColumns(
-				state,
-				cameraPos,
-				depthWrite,
-				viewportWidth,
-				viewportHeight
-			);
-			if (quads.isEmpty()) {
-				return false;
-			}
-			recordWeatherSemanticDiagnostic(
-				state.rainColumns.size(), state.snowColumns.size(), quads.size(), state.intensity, depthWrite
-			);
-			frame = new PrimitiveFrame(
-				viewportWidth,
-				viewportHeight,
-				PENDING_VIEW.clone(),
-				PENDING_PROJECTION.clone(),
-				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
-				List.of(),
-				List.of(),
-				List.of(),
-				List.copyOf(quads),
-				List.of()
-			);
-		}
-		auditMessage("Rust VulkanicGAL weather semantic request"
-			+ " route=rust-opengl"
-			+ " rain_columns=" + state.rainColumns.size()
-			+ " snow_columns=" + state.snowColumns.size()
-			+ " quads=" + frame.materialQuads().size()
-			+ " depth_write=" + depthWrite
-			+ " result=queued");
-		if (!RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, "minecraft.world.weather")) {
-			throw new IllegalStateException("Rust VulkanicGAL weather submission failed after Rust route selection");
-		}
-		recordWeatherExecutionDiagnostic("rust_opengl_borrowed_context", 0L, 0L, frame.materialQuads().size());
-		return true;
-	}
-
 	private static List<VulkanicGalBridge.WorldMaterialQuadRecord> weatherColumns(
 		WeatherRenderState state,
 		Vec3 cameraPos,
@@ -16377,45 +15685,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		}
 	}
 
-	public static boolean renderOpenGlPendingMeshInstances(Minecraft minecraft, String producerLabel) {
-		if (!shouldUseRustOpenGlMeshInstances()) {
-			return false;
-		}
-		PrimitiveFrame frame;
-		synchronized (LOCK) {
-			if (PENDING_MESH_INSTANCES.isEmpty()) {
-				return false;
-			}
-			int viewportWidth = pendingViewportWidth;
-			int viewportHeight = pendingViewportHeight;
-			if (viewportWidth <= 0 || viewportHeight <= 0) {
-				throw new IllegalStateException("Rust OpenGL world mesh instances require a seeded world primitive frame");
-			}
-			List<VulkanicGalBridge.WorldMeshInstanceRecord> instances = List.copyOf(PENDING_MESH_INSTANCES);
-			PENDING_MESH_INSTANCES.clear();
-			PENDING_MESH_PRODUCERS.clear();
-			PENDING_MODEL_MESH_SEMANTICS.clear();
-			frame = new PrimitiveFrame(
-				viewportWidth,
-				viewportHeight,
-				PENDING_VIEW.clone(),
-				PENDING_PROJECTION.clone(),
-				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
-				List.of(),
-				List.of(),
-				List.of(),
-				List.of(),
-				instances
-				);
-				}
-				auditMessage("Rust VulkanicGAL world mesh request"
-			+ " route=rust-opengl"
-			+ " producer=" + metricValue(producerLabel)
-			+ " mesh_instances=" + frame.meshInstances().size()
-				+ " result=queued");
-		return RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, producerLabel);
-	}
-
 	public static String materialMarkerSummary(List<VulkanicGalBridge.WorldMaterialQuadRecord> materialQuads,
 		List<VulkanicGalBridge.WorldParticleQuadRecord> particleQuads) {
 		int barrier = 0;
@@ -16495,105 +15764,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		return LIGHT_MARKER_TEXTURE_IDS[Mth.clamp(level, 0, 15)];
 	}
 
-	public static boolean renderOpenGlBlockBreakingCracks(
-		Minecraft minecraft,
-		List<BlockBreakingRenderState> states,
-		Camera camera
-	) {
-		if (!shouldUseRustOpenGlCrack()) {
-			return false;
-		}
-		if (minecraft == null || camera == null || states == null) {
-			return false;
-		}
-		if (states.isEmpty() && DIAGNOSTIC_CRACK_SCENARIO.isBlank()) {
-			auditMessage("Rust VulkanicGAL block-breaking crack request"
-				+ " route=rust-opengl"
-				+ " real_destroy_progress=true"
-				+ " states=0"
-				+ " quads=0"
-				+ " first=none"
-				+ " result=no-work");
-			return false;
-		}
-		PrimitiveFrame frame;
-		Vec3 cameraPos = camera.getPosition();
-		String firstStateSummary = firstCrackStateSummary(states);
-		synchronized (LOCK) {
-			int viewportWidth = pendingViewportWidth;
-			int viewportHeight = pendingViewportHeight;
-			if (viewportWidth <= 0 || viewportHeight <= 0) {
-				throw new IllegalStateException("Rust OpenGL block-breaking crack overlay requires a seeded world primitive frame");
-			}
-			PENDING_CRACK_QUADS.clear();
-			if (enqueueDiagnosticBlockBreakingCrack(camera)) {
-				// Diagnostic path wrote the requested quads or deliberately left the frame empty.
-			} else {
-				for (BlockBreakingRenderState state : states) {
-					if (state.progress < 0 || state.progress >= 10) {
-						continue;
-					}
-					if (state.blockState.isAir()) {
-						continue;
-					}
-					VoxelShape shape = state.blockState.getShape(state.level, state.blockPos, CollisionContext.of(camera.getEntity()));
-					if (shape.isEmpty()) {
-						shape = Shapes.block();
-					}
-					appendCrackShape(shape, state.blockPos, cameraPos, state.progress, viewportWidth, viewportHeight);
-				}
-			}
-			if (PENDING_CRACK_QUADS.isEmpty()) {
-				auditMessage("Rust VulkanicGAL block-breaking crack request"
-					+ " route=rust-opengl"
-					+ " real_destroy_progress=" + DIAGNOSTIC_CRACK_SCENARIO.isBlank()
-					+ " states=" + states.size()
-					+ " quads=0"
-					+ " first=" + metricValue(firstStateSummary)
-					+ " result=empty");
-				return false;
-			}
-			frame = new PrimitiveFrame(
-				viewportWidth,
-				viewportHeight,
-				PENDING_VIEW.clone(),
-				PENDING_PROJECTION.clone(),
-				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
-				List.of(),
-				List.copyOf(PENDING_CRACK_QUADS),
-				List.of(),
-				List.of(),
-				List.of()
-			);
-			PENDING_CRACK_QUADS.clear();
-		}
-		auditMessage("Rust VulkanicGAL block-breaking crack request"
-			+ " route=rust-opengl"
-			+ " real_destroy_progress=" + DIAGNOSTIC_CRACK_SCENARIO.isBlank()
-			+ " states=" + states.size()
-			+ " quads=" + frame.crackQuads().size()
-			+ " first=" + metricValue(firstStateSummary)
-			+ " result=queued");
-		return RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, "minecraft.world.block-breaking-crack");
-	}
-
-	public static boolean hasValidOpenGlBlockBreakingCracks(List<BlockBreakingRenderState> states, Camera camera) {
-		if (!shouldUseRustOpenGlCrack() || states == null || camera == null) {
-			return false;
-		}
-		if (!DIAGNOSTIC_CRACK_SCENARIO.isBlank()) {
-			return !"hidden".equalsIgnoreCase(DIAGNOSTIC_CRACK_SCENARIO)
-				&& !"no-target".equalsIgnoreCase(DIAGNOSTIC_CRACK_SCENARIO);
-		}
-		for (BlockBreakingRenderState state : states) {
-			if (state.progress < 0 || state.progress >= 10 || state.blockState.isAir()) {
-				continue;
-			}
-			return true;
-		}
-		return false;
-	}
-
 	private static boolean enqueueDiagnosticBlockBreakingCrack(Camera camera) {
 		if (DIAGNOSTIC_CRACK_SCENARIO.isBlank()) {
 			return false;
@@ -16618,26 +15788,6 @@ public final class RustGalWorldPrimitiveRenderer {
 			appendCrackShape(shape, blockPos, cameraPos, stage, viewportWidth, viewportHeight);
 		}
 		return true;
-	}
-
-	private static String firstCrackStateSummary(List<BlockBreakingRenderState> states) {
-		if (states == null || states.isEmpty()) {
-			return "none";
-		}
-		BlockBreakingRenderState state = states.get(0);
-		String block = state.blockPos == null ? "unknown" : state.blockPos.toShortString();
-		String blockType = state.blockState == null ? "unknown" : state.blockState.getBlock().builtInRegistryHolder().key().location().toString();
-		return "block_" + block + "_stage_" + state.progress + "_type_" + blockType;
-	}
-
-	private static int blockMarkerTextureId(BlockState blockState) {
-		if (blockState.is(Blocks.BARRIER)) {
-			return MATERIAL_TEXTURE_BLOCK_MARKER_BARRIER;
-		}
-		if (blockState.is(Blocks.LIGHT)) {
-			return LIGHT_MARKER_TEXTURE_IDS[Mth.clamp(blockState.getValue(LightBlock.LEVEL), 0, 15)];
-		}
-		return MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS;
 	}
 
 	private static int terrainParticleTextureId(BlockState blockState) {
@@ -16685,9 +15835,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	public static boolean enqueueWorldBorder(WorldBorderRenderState state, Vec3 cameraPosition, double renderDistance, double depthFar) {
-		if (!WorldRenderRoutePolicy.currentWorldBorderRoute().usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		if (state == null || cameraPosition == null) {
 			throw new IllegalStateException("Rust whole-frame world-border route requires border state and camera semantics");
 		}
@@ -17003,14 +16150,6 @@ public final class RustGalWorldPrimitiveRenderer {
 		if (shape.isEmpty()) {
 			return;
 		}
-		if (!shouldUseRustWholeFrameOutline()) {
-			if (RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException(
-					"Rust whole-frame outline route rejected visible semantic work; Java Vulkan fallback is unavailable"
-				);
-			}
-			return;
-		}
 		if (enqueueDiagnosticBlockOutline(camera)) {
 			return;
 		}
@@ -17038,125 +16177,6 @@ public final class RustGalWorldPrimitiveRenderer {
 				}
 			}
 		}
-
-	public static boolean renderOpenGlBlockOutline(
-		Minecraft minecraft,
-		BlockOutlineRenderState blockOutlineRenderState,
-		Vec3 cameraPos
-	) {
-		if (!shouldUseRustOpenGlOutline()) {
-			return false;
-		}
-		if (minecraft == null || blockOutlineRenderState == null || blockOutlineRenderState.shape().isEmpty()) {
-			return false;
-		}
-		PrimitiveFrame frame;
-		synchronized (LOCK) {
-			int viewportWidth = pendingViewportWidth;
-			int viewportHeight = pendingViewportHeight;
-			if (viewportWidth <= 0 || viewportHeight <= 0) {
-				throw new IllegalStateException("Rust OpenGL block outline requires a seeded world primitive frame");
-			}
-			PENDING_SEGMENTS.clear();
-			int depthPolicy = diagnosticDepthPolicy();
-			if (blockOutlineRenderState.highContrast()) {
-				appendShapeEdges(
-					blockOutlineRenderState.shape(),
-					blockOutlineRenderState.pos(),
-					cameraPos,
-					viewportWidth,
-					viewportHeight,
-						STYLE_HIGH_CONTRAST,
-						DEPTH_POLICY_TEST_NO_WRITE,
-						-16777216,
-						7.0F
-					);
-					appendShapeEdges(
-						blockOutlineRenderState.shape(),
-					blockOutlineRenderState.pos(),
-					cameraPos,
-					viewportWidth,
-					viewportHeight,
-						STYLE_HIGH_CONTRAST,
-						depthPolicy,
-						-11010079,
-						defaultOutlineLineWidth(viewportWidth)
-					);
-				} else {
-					appendShapeEdges(
-					blockOutlineRenderState.shape(),
-					blockOutlineRenderState.pos(),
-					cameraPos,
-					viewportWidth,
-					viewportHeight,
-						STYLE_NORMAL,
-						depthPolicy,
-						0x66000000,
-						defaultOutlineLineWidth(viewportWidth)
-					);
-				}
-			frame = new PrimitiveFrame(
-				viewportWidth,
-				viewportHeight,
-				PENDING_VIEW.clone(),
-				PENDING_PROJECTION.clone(),
-				VulkanicGalBridge.WorldBackgroundRecord.diagnosticFallback(),
-				List.copyOf(PENDING_SEGMENTS),
-				List.of(),
-				List.of(),
-				List.of(),
-				List.of()
-			);
-			logFirstProjectedLineForDiagnostics(frame);
-			PENDING_SEGMENTS.clear();
-		}
-		return RustGalFrameCoordinator.executeWorldPrimitiveFrame(minecraft, frame, "minecraft.world.block-outline");
-	}
-
-	private static void logFirstProjectedLineForDiagnostics(PrimitiveFrame frame) {
-		if (!BLOCK_OUTLINE_DIAGNOSTICS || blockOutlineProjectionDiagnosticLogs >= 16 || frame.segments().isEmpty()) {
-			return;
-		}
-		VulkanicGalBridge.WorldLineSegmentRecord segment = frame.segments().get(0);
-		Matrix4f view = new Matrix4f().set(frame.viewMatrix());
-		Matrix4f projection = new Matrix4f().set(frame.projectionMatrix());
-		ProjectedEndpoint start = projectEndpoint(segment.startX(), segment.startY(), segment.startZ(), view, projection, frame.viewportWidth(), frame.viewportHeight());
-		ProjectedEndpoint end = projectEndpoint(segment.endX(), segment.endY(), segment.endZ(), view, projection, frame.viewportWidth(), frame.viewportHeight());
-		ProjectedEndpoint columnStart = projectEndpointColumnVector(segment.startX(), segment.startY(), segment.startZ(), view, projection, frame.viewportWidth(), frame.viewportHeight());
-		ProjectedEndpoint columnEnd = projectEndpointColumnVector(segment.endX(), segment.endY(), segment.endZ(), view, projection, frame.viewportWidth(), frame.viewportHeight());
-		LOGGER.info(
-			"[MattMC graphics-audit] rust-gal block-outline projected-first-segment viewport={}x{} color=0x{} depthPolicy={} rowStart={} rowEnd={} columnStart={} columnEnd={}",
-			frame.viewportWidth(),
-			frame.viewportHeight(),
-			Integer.toUnsignedString(segment.colorArgb(), 16),
-			segment.depthPolicy(),
-			start,
-			end,
-			columnStart,
-			columnEnd
-		);
-		blockOutlineProjectionDiagnosticLogs++;
-	}
-
-	private static ProjectedEndpoint projectEndpoint(
-		float x,
-		float y,
-		float z,
-		Matrix4f view,
-		Matrix4f projection,
-		int viewportWidth,
-		int viewportHeight
-	) {
-		Vector4f clip = new Vector4f(x, y, z, 1.0F).mul(view).mul(projection);
-		if (!Float.isFinite(clip.x()) || !Float.isFinite(clip.y()) || !Float.isFinite(clip.z()) || !Float.isFinite(clip.w()) || Math.abs(clip.w()) < 1.0E-5F) {
-			return new ProjectedEndpoint(clip.x(), clip.y(), clip.z(), clip.w(), Float.NaN, Float.NaN, false);
-		}
-		float ndcX = clip.x() / clip.w();
-		float ndcY = clip.y() / clip.w();
-		float screenX = (ndcX * 0.5F + 0.5F) * viewportWidth;
-		float screenY = (ndcY * 0.5F + 0.5F) * viewportHeight;
-		return new ProjectedEndpoint(clip.x(), clip.y(), clip.z(), clip.w(), screenX, screenY, Float.isFinite(screenX) && Float.isFinite(screenY));
-	}
 
 	private static ProjectedEndpoint projectEndpointColumnVector(
 		float x,
@@ -19092,9 +18112,6 @@ public final class RustGalWorldPrimitiveRenderer {
 	 * backend object to the semantic terrain caller.
 	 */
 	public static boolean isStaticTerrainMeshGenerationUploaded(long meshKey, long meshGeneration) {
-		if (!WorldRenderRoutePolicy.currentStaticTerrainRoute().usesRustWholeFrameVulkan()) {
-			return false;
-		}
 		synchronized (LOCK) {
 			return isWorldMeshGenerationAndTexturesUploadedLocked(meshKey, meshGeneration);
 		}
@@ -19386,5 +18403,38 @@ public final class RustGalWorldPrimitiveRenderer {
 	}
 
 	private record WorldMaterialAssetCandidate(int textureId, ResourceLocation location) {
+	}
+
+	/** Returns true only when copied semantics contain work requiring Fabulous attachments. */
+	public static boolean hasPendingFabulousTransparencyWork() {
+		synchronized (LOCK) {
+			if (PENDING_PARTICLE_QUADS.stream().anyMatch(VulkanicGalBridge.WorldParticleQuadRecord::translucent)) return true;
+			if (PENDING_MATERIAL_QUADS.stream().anyMatch(quad -> quad.materialMode() == MATERIAL_MODE_TRANSLUCENT)) {
+				return true;
+			}
+			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_MESH_INSTANCES) {
+				VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(instance.meshKey());
+				if (asset != null && asset.sections().stream().anyMatch(section -> materialUsesAlphaBlending(section.materialMode()))) {
+					return true;
+				}
+			}
+			for (VulkanicGalBridge.WorldMeshInstanceRecord instance : PENDING_FIRST_PERSON_MESH_INSTANCES) {
+				VulkanicGalBridge.WorldMeshAssetRecord asset = WORLD_MESH_ASSETS.get(instance.meshKey());
+				if (asset != null && asset.sections().stream().anyMatch(section -> materialUsesAlphaBlending(section.materialMode()))) {
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+
+	public static boolean hasPendingMaterialQuads() {
+		synchronized (LOCK) {
+			return !PENDING_MATERIAL_QUADS.isEmpty() || !PENDING_PARTICLE_QUADS.isEmpty();
+		}
+	}
+
+	private static boolean materialUsesAlphaBlending(int mode) {
+		return mode == MATERIAL_MODE_TRANSLUCENT || mode == MATERIAL_MODE_TRANSLUCENT_CUTOUT;
 	}
 }

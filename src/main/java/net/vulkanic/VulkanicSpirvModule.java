@@ -59,19 +59,6 @@ public final class VulkanicSpirvModule {
         this.spirvBytes = Objects.requireNonNull(spirvBytes, "spirvBytes must not be null").clone();
     }
 
-    public VulkanicSpirvModule withFragmentOutputs(List<FragmentOutput> fragmentOutputs) {
-        return new VulkanicSpirvModule(
-            stage,
-            entryPoint,
-            spirvBytes,
-            sourceName,
-            compilerName,
-            sourceContainsIrisFragData0,
-            sourceIsSodiumCoreVulkanChunk,
-            fragmentOutputs
-        );
-    }
-
     public VulkanicShaderStage stage() {
         return stage;
     }
@@ -86,14 +73,6 @@ public final class VulkanicSpirvModule {
 
     public String compilerName() {
         return compilerName;
-    }
-
-    public boolean sourceContainsIrisFragData0() {
-        return sourceContainsIrisFragData0;
-    }
-
-    public boolean sourceIsSodiumCoreVulkanChunk() {
-        return sourceIsSodiumCoreVulkanChunk;
     }
 
     public List<FragmentOutput> fragmentOutputs() {

@@ -1,7 +1,6 @@
 package net.irisshaders.iris.shaderpack;
 
 import com.google.common.collect.ImmutableList;
-import net.irisshaders.iris.gl.shader.StandardMacros;
 import net.irisshaders.iris.helpers.StringPair;
 import net.irisshaders.iris.parsing.BiomeCategories;
 import net.irisshaders.iris.uniforms.BiomeUniforms;
@@ -25,11 +24,7 @@ public class IrisDefines {
 	public static ImmutableList<StringPair> createIrisReplacements() {
 		// On the Rust Vulkan route the caller supplies the Rust engine environment;
 		// the GL standard macros query Java GPU state, which that route forbids.
-		boolean rustVulkanRoute = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		ArrayList<StringPair> s = rustVulkanRoute
-			? new ArrayList<>()
-			: new ArrayList<>(StandardMacros.createStandardEnvironmentDefines());
+		ArrayList<StringPair> s = new ArrayList<>();
 
 		BiomeUniforms.getBiomeMap().forEach((biome, id) -> define(s, "BIOME_" + biome.location().getPath().toUpperCase(Locale.ROOT), String.valueOf(id)));
 

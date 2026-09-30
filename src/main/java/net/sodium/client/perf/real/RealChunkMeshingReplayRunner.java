@@ -982,7 +982,7 @@ public final class RealChunkMeshingReplayRunner implements GameHooks {
 
     private static ChunkBuildOutput executeTask(SectionPos sectionPos, ChunkRenderContext renderContext,
                                                 ChunkBuildContext context) {
-        RenderRegion region = new RenderRegion(sectionPos.getX() >> 3, sectionPos.getY() >> 2, sectionPos.getZ() >> 3, null);
+        RenderRegion region = new RenderRegion(sectionPos.getX() >> 3, sectionPos.getY() >> 2, sectionPos.getZ() >> 3);
         RenderSection renderSection = new RenderSection(region, sectionPos.getX(), sectionPos.getY(), sectionPos.getZ());
         ChunkBuilderMeshingTask task = new ChunkBuilderMeshingTask(renderSection, 0,
                 new Vector3d(sectionPos.minBlockX() + 8.0, sectionPos.minBlockY() + 8.0, sectionPos.minBlockZ() + 8.0),

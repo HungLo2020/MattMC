@@ -63,20 +63,7 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		if (modChecker.isModLoaded("sodium"))
 		{
 			ModAccessorInjector.INSTANCE.bind(ISodiumAccessor.class, new SodiumAccessor());
-			
-			// If sodium is installed Indium is also necessary for versions 0.5 and less in order to use the Fabric rendering API
-			if (!modChecker.isModLoaded("indium") && SodiumAccessor.isSodiumV5OrLess)
-			{
-				String indiumMissingMessage = ModInfo.READABLE_NAME + " needs Indium to work with Sodium.\nPlease install Indium manually.";
-				LOGGER.fatal(indiumMissingMessage);
-				
-				NativeDialogUtil.showDialog(ModInfo.READABLE_NAME, indiumMissingMessage, "ok", "error");
-				
-				IMinecraftClientWrapper mc = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
-				String errorMessage = "loading Distant Horizons. Distant Horizons requires Indium in order to run with Sodium.";
-				String exceptionError = "Distant Horizons conditional mod Exception";
-				mc.crashMinecraft(errorMessage, new Exception(exceptionError));
-			}
+
 		}
 		
 		this.tryCreateModCompatAccessor("starlight", IStarlightAccessor.class, StarlightAccessor::new);
@@ -170,9 +157,6 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		super.onInitializeClient();
 		
 		// Register Distant Horizons rendering hooks to replace mixin-based injection
-		net.minecraft.hooks.HookRegistry.registerChunkRenderLayerHook(
-			new com.seibel.distanthorizons.fabric.hooks.DistantHorizonsChunkRenderHook()
-		);
 		net.minecraft.hooks.HookRegistry.registerLevelRendererHook(
 			new com.seibel.distanthorizons.fabric.hooks.DistantHorizonsLevelRenderHook()
 		);

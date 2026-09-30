@@ -240,9 +240,7 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 		// instance. Keep the selected Vulkan route on the model's ordinary
 		// semantic material instead of passing Java's outline-only RenderType,
 		// which has no texture/material contract at the Rust boundary.
-		if ((net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			&& renderType.isOutline() && textureIdentity != null) {
+		if (renderType.isOutline() && textureIdentity != null) {
 			RenderType semanticOutlineMaterial = this.model.renderType(textureIdentity);
 			if (semanticOutlineMaterial != null && !semanticOutlineMaterial.isOutline()) {
 				renderType = semanticOutlineMaterial;
@@ -994,8 +992,7 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 			var rustLivingModelOwnership = net.vulkanic.world.LivingEntityBaseModelOwnershipPolicy.currentOwnershipRoute(rustLivingModelFamily);
 			boolean semanticSubmission = EntityRenderDispatcher.isSemanticSubmission();
 			boolean rustLivingOutlineOnlySubmitted = false;
-			if (!semanticSubmission && rustOutlineOnlyLivingBody && rustLivingModelFamily && entityIdentity != null
-				&& net.vulkanic.world.WorldRenderRoutePolicy.currentModelMeshRoute(true).usesRustWholeFrameVulkan()) {
+			if (!semanticSubmission && rustOutlineOnlyLivingBody && rustLivingModelFamily && entityIdentity != null) {
 				RenderType outlineMaterial = this.model.renderType(textureIdentity);
 				if (outlineMaterial == null || outlineMaterial.isOutline()
 					|| !net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueStandaloneModelMeshOutlineOnly(
@@ -1041,7 +1038,7 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 						livingEntityRenderState.entityId,
 						false,
 						false,
-						rustLivingModelOwnership.usesJavaCompatibility()
+						false
 					);
 				}
 				// Every living-entity base callsite already has an immutable direct
@@ -1067,9 +1064,7 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 
 		if (this.shouldRenderLayers(livingEntityRenderState) && !this.layers.isEmpty()) {
 			this.model.setupAnim(livingEntityRenderState);
-			boolean rustItemScope = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-			if (rustItemScope) net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
+			net.vulkanic.world.RustGalWorldPrimitiveRenderer.beginItemEntitySubmission();
 			try {
 				for (RenderLayer<S, M> renderLayer : this.layers) {
 					renderLayer.submit(
@@ -1077,7 +1072,7 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 					);
 				}
 			} finally {
-				if (rustItemScope) net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
+				net.vulkanic.world.RustGalWorldPrimitiveRenderer.endItemEntitySubmission();
 			}
 		}
 

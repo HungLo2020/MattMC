@@ -23,7 +23,6 @@ import net.voxelmap.util.EasingUtils;
 import net.voxelmap.util.GameVariableAccessShim;
 import net.voxelmap.util.ImageUtils;
 import net.voxelmap.util.VoxelMapGuiGraphics;
-import net.vulkanic.bridge.RustGalVulkanWholeFrameMode;
 import net.vulkanic.gui.RustGalGuiRawImageAssets;
 import net.voxelmap.util.VoxelMapPipelines;
 import net.voxelmap.util.Waypoint;
@@ -181,14 +180,7 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
         DynamicTexture texture = new DynamicTexture(() -> "Voxelmap player", ImageUtils.nativeImageFromBufferedImage(skinImage));
         texture.setFilter(true, false);
         minecraft.getTextureManager().register(voxelmapSkinLocation, texture);
-        // The persistent-map skin is synthesized from the player's live skin,
-        // so Rust cannot resolve it from a resource-pack PNG. Publish a bounded
-        // CPU snapshot for semantic GUI consumption while keeping Java texture
-        // views out of the Rust presenter path.
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                || RustGalVulkanWholeFrameMode.enabled()) {
-            RustGalGuiRawImageAssets.registerDynamicTexture(voxelmapSkinLocation, texture);
-        }
+        RustGalGuiRawImageAssets.registerDynamicTexture(voxelmapSkinLocation, texture);
     }
 
     @Override
@@ -209,8 +201,8 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
         this.buttonWidth = (this.width - this.sideMargin * 2 - this.buttonSeparation * (this.buttonCount - 1)) / this.buttonCount;
         this.buttonWaypoints = new PopupGuiButton(this.sideMargin, this.getHeight() - 28, this.buttonWidth, 20, Component.translatable("voxelmap.options.minimap.waypoints"), button -> minecraft.setScreen(new GuiWaypoints(this)), this);
         this.addRenderableWidget(this.buttonWaypoints);
-        this.multiworldButtonName = Component.translatable(VoxelConstants.isRealmServer() ? "menu.online" : "voxelmap.options.worldmap.multiworld");
-        this.multiworldButtonNameRed = (Component.translatable(VoxelConstants.isRealmServer() ? "menu.online" : "voxelmap.options.worldmap.multiworld")).withStyle(ChatFormatting.RED);
+        this.multiworldButtonName = Component.translatable("voxelmap.options.worldmap.multiworld");
+        this.multiworldButtonNameRed = (Component.translatable("voxelmap.options.worldmap.multiworld")).withStyle(ChatFormatting.RED);
         if (!minecraft.hasSingleplayerServer() && !VoxelConstants.getVoxelMapInstance().getWaypointManager().receivedAutoSubworldName()) {
             this.addRenderableWidget(this.buttonMultiworld = new PopupGuiButton(this.sideMargin + (this.buttonWidth + this.buttonSeparation), this.getHeight() - 28, this.buttonWidth, 20, this.multiworldButtonName, button -> minecraft.setScreen(new GuiSubworldsSelect(this)), this));
         }
@@ -257,9 +249,6 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
             }
             if (worldName.get() == null || worldName.get().isBlank()) {
                 worldName.set("Multiplayer Server");
-            }
-            if (VoxelConstants.isRealmServer()) {
-                worldName.set("Realms");
             }
         });
 
@@ -647,7 +636,8 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
             for (CachedRegion region : this.regions) {
                 ResourceLocation resource = region.getTextureLocation();
                 if (resource != null) {
-                    guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resource, region.getX() * 256, region.getZ() * 256, 0, 0, region.getWidth(), region.getWidth(), region.getWidth(), region.getWidth());
+                    guiGraphics.submitRustSemanticBlit(resource, region.getX() * 256, region.getZ() * 256,
+                        region.getWidth(), region.getWidth(), 0.0F, 0.0F, 1.0F, 1.0F, 0xFFFFFFFF);
                 }
             }
 

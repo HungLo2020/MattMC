@@ -39,50 +39,8 @@ public final class VulkanicResourceBarriers {
         return new VulkanicResourceBarriers(values);
     }
 
-    /**
-     * Common post-dispatch barrier set for compute writes consumed by following texture reads.
-     */
-    public static VulkanicResourceBarriers computeWritesVisibleToTextureSampling() {
-        return of(
-            Barrier.SHADER_IMAGE_ACCESS,
-            Barrier.TEXTURE_FETCH,
-            Barrier.SHADER_STORAGE
-        );
-    }
-
     public Set<Barrier> barriers() {
         return Collections.unmodifiableSet(barriers);
-    }
-
-    /**
-     * OpenGL mapping helper for backend implementations.
-     */
-    public int toOpenGLBarrierBits() {
-        int bits = 0;
-        for (Barrier barrier : barriers) {
-            bits |= barrier.openGLBit();
-        }
-        return bits;
-    }
-
-    /**
-     * Converts legacy OpenGL barrier bits into the typed subset currently understood by Vulkanic.
-     */
-    public static Optional<VulkanicResourceBarriers> fromOpenGLBits(int bits) {
-        EnumSet<Barrier> values = EnumSet.noneOf(Barrier.class);
-        int remainingBits = bits;
-        for (Barrier barrier : Barrier.values()) {
-            if ((bits & barrier.openGLBit()) != 0) {
-                values.add(barrier);
-                remainingBits &= ~barrier.openGLBit();
-            }
-        }
-
-        if (remainingBits != 0 || values.isEmpty()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(new VulkanicResourceBarriers(values));
     }
 
     /**
@@ -99,8 +57,5 @@ public final class VulkanicResourceBarriers {
             this.openGLBit = openGLBit;
         }
 
-        public int openGLBit() {
-            return openGLBit;
-        }
     }
 }

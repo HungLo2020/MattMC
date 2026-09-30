@@ -32,20 +32,8 @@ public enum SortBehavior {
         this(shortName, SortMode.DYNAMIC, priorityMode, deferMode);
     }
 
-    public String getShortName() {
-        return this.shortName;
-    }
-
     public SortMode getSortMode() {
         return this.sortMode;
-    }
-
-    public PriorityMode getPriorityMode() {
-        return this.priorityMode;
-    }
-
-    public DeferMode getDeferMode() {
-        return this.deferMode;
     }
 
     public enum SortMode {

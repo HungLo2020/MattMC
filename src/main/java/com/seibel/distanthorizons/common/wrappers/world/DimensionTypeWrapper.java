@@ -50,7 +50,6 @@ public class DimensionTypeWrapper implements IDimensionTypeWrapper
 		return dimensionType.effectsLocation().getPath();
 	}
 	
-	public static void clearMap() { DIMENSION_WRAPPER_BY_NAME.clear(); }
 	
 	
 	

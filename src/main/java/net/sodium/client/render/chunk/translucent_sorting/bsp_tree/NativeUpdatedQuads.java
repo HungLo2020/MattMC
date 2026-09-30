@@ -119,7 +119,7 @@ public final class NativeUpdatedQuads implements AutoCloseable {
         check(invokeApply(this.state.getHandle(), MemoryUtil.memAddress(buffer), buffer.remaining(),
                 NativeChunkMeshEncoder.NATIVE_QUAD_STRIDE, format.stride(), format.blockIdOffset(),
                 format.normalOffset(), format.tangentOffset(), format.midUvOffset(), format.midBlockOffset(),
-                sectionIndex, usesSeparateAo() ? 1 : 0, DefaultMaterials.TRANSLUCENT.bits()),
+                sectionIndex, 0, DefaultMaterials.TRANSLUCENT.bits()),
                 "native updated quad buffer application");
     }
 
@@ -145,11 +145,7 @@ public final class NativeUpdatedQuads implements AutoCloseable {
     }
 
     private static boolean usesSeparateAo() {
-        if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                || net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-            return false;
-        }
-        return net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo();
+        return false;
     }
 
     private static void check(int status, String operation) {

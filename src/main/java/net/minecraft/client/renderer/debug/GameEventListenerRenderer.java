@@ -8,7 +8,6 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
@@ -34,59 +33,8 @@ public class GameEventListenerRenderer implements DebugRenderer.SimpleDebugRende
 		);
 	}
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.lines());
-		this.forEachListener(debugValueAccess, (vec3, i) -> {
-			double g = i * 2.0;
-			DebugRenderer.renderVoxelShape(poseStack, vertexConsumer, Shapes.create(AABB.ofSize(vec3, g, g, g)), -d, -e, -f, 1.0F, 1.0F, 0.0F, 0.35F, true);
-		});
-		VertexConsumer vertexConsumer2 = multiBufferSource.getBuffer(RenderType.debugFilledBox());
-		this.forEachListener(
-			debugValueAccess,
-			(vec3, i) -> ShapeRenderer.addChainedFilledBoxVertices(
-				poseStack,
-				vertexConsumer2,
-				vec3.x() - 0.25 - d,
-				vec3.y() - e,
-				vec3.z() - 0.25 - f,
-				vec3.x() + 0.25 - d,
-				vec3.y() - e + 1.0,
-				vec3.z() + 0.25 - f,
-				1.0F,
-				1.0F,
-				0.0F,
-				0.35F
-			)
-		);
-		this.forEachListener(debugValueAccess, (vec3, i) -> {
-			DebugRenderer.renderFloatingText(poseStack, multiBufferSource, "Listener Origin", vec3.x(), vec3.y() + 1.8F, vec3.z(), -1, 0.025F);
-			DebugRenderer.renderFloatingText(poseStack, multiBufferSource, BlockPos.containing(vec3).toString(), vec3.x(), vec3.y() + 1.5, vec3.z(), -6959665, 0.025F);
-		});
-		debugValueAccess.forEachEvent(
-			DebugSubscriptions.GAME_EVENTS,
-			(debugGameEventInfo, i, j) -> {
-				Vec3 vec3 = debugGameEventInfo.pos();
-				double dx = 0.4;
-				AABB aABB = AABB.ofSize(vec3.add(0.0, 0.5, 0.0), 0.4, 0.9, 0.4);
-				renderFilledBox(poseStack, multiBufferSource, aABB, 1.0F, 1.0F, 1.0F, 0.2F);
-				DebugRenderer.renderFloatingText(
-					poseStack, multiBufferSource, debugGameEventInfo.event().getRegisteredName(), vec3.x, vec3.y + 0.85F, vec3.z, -7564911, 0.0075F
-				);
-			}
-		);
-	}
-
 	/** Copies listener radii, origins, and labels into Rust semantic streams. */
 	public void collectRustSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame game-event debug route is unavailable; Java debug geometry is not a fallback");
-			}
-			return;
-		}
 		if (camera == null || !camera.isInitialized()) return;
 		DebugValueAccess access = Minecraft.getInstance().getConnection().createDebugValueAccess();
 		Vec3 cameraPosition = camera.getPosition();
@@ -154,14 +102,6 @@ public class GameEventListenerRenderer implements DebugRenderer.SimpleDebugRende
 		case 3->new float[]{x1,y0,z0,x1,y0,z1,x1,y1,z1,x1,y1,z0};
 		case 4->new float[]{x0,y0,z0,x0,y0,z1,x1,y0,z1,x1,y0,z0};
 		default->new float[]{x0,y1,z1,x0,y1,z0,x1,y1,z0,x1,y1,z1};};}
-
-	private static void renderFilledBox(PoseStack poseStack, MultiBufferSource multiBufferSource, AABB aABB, float f, float g, float h, float i) {
-		Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
-		if (camera.isInitialized()) {
-			Vec3 vec3 = camera.getPosition().reverse();
-			DebugRenderer.renderFilledBox(poseStack, multiBufferSource, aABB.move(vec3), f, g, h, i);
-		}
-	}
 
 	@FunctionalInterface
 	@Environment(EnvType.CLIENT)

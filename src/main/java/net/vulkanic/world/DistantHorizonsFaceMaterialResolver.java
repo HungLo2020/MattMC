@@ -172,11 +172,6 @@ final class DistantHorizonsFaceMaterialResolver {
 			return !this.faceLayers.isEmpty();
 		}
 
-		/** Exact-atlas provenance may only advertise a complete model-face map. */
-		boolean isExactAtlasAdmissible() {
-			return this.status == Status.COMPLETE && hasResolvedFaces();
-		}
-
 		/**
 	 * Some baked models (notably crossed vegetation) contain the same copied
 	 * material on several planar faces, while DH's reduced geometry may classify
@@ -265,47 +260,11 @@ final class DistantHorizonsFaceMaterialResolver {
 				&& left.tinted() == right.tinted()
 				&& left.tintArgb() == right.tintArgb();
 		}
-	}
 
-	/**
-	 * Resolves copied candidates with no Minecraft object retained in the
-	 * result. The first ambiguity rejects the entire identity; choosing an
-	 * arbitrary face sprite would create the texture swaps this contract exists
-	 * to prevent.
-	 */
-	static Resolution resolveCandidates(List<FaceCandidate> candidates) {
-		Objects.requireNonNull(candidates, "candidates");
-		EnumMap<Direction, List<FaceMaterial>> faces = new EnumMap<>(Direction.class);
-		Status firstUnavailable = null;
-		for (Direction face : Direction.values()) {
-			LinkedHashSet<FaceMaterial> materials = new LinkedHashSet<>();
-			Status unavailable = null;
-			for (FaceCandidate candidate : candidates) {
-				if (candidate.face() != face) {
-					continue;
-				}
-				if (candidate.unculled()) {
-					unavailable = Status.UNCULLED_QUAD;
-					break;
-				}
-				materials.add(candidate.material());
-				if (materials.size() > MAX_FACE_LAYERS) {
-					unavailable = Status.MULTIPLE_FACE_QUADS;
-					break;
-				}
-			}
-			if (unavailable != null) {
-				if (firstUnavailable == null) {
-					firstUnavailable = unavailable;
-				}
-			} else if (!materials.isEmpty()) {
-				faces.put(face, numberedLayers(materials));
-			}
+		/** Exact-atlas provenance may only advertise a complete model-face map. */
+		boolean isExactAtlasAdmissible() {
+			return this.status == Status.COMPLETE && hasResolvedFaces();
 		}
-		if (faces.isEmpty()) {
-			return new Resolution(firstUnavailable == null ? Status.UNSUPPORTED_FACE_MAPPING : firstUnavailable, faces);
-		}
-		return new Resolution(firstUnavailable == null ? Status.COMPLETE : Status.PARTIAL_FACE_MAPPING, faces);
 	}
 
 	/** Stable semantic face IDs shared with the Rust world-material ABI. */
@@ -636,23 +595,6 @@ final class DistantHorizonsFaceMaterialResolver {
 		}
 		synchronized (CACHED_VARIANT_RESOLUTIONS) {
 			CACHED_VARIANT_RESOLUTIONS.clear();
-		}
-	}
-
-	static int cachedStateResolutionCountForTest() {
-		synchronized (CACHED_STATE_RESOLUTIONS) {
-			return CACHED_STATE_RESOLUTIONS.size();
-		}
-	}
-
-	static void cacheStateResolutionForTest(String blockStateIdentity, Resolution resolution) {
-		Objects.requireNonNull(blockStateIdentity, "blockStateIdentity");
-		Objects.requireNonNull(resolution, "resolution");
-		synchronized (CACHED_STATE_RESOLUTIONS) {
-			CACHED_STATE_RESOLUTIONS.put(blockStateIdentity, resolution);
-			if (CACHED_STATE_RESOLUTIONS.size() > MAX_CACHED_STATE_RESOLUTIONS) {
-				CACHED_STATE_RESOLUTIONS.remove(CACHED_STATE_RESOLUTIONS.entrySet().iterator().next().getKey());
-			}
 		}
 	}
 
@@ -995,5 +937,63 @@ final class DistantHorizonsFaceMaterialResolver {
 		if (Math.abs(value - minimum) <= tolerance) return 0;
 		if (Math.abs(value - maximum) <= tolerance) return 1;
 		return -1;
+	}
+
+	static int cachedStateResolutionCountForTest() {
+		synchronized (CACHED_STATE_RESOLUTIONS) {
+			return CACHED_STATE_RESOLUTIONS.size();
+		}
+	}
+
+	/**
+	 * Resolves copied candidates with no Minecraft object retained in the
+	 * result. The first ambiguity rejects the entire identity; choosing an
+	 * arbitrary face sprite would create the texture swaps this contract exists
+	 * to prevent.
+	 */
+	static Resolution resolveCandidates(List<FaceCandidate> candidates) {
+		Objects.requireNonNull(candidates, "candidates");
+		EnumMap<Direction, List<FaceMaterial>> faces = new EnumMap<>(Direction.class);
+		Status firstUnavailable = null;
+		for (Direction face : Direction.values()) {
+			LinkedHashSet<FaceMaterial> materials = new LinkedHashSet<>();
+			Status unavailable = null;
+			for (FaceCandidate candidate : candidates) {
+				if (candidate.face() != face) {
+					continue;
+				}
+				if (candidate.unculled()) {
+					unavailable = Status.UNCULLED_QUAD;
+					break;
+				}
+				materials.add(candidate.material());
+				if (materials.size() > MAX_FACE_LAYERS) {
+					unavailable = Status.MULTIPLE_FACE_QUADS;
+					break;
+				}
+			}
+			if (unavailable != null) {
+				if (firstUnavailable == null) {
+					firstUnavailable = unavailable;
+				}
+			} else if (!materials.isEmpty()) {
+				faces.put(face, numberedLayers(materials));
+			}
+		}
+		if (faces.isEmpty()) {
+			return new Resolution(firstUnavailable == null ? Status.UNSUPPORTED_FACE_MAPPING : firstUnavailable, faces);
+		}
+		return new Resolution(firstUnavailable == null ? Status.COMPLETE : Status.PARTIAL_FACE_MAPPING, faces);
+	}
+
+	static void cacheStateResolutionForTest(String blockStateIdentity, Resolution resolution) {
+		Objects.requireNonNull(blockStateIdentity, "blockStateIdentity");
+		Objects.requireNonNull(resolution, "resolution");
+		synchronized (CACHED_STATE_RESOLUTIONS) {
+			CACHED_STATE_RESOLUTIONS.put(blockStateIdentity, resolution);
+			if (CACHED_STATE_RESOLUTIONS.size() > MAX_CACHED_STATE_RESOLUTIONS) {
+				CACHED_STATE_RESOLUTIONS.remove(CACHED_STATE_RESOLUTIONS.entrySet().iterator().next().getKey());
+			}
+		}
 	}
 }

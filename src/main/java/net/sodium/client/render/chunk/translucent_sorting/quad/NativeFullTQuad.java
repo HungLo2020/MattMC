@@ -169,20 +169,6 @@ public final class NativeFullTQuad extends RegularTQuad {
         }
     }
 
-    public static NativeFullTQuad splittingCopy(NativeFullTQuad quad) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment handleSegment = arena.allocate(ValueLayout.JAVA_LONG);
-            MemorySegment stateSegment = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            check(invokeCopy(quad.getHandle(), handleSegment, stateSegment), "native full translucent quad copy");
-
-            long handle = handleSegment.get(ValueLayout.JAVA_LONG, 0);
-            if (handle == 0) {
-                throw new IllegalStateException("Native full translucent quad copy returned a null handle");
-            }
-            return new NativeFullTQuad(handle, stateSegment, quad.facing, quad.packedNormal);
-        }
-    }
-
     public int[] classifyAgainst(Vector3fc splitPlane, float splitDistance) {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment mapsSegment = arena.allocate(ValueLayout.JAVA_INT, 2);
@@ -192,61 +178,6 @@ public final class NativeFullTQuad extends RegularTQuad {
                     mapsSegment.getAtIndex(ValueLayout.JAVA_INT, 0),
                     mapsSegment.getAtIndex(ValueLayout.JAVA_INT, 1)
             };
-        }
-    }
-
-    public static void splitEven(int vertexInsideMap, NativeFullTQuad insideQuad, NativeFullTQuad outsideQuad,
-            Vector3fc splitPlane, float splitDistance) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment insideState = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            MemorySegment outsideState = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            check(invokeSplitEven(vertexInsideMap, insideQuad.getHandle(), outsideQuad.getHandle(),
-                    splitPlane.x(), splitPlane.y(), splitPlane.z(), splitDistance, insideState, outsideState),
-                    "native full translucent quad even split");
-            insideQuad.applyState(insideState);
-            outsideQuad.applyState(outsideState);
-        }
-    }
-
-    public static void splitOdd(int cornerIndex, NativeFullTQuad cornerQuad, NativeFullTQuad cutQuad,
-            NativeFullTQuad bulkQuad, Vector3fc splitPlane, float splitDistance) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment cornerState = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            MemorySegment cutState = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            MemorySegment bulkState = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            check(invokeSplitOdd(cornerIndex, cornerQuad.getHandle(), cutQuad.getHandle(), bulkQuad.getHandle(),
-                    splitPlane.x(), splitPlane.y(), splitPlane.z(), splitDistance, cornerState, cutState, bulkState),
-                    "native full translucent quad odd split");
-            cornerQuad.applyState(cornerState);
-            cutQuad.applyState(cutState);
-            bulkQuad.applyState(bulkState);
-        }
-    }
-
-    public static void splitTriangleCorner(int cornerIndex, NativeFullTQuad cornerQuad, NativeFullTQuad bulkQuad,
-            Vector3fc splitPlane, float splitDistance) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment cornerState = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            MemorySegment bulkState = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            check(invokeSplitTriangleCorner(cornerIndex, cornerQuad.getHandle(), bulkQuad.getHandle(),
-                    splitPlane.x(), splitPlane.y(), splitPlane.z(), splitDistance, cornerState, bulkState),
-                    "native full translucent quad triangle-corner split");
-            cornerQuad.applyState(cornerState);
-            bulkQuad.applyState(bulkState);
-        }
-    }
-
-    public static void splitTriangleVertex(int insideIndex, int outsideIndex, int duplicateIndex,
-            boolean duplicateIsInside, NativeFullTQuad insideQuad, NativeFullTQuad outsideQuad,
-            Vector3fc splitPlane, float splitDistance) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment insideState = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            MemorySegment outsideState = arena.allocate(STATE_STRIDE, Integer.BYTES);
-            check(invokeSplitTriangleVertex(insideIndex, outsideIndex, duplicateIndex, duplicateIsInside ? 1 : 0,
-                    insideQuad.getHandle(), outsideQuad.getHandle(), splitPlane.x(), splitPlane.y(), splitPlane.z(),
-                    splitDistance, insideState, outsideState), "native full translucent quad triangle-vertex split");
-            insideQuad.applyState(insideState);
-            outsideQuad.applyState(outsideState);
         }
     }
 
@@ -383,14 +314,6 @@ public final class NativeFullTQuad extends RegularTQuad {
         }
     }
 
-    private static int invokeCopy(long handle, MemorySegment handleOutput, MemorySegment stateOutput) {
-        try {
-            return (int) COPY.invokeExact(handle, handleOutput, stateOutput);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust full translucent quad copy downcall failed", throwable);
-        }
-    }
-
     private static int invokeGetVeryAccurateNormal(long handle, MemorySegment stateOutput) {
         try {
             return (int) GET_VERY_ACCURATE_NORMAL.invokeExact(handle, stateOutput);
@@ -429,51 +352,6 @@ public final class NativeFullTQuad extends RegularTQuad {
             return (int) WRITE_TO_NATIVE_BUFFER.invokeExact(handle, nativeQuadAddress, materialBits);
         } catch (Throwable throwable) {
             throw new IllegalStateException("Rust full translucent quad native buffer write downcall failed", throwable);
-        }
-    }
-
-    private static int invokeSplitEven(int vertexInsideMap, long insideHandle, long outsideHandle, float normalX,
-            float normalY, float normalZ, float distance, MemorySegment insideState, MemorySegment outsideState) {
-        try {
-            return (int) SPLIT_EVEN.invokeExact(vertexInsideMap, insideHandle, outsideHandle,
-                    normalX, normalY, normalZ, distance, insideState, outsideState);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust full translucent quad even split downcall failed", throwable);
-        }
-    }
-
-    private static int invokeSplitOdd(int cornerIndex, long cornerHandle, long cutHandle, long bulkHandle,
-            float normalX, float normalY, float normalZ, float distance, MemorySegment cornerState,
-            MemorySegment cutState, MemorySegment bulkState) {
-        try {
-            return (int) SPLIT_ODD.invokeExact(cornerIndex, cornerHandle, cutHandle, bulkHandle,
-                    normalX, normalY, normalZ, distance, cornerState, cutState, bulkState);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust full translucent quad odd split downcall failed", throwable);
-        }
-    }
-
-    private static int invokeSplitTriangleCorner(int cornerIndex, long cornerHandle, long bulkHandle, float normalX,
-            float normalY, float normalZ, float distance, MemorySegment cornerState, MemorySegment bulkState) {
-        try {
-            return (int) SPLIT_TRIANGLE_CORNER.invokeExact(cornerIndex, cornerHandle, bulkHandle,
-                    normalX, normalY, normalZ, distance, cornerState, bulkState);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust full translucent quad triangle-corner split downcall failed",
-                    throwable);
-        }
-    }
-
-    private static int invokeSplitTriangleVertex(int insideIndex, int outsideIndex, int duplicateIndex,
-            int duplicateIsInside, long insideHandle, long outsideHandle, float normalX, float normalY, float normalZ,
-            float distance, MemorySegment insideState, MemorySegment outsideState) {
-        try {
-            return (int) SPLIT_TRIANGLE_VERTEX.invokeExact(insideIndex, outsideIndex, duplicateIndex,
-                    duplicateIsInside, insideHandle, outsideHandle, normalX, normalY, normalZ, distance,
-                    insideState, outsideState);
-        } catch (Throwable throwable) {
-            throw new IllegalStateException("Rust full translucent quad triangle-vertex split downcall failed",
-                    throwable);
         }
     }
 

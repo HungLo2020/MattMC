@@ -108,35 +108,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		return new Vec3d(projectedView.x, projectedView.y, projectedView.z);
 	}
 	
-	@Override
-	public Color getFogColor(float partialTicks)
-	{
-			
-		if (mcFogRenderer == null)
-		{
-			mcFogRenderer = new FogRenderer();
-		}
-		
-		if (MC.level == null)
-		{
-			// shouldn't happen, but just in case
-			return Color.white;
-		}
-		
-		Vector4f colorValues = mcFogRenderer.setupFog(
-			MC.gameRenderer.getMainCamera(),
-			MC.options.getEffectiveRenderDistance(),
-			false, // bl parameter
-			MC.deltaTracker,
-			MC.gameRenderer.getDarkenWorldAmount(MC.deltaTracker.getGameTimeDeltaPartialTick(true)),
-			MC.level);
-		return new Color(
-				Math.max(0f, Math.min(colorValues.x, 1f)), // r
-				Math.max(0f, Math.min(colorValues.y, 1f)), // g
-				Math.max(0f, Math.min(colorValues.z, 1f)), // b
-				Math.max(0f, Math.min(colorValues.w, 1f))  // a
-		);
-	}
 	
 	@Override
 	public Color getSkyColor()
@@ -180,116 +151,33 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	@Override
 	public boolean hasTargetRenderTarget()
 	{
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-		{
-			throw new IllegalStateException("Java Distant Horizons render-target identity is unavailable while Rust owns whole-frame presentation");
-		}
-		return this.resolveTargetFramebufferId(this.getRenderTarget()) != -1;
+		throw new IllegalStateException("Java Distant Horizons render-target identity is unavailable while Rust owns whole-frame presentation");
 	}
 
 	@Override
 	public boolean bindTargetRenderTarget(CommandContext ctx)
 	{
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-		{
-			throw new IllegalStateException("Java Distant Horizons render-target binding is unavailable while Rust owns whole-frame presentation");
-		}
-		RenderTarget renderTarget = this.getRenderTarget();
-		int framebufferId = this.resolveTargetFramebufferId(renderTarget);
-		if (framebufferId == -1 || renderTarget == null)
-		{
-			return false;
-		}
-
-		this.finalLevelFrameBufferId = framebufferId;
-		VulkanicAPI.bindRenderTarget(ctx, renderTarget.getColorTexture(), renderTarget.getDepthTexture());
-		return true;
+		throw new IllegalStateException("Java Distant Horizons render-target binding is unavailable while Rust owns whole-frame presentation");
 	}
 	
 	@Override
 	public int getTargetFramebuffer()
 	{
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-		{
-			throw new IllegalStateException("Java Distant Horizons framebuffer handles are unavailable while Rust owns whole-frame presentation");
-		}
-		RenderTarget renderTarget = this.getRenderTarget();
-		this.finalLevelFrameBufferId = this.resolveTargetFramebufferId(renderTarget);
-		return this.finalLevelFrameBufferId;
+		throw new IllegalStateException("Java Distant Horizons framebuffer handles are unavailable while Rust owns whole-frame presentation");
 	}
 	
 	@Override
 	public void clearTargetFrameBuffer() { this.finalLevelFrameBufferId = -1; }
 
-	private int resolveTargetFramebufferId(RenderTarget renderTarget)
-	{
-		if (renderTarget == null)
-		{
-			return -1;
-		}
-
-		int framebufferId = VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture());
-		return framebufferId == 0 ? -1 : framebufferId;
-	}
-	
 	@Override
 	public int getDepthTextureId()
 	{
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-		{
-			throw new IllegalStateException("Java Distant Horizons depth-texture handles are unavailable while Rust owns whole-frame presentation");
-		}
-		RenderTarget renderTarget = this.getRenderTarget();
-		if (renderTarget == null)
-		{
-			return -1;
-		}
-
-		net.blaze3d.textures.GpuTexture depthTexture = renderTarget.getDepthTexture();
-		if (depthTexture == null)
-		{
-			return -1;
-		}
-
-		int textureId = net.vulkanic.VulkanicCoreAPI.textureId(depthTexture);
-		if (textureId <= 0)
-		{
-			return -1;
-		}
-
-		return textureId;
+		throw new IllegalStateException("Java Distant Horizons depth-texture handles are unavailable while Rust owns whole-frame presentation");
 	}
 	@Override
 	public int getColorTextureId() 
 	{
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-		{
-			throw new IllegalStateException("Java Distant Horizons color-texture handles are unavailable while Rust owns whole-frame presentation");
-		}
-		RenderTarget renderTarget = this.getRenderTarget();
-		if (renderTarget == null)
-		{
-			return -1;
-		}
-
-		net.blaze3d.textures.GpuTexture colorTexture = renderTarget.getColorTexture();
-		if (colorTexture == null)
-		{
-			return -1;
-		}
-
-		int textureId = net.vulkanic.VulkanicCoreAPI.textureId(colorTexture);
-		if (textureId <= 0)
-		{
-			return -1;
-		}
-		
-		return textureId;
+		throw new IllegalStateException("Java Distant Horizons color-texture handles are unavailable while Rust owns whole-frame presentation");
 	}
 	
 	@Override

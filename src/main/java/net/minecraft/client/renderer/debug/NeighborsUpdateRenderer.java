@@ -9,7 +9,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.BlockPos;
@@ -22,41 +21,9 @@ import net.minecraft.network.chat.Component;
 
 @Environment(EnvType.CLIENT)
 public class NeighborsUpdateRenderer implements DebugRenderer.SimpleDebugRenderer {
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		int i = DebugSubscriptions.NEIGHBOR_UPDATES.expireAfterTicks();
-		double g = 1.0 / (i * 2);
-		Map<BlockPos, NeighborsUpdateRenderer.LastUpdate> map = new HashMap();
-		debugValueAccess.forEachEvent(DebugSubscriptions.NEIGHBOR_UPDATES, (blockPosx, ix, j) -> {
-			long l = j - ix;
-			NeighborsUpdateRenderer.LastUpdate lastUpdatex = (NeighborsUpdateRenderer.LastUpdate)map.getOrDefault(blockPosx, NeighborsUpdateRenderer.LastUpdate.NONE);
-			map.put(blockPosx, lastUpdatex.tryCount((int)l));
-		});
-		VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.lines());
-
-		for (Entry<BlockPos, NeighborsUpdateRenderer.LastUpdate> entry : map.entrySet()) {
-			BlockPos blockPos = (BlockPos)entry.getKey();
-			NeighborsUpdateRenderer.LastUpdate lastUpdate = (NeighborsUpdateRenderer.LastUpdate)entry.getValue();
-			AABB aABB = new AABB(BlockPos.ZERO).inflate(0.002).deflate(g * lastUpdate.age).move(blockPos.getX(), blockPos.getY(), blockPos.getZ()).move(-d, -e, -f);
-			ShapeRenderer.renderLineBox(poseStack.last(), vertexConsumer, aABB.minX, aABB.minY, aABB.minZ, aABB.maxX, aABB.maxY, aABB.maxZ, 1.0F, 1.0F, 1.0F, 1.0F);
-		}
-
-		for (Entry<BlockPos, NeighborsUpdateRenderer.LastUpdate> entry : map.entrySet()) {
-			BlockPos blockPos = (BlockPos)entry.getKey();
-			NeighborsUpdateRenderer.LastUpdate lastUpdate = (NeighborsUpdateRenderer.LastUpdate)entry.getValue();
-			DebugRenderer.renderFloatingText(poseStack, multiBufferSource, String.valueOf(lastUpdate.count), blockPos.getX(), blockPos.getY(), blockPos.getZ(), -1);
-		}
-	}
 
 	/** Copies neighbor-update boxes and labels into Rust semantic streams. */
 	public void collectRustSemantics(Camera camera, SubmitNodeStorage geometry, SubmitNodeStorage text) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentWorldTextRoute().usesRustWholeFrameVulkan()) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame neighbor-update debug route is unavailable; Java debug geometry is not a fallback");
-			}
-			return;
-		}
 		if (camera == null || !camera.isInitialized()) return;
 		int expiry = DebugSubscriptions.NEIGHBOR_UPDATES.expireAfterTicks();
 		double half = 1.0 / (expiry * 2.0);

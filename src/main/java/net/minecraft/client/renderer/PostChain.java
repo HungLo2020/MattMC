@@ -4,11 +4,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import com.google.common.collect.ImmutableList.Builder;
 import net.blaze3d.buffers.GpuBufferSlice;
-import net.blaze3d.framegraph.FrameGraphBuilder;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.resource.GraphicsResourceAllocator;
-import net.blaze3d.resource.RenderTargetDescriptor;
 import net.blaze3d.resource.ResourceHandle;
 import net.blaze3d.shaders.UniformType;
 import java.util.ArrayList;
@@ -45,142 +43,6 @@ public class PostChain implements AutoCloseable {
 		this.internalTargets = map;
 		this.externalTargets = set;
 		this.projectionMatrixBuffer = cachedOrthoProjectionMatrixBuffer;
-	}
-
-	public static PostChain load(
-		PostChainConfig postChainConfig,
-		TextureManager textureManager,
-		Set<ResourceLocation> set,
-		ResourceLocation resourceLocation,
-		CachedOrthoProjectionMatrixBuffer cachedOrthoProjectionMatrixBuffer
-	) throws ShaderManager.CompilationException {
-		// Keep direct callers fail-closed as well as ShaderManager: constructing a
-		// PostChain resolves resource-pack textures and Java pipeline metadata before
-		// any pass is admitted. The Rust whole-frame route must receive only the
-		// semantic post-effect identity and its copied shader sources.
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java post-chain construction is unavailable while Rust owns the selected Vulkan route");
-		}
-		Stream<ResourceLocation> stream = postChainConfig.passes().stream().flatMap(PostChainConfig.Pass::referencedTargets);
-		Set<ResourceLocation> set2 = (Set<ResourceLocation>)stream.filter(resourceLocationx -> !postChainConfig.internalTargets().containsKey(resourceLocationx))
-			.collect(Collectors.toSet());
-		Set<ResourceLocation> set3 = Sets.<ResourceLocation>difference(set2, set);
-		if (!set3.isEmpty()) {
-			throw new ShaderManager.CompilationException("Referenced external targets are not available in this context: " + set3);
-		} else {
-			Builder<PostPass> builder = ImmutableList.builder();
-
-			for (int i = 0; i < postChainConfig.passes().size(); i++) {
-				PostChainConfig.Pass pass = (PostChainConfig.Pass)postChainConfig.passes().get(i);
-				builder.add(createPass(textureManager, pass, resourceLocation.withSuffix("/" + i)));
-			}
-
-			return new PostChain(builder.build(), postChainConfig.internalTargets(), set2, cachedOrthoProjectionMatrixBuffer);
-		}
-	}
-
-	private static PostPass createPass(TextureManager textureManager, PostChainConfig.Pass pass, ResourceLocation resourceLocation) throws ShaderManager.CompilationException {
-		RenderPipeline.Builder builder = RenderPipeline.builder(RenderPipelines.POST_PROCESSING_SNIPPET)
-			.withFragmentShader(pass.fragmentShaderId())
-			.withVertexShader(pass.vertexShaderId())
-			.withLocation(resourceLocation);
-
-		for (PostChainConfig.Input input : pass.inputs()) {
-			builder.withSampler(input.samplerName() + "Sampler");
-		}
-
-		builder.withUniform("SamplerInfo", UniformType.UNIFORM_BUFFER);
-
-		for (String string : pass.uniforms().keySet()) {
-			builder.withUniform(string, UniformType.UNIFORM_BUFFER);
-		}
-
-		RenderPipeline renderPipeline = builder.build();
-		List<PostPass.Input> list = new ArrayList();
-
-		for (PostChainConfig.Input input2 : pass.inputs()) {
-			switch (input2) {
-				case PostChainConfig.TextureInput(String var35, ResourceLocation var36, int var37, int var38, boolean var39):
-					AbstractTexture abstractTexture = textureManager.getTexture(var36.withPath(string -> "textures/effect/" + string + ".png"));
-					abstractTexture.setFilter(var39, false);
-					list.add(new PostPass.TextureInput(var35, abstractTexture, var37, var38));
-					break;
-				case PostChainConfig.TargetInput(String var21, ResourceLocation var41, boolean var42, boolean var43):
-					list.add(new PostPass.TargetInput(var21, var41, var42, var43));
-					break;
-				default:
-					throw new MatchException(null, null);
-			}
-		}
-
-		return new PostPass(renderPipeline, pass.outputTarget(), pass.uniforms(), list);
-	}
-
-	public void addToFrame(FrameGraphBuilder frameGraphBuilder, int i, int j, PostChain.TargetBundle targetBundle) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java post-chain admission is unavailable while Rust owns whole-frame presentation");
-		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java Vulkan post-chain admission is unavailable until the Rust whole-frame route is admitted");
-		}
-		GpuBufferSlice gpuBufferSlice = this.projectionMatrixBuffer.getBuffer(i, j);
-		Map<ResourceLocation, ResourceHandle<RenderTarget>> map = new HashMap(this.internalTargets.size() + this.externalTargets.size());
-
-		for (ResourceLocation resourceLocation : this.externalTargets) {
-			map.put(resourceLocation, targetBundle.getOrThrow(resourceLocation));
-		}
-
-		for (Entry<ResourceLocation, PostChainConfig.InternalTarget> entry : this.internalTargets.entrySet()) {
-			ResourceLocation resourceLocation2 = (ResourceLocation)entry.getKey();
-			PostChainConfig.InternalTarget internalTarget = (PostChainConfig.InternalTarget)entry.getValue();
-			RenderTargetDescriptor renderTargetDescriptor = new RenderTargetDescriptor(
-				(Integer)internalTarget.width().orElse(i), (Integer)internalTarget.height().orElse(j), true, internalTarget.clearColor()
-			);
-			if (internalTarget.persistent()) {
-				RenderTarget renderTarget = this.getOrCreatePersistentTarget(resourceLocation2, renderTargetDescriptor);
-				map.put(resourceLocation2, frameGraphBuilder.importExternal(resourceLocation2.toString(), renderTarget));
-			} else {
-				map.put(resourceLocation2, frameGraphBuilder.createInternal(resourceLocation2.toString(), renderTargetDescriptor));
-			}
-		}
-
-		for (PostPass postPass : this.passes) {
-			postPass.addToFrame(frameGraphBuilder, map, gpuBufferSlice);
-		}
-
-		for (ResourceLocation resourceLocation : this.externalTargets) {
-			targetBundle.replace(resourceLocation, (ResourceHandle<RenderTarget>)map.get(resourceLocation));
-		}
-	}
-
-	@Deprecated
-	public void process(RenderTarget renderTarget, GraphicsResourceAllocator graphicsResourceAllocator) {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java post-chain processing is unavailable while Rust owns whole-frame presentation");
-		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			throw new IllegalStateException("Java Vulkan post-chain processing is unavailable until the Rust whole-frame route is admitted");
-		}
-		FrameGraphBuilder frameGraphBuilder = new FrameGraphBuilder();
-		PostChain.TargetBundle targetBundle = PostChain.TargetBundle.of(MAIN_TARGET_ID, frameGraphBuilder.importExternal("main", renderTarget));
-		this.addToFrame(frameGraphBuilder, renderTarget.width, renderTarget.height, targetBundle);
-		frameGraphBuilder.execute(graphicsResourceAllocator);
-	}
-
-	private RenderTarget getOrCreatePersistentTarget(ResourceLocation resourceLocation, RenderTargetDescriptor renderTargetDescriptor) {
-		RenderTarget renderTarget = (RenderTarget)this.persistentTargets.get(resourceLocation);
-		if (renderTarget == null || renderTarget.width != renderTargetDescriptor.width() || renderTarget.height != renderTargetDescriptor.height()) {
-			if (renderTarget != null) {
-				renderTarget.destroyBuffers();
-			}
-
-			renderTarget = renderTargetDescriptor.allocate();
-			renderTargetDescriptor.prepare(renderTarget);
-			this.persistentTargets.put(resourceLocation, renderTarget);
-		}
-
-		return renderTarget;
 	}
 
 	public void close() {

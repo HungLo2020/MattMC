@@ -186,24 +186,6 @@ public class DhSectionPos
 		return DhSectionPos.getCenterBlockPosZ(pos) - halfBlockWidth;
 	}
 	
-	/** 
-	 * A detail level of X lower than this section's detail level will return: <br>
-	 * 0 -> 1 <br>
-	 * 1 -> 2 <br>
-	 * 2 -> 4 <br>
-	 * 3 -> 8 <br>
-	 * etc.
-	 * 
-	 * @return how many {@link DhSectionPos}'s at the given detail level it would take to span the width of this section.
-	 */
-	public static int getWidthCountForLowerDetailedSection(long pos, byte returnDetailLevel)
-	{
-		byte detailLevel = getDetailLevel(pos);
-		
-		LodUtil.assertTrue(returnDetailLevel <= detailLevel, "returnDetailLevel must be less than sectionDetail");
-		byte offset = (byte) (detailLevel - returnDetailLevel);
-		return BitShiftUtil.powerOfTwo(offset);
-	}
 	
 	
 	/** @return how wide this section is in chunks */
@@ -319,8 +301,6 @@ public class DhSectionPos
 				x * 2 + (child0to3 & 1),
 				z * 2 + BitShiftUtil.half(child0to3 & 2));
 	}
-	/** Returns this position's child index in its parent */
-	public static int getChildIndexOfParent(long pos) { return (getX(pos) & 1) + BitShiftUtil.square(getZ(pos) & 1); }
 	
 	public static long getParentPos(long pos) { return DhSectionPos.encode((byte) (getDetailLevel(pos) + 1), BitShiftUtil.half(getX(pos)), BitShiftUtil.half(getZ(pos))); }
 	
@@ -395,21 +375,6 @@ public class DhSectionPos
 	}
 
 	/** Applies the given consumer to all children of the position at the given section detail level. */
-	public static void forEachChildDownToDetailLevel(long pos, byte minSectionDetailLevel, ICancelablePrimitiveLongConsumer callback) throws IllegalArgumentException, IllegalStateException
-	{
-		boolean stop = callback.accept(pos);
-		if (stop || minSectionDetailLevel == getDetailLevel(pos))
-		{
-			return;
-		}
-		
-		for (int i = 0; i < 4; i++)
-		{
-			forEachChildDownToDetailLevel(getChildByIndex(pos, i), minSectionDetailLevel, callback);
-		}
-	}
-
-	/** Applies the given consumer to all children of the position at the given section detail level. */
 	public static void forEachChildAtDetailLevel(long pos, byte sectionDetailLevel, LongConsumer callback) throws IllegalArgumentException, IllegalStateException
 	{
 		if (sectionDetailLevel == getDetailLevel(pos))
@@ -424,18 +389,6 @@ public class DhSectionPos
 		}
 	}
 
-	/** Applies the given consumer to all children of the position at the given section detail level. */
-	public static void forEachPosUpToDetailLevel(long pos, byte maxSectionDetailLevel, LongConsumer callback)
-	{
-		callback.accept(pos);
-		if (maxSectionDetailLevel == getDetailLevel(pos))
-		{
-			return;
-		}
-		
-		forEachPosUpToDetailLevel(getParentPos(pos), maxSectionDetailLevel, callback);
-	}
-	
 	
 	
 	//==============//

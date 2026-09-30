@@ -10,7 +10,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.core.Direction;
@@ -42,36 +41,8 @@ public class LightSectionDebugRenderer implements DebugRenderer.SimpleDebugRende
 		this.lightLayer = lightLayer;
 	}
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Java light-section debug rendering is unavailable on selected Vulkan");
-		}
-		Instant instant = Instant.now();
-		if (this.data == null || Duration.between(this.lastUpdateTime, instant).compareTo(REFRESH_INTERVAL) > 0) {
-			this.lastUpdateTime = instant;
-			this.data = new LightSectionDebugRenderer.SectionData(
-				this.minecraft.level.getLightEngine(), SectionPos.of(this.minecraft.player.blockPosition()), 10, this.lightLayer
-			);
-		}
-
-		renderEdges(poseStack, this.data.lightAndBlocksShape, this.data.minPos, multiBufferSource, d, e, f, LIGHT_AND_BLOCKS_COLOR);
-		renderEdges(poseStack, this.data.lightShape, this.data.minPos, multiBufferSource, d, e, f, LIGHT_ONLY_COLOR);
-		VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.debugSectionQuads());
-		renderFaces(poseStack, this.data.lightAndBlocksShape, this.data.minPos, vertexConsumer, d, e, f, LIGHT_AND_BLOCKS_COLOR);
-		renderFaces(poseStack, this.data.lightShape, this.data.minPos, vertexConsumer, d, e, f, LIGHT_ONLY_COLOR);
-	}
-
 	/** Copies light-section edges and faces into Rust semantic primitives. */
 	public void collectRustSemantics(Camera camera, SubmitNodeStorage geometry) {
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) {
-			if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame light-section debug route is unavailable; Java debug geometry is not a fallback");
-			}
-			return;
-		}
 		if (camera == null || !camera.isInitialized() || minecraft.level == null) return;
 		Instant now = Instant.now();
 		if (this.data == null || Duration.between(this.lastUpdateTime, now).compareTo(REFRESH_INTERVAL) > 0) {
@@ -105,71 +76,6 @@ public class LightSectionDebugRenderer implements DebugRenderer.SimpleDebugRende
 				case NORTH->new float[]{x0,y0,z0,x1,y0,z0,x1,y1,z0,x0,y1,z0}; default->new float[]{x1,y0,z1,x0,y0,z1,x0,y1,z1,x1,y1,z1};};
 			PoseStack pose=new PoseStack();pose.last().pose().set(transform); if(!geometry.submitColoredQuadsSemantic(pose,RenderType.debugFilledBox(),v,new float[]{0,0,1,0,1,1,0,1},new int[]{color},15728880))throw new IllegalStateException("Rust whole-frame light-section debug route rejected face");
 		});
-	}
-
-	private static void renderFaces(
-		PoseStack poseStack,
-		DiscreteVoxelShape discreteVoxelShape,
-		SectionPos sectionPos,
-		VertexConsumer vertexConsumer,
-		double d,
-		double e,
-		double f,
-		Vector4f vector4f
-	) {
-		discreteVoxelShape.forAllFaces((direction, i, j, k) -> {
-			int l = i + sectionPos.getX();
-			int m = j + sectionPos.getY();
-			int n = k + sectionPos.getZ();
-			renderFace(poseStack, vertexConsumer, direction, d, e, f, l, m, n, vector4f);
-		});
-	}
-
-	private static void renderEdges(
-		PoseStack poseStack,
-		DiscreteVoxelShape discreteVoxelShape,
-		SectionPos sectionPos,
-		MultiBufferSource multiBufferSource,
-		double d,
-		double e,
-		double f,
-		Vector4f vector4f
-	) {
-		discreteVoxelShape.forAllEdges((i, j, k, l, m, n) -> {
-			int o = i + sectionPos.getX();
-			int p = j + sectionPos.getY();
-			int q = k + sectionPos.getZ();
-			int r = l + sectionPos.getX();
-			int s = m + sectionPos.getY();
-			int t = n + sectionPos.getZ();
-			VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.debugLineStrip(1.0));
-			renderEdge(poseStack, vertexConsumer, d, e, f, o, p, q, r, s, t, vector4f);
-		}, true);
-	}
-
-	private static void renderFace(
-		PoseStack poseStack, VertexConsumer vertexConsumer, Direction direction, double d, double e, double f, int i, int j, int k, Vector4f vector4f
-	) {
-		float g = (float)(SectionPos.sectionToBlockCoord(i) - d);
-		float h = (float)(SectionPos.sectionToBlockCoord(j) - e);
-		float l = (float)(SectionPos.sectionToBlockCoord(k) - f);
-		ShapeRenderer.renderFace(
-			poseStack.last().pose(), vertexConsumer, direction, g, h, l, g + 16.0F, h + 16.0F, l + 16.0F, vector4f.x(), vector4f.y(), vector4f.z(), vector4f.w()
-		);
-	}
-
-	private static void renderEdge(
-		PoseStack poseStack, VertexConsumer vertexConsumer, double d, double e, double f, int i, int j, int k, int l, int m, int n, Vector4f vector4f
-	) {
-		float g = (float)(SectionPos.sectionToBlockCoord(i) - d);
-		float h = (float)(SectionPos.sectionToBlockCoord(j) - e);
-		float o = (float)(SectionPos.sectionToBlockCoord(k) - f);
-		float p = (float)(SectionPos.sectionToBlockCoord(l) - d);
-		float q = (float)(SectionPos.sectionToBlockCoord(m) - e);
-		float r = (float)(SectionPos.sectionToBlockCoord(n) - f);
-		Matrix4f matrix4f = poseStack.last().pose();
-		vertexConsumer.addVertex(matrix4f, g, h, o).setColor(vector4f.x(), vector4f.y(), vector4f.z(), 1.0F);
-		vertexConsumer.addVertex(matrix4f, p, q, r).setColor(vector4f.x(), vector4f.y(), vector4f.z(), 1.0F);
 	}
 
 	@Environment(EnvType.CLIENT)

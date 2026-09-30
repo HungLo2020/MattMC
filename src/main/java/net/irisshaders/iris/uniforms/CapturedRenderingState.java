@@ -28,22 +28,6 @@ public class CapturedRenderingState {
 	private CapturedRenderingState() {
 	}
 
-	public Matrix4fc getGbufferModelView() {
-		return gbufferModelView;
-	}
-
-	public void setGbufferModelView(Matrix4fc gbufferModelView) {
-		this.gbufferModelView = new Matrix4f(gbufferModelView);
-	}
-
-	public Matrix4fc getGbufferProjection() {
-		return gbufferProjection;
-	}
-
-	public void setGbufferProjection(Matrix4f gbufferProjection) {
-		this.gbufferProjection = new Matrix4f(gbufferProjection);
-	}
-
 	public Vector3d getFogColor() {
 		if (Minecraft.getInstance().level == null || fogColor == null) {
 			return ZERO_VECTOR_3d;
@@ -56,28 +40,8 @@ public class CapturedRenderingState {
 		fogColor = new Vector3d(red, green, blue);
 	}
 
-	public float getFogDensity() {
-		return fogDensity;
-	}
-
 	public void setFogDensity(float fogDensity) {
 		this.fogDensity = fogDensity;
-	}
-
-	public float getTickDelta() {
-		return tickDelta;
-	}
-
-	public void setTickDelta(float tickDelta) {
-		this.tickDelta = tickDelta;
-	}
-
-	public float getRealTickDelta() {
-		return realTickDelta;
-	}
-
-	public void setRealTickDelta(float tickDelta) {
-		this.realTickDelta = tickDelta;
 	}
 
 	public void setCurrentBlockEntity(int entity) {
@@ -104,27 +68,4 @@ public class CapturedRenderingState {
 		this.currentRenderedItem = item;
 	}
 
-	public float getCurrentAlphaTest() {
-		return currentAlphaTest;
-	}
-
-	public void setCurrentAlphaTest(float alphaTest) {
-		this.currentAlphaTest = alphaTest;
-	}
-
-	public float getDarknessLightFactor() {
-		return darknessLightFactor;
-	}
-
-	public void setDarknessLightFactor(float factor) {
-		darknessLightFactor = factor;
-	}
-
-	public float getCloudTime() {
-		return this.cloudTime;
-	}
-
-	public void setCloudTime(float cloudTime) {
-		this.cloudTime = cloudTime;
-	}
 }

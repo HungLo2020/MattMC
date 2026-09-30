@@ -89,36 +89,11 @@ public class TerrainParticle extends SingleQuadParticle {
 	public void extract(QuadParticleRenderState quadParticleRenderState, Camera camera, float f) {
 		long startNanos = System.nanoTime();
 		GraphicsFrameBenchmark.beginPhase("game.particles.terrain.extract");
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.disabled")) {
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame terrain particle route cannot be disabled");
-			}
-			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
-			GraphicsFrameBenchmark.recordTerrainParticleExtraction("disabled", this.blockState, System.nanoTime() - startNanos);
-			return;
-		}
-		if (Boolean.getBoolean("mattmc.dev.rustGalWorldMaterial.terrainParticle.legacyControl")) {
-			if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame terrain particles cannot use the Java legacy control path");
-			}
-			super.extract(quadParticleRenderState, camera, f);
-			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
-			GraphicsFrameBenchmark.recordTerrainParticleExtraction("java-legacy", this.blockState, System.nanoTime() - startNanos);
-			return;
-		}
 		if (this.enqueueRustGal(camera, f)) {
 			GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
 			return;
 		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Rust whole-frame terrain particle semantics were rejected; Java particle extraction is not a fallback");
-		}
-		super.extract(quadParticleRenderState, camera, f);
-		GraphicsFrameBenchmark.endPhase("game.particles.terrain.extract");
-		GraphicsFrameBenchmark.recordTerrainParticleExtraction("java-compat", this.blockState, System.nanoTime() - startNanos);
+		throw new IllegalStateException("Rust whole-frame terrain particle semantics were rejected; Java particle extraction is not a fallback");
 	}
 
 	boolean enqueueRustGal(Camera camera, float f) {

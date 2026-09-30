@@ -92,17 +92,7 @@ public class BossHealthOverlay {
 
 	private void drawBar(GuiGraphics guiGraphics, int i, int j, BossEvent bossEvent) {
 		int k = Mth.lerpDiscrete(bossEvent.getProgress(), 0, 182);
-		if (RustGalGuiRenderer.isMigratedGuiDisabledForDiagnostics()) {
-			return;
-		}
-		if (RustGalGuiRenderer.shouldDrawJavaCompatibilityGui()) {
-			this.drawBar(guiGraphics, i, j, bossEvent, 182, BAR_BACKGROUND_SPRITES, OVERLAY_BACKGROUND_SPRITES);
-			if (k > 0) {
-				this.drawBar(guiGraphics, i, j, bossEvent, k, BAR_PROGRESS_SPRITES, OVERLAY_PROGRESS_SPRITES);
-			}
-		} else {
-			RustGalGuiRenderer.enqueueBossBar(this.minecraft, guiGraphics, i, j, 182, 5, bossEvent.getProgress(), k, bossEvent.getColor(), bossEvent.getOverlay());
-		}
+		RustGalGuiRenderer.enqueueBossBar(this.minecraft, guiGraphics, i, j, 182, 5, bossEvent.getProgress(), k, bossEvent.getColor(), bossEvent.getOverlay());
 	}
 
 	private void drawBar(

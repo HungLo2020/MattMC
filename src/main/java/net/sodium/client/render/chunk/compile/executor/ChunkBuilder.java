@@ -68,14 +68,6 @@ public class ChunkBuilder {
     }
 
     /**
-     * Returns the remaining effort for tasks which should be scheduled this frame. If an attempt is made to
-     * spawn more tasks than the budget allows, it will block until resources become available.
-     */
-    public long getTotalRemainingDuration(long durationPerThread) {
-        return Math.max(0, this.threads.size() * durationPerThread - this.queue.getJobDurationSum());
-    }
-
-    /**
      * <p>Notifies all worker threads to stop and blocks until all workers terminate. After the workers have been shut
      * down, all tasks are cancelled and the pending queues are cleared. If the builder is already stopped, this
      * method does nothing and exits.</p>
@@ -144,30 +136,8 @@ public class ChunkBuilder {
         return Runtime.getRuntime().availableProcessors();
     }
 
-    public void tryStealTask(ChunkJob job) {
-        if (!this.queue.stealJob(job)) {
-            return;
-        }
-
-        var localContext = this.localContext;
-
-        try {
-            job.execute(localContext);
-        } finally {
-            localContext.cleanup();
-        }
-    }
-
-    public boolean isBuildQueueEmpty() {
-        return this.queue.isEmpty();
-    }
-
     public int getScheduledJobCount() {
         return this.queue.size();
-    }
-
-    public float getBusyFraction(long frameDuration) {
-        return (float) this.queue.getJobDurationSum() / (frameDuration * this.threads.size());
     }
 
     public int getBusyThreadCount() {

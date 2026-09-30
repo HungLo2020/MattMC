@@ -53,11 +53,4 @@ public enum PixelType {
 		return byteSize;
 	}
 
-	public int getGlFormat() {
-		return glFormat;
-	}
-
-	public GlVersion getMinimumGlVersion() {
-		return minimumGlVersion;
-	}
 }

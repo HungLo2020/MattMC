@@ -14,8 +14,6 @@ import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import java.util.OptionalInt;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.pbr.TextureTracker;
 import net.logging.LogUtils;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -81,64 +79,12 @@ public class LightTexture implements AutoCloseable {
 	private MappableRingBuffer ubo;
 
 	public LightTexture(GameRenderer gameRenderer, Minecraft minecraft) {
-		if (VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			this.texture = null;
-			this.textureView = null;
-			this.ubo = null;
-			this.renderer = gameRenderer;
-			this.minecraft = minecraft;
-			return;
-		}
+		this.texture = null;
+		this.textureView = null;
+		this.ubo = null;
 		this.renderer = gameRenderer;
 		this.minecraft = minecraft;
-		this.texture = VulkanicAPI.createTexture(
-			"Light Texture",
-			GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT,
-			TextureFormat.RGBA8,
-			16,
-			16,
-			1,
-			1
-		);
-		this.texture.setTextureFilter(FilterMode.LINEAR, false);
-		this.textureView = VulkanicAPI.createTextureView(this.texture);
-		if (PROBE_VULKAN_SHADER_LIGHTMAP) {
-			this.shaderLightmapProbeTexture = VulkanicAPI.createTexture(
-				"Light Texture Shader Probe",
-				GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_COPY_SRC,
-				TextureFormat.RGBA8,
-				TEXTURE_SIZE,
-				TEXTURE_SIZE,
-				1,
-				1
-			);
-			this.shaderLightmapProbeTexture.setTextureFilter(FilterMode.LINEAR, false);
-			this.shaderLightmapProbeView = VulkanicAPI.createTextureView(this.shaderLightmapProbeTexture);
-		}
-		// The whole-frame Rust path derives its lightmap from the semantic
-		// gameplay inputs below.  Do not submit a Java clear into its startup
-		// device: this texture is retained only as an inert compatibility object
-		// for callers that have not yet been ported to the semantic lightmap.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			VulkanicAPI.createCommandEncoder().clearColorTexture(this.texture, -1);
-		}
-		this.ubo = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			? null
-			: new MappableRingBuffer(() -> "Lightmap UBO", 130, LIGHTMAP_UBO_SIZE);
-	}
-
-	public GpuTextureView getTextureView() {
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException(
-				"Java lightmap texture view is unavailable on the Rust Vulkan route; use semantic lightmap inputs"
-			);
-		}
-		if (this.textureView == null) {
-			throw new IllegalStateException("Java lightmap texture view is unavailable; use semantic lightmap inputs");
-		}
-		return this.textureView;
+		return;
 	}
 
 	@Nullable
@@ -216,12 +162,9 @@ public class LightTexture implements AutoCloseable {
 
 	/** Releases compatibility lightmap resources if Vulkan ownership starts after construction. */
 	public void ensureRustSemanticRoute() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			if (this.texture != null || this.textureView != null || this.ubo != null
-				|| this.shaderLightmapProbeTexture != null || this.shaderLightmapProbeView != null) {
-				this.close();
-			}
+		if (this.texture != null || this.textureView != null || this.ubo != null
+			|| this.shaderLightmapProbeTexture != null || this.shaderLightmapProbeView != null) {
+			this.close();
 		}
 	}
 
@@ -236,34 +179,17 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOffLightLayer() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
-		IrisRenderSystem.bindTextureToUnit(2, 0);
-		TextureTracker.INSTANCE.onSetShaderTexture(2, null);
+		return;
 	}
 
 	public void turnOnLightLayer() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| VulkanicAPI.isVulkanBackendSelected()) {
-			return;
-		}
-		var ctx = VulkanicAPI.getCommandContext();
-		VulkanicAPI.bindTextureUnit(ctx, 2, this.textureView);
-		TextureTracker.INSTANCE.onSetShaderTexture(2, this.textureView);
+		return;
 	}
 
 	private float calculateDarknessScale(LivingEntity livingEntity, float f, float g) {
 		float h = 0.45F * f;
 		float result = Math.max(0.0F, Mth.cos((livingEntity.tickCount - g) * (float) Math.PI * 0.025F) * h);
 		
-		// Iris captured state is compatibility-only; the semantic Rust route
-		// carries the darkness/lightmap inputs directly and must not publish it.
-		if (!net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			&& !VulkanicAPI.isVulkanBackendSelected()) {
-			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setDarknessLightFactor((float) (result * this.minecraft.options.darknessEffectScale().get()));
-		}
 		
 		return result;
 	}
@@ -335,94 +261,22 @@ public class LightTexture implements AutoCloseable {
 			profilerFiller.push("lightTex");
 			ClientLevel clientLevel = this.minecraft.level;
 			if (clientLevel != null) {
-				// Rust's whole-frame renderer consumes this immutable record directly.
-				// Keep the Java GPU lightmap, its UBO, and Iris runtime state entirely
-				// outside that route until each remaining texture consumer is semantic.
-				if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-					|| VulkanicAPI.isVulkanBackendSelected()) {
-					this.ensureRustSemanticRoute();
-					// The renderer can tick once while a client level exists but its
-					// player has not been attached yet.  Keep the semantic resource
-					// unavailable for that frame instead of dereferencing a null player
-					// or resurrecting the Java lightmap as a fallback.
-					if (this.minecraft.player == null) {
-						this.rustSemanticLightmapInputs = null;
-						profilerFiller.pop();
-						return;
-					}
-					this.rustSemanticLightmapInputs = this.computeRustSemanticLightmapInputs(
-						clientLevel, this.minecraft.player, f, false
-					);
+				this.ensureRustSemanticRoute();
+				// The renderer can tick once while a client level exists but its
+				// player has not been attached yet.  Keep the semantic resource
+				// unavailable for that frame instead of dereferencing a null player
+				// or resurrecting the Java lightmap as a fallback.
+				if (this.minecraft.player == null) {
+					this.rustSemanticLightmapInputs = null;
 					profilerFiller.pop();
 					return;
 				}
-				// Iris: Reset darkness value before calculating
-				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setDarknessLightFactor(0.0F);
-				
 				this.rustSemanticLightmapInputs = this.computeRustSemanticLightmapInputs(
-					clientLevel, this.minecraft.player, f, true
+					clientLevel, this.minecraft.player, f, false
 				);
-				RustSemanticLightmapInputs lightmap = this.rustSemanticLightmapInputs;
-				float o = lightmap.ambientLightFactor();
-				float i = lightmap.skyFactor();
-				float n = lightmap.blockFactor();
-				float m = lightmap.nightVisionFactor();
-				float k = lightmap.darknessScale();
-				float q = lightmap.darkenWorldFactor();
-				float r = lightmap.brightnessFactor();
-				Vector3f vector3f2 = new Vector3f(
-					lightmap.skyLightRed(), lightmap.skyLightGreen(), lightmap.skyLightBlue()
-				);
-				Vector3f vector3f = new Vector3f(
-					lightmap.ambientRed(), lightmap.ambientGreen(), lightmap.ambientBlue()
-				);
-				CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
-
-				try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(this.ubo.currentBuffer(), false, true)) {
-					Std140Builder.intoBuffer(mappedView.data())
-						.putFloat(o)
-						.putFloat(i)
-						.putFloat(n)
-						.putFloat(m)
-						.putFloat(k)
-						.putFloat(q)
-						.putFloat(r)
-						.putVec3(vector3f2)
-						.putVec3(vector3f);
-				}
-				this.traceLightmapInfoParity(f, o, i, n, m, k, q, r, vector3f2, vector3f);
-
-				this.renderLightTextureShader(commandEncoder, this.textureView, "Update light");
-
-				if (VulkanicAPI.isVulkanBackendSelected()) {
-					this.updateVulkanShaderLightmapProbe(commandEncoder);
-					this.dumpGpuLightmapDebugOnce();
-				}
-
-				this.ubo.rotate();
-				
-				// LightTextureHooks are a Java GPU compatibility extension point. The
-				// Rust Vulkan route publishes copied light semantics instead of a Java
-				// texture, so invoking these callbacks there could re-enter hidden Java
-				// GPU state or inspect a deliberately unavailable texture view.
-				if (!VulkanicAPI.isVulkanBackendSelected()
-					&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-					for (net.minecraft.hooks.LightTextureHooks hook : net.minecraft.hooks.HookRegistry.getLightTextureHooks()) {
-						hook.onLightTextureUpdated(this, f);
-					}
-				}
-				
 				profilerFiller.pop();
+				return;
 			}
-		}
-	}
-
-	private void renderLightTextureShader(CommandEncoder commandEncoder, GpuTextureView targetView, String label) {
-		try (RenderPass renderPass = commandEncoder.createRenderPass(() -> label, targetView, OptionalInt.empty())) {
-			renderPass.setPipeline(RenderPipelines.LIGHTMAP);
-			VulkanicAPI.bindDefaultUniforms(renderPass);
-			renderPass.setUniform("LightmapInfo", this.ubo.currentBuffer());
-			renderPass.draw(0, 3);
 		}
 	}
 
@@ -466,50 +320,6 @@ public class LightTexture implements AutoCloseable {
 			lightColor.y(),
 			lightColor.z()
 		);
-	}
-
-	private void updateVulkanShaderLightmapProbe(CommandEncoder commandEncoder) {
-		if (this.shaderLightmapProbeView == null) {
-			return;
-		}
-
-		this.renderLightTextureShader(commandEncoder, this.shaderLightmapProbeView, "Probe Vulkan shader light");
-		this.dumpShaderLightmapProbeDebugOnce();
-	}
-
-	private void dumpGpuLightmapDebugOnce() {
-		if (this.dumpedGpuLightmapDebug) {
-			return;
-		}
-
-		this.dumpedGpuLightmapDebug = true;
-		try {
-			Path autoCaptureDir = this.getAutoCaptureDir();
-			Files.createDirectories(autoCaptureDir);
-			TextureUtil.writeAsPNG(autoCaptureDir, "light_texture_debug_gpu", this.texture, 0, i -> i);
-		} catch (IOException ignored) {
-		}
-	}
-
-	private void dumpShaderLightmapProbeDebugOnce() {
-		if (this.dumpedShaderLightmapProbeDebug || this.shaderLightmapProbeTexture == null) {
-			return;
-		}
-
-		this.dumpedShaderLightmapProbeDebug = true;
-		try {
-			Path autoCaptureDir = this.getAutoCaptureDir();
-			Files.createDirectories(autoCaptureDir);
-			TextureUtil.writeAsPNG(autoCaptureDir, "light_texture_debug_shader_probe", this.shaderLightmapProbeTexture, 0, i -> i);
-		} catch (IOException exception) {
-			LOGGER.warn("Failed to dump Vulkan shader lightmap probe", exception);
-		}
-	}
-
-	private Path getAutoCaptureDir() {
-		Path gameDir = this.minecraft.gameDirectory.toPath().toAbsolutePath().normalize();
-		Path parent = gameDir.getParent();
-		return (parent != null ? parent : gameDir).resolve("logs/auto-capture");
 	}
 
 	public static float getBrightness(DimensionType dimensionType, int i) {

@@ -743,14 +743,6 @@ public class ColumnRenderBufferBuilder
 			- clientLevel.getLevelWrapper().getMinHeight();
 	}
 
-	private static ColumnRenderSource.SemanticMaterialSpan spanAt(
-		ColumnRenderSource.SemanticHorizontalContributor contributor, int y)
-	{
-		for (ColumnRenderSource.SemanticMaterialSpan span : contributor.spans())
-			if (y >= span.minY() && y < span.maxY()) return span;
-		return null;
-	}
-
 	static List<ColumnRenderSource.SemanticMaterialSpan> clippedContributorSpans(
 		ColumnRenderSource.SemanticHorizontalContributor contributor, int minY, int maxY)
 	{

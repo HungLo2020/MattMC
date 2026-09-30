@@ -89,11 +89,8 @@ public class FontManager implements PreparableReloadListener, AutoCloseable {
 
 	/** Releases pre-selection Java glyph textures while retaining copied semantic atlases. */
 	public void ensureRustSemanticRoute() {
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-			|| net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
-			this.fontSets.values().forEach(FontSet::ensureRustSemanticRoute);
-			this.missingFontSet.ensureRustSemanticRoute();
-		}
+		this.fontSets.values().forEach(FontSet::ensureRustSemanticRoute);
+		this.missingFontSet.ensureRustSemanticRoute();
 	}
 
 	private static GlyphProvider.Conditional createFallbackProvider() {

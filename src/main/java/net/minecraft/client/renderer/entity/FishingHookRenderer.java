@@ -45,9 +45,7 @@ public class FishingHookRenderer extends EntityRenderer<FishingHook, FishingHook
 		boolean rustBillboard = submitNodeCollector.submitTexturedQuadSemantic(
 			poseStack, RENDER_TYPE, TEXTURE_LOCATION, billboardVertices, billboardUvs, -1, fishingHookRenderState.lightCoords
 		);
-		if (!rustBillboard && (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.world.WorldRenderRoutePolicy.currentTexturedBillboardRoute().usesRustWholeFrameVulkan()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())) {
+		if (!rustBillboard) {
 			throw new IllegalStateException("Rust whole-frame fishing-hook route rejected semantic billboard");
 		}
 		if (!rustBillboard) submitNodeCollector.submitCustomGeometrySemantic(poseStack, RENDER_TYPE, (pose, vertexConsumer) -> {
@@ -71,15 +69,10 @@ public class FishingHookRenderer extends EntityRenderer<FishingHook, FishingHook
 				lineEndpoints[endpointIndex++] = h * t;
 			}
 		}
-		boolean rustFishingLine = net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.world.WorldRenderRoutePolicy.currentFishingLineRoute().usesRustWholeFrameVulkan()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		if (rustFishingLine) {
-			for (float endpoint : lineEndpoints) {
-				if (!Float.isFinite(endpoint)) {
-					poseStack.popPose();
-					throw new IllegalStateException("Rust whole-frame fishing-hook route rejected non-finite line endpoints");
-				}
+		for (float endpoint : lineEndpoints) {
+			if (!Float.isFinite(endpoint)) {
+				poseStack.popPose();
+				throw new IllegalStateException("Rust whole-frame fishing-hook route rejected non-finite line endpoints");
 			}
 		}
 		if (submitNodeCollector.submitLineSegmentsSemantic(poseStack, lineEndpoints, -16777216, 1.0F)) {
@@ -87,23 +80,7 @@ public class FishingHookRenderer extends EntityRenderer<FishingHook, FishingHook
 			super.submit(fishingHookRenderState, poseStack, submitNodeCollector, cameraRenderState);
 			return;
 		}
-		if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.world.WorldRenderRoutePolicy.currentFishingLineRoute().usesRustWholeFrameVulkan()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-			throw new IllegalStateException("Rust whole-frame fishing-hook route rejected semantic line segments");
-		}
-		submitNodeCollector.submitCustomGeometrySemantic(poseStack, RenderType.lines(), (pose, vertexConsumer) -> {
-			int i = 16;
-
-			for (int j = 0; j < 16; j++) {
-				float k = fraction(j, 16);
-				float l = fraction(j + 1, 16);
-				stringVertex(f, g, h, vertexConsumer, pose, k, l);
-				stringVertex(f, g, h, vertexConsumer, pose, l, k);
-			}
-		});
-		poseStack.popPose();
-		super.submit(fishingHookRenderState, poseStack, submitNodeCollector, cameraRenderState);
+		throw new IllegalStateException("Rust whole-frame fishing-hook route rejected semantic line segments");
 	}
 
 	public static HumanoidArm getHoldingArm(Player player) {
@@ -139,20 +116,6 @@ public class FishingHookRenderer extends EntityRenderer<FishingHook, FishingHook
 			.setOverlay(OverlayTexture.NO_OVERLAY)
 			.setLight(i)
 			.setNormal(pose, 0.0F, 1.0F, 0.0F);
-	}
-
-	private static void stringVertex(float f, float g, float h, VertexConsumer vertexConsumer, PoseStack.Pose pose, float i, float j) {
-		float k = f * i;
-		float l = g * (i * i + i) * 0.5F + 0.25F;
-		float m = h * i;
-		float n = f * j - k;
-		float o = g * (j * j + j) * 0.5F + 0.25F - l;
-		float p = h * j - m;
-		float q = Mth.sqrt(n * n + o * o + p * p);
-		n /= q;
-		o /= q;
-		p /= q;
-		vertexConsumer.addVertex(pose, k, l, m).setColor(-16777216).setNormal(pose, n, o, p);
 	}
 
 	public FishingHookRenderState createRenderState() {

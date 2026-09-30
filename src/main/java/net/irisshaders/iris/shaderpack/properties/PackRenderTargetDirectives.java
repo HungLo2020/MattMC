@@ -52,18 +52,6 @@ public class PackRenderTargetDirectives {
 			(index) -> renderTargetSettings.put(index.intValue(), new RenderTargetSettings()));
 	}
 
-	public IntList getBuffersToBeCleared() {
-		IntList buffersToBeCleared = new IntArrayList();
-
-		renderTargetSettings.forEach((index, settings) -> {
-			if (settings.shouldClear()) {
-				buffersToBeCleared.add(index.intValue());
-			}
-		});
-
-		return buffersToBeCleared;
-	}
-
 	public Map<Integer, RenderTargetSettings> getRenderTargetSettings() {
 		return Collections.unmodifiableMap(renderTargetSettings);
 	}
@@ -137,14 +125,6 @@ public class PackRenderTargetDirectives {
 
 		public InternalTextureFormat getInternalFormat() {
 			return requestedFormat;
-		}
-
-		public boolean shouldClear() {
-			return clear;
-		}
-
-		public Optional<Vector4f> getClearColor() {
-			return Optional.ofNullable(clearColor);
 		}
 
 		@Override

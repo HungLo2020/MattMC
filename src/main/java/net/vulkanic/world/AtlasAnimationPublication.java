@@ -45,9 +45,6 @@ final class AtlasAnimationPublication {
     long stagedGeneration() { return stagedGeneration; }
     int spriteCount() { return source.sprites().size(); }
     int pendingTickCount() { return resource.pendingTickCount(); }
-    boolean recordSpriteUse(net.minecraft.resources.ResourceLocation atlas, net.minecraft.resources.ResourceLocation name) {
-        return resource.recordUse(atlas, name);
-    }
 
     void enqueueTick(long tick, boolean onlyVisible) {
         resource.enqueueTick(tick, onlyVisible);
@@ -89,5 +86,9 @@ final class AtlasAnimationPublication {
         stagedGeneration = generation;
         pendingGeneration = 0;
         return result;
+    }
+
+    boolean recordSpriteUse(net.minecraft.resources.ResourceLocation atlas, net.minecraft.resources.ResourceLocation name) {
+        return resource.recordUse(atlas, name);
     }
 }

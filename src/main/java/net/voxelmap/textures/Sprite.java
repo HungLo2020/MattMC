@@ -95,14 +95,6 @@ public class Sprite {
         return this.imageData;
     }
 
-    public void setIconWidth(int width) {
-        this.width = width;
-    }
-
-    public void setIconHeight(int height) {
-        this.height = height;
-    }
-
     public void setTextureData(NativeImage imageData) {
         if (this.imageData != null) {
             this.imageData.close();

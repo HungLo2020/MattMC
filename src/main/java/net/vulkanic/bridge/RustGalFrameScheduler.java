@@ -61,10 +61,6 @@ public final class RustGalFrameScheduler<T> {
 		}
 	}
 
-	public List<T> takeAll(List<Token> tokens, long generation) {
-		return this.takeAllItems(tokens, generation).stream().map(Item::payload).toList();
-	}
-
 	/** Returns the semantic payload with its stable scheduler sequence. */
 	public List<Item<T>> takeAllItems(List<Token> tokens, long generation) {
 		List<Token> ordered = new ArrayList<>(tokens);
@@ -149,5 +145,9 @@ public final class RustGalFrameScheduler<T> {
 	}
 
 	private record Scheduled<T>(Token token, T payload) {
+	}
+
+	public List<T> takeAll(List<Token> tokens, long generation) {
+		return this.takeAllItems(tokens, generation).stream().map(Item::payload).toList();
 	}
 }

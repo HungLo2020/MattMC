@@ -1319,36 +1319,6 @@ public class FullDataSourceV2
 		return dataChanged;
 	}
 
-	/** Conservative proof for one 2x2 downsample footprint. */
-	static boolean hasSemanticUniformInputFootprint(FullDataSourceV2 inputDataSource, int inputX, int inputZ)
-	{
-		if (inputX < 0 || inputZ < 0 || inputX + 1 >= WIDTH || inputZ + 1 >= WIDTH)
-		{
-			return false;
-		}
-		LongArrayList reference = inputDataSource.dataPoints[relativePosToIndex(inputX, inputZ)];
-		if (reference == null || !inputDataSource.semanticHorizontalUniform[relativePosToIndex(inputX, inputZ)])
-		{
-			return false;
-		}
-		for (int x = inputX; x <= inputX + 1; x++)
-		{
-			for (int z = inputZ; z <= inputZ + 1; z++)
-			{
-				int index = relativePosToIndex(x, z);
-				if (!inputDataSource.semanticHorizontalUniform[index]
-					|| inputDataSource.columnWorldCompressionMode.getByte(index)
-						!= EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value
-					|| !java.util.Objects.equals(reference, inputDataSource.dataPoints[index]))
-				{
-					return false;
-				}
-			}
-		}
-		return inputDataSource.columnWorldCompressionMode.getByte(relativePosToIndex(inputX, inputZ))
-			== EDhApiWorldCompressionMode.MERGE_SAME_BLOCKS.value;
-	}
-	
 	
 	
 	//===================//

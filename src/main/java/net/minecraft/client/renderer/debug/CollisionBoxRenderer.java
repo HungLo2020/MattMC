@@ -30,17 +30,6 @@ public class CollisionBoxRenderer implements DebugRenderer.SimpleDebugRenderer {
 		this.minecraft = minecraft;
 	}
 
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		this.refreshShapes();
-
-		VertexConsumer vertexConsumer = multiBufferSource.getBuffer(RenderType.lines());
-
-		for (VoxelShape voxelShape : this.shapes) {
-			DebugRenderer.renderVoxelShape(poseStack, vertexConsumer, voxelShape, -d, -e, -f, 1.0F, 1.0F, 1.0F, 1.0F, true);
-		}
-	}
-
 	/**
 	 * Copies the collision shapes into the explicit Rust debug-line stream. The
 	 * legacy renderer above remains the private OpenGL compatibility lowering;
@@ -48,12 +37,6 @@ public class CollisionBoxRenderer implements DebugRenderer.SimpleDebugRenderer {
 	 */
 	public void collectRustSemantics(PoseStack poseStack, SubmitNodeStorage geometry, Camera camera) {
 		this.refreshShapes();
-		if (!net.vulkanic.world.WorldRenderRoutePolicy.currentDebugLineRoute().usesRustWholeFrameVulkan()) {
-			if (!shapes.isEmpty() && net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-				throw new IllegalStateException("Rust whole-frame collision-debug route is unavailable; Java debug geometry is not a fallback");
-			}
-			return;
-		}
 		if (camera == null || !camera.isInitialized()) return;
 		if (shapes.isEmpty()) return;
 		PoseStack semanticPose = new PoseStack();

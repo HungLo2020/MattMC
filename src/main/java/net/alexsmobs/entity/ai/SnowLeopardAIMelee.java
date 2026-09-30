@@ -174,7 +174,7 @@ public class SnowLeopardAIMelee extends Goal {
     private Vec3 calculateVantagePoint(LivingEntity creature, int xz, int y, int p_226339_3_, @Nullable Vec3 p_226339_4_, boolean p_226339_5_, double p_226339_6_, ToDoubleFunction<BlockPos> p_226339_8_, boolean p_226339_9_, int p_226339_10_, int p_226339_11_, boolean p_226339_12_) {
         PathNavigation lvt_13_1_ = leopard.getNavigation();
         RandomSource lvt_14_1_ = creature.getRandom();
-        boolean lvt_15_2_ = false; // Simplified - restriction checks removed
+         // Simplified - restriction checks removed
 
         boolean lvt_16_1_ = false;
         double lvt_17_1_ = -1.0D / 0.0;

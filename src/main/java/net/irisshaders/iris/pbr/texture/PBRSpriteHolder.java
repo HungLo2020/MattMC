@@ -12,17 +12,9 @@ public class PBRSpriteHolder {
 		return normalSprite;
 	}
 
-	public void setNormalSprite(TextureAtlasSprite sprite) {
-		normalSprite = sprite;
-	}
-
 	@Nullable
 	public TextureAtlasSprite getSpecularSprite() {
 		return specularSprite;
-	}
-
-	public void setSpecularSprite(TextureAtlasSprite sprite) {
-		specularSprite = sprite;
 	}
 
 	public void close() {

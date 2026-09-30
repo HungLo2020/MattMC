@@ -13,7 +13,7 @@ import net.minecraft.hooks.RenderBuffersHooks;
 
 @Environment(EnvType.CLIENT)
 public class RenderBuffers {
-	private final SectionBufferBuilderPack fixedBufferPack = new SectionBufferBuilderPack(rustWholeFrameVulkan());
+	private final SectionBufferBuilderPack fixedBufferPack = new SectionBufferBuilderPack(true);
 	private final SectionBufferBuilderPool sectionBufferPool;
 	private final MultiBufferSource.BufferSource bufferSource;
 	private final MultiBufferSource.BufferSource crumblingBufferSource;
@@ -22,18 +22,6 @@ public class RenderBuffers {
 	public RenderBuffers(int i) {
 		// Allow hooks to provide custom section buffer pool
 		SectionBufferBuilderPool customPool = null;
-		// Rust owns semantic terrain extraction on Vulkan. Do not allow an
-		// extension hook to reintroduce a Java staging pool after ownership has
-		// transferred; the fallback allocator supplies one minimal bookkeeping
-		// pack for visibility bookkeeping instead.
-		if (!rustWholeFrameVulkan()) {
-			for (RenderBuffersHooks hook : HookRegistry.getRenderBuffersHooks()) {
-				customPool = hook.provideSectionBufferPool(i);
-				if (customPool != null) {
-					break;
-				}
-			}
-		}
 		
 		// Fall back to default implementation if no hook provided a result
 		this.sectionBufferPool = (customPool != null) ? customPool : SectionBufferBuilderPool.allocate(i);
@@ -48,7 +36,7 @@ public class RenderBuffers {
 				put(object2ObjectLinkedOpenHashMap, Sheets.shulkerBoxSheet());
 				put(object2ObjectLinkedOpenHashMap, Sheets.signSheet());
 				put(object2ObjectLinkedOpenHashMap, Sheets.hangingSignSheet());
-				object2ObjectLinkedOpenHashMap.put(Sheets.chestSheet(), new ByteBufferBuilder(rustWholeFrameVulkan() ? 0 : 786432));
+				object2ObjectLinkedOpenHashMap.put(Sheets.chestSheet(), new ByteBufferBuilder(0));
 				put(object2ObjectLinkedOpenHashMap, RenderType.armorEntityGlint());
 				put(object2ObjectLinkedOpenHashMap, RenderType.glint());
 				put(object2ObjectLinkedOpenHashMap, RenderType.glintTranslucent());
@@ -56,7 +44,7 @@ public class RenderBuffers {
 				put(object2ObjectLinkedOpenHashMap, RenderType.waterMask());
 			}
 		);
-		this.bufferSource = MultiBufferSource.immediateWithBuffers(sequencedMap, new ByteBufferBuilder(rustWholeFrameVulkan() ? 0 : 786432));
+		this.bufferSource = MultiBufferSource.immediateWithBuffers(sequencedMap, new ByteBufferBuilder(0));
 		this.outlineBufferSource = new OutlineBufferSource();
 		SequencedMap<RenderType, ByteBufferBuilder> sequencedMap2 = (SequencedMap<RenderType, ByteBufferBuilder>)Util.make(
 			new Object2ObjectLinkedOpenHashMap(),
@@ -65,13 +53,8 @@ public class RenderBuffers {
 		this.crumblingBufferSource = MultiBufferSource.immediateWithBuffers(sequencedMap2, new ByteBufferBuilder(0));
 	}
 
-	private static boolean rustWholeFrameVulkan() {
-		return net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-	}
-
 	private static void put(Object2ObjectLinkedOpenHashMap<RenderType, ByteBufferBuilder> object2ObjectLinkedOpenHashMap, RenderType renderType) {
-		object2ObjectLinkedOpenHashMap.put(renderType, new ByteBufferBuilder(rustWholeFrameVulkan() ? 0 : renderType.bufferSize()));
+		object2ObjectLinkedOpenHashMap.put(renderType, new ByteBufferBuilder(0));
 	}
 
 	public SectionBufferBuilderPack fixedBufferPack() {

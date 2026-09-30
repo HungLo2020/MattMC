@@ -96,26 +96,9 @@ public class GLProxy
 	
 	private GLProxy() throws IllegalStateException
 	{
-		// Treat the Rust presenter shell as Vulkan ownership before backend
-		// selection is finalized; this prevents DH from probing or retaining
-		// Java/OpenGL capability state during the handoff.
-		boolean vulkanBackend = VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled();
-		// this must be created on minecraft's render context to work correctly
-		if (!vulkanBackend && GLFW.glfwGetCurrentContext() == 0L)
-		{
-			throw new IllegalStateException(GLProxy.class.getSimpleName() + " was created outside the render thread!");
-		}
 		
 		LOGGER.info("Creating " + GLProxy.class.getSimpleName() + "... If this is the last message you see there must have been an OpenGL error.");
-		if (vulkanBackend)
-		{
-			LOGGER.info("Lod Render Vulkan compatibility backend [" + VulkanicAPI.getActiveBackendType() + "].");
-		}
-		else
-		{
-			LOGGER.info("Lod Render OpenGL version [" + VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VERSION) + "].");
-		}
+		LOGGER.info("Lod Render Vulkan compatibility backend [" + VulkanicAPI.getActiveBackendType() + "].");
 		
 		
 		
@@ -127,35 +110,10 @@ public class GLProxy
 		// A selected Rust Vulkan route has no Java OpenGL capability object to
 		// borrow. DH's compatibility wrappers use the explicit backend flags
 		// below instead; only the OpenGL backend receives Minecraft's GL object.
-		this.glCapabilities = vulkanBackend ? null : VulkanicAPI.getGLCapabilities();
+		this.glCapabilities = null;
 		
-		// crash the game if the GPU doesn't support OpenGL 3.2
-		if (!vulkanBackend && !VulkanicAPI.checkOpenGL32Support())
-		{
-			String supportedVersionInfo = VulkanicAPI.getCapabilityDebugInfo() +
-				"If you noticed that your computer supports higher OpenGL versions" +
-				" but not the required version, try running the game in compatibility mode." +
-				" (How you turn that on, I have no clue~)";
+		LOGGER.info("minecraftGlCapabilities: Vulkan compatibility mode; OpenGL capability floor checks skipped.");
 			
-			// See full requirement at above.
-			String errorMessage = ModInfo.READABLE_NAME + " was initializing " + GLProxy.class.getSimpleName()
-					+ " and discovered this GPU doesn't meet the OpenGL requirements. Sorry I couldn't tell you sooner :(\n" +
-				"Additional info:\n" + supportedVersionInfo;
-			MC.crashMinecraft(errorMessage, new UnsupportedOperationException("Distant Horizon OpenGL requirements not met"));
-		}
-		if (!vulkanBackend)
-		{
-			LOGGER.info("minecraftGlCapabilities:\n" + VulkanicAPI.getCapabilityDebugInfo());
-		}
-		else
-		{
-			LOGGER.info("minecraftGlCapabilities: Vulkan compatibility mode; OpenGL capability floor checks skipped.");
-		}
-			
-		if (!vulkanBackend && Config.Client.Advanced.Debugging.OpenGl.overrideVanillaGLLogger.get())
-		{
-			VulkanicAPI.setupDebugMessageCallback(new PrintStream(new GLMessageOutputStream(GLProxy::logMessage, this.vanillaDebugMessageBuilder), true));
-		}
 		
 		
 		
@@ -165,58 +123,23 @@ public class GLProxy
 		
 		// These are OpenGL function-pointer probes. Never perform them while
 		// Rust owns selected Vulkan; compatibility capabilities remain unavailable.
-		this.namedObjectSupported = !vulkanBackend && VulkanicAPI.getNamedBufferDataPointer() != 0L; //Nullptr
-		this.bufferStorageSupported = !vulkanBackend && VulkanicAPI.getBufferStoragePointer() != 0L; // Nullptr
+		this.namedObjectSupported = false; //Nullptr
+		this.bufferStorageSupported = false; // Nullptr
 		if (!this.bufferStorageSupported)
 		{
 			LOGGER.info("This GPU doesn't support Buffer Storage (OpenGL 4.4), falling back to using other methods.");
 		}
 		
 		// Check if we can use the make-over version of Vertex Attribute, which is available in GL4.3 or after
-		this.vertexAttributeBufferBindingSupported = !vulkanBackend && VulkanicAPI.getBindVertexBufferPointer() != 0L; // Nullptr
+		this.vertexAttributeBufferBindingSupported = false; // Nullptr
 		
-		if (vulkanBackend)
-		{
-			this.vertexAttribDivisorSupported = true;
-			this.instancedArraysSupported = true;
-		}
-		else
-		{
-			// used by instanced rendering
-			this.vertexAttribDivisorSupported = VulkanicAPI.checkOpenGL33Support();
-			// denotes if ARBInstancedArrays.glVertexAttribDivisorARB() is available or not
-			// can be used as a backup if MC didn't create a GL 3.3+ context
-			this.instancedArraysSupported = VulkanicAPI.checkARBInstancedArraysSupport();
-		}
+		this.vertexAttribDivisorSupported = true;
+		this.instancedArraysSupported = true;
 		
 		// get the best automatic upload method
 		String vendor;
-		if (vulkanBackend)
-		{
-			vendor = "VULKANIC";
-			this.preferredUploadMethod = EDhApiGpuUploadMethod.DATA;
-		}
-		else if (EPlatform.get() != EPlatform.MACOS)
-		{
-			vendor = VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
-			if (vendor.contains("NVIDIA") || vendor.contains("GEFORCE"))
-			{
-				// NVIDIA card
-				this.preferredUploadMethod = this.bufferStorageSupported ? EDhApiGpuUploadMethod.BUFFER_STORAGE : EDhApiGpuUploadMethod.SUB_DATA;
-			}
-			else
-			{
-				// AMD or Intel card
-				this.preferredUploadMethod = this.bufferStorageSupported ? EDhApiGpuUploadMethod.BUFFER_STORAGE : EDhApiGpuUploadMethod.DATA;
-			}
-		}
-		else
-		{
-			vendor = VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
-			// Mac may have an issue with Buffer Storage, so default to the most basic
-			// form of uploading
-			this.preferredUploadMethod = EDhApiGpuUploadMethod.DATA;
-		}
+		vendor = "VULKANIC";
+		this.preferredUploadMethod = EDhApiGpuUploadMethod.DATA;
 		LOGGER.info("GPU Vendor [" + vendor + "] with OS [" + EPlatform.get().getName() + "], Preferred upload method is [" + this.preferredUploadMethod + "].");
 		
 		
@@ -247,28 +170,7 @@ public class GLProxy
 		return instance;
 	}
 	
-	public EDhApiGpuUploadMethod getGpuUploadMethod() 
-	{
-		EDhApiGpuUploadMethod uploadOverride = Config.Client.Advanced.Debugging.OpenGl.glUploadMode.get();
-		if (uploadOverride == EDhApiGpuUploadMethod.AUTO)
-		{
-			return this.preferredUploadMethod;
-		}
-		
-		return uploadOverride;
-	}
 	
-	public static boolean runningOnRenderThread()
-	{
-		if (VulkanicAPI.isVulkanBackendSelected()
-			|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-		{
-			return VulkanicAPI.isOnRenderThread();
-		}
-
-		long currentContext = GLFW.glfwGetCurrentContext();
-		return currentContext != 0L; // if the context isn't null, it's the MC context
-	}
 	
 	
 	
@@ -295,136 +197,6 @@ public class GLProxy
 		}
 	}
 	
-	/**
-	 * Doesn't do any thread/GL Context validation.
-	 * Running this outside of the render thread may cause crashes or other issues. 
-	 */
-	public static void runRenderThreadTasks()
-	{
-		runRenderThreadTasks(DEFAULT_RENDER_THREAD_TASK_BUDGET_NANOS, 0);
-	}
-
-	public static void runLodUploadRenderThreadTasks()
-	{
-		if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-		{
-			throw new IllegalStateException(
-				"Java Distant Horizons upload-task draining is unavailable while Rust owns whole-frame presentation");
-		}
-		if (VulkanicAPI.isVulkanBackendSelected())
-		{
-			throw new IllegalStateException(
-				"Java Distant Horizons Vulkan upload-task draining is unavailable until the Rust whole-frame route is admitted");
-		}
-		runRenderThreadTasks();
-	}
-
-	static int runRenderThreadTasksForTesting(long maxDurationNanos, int minimumTaskCount)
-	{
-		return runRenderThreadTasks(maxDurationNanos, minimumTaskCount);
-	}
-
-	static DrainStats drainStatsForTesting()
-	{
-		return new DrainStats(
-			DRAIN_FRAMES.get(),
-			DRAIN_TASKS_PROCESSED.get(),
-			DRAIN_ELAPSED_NANOS.get(),
-			DRAIN_TIME_LIMIT_FRAMES.get(),
-			DRAIN_MINIMUM_TASK_FRAMES.get(),
-			DRAIN_MAX_BACKLOG.get(),
-			RENDER_THREAD_RUNNABLE_QUEUE.size()
-		);
-	}
-
-	static void resetDrainStatsForTesting()
-	{
-		DRAIN_FRAMES.set(0L);
-		DRAIN_TASKS_PROCESSED.set(0L);
-		DRAIN_ELAPSED_NANOS.set(0L);
-		DRAIN_TIME_LIMIT_FRAMES.set(0L);
-		DRAIN_MINIMUM_TASK_FRAMES.set(0L);
-		DRAIN_MAX_BACKLOG.set(0L);
-		RENDER_THREAD_RUNNABLE_QUEUE.clear();
-	}
-
-	private static int runRenderThreadTasks(long maxDurationNanos, int minimumTaskCount)
-	{
-		long startTime = System.nanoTime();
-		int tasksRun = 0;
-		boolean diagnosticsEnabled = Boolean.getBoolean(DH_UPLOAD_DRAIN_DIAGNOSTICS_PROPERTY);
-		int queuedBefore = diagnosticsEnabled ? RENDER_THREAD_RUNNABLE_QUEUE.size() : -1;
-		boolean exitedOnTimeLimit = false;
-		boolean usedMinimumTaskFloor = false;
-		
-		Runnable runnable = RENDER_THREAD_RUNNABLE_QUEUE.poll();
-		while(runnable != null)
-		{
-			runnable.run();
-			tasksRun++;
-			
-			// Keep a time budget to prevent random lag spikes, while still allowing
-			// Vulkan's slower compatibility uploads to make bounded progress.
-			long currentTime = System.nanoTime();
-			long runDuration = currentTime - startTime;
-			if (minimumTaskCount > 0 && tasksRun < minimumTaskCount && runDuration > maxDurationNanos)
-			{
-				usedMinimumTaskFloor = true;
-			}
-			if (tasksRun >= minimumTaskCount && runDuration > maxDurationNanos)
-			{
-				exitedOnTimeLimit = true;
-				break;
-			}
-			
-			runnable = RENDER_THREAD_RUNNABLE_QUEUE.poll();
-		}
-		if (diagnosticsEnabled)
-		{
-			recordDrainStats(tasksRun, System.nanoTime() - startTime, queuedBefore, exitedOnTimeLimit, usedMinimumTaskFloor);
-		}
-		return tasksRun;
-	}
-
-	private static void recordDrainStats(
-		int tasksRun,
-		long elapsedNanos,
-		int queuedBefore,
-		boolean exitedOnTimeLimit,
-		boolean usedMinimumTaskFloor
-	) {
-		long frames = DRAIN_FRAMES.incrementAndGet();
-		long totalTasks = DRAIN_TASKS_PROCESSED.addAndGet(tasksRun);
-		long totalElapsedNanos = DRAIN_ELAPSED_NANOS.addAndGet(elapsedNanos);
-		if (exitedOnTimeLimit)
-		{
-			DRAIN_TIME_LIMIT_FRAMES.incrementAndGet();
-		}
-		if (usedMinimumTaskFloor)
-		{
-			DRAIN_MINIMUM_TASK_FRAMES.incrementAndGet();
-		}
-		DRAIN_MAX_BACKLOG.accumulateAndGet(Math.max(0, queuedBefore), Math::max);
-		int queuedAfter = RENDER_THREAD_RUNNABLE_QUEUE.size();
-		if (frames <= 5
-			|| exitedOnTimeLimit
-			|| usedMinimumTaskFloor
-			|| frames % DH_UPLOAD_DRAIN_DIAGNOSTIC_LOG_INTERVAL_FRAMES == 0)
-		{
-			LOGGER.info(
-				"DH upload drain diagnostics: frame=" + frames
-					+ " queuedBefore=" + queuedBefore
-					+ " queuedAfter=" + queuedAfter
-					+ " tasksProcessed=" + tasksRun
-					+ " elapsedMs=" + String.format(java.util.Locale.ROOT, "%.3f", elapsedNanos / 1_000_000.0)
-					+ " timeLimit=" + exitedOnTimeLimit
-					+ " minimumFloor=" + usedMinimumTaskFloor
-					+ " totalTasks=" + totalTasks
-					+ " totalElapsedMs=" + String.format(java.util.Locale.ROOT, "%.3f", totalElapsedNanos / 1_000_000.0)
-					+ " maxBacklog=" + DRAIN_MAX_BACKLOG.get()
-			);
-		}
-	}
 
 	static record DrainStats(
 		long frames,

@@ -307,48 +307,6 @@ class VulkanicGalBridgeAbiTest {
 
 
 
-	@Test
-	void shaderAffectedWeatherRouteKeepsIrisAndNormalJavaVulkanCompatibilityOwned() {
-		assertEquals(
-			WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME,
-			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(true, true, true, false, false),
-			"a selected Rust Vulkan whole-frame route owns weather even with a shader pack configured"
-		);
-		assertEquals(
-			WorldRenderRoutePolicy.Route.DISABLED,
-			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(true, false, false, false, false),
-			"unadmitted Vulkan must remain unavailable rather than reopening Java rendering"
-		);
-		assertEquals(
-			WorldRenderRoutePolicy.Route.JAVA_COMPATIBILITY,
-			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(false, false, true, false, false),
-			"Iris OpenGL must remain Java-compatible until Rust owns the complete shader frame"
-		);
-		assertEquals(
-			WorldRenderRoutePolicy.Route.RUST_OPENGL_BORROWED_CONTEXT,
-			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(false, false, false, false, false),
-			"non-Iris OpenGL may select Rust's explicit borrowed-context route"
-		);
-		assertEquals(
-			WorldRenderRoutePolicy.Route.DISABLED,
-			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(true, true, false, true, false)
-		);
-		assertEquals(
-			WorldRenderRoutePolicy.Route.DISABLED,
-			WorldRenderRoutePolicy.selectShaderAffectedRouteForTests(true, true, false, false, true)
-			, "legacy route controls must fail closed while Rust Vulkan owns the whole frame"
-		);
-		assertEquals(
-			WorldRenderRoutePolicy.Route.DISABLED,
-			WorldRenderRoutePolicy.selectRouteForTests(true, true, false, true),
-			"generic legacy route controls must not reopen Java Vulkan rendering"
-		);
-		assertEquals(
-			WorldRenderRoutePolicy.Route.DISABLED,
-			WorldRenderRoutePolicy.selectWholeFrameRouteForTests(true, true, false, true),
-			"whole-frame legacy route controls must remain unavailable under Rust Vulkan"
-		);
-	}
 
 
 
@@ -358,31 +316,6 @@ class VulkanicGalBridgeAbiTest {
 
 
 
-
-
-	@Test
-	void staticTerrainBuildMetadataRouteDoesNotDependOnBackendSelectionTiming() {
-		String previousWholeFrame = System.getProperty("mattmc.dev.rustGalVulkanWholeFrame");
-		String previousDisabled = System.getProperty("mattmc.dev.rustGalStaticTerrain.disabled");
-		String previousLegacy = System.getProperty("mattmc.dev.rustGalStaticTerrain.legacyControl");
-		try {
-			System.setProperty("mattmc.dev.rustGalVulkanWholeFrame", "true");
-			System.clearProperty("mattmc.dev.rustGalStaticTerrain.disabled");
-			System.clearProperty("mattmc.dev.rustGalStaticTerrain.legacyControl");
-			assertTrue(WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata());
-
-			System.setProperty("mattmc.dev.rustGalStaticTerrain.disabled", "true");
-			assertFalse(WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata());
-			System.clearProperty("mattmc.dev.rustGalStaticTerrain.disabled");
-
-			System.setProperty("mattmc.dev.rustGalStaticTerrain.legacyControl", "true");
-			assertFalse(WorldRenderRoutePolicy.staticTerrainBuildRequiresRustWholeFrameMetadata());
-		} finally {
-			restoreProperty("mattmc.dev.rustGalVulkanWholeFrame", previousWholeFrame);
-			restoreProperty("mattmc.dev.rustGalStaticTerrain.disabled", previousDisabled);
-			restoreProperty("mattmc.dev.rustGalStaticTerrain.legacyControl", previousLegacy);
-		}
-	}
 
 
 	private static void restoreProperty(String key, String value) {

@@ -20,44 +20,9 @@ public class ShadowFeatureRenderer {
 	private static final RenderType SHADOW_RENDER_TYPE = RenderType.entityShadow(ResourceLocation.withDefaultNamespace("textures/misc/shadow.png"));
 
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource) {
-		net.vulkanic.world.WorldRenderRoutePolicy.Route route = net.vulkanic.world.WorldRenderRoutePolicy.currentEntityShadowRoute();
-		if (route == net.vulkanic.world.WorldRenderRoutePolicy.Route.DISABLED
-			|| route == net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME
-			|| (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-				&& route != net.vulkanic.world.WorldRenderRoutePolicy.Route.RUST_VULKAN_WHOLE_FRAME)) {
-			// Rust owns the whole Vulkan frame; do not let a direct Java feature
-			// invocation become an invisible fallback draw.
-			return;
-		}
-		// Call hooks to allow mods to optimize shadow rendering
-		for (net.minecraft.hooks.EntityRenderHooks hook : net.minecraft.hooks.HookRegistry.getEntityRenderHooks()) {
-			if (hook.onRenderEntityShadows(submitNodeCollection, bufferSource)) {
-				return; // Hook handled rendering, skip vanilla implementation
-			}
-		}
-		
-		VertexConsumer vertexConsumer = bufferSource.getBuffer(SHADOW_RENDER_TYPE);
-
-		for (SubmitNodeStorage.ShadowSubmit shadowSubmit : submitNodeCollection.getShadowSubmits()) {
-			for (EntityRenderState.ShadowPiece shadowPiece : shadowSubmit.pieces()) {
-				AABB aABB = shadowPiece.shapeBelow().bounds();
-				float f = shadowPiece.relativeX() + (float)aABB.minX;
-				float g = shadowPiece.relativeX() + (float)aABB.maxX;
-				float h = shadowPiece.relativeY() + (float)aABB.minY;
-				float i = shadowPiece.relativeZ() + (float)aABB.minZ;
-				float j = shadowPiece.relativeZ() + (float)aABB.maxZ;
-				float k = shadowSubmit.radius();
-				float l = -f / 2.0F / k + 0.5F;
-				float m = -g / 2.0F / k + 0.5F;
-				float n = -i / 2.0F / k + 0.5F;
-				float o = -j / 2.0F / k + 0.5F;
-				int p = ARGB.white(shadowPiece.alpha());
-				shadowVertex(shadowSubmit.pose(), vertexConsumer, p, f, h, i, l, n);
-				shadowVertex(shadowSubmit.pose(), vertexConsumer, p, f, h, j, l, o);
-				shadowVertex(shadowSubmit.pose(), vertexConsumer, p, g, h, j, m, o);
-				shadowVertex(shadowSubmit.pose(), vertexConsumer, p, g, h, i, m, n);
-			}
-		}
+		// Rust owns the whole Vulkan frame; do not let a direct Java feature
+		// invocation become an invisible fallback draw.
+		return;
 	}
 
 	private static void shadowVertex(Matrix4f matrix4f, VertexConsumer vertexConsumer, int i, float f, float g, float h, float j, float k) {

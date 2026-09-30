@@ -13,35 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class NativeChunkMeshOutputTest {
-    @Test
-    void writesSharedIntQuadIndexBuffer() {
-        NativeBufferHandle buffer = NativeBufferHandle.allocate(2 * TranslucentData.INDICES_PER_QUAD * Integer.BYTES);
-
-        try {
-            SharedQuadIndexBuffer.IndexType.INTEGER.createIndexBuffer(buffer.byteBuffer, 2);
-
-            int[] values = new int[12];
-            buffer.byteBuffer.asIntBuffer().get(values);
-            assertArrayEquals(new int[] {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4}, values);
-        } finally {
-            buffer.free();
-        }
-    }
-
-    @Test
-    void writesSharedShortQuadIndexBuffer() {
-        NativeBufferHandle buffer = NativeBufferHandle.allocate(2 * TranslucentData.INDICES_PER_QUAD * Short.BYTES);
-
-        try {
-            SharedQuadIndexBuffer.IndexType.SHORT.createIndexBuffer(buffer.byteBuffer, 2);
-
-            short[] values = new short[12];
-            buffer.byteBuffer.asShortBuffer().get(values);
-            assertArrayEquals(new short[] {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4}, values);
-        } finally {
-            buffer.free();
-        }
-    }
 
     @Test
     void writesSortedQuadIndexesAndAdvancesPosition() {

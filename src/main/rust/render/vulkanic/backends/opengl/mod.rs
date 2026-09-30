@@ -33,6 +33,11 @@ use self::lowering::OpenGlSyncStats;
 use self::lowering::StateCacheSnapshot;
 use self::resources::OpenGlObjects;
 
+/// Every borrowed-context frame draws into Minecraft's default framebuffer, so
+/// the bridge reuses one GAL frame target (and its cached passes) across frames;
+/// a resize destroys it. Zero is reserved for "no target" (minimized).
+const DEFAULT_FRAMEBUFFER_TARGET: FrameRenderTargetId = FrameRenderTargetId(1);
+
 pub(in crate::render::vulkanic) struct OpenGlBackend {
     context: OpenGlContext,
     objects: OpenGlObjects,
@@ -342,7 +347,7 @@ impl Backend for OpenGlBackend {
             } else {
                 FrameAcquireStatus::Suboptimal
             },
-            render_target: FrameRenderTargetId(frame.0),
+            render_target: DEFAULT_FRAMEBUFFER_TARGET,
             extent: presentation.desc.extent,
             color_format: presentation.desc.color_format,
         })
@@ -379,6 +384,8 @@ impl Backend for OpenGlBackend {
                 "OpenGL frame was not acquired before present",
             ));
         }
+        presentation.acquired.retain(|frame| *frame != desc.frame);
+        self.objects.retire_frame_target(desc.frame.0);
         self.context.make_current()?;
         let _state_guard = self.context.borrowed_state_guard();
         let completed_submission = self
@@ -393,10 +400,23 @@ impl Backend for OpenGlBackend {
         Ok(PresentedFrame {
             frame: desc.frame,
             correlation_id: desc.correlation_id,
-            render_target: FrameRenderTargetId(desc.frame.0),
+            render_target: DEFAULT_FRAMEBUFFER_TARGET,
             status: FramePresentStatus::Presented,
             completed_submission,
         })
+    }
+
+    fn cancel_frame(&mut self, frame: FrameId) -> GalResult<()> {
+        let Some(presentation) = &mut self.presentation else {
+            return Err(GalError::unsupported_feature(
+                "OpenGL presentation requires an explicit borrowed Minecraft context",
+            ));
+        };
+        // The borrowed default framebuffer has no acquire/present fence; a
+        // cancelled frame only needs its bookkeeping retired.
+        presentation.acquired.retain(|acquired| *acquired != frame);
+        self.objects.retire_frame_target(frame.0);
+        Ok(())
     }
 
     fn shutdown_frame_surface(&mut self) -> GalResult<()> {

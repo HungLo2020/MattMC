@@ -25,23 +25,6 @@ import java.util.List;
 import java.util.Map;
 
 public class BlockMaterialMapping {
-	public static Object2IntMap<BlockState> createBlockStateIdMap(Int2ObjectLinkedOpenHashMap<List<BlockEntry>> blockPropertiesMap, Int2ObjectLinkedOpenHashMap<List<TagEntry>> tagPropertiesMap) {
-		Object2IntMap<BlockState> blockStateIds = new Object2IntLinkedOpenHashMap<>();
-		blockStateIds.defaultReturnValue(-1);
-		blockPropertiesMap.forEach((intId, entries) -> {
-			for (BlockEntry entry : entries) {
-				addBlockStates(entry, blockStateIds, intId);
-			}
-		});
-
-		tagPropertiesMap.forEach((intId, entries) -> {
-			for (TagEntry entry : entries) {
-				addTag(entry, blockStateIds, intId);
-			}
-		});
-
-		return blockStateIds;
-	}
 
 	private static void addTag(TagEntry tagEntry, Object2IntMap<BlockState> idMap, int intId) {
 		List<HolderSet.Named<Block>> compatibleTags = BuiltInRegistries.BLOCK.getTags().filter(t -> t.key().location().getNamespace().equalsIgnoreCase(tagEntry.id().getNamespace()) &&
@@ -103,22 +86,6 @@ public class BlockMaterialMapping {
 		}
 	}
 
-	public static Map<Block, BlockRenderType> createBlockTypeMap(Map<NamespacedId, BlockRenderType> blockPropertiesMap) {
-		if (blockPropertiesMap.isEmpty()) return Object2ObjectMaps.emptyMap();
-
-		Map<Block, BlockRenderType> blockTypeIds = new Reference2ReferenceOpenHashMap<>();
-
-		blockPropertiesMap.forEach((id, blockType) -> {
-			ResourceLocation resourceLocation = ResourceLocation.fromNamespaceAndPath(id.getNamespace(), id.getName());
-
-			Block block = BuiltInRegistries.BLOCK.get(resourceLocation).map(Holder::value).orElse(Blocks.AIR);
-
-			blockTypeIds.put(block, blockType);
-		});
-
-		return blockTypeIds;
-	}
-
 	public static ChunkSectionLayer convertBlockToRenderType(BlockRenderType type) {
 		if (type == null) {
 			return null;
@@ -130,66 +97,6 @@ public class BlockMaterialMapping {
 			case CUTOUT_MIPPED -> ChunkSectionLayer.CUTOUT_MIPPED;
 			case TRANSLUCENT -> ChunkSectionLayer.TRANSLUCENT;
 		};
-	}
-
-	private static void addBlockStates(BlockEntry entry, Object2IntMap<BlockState> idMap, int intId) {
-		NamespacedId id = entry.id();
-		ResourceLocation resourceLocation;
-		try {
-			resourceLocation = ResourceLocation.fromNamespaceAndPath(id.getNamespace(), id.getName());
-		} catch (Exception exception) {
-			throw new IllegalStateException("Failed to get entry for " + intId, exception);
-		}
-
-		Block block = BuiltInRegistries.BLOCK.get(resourceLocation).map(Holder::value).orElse(Blocks.AIR);
-
-		if (block == Blocks.AIR) {
-			return;
-		}
-
-		Map<String, String> propertyPredicates = entry.propertyPredicates();
-
-		if (propertyPredicates.isEmpty()) {
-			// Just add all the states if there aren't any predicates
-			for (BlockState state : block.getStateDefinition().getPossibleStates()) {
-				// NB: Using putIfAbsent means that the first successful mapping takes precedence
-				//     Needed for OptiFine parity:
-				//     https://github.com/IrisShaders/Iris/issues/1327
-				idMap.putIfAbsent(state, intId);
-			}
-
-			return;
-		}
-
-		// As a result, we first collect each key=value pair in order to determine what properties we need to filter on.
-		// We already get this from BlockEntry, but we convert the keys to `Property`s to ensure they exist and to avoid
-		// string comparisons later.
-		Map<Property<?>, String> properties = new LinkedHashMap<>();
-		StateDefinition<Block, BlockState> stateManager = block.getStateDefinition();
-
-		propertyPredicates.forEach((key, value) -> {
-			Property<?> property = stateManager.getProperty(key);
-
-			if (property == null) {
-				Iris.logger.warn("Error while parsing the block ID map entry for \"" + "block." + intId + "\":");
-				Iris.logger.warn("- The block " + resourceLocation + " has no property with the name " + key + ", ignoring!");
-
-				return;
-			}
-
-			properties.put(property, value);
-		});
-
-		// Once we have a list of properties and their expected values, we iterate over every possible state of this
-		// block and check for ones that match the filters. This isn't particularly efficient, but it works!
-		for (BlockState state : stateManager.getPossibleStates()) {
-			if (checkState(state, properties)) {
-				// NB: Using putIfAbsent means that the first successful mapping takes precedence
-				//     Needed for OptiFine parity:
-				//     https://github.com/IrisShaders/Iris/issues/1327
-				idMap.putIfAbsent(state, intId);
-			}
-		}
 	}
 
 	// We ignore generics here, the actual types don't matter because we just convert

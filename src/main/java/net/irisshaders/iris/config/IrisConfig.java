@@ -76,15 +76,6 @@ public class IrisConfig {
 	}
 
 	/**
-	 * returns whether or not the current shaderpack is internal
-	 *
-	 * @return if the shaderpack is internal
-	 */
-	public boolean isInternal() {
-		return false;
-	}
-
-	/**
 	 * Returns the name of the current shaderpack
 	 *
 	 * @return Returns the current shaderpack name - if internal shaders are being used it returns "(internal)"
@@ -115,10 +106,6 @@ public class IrisConfig {
 
 	public boolean areDebugOptionsEnabled() {
 		return enableDebugOptions;
-	}
-
-	public boolean shouldDisableUpdateMessage() {
-		return disableUpdateMessage;
 	}
 
 	public void setDebugEnabled(boolean enabled) {
@@ -209,10 +196,6 @@ public class IrisConfig {
 		try (OutputStream os = Files.newOutputStream(propertiesPath)) {
 			properties.store(os, COMMENT);
 		}
-	}
-
-	public boolean shouldAllowUnknownShaders() {
-		return allowUnknownShaders;
 	}
 
 	public boolean shouldSkip(ResourceLocation value) {

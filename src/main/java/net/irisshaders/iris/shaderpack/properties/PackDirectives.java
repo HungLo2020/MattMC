@@ -122,32 +122,12 @@ public class PackDirectives {
 		return Math.max(lo, Math.min(hi, val));
 	}
 
-	public int getNoiseTextureResolution() {
-		return noiseTextureResolution;
-	}
-
 	public float getSunPathRotation() {
 		return sunPathRotation;
 	}
 
 	public float getAmbientOcclusionLevel() {
 		return ambientOcclusionLevel;
-	}
-
-	public float getWetnessHalfLife() {
-		return wetnessHalfLife;
-	}
-
-	public float getDrynessHalfLife() {
-		return drynessHalfLife;
-	}
-
-	public float getEyeBrightnessHalfLife() {
-		return eyeBrightnessHalfLife;
-	}
-
-	public float getCenterDepthHalfLife() {
-		return centerDepthHalfLife;
 	}
 
 	public CloudSetting getCloudSetting() {
@@ -166,72 +146,16 @@ public class PackDirectives {
 		return vignette;
 	}
 
-	public boolean shouldRenderSun() {
-		return sun;
-	}
-
-	public boolean shouldRenderWeather() {
-		return weather;
-	}
-
-	public boolean shouldRenderWeatherParticles() {
-		return weatherParticles;
-	}
-
-	public boolean shouldRenderMoon() {
-		return moon;
-	}
-
-	public boolean shouldRenderStars() {
-		return stars;
-	}
-
-	public boolean shouldRenderSkyDisc() {
-		return sky;
-	}
-
 	public ParticleRenderingSettings getParticleRenderingSettings() {
 		return particleRenderingSettings;
-	}
-
-	public boolean rainDepth() {
-		return rainDepth;
 	}
 
 	public boolean shouldUseSeparateAo() {
 		return separateAo;
 	}
 
-	public boolean shouldVoxelizeLightBlocks() {
-		return voxelizeLightBlocks;
-	}
-
-	public boolean shouldUseSeparateEntityDraws() {
-		return separateEntityDraws;
-	}
-
-	public boolean shouldUseFrustumCulling() {
-		return frustumCulling;
-	}
-
-	public boolean shouldUseOcclusionCulling() {
-		return occlusionCulling;
-	}
-
-	public boolean isOldLighting() {
-		return oldLighting;
-	}
-
-	public boolean isOldHandLight() {
-		return oldHandLight;
-	}
-
 	public boolean getConcurrentCompute() {
 		return concurrentCompute;
-	}
-
-	public boolean isPrepareBeforeShadow() {
-		return prepareBeforeShadow;
 	}
 
 	public boolean skipAllRendering() {
@@ -315,32 +239,6 @@ public class PackDirectives {
 		});
 
 		return explicitFlips.build();
-	}
-
-	public Vector2i getTextureScaleOverride(int index, int dimensionX, int dimensionY) {
-		final String name = "colortex" + index;
-
-		// TODO: How do custom textures interact with aliases?
-
-		Vector2i scale = new Vector2i();
-
-		if (index < PackRenderTargetDirectives.LEGACY_RENDER_TARGETS.size()) {
-			String legacyName = PackRenderTargetDirectives.LEGACY_RENDER_TARGETS.get(index);
-
-			if (scaleOverrides.containsKey(legacyName)) {
-				scale.set(scaleOverrides.get(legacyName).getX(dimensionX), scaleOverrides.get(legacyName).getY(dimensionY));
-			} else if (scaleOverrides.containsKey(name)) {
-				scale.set(scaleOverrides.get(name).getX(dimensionX), scaleOverrides.get(name).getY(dimensionY));
-			} else {
-				scale.set(dimensionX, dimensionY);
-			}
-		} else if (scaleOverrides.containsKey(name)) {
-			scale.set(scaleOverrides.get(name).getX(dimensionX), scaleOverrides.get(name).getY(dimensionY));
-		} else {
-			scale.set(dimensionX, dimensionY);
-		}
-
-		return scale;
 	}
 
 	public boolean supportsEndFlash() {

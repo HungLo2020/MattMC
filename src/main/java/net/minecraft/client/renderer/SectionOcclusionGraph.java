@@ -102,10 +102,6 @@ public class SectionOcclusionGraph {
 		}, frustum, 32);
 	}
 
-	public boolean consumeFrustumUpdate() {
-		return this.needsFrustumUpdate.compareAndSet(true, false);
-	}
-
 	public void onChunkReadyToRender(ChunkPos chunkPos) {
 		SectionOcclusionGraph.GraphEvents graphEvents = (SectionOcclusionGraph.GraphEvents)this.nextGraphEvents.get();
 		if (graphEvents != null) {

@@ -90,10 +90,6 @@ public class RenderPipeline {
 		return SharedConstants.DEBUG_SHUFFLE_UI_RENDERING_ORDER ? super.hashCode() * (sortKeySeed + 1) : this.sortKey;
 	}
 
-	public static void updateSortKeySeed() {
-		sortKeySeed = Math.round(100000.0F * (float)Math.random());
-	}
-
 	public String toString() {
 		return this.location.toString();
 	}
@@ -102,16 +98,8 @@ public class RenderPipeline {
 		return this.depthTestFunction;
 	}
 
-	public PolygonMode getPolygonMode() {
-		return this.polygonMode;
-	}
-
 	public boolean isCull() {
 		return this.cull;
-	}
-
-	public LogicOp getColorLogic() {
-		return this.colorLogic;
 	}
 
 	public Optional<BlendFunction> getBlendFunction() {
@@ -122,20 +110,8 @@ public class RenderPipeline {
 		return this.writeColor;
 	}
 
-	public boolean isWriteAlpha() {
-		return this.writeAlpha;
-	}
-
 	public boolean isWriteDepth() {
 		return this.writeDepth;
-	}
-
-	public float getDepthBiasScaleFactor() {
-		return this.depthBiasScaleFactor;
-	}
-
-	public float getDepthBiasConstant() {
-		return this.depthBiasConstant;
 	}
 
 	public ResourceLocation getLocation() {
@@ -163,28 +139,8 @@ public class RenderPipeline {
 		return this.vertexFormatMode;
 	}
 
-	public ResourceLocation getVertexShader() {
-		return this.vertexShader;
-	}
-
-	public ResourceLocation getFragmentShader() {
-		return this.fragmentShader;
-	}
-
 	public ShaderDefines getShaderDefines() {
 		return this.shaderDefines;
-	}
-
-	public List<String> getSamplers() {
-		return this.samplers;
-	}
-
-	public List<RenderPipeline.UniformDescription> getUniforms() {
-		return this.uniforms;
-	}
-
-	public boolean wantsDepthTexture() {
-		return this.depthTestFunction != DepthTestFunction.NO_DEPTH_TEST || this.depthBiasConstant != 0.0F || this.depthBiasScaleFactor != 0.0F || this.writeDepth;
 	}
 
 	public static RenderPipeline.Builder builder(RenderPipeline.Snippet... snippets) {

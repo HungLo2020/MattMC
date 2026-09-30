@@ -109,10 +109,6 @@ public final class VulkanicPassResourceModel {
             return new Subresource(EnumSet.of(Aspect.DEPTH), baseMipLevel, levelCount, baseLayer, layerCount);
         }
 
-        public static Subresource depthStencil(int baseMipLevel, int levelCount, int baseLayer, int layerCount) {
-            return new Subresource(EnumSet.of(Aspect.DEPTH, Aspect.STENCIL), baseMipLevel, levelCount, baseLayer, layerCount);
-        }
-
         public boolean overlaps(Subresource other) {
             Objects.requireNonNull(other, "other");
             if (aspects.stream().noneMatch(other.aspects::contains)) {
@@ -274,12 +270,6 @@ public final class VulkanicPassResourceModel {
             finalResourceUsages = List.copyOf(Objects.requireNonNull(finalResourceUsages, "finalResourceUsages"));
         }
 
-        public Optional<ResourceUse> firstUse(String stableKey) {
-            Objects.requireNonNull(stableKey, "stableKey");
-            return orderedUses.stream()
-                .filter(use -> use.resource().stableKey().equals(stableKey))
-                .findFirst();
-        }
     }
 
     private static String requireNonBlank(String value, String name) {

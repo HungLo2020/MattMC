@@ -49,10 +49,6 @@ public class NormI8 {
 		return ((int) (x * 127) & 0xFF) | (((int) (y * 127) & 0xFF) << 8) | (((int) (z * 127) & 0xFF) << 16) | (((int) (w * 127) & 0xFF) << 24);
 	}
 
-	public static byte toByte(float v) {
-		return (byte) ((byte) (v * 127) & 0xFF);
-	}
-
 	/**
 	 * Packs the specified vector components into a 32-bit integer in XYZ ordering with the 8 bits of padding at the
 	 * end.
@@ -101,12 +97,4 @@ public class NormI8 {
 		return ((byte) ((norm >> Z_COMPONENT_OFFSET) & 0xFF)) * NORM;
 	}
 
-	/**
-	 * Unpacks the w-component of the packed normal, denormalizing it to a float in the range of -1.0..1.0.
-	 *
-	 * @param norm The packed normal
-	 */
-	public static float unpackW(int norm) {
-		return ((byte) ((norm >> W_COMPONENT_OFFSET) & 0xFF)) * NORM;
-	}
 }

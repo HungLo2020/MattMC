@@ -26,18 +26,6 @@ public class GraphicsBackendOptionSelectionTest {
     }
 
     @Test
-    public void testNormalizeBackendOptionValue() {
-        String defaultBackend = net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled() ? "vulkan" : "opengl";
-        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue(null));
-        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue(""));
-        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue("opengl"));
-        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue("OpenGL"));
-        assertEquals("vulkan", VulkanicAPI.normalizeBackendOptionValue("vulkan"));
-        assertEquals("vulkan", VulkanicAPI.normalizeBackendOptionValue("  VULKAN  "));
-        assertEquals(defaultBackend, VulkanicAPI.normalizeBackendOptionValue("dx12"));
-    }
-
-    @Test
     public void testInitializeFromOptionsValueSelectsOpenGLForMissingOrInvalidValues() {
         VulkanicAPI.initializeFromOptionsValue(null);
         assertEquals(GraphicsBackendType.OPENGL, VulkanicAPI.getActiveBackendType());
@@ -67,20 +55,6 @@ public class GraphicsBackendOptionSelectionTest {
             Integer.parseInt(System.getProperty(LWJGL_STACK_SIZE_PROPERTY)) >= 512,
             "Vulkan selection should raise LWJGL MemoryStack size to avoid native stack exhaustion during VkInstance startup"
         );
-    }
-
-    @Test
-    public void testVulkanSelectionAdmissionPrecedesCompatibilityBackendConstruction() throws IOException {
-        Path apiFile = PROJECT_ROOT.resolve("src/main/java/net/vulkanic/VulkanicAPI.java");
-        String source = Files.readString(apiFile);
-        int vulkanCase = source.indexOf("case VULKAN:");
-        int marker = source.indexOf("RustGalVulkanWholeFrameMode.markVulkanBackendSelected();", vulkanCase);
-        int backendConstruction = source.indexOf("rawVulkanBackend = new VulkanBackend();", vulkanCase);
-
-        assertTrue(vulkanCase >= 0, "Vulkan backend initialization branch should remain explicit");
-        assertTrue(marker > vulkanCase, "Vulkan selection should admit the Rust whole-frame route");
-        assertTrue(backendConstruction > marker,
-            "Rust whole-frame admission must be recorded before any Java compatibility backend is constructed");
     }
 
     @Test
@@ -155,13 +129,11 @@ public class GraphicsBackendOptionSelectionTest {
 
     private static void resetBackendStateUnchecked() {
         try {
-            for (String fieldName : new String[]{"backend", "rawVulkanBackend"}) {
+            for (String fieldName : new String[]{"backendType"}) {
                 Field field = VulkanicAPI.class.getDeclaredField(fieldName);
                 field.setAccessible(true);
                 field.set(null, null);
             }
-            net.vulkanic.bridge.RustGalVulkanWholeFrameMode.deactivateRustPresentation();
-            net.vulkanic.bridge.RustGalVulkanWholeFrameMode.clearVulkanBackendSelection();
         } catch (ReflectiveOperationException exception) {
             throw new RuntimeException("Failed to reset VulkanicAPI backend state", exception);
         }

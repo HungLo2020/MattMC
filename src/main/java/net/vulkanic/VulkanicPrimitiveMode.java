@@ -12,19 +12,6 @@ public enum VulkanicPrimitiveMode {
     PATCHES;
 
     /**
-     * Converts a legacy GL primitive mode constant into a typed mode when known.
-     */
-    public static Optional<VulkanicPrimitiveMode> fromLegacyGlConstant(int constant) {
-        return switch (constant) {
-            case VulkanicAPI.GL_LINES -> Optional.of(LINES);
-            case VulkanicAPI.GL_TRIANGLES -> Optional.of(TRIANGLES);
-            case VulkanicAPI.GL_TRIANGLE_FAN -> Optional.of(TRIANGLE_FAN);
-            case VulkanicAPI.GL_PATCHES -> Optional.of(PATCHES);
-            default -> Optional.empty();
-        };
-    }
-
-    /**
      * Returns the corresponding Vulkanic/OpenGL primitive mode constant.
      */
     public int toGlModeConstant() {

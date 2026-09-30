@@ -181,25 +181,11 @@ public class VallumraptorModel extends AdvancedEntityModel<VallumraptorRenderSta
     }
 
     public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, float red, float green, float blue, float alphaIn) {
-        if (false) {
-            float f = 1.5F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, ColorUtil.packColor(red, green, blue, alphaIn * this.alpha));
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, ColorUtil.packColor(red, green, blue, alphaIn * this.alpha));
-            });
-            matrixStackIn.popPose();
-        }
+        matrixStackIn.pushPose();
+        parts().forEach((p_228290_8_) -> {
+            p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, ColorUtil.packColor(red, green, blue, alphaIn * this.alpha));
+        });
+        matrixStackIn.popPose();
     }
 
     public void animate(IAnimatedEntity entity) {

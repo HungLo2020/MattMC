@@ -41,29 +41,4 @@ public final class ReflectionUtils {
         return null;
     }
 
-    public static ArrayList<Field> getFieldsByType(Object o, Class<?> objectClassBaseType, Class<?> fieldClasstype) {
-        ArrayList<Field> matches = new ArrayList<>();
-
-        for (Class<?> objectClass = o.getClass(); !objectClass.equals(objectClassBaseType) && objectClass.getSuperclass() != null; objectClass = objectClass.getSuperclass()) {
-            Field[] fields = objectClass.getDeclaredFields();
-
-            for (Field field : fields) {
-                if (fieldClasstype.isAssignableFrom(field.getType())) {
-                    field.setAccessible(true);
-                    matches.add(field);
-                }
-            }
-        }
-
-        return matches;
-    }
-
-    public static boolean classExists(String className) {
-        try {
-            Class.forName(className);
-            return true;
-        } catch (ClassNotFoundException var2) {
-            return false;
-        }
-    }
 }

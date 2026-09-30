@@ -73,7 +73,4 @@ public final class Viewport {
         return this.sectionCoords;
     }
 
-    public BlockPos getBlockCoord() {
-        return this.blockCoords;
-    }
 }

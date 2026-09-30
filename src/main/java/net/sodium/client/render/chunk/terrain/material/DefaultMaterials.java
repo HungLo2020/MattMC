@@ -23,22 +23,6 @@ public class DefaultMaterials {
         return forChunkLayer(ItemBlockRenderTypes.getRenderLayer(state));
     }
 
-    public static Material forRenderLayer(RenderType layer) {
-        if (layer == RenderType.solid()) {
-            return SOLID;
-        } else if (layer == RenderType.cutout()) {
-            return CUTOUT;
-        } else if (layer == RenderType.cutoutMipped()) {
-            return CUTOUT_MIPPED;
-        } else if (layer == RenderType.tripwire()) {
-            return TRIPWIRE;
-        } else if (layer == RenderType.translucentMovingBlock()) {
-            return TRANSLUCENT;
-        }
-
-        throw new IllegalArgumentException("No material mapping exists for " + layer);
-    }
-
     public static Material forChunkLayer(ChunkSectionLayer layer) {
         return switch (layer) {
             case SOLID -> SOLID;

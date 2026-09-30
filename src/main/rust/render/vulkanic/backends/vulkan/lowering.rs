@@ -886,6 +886,13 @@ impl SubmissionLowerer {
     }
 
     fn allocate_timestamp_set(&mut self) -> GpuTimestampSet {
+        if !gpu_timestamps_enabled() {
+            return GpuTimestampSet::default();
+        }
+        if self.timestamp_pool.is_none() && self.context.timestamp_valid_bits != 0 {
+            // Requested at runtime after the lowerer was created.
+            self.timestamp_pool = create_timestamp_pool(&self.context).ok();
+        }
         if self.timestamp_pool.is_none()
             || self.context.timestamp_valid_bits == 0
             || self.context.timestamp_period <= 0.0
@@ -2550,13 +2557,23 @@ fn pipeline_statistics_flags() -> vk::QueryPipelineStatisticFlags {
         | vk::QueryPipelineStatisticFlags::COMPUTE_SHADER_INVOCATIONS
 }
 
+/// Runtime request for GPU frame timestamps (the F3 GPU-utilization entry
+/// and profiler recordings). The launch-time env var forces them on.
+static GPU_TIMESTAMPS_REQUESTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+pub(crate) fn set_gpu_timestamps_requested(requested: bool) {
+    GPU_TIMESTAMPS_REQUESTED.store(requested, std::sync::atomic::Ordering::Relaxed);
+}
+
 fn gpu_timestamps_enabled() -> bool {
-    matches!(
-        std::env::var("MATTMC_RUST_VULKAN_GPU_TIMESTAMPS")
-            .ok()
-            .as_deref(),
-        Some("1" | "true" | "TRUE" | "yes" | "on")
-    )
+    GPU_TIMESTAMPS_REQUESTED.load(std::sync::atomic::Ordering::Relaxed)
+        || matches!(
+            std::env::var("MATTMC_RUST_VULKAN_GPU_TIMESTAMPS")
+                .ok()
+                .as_deref(),
+            Some("1" | "true" | "TRUE" | "yes" | "on")
+        )
 }
 
 fn pipeline_statistics_mode() -> PipelineStatisticsMode {

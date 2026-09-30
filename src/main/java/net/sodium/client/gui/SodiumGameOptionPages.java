@@ -8,8 +8,6 @@ import net.blaze3d.platform.Window;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.compatibility.environment.OsUtils;
 import net.sodium.client.compatibility.workarounds.Workarounds;
-import net.sodium.client.gl.arena.staging.MappedStagingBuffer;
-import net.sodium.client.gl.device.RenderDevice;
 import net.sodium.client.gui.options.*;
 import net.sodium.client.gui.options.*;
 import net.sodium.client.gui.options.binding.compat.VanillaBooleanOptionBinding;
@@ -25,7 +23,6 @@ import net.minecraft.server.level.ParticleStatus;
 import net.minecraft.client.PanoramaTheme;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.GraphicsFeature;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -267,15 +264,6 @@ public class SodiumGameOptionPages {
                         .setControl(option -> new CyclingControl<>(option, CloudStatus.class, new Component[] { Component.translatable("options.off"), Component.translatable("options.clouds.fast"), Component.translatable("options.clouds.fancy") }))
                         .setBinding((opts, value) -> {
                             opts.cloudStatus().set(value);
-
-                            if (Minecraft.useShaderTransparency()
-								&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-								&& !VulkanicAPI.isVulkanBackendSelected()) {
-                                RenderTarget framebuffer = Minecraft.getInstance().levelRenderer.getCloudsTarget();
-                                if (framebuffer != null) {
-                                                                        VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorTexture(), 0xFFFFFFFF, framebuffer.getDepthTexture(), 1.0f);
-                                }
-                            }
                         }, opts -> opts.cloudStatus().get())
                         .setImpact(OptionImpact.LOW)
                         .build())
@@ -461,17 +449,12 @@ public class SodiumGameOptionPages {
     private static boolean supportsNoErrorContext() {
         // This controls creation of an OpenGL context, not an explicit GAL
         // capability. Never query the fenced Java backend on Rust Vulkan.
-        if (net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) return false;
-        var capabilities = VulkanicAPI.getGraphicsCapabilities();
-                return capabilities.supports(GraphicsFeature.NO_ERROR_CONTEXT)
-                && !Workarounds.isWorkaroundEnabled(Workarounds.Reference.NO_ERROR_CONTEXT_UNSUPPORTED);
+        return false;
     }
 
     public static OptionPage advanced() {
         List<OptionGroup> groups = new ArrayList<>();
 
-        boolean isPersistentMappingSupported = !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-                && MappedStagingBuffer.isSupported(RenderDevice.instance());
 
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
@@ -479,7 +462,7 @@ public class SodiumGameOptionPages {
                         .setTooltip(Component.translatable("sodium.options.use_persistent_mapping.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setImpact(OptionImpact.MEDIUM)
-                        .setEnabled(() -> isPersistentMappingSupported)
+                        .setEnabled(() -> false)
                         .setBinding((opts, value) -> opts.advanced.useAdvancedStagingBuffers = value, opts -> opts.advanced.useAdvancedStagingBuffers)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()

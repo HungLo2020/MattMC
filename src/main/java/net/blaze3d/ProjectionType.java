@@ -18,10 +18,6 @@ public enum ProjectionType {
 		this.layeringTransform = layeringTransform;
 	}
 
-	public VertexSorting vertexSorting() {
-		return this.vertexSorting;
-	}
-
 	public void applyLayeringTransform(Matrix4f matrix4f, float f) {
 		this.layeringTransform.apply(matrix4f, f);
 	}

@@ -284,17 +284,7 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 				if (!submitNodeCollector.submitColoredQuadsSemantic(
 					poseStack, bl ? RenderType.textBackgroundSeeThrough() : RenderType.textBackground(), backgroundVertices, backgroundUvs, new int[] {j}, i
 				)) {
-					if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-						|| net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()
-						|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-						throw new IllegalStateException("Rust whole-frame display-text route rejected semantic background quad");
-					}
-					submitNodeCollector.submitCustomGeometrySemantic(poseStack, bl ? RenderType.textBackgroundSeeThrough() : RenderType.textBackground(), (pose, vertexConsumer) -> {
-						vertexConsumer.addVertex(pose, -1.0F, -1.0F, 0.0F).setColor(j).setLight(i);
-						vertexConsumer.addVertex(pose, -1.0F, (float)n, 0.0F).setColor(j).setLight(i);
-						vertexConsumer.addVertex(pose, (float)m, (float)n, 0.0F).setColor(j).setLight(i);
-						vertexConsumer.addVertex(pose, (float)m, -1.0F, 0.0F).setColor(j).setLight(i);
-					});
+					throw new IllegalStateException("Rust whole-frame display-text route rejected semantic background quad");
 				}
 			}
 
@@ -309,16 +299,9 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 				};
 				Font.DisplayMode displayMode = bl ? Font.DisplayMode.SEE_THROUGH : Font.DisplayMode.POLYGON_OFFSET;
 				int textColor = c << 24 | 16777215;
-				if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-					|| net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()) {
-					orderedSubmitNodeCollector.submitTextSemantic(
-						poseStack, h, g, cachedLine.contents(), bl3, displayMode, i, textColor, 0, 0
-					);
-				} else {
-					orderedSubmitNodeCollector.submitTextSemantic(
-						poseStack, h, g, cachedLine.contents(), bl3, displayMode, i, textColor, 0, 0
-					);
-				}
+				orderedSubmitNodeCollector.submitTextSemantic(
+					poseStack, h, g, cachedLine.contents(), bl3, displayMode, i, textColor, 0, 0
+				);
 				g += l;
 			}
 		}

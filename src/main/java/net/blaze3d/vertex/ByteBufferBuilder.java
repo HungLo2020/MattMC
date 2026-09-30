@@ -42,10 +42,6 @@ public class ByteBufferBuilder implements AutoCloseable, net.irisshaders.iris.ve
 		this(i, 4294967295L);
 	}
 
-	public static ByteBufferBuilder exactlySized(int i) {
-		return new ByteBufferBuilder(i, i);
-	}
-
 	public long reserve(int i) {
 		long l = this.writeOffset;
 		long m = Math.addExact(l, i);

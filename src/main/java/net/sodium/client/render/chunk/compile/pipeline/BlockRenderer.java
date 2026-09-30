@@ -84,15 +84,6 @@ public class BlockRenderer extends AbstractBlockRenderContext implements net.iri
     }
 
     public void renderModel(BlockStateModel model, BlockState state, BlockPos pos, BlockPos origin) {
-        // The whole-frame Vulkan source owns the compact semantic layout and
-        // must not read Iris material-map state.  Iris overrides remain a
-        // private compatibility concern for the legacy renderer.
-        if (!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-                && !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled()
-                && net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE
-                .getBlockTypeIds().containsKey(state.getBlock())) {
-            iris$hasOverride = true;
-        }
         
         this.state = state;
         this.pos = pos;

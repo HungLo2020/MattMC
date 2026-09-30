@@ -38,24 +38,12 @@ public class ComputeSource {
 		return source != null;
 	}
 
-	public Vector2f getWorkGroupRelative() {
-		return workGroupRelative;
-	}
-
 	public void setWorkGroupRelative(Vector2f workGroupRelative) {
 		this.workGroupRelative = workGroupRelative;
 	}
 
-	public Vector3i getWorkGroups() {
-		return workGroups;
-	}
-
 	public void setWorkGroups(Vector3i workGroups) {
 		this.workGroups = workGroups;
-	}
-
-	public IndirectPointer getIndirectPointer() {
-		return indirectPointer;
 	}
 
 	public Optional<ComputeSource> requireValid() {

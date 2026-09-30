@@ -15,19 +15,9 @@ import net.minecraft.util.debug.DebugValueAccess;
 
 @Environment(EnvType.CLIENT)
 public class VillageSectionsDebugRenderer implements DebugRenderer.SimpleDebugRenderer {
-	@Override
-	public void render(PoseStack poseStack, MultiBufferSource multiBufferSource, double d, double e, double f, DebugValueAccess debugValueAccess, Frustum frustum) {
-		debugValueAccess.forEachBlock(DebugSubscriptions.VILLAGE_SECTIONS, (blockPos, unit) -> {
-			SectionPos sectionPos = SectionPos.of(blockPos);
-			DebugRenderer.renderFilledUnitCube(poseStack, multiBufferSource, sectionPos.center(), 0.2F, 1.0F, 0.2F, 0.15F);
-		});
-	}
 
 	/** Copies subscribed village-section markers into Rust-owned semantic quads. */
 	public void collectRustSemantics(Minecraft minecraft, Camera camera, SubmitNodeStorage geometry) {
-		if ((!net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			&& !net.vulkanic.bridge.RustGalVulkanWholeFrameMode.enabled())
-			|| !net.vulkanic.world.WorldRenderRoutePolicy.currentProceduralQuadRoute().usesRustWholeFrameVulkan()) return;
 		DebugValueAccess access = minecraft.getConnection().createDebugValueAccess();
 		PoseStack transform = new PoseStack();
 		transform.translate(-camera.getPosition().x, -camera.getPosition().y, -camera.getPosition().z);
