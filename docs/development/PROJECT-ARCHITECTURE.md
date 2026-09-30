@@ -33,6 +33,12 @@ src/main/rust/
 ├── tools/
 └── world/
     └── level/
+        ├── biome/
+        ├── color_map_color_util.rs
+        └── levelgen/
+            ├── synth/
+            ├── density/
+            └── surface/
 ```
 
 ## Directory Responsibilities
@@ -47,7 +53,12 @@ Shared engine primitives belong here. Use this for low-level types, algorithms, 
 
 ### `world/`
 
-World simulation and world data helpers belong here. Current Rust world code includes `world/level/color_map_color_util.rs`, which backs Java color-map behavior through native functions.
+World simulation and world data helpers belong here. Current code includes
+`world/level/color_map_color_util.rs` for Java color-map behavior,
+`world/level/biome/` for biome corner selection, and `world/level/levelgen/` for
+noise synthesis, density evaluation, and surface evaluation. See
+[Rust World-Generation Organization](RUST-WORLDGEN-ORGANIZATION.md) for module
+ownership, native boundaries, and recorded verification.
 
 ### `gameplay/`
 

@@ -21,6 +21,25 @@ Source Code: https://github.com/HungLo2020/MattMC
 ## Quick Start
 - download or clone the repository, ```git clone https://github.com/HungLo2020/MattMC.git```
 - run ```./DevUtils/SetupProject.sh``` on Linux/macOS or ```.\DevUtils\SetupProject.ps1``` on Windows to set up the project.
-- run ```./gradlew runClient``` to launch the client or ```./gradlew runServer``` to launch the server. Or optioinally use the built in scripts, ```./DevUtils/RunDev.sh``` to launch the game in the dev environment. ```./DevUtils/ExportToDownloads.sh``` to export the build.
+- run `./gradlew runClient` to launch the client or `./gradlew runServer` to launch the server. Alternatively, use `python3 DevUtils/RunDev.py` to launch the development client or `python3 DevUtils/ExportToDownloads.py` to export the build. On Windows, use `gradlew.bat` and `python`.
 
 May need to launch with "code --disable-gpu" on linux. stupid.
+
+## Agents
+
+- Before changing a subsystem, start at [the documentation index](docs/index.md)
+  and read the relevant development, testing, and feature documentation.
+- Update affected documentation alongside code changes. Keep documented
+  behavior, architecture, commands, and file paths accurate.
+- Preserve the documentation/wiki hierarchy. Every documentation directory
+  must have one clearly identified index linking to every other Markdown
+  file directly inside it and to each immediate child documentation directory's index.
+- When adding, moving, renaming, or removing pages, update the affected
+  indexes and incoming links in the same change. Preserve existing index
+  filenames and published URLs where practical.
+- Clearly distinguish current behavior, proposed work, and historical results.
+  Report verification accurately.
+- Follow the [documentation maintenance guide](docs/development/DOCUMENTATION.md)
+  and run `python3 DevUtils/RunWiki.py check` after documentation changes.
+
+`AGENTS.md` is a symlink to this README, keeping these instructions in one place.

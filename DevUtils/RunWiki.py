@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, serve, or set up the MattMC wiki/docs environment."""
+"""Check, build, serve, or set up the MattMC wiki/docs environment."""
 
 from __future__ import annotations
 
@@ -76,12 +76,12 @@ def ensure_wiki_environment(root: Path, platform_name: str) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build, serve, or set up the MattMC wiki/docs environment.")
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
         nargs="?",
         default="serve",
-        choices=("serve", "build", "setup"),
+        choices=("check", "serve", "build", "setup"),
         help="command to run; default: serve",
     )
     parser.add_argument(
@@ -101,12 +101,13 @@ def main() -> int:
     if args.command == "setup":
         install_wiki_environment(root, platform_name)
         print("Wiki environment is ready.")
-    elif args.command == "serve":
+    else:
         ensure_wiki_environment(root, platform_name)
-        run_checked([str(venv_py), "-m", "mkdocs", "serve"], cwd=root)
-    elif args.command == "build":
-        ensure_wiki_environment(root, platform_name)
-        run_checked([str(venv_py), "-m", "mkdocs", "build", "--strict"], cwd=root)
+        run_checked([str(venv_py), str(root / "DevUtils" / "CheckDocs.py")], cwd=root)
+        if args.command == "serve":
+            run_checked([str(venv_py), "-m", "mkdocs", "serve"], cwd=root)
+        elif args.command == "build":
+            run_checked([str(venv_py), "-m", "mkdocs", "build", "--strict"], cwd=root)
 
     return 0
 

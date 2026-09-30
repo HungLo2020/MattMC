@@ -5,11 +5,26 @@ on:
     branches:
       - master
     paths:
+      - README.md
+      - AGENTS.md
       - docs/**
       - wiki/**
       - mkdocs.yml
       - requirements-docs.txt
       - .github/workflows/wiki-pages.yml
+      - DevUtils/CheckDocs.py
+      - DevUtils/RunWiki.py
+  pull_request:
+    paths:
+      - README.md
+      - AGENTS.md
+      - docs/**
+      - wiki/**
+      - mkdocs.yml
+      - requirements-docs.txt
+      - .github/workflows/wiki-pages.yml
+      - DevUtils/CheckDocs.py
+      - DevUtils/RunWiki.py
   workflow_dispatch:
 
 permissions:
@@ -18,7 +33,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: wiki-pages
+  group: wiki-pages-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -40,19 +55,25 @@ jobs:
       - name: Install wiki dependencies
         run: pip install -r requirements-docs.txt
 
+      - name: Check documentation indexes and links
+        run: python DevUtils/CheckDocs.py
+
       - name: Build wiki
         run: mkdocs build --strict
 
       - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         uses: actions/configure-pages@v6
 
       - name: Upload GitHub Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
   deploy:
     name: Deploy wiki
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
     environment:

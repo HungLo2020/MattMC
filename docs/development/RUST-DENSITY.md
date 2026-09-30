@@ -195,6 +195,8 @@ for Nether (9.01% less time) and Primordial Caves (4.78% less time). Those logs
 remain available. The single-interpolator SIMD kernel was added to address
 those misses. The final production run below passed the full gate.
 
+<a id="final-production-results--2026-09-30"></a>
+
 ### Final production results — 2026-09-30
 
 **PASS: all eight settings**, all three independent JVM pairs, and every upper

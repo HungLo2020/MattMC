@@ -19,3 +19,15 @@ From its creation, Minecraft was developed almost exclusively by Swedish game de
 - [Development Tools](development/home.md)
 - [Gameplay](gameplay/Gameplay.md)
 
+## Agent Task Templates
+
+- [Standard Copilot Prompts](STANDARD-COPILOT-PROMPTS.md)
+- [Rust Migration Prompts](RUST-MIGRATION-PROMPTS.md)
+
+## Rendering Plans and Recorded Progress
+
+These documents record plans and scoped results; consult their dates and the
+current implementation before treating them as current verification.
+
+- [Vulkan Structural Plan](VULKAN-STRUCTURAL-PLAN.md)
+- [Vanilla Rust Vulkan Completion Ledger](VANILLA-RUST-VULKAN-COMPLETION.md)
