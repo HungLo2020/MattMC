@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git rm:*)",
+      "Bash(rm:*)",
+      "Bash(java:*)",
+      "Bash(bash /tmp/claude-1000/-home-matt-Documents-Repos-MattMC/9e60ef3d-1b15-42fd-9300-ce098bf07954/scratchpad/*)"
+    ]
+  }
+}
