@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.util.KeyDispatchDataCodec;
-import net.minecraft.world.level.levelgen.synth.NativeDensityProgram;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 /** Private cell evaluator: immutable programs are shared, corner snapshots belong

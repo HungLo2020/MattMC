@@ -11,7 +11,7 @@ import net.minecraft.util.NativeLibraryLoader;
 /** Immutable, GC-owned ABI state. No Rust allocation/handle registry and no Java callbacks.
  * Permutations and coefficients originate in the unchanged Java seed constructors.
  */
-final class NativeNoise {
+final class NativeNoise implements NativeNoiseState {
 	static final int HEADER = 80;
 	static final int OCTAVE = 1320;
 	static final int MAX_BATCH = 256;
@@ -40,6 +40,10 @@ final class NativeNoise {
 	final MemorySegment state;
 	final boolean critical;
 	final double[] amplitudes;
+
+    @Override public MemorySegment state() { return state; }
+    @Override public boolean critical() { return critical; }
+    @Override public int octaveCount() { return amplitudes.length; }
 
 	private static MethodHandle bind(String suffix, FunctionDescriptor descriptor, boolean critical) {
 		return bind(suffix, descriptor, critical, true);

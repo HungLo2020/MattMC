@@ -3,7 +3,6 @@ package net.minecraft.world.level.levelgen;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import net.minecraft.util.KeyDispatchDataCodec;
-import net.minecraft.world.level.levelgen.synth.NativeDensityProgram;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 /** Fuses known pure expressions. Other paths use the same Rust operations via Java traversal. */

@@ -8,12 +8,17 @@ All migrated density operations have one production implementation, in Rust:
 - Shifted-noise coordinate combination and both rarity mappings.
 - Add, multiply, min/max, constant arithmetic, mapped transforms and clamp.
 - Range-choice predicates and arithmetic short-circuit predicates.
-- End island-height search (in `world/noise.rs`).
+- End island-height search (in `world/level/levelgen/density/end_islands.rs`).
 
-`world/density.rs` shares these routines between fused expression programs and
+`world/level/levelgen/density/` shares these routines between fused expression programs and
 individual/batched operations called through `NativeDensityMath`. There is no
 Java arithmetic fallback for these operations. Loading the native library is
 mandatory.
+
+The Java bridges `NativeDensityProgram`, `NativeDensityMath`, and
+`NativeUnaryProgram` live in `levelgen`. They access synthesis state through
+the sealed, read-only `synth.NativeNoiseState` view, which adds no allocation
+and preserves snapshot identity. See [module organization](RUST-WORLDGEN-ORGANIZATION.md).
 
 Java still owns graph construction, metadata bounds, serialization, seed/state
 construction, context traversal, caches and interpolation. Operations that were

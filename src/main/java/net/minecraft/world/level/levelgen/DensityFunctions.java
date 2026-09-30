@@ -1,6 +1,5 @@
 package net.minecraft.world.level.levelgen;
 
-import net.minecraft.world.level.levelgen.synth.NativeDensityMath;
 import com.mojang.datafixers.util.Either;
 import net.logging.LogUtils;
 import com.mojang.serialization.Codec;

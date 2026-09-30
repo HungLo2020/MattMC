@@ -109,6 +109,10 @@ public class NormalNoise {
 	}
 
 	private volatile NativeNoise nativeNoise;
+
+    /** Internal read-only state bridge for compiled density programs. */
+    public NativeNoiseState nativeState() { return nativeNoise(); }
+
 	NativeNoise nativeNoise() {
 		NativeNoise value = nativeNoise;
 		if (value == null || !first.matchesAmplitudes(value)) {

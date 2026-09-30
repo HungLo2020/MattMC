@@ -1,6 +1,5 @@
 package net.minecraft.world.level.levelgen;
 
-import net.minecraft.world.level.levelgen.synth.NativeDensityMath;
 import net.minecraft.world.level.levelgen.synth.BlendedNoise;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 

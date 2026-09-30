@@ -13,8 +13,11 @@ octave parameters, metadata bounds, codecs, and public integration classes.
 These preserve seed compatibility and the existing Java API. The unused Java
 Simplex gradient table and dot-product helper have been removed.
 
-`world/noise.rs` owns the scalar kernels. `world/noise_simd.rs` provides the
-bounded SIMD batch route with a scalar Rust route for other hardware and tails.
+`world/level/levelgen/synth/` contains separate Improved, Perlin, Normal,
+Blended, Simplex and Perlin-Simplex modules. Family-specific optimized kernels
+live below their family module. `dispatch.rs` owns CPU/coordinate guards and
+bounded batches; `ffi.rs` preserves the exported symbols. Scalar Rust handles
+other hardware and unsupported inputs. See [module organization](RUST-WORLDGEN-ORGANIZATION.md).
 No reassociation, fast-math, or fused multiply-add is used to change the original
 floating-point evaluation order.
 
@@ -81,6 +84,9 @@ historical evidence and do not certify the timing of later boundary changes.
 
 
 ## Current production performance
+
+The speedup measurements below predate the structural module reorganization.
+Its before/after checks are documented in [module organization](RUST-WORLDGEN-ORGANIZATION.md).
 
 The final boundary-inclusive NOISE-stage comparison passed the 10% gate in all
 eight settings and all three JVM pairs. Median paired time reductions are

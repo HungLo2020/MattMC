@@ -1,8 +1,10 @@
-package net.minecraft.world.level.levelgen.synth;
+package net.minecraft.world.level.levelgen;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import net.minecraft.util.NativeLibraryLoader;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+import net.minecraft.world.level.levelgen.synth.NativeNoiseState;
 
 /** Internal compiled density ABI; all native pointers are offsets within one GC-owned segment. */
 public final class NativeDensityProgram {
@@ -24,7 +26,7 @@ public final class NativeDensityProgram {
     private final Node[] nodes;
     private final NormalNoise[] noises;
     private final int inputs;
-    private record Snapshot(MemorySegment state, NativeNoise[] noises) {}
+    private record Snapshot(MemorySegment state, NativeNoiseState[] noises) {}
     private volatile Snapshot snapshot;
     public NativeDensityProgram(Node[] nodes, NormalNoise[] noises) {
         this(nodes,noises,0);
@@ -44,18 +46,18 @@ public final class NativeDensityProgram {
         Snapshot s=snapshot;
         if (s!=null) {
             boolean fresh=true;
-            for(int i=0;i<noises.length;i++) if(noises[i].nativeNoise()!=s.noises[i]) {fresh=false;break;}
+            for(int i=0;i<noises.length;i++) if(noises[i].nativeState()!=s.noises[i]) {fresh=false;break;}
             if(fresh) return s;
         }
         return rebuild();
     }
     private synchronized Snapshot rebuild() {
-        NativeNoise[] current=new NativeNoise[noises.length];
+        NativeNoiseState[] current=new NativeNoiseState[noises.length];
         long size=16L+64L*nodes.length; int octaves=0;
         long[] offsets=new long[noises.length];
         for(int i=0;i<current.length;i++) {
-            current[i]=noises[i].nativeNoise(); offsets[i]=size; size+=current[i].state.byteSize();
-            octaves+=current[i].amplitudes.length;
+            current[i]=noises[i].nativeState(); offsets[i]=size; size+=current[i].state().byteSize();
+            octaves+=current[i].octaveCount();
         }
         if(octaves>128) throw new IllegalArgumentException("Density critical-call work limit");
         MemorySegment data=Arena.ofAuto().allocate(size,8);
@@ -67,11 +69,11 @@ public final class NativeDensityProgram {
             data.set(ValueLayout.JAVA_INT,at,n.op);data.set(ValueLayout.JAVA_INT,at+4,n.a);data.set(ValueLayout.JAVA_INT,at+8,n.b);data.set(ValueLayout.JAVA_INT,at+12,n.c);
             if(n.noise>=0) {
                 data.set(ValueLayout.JAVA_LONG,at+16,offsets[n.noise]);
-                data.set(ValueLayout.JAVA_LONG,at+24,current[n.noise].state.byteSize());
+                data.set(ValueLayout.JAVA_LONG,at+24,current[n.noise].state().byteSize());
             }
             data.set(ValueLayout.JAVA_DOUBLE,at+32,n.p);data.set(ValueLayout.JAVA_DOUBLE,at+40,n.q);data.set(ValueLayout.JAVA_DOUBLE,at+48,n.r);
         }
-        for(int i=0;i<current.length;i++) MemorySegment.copy(current[i].state,0,data,offsets[i],current[i].state.byteSize());
+        for(int i=0;i<current.length;i++) MemorySegment.copy(current[i].state(),0,data,offsets[i],current[i].state().byteSize());
         try { int status=(int)VALIDATE.invokeExact(data,size); if(status!=0)throw new IllegalArgumentException("Invalid density ABI: "+status); }
         catch(Throwable t){throw failure(t);}
         Snapshot s=new Snapshot(data.asReadOnly(),current);snapshot=s;return s;

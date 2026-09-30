@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.util.KeyDispatchDataCodec;
-import net.minecraft.world.level.levelgen.synth.NativeUnaryProgram;
 
 /** Fuses consecutive transforms without speculating about child evaluation. */
 final class NativeUnary implements DensityFunction {
@@ -42,17 +41,17 @@ final class NativeUnary implements DensityFunction {
         return tree(f,programs,new java.util.HashMap<>());
     }
     static DensityFunction tree(DensityFunction f, Map<List<NativeUnaryProgram.Step>,NativeUnaryProgram> programs,
-                               Map<NativeOperands.Key,net.minecraft.world.level.levelgen.synth.NativeDensityProgram> operands) {
+                               Map<NativeOperands.Key,NativeDensityProgram> operands) {
         return tree(f,programs,operands,new java.util.HashMap<>());
     }
     static DensityFunction tree(DensityFunction f, Map<List<NativeUnaryProgram.Step>,NativeUnaryProgram> programs,
-        Map<NativeOperands.Key,net.minecraft.world.level.levelgen.synth.NativeDensityProgram> operands,
-        Map<NativeCellDensity.Key,net.minecraft.world.level.levelgen.synth.NativeDensityProgram> cells) {
+        Map<NativeOperands.Key,NativeDensityProgram> operands,
+        Map<NativeCellDensity.Key,NativeDensityProgram> cells) {
         return tree(f,programs,operands,cells,new java.util.IdentityHashMap<>(),0);
     }
     private static DensityFunction tree(DensityFunction f, Map<List<NativeUnaryProgram.Step>,NativeUnaryProgram> programs,
-                                       Map<NativeOperands.Key,net.minecraft.world.level.levelgen.synth.NativeDensityProgram> operands,
-                                       Map<NativeCellDensity.Key,net.minecraft.world.level.levelgen.synth.NativeDensityProgram> cells,
+                                       Map<NativeOperands.Key,NativeDensityProgram> operands,
+                                       Map<NativeCellDensity.Key,NativeDensityProgram> cells,
                                        java.util.IdentityHashMap<DensityFunction,DensityFunction> seen,int depth) {
         if(depth>64 || f instanceof NativeDensity || f instanceof NativeUnary)return f;
         DensityFunction cached=seen.get(f);if(cached!=null)return cached;

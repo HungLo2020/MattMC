@@ -1,4 +1,4 @@
-package net.minecraft.world.level.levelgen.synth;
+package net.minecraft.world.level.levelgen;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -7,6 +7,8 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import net.minecraft.util.NativeLibraryLoader;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
+import net.minecraft.world.level.levelgen.synth.NativeNoiseState;
 
 /** Rust operations shared by fused programs and Java's context/cache traversal.
  * Java supplies operands and preserves visitation order; it has no alternate math implementation.
@@ -84,9 +86,9 @@ public final class NativeDensityMath {
 
     public static double noise(NormalNoise noise, int op, double x, double y, double z,
                                double sx, double sy, double sz, double p, double q) {
-        NativeNoise nativeNoise = noise == null ? null : noise.nativeNoise();
-        MemorySegment state = nativeNoise == null ? MemorySegment.NULL : nativeNoise.state;
-        if (nativeNoise != null && !nativeNoise.critical) {
+        NativeNoiseState nativeNoise = noise == null ? null : noise.nativeState();
+        MemorySegment state = nativeNoise == null ? MemorySegment.NULL : nativeNoise.state();
+        if (nativeNoise != null && !nativeNoise.critical()) {
             return noiseSlow(state, op, x, y, z, sx, sy, sz, p, q);
         }
         try { return (double) NOISE.invokeExact(state, op, x, y, z, sx, sy, sz, p, q); }
@@ -105,9 +107,9 @@ public final class NativeDensityMath {
     }
     public static void noiseArray(NormalNoise noise, int op, double[] input, double[] output, int size, double p, double q) {
         if (size<0 || size>output.length || input == output || input.length < (long) size * 6) throw new IllegalArgumentException("Density noise buffers");
-        NativeNoise nativeNoise = noise == null ? null : noise.nativeNoise();
-        MemorySegment state = nativeNoise == null ? MemorySegment.NULL : nativeNoise.state;
-        if (nativeNoise != null && !nativeNoise.critical) {
+        NativeNoiseState nativeNoise = noise == null ? null : noise.nativeState();
+        MemorySegment state = nativeNoise == null ? MemorySegment.NULL : nativeNoise.state();
+        if (nativeNoise != null && !nativeNoise.critical()) {
             noiseArraySlow(state, op, input, output, size, p, q);
             return;
         }

@@ -11,10 +11,11 @@ its server. No user worlds or production configuration are touched.
 from pathlib import Path
 import argparse,subprocess,json,time,os,hashlib,re
 ROOT=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('label');p.add_argument('--seed',type=int,default=42);p.add_argument('--dimension',default='');p.add_argument('--radius',type=int,default=5);p.add_argument('--rounds',type=int,default=3);p.add_argument('--warmups',type=int,default=2);p.add_argument('--warm-radius',type=int,default=3);p.add_argument('--workers',type=int,default=3);p.add_argument('--cpus',default='2-5');p.add_argument('--reference',action='store_true');p.add_argument('--hash',action='store_true');p.add_argument('--serial',action='store_true');p.add_argument('--compare',help='Compare hashes with an earlier label in the output directory');p.add_argument('--output',default='build/rust-surface-world');p.add_argument('--classpath',default='build/rust-surface-verification/classpath.txt');args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('label');p.add_argument('--seed',type=int,default=42);p.add_argument('--dimension',default='');p.add_argument('--radius',type=int,default=5);p.add_argument('--rounds',type=int,default=3);p.add_argument('--warmups',type=int,default=2);p.add_argument('--warm-radius',type=int,default=3);p.add_argument('--workers',type=int,default=3);p.add_argument('--cpus',default='2-5');p.add_argument('--reference',action='store_true');p.add_argument('--hash',action='store_true');p.add_argument('--serial',action='store_true');p.add_argument('--compare',help='Compare hashes with an earlier label in the output directory');p.add_argument('--output',default='build/rust-surface-world');p.add_argument('--classpath',default='build/rust-surface-verification/classpath.txt');p.add_argument("--native-dir", default="build/rust/native", help="Frozen native library directory for before/after comparisons");args=p.parse_args()
 if not re.fullmatch(r'[A-Za-z0-9_-]+',args.label) or (args.compare and not re.fullmatch(r'[A-Za-z0-9_-]+',args.compare)):p.error('Use a simple directory name as label')
 if min(args.radius,args.rounds,args.warmups,args.warm_radius)<0 or args.workers<1:p.error('Invalid workload size')
 if args.compare and not args.hash:p.error('--compare requires --hash')
+NATIVE=(ROOT/args.native_dir).resolve()
 BASE=(ROOT/args.output).resolve()
 if not BASE.is_relative_to(ROOT/'build'):p.error('Output must be under build/')
 BASE.mkdir(parents=True,exist_ok=True)
@@ -45,8 +46,8 @@ spawn-protection=0
 ''')
 cp=str(BASE/'audit-agent.jar')+':'+cp_file.read_text().strip()
 if args.reference:cp=str(reference)+':'+cp
-cmd=['taskset','-c',args.cpus,'java','-Xms1G','-Xmx8G','-XX:+UseZGC','-XX:+UseCompactObjectHeaders','-XX:+UnlockDiagnosticVMOptions','-XX:+DebugNonSafepoints','-XX:+PreserveFramePointer','--enable-native-access=ALL-UNNAMED',f'-Dmax.bg.threads={args.workers}',f'-Dmattmc.rust.natives.dir={ROOT}/build/rust/native',f'-Daudit.output={out}',f'-Daudit.serial={str(args.serial).lower()}',f'-Daudit.hash={str(args.hash).lower()}',f'-Daudit.radius={args.radius}',f'-Daudit.rounds={args.rounds}',f'-Daudit.warmRadius={args.warm_radius}',f'-Daudit.warmups={args.warmups}',f'-Daudit.dimension={args.dimension}',f'-javaagent:{BASE}/audit-agent.jar','-cp',cp,'net.minecraft.server.Main','--nogui','--port','0']
-(out/'command.json').write_text(json.dumps({'args':vars(args),'command':cmd,'head':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'native_sha256':hashlib.sha256((ROOT/'build/rust/native/mattmc_rust-linux-x64.so').read_bytes()).hexdigest()},indent=2))
+cmd=['taskset','-c',args.cpus,'java','-Xms1G','-Xmx8G','-XX:+UseZGC','-XX:+UseCompactObjectHeaders','-XX:+UnlockDiagnosticVMOptions','-XX:+DebugNonSafepoints','-XX:+PreserveFramePointer','--enable-native-access=ALL-UNNAMED',f'-Dmax.bg.threads={args.workers}',f'-Dmattmc.rust.natives.dir={NATIVE}',f'-Daudit.output={out}',f'-Daudit.serial={str(args.serial).lower()}',f'-Daudit.hash={str(args.hash).lower()}',f'-Daudit.radius={args.radius}',f'-Daudit.rounds={args.rounds}',f'-Daudit.warmRadius={args.warm_radius}',f'-Daudit.warmups={args.warmups}',f'-Daudit.dimension={args.dimension}',f'-javaagent:{BASE}/audit-agent.jar','-cp',cp,'net.minecraft.server.Main','--nogui','--port','0']
+(out/'command.json').write_text(json.dumps({'args':vars(args),'command':cmd,'head':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'native_sha256':hashlib.sha256((NATIVE/'mattmc_rust-linux-x64.so').read_bytes()).hexdigest()},indent=2))
 start=time.time();peak=0
 with (out/'server.log').open('w') as log:
  proc=subprocess.Popen(cmd,cwd=world,stdout=log,stderr=subprocess.STDOUT)

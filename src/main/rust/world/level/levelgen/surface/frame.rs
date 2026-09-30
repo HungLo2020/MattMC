@@ -1,0 +1,21 @@
+//! Word offsets in the existing Java/Rust resumable frame ABI.
+pub(super) const FRAME_WORDS: usize = 24;
+pub(super) const Y_INDEX: usize = 0;
+pub(super) const STONE_ABOVE: usize = 1;
+pub(super) const WATER_HEIGHT: usize = 2;
+pub(super) const STONE_BOTTOM: usize = 3;
+pub(super) const PROGRAM_COUNTER: usize = 4;
+pub(super) const PHASE: usize = 5;
+pub(super) const CONTEXT_UPDATES: usize = 6;
+pub(super) const ANSWER: usize = 7;
+pub(super) const ANSWER_READY: usize = 8;
+pub(super) const STONE_BELOW: usize = 10;
+pub(super) const SURFACE_DEPTH: usize = 11;
+pub(super) const MIN_Y: usize = 12;
+pub(super) const MIN_SURFACE: usize = 14;
+pub(super) const MIN_SURFACE_READY: usize = 15;
+pub(super) const SECONDARY_READY: usize = 16;
+pub(super) const REQUEST: usize = 17;
+pub(super) const BAND_OFFSET: usize = 18;
+pub(super) const BAND_OFFSET_READY: usize = 19;
+pub(super) const BELOW_WORLD_SENTINEL: usize = 20;

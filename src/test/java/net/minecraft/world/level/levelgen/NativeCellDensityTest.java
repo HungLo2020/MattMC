@@ -2,8 +2,7 @@ package net.minecraft.world.level.levelgen;
 
 import java.util.Random;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.levelgen.synth.NativeDensityProgram;
-import net.minecraft.world.level.levelgen.synth.NativeDensityProgram.Node;
+import net.minecraft.world.level.levelgen.NativeDensityProgram.Node;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

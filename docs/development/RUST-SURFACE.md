@@ -57,7 +57,11 @@ area length; instructions begin at word eight. Instructions contain opcode,
 four operands, false-branch target, inversion flag, and a reserved word.
 Trailing data holds sorted biome IDs or terracotta block IDs. Validation checks
 instruction ranges, forward jumps, opcodes, and data ranges before execution.
-The Rust source documents the resumable frame layout.
+`world/level/levelgen/surface/frame.rs` names the resumable frame slots;
+`program.rs` owns rule opcodes and validation, `evaluator.rs` keeps the fused
+scan/rule loop, and `ffi.rs` exposes the existing symbols. Biome corner selection
+lives in `world/level/biome/fiddled_distance.rs`, with its existing surface ABI
+adapter preserved. See [module organization](RUST-WORLDGEN-ORGANIZATION.md).
 
 Columns are bounded at 4,096 entries, covering the supported dimension-height
 limit plus the top sentinel. One evaluator call executes at most 8,192 steps;
@@ -76,7 +80,7 @@ reference classpath under `build/`.
 ```sh
 ./gradlew -PmattmcRustProfile=release test \
   --tests net.minecraft.world.level.levelgen.NativeSurfaceTest -x testRustNative
-rustc --edition=2021 --test src/main/rust/world/surface.rs \
+rustc --edition=2021 --test src/test/rust/worldgen.rs \
   -o build/surface-rust-tests
 build/surface-rust-tests
 python3 DevUtils/VerifyRustSurface.py --forks 3
@@ -84,7 +88,7 @@ python3 DevUtils/VerifyRustSurface.py --forks 3
 
 The focused Gradle invocation excludes the repository-wide Rust test task,
 which also builds unrelated renderer/audio tests. The standalone Rust command
-above tests the surface module directly.
+above tests world-generation modules and their shared dependencies directly.
 
 `VerifyRustSurface.py` records reference revision, native binary hash, exact
 fingerprints, every timing sample, and compilation time. It checks all eight

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.util.KeyDispatchDataCodec;
-import net.minecraft.world.level.levelgen.synth.NativeDensityProgram;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 /** Fuse arithmetic after its mandatory operands have been visited in Java order.

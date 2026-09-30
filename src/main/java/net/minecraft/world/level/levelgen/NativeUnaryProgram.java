@@ -1,4 +1,4 @@
-package net.minecraft.world.level.levelgen.synth;
+package net.minecraft.world.level.levelgen;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;

@@ -128,10 +128,10 @@ public final class RandomState {
 	}
 
     private final Map<DensityFunction, DensityFunction> nativeDensities = new ConcurrentHashMap<>();
-    private final Map<java.util.List<net.minecraft.world.level.levelgen.synth.NativeUnaryProgram.Step>, net.minecraft.world.level.levelgen.synth.NativeUnaryProgram> unaryPrograms = new ConcurrentHashMap<>();
-    private final Map<NativeOperands.Key,net.minecraft.world.level.levelgen.synth.NativeDensityProgram> operandPrograms = new ConcurrentHashMap<>();
+    private final Map<java.util.List<NativeUnaryProgram.Step>, NativeUnaryProgram> unaryPrograms = new ConcurrentHashMap<>();
+    private final Map<NativeOperands.Key,NativeDensityProgram> operandPrograms = new ConcurrentHashMap<>();
 
-    private final Map<NativeCellDensity.Key,net.minecraft.world.level.levelgen.synth.NativeDensityProgram> cellPrograms = new ConcurrentHashMap<>();
+    private final Map<NativeCellDensity.Key,NativeDensityProgram> cellPrograms = new ConcurrentHashMap<>();
     DensityFunction optimizeUnary(DensityFunction function) {
         return NativeUnary.tree(function, unaryPrograms, operandPrograms, cellPrograms);
     }
