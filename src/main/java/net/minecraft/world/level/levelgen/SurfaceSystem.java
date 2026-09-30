@@ -99,7 +99,7 @@ public class SurfaceSystem {
 			}
 		};
 		SurfaceRules.Context context = new SurfaceRules.Context(this, randomState, chunkAccess, noiseChunk, biomeManager::getBiome, registry, worldGenerationContext);
-		SurfaceRules.SurfaceRule surfaceRule = (SurfaceRules.SurfaceRule)ruleSource.apply(context);
+		NativeSurface surfaceRule = new NativeSurface(ruleSource, context, registry, biomeManager);
 		BlockPos.MutableBlockPos mutableBlockPos2 = new BlockPos.MutableBlockPos();
 
 		for (int k = 0; k < 16; k++) {
@@ -115,45 +115,52 @@ public class SurfaceSystem {
 
 				int p = chunkAccess.getHeight(Heightmap.Types.WORLD_SURFACE_WG, k, l) + 1;
 				context.updateXZ(m, n);
-				int q = 0;
-				int r = Integer.MIN_VALUE;
-				int s = Integer.MAX_VALUE;
-				int t = chunkAccess.getMinY();
+				if (surfaceRule.canBatch) {
+					surfaceRule.column(chunkAccess, blockColumn, this.defaultBlock, m, n, p);
+				} else {
+					// Extension-owned rules may observe or mutate the chunk while
+					// evaluating. Keep their incremental reads and writes; common
+					// rule operations still use the same native evaluator.
+					int q = 0;
+					int r = Integer.MIN_VALUE;
+					int s = Integer.MAX_VALUE;
+					int t = chunkAccess.getMinY();
 
-				for (int u = p; u >= t; u--) {
-					BlockState blockState = blockColumn.getBlock(u);
-					if (blockState.isAir()) {
-						q = 0;
-						r = Integer.MIN_VALUE;
-					} else if (!blockState.getFluidState().isEmpty()) {
-						if (r == Integer.MIN_VALUE) {
-							r = u + 1;
-						}
-					} else {
-						if (s >= u) {
-							s = DimensionType.WAY_BELOW_MIN_Y;
+					for (int u = p; u >= t; u--) {
+						BlockState blockState = blockColumn.getBlock(u);
+						if (blockState.isAir()) {
+							q = 0;
+							r = Integer.MIN_VALUE;
+						} else if (!blockState.getFluidState().isEmpty()) {
+							if (r == Integer.MIN_VALUE) {
+								r = u + 1;
+							}
+						} else {
+							if (s >= u) {
+								s = DimensionType.WAY_BELOW_MIN_Y;
 
-							for (int v = u - 1; v >= t - 1; v--) {
-								BlockState blockState2 = blockColumn.getBlock(v);
-								if (!this.isStone(blockState2)) {
-									s = v + 1;
-									break;
+								for (int v = u - 1; v >= t - 1; v--) {
+									BlockState blockState2 = blockColumn.getBlock(v);
+									if (!this.isStone(blockState2)) {
+										s = v + 1;
+										break;
+									}
+								}
+							}
+
+							q++;
+							int vx = u - s + 1;
+							context.updateY(q, vx, r, m, u, n);
+							if (blockState == this.defaultBlock) {
+								BlockState blockState2 = surfaceRule.tryApply(m, u, n);
+								if (blockState2 != null) {
+									blockColumn.setBlock(u, blockState2);
 								}
 							}
 						}
-
-						q++;
-						int vx = u - s + 1;
-						context.updateY(q, vx, r, m, u, n);
-						if (blockState == this.defaultBlock) {
-							BlockState blockState2 = surfaceRule.tryApply(m, u, n);
-							if (blockState2 != null) {
-								blockColumn.setBlock(u, blockState2);
-							}
-						}
 					}
-				}
 
+				}
 				if (holder.is(Biomes.FROZEN_OCEAN) || holder.is(Biomes.DEEP_FROZEN_OCEAN)) {
 					this.frozenOceanExtension(context.getMinSurfaceLevel(), holder.value(), blockColumn, mutableBlockPos2, m, n, o);
 				}
@@ -191,7 +198,7 @@ public class SurfaceSystem {
 		SurfaceRules.Context context = new SurfaceRules.Context(
 			this, carvingContext.randomState(), chunkAccess, noiseChunk, function, carvingContext.registryAccess().lookupOrThrow(Registries.BIOME), carvingContext
 		);
-		SurfaceRules.SurfaceRule surfaceRule = (SurfaceRules.SurfaceRule)ruleSource.apply(context);
+		SurfaceRules.SurfaceRule surfaceRule = new NativeSurface(ruleSource, context, carvingContext.registryAccess().lookupOrThrow(Registries.BIOME), null);
 		int i = blockPos.getX();
 		int j = blockPos.getY();
 		int k = blockPos.getZ();
@@ -317,7 +324,15 @@ public class SurfaceSystem {
 	}
 
 	protected BlockState getBand(int i, int j, int k) {
-		int l = (int)Math.round(this.clayBandsOffsetNoise.getValue(i, 0.0, k) * 4.0);
+		int l = this.bandOffset(i, k);
 		return this.clayBands[(j + l + this.clayBands.length) % this.clayBands.length];
+	}
+
+	int bandOffset(int x, int z) {
+		return (int)Math.round(this.clayBandsOffsetNoise.getValue(x, 0.0, z) * 4.0);
+	}
+
+	BlockState[] bandStates() {
+		return this.clayBands;
 	}
 }
