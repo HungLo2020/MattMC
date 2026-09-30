@@ -172,6 +172,12 @@ public abstract class Player extends Avatar implements ContainerUser {
 	private int armorValueForDeterministicCapture = -1;
 	private float healthForDeterministicCapture = Float.NaN;
 	private float maxHealthForDeterministicCapture = Float.NaN;
+	// LivingEntity's constructor reads getHealth/getArmorValue/getAttributeValue
+	// before these field initializers run (the fields are still 0 then), so
+	// each override is gated on an explicit flag whose default is false.
+	private boolean armorOverrideForDeterministicCapture;
+	private boolean healthOverrideForDeterministicCapture;
+	private boolean maxHealthOverrideForDeterministicCapture;
 	private final ItemCooldowns cooldowns = this.createItemCooldowns();
 	private Optional<GlobalPos> lastDeathLocation = Optional.empty();
 	@Nullable
@@ -1743,7 +1749,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public int getArmorValue() {
-		if (this.armorValueForDeterministicCapture >= 0) {
+		if (this.armorOverrideForDeterministicCapture && this.armorValueForDeterministicCapture >= 0) {
 			return this.armorValueForDeterministicCapture;
 		}
 		return super.getArmorValue();
@@ -1751,7 +1757,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public float getHealth() {
-		if (Float.isFinite(this.healthForDeterministicCapture)) {
+		if (this.healthOverrideForDeterministicCapture && Float.isFinite(this.healthForDeterministicCapture)) {
 			return this.healthForDeterministicCapture;
 		}
 		return super.getHealth();
@@ -1759,7 +1765,8 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public double getAttributeValue(Holder<Attribute> holder) {
-		if (holder.is(Attributes.MAX_HEALTH) && Float.isFinite(this.maxHealthForDeterministicCapture)) {
+		if (this.maxHealthOverrideForDeterministicCapture && holder.is(Attributes.MAX_HEALTH)
+				&& Float.isFinite(this.maxHealthForDeterministicCapture)) {
 			return this.maxHealthForDeterministicCapture;
 		}
 		return super.getAttributeValue(holder);
@@ -1771,6 +1778,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	public void setArmorValueForDeterministicCapture(int armorValue) {
 		this.armorValueForDeterministicCapture = armorValue >= 0 ? Math.min(20, armorValue) : -1;
+		this.armorOverrideForDeterministicCapture = this.armorValueForDeterministicCapture >= 0;
 	}
 
 	public float getHealthForDeterministicCapture() {
@@ -1779,6 +1787,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	public void setHealthForDeterministicCapture(float health) {
 		this.healthForDeterministicCapture = Float.isFinite(health) && health >= 0.0F ? health : Float.NaN;
+		this.healthOverrideForDeterministicCapture = Float.isFinite(this.healthForDeterministicCapture);
 	}
 
 	public float getMaxHealthForDeterministicCapture() {
@@ -1787,6 +1796,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	public void setMaxHealthForDeterministicCapture(float maxHealth) {
 		this.maxHealthForDeterministicCapture = Float.isFinite(maxHealth) && maxHealth > 0.0F ? maxHealth : Float.NaN;
+		this.maxHealthOverrideForDeterministicCapture = Float.isFinite(this.maxHealthForDeterministicCapture);
 	}
 
 	public ItemCooldowns getCooldowns() {
