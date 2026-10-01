@@ -33,6 +33,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Enchanting](enchanting/Enchanting.md): bookshelf setup, costs versus requirements, eligibility, and reroll behavior
 - [Bookshelf](items/Bookshelf.md), [Book](items/Book.md), [Enchanted Book](items/EnchantedBook.md), and [Lapis Lazuli](items/LapisLazuli.md): supporting materials
 
+- [Status effects](effects/Effects.md): Poison, Wither, Regeneration, and choosing Milk versus Honey
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
