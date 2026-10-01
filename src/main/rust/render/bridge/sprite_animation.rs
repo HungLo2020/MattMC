@@ -1,6 +1,6 @@
 //! Owned animation resource staging and explicit semantic tick delivery.
 //! No normal-game animation admission is implied by these transport endpoints.
-use super::*;
+use crate::render::bridge::*;
 use crate::render::shared::sprite_interpolation::{
     OwnedAtlasAnimationUpdate, OwnedSpriteAnimation, SpriteAnimationClock, SpriteAnimationFrame,
     SpriteAtlasRegion, SpriteMipSheet,
@@ -314,7 +314,7 @@ pub(crate) unsafe fn decode_atlas_animation_update(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::render::bridge::sprite_animation::*;
     use crate::render::shared::sprite_interpolation::{
         apply_sprite_sheet_update, SpriteFrameUpdate,
     };
@@ -408,7 +408,7 @@ mod tests {
         assert_eq!(size_of::<FfiSpriteAnimationSource>(), 64);
         assert_eq!(size_of::<FfiAtlasAnimationAssetUpdate>(), 48);
         for (id, size, fields) in [(102, 32, 5), (103, 64, 10), (104, 48, 6)] {
-            let layout = super::super::layout::layout_for_struct(id).unwrap();
+            let layout = crate::render::bridge::layout::layout_for_struct(id).unwrap();
             assert_eq!(layout.byte_size, size);
             assert_eq!(layout.field_count, fields);
         }

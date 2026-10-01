@@ -1,25 +1,14 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
+pub use super::backends::BackendRuntimeMetrics;
+
+/// What the GAL measured while validating, recording and submitting one
+/// frame's commands: op counts, hazard analysis, validation and backend
+/// timings, native present/swapchain state and GPU timestamps. Renderers embed
+/// it in their own frame profiles.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct WholeFrameProfile {
-    pub ffi_decode_nanos: u64,
-    pub gui_frontend_nanos: u64,
-    pub world_frontend_total_nanos: u64,
-    pub world_validate_frame_nanos: u64,
-    pub world_batching_nanos: u64,
-    pub world_resource_prepare_nanos: u64,
-    pub world_prepare_target_query_nanos: u64,
-    pub world_prepare_render_resources_nanos: u64,
-    pub world_prepare_depth_attachment_nanos: u64,
-    pub world_prepare_g_buffer_resources_nanos: u64,
-    pub world_prepare_g_buffer_cache_check_nanos: u64,
-    pub world_prepare_g_buffer_destroy_nanos: u64,
-    pub world_prepare_g_buffer_plan_nanos: u64,
-    pub world_prepare_g_buffer_create_nanos: u64,
-    pub world_prepare_frame_pass_nanos: u64,
-    pub world_mesh_section_expand_group_nanos: u64,
-    pub shader_plan_lookup_nanos: u64,
+pub struct SubmitProfile {
     pub gal_command_generation_nanos: u64,
     pub gal_submit_total_nanos: u64,
     pub gal_validate_ops_nanos: u64,
@@ -58,25 +47,6 @@ pub struct WholeFrameProfile {
     /// GPU nanoseconds per frontend-assigned profiling scope.
     pub gpu_scope_nanos: [u64; super::resources::GPU_PROFILE_SCOPE_COUNT],
     pub gpu_frame_total_nanos: u64,
-    pub g_buffer_persistent_cache_hits: u64,
-    pub g_buffer_persistent_cache_misses: u64,
-    pub g_buffer_final_binding_cache_hits: u64,
-    pub g_buffer_final_binding_cache_misses: u64,
-    pub g_buffer_attachment_creates: u64,
-    pub g_buffer_pipeline_creates: u64,
-    pub g_buffer_shader_module_creates: u64,
-    pub g_buffer_descriptor_creates: u64,
-    pub g_buffer_render_target_creates: u64,
-    pub g_buffer_resources_retired: u64,
-    pub world_prepare_g_buffer_persistent_key_nanos: u64,
-    pub world_prepare_g_buffer_persistent_lookup_nanos: u64,
-    pub world_prepare_g_buffer_final_key_nanos: u64,
-    pub world_prepare_g_buffer_final_lookup_nanos: u64,
-    pub world_prepare_g_buffer_final_create_nanos: u64,
-    pub world_prepare_frame_target_attachment_query_nanos: u64,
-    pub world_prepare_mesh_material_asset_nanos: u64,
-    pub world_prepare_metrics_accounting_nanos: u64,
-    pub g_buffer_final_pass_creates: u64,
     pub native_acquire_nanos: u64,
     pub native_present_nanos: u64,
     pub native_present_wait_nanos: u64,
@@ -105,35 +75,6 @@ pub struct WholeFrameProfile {
     pub gal_redundant_resource_set_binds_removed: u64,
     pub gal_redundant_vertex_buffer_binds_removed: u64,
     pub gal_redundant_index_buffer_binds_removed: u64,
-    pub world_prepare_mesh_cache_scan_nanos: u64,
-    pub world_prepare_material_resource_nanos: u64,
-    pub world_prepare_mesh_stream_capacity_nanos: u64,
-    pub world_prepare_mesh_stream_lookup_nanos: u64,
-    pub world_prepare_mesh_stream_grow_nanos: u64,
-    pub world_prepare_mesh_resource_nanos: u64,
-    pub world_prepare_material_slot_check_nanos: u64,
-    pub world_prepare_mesh_slot_check_nanos: u64,
-    pub world_prepare_mesh_batch_count: u64,
-    pub world_prepare_mesh_stream_required_bytes: u64,
-    pub world_prepare_mesh_stream_capacity_bytes: u64,
-    pub world_prepare_mesh_stream_grows: u64,
-    pub world_mesh_stream_payload_pack_nanos: u64,
-    pub world_mesh_draw_record_nanos: u64,
-    pub world_mesh_stream_payload_bytes: u64,
-    pub world_mesh_dynamic_offset_count: u64,
-    pub gui_mesh_prepare_nanos: u64,
-    pub gui_mesh_lower_nanos: u64,
-    pub world_mesh_page_indirect_batch_count: u64,
-    pub world_mesh_page_indirect_run_count: u64,
-    pub world_mesh_dynamic_terrain_batch_count: u64,
-    pub world_mesh_dynamic_non_terrain_batch_count: u64,
-    pub world_mesh_terrain_translucent_batch_count: u64,
-    /// Complete native whole-frame boundary, including world/GUI frontend
-    /// work, GAL submission, and post-submit ownership confirmation.
-    pub whole_frame_native_total_nanos: u64,
-    /// Work after GAL accepts the submission: resource ownership commits,
-    /// deferred retirement, and optional observation/capture completion.
-    pub world_post_submit_confirm_nanos: u64,
     /// Exit cost of the nestable command-recording lifetime guard, including
     /// the outermost deferred-destroy drain.
     pub gal_command_recording_finish_nanos: u64,

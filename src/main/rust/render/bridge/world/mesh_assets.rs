@@ -1,4 +1,6 @@
-use super::*;
+//! World material and mesh asset updates: textures, mesh assets, animation frames and sorted indices.
+
+use crate::render::bridge::*;
 use crate::render::worldrender::frame::material_quads as world_material_semantics;
 use crate::render::worldrender::WorldMeshAnimationFrame;
 use crate::render::worldrender::WORLD_MAX_MESH_ANIMATION_FRAMES;
@@ -384,7 +386,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             "world mesh asset entity identity",
         )?;
         if !entity_identity.is_empty()
-            && !super::world::is_canonical_resource_location(&entity_identity)
+            && !crate::render::bridge::world::is_canonical_resource_location(&entity_identity)
         {
             return Err(GalError::ffi(
                 StatusCode::InvalidArgument,

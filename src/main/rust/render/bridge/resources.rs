@@ -1,4 +1,7 @@
-use super::*;
+//! The resource-batch entry point: decoding owned create/update/destroy
+//! requests and executing them against the GAL.
+
+use crate::render::bridge::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FfiOwnedCreate<T> {
@@ -440,42 +443,6 @@ pub unsafe fn decode_resource_batch(
             .push((require_handle(item.handle, kind, "destroy handle")?, kind));
     }
     Ok(owned)
-}
-pub fn serialize_resource_batch_canonical(batch: &FfiOwnedResourceBatch) -> Vec<u8> {
-    let mut out = Vec::new();
-    push_u32(&mut out, FFI_ABI_VERSION);
-    push_u64(&mut out, batch.negotiated_feature_bits);
-    push_u64(&mut out, batch.buffers.len() as u64);
-    for item in &batch.buffers {
-        push_create_prefix(&mut out, item.request_id, &item.desc.label);
-        push_u64(&mut out, item.desc.size);
-        push_u32(&mut out, item.desc.memory as u32);
-        push_u64(&mut out, buffer_usage_bits_from_desc(&item.desc.usages));
-    }
-    push_u64(&mut out, batch.textures.len() as u64);
-    for item in &batch.textures {
-        push_create_prefix(&mut out, item.request_id, &item.desc.label);
-        push_u32(&mut out, item.desc.dimension as u32);
-        push_u32(&mut out, item.desc.format as u32);
-        push_extent(&mut out, item.desc.extent);
-        push_u32(&mut out, item.desc.mip_levels);
-        push_u32(&mut out, item.desc.array_layers);
-        push_u64(&mut out, texture_usage_bits_from_desc(&item.desc.usages));
-    }
-    push_u64(&mut out, batch.shaders.len() as u64);
-    for item in &batch.shaders {
-        push_create_prefix(&mut out, item.request_id, &item.desc.label);
-        push_u32(&mut out, item.desc.stage as u32);
-        push_u32(&mut out, item.desc.code_format as u32);
-        push_bytes(&mut out, &item.desc.code);
-        push_str(&mut out, &item.desc.entry_point);
-    }
-    push_u64(&mut out, batch.destroys.len() as u64);
-    for (handle, kind) in &batch.destroys {
-        push_u64(&mut out, handle.raw());
-        push_u32(&mut out, *kind as u32);
-    }
-    out
 }
 pub(crate) fn create_result_capacity_required(batch: &FfiOwnedResourceBatch) -> usize {
     batch.buffers.len()

@@ -1,4 +1,9 @@
-use super::*;
+//! Context registry and lifetime. A context owns one GAL plus the world and
+//! GUI renderers that record into it; contexts live in a per-thread registry
+//! (at most `MAX_BRIDGE_CONTEXTS`, one windowed presenter at a time). Context
+//! creation is where the bridge chooses the GAL backend Java asked for.
+
+use crate::render::bridge::*;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// Maximum number of simultaneously live FFI contexts in one thread-local
@@ -177,10 +182,10 @@ fn ensure_context_capacity() -> GalResult<()> {
     })
 }
 
-fn backend_kind(raw: u32) -> GalResult<BackendKind> {
+fn backend_choice(raw: u32) -> GalResult<BackendChoice> {
     match raw {
-        1 => Ok(BackendKind::Vulkan),
-        2 => Ok(BackendKind::OpenGl),
+        1 => Ok(BackendChoice::Vulkan),
+        2 => Ok(BackendChoice::OpenGl),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown Rust VulkanicGAL backend kind {raw}"),
@@ -196,13 +201,13 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
         let request = read_struct(request, "context create request")?;
         validate_header::<FfiContextCreateRequest>(request.header)?;
         ensure_context_capacity()?;
-        let kind = backend_kind(request.backend_kind)?;
+        let backend = backend_choice(request.backend_kind)?;
         let label = read_label(request.label, "context label")?;
-        let backend = create_backend(kind, &label)?;
-        let mut gal = VulkanicGal::new_with_backend(
+        let mut gal = VulkanicGal::create(
             backend,
+            &label,
             bool_flag(request.tracy_enabled, "tracy enabled")?,
-        );
+        )?;
         gal.install_gpu_profile_classifier(
             crate::render::worldrender::diagnostics::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
@@ -291,11 +296,11 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
             ));
         }
         let label = read_label(request.label, "borrowed OpenGL context label")?;
-        let backend = create_borrowed_opengl_backend(&label, request.stable_window_id)?;
-        let mut gal = VulkanicGal::new_with_backend(
-            backend,
+        let mut gal = VulkanicGal::create_borrowed_opengl(
+            &label,
+            request.stable_window_id,
             bool_flag(request.tracy_enabled, "tracy enabled")?,
-        );
+        )?;
         gal.install_gpu_profile_classifier(
             crate::render::worldrender::diagnostics::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
@@ -398,18 +403,18 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
             present_mode: present_mode(request.present_mode)?,
             max_frames_in_flight: request.max_frames_in_flight,
         };
-        let backend = create_native_windowed_vulkan_backend(
+        let window = NativeWindow {
+            platform: request.platform,
+            stable_window_id: request.stable_window_id,
+            native_display: request.native_display,
+            native_window: request.native_window,
+        };
+        let mut gal = VulkanicGal::create_native_windowed_vulkan(
             &label,
-            request.platform,
-            request.stable_window_id,
-            request.native_display,
-            request.native_window,
+            window,
             surface_desc,
-        )?;
-        let mut gal = VulkanicGal::new_with_backend(
-            backend,
             bool_flag(request.tracy_enabled, "tracy enabled")?,
-        );
+        )?;
         gal.install_gpu_profile_classifier(
             crate::render::worldrender::diagnostics::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
@@ -529,7 +534,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::render::bridge::context::*;
 
     #[test]
     fn windowed_presenter_reservation_is_exclusive_and_releasable() {
@@ -629,4 +634,13 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_last_error(
         }
         bytes.len() as u64
     })
+}
+
+/// Turns GPU frame timestamps on or off for backends that record them.
+/// Timestamps feed the per-frame profile's GPU timings; they cost a few query
+/// writes per pass.
+#[no_mangle]
+pub extern "C" fn mattmc_vulkanic_gal_set_gpu_timestamps_requested(requested: i32) -> i32 {
+    crate::render::vulkanic::create::set_gpu_timestamps_requested(requested != 0);
+    StatusCode::Ok as i32
 }

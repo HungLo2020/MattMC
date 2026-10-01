@@ -22,8 +22,8 @@ geometry/     arenas/streams, batching, translucent order
 passes/       targets, pipelines, oriented target
 features/     outline, world text, particles, experience orbs, decal foil
 terrain/      static chunk-terrain boundary
-diagnostics/  capture, traces, decal/equipment capture, vertex observation,
-              GPU profile scopes
+diagnostics/  whole-frame profile, capture, traces, decal/equipment capture,
+              vertex observation, GPU profile scopes
 teardown.rs, util.rs
 ```
 

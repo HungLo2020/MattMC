@@ -1,4 +1,7 @@
-use super::*;
+//! The ABI struct-layout table: size, alignment and field offsets of every
+//! wire record, keyed by struct id, so Java can check its layouts match.
+
+use crate::render::bridge::*;
 use std::mem::offset_of;
 
 pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {

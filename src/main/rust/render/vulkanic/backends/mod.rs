@@ -27,16 +27,11 @@ use super::resources::{
     PipelineLayoutDesc, RenderPassDesc, RenderTargetDesc, ResourceLayoutDesc, ResourceSetDesc,
     SamplerDesc, ShaderModuleDesc, TextureDesc, TextureViewDesc,
 };
+use super::create::BackendChoice;
 use super::sync::SubmissionId;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct BackendToken(pub u64);
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::render::vulkanic) enum BackendKind {
-    Vulkan,
-    OpenGl,
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompletedHostRead {
@@ -46,48 +41,51 @@ pub struct CompletedHostRead {
     pub bytes: Vec<u8>,
 }
 
+/// Native work counters and timings a backend reports for the latest frame:
+/// command and native-call counts, per-stage CPU nanoseconds, present and
+/// swapchain state, and GPU scope timestamps. Backend-neutral numbers only.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(in crate::render::vulkanic) struct BackendRuntimeMetrics {
-    pub(in crate::render::vulkanic) command_batches: u64,
-    pub(in crate::render::vulkanic) command_lists: u64,
-    pub(in crate::render::vulkanic) command_ops: u64,
-    pub(in crate::render::vulkanic) native_calls: u64,
-    pub(in crate::render::vulkanic) native_flushes: u64,
-    pub(in crate::render::vulkanic) native_finishes: u64,
-    pub(in crate::render::vulkanic) native_fences_inserted: u64,
-    pub(in crate::render::vulkanic) native_fences_polled: u64,
-    pub(in crate::render::vulkanic) native_fences_waited: u64,
-    pub(in crate::render::vulkanic) native_fences_deleted: u64,
-    pub(in crate::render::vulkanic) native_command_buffer_alloc_nanos: u64,
-    pub(in crate::render::vulkanic) native_command_buffer_begin_nanos: u64,
-    pub(in crate::render::vulkanic) native_command_recording_nanos: u64,
-    pub(in crate::render::vulkanic) native_command_buffer_end_nanos: u64,
-    pub(in crate::render::vulkanic) native_queue_submit_nanos: u64,
-    pub(in crate::render::vulkanic) native_timeline_poll_nanos: u64,
-    pub(in crate::render::vulkanic) native_timeline_wait_nanos: u64,
-    pub(in crate::render::vulkanic) native_device_wait_idle_nanos: u64,
-    pub(in crate::render::vulkanic) native_acquire_nanos: u64,
-    pub(in crate::render::vulkanic) native_present_nanos: u64,
-    pub(in crate::render::vulkanic) native_present_wait_nanos: u64,
-    pub(in crate::render::vulkanic) native_command_buffers_allocated: u64,
-    pub(in crate::render::vulkanic) native_command_buffers_freed: u64,
-    pub(in crate::render::vulkanic) native_wait_count: u64,
-    pub(in crate::render::vulkanic) native_device_wait_idle_count: u64,
-    pub(in crate::render::vulkanic) native_present_mode: u64,
-    pub(in crate::render::vulkanic) native_requested_present_mode: u64,
-    pub(in crate::render::vulkanic) native_supported_present_modes: u64,
-    pub(in crate::render::vulkanic) native_present_mode_fallback_reason: u64,
-    pub(in crate::render::vulkanic) native_acquired_image_index: u64,
-    pub(in crate::render::vulkanic) native_swapchain_generation: u64,
-    pub(in crate::render::vulkanic) native_swapchain_image_count: u64,
-    pub(in crate::render::vulkanic) native_surface_min_image_count: u64,
-    pub(in crate::render::vulkanic) native_surface_max_image_count: u64,
-    pub(in crate::render::vulkanic) native_configured_frames_in_flight: u64,
-    pub(in crate::render::vulkanic) native_images_in_flight: u64,
-    pub(in crate::render::vulkanic) native_available_frame_slots: u64,
-    pub(in crate::render::vulkanic) gpu_timestamp_status: u64,
-    pub(in crate::render::vulkanic) gpu_scope_nanos: [u64; GPU_PROFILE_SCOPE_COUNT],
-    pub(in crate::render::vulkanic) gpu_frame_total_nanos: u64,
+pub struct BackendRuntimeMetrics {
+    pub command_batches: u64,
+    pub command_lists: u64,
+    pub command_ops: u64,
+    pub native_calls: u64,
+    pub native_flushes: u64,
+    pub native_finishes: u64,
+    pub native_fences_inserted: u64,
+    pub native_fences_polled: u64,
+    pub native_fences_waited: u64,
+    pub native_fences_deleted: u64,
+    pub native_command_buffer_alloc_nanos: u64,
+    pub native_command_buffer_begin_nanos: u64,
+    pub native_command_recording_nanos: u64,
+    pub native_command_buffer_end_nanos: u64,
+    pub native_queue_submit_nanos: u64,
+    pub native_timeline_poll_nanos: u64,
+    pub native_timeline_wait_nanos: u64,
+    pub native_device_wait_idle_nanos: u64,
+    pub native_acquire_nanos: u64,
+    pub native_present_nanos: u64,
+    pub native_present_wait_nanos: u64,
+    pub native_command_buffers_allocated: u64,
+    pub native_command_buffers_freed: u64,
+    pub native_wait_count: u64,
+    pub native_device_wait_idle_count: u64,
+    pub native_present_mode: u64,
+    pub native_requested_present_mode: u64,
+    pub native_supported_present_modes: u64,
+    pub native_present_mode_fallback_reason: u64,
+    pub native_acquired_image_index: u64,
+    pub native_swapchain_generation: u64,
+    pub native_swapchain_image_count: u64,
+    pub native_surface_min_image_count: u64,
+    pub native_surface_max_image_count: u64,
+    pub native_configured_frames_in_flight: u64,
+    pub native_images_in_flight: u64,
+    pub native_available_frame_slots: u64,
+    pub gpu_timestamp_status: u64,
+    pub gpu_scope_nanos: [u64; GPU_PROFILE_SCOPE_COUNT],
+    pub gpu_frame_total_nanos: u64,
 }
 
 /// Requests GPU frame timestamps from every backend that records them.
@@ -101,12 +99,12 @@ pub(super) fn graphics_backend_lock() -> &'static Mutex<()> {
 }
 
 pub(in crate::render::vulkanic) fn create_backend(
-    kind: BackendKind,
+    choice: BackendChoice,
     label: &str,
 ) -> GalResult<Box<dyn Backend>> {
-    match kind {
-        BackendKind::Vulkan => Ok(Box::new(vulkan::VulkanBackend::new(label)?)),
-        BackendKind::OpenGl => Ok(Box::new(opengl::OpenGlBackend::new(label)?)),
+    match choice {
+        BackendChoice::Vulkan => Ok(Box::new(vulkan::VulkanBackend::new(label)?)),
+        BackendChoice::OpenGl => Ok(Box::new(opengl::OpenGlBackend::new(label)?)),
     }
 }
 

@@ -1,4 +1,7 @@
-use super::*;
+//! Frame entry points: surface configuration, acquire, resize, present,
+//! cancel, shutdown and frame-target capture.
+
+use crate::render::bridge::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_configure(

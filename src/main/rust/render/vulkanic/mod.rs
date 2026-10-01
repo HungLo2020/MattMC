@@ -3,18 +3,12 @@ mod architecture_boundary;
 
 mod backends;
 
-// Private resource-processing prerequisite; not yet admitted through terrain FFI.
-
 mod buffer_upload_capture;
 pub mod commands;
+pub mod create;
 pub mod error;
-pub mod ffi;
 pub mod frame;
 pub mod gal;
-// Explicit same-context atlas references; private until native GUI sampling is wired.
-/// Backend-neutral GUI mesh semantics. This is not an FFI-admitted route
-/// until the owned offscreen renderer consumes it.
-/// Private semantic tiled-GUI lowering; not yet a frame/FFI-admitted route.
 pub mod handles;
 pub mod metrics;
 pub mod resources;
@@ -22,7 +16,7 @@ pub mod sync;
 #[cfg(test)]
 pub(crate) mod test_support;
 
-
+pub use create::{set_gpu_timestamps_requested, BackendChoice, NativeWindow};
 pub use commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandList,
     CommandListDesc, CommandOp, PassAttachment, ResourceBarrier, SubmissionBatch, TextureOrigin3d,

@@ -1,4 +1,8 @@
-use super::*;
+//! Reading and writing Java-owned memory: header and version checks, bounded
+//! slices and byte ranges, labels, flags, and result writes. Everything is
+//! copied out of Java memory before use.
+
+use crate::render::bridge::*;
 
 pub fn validate_header<T>(header: FfiHeader) -> GalResult<()> {
     if !matches!(
@@ -99,6 +103,7 @@ pub unsafe fn read_slice<'a, T>(
     Ok(slice::from_raw_parts(slice_desc.ptr, count))
 }
 
+#[cfg(test)]
 pub unsafe fn validate_buffer_create_request(
     request: *const FfiBufferCreateRequest,
 ) -> GalResult<FfiBufferCreateRequest> {
@@ -127,6 +132,7 @@ pub unsafe fn validate_buffer_create_request(
     Ok(request)
 }
 
+#[cfg(test)]
 pub unsafe fn validate_submission_request(
     request: *const FfiSubmissionRequest,
 ) -> GalResult<FfiSubmissionRequest> {

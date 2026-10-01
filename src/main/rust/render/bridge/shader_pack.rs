@@ -1,4 +1,7 @@
-use super::*;
+//! Shader-pack source and asset updates, copied into the shader pack's own
+//! update types. Parsing and pass policy stay in `render::shaderpack`.
+
+use crate::render::bridge::*;
 use crate::render::shaderpack::source::assets::{ShaderPackAssetFile, ShaderPackAssetUpdate};
 use crate::render::shaderpack::source::{ShaderPackSourceUpdate, ShaderSourceFile};
 

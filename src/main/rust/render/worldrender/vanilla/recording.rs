@@ -694,12 +694,12 @@ impl WorldPrimitiveFrontend {
         profile.world_prepare_frame_pass_nanos = elapsed_nanos_u64(frame_pass_started);
         let metrics_started = std::time::Instant::now();
         let resource_metrics_after = gal.metrics();
-        profile.resource_creates_delta = profile.resource_creates_delta.saturating_add(
+        profile.gal.resource_creates_delta = profile.gal.resource_creates_delta.saturating_add(
             resource_metrics_after
                 .resource_creates
                 .saturating_sub(resource_creates_before),
         );
-        profile.resource_destroys_delta = profile.resource_destroys_delta.saturating_add(
+        profile.gal.resource_destroys_delta = profile.gal.resource_destroys_delta.saturating_add(
             resource_metrics_after
                 .resource_destroys
                 .saturating_sub(resource_destroys_before),
@@ -2829,9 +2829,9 @@ impl WorldPrimitiveFrontend {
         if frame_target.kind() == Some(crate::render::vulkanic::handles::HandleKind::FrameTarget) {
             gal.begin_frame_target_depth_write(frame_target)?;
         }
-        stats.profile.gal_command_generation_nanos = stats
+        stats.profile.gal.gal_command_generation_nanos = stats
             .profile
-            .gal_command_generation_nanos
+            .gal.gal_command_generation_nanos
             .saturating_add(elapsed_nanos_u64(command_generation_started));
         Ok((ops, stats))
     }

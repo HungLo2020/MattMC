@@ -1085,7 +1085,7 @@ impl WorldPrimitiveFrontend {
                 label: "minecraft.world-and-gui.frame".to_string(),
                 command_lists,
             },
-            &mut stats.profile,
+            &mut stats.profile.gal,
         ) {
             Ok(token) => token,
             Err(error) => {
@@ -1516,8 +1516,8 @@ impl WorldPrimitiveFrontend {
         let finish_nanos = elapsed_nanos_u64(finish_started);
         result.and_then(|(mut stats, gui_stats)| {
             finish.map(|()| {
-                stats.profile.gal_command_recording_finish_nanos = finish_nanos;
-                stats.profile.gal_command_recording_deferred_destroys = deferred_destroy_count;
+                stats.profile.gal.gal_command_recording_finish_nanos = finish_nanos;
+                stats.profile.gal.gal_command_recording_deferred_destroys = deferred_destroy_count;
                 (stats, gui_stats)
             })
         })

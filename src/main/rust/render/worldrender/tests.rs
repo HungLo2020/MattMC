@@ -2556,8 +2556,8 @@ fn source_candidate_prepares_matching_png_assets_without_admitting_execution() {
         assert!(coordinator_stats.source_cloud_faces_suppressed);
         assert!(
             coordinator_stats.command_ops > 0
-                && coordinator_stats.profile.pass_count > 0
-                && coordinator_stats.profile.draw_indexed_ops > 0,
+                && coordinator_stats.profile.gal.pass_count > 0
+                && coordinator_stats.profile.gal.draw_indexed_ops > 0,
             "the coordinator source route must record visible terrain/fullscreen work, not only route counters: {coordinator_stats:?}",
         );
         assert!(
@@ -3194,7 +3194,7 @@ fn complete_source_chain_executes_once_on_a_native_acquired_vulkan_frame() {
         .expect("complete normal-terrain and DH source chain must execute on a native acquired target")
         .0;
     assert!(stats.mesh_batch_count > 0);
-    assert!(stats.profile.draw_indexed_ops >= 2);
+    assert!(stats.profile.gal.draw_indexed_ops >= 2);
     let presented = gal
         .present_frame(crate::render::vulkanic::frame::PresentFrameDesc {
             frame: acquired.frame,
@@ -26991,4 +26991,14 @@ fn oversized_graphics_pass_replays_only_the_latest_bound_state() {
                 .count()
         );
     }
+}
+
+#[test]
+fn gal_upload_capture_covers_twice_the_mesh_geometry_residency() {
+    // Persistent mesh allocations span animation poses; the GAL's upload
+    // capture must be able to track two ranges per resident geometry.
+    assert!(
+        2 * WORLD_MESH_GEOMETRY_RESIDENCY
+            <= crate::render::vulkanic::test_support::BUFFER_UPLOAD_CAPTURE_MAX_RANGES
+    );
 }

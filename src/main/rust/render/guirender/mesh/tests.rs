@@ -2023,7 +2023,7 @@ fn item_layer_gaps_are_compacted_in_order_but_duplicates_still_fail() {
     let mut second = first.clone();
     second.layer_index = 3;
     let mut batches = vec![second, first];
-    crate::render::vulkanic::ffi::gui::compact_gui_mesh_item_layers(&mut batches);
+    crate::render::bridge::gui::compact_gui_mesh_item_layers(&mut batches);
     assert_eq!(vec![1, 0], batches.iter().map(|b| b.layer_index).collect::<Vec<_>>());
     validate_batches(&batches).unwrap();
     let duplicate = vec![batches[1].clone(), batches[1].clone()];

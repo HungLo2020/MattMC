@@ -85,7 +85,8 @@ use crate::render::guirender::frontend::{
 };
 use crate::render::guirender::mesh::GuiMeshBatchRequest;
 use crate::render::vulkanic::handles::Handle;
-use crate::render::vulkanic::metrics::{elapsed_nanos_u64, WholeFrameProfile};
+use crate::render::vulkanic::metrics::elapsed_nanos_u64;
+use crate::render::worldrender::diagnostics::profile::WholeFrameProfile;
 use crate::render::vulkanic::resources::{
     AccessFlags, BackendFeature, BlendMode, BufferDesc, BufferUsage, ColorFormat, ShaderConventions,
     CombinedTextureSamplerDesc, CompareOp, DepthBias, Extent3d, FrontFace, GraphicsPipelineDesc,

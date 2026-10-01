@@ -6,5 +6,6 @@ pub(crate) mod capture;
 pub(crate) mod decal_capture;
 pub(crate) mod equipment_capture;
 pub(crate) mod gpu_profile_scopes;
+pub(crate) mod profile;
 pub(crate) mod traces;
 pub(crate) mod vertex_observation;

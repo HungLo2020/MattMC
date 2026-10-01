@@ -1,25 +1,74 @@
+//! The Java boundary: the C ABI that Java calls through FFM downcalls.
+//!
+//! Every `mattmc_vulkanic_gal_*` entry point reads a versioned `#[repr(C)]`
+//! request (`abi`), bounds and copies what Java sent (`memory`, `accounting`),
+//! decodes wire values into GAL and renderer types (`wire`, `capabilities`),
+//! calls the GAL or a renderer, and writes a status result back (`status`).
+//! The bridge makes no rendering decisions. It owns the context registry and
+//! is the one place that chooses a GAL backend (`context`).
+//!
+//! - `abi`: wire records by family, ABI versions and payload limits.
+//! - `layout`: the struct-layout table Java checks against at load.
+//! - `context`: context registry and lifetime, backend choice, capabilities.
+//! - `resources`, `submission`, `frame`: raw GAL resource, command and frame
+//!   entry points.
+//! - `gui`, `world`, `shader_pack`, `sprite_animation`: semantic frames and
+//!   asset updates handed to the GUI renderer, world renderer and shader pack.
+//! - `canonical` (tests only): canonical encoding of decoded batches.
+
+pub(crate) mod abi;
+pub(crate) mod accounting;
+#[cfg(test)]
+pub(crate) mod canonical;
+pub(crate) mod capabilities;
+pub(crate) mod context;
+pub(crate) mod frame;
+pub(crate) mod gui;
+pub(crate) mod layout;
+pub(crate) mod memory;
+pub(crate) mod resources;
+pub(crate) mod shader_pack;
+pub(crate) mod sprite_animation;
+pub(crate) mod status;
+pub(crate) mod submission;
+pub(crate) mod wire;
+pub(crate) mod world;
+
+pub use self::abi::*;
+pub(crate) use self::accounting::*;
+#[cfg(test)]
+pub(crate) use self::canonical::*;
+pub(crate) use self::capabilities::*;
+pub(crate) use self::context::*;
+pub(crate) use self::gui::*;
+pub(crate) use self::memory::*;
+#[cfg(test)]
+pub(crate) use self::resources::*;
+pub(crate) use self::status::*;
+pub(crate) use self::submission::*;
+pub(crate) use self::wire::*;
+#[cfg(test)]
+pub(crate) use self::world::*;
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::mem::{align_of, size_of};
 use std::ptr;
 use std::slice;
 
-use super::backends::{
-    create_backend, create_borrowed_opengl_backend, create_native_windowed_vulkan_backend,
-    BackendKind,
-};
-use super::commands::{
+use crate::render::vulkanic::create::{BackendChoice, NativeWindow};
+use crate::render::vulkanic::commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandList,
     CommandListDesc, CommandOp, PassAttachment, ResourceBarrier, SubmissionBatch, TextureOrigin3d,
     TextureUsageState,
 };
-use super::error::{ErrorDomain, GalError, GalResult, StatusCode};
-use super::frame::{
+use crate::render::vulkanic::error::{ErrorDomain, GalError, GalResult, StatusCode};
+use crate::render::vulkanic::frame::{
     FrameAcquireDesc, FrameAcquireStatus, FrameCorrelationId, FrameId as VulkanicFrameId,
     FramePresentStatus, FrameRenderTargetId, FrameResizeDesc, FrameSurfaceDesc, PresentFrameDesc,
     PresentMode,
 };
-use super::gal::VulkanicGal;
+use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::guirender::frontend::{
     GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat,
     GuiSpriteRequest, GuiSubmitStats, GuiTiledQuadRequest, GUI_MAX_RAW_IMAGES,
@@ -30,9 +79,9 @@ use crate::render::guirender::mesh::{
     GuiMeshBatchRequest, GuiMeshLightingMode, GuiMeshMaterialMode, GuiMeshVertex,
     GUI_MESH_MAX_BATCHES, GUI_MESH_MAX_INDICES, GUI_MESH_MAX_VERTICES,
 };
-use super::handles::{Handle, HandleKind};
-use super::metrics::Metrics;
-use super::resources::{
+use crate::render::vulkanic::handles::{Handle, HandleKind};
+use crate::render::vulkanic::metrics::Metrics;
+use crate::render::vulkanic::resources::{
     AccessFlags, BackendCapabilities, BackendFeature, BackendLimits, BlendMode,
     BufferDesc, BufferUsage, ColorFormat, CompareOp, ComputePipelineDesc, CullMode, Extent3d,
     FrameTargetDesc, GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc,
@@ -42,7 +91,7 @@ use super::resources::{
     ShaderStage, TextureDesc, TextureDimension, TextureFormat, TextureSubresourceRange,
     TextureUsage, TextureViewDesc,
 };
-use super::sync::SubmissionId;
+use crate::render::vulkanic::sync::SubmissionId;
 use crate::render::worldrender::WorldBackgroundRequest;
 use crate::render::worldrender::WorldBorderAssetPayload;
 use crate::render::worldrender::WorldBorderQuadRequest;
@@ -93,33 +142,6 @@ use crate::render::scene::strata::WORLD_STRATUM_TERRAIN;
 use crate::render::scene::mesh::WORLD_TOPOLOGY_TRIANGLES;
 use crate::render::scene::mesh::WORLD_WINDING_CCW;
 use crate::render::scene::mesh::WORLD_WINDING_CW;
-
-pub(crate) mod abi;
-pub(crate) mod context;
-pub(crate) mod frame;
-pub(crate) mod gui;
-pub(crate) mod layout;
-pub(crate) mod material;
-pub(crate) mod memory;
-pub(crate) mod resources;
-pub(crate) mod shader_pack;
-pub(crate) mod sprite_animation;
-pub(crate) mod status;
-pub(crate) mod submission;
-pub(crate) mod world;
-
-pub use self::abi::*;
-pub(crate) use self::context::*;
-pub(crate) use self::gui::*;
-#[cfg(test)]
-pub(crate) use self::material::*;
-pub(crate) use self::memory::*;
-#[cfg(test)]
-pub(crate) use self::resources::*;
-pub(crate) use self::status::*;
-pub(crate) use self::submission::*;
-#[cfg(test)]
-pub(crate) use self::world::*;
 
 #[cfg(test)]
 mod tests;

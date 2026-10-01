@@ -136,49 +136,48 @@ fn backend_modules_do_not_reference_each_other() {
 }
 
 #[test]
-fn vulkanic_ffi_is_split_into_focused_modules() {
+fn bridge_is_split_into_focused_modules() {
     let rust_root = Path::new(RUST_ROOT);
-    let ffi_file = rust_root.join("render/vulkanic/ffi.rs");
-    let ffi_dir = rust_root.join("render/vulkanic/ffi");
+    for removed in ["render/vulkanic/ffi", "render/vulkanic/ffi.rs", "render/bridge.rs"] {
+        assert!(
+            !rust_root.join(removed).exists(),
+            "{removed} must not return; the bridge lives in render/bridge/"
+        );
+    }
+    let bridge = rust_root.join("render/bridge");
     let required = [
         "mod.rs",
-        "abi.rs",
-        "memory.rs",
-        "status.rs",
+        "abi/mod.rs",
+        "abi/common.rs",
         "layout.rs",
+        "memory.rs",
+        "accounting.rs",
+        "wire.rs",
+        "capabilities.rs",
+        "status.rs",
         "context.rs",
         "resources.rs",
         "submission.rs",
         "frame.rs",
-        "gui.rs",
-        "world.rs",
-        "material.rs",
+        "gui/mod.rs",
+        "world/mod.rs",
+        "world/mesh_assets.rs",
+        "shader_pack.rs",
+        "sprite_animation.rs",
         "tests/mod.rs",
     ];
-
-    assert!(
-        !ffi_file.exists(),
-        "{} must not return as a monolithic FFI file",
-        relative(&ffi_file)
-    );
     for file in required {
-        let path = ffi_dir.join(file);
-        assert!(
-            path.is_file(),
-            "missing focused FFI module {}",
-            relative(&path)
-        );
+        let path = bridge.join(file);
+        assert!(path.is_file(), "missing focused bridge module {}", relative(&path));
     }
 }
 
 #[test]
 fn semantic_ffi_modules_do_not_construct_rendering_policy() {
     let rust_root = Path::new(RUST_ROOT);
-    let checked = [
-        rust_root.join("render/vulkanic/ffi/gui.rs"),
-        rust_root.join("render/vulkanic/ffi/world.rs"),
-        rust_root.join("render/vulkanic/ffi/material.rs"),
-    ];
+    let mut checked = rust_files(&rust_root.join("render/bridge/gui"));
+    checked.extend(rust_files(&rust_root.join("render/bridge/world")));
+    assert!(checked.iter().any(|file| file.ends_with("world/mesh_assets.rs")));
     let forbidden_tokens = [
         "CommandOp::",
         "create_graphics_pipeline",
@@ -218,7 +217,7 @@ fn semantic_ffi_modules_do_not_construct_rendering_policy() {
 
     assert!(
         violations.is_empty(),
-        "Semantic FFI modules must only decode/copy transport records and call frontends:\n{}",
+        "Semantic bridge modules must only decode/copy transport records and call renderers:\n{}",
         violations.join("\n")
     );
 }
@@ -226,7 +225,7 @@ fn semantic_ffi_modules_do_not_construct_rendering_policy() {
 #[test]
 fn ffi_abi_does_not_accumulate_producer_specific_schema_names() {
     let rust_root = Path::new(RUST_ROOT);
-    let ffi_dir = rust_root.join("render/vulkanic/ffi");
+    let ffi_dir = rust_root.join("render/bridge");
     let forbidden = [
         "BlockMarker",
         "TerrainParticle",
@@ -306,7 +305,7 @@ fn opengl_backend_does_not_borrow_iris_renderer_internals() {
 fn shader_pack_policy_stays_out_of_ffi_and_backends() {
     let rust_root = Path::new(RUST_ROOT);
     let checked_roots = [
-        rust_root.join("render/vulkanic/ffi"),
+        rust_root.join("render/bridge"),
         rust_root.join("render/vulkanic/backends/opengl"),
         rust_root.join("render/vulkanic/backends/vulkan"),
     ];
@@ -398,7 +397,7 @@ fn shader_pack_runtime_owns_private_terrain_volume_resources() {
 #[test]
 fn source_terrain_execution_is_rust_owned_and_never_an_ffi_or_iris_route() {
     let rust_root = Path::new(RUST_ROOT);
-    let ffi_dir = rust_root.join("render/vulkanic/ffi");
+    let ffi_dir = rust_root.join("render/bridge");
     let source = world_renderer_source(rust_root);
 
     assert!(
@@ -487,12 +486,10 @@ fn frontend_production_code_does_not_name_backend_implementations() {
         if is_inside(&file, &backends) {
             continue;
         }
-        // The FFI context is the composition root that constructs the
-        // backend Java selected; it may name backend constructors.
-        let composition_root = file.ends_with("ffi/mod.rs") || file.ends_with("ffi/context.rs");
+        // Backends are chosen through `vulkanic::create`; nothing names them.
         for (line_number, line) in production_lines(&read_source(&file)) {
             for token in forbidden {
-                if line.contains(token) && !(composition_root && token.starts_with("backends::")) {
+                if line.contains(token) {
                     violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
                 }
             }
@@ -515,6 +512,9 @@ fn core_gal_and_backends_do_not_depend_on_frontends() {
         "worldrender",
         "guirender",
         "shaderpack",
+        "render::scene",
+        "render::shared",
+        "render::bridge",
         "vulkanic::terrain",
         "vulkanic::ffi",
         "super::ffi",
@@ -643,8 +643,8 @@ fn core_gal_and_backends_do_not_branch_on_resource_labels() {
 }
 
 /// GAL modules that code outside `render::vulkanic` may use.
-const PUBLIC_GAL_MODULES: [&str; 8] =
-    ["gal", "resources", "commands", "handles", "error", "frame", "sync", "metrics"];
+const PUBLIC_GAL_MODULES: [&str; 9] =
+    ["gal", "create", "resources", "commands", "handles", "error", "frame", "sync", "metrics"];
 
 /// `render::vulkanic::X` modules named on a line, excluding the public GAL
 /// modules and the items the GAL re-exports at its root (`GalError`, ...).
@@ -769,6 +769,43 @@ fn guirender_uses_the_public_gal_and_lower_layers_only() {
 }
 
 #[test]
+fn bridge_is_the_composition_root_over_the_public_gal() {
+    let rust_root = Path::new(RUST_ROOT);
+    let mut violations = Vec::new();
+    // The bridge reaches the GAL through its public modules only.
+    for file in production_files(&rust_root.join("render/bridge")) {
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            if !non_public_gal_references(&line).is_empty() {
+                violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+            }
+        }
+    }
+    // Only the bridge creates GALs and chooses their backend.
+    let creation = [
+        "BackendChoice",
+        "NativeWindow",
+        "VulkanicGal::create",
+        "set_gpu_timestamps_requested",
+    ];
+    let render = rust_root.join("render");
+    for file in production_files(&render) {
+        if is_inside(&file, &render.join("bridge")) || is_inside(&file, &render.join("vulkanic")) {
+            continue;
+        }
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            if creation.iter().any(|token| line.contains(token)) {
+                violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "render::bridge uses the public GAL modules {PUBLIC_GAL_MODULES:?}, and only it creates GALs:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
 fn shared_helpers_depend_only_on_the_public_gal() {
     let rust_root = Path::new(RUST_ROOT);
     let mut violations = Vec::new();
@@ -840,17 +877,10 @@ fn world_renderer_production_source(rust_root: &Path) -> String {
         .join("\n")
 }
 
-/// Core GAL files (backend-neutral API and bookkeeping) plus backend
-/// implementation files, excluding test-only suites.
+/// Every production file of the GAL: its core modules and its backends.
 fn core_and_backend_production_files(rust_root: &Path) -> Vec<PathBuf> {
-    let vulkanic = rust_root.join("render/vulkanic");
-    let mut files: Vec<PathBuf> = [
-        "gal.rs", "resources.rs", "commands.rs", "frame.rs", "sync.rs", "handles.rs", "error.rs",
-    ]
-    .iter()
-    .map(|name| vulkanic.join(name))
-    .collect();
-    files.extend(production_files(&vulkanic.join("backends")));
+    let files = production_files(&rust_root.join("render/vulkanic"));
+    assert!(files.iter().any(|file| file.ends_with("vulkanic/buffer_upload_capture.rs")));
     files
 }
 

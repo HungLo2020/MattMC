@@ -1,4 +1,7 @@
-use super::*;
+//! End-to-end bridge tests through the C ABI, plus `gal_abi` for record
+//! layouts, ABI versions and raw batch decoding.
+
+use crate::render::bridge::*;
 use crate::render::guirender::atlas_reference::GuiAtlasOwner;
 use crate::render::vulkanic::resources::{
     BackendFeatureFlags, GlslDialect, ShaderConventions, BackendLimits, BlendMode,
@@ -85,9 +88,9 @@ fn blend_mode_wire_values_cover_every_declared_mode_including_crumbling() {
         BlendMode::DepthMask,
     ];
     for (index, expected_mode) in expected.into_iter().enumerate() {
-        assert_eq!(expected_mode, status::blend_mode(index as u32 + 1).unwrap());
+        assert_eq!(expected_mode, wire::blend_mode(index as u32 + 1).unwrap());
     }
-    let error = status::blend_mode(15).expect_err("unassigned blend mode must fail closed");
+    let error = wire::blend_mode(15).expect_err("unassigned blend mode must fail closed");
     assert_eq!(StatusCode::UnknownEnum, error.code);
 }
 
@@ -174,10 +177,10 @@ fn experience_orb_frame_transport_lowers_placement_and_preserves_mesh_order() {
     orbs[0].entity_transform[12] = 999.0;
     assert_eq!(instance.transform[12], 1.25);
     assert_eq!(orbs[0].entity_transform[12], 999.0);
-    let layout = super::layout::layout_for_struct(110).unwrap();
+    let layout = crate::render::bridge::layout::layout_for_struct(110).unwrap();
     assert_eq!(layout.byte_size, 112);
     assert_eq!(&layout.field_offsets[..8], &[0, 4, 8, 16, 24, 88, 104, 108]);
-    let layout = super::layout::layout_for_struct(53).unwrap();
+    let layout = crate::render::bridge::layout::layout_for_struct(53).unwrap();
     assert_eq!(
         layout.field_offsets[45],
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32
@@ -287,7 +290,7 @@ fn particle_semantic_transport_lowers_owned_geometry_in_the_whole_frame() {
     p.center[0] = 100.0;
     assert_eq!(quad.vertices[0][0], 1.5, "decoded frame owns its geometry");
     assert_eq!(p.center[0], 100.0);
-    let layout = super::layout::layout_for_struct(108).unwrap();
+    let layout = crate::render::bridge::layout::layout_for_struct(108).unwrap();
     assert_eq!(layout.field_count, 10);
     assert_eq!(
         layout.byte_size,
@@ -297,7 +300,7 @@ fn particle_semantic_transport_lowers_owned_geometry_in_the_whole_frame() {
         layout.field_offsets[5],
         std::mem::offset_of!(FfiWorldParticleQuadRequest, rotation) as u32
     );
-    let layout = super::layout::layout_for_struct(53).unwrap();
+    let layout = crate::render::bridge::layout::layout_for_struct(53).unwrap();
     assert_eq!(
         layout.field_offsets[44],
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_particle_quads) as u32
@@ -347,24 +350,24 @@ fn terrain_surface_transport_uses_rust_block_atlas_and_cutout_policy() {
 fn particle_semantic_transport_preserves_interleaving_and_equal_index_order() {
     let base = semantic_particle_record();
     let materials =
-        super::world::merge_particle_semantics(vec![], &[base, base], [1280, 720]).unwrap();
+        crate::render::bridge::world::merge_particle_semantics(vec![], &[base, base], [1280, 720]).unwrap();
     let mut particles = [base; 4];
     for (p, (index, color)) in particles.iter_mut().zip([(0, 1), (1, 2), (1, 3), (2, 4)]) {
         p.material_index = index;
         p.color_argb = color;
     }
     let result =
-        super::world::merge_particle_semantics(materials.clone(), &particles, [1280, 720]).unwrap();
+        crate::render::bridge::world::merge_particle_semantics(materials.clone(), &particles, [1280, 720]).unwrap();
     assert_eq!(
         result.iter().map(|q| q.color_argb).collect::<Vec<_>>(),
         vec![1, base.color_argb, 2, 3, base.color_argb, 4]
     );
     particles[2].material_index = 0;
     assert!(
-        super::world::merge_particle_semantics(materials.clone(), &particles, [1280, 720]).is_err()
+        crate::render::bridge::world::merge_particle_semantics(materials.clone(), &particles, [1280, 720]).is_err()
     );
     particles[2].material_index = 3;
-    assert!(super::world::merge_particle_semantics(materials, &particles, [1280, 720]).is_err());
+    assert!(crate::render::bridge::world::merge_particle_semantics(materials, &particles, [1280, 720]).is_err());
 }
 
 #[test]
@@ -430,8 +433,8 @@ fn gui_atlas_reference_transport_is_owned_bounded_and_layout_described() {
     );
     assert_eq!(48, size_of::<FfiGuiAtlasReference>());
     assert_eq!(40, size_of::<FfiGuiAtlasReferenceUpdate>());
-    assert!(super::layout::layout_for_struct(105).is_ok());
-    assert!(super::layout::layout_for_struct(106).is_ok());
+    assert!(crate::render::bridge::layout::layout_for_struct(105).is_ok());
+    assert!(crate::render::bridge::layout::layout_for_struct(106).is_ok());
     for count in [4097, u64::MAX] {
         request.references = FfiSlice {
             ptr: 1usize as *const FfiGuiAtlasReference,
@@ -504,14 +507,7 @@ fn gui_submit_ffi_consumes_context_owned_atlas_declarations_without_raw_images()
         let context = registry.contexts.get_mut(&id).unwrap();
         let mut capabilities = test_capabilities();
         capabilities.features.blended_pass = true;
-        context.gal = VulkanicGal::new_with_backend(
-            Box::new(
-                crate::render::vulkanic::backends::mock::MockBackend::with_capabilities(
-                    capabilities,
-                ),
-            ),
-            false,
-        );
+        context.gal = crate::render::vulkanic::test_support::mock_gal_with_capabilities(capabilities);
         context
             .world_primitive_frontend
             .apply_world_mesh_asset_update(
@@ -883,7 +879,7 @@ fn ffi_barrier_rejects_deprecated_stage_access_bits() {
         src_queue: QueueClass::Graphics as u32,
         dst_queue: QueueClass::Graphics as u32,
     };
-    let error = super::submission::decode_barrier(&barrier).unwrap_err();
+    let error = crate::render::bridge::submission::decode_barrier(&barrier).unwrap_err();
     assert_eq!(StatusCode::InvalidArgument, error.code);
 }
 
@@ -918,7 +914,7 @@ fn stable_ffi_rejects_internal_d3_texture_resources_even_when_the_backend_suppor
 
 fn test_vulkan_capabilities() -> BackendCapabilities {
     BackendCapabilities {
-        shader_conventions: crate::render::vulkanic::backends::vulkan_capabilities()
+        shader_conventions: crate::render::vulkanic::test_support::vulkan_capabilities()
             .shader_conventions,
         name: "ffi-test-vulkan",
         ..test_capabilities()
@@ -1066,18 +1062,18 @@ fn gui_mesh_batch_request(
 
 #[test]
 fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
-    let sprite = super::layout::layout_for_struct(44).expect("GUI sprite layout");
+    let sprite = crate::render::bridge::layout::layout_for_struct(44).expect("GUI sprite layout");
     assert_eq!(14, sprite.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiGuiSpriteRequest, sequence) as u32,
         sprite.field_offsets[13]
     );
 
-    let affine = super::layout::layout_for_struct(92).expect("GUI affine layout");
+    let affine = crate::render::bridge::layout::layout_for_struct(92).expect("GUI affine layout");
     assert_eq!(27, affine.field_count);
     assert_eq!(152, size_of::<FfiGuiAffineQuadRequest>());
     assert_eq!(136, affine.field_offsets[26]);
-    let layer = super::layout::layout_for_struct(107).unwrap();
+    let layer = crate::render::bridge::layout::layout_for_struct(107).unwrap();
     assert_eq!(7, layer.field_count);
     assert_eq!(128, size_of::<FfiGuiItemRasterLayer>());
     assert_eq!(60, layer.field_offsets[6]);
@@ -1102,7 +1098,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         affine.field_offsets[22]
     );
 
-    let mesh_vertex = super::layout::layout_for_struct(96).expect("GUI mesh vertex layout");
+    let mesh_vertex = crate::render::bridge::layout::layout_for_struct(96).expect("GUI mesh vertex layout");
     assert_eq!(7, mesh_vertex.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiGuiMeshVertex, source_face) as u32,
@@ -1116,7 +1112,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiGuiMeshVertex, local_uv) as u32,
         mesh_vertex.field_offsets[2]
     );
-    let mesh_batch = super::layout::layout_for_struct(97).expect("GUI mesh batch layout");
+    let mesh_batch = crate::render::bridge::layout::layout_for_struct(97).expect("GUI mesh batch layout");
     assert_eq!(40, mesh_batch.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiGuiMeshBatchRequest, item_cache_identity) as u32,
@@ -1175,7 +1171,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         mesh_batch.field_offsets[26]
     );
 
-    let whole_result = super::layout::layout_for_struct(54).expect("whole-frame result layout");
+    let whole_result = crate::render::bridge::layout::layout_for_struct(54).expect("whole-frame result layout");
     assert_eq!(55, whole_result.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitResult, gui_mesh_draw_count) as u32,
@@ -1191,7 +1187,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
     );
 
     let first_person =
-        super::layout::layout_for_struct(98).expect("world first-person frame layout");
+        crate::render::bridge::layout::layout_for_struct(98).expect("world first-person frame layout");
     assert_eq!(7, first_person.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWorldFirstPersonFrame, projection_matrix) as u32,
@@ -1205,8 +1201,8 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWorldFirstPersonFrame, model_view_matrix) as u32,
         first_person.field_offsets[5]
     );
-    let whole_frame = super::layout::layout_for_struct(53).expect("whole-frame layout");
-    let texture = super::layout::layout_for_struct(67).expect("mesh texture layout");
+    let whole_frame = crate::render::bridge::layout::layout_for_struct(53).expect("whole-frame layout");
+    let texture = crate::render::bridge::layout::layout_for_struct(67).expect("mesh texture layout");
     assert_eq!(16, texture.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWorldMeshTextureAssetPayload, requested_mip_levels) as u32,
@@ -1244,13 +1240,13 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, gui_projection_height) as u32,
         whole_frame.field_offsets[35]
     );
-    let gui_frame = super::layout::layout_for_struct(45).unwrap();
+    let gui_frame = crate::render::bridge::layout::layout_for_struct(45).unwrap();
     assert_eq!(13, gui_frame.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiGuiFrameSubmitRequest, tiled_quads) as u32,
         gui_frame.field_offsets[12]
     );
-    let tiled = super::layout::layout_for_struct(101).unwrap();
+    let tiled = crate::render::bridge::layout::layout_for_struct(101).unwrap();
     assert_eq!(12, tiled.field_count);
     assert_eq!(size_of::<FfiGuiTiledQuadRequest>() as u32, tiled.byte_size);
     assert_eq!(
@@ -1303,7 +1299,7 @@ fn gui_mesh_decal_transport_copies_poses_and_rejects_noncanonical_or_incomplete_
     let indices = [0_u32, 1, 2];
     let mut request = gui_mesh_batch_request(&vertices, &indices);
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: request,
                 count: 1,
@@ -1353,7 +1349,7 @@ fn gui_mesh_block_layout_transport_preserves_double_bounds_and_original_normals(
     let indices = [0_u32, 1, 2];
     let mut request = gui_mesh_batch_request(&vertices, &indices);
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: request,
                 count: 1,
@@ -1427,7 +1423,7 @@ fn gui_mesh_flat_scale_transport_requires_native_layout_and_unresolved_frame_lig
     request.guard_pixels = 0;
     request.model_transform = crate::render::guirender::items::raster::GuiItemModelTransform::default().0;
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: request,
                 count: 1,
@@ -1457,7 +1453,7 @@ fn gui_mesh_foil_transport_preserves_semantics_and_rejects_invalid_modes() {
     let indices = [0_u32, 1, 2];
     let mut request = gui_mesh_batch_request(&vertices, &indices);
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: request,
                 count: 1,
@@ -1507,7 +1503,7 @@ fn gui_inventory_block_lighting_transport_is_explicit_and_closed() {
     let mut request = gui_mesh_batch_request(&vertices, &indices);
     request.lighting_mode = 3;
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: request,
                 count: 1,
@@ -1534,7 +1530,7 @@ fn gui_entity_preview_decal_material_transport_is_explicit_and_closed() {
     request.lighting_mode = 5;
     request.alpha_cutoff = 0.1;
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: request,
                 count: 1,
@@ -1557,7 +1553,7 @@ fn gui_mesh_transport_copies_and_rejects_malformed_payloads() {
     let indices = [0_u32, 1, 2];
     let request = gui_mesh_batch_request(&vertices, &indices);
     let decoded = unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: &request,
                 count: 1,
@@ -1572,9 +1568,9 @@ fn gui_mesh_transport_copies_and_rejects_malformed_payloads() {
     assert_eq!(vec![0, 1, 2], decoded[0].indices);
 
     let mut panorama = gui_mesh_batch_request(&vertices, &indices);
-    panorama.material_mode = super::gui::GUI_MESH_MATERIAL_PANORAMA;
+    panorama.material_mode = crate::render::bridge::gui::GUI_MESH_MATERIAL_PANORAMA;
     let panorama_decoded = unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: &panorama,
                 count: 1,
@@ -1593,7 +1589,7 @@ fn gui_mesh_transport_copies_and_rejects_malformed_payloads() {
     let invalid_indices = [0_u32, 1, 3];
     let invalid = gui_mesh_batch_request(&vertices, &invalid_indices);
     let error = unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: &invalid,
                 count: 1,
@@ -1615,7 +1611,7 @@ fn gui_mesh_transport_rejects_aggregate_payload_before_copying_vertices() {
     batch.indices.count = (GUI_MESH_MAX_INDICES - 3) as u64;
     let batches = vec![batch; 70];
     let error = unsafe {
-        super::gui::decode_gui_mesh_batches(
+        crate::render::bridge::gui::decode_gui_mesh_batches(
             FfiSlice {
                 ptr: batches.as_ptr(),
                 count: batches.len() as u64,
@@ -1640,7 +1636,7 @@ fn gui_frame_mesh_transport_is_owned_and_shares_one_item_sequence() {
         count: batches.len() as u64,
     };
     let (_, _, sprites, affine, decoded) = unsafe {
-        super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
+        crate::render::bridge::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
     };
     assert!(sprites.is_empty());
     assert!(affine.is_empty());
@@ -2420,15 +2416,15 @@ fn experience_orb_asset_transport_lowers_copied_appearance_without_caller_geomet
     assert_eq!(mesh.vertices.len(), 4);
     assert_eq!(mesh.index_bytes.len(), 12);
     assert_eq!(mesh.entity_identity, "minecraft:experience_orb");
-    let layout = super::layout::layout_for_struct(109).unwrap();
+    let layout = crate::render::bridge::layout::layout_for_struct(109).unwrap();
     assert_eq!(layout.byte_size, 40);
     assert_eq!(&layout.field_offsets[..8], &[0, 4, 8, 16, 24, 28, 32, 36]);
-    let update_layout = super::layout::layout_for_struct(68).unwrap();
+    let update_layout = crate::render::bridge::layout::layout_for_struct(68).unwrap();
     assert_eq!(update_layout.field_count, 8);
     let empty = world_mesh_asset_update_request(&[], &[]);
     assert_eq!(
-        super::status::input_bytes_for_world_mesh_asset_update(&request)
-            - super::status::input_bytes_for_world_mesh_asset_update(&empty),
+        crate::render::bridge::accounting::input_bytes_for_world_mesh_asset_update(&request)
+            - crate::render::bridge::accounting::input_bytes_for_world_mesh_asset_update(&empty),
         40
     );
 }
@@ -2739,15 +2735,15 @@ fn terrain_face_mask_matches_sodium_section_bounds() {
     instance.terrain_origin = [0, 0, 0];
     instance.terrain_camera = [100.0, 0.0, -100.0];
     assert_eq!(
-        super::world::terrain_visible_facing_mask(&instance),
+        crate::render::bridge::world::terrain_visible_facing_mask(&instance),
         0b1110011
     );
     instance.terrain_camera = [-3.0, 0.0, 0.0];
-    assert_eq!(super::world::terrain_visible_facing_mask(&instance) & 1, 0);
+    assert_eq!(crate::render::bridge::world::terrain_visible_facing_mask(&instance) & 1, 0);
     instance.terrain_camera = [-2.0, 0.0, 0.0];
-    assert_eq!(super::world::terrain_visible_facing_mask(&instance) & 1, 1);
+    assert_eq!(crate::render::bridge::world::terrain_visible_facing_mask(&instance) & 1, 1);
     instance.terrain_placement_mode = 0;
-    assert_eq!(super::world::terrain_visible_facing_mask(&instance), 0x7f);
+    assert_eq!(crate::render::bridge::world::terrain_visible_facing_mask(&instance), 0x7f);
 }
 
 #[test]
@@ -2773,17 +2769,17 @@ fn semantic_affine_material_is_copied_and_unknown_modes_are_rejected() {
         count: 1,
     };
     let (_, _, _, decoded, _) = unsafe {
-        super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
+        crate::render::bridge::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
     };
     affine.material_mode = 2;
     assert_eq!(decoded[0].material, GuiAffineMaterial::FlatItemPending);
     let (_, _, _, cutout, _) = unsafe {
-        super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
+        crate::render::bridge::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
     };
     assert_eq!(cutout[0].material, GuiAffineMaterial::FlatItemCutoutPending);
     affine.material_mode = 3;
     assert!(unsafe {
-        super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities())
+        crate::render::bridge::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities())
     }
     .is_err());
 }
@@ -2800,7 +2796,7 @@ fn full_item_raster_ffi_copies_scale_and_rejects_incoherent_semantics() {
             ptr: affine,
             count: 1,
         };
-        unsafe { super::gui::decode_gui_frame_submit_with_mesh(&frame, test_capabilities()) }
+        unsafe { crate::render::bridge::gui::decode_gui_frame_submit_with_mesh(&frame, test_capabilities()) }
     };
     let (_, _, _, owned, _) = decode(&affine).unwrap();
     assert_eq!(
@@ -2886,7 +2882,7 @@ fn item_layer_transport_copies_order_and_rejects_invalid_nested_data_before_admi
             ptr: value,
             count: 1,
         };
-        unsafe { super::gui::decode_gui_frame_submit_with_mesh(&frame, test_capabilities()) }
+        unsafe { crate::render::bridge::gui::decode_gui_frame_submit_with_mesh(&frame, test_capabilities()) }
     };
     let owned = decode(&affine).unwrap().3;
     assert_eq!(
@@ -2969,7 +2965,7 @@ fn semantic_gui_projection_is_owned_exact_and_validated_for_every_family() {
     request.gui_projection_width = 319.75;
     request.gui_projection_height = 179.5;
     let (_, _, sprites, affine, meshes) = unsafe {
-        super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
+        crate::render::bridge::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities()).unwrap()
     };
     request.gui_projection_width = 320.0;
     assert_eq!([319.75, 179.5], sprites[0].projection_extent);
@@ -2979,7 +2975,7 @@ fn semantic_gui_projection_is_owned_exact_and_validated_for_every_family() {
     for invalid in [f32::NAN, f32::INFINITY, 0.0, -1.0, 319.0, 320.5] {
         request.gui_projection_width = invalid;
         assert!(unsafe {
-            super::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities())
+            crate::render::bridge::gui::decode_gui_frame_submit_with_mesh(&request, test_capabilities())
         }
         .is_err());
     }
@@ -3004,7 +3000,7 @@ fn semantic_gui_affine_quad_ffi_copies_and_rejects_malformed_input() {
         count: affine_quads.len() as u64,
     };
     let (_generation, _target, sprites, owned) = unsafe {
-        super::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()).unwrap()
+        crate::render::bridge::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()).unwrap()
     };
     assert!(sprites.is_empty());
     affine_quads[0].x0 = 99.0;
@@ -3019,7 +3015,7 @@ fn semantic_gui_affine_quad_ffi_copies_and_rejects_malformed_input() {
         count: 1,
     };
     let error =
-        unsafe { super::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()) }
+        unsafe { crate::render::bridge::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()) }
             .expect_err("malformed affine quad must fail");
     assert_eq!(error.code, StatusCode::InvalidArgument);
     assert!(error.message.contains("GUI affine quad byte size mismatch"));
@@ -3033,7 +3029,7 @@ fn semantic_gui_affine_quad_ffi_copies_and_rejects_malformed_input() {
         count: 1,
     };
     let error =
-        unsafe { super::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()) }
+        unsafe { crate::render::bridge::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()) }
             .expect_err("out-of-bounds GUI clip must fail");
     assert_eq!(error.code, StatusCode::InvalidArgument);
     assert!(error.message.contains("clip"));
@@ -3046,7 +3042,7 @@ fn semantic_gui_ffi_rejects_missing_or_duplicate_cross_family_sequences() {
     let sprites = vec![sprite];
     let request = frame_request(&sprites);
     let error =
-        unsafe { super::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()) }
+        unsafe { crate::render::bridge::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()) }
             .expect_err("zero scheduler sequence must fail");
     assert_eq!(StatusCode::InvalidArgument, error.code);
     assert!(error.message.contains("non-zero scheduler sequences"));
@@ -3060,7 +3056,7 @@ fn semantic_gui_ffi_rejects_missing_or_duplicate_cross_family_sequences() {
         count: affine_quads.len() as u64,
     };
     let error =
-        unsafe { super::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()) }
+        unsafe { crate::render::bridge::gui::decode_gui_frame_submit_with_affine(&request, test_capabilities()) }
             .expect_err("duplicate cross-family sequence must fail");
     assert_eq!(StatusCode::InvalidArgument, error.code);
     assert!(error.message.contains("must be unique"));
@@ -3636,7 +3632,7 @@ fn world_and_hand_decal_foil_transport_copies_context_and_rejects_malformed_requ
             unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.is_err()
         );
     }
-    let layout = super::layout::layout_for_struct(69).unwrap();
+    let layout = crate::render::bridge::layout::layout_for_struct(69).unwrap();
     assert_eq!(layout.field_count, 31);
     assert_eq!(
         layout.field_offsets[24],
@@ -4943,11 +4939,11 @@ fn semantic_raw_gui_image_ffi_copies_and_validates_pixels() {
                 let sampling = result.unwrap().1[0].sampling.unwrap();
                 assert_eq!(
                     filter == 2,
-                    sampling.0 == super::super::resources::SamplerFilter::Linear
+                    sampling.0 == crate::render::vulkanic::resources::SamplerFilter::Linear
                 );
                 assert_eq!(
                     address == 2,
-                    sampling.1 == super::super::resources::SamplerAddressMode::ClampToEdge
+                    sampling.1 == crate::render::vulkanic::resources::SamplerAddressMode::ClampToEdge
                 );
             }
         }
@@ -6146,7 +6142,7 @@ fn whole_frame_post_effect_identity_is_bounded_utf8_semantic_data() {
         len: id.len() as u64,
     };
     unsafe {
-        super::world::decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities())
+        crate::render::bridge::world::decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities())
             .expect("valid copied post-effect identity must decode");
     }
     let invalid = [0xffu8];
@@ -6155,7 +6151,7 @@ fn whole_frame_post_effect_identity_is_bounded_utf8_semantic_data() {
         len: invalid.len() as u64,
     };
     let error = unsafe {
-        super::world::decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities())
+        crate::render::bridge::world::decode_whole_frame_submit_with_gui(&request, test_vulkan_capabilities())
     }
     .unwrap_err();
     assert!(error.to_string().contains("UTF-8"));
@@ -6179,7 +6175,7 @@ fn shader_pack_source_ffi_copies_owned_utf8_files() {
         },
     }];
     let request = shader_pack_source_update_request(&pack_name, &files);
-    let decoded = unsafe { super::shader_pack::decode_shader_pack_source_update(&request) }
+    let decoded = unsafe { crate::render::bridge::shader_pack::decode_shader_pack_source_update(&request) }
         .expect("valid source update");
 
     pack_name.fill(b'x');
@@ -6210,7 +6206,7 @@ fn shader_pack_source_ffi_rejects_malformed_file_records() {
         },
     }];
     let request = shader_pack_source_update_request(pack_name, &files);
-    let reserved = unsafe { super::shader_pack::decode_shader_pack_source_update(&request) }
+    let reserved = unsafe { crate::render::bridge::shader_pack::decode_shader_pack_source_update(&request) }
         .expect_err("reserved field must be rejected");
     assert_eq!(StatusCode::InvalidArgument, reserved.code);
 
@@ -6218,7 +6214,7 @@ fn shader_pack_source_ffi_rejects_malformed_file_records() {
     files[0].byte_size -= 4;
     let malformed_request = shader_pack_source_update_request(pack_name, &files);
     let malformed =
-        unsafe { super::shader_pack::decode_shader_pack_source_update(&malformed_request) }
+        unsafe { crate::render::bridge::shader_pack::decode_shader_pack_source_update(&malformed_request) }
             .expect_err("truncated item must be rejected");
     assert_eq!(StatusCode::InvalidArgument, malformed.code);
 }
@@ -6227,7 +6223,7 @@ fn shader_pack_source_ffi_rejects_malformed_file_records() {
 fn shader_pack_source_ffi_accepts_an_explicit_empty_generation() {
     let pack_name = b"disabled";
     let request = shader_pack_source_update_request(pack_name, &[]);
-    let decoded = unsafe { super::shader_pack::decode_shader_pack_source_update(&request) }
+    let decoded = unsafe { crate::render::bridge::shader_pack::decode_shader_pack_source_update(&request) }
         .expect("empty source generation clears a prior pack without stale reuse");
     assert_eq!("disabled", decoded.pack_name);
     assert!(decoded.files.is_empty());
@@ -6251,7 +6247,7 @@ fn shader_pack_asset_ffi_copies_owned_binary_files() {
         },
     }];
     let request = shader_pack_asset_update_request(&pack_name, &files);
-    let decoded = unsafe { super::shader_pack::decode_shader_pack_asset_update(&request) }
+    let decoded = unsafe { crate::render::bridge::shader_pack::decode_shader_pack_asset_update(&request) }
         .expect("valid asset update");
 
     pack_name.fill(b'x');
@@ -6285,7 +6281,7 @@ fn shader_pack_asset_ffi_rejects_malformed_file_records() {
         },
     }];
     let request = shader_pack_asset_update_request(pack_name, &files);
-    let reserved = unsafe { super::shader_pack::decode_shader_pack_asset_update(&request) }
+    let reserved = unsafe { crate::render::bridge::shader_pack::decode_shader_pack_asset_update(&request) }
         .expect_err("reserved field must be rejected");
     assert_eq!(StatusCode::InvalidArgument, reserved.code);
 
@@ -6293,7 +6289,9 @@ fn shader_pack_asset_ffi_rejects_malformed_file_records() {
     files[0].byte_size -= 4;
     let malformed_request = shader_pack_asset_update_request(pack_name, &files);
     let malformed =
-        unsafe { super::shader_pack::decode_shader_pack_asset_update(&malformed_request) }
+        unsafe { crate::render::bridge::shader_pack::decode_shader_pack_asset_update(&malformed_request) }
             .expect_err("truncated item must be rejected");
     assert_eq!(StatusCode::InvalidArgument, malformed.code);
 }
+
+mod gal_abi;

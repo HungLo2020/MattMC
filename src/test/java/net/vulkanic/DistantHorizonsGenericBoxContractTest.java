@@ -37,8 +37,13 @@ class DistantHorizonsGenericBoxContractTest {
         String generic = Files.readString(root.resolve(
             "src/main/java/com/seibel/distanthorizons/core/render/renderer/generic/GenericObjectRenderer.java"));
 
-        String rustFfi = Files.readString(root.resolve(
-            "src/main/rust/render/vulkanic/ffi/world.rs"));
+        StringBuilder rustWorldBridge = new StringBuilder();
+        try (java.util.stream.Stream<Path> paths = Files.walk(root.resolve("src/main/rust/render/bridge/world"))) {
+            for (Path path : paths.filter(file -> file.toString().endsWith(".rs")).sorted().toList()) {
+                rustWorldBridge.append(Files.readString(path)).append('\n');
+            }
+        }
+        String rustFfi = rustWorldBridge.toString();
         assertEquals(0, count(renderer, "appendDistantHorizonsGenericBoxFaceLocked(box,"),
             "Java must not rebuild six face records for each copied box");
         assertTrue(renderer.contains("PENDING_DH_GENERIC_BOXES.addAll(boxes)"));

@@ -190,7 +190,7 @@ class VulkanicGalBridgeAbiTest {
 	}
 
 	private static String readRustFfiModules() throws Exception {
-		Path root = Path.of("src/main/rust/render/vulkanic/ffi");
+		Path root = Path.of("src/main/rust/render/bridge");
 		StringBuilder source = new StringBuilder();
 		try (java.util.stream.Stream<Path> paths = Files.walk(root)) {
 			for (Path path : paths

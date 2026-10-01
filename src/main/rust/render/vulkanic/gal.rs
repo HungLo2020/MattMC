@@ -17,7 +17,7 @@ use super::frame::{
     PresentFrameDesc, PresentedFrame,
 };
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
-use super::metrics::{elapsed_nanos_u64, Metrics, WholeFrameProfile};
+use super::metrics::{elapsed_nanos_u64, Metrics, SubmitProfile};
 use super::resources::*;
 /// Bytes read back from a buffer by a completed submission.
 pub use super::backends::CompletedHostRead;
@@ -522,9 +522,8 @@ impl VulkanicGal {
         &self.metrics
     }
 
-    pub(in crate::render::vulkanic) fn backend_runtime_metrics(
-        &self,
-    ) -> super::backends::BackendRuntimeMetrics {
+    /// The backend's native counters and timings (see `BackendRuntimeMetrics`).
+    pub fn backend_runtime_metrics(&self) -> BackendRuntimeMetrics {
         self.backend.runtime_metrics()
     }
 
@@ -1983,7 +1982,7 @@ impl VulkanicGal {
     pub fn submit_profiled(
         &mut self,
         batch: SubmissionBatch,
-        profile: &mut WholeFrameProfile,
+        profile: &mut SubmitProfile,
     ) -> GalResult<SyncToken> {
         self.submit_inner(batch, Some(profile))
     }
@@ -1991,7 +1990,7 @@ impl VulkanicGal {
     fn submit_inner(
         &mut self,
         mut batch: SubmissionBatch,
-        mut profile: Option<&mut WholeFrameProfile>,
+        mut profile: Option<&mut SubmitProfile>,
     ) -> GalResult<SyncToken> {
         let submit_started = std::time::Instant::now();
         let creates_before = self.metrics.resource_creates;
@@ -3350,7 +3349,7 @@ impl VulkanicGal {
     fn validate_submission_hazards(
         &mut self,
         batch: &SubmissionBatch,
-        mut profile: Option<&mut WholeFrameProfile>,
+        mut profile: Option<&mut SubmitProfile>,
     ) -> GalResult<()> {
         self.buffer_upload_capture.begin();
         let mut accesses = AccessTracker::default();
@@ -3892,7 +3891,7 @@ impl VulkanicGal {
         &mut self,
         accesses: &mut AccessTracker,
         event: AccessEvent,
-        mut profile: Option<&mut WholeFrameProfile>,
+        mut profile: Option<&mut SubmitProfile>,
     ) -> GalResult<()> {
         if event.mode == AccessMode::Write {
             if let AccessTarget::Buffer {
@@ -5063,7 +5062,7 @@ fn fuse_adjacent_identical_passes(original: Vec<CommandOp>) -> Vec<CommandOp> {
     fused
 }
 
-fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch) {
+fn add_command_profile(profile: &mut SubmitProfile, batch: &SubmissionBatch) {
     for list in &batch.command_lists {
         for op in &list.operations {
             match op {
@@ -5105,7 +5104,7 @@ fn add_command_profile(profile: &mut WholeFrameProfile, batch: &SubmissionBatch)
 }
 
 fn add_backend_metric_deltas(
-    profile: &mut WholeFrameProfile,
+    profile: &mut SubmitProfile,
     before: BackendRuntimeMetrics,
     after: BackendRuntimeMetrics,
 ) {

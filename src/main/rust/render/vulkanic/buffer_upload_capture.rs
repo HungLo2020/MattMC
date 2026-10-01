@@ -5,8 +5,10 @@ use super::{GalError, GalResult, Handle};
 use std::collections::BTreeMap;
 
 // Persistent allocations span animation poses, not just one frame of draws.
-// Bound metadata by the owned mesh residency and exact retained bytes separately.
-const MAX_RANGES: usize = 2 * crate::render::worldrender::WORLD_MESH_GEOMETRY_RESIDENCY;
+// Bound metadata and exact retained bytes separately. The range bound is the
+// GAL's own; it covers twice the world renderer's mesh geometry residency
+// (16,384), which a world renderer test keeps true.
+pub(crate) const MAX_RANGES: usize = 32_768;
 const MAX_TOTAL_BYTES: usize = 5 * 1024 * 1024;
 const MAX_BYTES: usize = 512 * 80;
 type Range = (Handle, u64, usize);

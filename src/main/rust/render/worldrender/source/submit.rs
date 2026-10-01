@@ -1750,7 +1750,7 @@ impl WorldPrimitiveFrontend {
             CommandOp::GenerateMipmaps { texture, .. } => texture_transfer_pending.remove(texture),
             _ => true,
         });
-        profile.gal_command_generation_nanos = elapsed_nanos_u64(command_generation_started);
+        profile.gal.gal_command_generation_nanos = elapsed_nanos_u64(command_generation_started);
         // One source-derived shader-pack frame can legitimately contain far
         // more operations than a backend's *single command-list* budget.
         // Keep pass recording atomic, but use the backend's ordered multi-list
@@ -1786,7 +1786,7 @@ impl WorldPrimitiveFrontend {
                 label: "minecraft.source-terrain-dh.whole-frame".to_string(),
                 command_lists,
             },
-            &mut profile,
+            &mut profile.gal,
         ) {
             Ok(token) => token,
             Err(error) => {
@@ -1885,9 +1885,12 @@ impl WorldPrimitiveFrontend {
             world_text_first_ndc_corners: source_world_text_stats.first_ndc_corners,
             world_text_ndc_bounds_sample: source_world_text_stats.ndc_bounds_sample,
             profile: WholeFrameProfile {
-                pass_count,
-                draw_ops,
-                draw_indexed_ops,
+                gal: crate::render::vulkanic::metrics::SubmitProfile {
+                    pass_count,
+                    draw_ops,
+                    draw_indexed_ops,
+                    ..profile.gal
+                },
                 ..profile
             },
             ..WorldPrimitiveSubmitStats::default()

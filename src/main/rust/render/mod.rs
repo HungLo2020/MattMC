@@ -1,3 +1,4 @@
+pub mod bridge;
 pub mod guirender;
 pub(crate) mod shared;
 pub mod worldrender;

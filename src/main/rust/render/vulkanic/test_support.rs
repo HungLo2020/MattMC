@@ -65,3 +65,7 @@ pub(crate) fn opengl_capabilities() -> BackendCapabilities {
 pub(crate) fn presentation_capabilities(capabilities: BackendCapabilities) -> BackendCapabilities {
     backends::presentation_capabilities(capabilities)
 }
+
+/// Range bound of the GAL's buffer upload capture, for renderers whose
+/// resident allocations it must cover.
+pub(crate) const BUFFER_UPLOAD_CAPTURE_MAX_RANGES: usize = super::buffer_upload_capture::MAX_RANGES;
