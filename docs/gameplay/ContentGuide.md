@@ -67,6 +67,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Wolf](mobs/Wolf.md) and [Wolf Armor](items/WolfArmor.md): real spawn/food routes, owner care, scute repairs, and fully damaged armor behavior
 
+- [Enderman](mobs/Enderman.md) and [Cave Spider](mobs/CaveSpider.md): gaze protection, teleportation, poison, and ordinary versus trial-spawner rules
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

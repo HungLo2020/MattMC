@@ -2,7 +2,7 @@
 
 For detailed source-reviewed examples, see [Grizzly Bear](GrizzlyBear.md), [Trilocaris](Trilocaris.md), [Cow](Cow.md), [Subterranodon](Subterranodon.md), [Blobfish](Blobfish.md), and [Roadrunner](Roadrunner.md). The [content guide](../ContentGuide.md) explains verification labels. Behavior categories below are the existing browsing groups; individual pages may describe conditional behavior and integration limits.
 
-For source-reviewed hostile or conditional encounters, see [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), and [Spider](Spider.md).
+For source-reviewed hostile or conditional encounters, see [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Cave Spider](CaveSpider.md), and [Enderman](Enderman.md).
 
 Elephant, Raccoon, and Capuchin Monkey are listed as neutral here because their active goals include retaliation; their articles separate owner controls from missing bundled taming foods.
 
@@ -79,6 +79,7 @@ MattMC mobs grouped by behavior. Each section is alphabetized.
 - [Cachalot Whale](CachalotWhale.md)
 - [Caiman](Caiman.md)
 - [Capuchin Monkey](CapuchinMonkey.md)
+- [Cave Spider](CaveSpider.md)
 - [Cosmaw](Cosmaw.md)
 - [Crocodile](Crocodile.md)
 - [Crow](Crow.md)
@@ -133,7 +134,6 @@ MattMC mobs grouped by behavior. Each section is alphabetized.
 - [Breeze](Breeze.md)
 - [Bunfungus](Bunfungus.md)
 - [Cave Centipede](CaveCentipede.md)
-- [Cave Spider](CaveSpider.md)
 - [Creaking](Creaking.md)
 - [Creeper](Creeper.md)
 - [Drowned](Drowned.md)
