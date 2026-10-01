@@ -43,6 +43,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Structures](structures/Structures.md): prepare for [Nether Fortresses](structures/NetherFortress.md) and [Strongholds](structures/Stronghold.md), including optional rooms and portal hazards
 
+- [Ender Pearl](items/EnderPearl.md), [Eye of Ender](items/EyeOfEnder.md), and [Blaze Rod](items/BlazeRod.md): teleport risks, portal supplies, recipes, and fuel
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
