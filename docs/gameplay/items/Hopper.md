@@ -1,17 +1,34 @@
 # Hopper
 
+The Hopper item places the `minecraft:hopper` block, a five-slot automatic item-transfer container.
+
 ## Obtaining
 
-Hopper can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft one from five Iron Ingots and one ordinary Chest: ingots in the upper corners, Ingot–Chest–Ingot across the middle, and one ingot centered below. Collect the placed block with a pickaxe.
 
-## Usage
+## Use
 
-Hopper is a redstone and inventory utility block used to move items between containers.
+Place its outlet toward the destination container; it can point down or sideways. The placed Hopper pulls from above and pushes toward the outlet. Redstone power stops its own automatic transfers, but does not prevent every outside access to its inventory.
 
-## Behavior
+See the [Hopper block guide](../blocks/Hopper.md) for timing, loose-item pickup, locking, inventory handling, and Furnace connections. Its five inventory slots are not carried inside the ordinary dropped block item.
 
-It pulls and pushes items according to its facing direction and redstone state.
+## Related pages
 
-## Notes
+- [Hopper behavior](../blocks/Hopper.md)
+- [Iron Ingot](IronIngot.md)
+- [Items](Items.md)
 
-* This item is the item form of the `minecraft:hopper` block.
+## Sources and verification
+
+Source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. No in-game transfer, pickup, redstone timing, comparator, or furnace-automation test was run. Container rules, tags, and data packs can change results.
+
+- [Recipe](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/recipe/crafting/hopper.json)
+- [Placement, redstone, and menu](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/HopperBlock.java)
+- [Transfer order, cooldown, item pickup, and saved inventory](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java)
+- [Correct-tool requirement](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/Blocks.java)
+- [Pickaxe tag](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json)
+- [Hopper block loot](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/blocks/hopper.json)
+- [Container removal drops](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/entity/BlockEntity.java)
+- [Above-block pickup exceptions](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/block/does_not_block_hoppers.json)
+- [Fullness signal calculation](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/inventory/AbstractContainerMenu.java)
+- [Furnace sided slots](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity.java)

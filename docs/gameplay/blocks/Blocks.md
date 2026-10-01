@@ -11,6 +11,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 - [Enchanting Table](EnchantingTable.md): eligible offers, shelves, and lapis
 - [Smithing Table](SmithingTable.md): equipment upgrades and armor trims
 - [Brewing Stand](BrewingStand.md): fueled three-bottle potion batches
+- [Hopper](Hopper.md): directional item transfer, redstone locking, and furnace connections
 - [Chest](Chest.md): storage, double-chest placement, and blocked lids
 
 - [Beds](Bed.md): sleeping, respawn conditions, and dimension hazards

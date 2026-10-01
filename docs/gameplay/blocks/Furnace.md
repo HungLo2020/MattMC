@@ -45,6 +45,20 @@ Taking output as a player triggers the furnace's stored recipe/experience payout
 
 If processing stalls, check that the device accepts the recipe type, fuel is valid, and the output has room for the right result. A [Smoker](../items/Smoker.md) uses smoking recipes and a [Blast Furnace](../items/BlastFurnace.md) uses blasting recipes; neither accepts every furnace recipe merely because it cooks faster.
 
+## Hopper automation
+
+[Hoppers](Hopper.md) use the Furnace's sided inventory rules:
+
+| Connection | Accessible role |
+| --- | --- |
+| Hopper feeding from above | Input slot |
+| Hopper feeding from a horizontal side | Fuel slot |
+| Hopper pulling from below | Output slot, plus the fuel slot only for an Empty Bucket or Water Bucket |
+
+A Hopper below does not normally pull unburned Coal from the fuel slot. The inserted item must still pass that slot's validation, and the Furnace needs a valid recipe, fuel, and output space to process anything. Redstone-lock the appropriate Hoppers when you need to stop their own transfers.
+
+Automation source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2`: [sided slots and item checks](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity.java), [Hopper transfer handling](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java). No automated setup was tested in-game.
+
 ## Related pages
 
 - [Smelting guide](../smelting/Smelting.md)

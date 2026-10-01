@@ -57,6 +57,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Shields and death protection](mechanics/DefensiveItems.md): facing, use delay, axe cooldowns, and held Totem effects
 
+- [Hopper](blocks/Hopper.md): item transfer, redstone locking, and sided Furnace automation
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

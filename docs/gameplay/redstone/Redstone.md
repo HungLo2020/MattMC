@@ -7,6 +7,7 @@ Redstone components carry signals and control blocks. Start with a source, a sup
 - [Lever](../blocks/Lever.md): toggled, sustained signal
 - [Buttons](../blocks/Buttons.md): timed Stone/Oak pulses and arrow differences
 - [Redstone Dust and wire](../blocks/RedstoneDust.md): connections and signal loss
+- [Hopper](../blocks/Hopper.md): item movement and powered locking
 - [Chest](../blocks/Chest.md): a container with analog fullness output
 
 ## Strength is not duration
