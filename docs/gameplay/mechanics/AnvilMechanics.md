@@ -75,6 +75,8 @@ Creative waives the experience requirement and payment, and skips the anvil's me
 
 [Result validation][result] · [Enchantment-storage check][components]
 
+See [Durability and repair](Durability.md) before choosing a different repair method: crafting-grid repair creates a fresh item and does not preserve the same custom data as an Anvil.
+
 ## Related pages
 
 - [Anvil block and wear](../blocks/Anvil.md)

@@ -53,6 +53,8 @@ The ordinary Copper, Iron, and Diamond crafting patterns use **5 materials for a
 
 Netherite equipment follows the matching Diamond-item Smithing upgrade with a Netherite Upgrade template and the accepted addition material. The existing [Smithing guide](../smithing/Smithing.md) covers template consumption, duplication, and retained components. This guide's stat table is not a claim that every listed armor family has the same crafting or acquisition route.
 
+[Durability and repair](Durability.md) compares retained broken gear and the data kept by Anvil, Grindstone, and crafting-grid repairs.
+
 ## Related pages
 
 - [Copper Chestplate](../items/CopperChestplate.md)

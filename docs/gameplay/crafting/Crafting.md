@@ -23,6 +23,8 @@ If nothing appears, verify the device, grid pattern, exact ingredients or tag me
 
 ## Verified recipe guides
 
+- [Crafting-grid repair](../mechanics/Durability.md#crafting-grid-repair-details): combines matching items but does not preserve the same names, trims, or enchantments as an Anvil
+
 - [Crafting Table](../blocks/CraftingTable.md)
 - [Furnace](../blocks/Furnace.md)
 - [Chest](../blocks/Chest.md)

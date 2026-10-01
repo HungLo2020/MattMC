@@ -69,6 +69,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Enderman](mobs/Enderman.md) and [Cave Spider](mobs/CaveSpider.md): gaze protection, teleportation, poison, and ordinary versus trial-spawner rules
 
+- [Durability and repair](mechanics/Durability.md): retained broken gear, guarded actions, and differences in repair data preservation
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

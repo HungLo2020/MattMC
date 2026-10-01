@@ -41,6 +41,8 @@ Examples of the requirement tags include Iron/Copper/Lapis Ores at Stone tier; D
 
 When a drop surprises you, check tool family, material restriction, correct-tool requirement, loot conditions, and current data-pack changes separately. A missing integration tag is a documentation caveat until the gameplay code/data is actually repaired.
 
+See [Durability and repair](Durability.md) when a previously suitable tool stops giving expected drops: fully damaged gear is retained as a broken stack and fails the normal correct-tool check.
+
 ## Related pages
 
 - [Stone](../blocks/Stone.md)
