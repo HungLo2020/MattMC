@@ -47,6 +47,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Anvil](blocks/Anvil.md) and [anvil mechanics](mechanics/AnvilMechanics.md): repairs, enchantment combining, names, wear, and the 40-level payment cap
 
+- [Grindstone](blocks/Grindstone.md): free repair, enchantment removal, curse retention, and experience refunds
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
