@@ -21,14 +21,22 @@ impl PartialEq for SubmissionUsage {
 impl Eq for SubmissionUsage {}
 
 impl SubmissionUsage {
-    pub(super) fn has_pending_commands(&self) -> bool {
+    /// Whether prepared commands still reference this storage.
+    pub fn has_pending_commands(&self) -> bool {
         Arc::strong_count(&self.0) > 1
     }
-    pub(super) fn last_submission(&self) -> SubmissionId {
+    /// The latest submission that used this storage.
+    pub fn last_submission(&self) -> SubmissionId {
         SubmissionId(self.0.load(Ordering::Acquire))
     }
     pub(super) fn accept(&self, id: SubmissionId) {
         self.0.fetch_max(id.0, Ordering::Release);
+    }
+    /// Marks this storage as used by `id` without submitting, for tests of
+    /// renderer-side reclamation outside the GAL.
+    #[cfg(test)]
+    pub(crate) fn accept_for_test(&self, id: SubmissionId) {
+        self.accept(id);
     }
 }
 

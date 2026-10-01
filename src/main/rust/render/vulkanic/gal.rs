@@ -2199,7 +2199,7 @@ impl VulkanicGal {
         self.latest_accepted_submission
     }
 
-    pub(in crate::render::vulkanic) fn render_pass_last_submission(
+    pub fn render_pass_last_submission(
         &self,
         pass: Handle,
     ) -> GalResult<Option<SubmissionId>> {

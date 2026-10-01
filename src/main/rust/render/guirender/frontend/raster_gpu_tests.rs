@@ -1,9 +1,9 @@
 //! Actual Vulkan reproduction of 16/32px sprites at independently captured GUI scales.
 //! This is an isolated raster-stage test, not a whole-game parity admission.
-use super::*;
-use crate::render::vulkanic::backends::vulkan::VulkanBackend;
-use crate::render::vulkanic::gui_item_material::{GuiAffineMaterial, GuiFlatItemLighting};
-use crate::render::vulkanic::gui_item_raster::{
+use crate::render::guirender::frontend::*;
+use crate::render::vulkanic::test_support::vulkan_gal;
+use crate::render::guirender::items::material::{GuiAffineMaterial, GuiFlatItemLighting};
+use crate::render::guirender::items::raster::{
     GuiItemRasterLayout, GuiItemRasterRows, GuiItemRasterTarget,
 };
 use crate::render::worldrender::WorldMeshTextureAssetPayload;
@@ -185,9 +185,8 @@ fn raster_and_composite_animation(
     let alpha_split = sprite_size / 4;
     let cell = (16 * scale) as usize;
     let columns = 512 / cell;
-    let backend = VulkanBackend::new("GUI item raster stage regression")
+    let mut gal = vulkan_gal("GUI item raster stage regression")
         .expect("Vulkan is required for the item raster regression");
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
     let mut world = WorldPrimitiveFrontend::default();
     let mut frontend = GuiFrontend::default();
     // Positions and ordering independently recorded from both callsites in
@@ -1111,7 +1110,7 @@ fn raster_and_composite_animation(
                         let [left, top, right, bottom] =
                             ITEM_RECTS[(index + generation as usize) % 9].map(|v| v as f32);
                         screen.item_raster_geometry =
-                            super::super::gui_item_raster::GuiItemRasterGeometry {
+                            crate::render::guirender::items::raster::GuiItemRasterGeometry {
                                 corners: [left, top, right, top, left, bottom],
                             };
                     }

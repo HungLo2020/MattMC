@@ -1,7 +1,8 @@
 use crate::render::worldrender::*;
-        use crate::render::vulkanic::test_support::{MockBackend, presentation_capabilities, vulkan_capabilities};
+use crate::render::vulkanic::test_support::{MockBackend, presentation_capabilities, vulkan_capabilities};
 use crate::render::vulkanic::commands::ClearColor;
-use crate::render::vulkanic::gui_frontend::{GuiFrontend, GuiSpriteRequest};
+use crate::render::guirender::frontend::{GuiFrontend, GuiSpriteRequest};
+use crate::render::guirender::atlas_reference::GuiAtlasOwner;
 use crate::render::vulkanic::handles::HandleKind;
 
 /// Explicit-binding conventions of the default test backend.
@@ -11587,7 +11588,7 @@ fn gui_atlas_sampling_requires_an_explicit_world_upload_boundary() {
     world.defer_world_uploads = true;
     assert!(world.require_gui_atlas_upload_boundary().is_err());
     let mut gal = gal();
-    let mut gui = crate::render::vulkanic::gui_frontend::GuiFrontend::default();
+    let mut gui = crate::render::guirender::frontend::GuiFrontend::default();
     // A no-op must not touch a target or interrupt unrelated recording.
     assert!(gui
         .append_owned_atlas_quads(
@@ -11615,7 +11616,7 @@ fn gui_atlas_sampling_requires_an_explicit_world_upload_boundary() {
 
 #[test]
 fn vanilla_whole_frame_consumes_owned_gui_atlas_with_world_work_and_blur() {
-    use crate::render::vulkanic::gui_atlas_reference::GuiAtlasReference;
+    use crate::render::guirender::atlas_reference::GuiAtlasReference;
     for blur_boundary in [-1, 2] {
         let mut gal = gal();
         let target = frame_target(&mut gal, 1, 128, 128);
@@ -11664,7 +11665,7 @@ fn vanilla_whole_frame_consumes_owned_gui_atlas_with_world_work_and_blur() {
             item_raster_layers: vec![],
             item_raster_scale: 0,
             item_raster_geometry: Default::default(),
-            material: crate::render::vulkanic::gui_item_material::GuiAffineMaterial::FlatItemPending,
+            material: crate::render::guirender::items::material::GuiAffineMaterial::FlatItemPending,
             stratum: 100,
             asset_id: 101,
             x0: 8.0,
@@ -11736,9 +11737,9 @@ fn gui_atlas_sampled_bindings_reuse_owner_images_and_retire_on_replacement() {
 }
 
 fn verify_gui_atlas_sampled_bindings(mut gal: VulkanicGal) {
-    use crate::render::vulkanic::gui_atlas_reference::GuiAtlasReference;
+    use crate::render::guirender::atlas_reference::GuiAtlasReference;
     let mut world = WorldPrimitiveFrontend::default();
-    let mut gui = crate::render::vulkanic::gui_frontend::GuiFrontend::default();
+    let mut gui = crate::render::guirender::frontend::GuiFrontend::default();
     let id = WORLD_MATERIAL_TEXTURE_STONE;
     let mut stable_live = None;
     for generation in 1..=16 {
@@ -11878,9 +11879,9 @@ fn gui_atlas_view_cache_invalidates_retries_and_stays_bounded() {
 }
 
 fn verify_gui_atlas_view_cache(mut gal: VulkanicGal) {
-    use crate::render::vulkanic::gui_atlas_reference::GuiAtlasReference;
+    use crate::render::guirender::atlas_reference::GuiAtlasReference;
     let mut world = WorldPrimitiveFrontend::default();
-    let mut gui = crate::render::vulkanic::gui_frontend::GuiFrontend::default();
+    let mut gui = crate::render::guirender::frontend::GuiFrontend::default();
     let id = WORLD_MATERIAL_TEXTURE_STONE;
     let payload = |variant| WorldMeshTextureAssetPayload {
         texture_id: id,
@@ -12026,9 +12027,9 @@ fn gui_atlas_views_use_the_owned_image_and_reject_replaced_incarnations() {
 }
 
 fn verify_gui_atlas_views(mut gal: VulkanicGal) {
-    use crate::render::vulkanic::gui_atlas_reference::GuiAtlasReference;
+    use crate::render::guirender::atlas_reference::GuiAtlasReference;
     let mut frontend = WorldPrimitiveFrontend::default();
-    let mut gui = crate::render::vulkanic::gui_frontend::GuiFrontend::default();
+    let mut gui = crate::render::guirender::frontend::GuiFrontend::default();
     let id = WORLD_MATERIAL_TEXTURE_STONE;
     let payload = |variant| WorldMeshTextureAssetPayload {
         texture_id: id,

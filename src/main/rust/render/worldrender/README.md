@@ -28,9 +28,10 @@ teardown.rs, util.rs
 ```
 
 Rules (enforced by `vulkanic/architecture_boundary.rs`): depend on
-`render::{scene, shared, shaderpack}` and the public GAL modules only; never
-name a backend. The GUI modules listed in `TRANSITIONAL_WORLD_GUI_MODULES`
-remain shared with `vulkanic` until the GUI renderer moves.
+`render::{scene, shared, shaderpack, guirender}` and the public GAL modules
+only; never name a backend or the bridge. The whole-frame submit composes the
+GUI renderer, and `WorldPrimitiveFrontend` implements `GuiAtlasOwner`
+(`assets/atlas_animation.rs`) so GUI quads can sample world-owned atlases.
 
 Known large functions kept intact (behaviour-preserving move): the vanilla
 recording loop (`vanilla/recording.rs`), named-source terrain/DH plans,

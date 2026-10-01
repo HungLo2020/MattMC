@@ -15,8 +15,8 @@
 //! - `diagnostics`, `teardown`, `util`.
 //!
 //! The renderer uses the GAL's public API only and never names a backend.
-//! It still shares a few types with `vulkanic::gui_*` until the GUI renderer
-//! moves out of the GAL.
+//! On the whole-frame route it composes `render::guirender` into its frame and,
+//! as the owner of stitched atlases, implements `GuiAtlasOwner` for it.
 
 pub(crate) mod assets;
 pub(crate) mod diagnostics;
@@ -79,11 +79,11 @@ use crate::render::vulkanic::commands::{
 };
 use crate::render::vulkanic::error::{GalError, GalResult, StatusCode};
 use crate::render::vulkanic::gal::VulkanicGal;
-use crate::render::vulkanic::gui_frontend::{
+use crate::render::guirender::frontend::{
     CustomPostEffectImage, CustomPostEffectSource, GuiAffineQuadRequest, GuiFrontend,
     GuiSpriteRequest, GuiSubmitStats, GuiTiledQuadRequest,
 };
-use crate::render::vulkanic::gui_mesh_frontend::GuiMeshBatchRequest;
+use crate::render::guirender::mesh::GuiMeshBatchRequest;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::metrics::{elapsed_nanos_u64, WholeFrameProfile};
 use crate::render::vulkanic::resources::{

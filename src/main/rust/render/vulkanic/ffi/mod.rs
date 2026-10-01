@@ -20,12 +20,12 @@ use super::frame::{
     PresentMode,
 };
 use super::gal::VulkanicGal;
-use super::gui_frontend::{
+use crate::render::guirender::frontend::{
     GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat,
     GuiSpriteRequest, GuiSubmitStats, GuiTiledQuadRequest, GUI_MAX_RAW_IMAGES,
     GUI_MAX_VIEWPORT_AXIS,
 };
-use super::gui_mesh_frontend::{
+use crate::render::guirender::mesh::{
     validate_batch as validate_gui_mesh_batch, validate_batches as validate_gui_mesh_batches,
     GuiMeshBatchRequest, GuiMeshLightingMode, GuiMeshMaterialMode, GuiMeshVertex,
     GUI_MESH_MAX_BATCHES, GUI_MESH_MAX_INDICES, GUI_MESH_MAX_VERTICES,

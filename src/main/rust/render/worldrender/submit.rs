@@ -1544,11 +1544,11 @@ impl WorldPrimitiveFrontend {
         let frame = self.admit_armed_source_frame(frame);
         #[cfg(not(test))]
         self.report_shader_route_outcome(&frame);
-        crate::render::vulkanic::gui_frontend::preflight_tiled_affine_count(
+        crate::render::guirender::frontend::preflight_tiled_affine_count(
             &gui_tiled_quads,
             gui_affine_quads.len(),
         )?;
-        crate::render::vulkanic::gui_frontend::validate_gui_frame_sequences(
+        crate::render::guirender::frontend::validate_gui_frame_sequences(
             &gui_sprites,
             &gui_affine_quads,
             &gui_mesh_batches,
@@ -1763,11 +1763,11 @@ impl WorldPrimitiveFrontend {
         let gui_sprites: Vec<GuiSpriteRequest> = gui_sprites
             .into_iter()
             .filter(|sprite| {
-                sprite.sprite_id != crate::render::vulkanic::gui_frontend::GUI_POST_EFFECT_INVERT_ID
+                sprite.sprite_id != crate::render::guirender::frontend::GUI_POST_EFFECT_INVERT_ID
                     && sprite.sprite_id
-                        != crate::render::vulkanic::gui_frontend::GUI_POST_EFFECT_CREEPER_ID
+                        != crate::render::guirender::frontend::GUI_POST_EFFECT_CREEPER_ID
                     && sprite.sprite_id
-                        != crate::render::vulkanic::gui_frontend::GUI_POST_EFFECT_SPIDER_ID
+                        != crate::render::guirender::frontend::GUI_POST_EFFECT_SPIDER_ID
             })
             .collect();
         if gui_blur_before_stratum >= 0 && !terrain_handoff_requested {

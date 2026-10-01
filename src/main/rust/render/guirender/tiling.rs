@@ -2,7 +2,7 @@
 //! No Java texture objects, GPU handles, pipeline state, or presenter enter here.
 //! Expansion is preflighted before allocation and feeds ordered frame submission.
 
-use super::{GalError, GalResult};
+use crate::render::vulkanic::{GalError, GalResult};
 use crate::render::scene::SEMANTIC_MAX_VIEWPORT_AXIS;
 
 /// Same finite expanded-segment bound as the existing copied GUI path. A large
@@ -202,7 +202,7 @@ pub(crate) fn lower_tiles(geometry: GuiTileGeometry) -> GalResult<Vec<GuiTileQua
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::render::guirender::tiling::*;
 
     fn geometry() -> GuiTileGeometry {
         GuiTileGeometry {

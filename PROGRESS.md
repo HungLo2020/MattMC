@@ -90,20 +90,20 @@ bench.sh after deletion (Current, moving): DH 38.8 -> 45.0 fps, noDH 44.0 -> 45.
 lowers GLSL generically; `architecture_boundary.rs` enforces layering. GL conformance tests now
 really run and match Vulkan. Rust GL next gap: `CopyFrameTargetToTexture` (GL allowed incomplete).
 **Shader-pack restructure (10-01).** `vulkanic/shader_pack` -> `render/shaderpack` (source,
-properties, contracts, lowering, programs/{model,lowered,builtin}, uniforms, plan, resources,
-voxels, vanilla, runtime); giant files split by concern (runtime 12.4k -> 331-line mod.rs +
-11 children; built-in GLSL in `programs/builtin/glsl/*.glsl`). Scene vocabulary (strata,
-material sources, mesh assets, voxel sources) in new `render/scene` (world frontend
-re-exports). Tests build GALs via `vulkanic::test_support`; boundary tests pin shaderpack to
-`scene` + public GAL. Code motion only; warnings = baseline (dead test-only items regrouped).
+properties, contracts, lowering, programs/, uniforms, plan, resources, voxels, vanilla, runtime;
+built-in GLSL in `glsl/`); scene vocabulary -> new `render/scene`. Code motion only.
 **World-renderer restructure (10-01).** `vulkanic/world_primitive_frontend*` + `terrain/` ->
-`render/worldrender` (81k-line file -> ~100 files, largest ~3k): frame/, vanilla/, source/
-(admission, programs/, frames/, plans/, resources/, receipts/, ...), lod/, assets/, geometry/,
-passes/, features/, diagnostics/, submit, fabulous, post_effects. All `WORLD_*` wire constants ->
-`render/scene`; world+GUI helpers -> `render/shared`. GAL APIs the renderer needs made public
-(depth-write tracking, retirement, capture descriptors, `CompletedHostRead`). Item census: no
-Rust item lost. Giant fns (vanilla recording 2.8k, named-source plans/submit, whole-frame
-submit, Fabulous frame) moved intact; splitting them is a separate logic refactor.
+`render/worldrender` (81k-line file -> ~100 files; see its README); `WORLD_*` wire constants ->
+`render/scene`, world+GUI helpers -> `render/shared`. Item census: nothing lost. Giant fns moved
+intact (splitting them is a separate logic refactor).
+**GUI-renderer move (10-01).** `vulkanic/gui_*` -> `render/guirender` (frontend/ 9.8k-line file ->
+~30 files, mesh/ 11 files, GLSL in `glsl/`, byte-identical). GUI reaches world atlases only via
+`GuiAtlasOwner` (world implements it); boundary test forbids guirender -> worldrender/bridge.
+Rust 1924 pass; census: nothing lost. Frozen MAE day 2.64, gun 2.47, pane 2.53: identical on the
+pre-move snapshot (drift is the 09-30 worldgen sync); DH 4.49-4.95 (3 runs) vs 4.46 snapshot = noise;
+glass 7.50, down 7.21, off 0.14-0.24, 0 VUIDs. Real config shaders on/off: joins, no errors.
+A/B vs snapshot (5 runs/side, entity-adjusted): noDH fps +0.70+/-0.41, GUI frontend -10+/-8 us;
+DH fps +0.11+/-0.29, GUI frontend +2+/-2 us (~388 us/frame) -> no regression.
 Ported while pruning: VoxelMap world map (regions staged as Rust raw images, released on
 unload), VoxelMap init (packet bridge was null on Rust), F3 GPU% (`TimerQuery` on Rust Vulkan
 timestamps via `mattmc_vulkanic_gal_set_gpu_timestamps_requested`), pack `weatherParticles`,

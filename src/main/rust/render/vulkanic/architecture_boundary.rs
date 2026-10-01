@@ -472,8 +472,7 @@ fn backend_identity_is_not_part_of_the_gal_api() {
 #[test]
 fn frontend_production_code_does_not_name_backend_implementations() {
     let rust_root = Path::new(RUST_ROOT);
-    let vulkanic = rust_root.join("render/vulkanic");
-    let backends = vulkanic.join("backends");
+    let backends = rust_root.join("render/vulkanic/backends");
     let forbidden = [
         "backends::vulkan",
         "backends::opengl",
@@ -484,7 +483,7 @@ fn frontend_production_code_does_not_name_backend_implementations() {
         "capabilities().name ==",
     ];
     let mut violations = Vec::new();
-    for file in production_files(&vulkanic) {
+    for file in production_files(&rust_root.join("render")) {
         if is_inside(&file, &backends) {
             continue;
         }
@@ -513,6 +512,8 @@ fn core_gal_and_backends_do_not_depend_on_frontends() {
         "world_primitive_frontend",
         "gui_frontend",
         "gui_mesh_frontend",
+        "worldrender",
+        "guirender",
         "shaderpack",
         "vulkanic::terrain",
         "vulkanic::ffi",
@@ -701,11 +702,6 @@ fn shaderpack_uses_only_the_scene_and_the_public_gal() {
     );
 }
 
-/// GUI modules the world renderer still shares with `vulkanic` until the GUI
-/// renderer moves out of the GAL. Shrink this list; never grow it.
-const TRANSITIONAL_WORLD_GUI_MODULES: [&str; 4] =
-    ["gui_frontend", "gui_mesh_frontend", "gui_atlas_reference", "gui_item_material"];
-
 #[test]
 fn worldrender_uses_the_public_gal_and_lower_layers_only() {
     let rust_root = Path::new(RUST_ROOT);
@@ -718,20 +714,56 @@ fn worldrender_uses_the_public_gal_and_lower_layers_only() {
     let mut violations = Vec::new();
     for file in production_files(&rust_root.join("render/worldrender")) {
         for (line_number, line) in production_lines(&read_source(&file)) {
-            let gal_violation = non_public_gal_references(&line)
-                .iter()
-                .any(|module| !TRANSITIONAL_WORLD_GUI_MODULES.contains(&module.as_str()));
-            let names_upper_layer = ["guirender", "bridge"]
-                .iter()
-                .any(|layer| line.contains(&format!("render::{layer}")));
-            if gal_violation || names_upper_layer {
+            // The whole-frame submit composes the GUI over the world, so the
+            // world renderer may call into `guirender`; the reverse is forbidden.
+            if !non_public_gal_references(&line).is_empty() || line.contains("render::bridge") {
                 violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
             }
         }
     }
     assert!(
         violations.is_empty(),
-        "render::worldrender may use render::{{scene, shared, shaderpack}}, the public GAL modules {PUBLIC_GAL_MODULES:?} and, until the GUI moves, {TRANSITIONAL_WORLD_GUI_MODULES:?}:\n{}",
+        "render::worldrender may use render::{{scene, shared, shaderpack, guirender}} and the public GAL modules {PUBLIC_GAL_MODULES:?}:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn guirender_uses_the_public_gal_and_lower_layers_only() {
+    let rust_root = Path::new(RUST_ROOT);
+    for removed in [
+        "gui_frontend.rs",
+        "gui_frontend",
+        "gui_mesh_frontend.rs",
+        "gui_atlas_reference.rs",
+        "gui_item_layout.rs",
+        "gui_item_material.rs",
+        "gui_item_raster.rs",
+        "gui_item_raster_gpu_tests.rs",
+        "gui_tiling.rs",
+        "fixtures",
+    ] {
+        assert!(
+            !rust_root.join("render/vulkanic").join(removed).exists(),
+            "render/vulkanic/{removed} moved to render/guirender and must not return"
+        );
+    }
+    let mut violations = Vec::new();
+    for file in production_files(&rust_root.join("render/guirender")) {
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            // World-owned atlases reach the GUI only through `GuiAtlasOwner`.
+            let names_upper_layer = ["worldrender", "bridge"]
+                .iter()
+                .any(|layer| line.contains(&format!("render::{layer}")))
+                || line.contains("WorldPrimitiveFrontend");
+            if !non_public_gal_references(&line).is_empty() || names_upper_layer {
+                violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "render::guirender may use render::{{scene, shared, shaderpack}} and the public GAL modules {PUBLIC_GAL_MODULES:?}:\n{}",
         violations.join("\n")
     );
 }

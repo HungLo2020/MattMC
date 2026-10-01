@@ -26,10 +26,17 @@ src/main/rust/
 │   │   ├── render_data.rs
 │   │   ├── render_list.rs
 │   │   └── translucent.rs
+│   ├── scene/
+│   ├── shared/
+│   ├── shaderpack/
+│   ├── worldrender/
+│   ├── guirender/
+│   ├── bridge/
 │   └── vulkanic/
-│       └── backends/
-│           ├── opengl/
-│           └── vulkan/
+│       ├── backends/
+│       │   ├── opengl/
+│       │   └── vulkan/
+│       └── ffi/
 ├── tools/
 └── world/
     └── level/
@@ -78,8 +85,14 @@ Important current subdirectories:
 
 - `render/chunk/`: native chunk-rendering infrastructure, render lists, occlusion, translucent sorting, index generation, and rebuild triggers.
 - `render/chunk/meshing/`: native chunk mesher implementation, including section scanning, static models, fluids, lighting/AO, tinting, culling, packing, assembly, FFI records, and diagnostics.
-- `render/vulkanic/`: Rust-side Vulkanic rendering support.
+- `render/vulkanic/`: the VulkanicGAL graphics abstraction layer (handles, resources, commands, frames, sync, capabilities, metrics). Its `ffi/` bridge to Java still lives here until it moves to `render/bridge/`. See its [README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/vulkanic/README.md).
 - `render/vulkanic/backends/`: private backend implementation modules. Code outside `render::vulkanic` must not call into backend modules directly.
+- `render/scene/`: wire and data vocabulary shared by Java and the renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/scene/README.md)).
+- `render/shared/`: helpers used by both the world and GUI renderers ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shared/README.md)).
+- `render/shaderpack/`: shader-pack parsing, planning and runtime ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shaderpack/README.md)).
+- `render/worldrender/`: the world renderer ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/README.md)).
+- `render/guirender/`: the GUI renderer: sprites, quads, item meshes and rasters, the panorama and GUI post effects ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/guirender/README.md)).
+- `render/bridge/`: future home of the FFI bridge ([README](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/README.md)).
 
 ### `assets/`
 
@@ -110,5 +123,13 @@ Rust `render/vulkanic/backends/` is intentionally private. The architecture test
 - `ash` and `shaderc` usage stays inside the Vulkan backend.
 - `glow` usage stays inside the OpenGL backend.
 - OpenGL and Vulkan backend modules do not depend on each other.
+
+The same tests (`render/vulkanic/architecture_boundary.rs`) enforce the renderer layering. Each layer may use the public GAL modules and the layers listed for it:
+
+- `scene` and `shared`: no renderers.
+- `shaderpack`: `scene`.
+- `guirender`: `scene`, `shared` and `shaderpack`. It never names `worldrender`; world-owned atlases reach it through the `GuiAtlasOwner` trait.
+- `worldrender`: `scene`, `shared`, `shaderpack` and `guirender`, which it composes on the whole-frame route.
+- The core GAL and backends import no renderer.
 
 Java package names may still appear in Java source and Java tests. The Rust tree should use subsystem ownership instead of Java-style package paths.

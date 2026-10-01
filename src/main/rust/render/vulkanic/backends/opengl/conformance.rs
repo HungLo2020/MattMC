@@ -67,7 +67,7 @@ fn gui_panorama_material_compiles_through_the_opengl_lowering() {
     };
     let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
     let (vertex, fragment) =
-        crate::render::vulkanic::gui_mesh_frontend::opengl_panorama_shader_sources_for_backend_test(
+        crate::render::guirender::mesh::opengl_panorama_shader_sources_for_backend_test(
         );
     for (stage, code, label) in [
         (ShaderStage::Vertex, vertex, "gui-panorama.vertex"),

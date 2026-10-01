@@ -1,4 +1,5 @@
 use super::*;
+use crate::render::guirender::atlas_reference::GuiAtlasOwner;
 use crate::render::vulkanic::resources::{
     BackendFeatureFlags, GlslDialect, ShaderConventions, BackendLimits, BlendMode,
 };
@@ -673,7 +674,7 @@ fn semantic_gui_tiled_private_decoder_copies_without_expanding() {
     assert_eq!(11, decoded[0].sequence);
     assert_eq!(
         8160,
-        crate::render::vulkanic::gui_tiling::tile_segment_count(decoded[0].geometry).unwrap()
+        crate::render::guirender::tiling::tile_segment_count(decoded[0].geometry).unwrap()
     );
     assert_eq!(1, record.bounds[2]);
 }
@@ -1331,7 +1332,7 @@ fn gui_mesh_decal_transport_copies_poses_and_rejects_noncanonical_or_incomplete_
     request.decal_normal_pose[0] = 2.;
     assert_eq!(copied.decal_foil.unwrap().model_pose[12], 0.);
     assert_eq!(copied.decal_foil.unwrap().normal_pose[0], 1.);
-    super::super::gui_mesh_frontend::prepare_draws(&[copied])
+    crate::render::guirender::mesh::prepare_draws(&[copied])
         .expect("decoded poses and valid original vertices must lower without Java UV preparation");
     request.decal_foil_mode = 3;
     assert!(decode(&request).is_err());
@@ -1424,7 +1425,7 @@ fn gui_mesh_flat_scale_transport_requires_native_layout_and_unresolved_frame_lig
     request.render_width = 0;
     request.render_height = 0;
     request.guard_pixels = 0;
-    request.model_transform = super::super::gui_item_raster::GuiItemModelTransform::default().0;
+    request.model_transform = crate::render::guirender::items::raster::GuiItemModelTransform::default().0;
     let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
         super::gui::decode_gui_mesh_batches(
             FfiSlice {
@@ -1439,7 +1440,7 @@ fn gui_mesh_flat_scale_transport_requires_native_layout_and_unresolved_frame_lig
     assert_eq!(decoded.item_raster_scale, 2);
     assert_eq!(decoded.render_extent, [0, 0]);
     assert!(decoded.item_lighting.is_none());
-    assert!(super::super::gui_mesh_frontend::prepare_draws(&[decoded]).is_err());
+    assert!(crate::render::guirender::mesh::prepare_draws(&[decoded]).is_err());
     request.render_width = 32;
     assert!(decode(&request).is_err());
     request.render_width = 0;
@@ -1474,7 +1475,7 @@ fn gui_mesh_foil_transport_preserves_semantics_and_rejects_invalid_modes() {
     let copied = decode(&request).unwrap().remove(0);
     assert_eq!(
         copied.item_foil.unwrap(),
-        super::super::gui_mesh_frontend::GuiItemFoil {
+        crate::render::guirender::mesh::GuiItemFoil {
             kind: crate::render::shared::item_foil::StandardFoilKind::Item,
             clock_millis: 12_345,
             speed: 0.5,
@@ -1518,7 +1519,7 @@ fn gui_inventory_block_lighting_transport_is_explicit_and_closed() {
     let decoded = decode(&request).unwrap();
     assert_eq!(
         decoded[0].lighting_mode,
-        super::super::gui_mesh_frontend::GuiMeshLightingMode::InventoryBlock
+        crate::render::guirender::mesh::GuiMeshLightingMode::InventoryBlock
     );
     request.lighting_mode = 4;
     assert!(decode(&request).is_err());
@@ -1544,7 +1545,7 @@ fn gui_entity_preview_decal_material_transport_is_explicit_and_closed() {
     };
     assert_eq!(
         decode(&request).unwrap()[0].material_mode,
-        super::super::gui_mesh_frontend::GuiMeshMaterialMode::EntityDecalCutoutNoCull
+        crate::render::guirender::mesh::GuiMeshMaterialMode::EntityDecalCutoutNoCull
     );
     request.material_mode = 10;
     assert!(decode(&request).is_err());
@@ -1584,7 +1585,7 @@ fn gui_mesh_transport_copies_and_rejects_malformed_payloads() {
     }
     .expect("explicit semantic panorama material decodes");
     assert_eq!(
-        super::super::gui_mesh_frontend::GuiMeshMaterialMode::Panorama,
+        crate::render::guirender::mesh::GuiMeshMaterialMode::Panorama,
         panorama_decoded[0].material_mode,
         "the FFI must preserve the no-cull/no-depth panorama policy rather than coercing it to item geometry",
     );
@@ -2763,7 +2764,7 @@ fn semantic_gui_ffi_decode_copies_caller_memory() {
 
 #[test]
 fn semantic_affine_material_is_copied_and_unknown_modes_are_rejected() {
-    use crate::render::vulkanic::gui_item_material::GuiAffineMaterial;
+    use crate::render::guirender::items::material::GuiAffineMaterial;
     let mut affine = affine_quad_request();
     affine.material_mode = 1;
     let mut request = frame_request(&[]);
@@ -2860,7 +2861,7 @@ fn item_layer_transport_copies_order_and_rejects_invalid_nested_data_before_admi
         color_argb: 0x80ff0000,
         corners: [0.0, 0.0, 16.0, 0.0, 0.0, 16.0],
         uv: [0.0, 0.0, 1.0, 1.0],
-        model_transform: super::super::gui_item_raster::GuiItemModelTransform::default().0,
+        model_transform: crate::render::guirender::items::raster::GuiItemModelTransform::default().0,
     };
     let mut layers = [
         layer,
@@ -5322,7 +5323,7 @@ fn whole_frame_world_mesh_ffi_copies_and_rejects_malformed_payloads() {
 
 #[test]
 fn world_mesh_asset_ffi_retires_gui_views_before_replacing_their_owner() {
-    use crate::render::vulkanic::gui_atlas_reference::GuiAtlasReference;
+    use crate::render::guirender::atlas_reference::GuiAtlasReference;
     let create = FfiContextCreateRequest {
         header: FfiHeader {
             version: FFI_ABI_VERSION,

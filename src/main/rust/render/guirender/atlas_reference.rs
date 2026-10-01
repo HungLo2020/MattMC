@@ -2,8 +2,32 @@
 //! The eventual GUI consumer must resolve the exact accepted atlas incarnation
 //! and declare sampled-resource use in its command stream. This table owns no
 //! pixels, GPU resources, animation clocks, submissions, or presentation state.
-use super::error::{GalError, GalResult, StatusCode};
+use crate::render::vulkanic::error::{GalError, GalResult, StatusCode};
+use crate::render::vulkanic::gal::VulkanicGal;
+use crate::render::vulkanic::handles::Handle;
 use std::collections::{BTreeMap, BTreeSet};
+
+/// The owner of the images that GUI atlas references sample.
+///
+/// Stitched atlases are uploaded and animated by the world renderer; the GUI
+/// renderer only names them. This trait is the whole of what the GUI needs
+/// from that owner, so `guirender` never depends on `worldrender`: the world
+/// renderer implements it and passes itself in when it composes the GUI.
+pub(crate) trait GuiAtlasOwner {
+    /// The exact incarnation currently accepted for `texture_id`, or `None`
+    /// when the texture is absent or is not a stitched (single-frame) atlas.
+    fn accepted_gui_atlas_incarnation(&self, texture_id: u32) -> Option<AcceptedAtlasIncarnation>;
+    /// Fails while owner uploads are deferred or pending, because GUI commands
+    /// sampling the atlas must be recorded after those uploads.
+    fn require_gui_atlas_upload_boundary(&self) -> GalResult<()>;
+    /// Creates a sampled view of the referenced atlas incarnation, rejecting
+    /// stale references and images whose storage differs from the declaration.
+    fn create_gui_atlas_view(
+        &mut self,
+        gal: &mut VulkanicGal,
+        reference: GuiAtlasReference,
+    ) -> GalResult<Handle>;
+}
 
 pub(crate) const MAX_GUI_ATLAS_REFERENCES: usize = 4096;
 
@@ -156,7 +180,7 @@ impl GuiAtlasReferences {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::render::guirender::atlas_reference::*;
     fn reference() -> GuiAtlasReference {
         GuiAtlasReference {
             asset_id: 101,

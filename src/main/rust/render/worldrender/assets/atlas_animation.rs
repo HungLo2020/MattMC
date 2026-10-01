@@ -1,5 +1,8 @@
 //! Atlas sprite animation: observation, ticks, owned-image uploads and GUI atlas views.
 
+use crate::render::guirender::atlas_reference::{
+    AcceptedAtlasIncarnation, GuiAtlasOwner, GuiAtlasReference,
+};
 use crate::render::worldrender::*;
 
 pub(in crate::render::worldrender) fn atlas_animation_registry_residency_fits(
@@ -245,80 +248,6 @@ impl WorldPrimitiveFrontend {
             (!self.latest_atlas_animation_observations.is_empty()).then_some(texture_id);
     }
 
-    /// Accepted same-context texture metadata, never a backend/native image handle.
-    /// Atlas interpolation changes pixels without changing this resource incarnation.
-    pub(crate) fn accepted_gui_atlas_incarnation(
-        &self,
-        texture_id: u32,
-    ) -> Option<crate::render::vulkanic::gui_atlas_reference::AcceptedAtlasIncarnation> {
-        let asset = self.mesh_texture_assets.get(&texture_id)?;
-        // Legacy independently animated image sheets are not stitched atlases.
-        if asset.frame_count != 1
-            || asset.animation_flags != 0
-            || asset.frame_width != asset.width
-            || asset.frame_height != asset.height
-        {
-            return None;
-        }
-        Some(crate::render::vulkanic::gui_atlas_reference::AcceptedAtlasIncarnation {
-            texture_id,
-            generation: asset.animation_generation,
-            width: asset.width,
-            height: asset.height,
-        })
-    }
-
-    /// Private GUI sampling cannot bypass the world upload transaction. A future
-    /// combined-frame consumer must explicitly order queued uploads before use.
-    pub(crate) fn require_gui_atlas_upload_boundary(&self) -> GalResult<()> {
-        if self.defer_world_uploads || !self.pending_world_upload_ops.is_empty() {
-            return Err(GalError::invalid_argument(
-                "GUI atlas sampling requires completed world upload recording",
-            ));
-        }
-        Ok(())
-    }
-
-    /// Private GAL view of the owner's image. The caller owns only this view and
-    /// must retire dependent GUI sets and this view before replacing the atlas.
-    /// No pixel copy or second image is created when the owner is already resident.
-    pub(crate) fn create_gui_atlas_view(
-        &mut self,
-        gal: &mut VulkanicGal,
-        reference: crate::render::vulkanic::gui_atlas_reference::GuiAtlasReference,
-    ) -> GalResult<Handle> {
-        reference.validate()?;
-        if self.accepted_gui_atlas_incarnation(reference.atlas.texture_id) != Some(reference.atlas)
-        {
-            return Err(GalError::ffi(
-                StatusCode::StaleHandle,
-                "GUI atlas reference does not name this accepted incarnation",
-            ));
-        }
-        self.ensure_mesh_texture_resources(gal, reference.atlas.texture_id, "gui-owned-atlas")?;
-        let resource = self
-            .mesh_texture_resources
-            .get(&reference.atlas.texture_id)
-            .ok_or_else(|| GalError::invalid_argument("GUI atlas image was not prepared"))?;
-        if resource.width != reference.atlas.width || resource.height != reference.atlas.height {
-            return Err(GalError::invalid_argument(
-                "GUI atlas image storage extent differs from its declaration",
-            ));
-        }
-        gal.create_texture_view(TextureViewDesc {
-            label: format!(
-                "gui-atlas-{}-generation-{}",
-                reference.asset_id, reference.atlas.generation
-            ),
-            texture: resource.texture,
-            format: TextureFormat::Rgba8Unorm,
-            base_mip: 0,
-            mip_count: resource.mip_levels,
-            base_layer: 0,
-            layer_count: 1,
-        })
-    }
-
     pub(in crate::render::worldrender) fn accepted_atlas_animation_observation(
         &self,
         gal: &VulkanicGal,
@@ -537,5 +466,81 @@ impl WorldPrimitiveFrontend {
         self.staged_atlas_animations
             .insert(update.texture_id, update);
         Ok(())
+    }
+}
+
+impl GuiAtlasOwner for WorldPrimitiveFrontend {
+    /// Accepted same-context texture metadata, never a backend/native image handle.
+    /// Atlas interpolation changes pixels without changing this resource incarnation.
+    fn accepted_gui_atlas_incarnation(
+        &self,
+        texture_id: u32,
+    ) -> Option<AcceptedAtlasIncarnation> {
+        let asset = self.mesh_texture_assets.get(&texture_id)?;
+        // Legacy independently animated image sheets are not stitched atlases.
+        if asset.frame_count != 1
+            || asset.animation_flags != 0
+            || asset.frame_width != asset.width
+            || asset.frame_height != asset.height
+        {
+            return None;
+        }
+        Some(AcceptedAtlasIncarnation {
+            texture_id,
+            generation: asset.animation_generation,
+            width: asset.width,
+            height: asset.height,
+        })
+    }
+
+    /// Private GUI sampling cannot bypass the world upload transaction. A future
+    /// combined-frame consumer must explicitly order queued uploads before use.
+    fn require_gui_atlas_upload_boundary(&self) -> GalResult<()> {
+        if self.defer_world_uploads || !self.pending_world_upload_ops.is_empty() {
+            return Err(GalError::invalid_argument(
+                "GUI atlas sampling requires completed world upload recording",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Private GAL view of the owner's image. The caller owns only this view and
+    /// must retire dependent GUI sets and this view before replacing the atlas.
+    /// No pixel copy or second image is created when the owner is already resident.
+    fn create_gui_atlas_view(
+        &mut self,
+        gal: &mut VulkanicGal,
+        reference: GuiAtlasReference,
+    ) -> GalResult<Handle> {
+        reference.validate()?;
+        if self.accepted_gui_atlas_incarnation(reference.atlas.texture_id) != Some(reference.atlas)
+        {
+            return Err(GalError::ffi(
+                StatusCode::StaleHandle,
+                "GUI atlas reference does not name this accepted incarnation",
+            ));
+        }
+        self.ensure_mesh_texture_resources(gal, reference.atlas.texture_id, "gui-owned-atlas")?;
+        let resource = self
+            .mesh_texture_resources
+            .get(&reference.atlas.texture_id)
+            .ok_or_else(|| GalError::invalid_argument("GUI atlas image was not prepared"))?;
+        if resource.width != reference.atlas.width || resource.height != reference.atlas.height {
+            return Err(GalError::invalid_argument(
+                "GUI atlas image storage extent differs from its declaration",
+            ));
+        }
+        gal.create_texture_view(TextureViewDesc {
+            label: format!(
+                "gui-atlas-{}-generation-{}",
+                reference.asset_id, reference.atlas.generation
+            ),
+            texture: resource.texture,
+            format: TextureFormat::Rgba8Unorm,
+            base_mip: 0,
+            mip_count: resource.mip_levels,
+            base_layer: 0,
+            layer_count: 1,
+        })
     }
 }

@@ -123,7 +123,7 @@ impl WorldPrimitiveFrontend {
             valid
         });
         if plan.ordered_passes.is_empty()
-            || plan.ordered_passes.len() > crate::render::vulkanic::gui_frontend::MAX_CUSTOM_POST_EFFECT_PASSES
+            || plan.ordered_passes.len() > crate::render::guirender::frontend::MAX_CUSTOM_POST_EFFECT_PASSES
             || private_targets.len() > 4
             || !final_output_is_main
             || !private_graph_is_sequential

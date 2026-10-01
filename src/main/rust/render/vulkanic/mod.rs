@@ -11,17 +11,10 @@ pub mod error;
 pub mod ffi;
 pub mod frame;
 pub mod gal;
-pub mod gui_frontend;
 // Explicit same-context atlas references; private until native GUI sampling is wired.
-pub(crate) mod gui_atlas_reference;
-mod gui_item_layout;
-pub(crate) mod gui_item_material;
-mod gui_item_raster;
 /// Backend-neutral GUI mesh semantics. This is not an FFI-admitted route
 /// until the owned offscreen renderer consumes it.
-pub mod gui_mesh_frontend;
 /// Private semantic tiled-GUI lowering; not yet a frame/FFI-admitted route.
-mod gui_tiling;
 pub mod handles;
 pub mod metrics;
 pub mod resources;

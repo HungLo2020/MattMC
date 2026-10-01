@@ -1,3 +1,4 @@
+pub mod guirender;
 pub(crate) mod shared;
 pub mod worldrender;
 pub mod scene;

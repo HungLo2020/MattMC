@@ -3319,7 +3319,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         // Observe decoded native item meshes, not Java producer
                         // counts. A group is the real scheduler item identity.
                         let (groups, layers, nonidentity, distinct) =
-                            super::super::gui_mesh_frontend::flat_item_mesh_decode_counts(&gui_mesh_batches);
+                            crate::render::guirender::mesh::flat_item_mesh_decode_counts(&gui_mesh_batches);
                         if layers != 0 {
                             whole_frame_trace(&format!("whole-frame.gui-item-mesh-layers groups={} layers={}", groups, layers));
                             whole_frame_trace(&format!("whole-frame.gui-item-mesh-transforms layers={} nonidentity={} distinct={}", layers, nonidentity, distinct));
@@ -3371,7 +3371,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         ).is_ok()
                     {
                         Some((gui_tiled_quads.len(),
-                            crate::render::vulkanic::gui_frontend::preflight_tiled_affine_count(
+                            crate::render::guirender::frontend::preflight_tiled_affine_count(
                                 &gui_tiled_quads, 0)?))
                     } else { None };
                     let frontend_result = context

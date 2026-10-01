@@ -4,7 +4,7 @@
 //! They do not imply white lighting. Keep this input distinct from texture
 //! regions, packed tint colors, and GUI scheduling strata.
 
-use super::error::{GalError, GalResult};
+use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::shaderpack::vanilla::lightmap::VanillaLightmapFrame;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -95,7 +95,7 @@ impl GuiFlatItemLighting {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::render::guirender::items::material::*;
     use crate::render::shaderpack::vanilla::lightmap::VanillaLightmapInputs;
 
     fn frame() -> VanillaLightmapFrame {

@@ -1,6 +1,6 @@
 //! Rust-owned item raster extents and axis conventions. No renderer/GPU inputs.
 //! Expanded block layout is a private prerequisite, not a newly admitted route.
-use super::error::{GalError, GalResult};
+use crate::render::vulkanic::error::{GalError, GalResult};
 
 const MAX_AXIS: u32 = 4096;
 
@@ -169,7 +169,7 @@ impl GuiItemRasterLayout {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::render::guirender::items::layout::*;
     const ID: [f32; 16] = [
         1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.,
     ];

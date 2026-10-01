@@ -95,7 +95,7 @@ fn terrain_coordinate_diagnostic_variants_compile_on_vulkan() {
 #[test]
 fn gui_mesh_shaders_compile_with_the_shared_frame_uniform_contract() {
     let (vertex, fragment) =
-        crate::render::vulkanic::gui_mesh_frontend::vulkan_shader_sources_for_backend_test();
+        crate::render::guirender::mesh::vulkan_shader_sources_for_backend_test();
     compile_glsl_for_backend_test(shaderc::ShaderKind::Vertex, vertex, "gui-mesh.vertex")
         .expect("Vulkan GUI mesh vertex shader must compile");
     compile_glsl_for_backend_test(shaderc::ShaderKind::Fragment, fragment, "gui-mesh.fragment")
@@ -105,7 +105,7 @@ fn gui_mesh_shaders_compile_with_the_shared_frame_uniform_contract() {
 #[test]
 fn gui_panorama_shaders_compile_as_an_unlit_rust_owned_material() {
     let (vertex, fragment) =
-        crate::render::vulkanic::gui_mesh_frontend::vulkan_panorama_shader_sources_for_backend_test(
+        crate::render::guirender::mesh::vulkan_panorama_shader_sources_for_backend_test(
         );
     compile_glsl_for_backend_test(shaderc::ShaderKind::Vertex, vertex, "gui-panorama.vertex")
         .expect("Vulkan GUI panorama vertex shader must compile");

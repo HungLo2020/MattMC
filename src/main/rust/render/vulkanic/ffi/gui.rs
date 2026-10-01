@@ -1,19 +1,19 @@
 use super::*;
-use crate::render::vulkanic::gui_frontend::{
+use crate::render::guirender::frontend::{
     GUI_MAX_RAW_IMAGE_BYTES_TOTAL, GUI_MAX_RAW_IMAGE_PIXELS, GUI_MAX_VIEWPORT_AXIS,
 };
-use crate::render::vulkanic::gui_mesh_frontend::GUI_MESH_MAX_FRAME_PAYLOAD_BYTES;
+use crate::render::guirender::mesh::GUI_MESH_MAX_FRAME_PAYLOAD_BYTES;
 
-const GUI_MAX_AFFINE_QUADS: usize = super::super::gui_frontend::GUI_MAX_EXPANDED_AFFINE_QUADS;
+const GUI_MAX_AFFINE_QUADS: usize = crate::render::guirender::frontend::GUI_MAX_EXPANDED_AFFINE_QUADS;
 
 pub(crate) unsafe fn decode_gui_atlas_reference_update(
     request: *const FfiGuiAtlasReferenceUpdate,
     capabilities: BackendCapabilities,
 ) -> GalResult<(
     u64,
-    Vec<super::super::gui_atlas_reference::GuiAtlasReference>,
+    Vec<crate::render::guirender::atlas_reference::GuiAtlasReference>,
 )> {
-    use super::super::gui_atlas_reference::{
+    use crate::render::guirender::atlas_reference::{
         AcceptedAtlasIncarnation, GuiAtlasReference, MAX_GUI_ATLAS_REFERENCES,
     };
     let request = read_struct(request, "GUI atlas reference update")?;
@@ -113,8 +113,8 @@ pub(crate) unsafe fn decode_gui_tiled_quads(
     gui_extent: [u32; 2],
     projection_extent: [f32; 2],
     ordinary_affine_count: usize,
-) -> GalResult<Vec<super::super::gui_frontend::GuiTiledQuadRequest>> {
-    use super::super::gui_frontend::{preflight_tiled_affine_count, GuiTiledQuadRequest};
+) -> GalResult<Vec<crate::render::guirender::frontend::GuiTiledQuadRequest>> {
+    use crate::render::guirender::frontend::{preflight_tiled_affine_count, GuiTiledQuadRequest};
     if raw.count > GUI_MAX_AFFINE_QUADS as u64 {
         return Err(GalError::invalid_argument(
             "tiled GUI request count exceeds bounded limit",
@@ -132,7 +132,7 @@ pub(crate) unsafe fn decode_gui_tiled_quads(
             _ => return Err(GalError::invalid_argument("invalid tiled GUI clip mode")),
         };
         let request = GuiTiledQuadRequest {
-            geometry: super::super::gui_tiling::GuiTileGeometry {
+            geometry: crate::render::guirender::tiling::GuiTileGeometry {
                 bounds: item.bounds,
                 tile_extent: item.tile_extent,
                 uv: item.uv,
@@ -251,7 +251,7 @@ pub(crate) unsafe fn decode_gui_frame_submit_with_tiles(
     }
     let frame_target = Handle::from(request.frame_target);
     let projection_extent = [request.gui_projection_width, request.gui_projection_height];
-    super::super::gui_frontend::validate_gui_projection(
+    crate::render::guirender::frontend::validate_gui_projection(
         [request.gui_width as u32, request.gui_height as u32],
         projection_extent,
     )?;
@@ -331,7 +331,7 @@ pub(crate) unsafe fn decode_gui_frame_submit_with_tiles(
         projection_extent,
         affine_quads.len(),
     )?;
-    super::super::gui_frontend::validate_gui_frame_sequences(
+    crate::render::guirender::frontend::validate_gui_frame_sequences(
         &owned,
         &affine_quads,
         &mesh_batches,
@@ -367,7 +367,7 @@ fn decode_gui_affine_quads(
     let mut total_layers = 0_usize;
     for quad in quads {
         validate_item_size::<FfiGuiAffineQuadRequest>(quad.byte_size, "GUI affine quad")?;
-        if quad.item_raster_layers.count > super::super::gui_item_raster::MAX_ITEM_LAYERS as u64
+        if quad.item_raster_layers.count > crate::render::guirender::items::raster::MAX_ITEM_LAYERS as u64
             || (quad.item_raster_layers.count != 0 && quad.item_raster_scale == 0)
         {
             return Err(GalError::invalid_argument(
@@ -375,7 +375,7 @@ fn decode_gui_affine_quads(
             ));
         }
         total_layers += quad.item_raster_layers.count as usize;
-        if total_layers > super::super::gui_frontend::GUI_MAX_RAW_IMAGES {
+        if total_layers > crate::render::guirender::frontend::GUI_MAX_RAW_IMAGES {
             return Err(GalError::invalid_argument(
                 "GUI item layer stream exceeds frame bound",
             ));
@@ -389,21 +389,21 @@ fn decode_gui_affine_quads(
                     "invalid GUI item layer resource/material",
                 ));
             }
-            let geometry = super::super::gui_item_raster::GuiItemRasterGeometry {
+            let geometry = crate::render::guirender::items::raster::GuiItemRasterGeometry {
                 corners: layer.corners,
             };
             geometry.identity()?;
-            super::super::gui_item_raster::item_uv_identity(layer.uv)?;
+            crate::render::guirender::items::raster::item_uv_identity(layer.uv)?;
             let model_transform =
-                super::super::gui_item_raster::GuiItemModelTransform(layer.model_transform);
+                crate::render::guirender::items::raster::GuiItemModelTransform(layer.model_transform);
             model_transform.validate()?;
-            item_raster_layers.push(super::super::gui_frontend::GuiItemRasterLayer {
+            item_raster_layers.push(crate::render::guirender::frontend::GuiItemRasterLayer {
                 asset_id: layer.asset_id,
                 color_argb: layer.color_argb,
                 geometry,
                 uv: layer.uv,
                 model_transform,
-                material: super::super::gui_item_material::GuiAffineMaterial::decode(
+                material: crate::render::guirender::items::material::GuiAffineMaterial::decode(
                     layer.material_mode,
                 )?,
             });
@@ -425,10 +425,10 @@ fn decode_gui_affine_quads(
         let request = GuiAffineQuadRequest {
             item_raster_layers,
             item_raster_scale: quad.item_raster_scale,
-            item_raster_geometry: super::super::gui_item_raster::GuiItemRasterGeometry {
+            item_raster_geometry: crate::render::guirender::items::raster::GuiItemRasterGeometry {
                 corners: quad.item_raster_corners,
             },
-            material: super::super::gui_item_material::GuiAffineMaterial::decode(
+            material: crate::render::guirender::items::material::GuiAffineMaterial::decode(
                 quad.material_mode,
             )?,
             stratum: quad.stratum,
@@ -455,7 +455,7 @@ fn decode_gui_affine_quads(
             clip_width: quad.clip_width,
             clip_height: quad.clip_height,
         };
-        super::super::gui_frontend::validate_affine_quad(&request)?;
+        crate::render::guirender::frontend::validate_affine_quad(&request)?;
         owned.push(request);
     }
     Ok(owned)
@@ -573,16 +573,16 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             })
             .collect();
         let request = GuiMeshBatchRequest {
-            item_cache: super::super::gui_mesh_frontend::GuiItemCache::decode(
+            item_cache: crate::render::guirender::mesh::GuiItemCache::decode(
                 batch.item_cache_identity,
                 batch.item_cache_mode,
             )?,
-            block_item_raster: super::super::gui_mesh_frontend::GuiBlockItemRaster::decode(
+            block_item_raster: crate::render::guirender::mesh::GuiBlockItemRaster::decode(
                 batch.block_item_scale,
                 batch.block_model_bounds,
                 batch.block_item_layout,
             )?,
-            decal_foil: super::super::gui_mesh_frontend::GuiDecalFoilProjection::decode(
+            decal_foil: crate::render::guirender::mesh::GuiDecalFoilProjection::decode(
                 batch.decal_foil_mode,
                 batch.decal_model_pose,
                 batch.decal_normal_pose,
@@ -655,7 +655,7 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
 /// the client reloads a dimension) still has a well-defined layer order.
 /// Renumber each item's unique layer indices densely from zero in that order
 /// rather than rejecting the whole frame; duplicates remain an error.
-pub(crate) fn compact_gui_mesh_item_layers(batches: &mut [crate::render::vulkanic::gui_mesh_frontend::GuiMeshBatchRequest]) {
+pub(crate) fn compact_gui_mesh_item_layers(batches: &mut [crate::render::guirender::mesh::GuiMeshBatchRequest]) {
     let mut layers = std::collections::BTreeMap::<(u32, u64), std::collections::BTreeSet<u32>>::new();
     for batch in batches.iter() {
         layers

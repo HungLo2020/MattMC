@@ -15,7 +15,6 @@ Rules, enforced by `architecture_boundary.rs`:
 - Code outside `vulkanic` uses the public GAL modules only; tests there build
   GALs through `test_support` (test builds only).
 
-Everything else in this directory is the GUI renderer and the FFI bridge,
-awaiting their moves to `render/guirender` and `render/bridge` (the shader
-pack and world renderer have moved to `render/shaderpack` and
-`render/worldrender`).
+Everything else in this directory (`ffi/`) is the FFI bridge, awaiting its
+move to `render/bridge`. The shader pack, world renderer and GUI renderer have
+moved to `render/shaderpack`, `render/worldrender` and `render/guirender`.
