@@ -41,6 +41,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Trading](trading/Trading.md), [Villagers](mobs/Villager.md), and [Emeralds](items/Emerald.md): professions, stock, prices, and optional trade-rebalance rules
 
+- [Structures](structures/Structures.md): prepare for [Nether Fortresses](structures/NetherFortress.md) and [Strongholds](structures/Stronghold.md), including optional rooms and portal hazards
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

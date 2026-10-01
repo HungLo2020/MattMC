@@ -1,1 +1,55 @@
 # Structures
+
+Structures give exploration a destination: a place to collect supplies, face a particular hazard, or unlock a route onward. Start with the guide for your goal, then prepare for the dimension around it.
+
+## Choose an expedition
+
+| Guide | Where to search in the bundled normal world | Main reasons to visit |
+| --- | --- | --- |
+| [Nether Fortress](NetherFortress.md) | Nether biomes | Blazes, Nether Wart where a stalk room generates, and corridor-chest loot |
+| [Stronghold](Stronghold.md) | Overworld | An End portal room, with possible libraries and other loot rooms |
+
+These are the structures reviewed in this section so far, not a list of every structure in MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
+
+## Finding a structure
+
+For a Survival stronghold search, use [Eyes of Ender](Stronghold.md#finding-a-stronghold). Fortress exploration starts in the [Nether](../dimensions/Nether.md); distinguish its Nether-brick bridges and corridors from a bastion before committing to a dangerous approach.
+
+Players with permission level 2 can use these search commands in the relevant dimension:
+
+```text
+/locate structure minecraft:fortress
+/locate structure minecraft:stronghold
+```
+
+`/locate` searches the command source's current dimension. It does not travel to another dimension or place a structure on demand. Its structure result gives X and Z with `~` in place of Y; the clickable coordinate suggests a teleport using your current height. **It is not a safe arrival point.** Inspect the terrain and plan an approach rather than assuming the suggested height is clear.
+
+A failed search is not proof that a structure does not exist anywhere. Check the dimension, world settings, applicable biomes, and exact ID first. See [Commands](../commands/Commands.md) for permission and command basics.
+
+## When generation is eligible
+
+New structure starts require the world's structure-generation option to be enabled. The generator then uses the world's loaded structure sets, placement rules, and allowed biomes. A biome being eligible means a structure may start there, not that every patch of that biome contains one.
+
+The guides describe bundled data and the normal world preset. Data packs, custom presets, and older already-generated terrain can differ. In particular, the bundled Primordial Caves preset uses Dry Midlands and Primordial Plains; neither biome belongs to these two structures' allowed biome tags. Do not carry a fortress or stronghold search into [Primordial Caves](../dimensions/PrimordialCaves.md) expecting the default Nether or Overworld result.
+
+## Before entering
+
+- Record your entrance and return route; mark junctions while exploring
+- Bring food, tools, lighting, and spare blocks for controlled access and retreat
+- Decide what you need before looting: optional rooms can justify searching another structure
+- Prepare separately for the destination beyond a portal. Finding a stronghold is not preparation for the [End](../dimensions/End.md)
+
+## Related pages
+
+- [Dimensions](../dimensions/Dimensions.md)
+- [Nether Wart crop](../blocks/NetherWart.md)
+- [Brewing](../brewing/Brewing.md)
+- [Gameplay](../Gameplay.md)
+
+## Sources and verification
+
+Source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. No in-game structure search or exploration test was performed. Structure-specific evidence is recorded on each guide.
+
+- [Structure-generation setting](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/chunk/status/ChunkStatusTasks.java#L40-L59), [structure-set and biome filtering](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/chunk/ChunkGeneratorStructureState.java#L45-L64), and [placement and generation](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/chunk/ChunkGenerator.java#L453-L580)
+- [Locate permissions, dimension scope, failure, and coordinate output](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/server/commands/LocateCommand.java)
+- [Normal world preset, including Primordial Caves](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/worldgen/world_preset/normal.json), [Nether biome tag](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/worldgen/biome/is_nether.json), and [Overworld biome tag](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/worldgen/biome/is_overworld.json)
