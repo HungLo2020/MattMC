@@ -1,5 +1,7 @@
 # Mobs
 
+For detailed source-reviewed examples, see [Grizzly Bear](GrizzlyBear.md), [Trilocaris](Trilocaris.md), and [Cow](Cow.md). The [content guide](../ContentGuide.md) explains verification labels. Behavior categories below are the existing browsing groups; individual pages may describe conditional behavior and integration limits.
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs

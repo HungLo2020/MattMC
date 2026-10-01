@@ -1,5 +1,7 @@
 # Items
 
+Find inventory objects here, including block items, food, equipment, and spawn eggs. For reviewed examples, start with the [content guide](../ContentGuide.md). Placed-block behavior is documented under [Blocks](../blocks/Blocks.md). Existing short entries are still being checked against MattMC source; an entry alone does not establish Survival availability.
+
 ## List of Items
 #### #
 - [.22 Modle 943 Revolver](22Modle943Revolver.md)

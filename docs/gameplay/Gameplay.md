@@ -1,6 +1,8 @@
 # Gameplay
 
-Gameplay.
+Explore MattMC gameplay by topic. These pages cover the behavior implemented in this repository; bundled content can differ from its upstream mod.
+
+Start with the [content guide](ContentGuide.md) for source-reviewed examples and how to read unfinished entries.
 
 ## Table of Contents
 

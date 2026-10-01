@@ -1,18 +1,21 @@
 # Ambersol
 
-## Obtaining
+Ambersol is the placeable item for the [Ambersol block](../blocks/Ambersol.md), a column-lighting block integrated from Alex's Caves.
 
-Ambersol can be obtained from the Creative Menu and from any Alex's Caves generation or recipes enabled in the current build.
+## Obtaining and use
 
-## Usage
+The item is included in the Creative inventory and is registered as `minecraft:ambersol`. Place it overhead to produce the block's downward lighting effect. See the block page for light level, placement behavior, and the unresolved Survival harvesting and generation details.
 
-Ambersol is a bright amber-like block used as a decorative light source.
+The item uses the block's standard registered item form; no separate item-only ability is established here.
 
-## Behavior
+## Related pages
 
-The block emits strong light, ticks randomly, and interacts with Ambersol Light blocks below it to extend its lighting effect.
+- [Ambersol block and lighting](../blocks/Ambersol.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:ambersol` block.
-* Ambersol is integrated from the bundled Alex's Caves content.
+Source-reviewed at [snapshot fffe4a073f0b](https://github.com/HungLo2020/MattMC/commit/fffe4a073f0b8d867902b067a6dd022cda31926f) on 2026-10-01; not an in-game test.
+
+- [Item registration](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/minecraft/world/item/Items.java)
+- [Creative inventory](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
