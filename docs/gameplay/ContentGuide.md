@@ -51,6 +51,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Root crops](blocks/RootCrops.md): Carrot, Potato, and Beetroot growth, custom harvesting, food, and cooking
 
+- [Pig](mobs/Pig.md), [Saddle](items/Saddle.md), and [Carrot on a Stick](items/CarrotOnAStick.md): root-crop breeding, riding, equipment recovery, and [Porkchop cooking](items/CookedPorkchop.md)
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
