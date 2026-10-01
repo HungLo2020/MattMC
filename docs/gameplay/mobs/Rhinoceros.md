@@ -50,7 +50,7 @@ Animated attacks fling or slash the main target and can hit nearby **untrusted, 
 
 An adult accepts a regular, splash, or lingering potion through its interaction method when the base potion has an effect. It stores **only that base potion's first effect**, including its amplifier and duration, for later animated hits. It consumes the potion and returns a Glass Bottle. This is not a promise that every custom potion effect behaves correctly.
 
-The stored coating counts newly applied effects and eventually wears off; its saved duration is the duration inflicted on a target, not a countdown for the coating itself. **Do not rely on an ordinary Water Bottle to clear it:** the current water comparison uses incompatible object forms and does not match the registered water potion as intended.
+The stored coating counts newly applied effects and eventually wears off; its saved duration is the duration inflicted on a target, not a countdown for the coating itself. **Do not rely on an ordinary Water Bottle to clear it:** the current water comparison uses incompatible object forms and does not match the registered water potion as intended. This specific clearing failure is tracked in [issue #783](https://github.com/HungLo2020/MattMC/issues/783).
 
 ## Drops and integration notes
 

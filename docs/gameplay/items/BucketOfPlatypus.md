@@ -21,7 +21,7 @@ The shared bucket helper writes **health**, a custom name, and basic flags such 
 Two limitations matter when moving a particular animal:
 
 - **Age is not saved** by the Platypus's bucket method or the shared helper. Capturing a baby therefore does not establish a same-age baby on release
-- **Special state uses mismatched data fields.** The Platypus writes sensing, egg-carrying, supercharged, fedora, and previous bucket-state flags into `CUSTOM_DATA`; the generic release code instead passes `BUCKET_ENTITY_DATA` to its loader. The special flags can consequently reset to their defaults on release. The release flow separately sets the new animal's from-bucket flag to true
+- **Special state uses mismatched data fields.** The Platypus writes sensing, egg-carrying, supercharged, fedora, and previous bucket-state flags into `CUSTOM_DATA`; the generic release code instead passes `BUCKET_ENTITY_DATA` to its loader. The special flags can consequently reset to their defaults on release. The release flow separately sets the new animal's from-bucket flag to true. The component mismatch is tracked in [issue #782](https://github.com/HungLo2020/MattMC/issues/782); this is a documented limitation, not a completed fix
 
 Ordinary world saving uses a different path and does save those Platypus flags; that does not repair the bucket transfer. If an animal is already sensing or carrying an egg, keep it in its enclosure instead of relying on the bucket to preserve that progress. [Bucket save/load][platypus-data] · [Generic release data][release] · [World save/load][world-data]
 

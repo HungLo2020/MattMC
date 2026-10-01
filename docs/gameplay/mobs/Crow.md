@@ -59,7 +59,7 @@ This implementation writes directly into container slots and has not been tested
 
 Feed **Pumpkin Seeds to two tamed adults** to enter love mode. Breeding produces a live crow chick. Its creation path does not copy an owner or tame state, so plan to tame the offspring separately. Babies cannot enter the crow's flying state.
 
-There is an interaction edge case: the handler can call ordinary animal feeding twice. Feeding a tamed chick from a stack can therefore consume a second seed and apply growth twice. Adult breeding also runs before command/item-return logic; clear its beak and check its command afterward. These are source-identified concerns, not in-game test results.
+There is an interaction edge case: the handler can call ordinary animal feeding twice. Feeding a tamed chick from a stack can therefore consume a second seed and apply growth twice. Adult breeding also runs before command/item-return logic; clear its beak and check its command afterward. These are source-identified concerns, not in-game test results. The repeated feeding and handled-result fallthrough are tracked in [issue #784](https://github.com/HungLo2020/MattMC/issues/784); the separate perch concern is outside that issue.
 
 ## Wild behavior and combat
 
