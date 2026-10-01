@@ -14,6 +14,8 @@ public class NonOverlappingMerger extends AbstractDoubleList implements IndexMer
 		this.swap = bl;
 	}
 
+	boolean nativeCompatible() { return NativeVoxelJoin.trustedCoordinates(this.lower) && NativeVoxelJoin.trustedCoordinates(this.upper); }
+
 	@Override
 	public int size() {
 		return this.lower.size() + this.upper.size();

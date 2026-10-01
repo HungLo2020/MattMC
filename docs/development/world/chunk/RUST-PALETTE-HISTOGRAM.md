@@ -51,6 +51,9 @@ Use `--cpu N` to select an available logical CPU. It pins the original count,
 recount and mutation bodies to Git `fffe4a073`, allowing only the known packing
 and histogram dispatch insertions in the container. It also runs the directly
 affected palette-packing parity tests. No server or renderer is required.
+The separate [resize](RUST-PALETTE-RESIZE.md) and
+[global-load](RUST-PALETTE-UNPACKING.md) dispatches and constructor visibility
+change are also permitted exactly; count, recount and mutation references stay pinned.
 
 Tests compare ordered raw ID/count records against actual fastutil and compare
 all callback identities/frequencies against the original Java method. Coverage

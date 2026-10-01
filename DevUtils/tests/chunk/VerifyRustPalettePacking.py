@@ -43,7 +43,9 @@ def main():
     a=original.index('public PalettedContainerRO.PackedData<T> pack(')
     pos=original.index('\t\t\tBitStorage bitStorage',a)
     from VerifyRustPaletteHistogram import ENTRY as histogram_entry
-    if source.read_text().replace(histogram_entry, "", 1)!=original[:pos]+entry+original[pos:]:
+    from VerifyRustPaletteResize import strip_resize
+    from VerifyRustPaletteUnpacking import strip_unpack
+    if strip_resize(strip_unpack(source.read_text())).replace(histogram_entry, "", 1)!=original[:pos]+entry+original[pos:]:
         raise RuntimeError('Original source/helpers differ outside the native dispatch insertion')
     a=original.index('\tpublic PalettedContainerRO.PackedData<T> pack(')
     b=original.index('\n\t@Override\n\tpublic int getSerializedSize',a)

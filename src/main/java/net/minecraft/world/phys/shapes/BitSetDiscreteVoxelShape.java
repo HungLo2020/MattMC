@@ -4,13 +4,13 @@ import java.util.BitSet;
 import net.minecraft.core.Direction;
 
 public final class BitSetDiscreteVoxelShape extends DiscreteVoxelShape {
-	private final BitSet storage;
-	private int xMin;
-	private int yMin;
-	private int zMin;
-	private int xMax;
-	private int yMax;
-	private int zMax;
+	final BitSet storage;
+	int xMin;
+	int yMin;
+	int zMin;
+	int xMax;
+	int yMax;
+	int zMax;
 
 	public BitSetDiscreteVoxelShape(int i, int j, int k) {
 		super(i, j, k);
@@ -116,6 +116,10 @@ public final class BitSetDiscreteVoxelShape extends DiscreteVoxelShape {
 		BooleanOp booleanOp
 	) {
 		BitSetDiscreteVoxelShape bitSetDiscreteVoxelShape = new BitSetDiscreteVoxelShape(indexMerger.size() - 1, indexMerger2.size() - 1, indexMerger3.size() - 1);
+		if ((long)bitSetDiscreteVoxelShape.xSize * bitSetDiscreteVoxelShape.ySize * bitSetDiscreteVoxelShape.zSize >= NativeVoxelJoin.MIN_CELLS) {
+			var nativeJoin = NativeVoxelJoin.join(discreteVoxelShape, discreteVoxelShape2, indexMerger, indexMerger2, indexMerger3, booleanOp, bitSetDiscreteVoxelShape);
+			if (nativeJoin != null) return nativeJoin;
+		}
 		int[] is = new int[]{Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
 		indexMerger.forMergedIndexes((i, j, k) -> {
 			boolean[] bls = new boolean[]{false};

@@ -67,7 +67,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 				.comapFlatMap((PalettedContainerRO.PackedData<T> packedData) -> unpacker.read(strategy, packedData), ro -> ro.pack(strategy));
 	}
 
-	private PalettedContainer(Strategy<T> strategy, Configuration configuration, BitStorage bitStorage, Palette<T> palette) {
+	PalettedContainer(Strategy<T> strategy, Configuration configuration, BitStorage bitStorage, Palette<T> palette) {
 		this.strategy = strategy;
 		this.data = new PalettedContainer.Data<>(configuration, bitStorage, palette);
 	}
@@ -100,7 +100,9 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 	public int onResize(int i, T object) {
 		PalettedContainer.Data<T> data = this.data;
 		PalettedContainer.Data<T> data2 = this.createOrReuseData(data, i);
-		data2.copyFrom(data.palette, data.storage);
+		if (this.getClass() != PalettedContainer.class || !NativePaletteResize.copy(this.strategy, data, data2)) {
+			data2.copyFrom(data.palette, data.storage);
+		}
 		this.data = data2;
 		return data2.palette.idFor(object, PaletteResize.noResizeExpected());
 	}
@@ -213,6 +215,8 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 						palette = configuration.createPalette(strategy, list);
 						bitStorage = new SimpleBitStorage(configuration.bitsInMemory(), i, ls);
 					} else {
+						var loaded = NativePaletteUnpacking.unpack(strategy, configuration, list, ls);
+						if (loaded != null) return DataResult.success(loaded);
 						Palette<T> palette2 = new HashMapPalette<>(j, list);
 						SimpleBitStorage simpleBitStorage = new SimpleBitStorage(j, i, ls);
 						Palette<T> palette3 = configuration.createPalette(strategy, list);

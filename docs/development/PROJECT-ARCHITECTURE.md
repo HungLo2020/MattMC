@@ -38,6 +38,9 @@ src/main/rust/
 │           └── vulkan/
 ├── tools/
 └── world/
+    ├── phys/
+    │   └── shapes/
+    │       └── boolean_join/
     └── level/
         ├── biome/
         │   └── climate/
@@ -76,7 +79,14 @@ ownership, native boundaries, and recorded verification.
 
 Packed chunk storage also uses [palette histograms](world/chunk/RUST-PALETTE-HISTOGRAM.md)
 under `world/level/chunk/palette/histogram/` for ordered counting and section
-counter reconstruction.
+counter reconstruction, and [palette resizing](world/chunk/RUST-PALETTE-RESIZE.md)
+under `world/level/chunk/palette/resize/` for bulk remapping during block palette growth.
+[Global palette loading](world/chunk/RUST-PALETTE-UNPACKING.md) uses
+`world/level/chunk/palette/unpack/` and the existing encoder for saved-data repacking.
+
+World collision geometry also uses [voxel Boolean joins](world/physics/RUST-VOXEL-JOIN.md)
+under `world/phys/shapes/boolean_join/`. Java keeps coordinate merging and
+shape ownership while Rust evaluates packed occupancy.
 
 ### `gameplay/`
 
