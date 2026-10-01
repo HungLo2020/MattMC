@@ -1,30 +1,14 @@
 # Mobs
 
-For detailed source-reviewed examples, see [Grizzly Bear](GrizzlyBear.md), [Trilocaris](Trilocaris.md), [Cow](Cow.md), [Subterranodon](Subterranodon.md), [Blobfish](Blobfish.md), and [Roadrunner](Roadrunner.md). The [content guide](../ContentGuide.md) explains verification labels. Behavior categories below are the existing browsing groups; individual pages may describe conditional behavior and integration limits.
+Browse MattMC mobs by their existing behavior groups below. Each group is alphabetized. Individual pages explain conditional aggression, owner controls, and integration limits; a category label does not describe every possible interaction.
 
-For source-reviewed hostile or conditional encounters, see [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Cave Spider](CaveSpider.md), and [Enderman](Enderman.md).
+Use the [content guide](../ContentGuide.md) for curated source-reviewed routes through animal care, combat, and bundled additions. Its verification notes distinguish checked implementation from in-game testing; unexpanded entries in this directory may still be brief starting pages.
 
-Elephant, Raccoon, and Capuchin Monkey are listed as neutral here because their active goals include retaliation; their articles separate owner controls from missing bundled taming foods.
+## Featured routes
 
-For a source-reviewed boss encounter, see [Wither](Wither.md) and its [Nether Star reward](../items/NetherStar.md).
-
-For renewable Wolf Armor materials, see [Armadillo](Armadillo.md), [Scutes](../items/ArmadilloScute.md), and [Brush](../items/Brush.md).
-
-For integrated large-animal behavior and availability limits, see [Rhinoceros](Rhinoceros.md) and [Komodo Dragon](KomodoDragon.md).
-
-For renewable farm resources, see [Sheep](Sheep.md), [White Wool](../items/WhiteWool.md), [Chicken](Chicken.md), and [Egg](../items/Egg.md).
-
-For bird companionship and utility, see [Blue Jay](BlueJay.md) and [Crow](Crow.md), including verified feeding routes and missing integration details.
-
-For apiary care, see [Bee](Bee.md) and [Bee housing](../blocks/BeeHousing.md).
-
-For fortress encounters, see [Blaze](Blaze.md) and [Wither Skeleton](WitherSkeleton.md), including spawning differences and skull rewards.
-
-For integrated predator interactions, see [Tiger](Tiger.md) and [Tasmanian Devil](TasmanianDevil.md), including blessing, howling, and source-defined limits.
-
-For aquatic assistance and care, see [Axolotl](Axolotl.md) and [Dolphin](Dolphin.md), including breeding, breathing, combat support, and treasure-guidance limits.
-
-MattMC mobs grouped by behavior. Each section is alphabetized.
+- **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Axolotl](Axolotl.md), and [Dolphin](Dolphin.md)
+- **Hostile encounters and bosses:** [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Enderman](Enderman.md), [Blaze](Blaze.md), [Wither Skeleton](WitherSkeleton.md), [Slime](Slime.md), [Magma Cube](MagmaCube.md), and [Wither](Wither.md)
+- **Bundled animals and caves:** use the [Alex's Mobs](../ContentGuide.md#alexs-mobs-additions) and [Alex's Caves](../ContentGuide.md#alexs-caves-additions) sections for reviewed feeding, ownership, resources, and availability limits
 
 ## Passive Mobs
 

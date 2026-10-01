@@ -4,8 +4,9 @@
 
 - Working branch: `docs/wiki-expansion`
 - Source default branch: `master`
-- Last source snapshot integrated: `4285adff2e35307c277a3a5bf54ebd064aa5e64b`
-- Latest source sync: real two-parent merge `0b73e6fe0303fcdf2b86ce5c58ebf1436ba4d71a`, preserving published wiki history and bringing in renderer cleanup/documentation from master without conflicts. Java gameplay, bundled game data, and workflows were unchanged.
+- Last source snapshot integrated: `3e85592c4c78ebb420302360667a6c230dc0318d`
+- Latest source sync: real two-parent merge `226ad2d5499924128d0e21c0390c69820320d8f2`, preserving published wiki history and integrating palette resize/unpacking and voxel-join migrations without conflicts. Incoming workflow definitions were unchanged.
+- Previous source sync: real two-parent merge `0b73e6fe0303fcdf2b86ce5c58ebf1436ba4d71a` integrated renderer cleanup/documentation; Java gameplay and bundled game data were unchanged then.
 - Previous source sync: real two-parent merge `c1c36ba1c0dc353b6a4ecc99b36229ee526c09f4` integrated palette packing/histograms without conflicts.
 - Source sync: fast-forwarded from `fffe4a073f0b8d867902b067a6dd022cda31926f` to the newer render-bridge refactor while preserving all wiki edits; inspected changes do not touch this batch's gameplay sources
 - Initial branch created from `fffe4a073f0b8d867902b067a6dd022cda31926f` on 2026-10-01
@@ -467,6 +468,14 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Clarified Pumpkin carving's source-reachable broken-Shears exception and normal wear. Updated Blocks, Content Guide, this checkpoint, and October log.
 - Source remains integrated master `4285adff2e35307c277a3a5bf54ebd064aa5e64b`.
 - Validation: checker and strict build passed on 2,158 pages / 35 indexes; source targets, local links/anchors and whitespace checked. No crop growth, harvesting, Bone Meal, carving, loot, or crafting gameplay test.
+
+## Sixty-first batch: slimes, cubes, and resource navigation
+
+- Expanded Slime/Magma Cube spawn chains and spawners, size/health/armor/contact damage, death splitting, size-dependent drops, frog rewards and XP.
+- Expanded Slimeball/Magma Cream recipes, trader/Panda/chest routes, brewing distinctions and Fire Resistance limits; preserved the actual five-String Lead recipe.
+- Organized the existing Content Guide into practical play topics and replaced accumulating Mobs introductory paragraphs with concise featured routes, retaining the complete alphabetical category directory.
+- Updated this checkpoint and October log. Integrated master `3e85592c4c78ebb420302360667a6c230dc0318d` through the real merge above. All cited Slime/Magma Cube article source paths remain unchanged from the reviewed `4285adff2e35307c277a3a5bf54ebd064aa5e64b` snapshot; recorded the landed palette/voxel work in October.
+- Validation: checker and strict build passed on 2,162 pages / 36 indexes; source targets, local links/anchors and whitespace checked. No spawning, splitting, loot-distribution, frog, spawner, brewing, or crafting gameplay test.
 
 ## Next batches, in priority order
 

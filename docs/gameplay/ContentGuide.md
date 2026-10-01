@@ -4,99 +4,77 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Vanilla-derived gameplay
 
-- [Sugar Cane](blocks/SugarCane.md) and [Pumpkin and Melon farming](blocks/PumpkinAndMelon.md): planting, growth, harvesting, and crop resources
-
-- [Axolotl](mobs/Axolotl.md), [Dolphin](mobs/Dolphin.md), and [Bucket of Axolotl](items/BucketOfAxolotl.md): aquatic care, breeding, player assistance, structure guidance, and bucket-state preservation
-
-- [Buckets](items/Bucket.md), [Water](items/WaterBucket.md), and [Lava](items/LavaBucket.md): source collection, waterlogging, dimension restrictions, source pools, and fuel
-
-- [Blaze](mobs/Blaze.md), [Wither Skeleton](mobs/WitherSkeleton.md), and [Skulls](items/WitherSkeletonSkull.md): fortress spawning, combat, loot, and boss-summoning materials
-
-- [Bees](mobs/Bee.md) and [Bee housing](blocks/BeeHousing.md): colony growth, safe flowers, nectar/honey, smoke, harvesting, and relocation
-
-- [Sheep](mobs/Sheep.md) and [Chickens](mobs/Chicken.md): breeding, fleece regrowth, [Wool](items/WhiteWool.md), egg variants, and [hatching](items/Egg.md)
-
-- [Bow](items/Bow.md) and [Crossbow](items/Crossbow.md): draw/load controls, ammunition selection, Infinity, rockets, enchantments, and wear
-
-- [Transport](mechanics/Transport.md): boats, chest storage, minecart controls, track construction, and stopping safely
-
-- [Oak](blocks/Oak.md), [Logs](items/OakLog.md), [Planks](items/OakPlanks.md), [Saplings](items/OakSapling.md), and [Sticks](items/Stick.md): the renewable beginner wood loop
-
-- [Armadillo](mobs/Armadillo.md): active savanna/badlands spawning, fear, breeding, and adult scute production
-- [Armadillo Scute](items/ArmadilloScute.md): brushing, shedding, Wolf Armor crafting and repair
-- [Brush](items/Brush.md): suspicious-block excavation, dispenser use, and broken-item interaction limits
-
-- [Fishing](mechanics/Fishing.md): practical casting, open-water treasure checks, weather, enchantments, and rod maintenance
-
-
-- [Stone](blocks/Stone.md): collecting stone instead of cobblestone, smelting, and construction recipes
-- [Cow](mobs/Cow.md): food, breeding, milking, and drops
-
-- [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations and storage
-- [Crafting](crafting/Crafting.md) and [Smelting](smelting/Smelting.md): current recipes, device types, and troubleshooting
+### Getting started and survival
 
 - [Game modes](gamemodes/Gamemodes.md): all four modes and permission-aware switching
-- [Hunger and healing](mechanics/Hunger.md): food, saturation, sprinting, and regeneration
-
+- [Oak](blocks/Oak.md), [Logs](items/OakLog.md), [Planks](items/OakPlanks.md), [Saplings](items/OakSapling.md), and [Sticks](items/Stick.md): the renewable beginner wood loop
+- [Stone](blocks/Stone.md): collecting stone instead of cobblestone, smelting, and construction recipes
+- [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations and storage
+- [Crafting](crafting/Crafting.md) and [Smelting](smelting/Smelting.md): current recipes, device types, and troubleshooting
 - [Beds](blocks/Bed.md) and [Torches](blocks/Torch.md): sleeping safety and basic lighting
 - [Coal](items/Coal.md) and [Charcoal](items/Charcoal.md): fuel, torch ingredients, and recipe distinctions
-
-- [Wheat farming](blocks/Wheat.md) and [Farmland](blocks/Farmland.md): hydration, growth, and MattMC's area-harvest controls
-- [Mining tools](mechanics/Mining.md): material stats and correct-drop rules, including Copper
-
-- [Redstone basics](redstone/Redstone.md): lever/button inputs, wire connections, and troubleshooting
-
-- [Creeper](mobs/Creeper.md) and [Skeleton](mobs/Skeleton.md): spawning, combat, drops, and special rewards
-- [Gunpowder](items/Gunpowder.md), [Bone](items/Bone.md), and [Arrow](items/Arrow.md): hostile-mob resources and verified uses
-
-- [Brewing](brewing/Brewing.md) and [Brewing Stand](blocks/BrewingStand.md): verified potion chains, fuel, modifiers, splash/lingering forms
-- [Nether Wart](blocks/NetherWart.md), [Blaze Powder](items/BlazePowder.md), and [Glass Bottle](items/GlassBottle.md): brewing inputs and acquisition
-
-- [Smithing](smithing/Smithing.md): equipment upgrades, trims, and component preservation
-- [Netherite Scrap](items/NetheriteScrap.md), [Ingot](items/NetheriteIngot.md), and [Upgrade Template](items/SmithingTemplateNetheriteUpgrade.md): material progression and template duplication
-
-- [Enchanting](enchanting/Enchanting.md): bookshelf setup, costs versus requirements, eligibility, and reroll behavior
-- [Bookshelf](items/Bookshelf.md), [Book](items/Book.md), [Enchanted Book](items/EnchantedBook.md), and [Lapis Lazuli](items/LapisLazuli.md): supporting materials
-
-- [Status effects](effects/Effects.md): Poison, Wither, Regeneration, and choosing Milk versus Honey
-
-- [Dimensions](dimensions/Dimensions.md): Nether linking/anchors, End arrival/return, and the custom Primordial Caves route
-
+- [Buckets](items/Bucket.md), [Water](items/WaterBucket.md), and [Lava](items/LavaBucket.md): source collection, waterlogging, dimension restrictions, source pools, and fuel
+- [Hunger and healing](mechanics/Hunger.md): food, saturation, sprinting, and regeneration
 - [Commands](commands/Commands.md): permission-aware examples, targeting, and shared time/weather scope
 
-- [Trading](trading/Trading.md), [Villagers](mobs/Villager.md), and [Emeralds](items/Emerald.md): professions, stock, prices, and optional trade-rebalance rules
+### Farming, food, and animal care
+
+- [Wheat farming](blocks/Wheat.md) and [Farmland](blocks/Farmland.md): hydration, growth, and MattMC's area-harvest controls
+- [Root crops](blocks/RootCrops.md): Carrot, Potato, and Beetroot growth, custom harvesting, food, and cooking
+- [Sugar Cane](blocks/SugarCane.md) and [Pumpkin and Melon farming](blocks/PumpkinAndMelon.md): planting, growth, harvesting, and crop resources
+- [Cow](mobs/Cow.md): food, breeding, milking, and drops
+- [Sheep](mobs/Sheep.md) and [Chickens](mobs/Chicken.md): breeding, fleece regrowth, [Wool](items/WhiteWool.md), egg variants, and [hatching](items/Egg.md)
+- [Pig](mobs/Pig.md), [Saddle](items/Saddle.md), and [Carrot on a Stick](items/CarrotOnAStick.md): root-crop breeding, riding, equipment recovery, and [Porkchop cooking](items/CookedPorkchop.md)
+- [Bees](mobs/Bee.md) and [Bee housing](blocks/BeeHousing.md): colony growth, safe flowers, nectar/honey, smoke, harvesting, and relocation
+- [Fishing](mechanics/Fishing.md): practical casting, open-water treasure checks, weather, enchantments, and rod maintenance
+- [Armadillo](mobs/Armadillo.md): active savanna/badlands spawning, fear, breeding, and adult scute production
+- [Armadillo Scute](items/ArmadilloScute.md): brushing, shedding, Wolf Armor crafting and repair
+- [Wolf](mobs/Wolf.md) and [Wolf Armor](items/WolfArmor.md): real spawn/food routes, owner care, scute repairs, and fully damaged armor behavior
+- [Axolotl](mobs/Axolotl.md), [Dolphin](mobs/Dolphin.md), and [Bucket of Axolotl](items/BucketOfAxolotl.md): aquatic care, breeding, player assistance, structure guidance, and bucket-state preservation
+
+### Materials, equipment, and enchanting
+
+- [Mining tools](mechanics/Mining.md): material stats and correct-drop rules, including Copper
+- [Ore resources](blocks/OreResources.md): Iron/Copper raw-metal processing, Diamond collection, and selected material recipes
+- [Armor](mechanics/Armor.md): current material values including Copper, toughness, repairs, and Chestplate progression
+- [Durability and repair](mechanics/Durability.md): retained broken gear, guarded actions, and differences in repair data preservation
+- [Anvil](blocks/Anvil.md) and [anvil mechanics](mechanics/AnvilMechanics.md): repairs, enchantment combining, names, wear, and the 40-level payment cap
+- [Grindstone](blocks/Grindstone.md): free repair, enchantment removal, curse retention, and experience refunds
+- [Enchanting](enchanting/Enchanting.md): bookshelf setup, costs versus requirements, eligibility, and reroll behavior
+- [Bookshelf](items/Bookshelf.md), [Book](items/Book.md), [Enchanted Book](items/EnchantedBook.md), and [Lapis Lazuli](items/LapisLazuli.md): supporting materials
+- [Smithing](smithing/Smithing.md): equipment upgrades, trims, and component preservation
+- [Netherite Scrap](items/NetheriteScrap.md), [Ingot](items/NetheriteIngot.md), and [Upgrade Template](items/SmithingTemplateNetheriteUpgrade.md): material progression and template duplication
+- [Brewing](brewing/Brewing.md) and [Brewing Stand](blocks/BrewingStand.md): verified potion chains, fuel, modifiers, splash/lingering forms
+- [Nether Wart](blocks/NetherWart.md), [Blaze Powder](items/BlazePowder.md), and [Glass Bottle](items/GlassBottle.md): brewing inputs and acquisition
+- [Status effects](effects/Effects.md): Poison, Wither, Regeneration, and choosing Milk versus Honey
+
+### Combat and mob resources
+
+- [Slime](mobs/Slime.md), [Magma Cube](mobs/MagmaCube.md), [Slimeball](items/Slimeball.md), and [Magma Cream](items/MagmaCream.md): spawning, splitting, frog rewards, and crafting/brewing resources
+
+- [Bow](items/Bow.md) and [Crossbow](items/Crossbow.md): draw/load controls, ammunition selection, Infinity, rockets, enchantments, and wear
+- [Shields and death protection](mechanics/DefensiveItems.md): facing, use delay, axe cooldowns, and held Totem effects
+- [Creeper](mobs/Creeper.md) and [Skeleton](mobs/Skeleton.md): spawning, combat, drops, and special rewards
+- [Zombie](mobs/Zombie.md) and [Spider](mobs/Spider.md): light rules, conditional behavior, doors/conversion, climbing, and drops
+- [Enderman](mobs/Enderman.md) and [Cave Spider](mobs/CaveSpider.md): gaze protection, teleportation, poison, and ordinary versus trial-spawner rules
+- [Blaze](mobs/Blaze.md), [Wither Skeleton](mobs/WitherSkeleton.md), and [Skulls](items/WitherSkeletonSkull.md): fortress spawning, combat, loot, and boss-summoning materials
+- [Gunpowder](items/Gunpowder.md), [Bone](items/Bone.md), and [Arrow](items/Arrow.md): hostile-mob resources and verified uses
+- [Rotten Flesh](items/RottenFlesh.md), [String](items/String.md), [Spider Eye](items/SpiderEye.md), and [Fermented Spider Eye](items/FermentedSpiderEye.md): mob resources, food risks, recipes, brewing, and trades
+- [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
+
+### Building, redstone, and travel
+
+- [Redstone basics](redstone/Redstone.md): lever/button inputs, wire connections, and troubleshooting
+- [Hopper](blocks/Hopper.md): item transfer, redstone locking, and sided Furnace automation
+- [Transport](mechanics/Transport.md): boats, chest storage, minecart controls, track construction, and stopping safely
+
+### Exploration, archaeology, and trade
 
 - [Structures](structures/Structures.md): prepare for [Nether Fortresses](structures/NetherFortress.md) and [Strongholds](structures/Stronghold.md), including optional rooms and portal hazards
-
+- [Dimensions](dimensions/Dimensions.md): Nether linking/anchors, End arrival/return, and the custom Primordial Caves route
 - [Ender Pearl](items/EnderPearl.md), [Eye of Ender](items/EyeOfEnder.md), and [Blaze Rod](items/BlazeRod.md): teleport risks, portal supplies, recipes, and fuel
-
-- [Anvil](blocks/Anvil.md) and [anvil mechanics](mechanics/AnvilMechanics.md): repairs, enchantment combining, names, wear, and the 40-level payment cap
-
-- [Grindstone](blocks/Grindstone.md): free repair, enchantment removal, curse retention, and experience refunds
-
-- [Root crops](blocks/RootCrops.md): Carrot, Potato, and Beetroot growth, custom harvesting, food, and cooking
-
-- [Pig](mobs/Pig.md), [Saddle](items/Saddle.md), and [Carrot on a Stick](items/CarrotOnAStick.md): root-crop breeding, riding, equipment recovery, and [Porkchop cooking](items/CookedPorkchop.md)
-
-- [Ore resources](blocks/OreResources.md): Iron/Copper raw-metal processing, Diamond collection, and selected material recipes
-
-- [Shields and death protection](mechanics/DefensiveItems.md): facing, use delay, axe cooldowns, and held Totem effects
-
-- [Hopper](blocks/Hopper.md): item transfer, redstone locking, and sided Furnace automation
-
-- [Armor](mechanics/Armor.md): current material values including Copper, toughness, repairs, and Chestplate progression
-
-- [Zombie](mobs/Zombie.md) and [Spider](mobs/Spider.md): light rules, conditional behavior, doors/conversion, climbing, and drops
-
-- [Rotten Flesh](items/RottenFlesh.md), [String](items/String.md), [Spider Eye](items/SpiderEye.md), and [Fermented Spider Eye](items/FermentedSpiderEye.md): mob resources, food risks, recipes, brewing, and trades
-
-- [Wolf](mobs/Wolf.md) and [Wolf Armor](items/WolfArmor.md): real spawn/food routes, owner care, scute repairs, and fully damaged armor behavior
-
-- [Enderman](mobs/Enderman.md) and [Cave Spider](mobs/CaveSpider.md): gaze protection, teleportation, poison, and ordinary versus trial-spawner rules
-
-- [Durability and repair](mechanics/Durability.md): retained broken gear, guarded actions, and differences in repair data preservation
-
-- [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
+- [Brush](items/Brush.md): suspicious-block excavation, dispenser use, and broken-item interaction limits
+- [Trading](trading/Trading.md), [Villagers](mobs/Villager.md), and [Emeralds](items/Emerald.md): professions, stock, prices, and optional trade-rebalance rules
 
 ## Alex's Mobs additions
 
