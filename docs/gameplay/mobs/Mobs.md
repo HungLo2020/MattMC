@@ -18,6 +18,8 @@ For bird companionship and utility, see [Blue Jay](BlueJay.md) and [Crow](Crow.m
 
 For apiary care, see [Bee](Bee.md) and [Bee housing](../blocks/BeeHousing.md).
 
+For fortress encounters, see [Blaze](Blaze.md) and [Wither Skeleton](WitherSkeleton.md), including spawning differences and skull rewards.
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs

@@ -28,6 +28,8 @@ A separate single roll selects either nothing with weight 14 or one Rib Armor Tr
 
 The bundled Blaze loot table requires a player-attributed kill for its rod pool. It gives a base 0–1 Blaze Rod, with a Looting count increase, so a kill does not guarantee a rod. One rod crafts into two Blaze Powder. Powder is used in [brewing](../brewing/Brewing.md) and in the Eye of Ender recipe used for a [Stronghold](Stronghold.md) expedition.
 
+For the active any-light spawn rule and combat details, see [Blaze](../mobs/Blaze.md). The bundled generated Blaze spawner has no darkness check, so torches alone do not disable it.
+
 Keep a spawner intact if you want to return to it. This page does not establish a farm design, spawn rate, or lighting arrangement that safely disables a spawner.
 
 ## Hazards and a safer approach
