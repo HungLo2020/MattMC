@@ -1,1 +1,9 @@
 # Mechanics
+
+Understand the systems behind everyday gameplay. Guides here explain current MattMC rules and point out which conditions depend on game rules, difficulty, or incomplete integration.
+
+- [Hunger, saturation, and healing](Hunger.md): food values, exhaustion, sprinting, healing, and starvation
+- [Game modes](../gamemodes/Gamemodes.md): Survival, Creative, Adventure, and Spectator
+- [Crafting](../crafting/Crafting.md)
+- [Smelting and cooking](../smelting/Smelting.md)
+- [Gameplay](../Gameplay.md)

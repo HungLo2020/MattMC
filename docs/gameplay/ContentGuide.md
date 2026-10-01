@@ -10,6 +10,9 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations and storage
 - [Crafting](crafting/Crafting.md) and [Smelting](smelting/Smelting.md): current recipes, device types, and troubleshooting
 
+- [Game modes](gamemodes/Gamemodes.md): all four modes and permission-aware switching
+- [Hunger and healing](mechanics/Hunger.md): food, saturation, sprinting, and regeneration
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
