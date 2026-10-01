@@ -49,8 +49,10 @@ def main():
     count_start = expected.index('public void count(')
     insert = expected.index('\t\t\tInt2IntOpenHashMap int2IntOpenHashMap',count_start)
     expected = expected[:insert]+ENTRY+expected[insert:]
-    if source.read_text()!=expected:
-        raise RuntimeError('Container source differs outside the two known native dispatch insertions')
+    from VerifyRustPaletteResize import strip_resize
+    from VerifyRustPaletteUnpacking import strip_unpack
+    if strip_resize(strip_unpack(source.read_text()))!=expected:
+        raise RuntimeError('Container source differs outside the three known native dispatch insertions')
     a=original.index('\tpublic void count(')
     b=original.index('\n\t@FunctionalInterface',a)
     body=original[a:b].replace('public void count(PalettedContainer.CountConsumer<T> countConsumer)', 'static <T> void count(PalettedContainer<T> source, PalettedContainer.CountConsumer<T> countConsumer)',1).replace('this.data.palette','source.dataForNativeScan().palette()').replace('this.data.storage','source.dataForNativeScan().storage()')

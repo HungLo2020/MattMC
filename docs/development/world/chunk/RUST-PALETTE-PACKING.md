@@ -4,7 +4,8 @@ Standard 4096-entry block containers use Rust for `PalettedContainer.pack()`:
 decoding source words, compacting used IDs in first-use order, and encoding
 padded save words with identity-alias remapping when needed. Java owns the
 container lock, resolves used object identities, and builds the returned
-list/stream. This is save packing; mutable storage, network serialization,
+list/stream. This is save packing; [block palette growth](RUST-PALETTE-RESIZE.md)
+is a separate migration. Ordinary storage reads/writes, network serialization,
 unpacking and 64-entry biome packing remain their existing implementations.
 
 The kernels and FFI live in
@@ -101,3 +102,6 @@ Those hashes describe that acceptance snapshot. The later
 [histogram migration](RUST-PALETTE-HISTOGRAM.md) adds a separate count dispatch
 to the same container; the packing verifier permits that exact known insertion
 and continues to pin the original pack body and shared helpers.
+It also permits the exact block-resize/global-unpack dispatches and constructor
+visibility change. These slice integrations retain the original shared helpers. Historical
+hashes and timings above describe their recorded snapshot.
