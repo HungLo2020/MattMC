@@ -23,6 +23,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Raw Cod](items/RawCod.md), [Cooked Cod](items/CookedCod.md), and [Honeycomb](items/Honeycomb.md): food and hive resources connected to bears
 - [Blobfish](mobs/Blobfish.md): aquatic care, slime/air handling, and bucket-data limits
 - [Roadrunner](mobs/Roadrunner.md): seed breeding, periodic feathers, and name-based speed
+- [Emu](mobs/Emu.md): seeds, egg production, and throwable eggs
+- [Gazelle](mobs/Gazelle.md): herd panic and the unverified breeding-food route
 - [All mobs](mobs/Mobs.md): the existing mob directory, including other integrated animals
 
 ## Alex's Caves additions
