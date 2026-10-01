@@ -52,6 +52,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Roadrunner](mobs/Roadrunner.md): seed breeding, periodic feathers, and name-based speed
 - [Emu](mobs/Emu.md): seeds, egg production, and throwable eggs
 - [Gazelle](mobs/Gazelle.md): herd panic and the unverified breeding-food route
+- [Raccoon](mobs/Raccoon.md) and [Capuchin Monkey](mobs/CapuchinMonkey.md): food behavior, owner controls, retaliation, and missing bundled taming routes
 - [All mobs](mobs/Mobs.md): the existing mob directory, including other integrated animals
 
 ## Alex's Caves additions

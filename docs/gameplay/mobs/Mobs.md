@@ -4,6 +4,8 @@ For detailed source-reviewed examples, see [Grizzly Bear](GrizzlyBear.md), [Tril
 
 For source-reviewed hostile encounters, see [Creeper](Creeper.md) and [Skeleton](Skeleton.md).
 
+Raccoon and Capuchin Monkey are listed as neutral here because their active goals include retaliation; their articles separate owner controls from missing bundled taming foods.
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs
@@ -15,7 +17,6 @@ MattMC mobs grouped by behavior. Each section is alphabetized.
 - [Blobfish](Blobfish.md)
 - [Blue Jay](BlueJay.md)
 - [Camel](Camel.md)
-- [Capuchin Monkey](CapuchinMonkey.md)
 - [Cat](Cat.md)
 - [Catfish](Catfish.md)
 - [Chicken](Chicken.md)
@@ -48,7 +49,6 @@ MattMC mobs grouped by behavior. Each section is alphabetized.
 - [Platypus](Platypus.md)
 - [Potoo](Potoo.md)
 - [Rabbit](Rabbit.md)
-- [Raccoon](Raccoon.md)
 - [Rain Frog](RainFrog.md)
 - [Salmon](Salmon.md)
 - [Seagull](Seagull.md)
@@ -79,6 +79,7 @@ MattMC mobs grouped by behavior. Each section is alphabetized.
 - [Bison](Bison.md)
 - [Cachalot Whale](CachalotWhale.md)
 - [Caiman](Caiman.md)
+- [Capuchin Monkey](CapuchinMonkey.md)
 - [Cosmaw](Cosmaw.md)
 - [Crocodile](Crocodile.md)
 - [Crow](Crow.md)
@@ -105,6 +106,7 @@ MattMC mobs grouped by behavior. Each section is alphabetized.
 - [Piglin](Piglin.md)
 - [Polar Bear](PolarBear.md)
 - [Pufferfish](Pufferfish.md)
+- [Raccoon](Raccoon.md)
 - [Rattlesnake](Rattlesnake.md)
 - [Relicheirus](Relicheirus.md)
 - [Rhinoceros](Rhinoceros.md)
