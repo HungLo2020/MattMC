@@ -1,17 +1,23 @@
 # Lever
 
-## Obtaining
+Lever is a placeable redstone input registered as `minecraft:lever`. It stays on or off until toggled.
 
-Lever can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Crafting and use
 
-## Usage
+Craft one with one Stick directly above one Cobblestone. Place it on a supported floor, wall, or ceiling face, then interact to operate it. Its signal while powered is 15.
 
-Lever is a utility, redstone, navigation, lighting, or workstation block.
+The [canonical block guide](../blocks/Lever.md) covers support, timing, direction, and exceptional trigger behavior. The exact recipe names its ingredient; do not substitute a similarly named imported material without checking recipe data.
 
-## Behavior
+## Related pages
 
-It provides its configured block interaction when placed in the world.
+- [Lever block behavior](../blocks/Lever.md)
+- [Redstone basics](../redstone/Redstone.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:lever` block.
+Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No circuit simulation or in-game timing test was run; feature flags can select different wire evaluators.
+
+- [Recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/lever.json)
+- [Block behavior](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/LeverBlock.java)
+- [Block registration](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/Blocks.java)

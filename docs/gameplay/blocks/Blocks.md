@@ -25,6 +25,12 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 - [Ambersol](Ambersol.md): overhead column lighting from integrated Alex's Caves content, with Survival acquisition limits clearly marked
 
 
+## Redstone components
+
+- [Lever](Lever.md): sustained on/off input
+- [Buttons](Buttons.md): Stone/Oak timing and arrow activation
+- [Redstone Dust and wire](RedstoneDust.md): support, connections, and signal loss
+
 ## Farming
 
 - [Farmland](Farmland.md): tilling, hydration, and protecting plots

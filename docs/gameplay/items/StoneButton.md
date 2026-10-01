@@ -1,17 +1,23 @@
 # Stone Button
 
-## Obtaining
+Stone Button is a placeable redstone input registered as `minecraft:stone_button`. It normally emits a 20-game-tick pulse and does not use the arrow-activation check.
 
-Stone Button can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Crafting and use
 
-## Usage
+Craft one with one Stone in a shapeless recipe. Place it on a supported floor, wall, or ceiling face, then interact to operate it. Its signal while powered is 15.
 
-Stone Button is a redstone input block. Place it on a surface and press it to emit a short redstone pulse.
+The [canonical block guide](../blocks/Buttons.md) covers support, timing, direction, and exceptional trigger behavior. The exact recipe names its ingredient; do not substitute a similarly named imported material without checking recipe data.
 
-## Behavior
+## Related pages
 
-Buttons release automatically after a brief delay. Wooden buttons can also be triggered by projectiles.
+- [Stone Button block behavior](../blocks/Buttons.md)
+- [Redstone basics](../redstone/Redstone.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:stone_button` block.
+Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No circuit simulation or in-game timing test was run; feature flags can select different wire evaluators.
+
+- [Recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/stone_button.json)
+- [Block behavior](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/ButtonBlock.java)
+- [Block registration](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/Blocks.java)
