@@ -18,17 +18,17 @@ use super::resources::BackendCapabilities;
 
 /// A GAL over the recording mock backend with Vulkan-like capabilities.
 pub(crate) fn mock_gal() -> VulkanicGal {
-    VulkanicGal::new_with_backend(Box::new(MockBackend::default()), false)
+    VulkanicGal::new_with_backend(Box::new(MockBackend::default()))
 }
 
 /// A GAL over the recording mock backend reporting `capabilities`.
 pub(crate) fn mock_gal_with_capabilities(capabilities: BackendCapabilities) -> VulkanicGal {
-    VulkanicGal::new_with_backend(Box::new(MockBackend::with_capabilities(capabilities)), false)
+    VulkanicGal::new_with_backend(Box::new(MockBackend::with_capabilities(capabilities)))
 }
 
 /// A GAL over a configured mock backend.
 pub(crate) fn gal_with_mock(mock: MockBackend) -> VulkanicGal {
-    VulkanicGal::new_with_backend(Box::new(mock), false)
+    VulkanicGal::new_with_backend(Box::new(mock))
 }
 
 /// A presenting Vulkan GAL on a test window, or the environment gap.
@@ -38,20 +38,17 @@ pub(crate) fn windowed_vulkan_gal(
     window: &super::backends::vulkan::WinitTestWindow,
     surface: FrameSurfaceDesc,
 ) -> GalResult<VulkanicGal> {
-    Ok(VulkanicGal::new_with_backend(
-        Box::new(VulkanBackend::new_windowed_for_test(label, window, surface)?),
-        false,
-    ))
+    Ok(VulkanicGal::new_with_backend(Box::new(VulkanBackend::new_windowed_for_test(label, window, surface)?)))
 }
 
 /// A GAL over a real headless Vulkan device, or the environment gap.
 pub(crate) fn vulkan_gal(label: &str) -> GalResult<VulkanicGal> {
-    Ok(VulkanicGal::new_with_backend(Box::new(VulkanBackend::new(label)?), false))
+    Ok(VulkanicGal::new_with_backend(Box::new(VulkanBackend::new(label)?)))
 }
 
 /// A GAL over a real isolated OpenGL context, or the environment gap.
 pub(crate) fn opengl_gal(label: &str) -> GalResult<VulkanicGal> {
-    Ok(VulkanicGal::new_with_backend(Box::new(OpenGlBackend::new(label)?), false))
+    Ok(VulkanicGal::new_with_backend(Box::new(OpenGlBackend::new(label)?)))
 }
 
 pub(crate) fn vulkan_capabilities() -> BackendCapabilities {

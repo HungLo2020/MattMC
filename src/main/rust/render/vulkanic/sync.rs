@@ -1,25 +1,31 @@
+//! Submission ids and the deferred-retirement queue.
+
 use std::collections::VecDeque;
 
 use super::handles::Handle;
 
+/// Identifies one accepted submission. Ids increase monotonically, so
+/// "completed through id N" covers every earlier submission.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SubmissionId(pub u64);
 
+/// Returned by a submission; names it for completion queries.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct SyncToken {
+    /// The submission this token names.
     pub submission: SubmissionId,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RetiredResource {
+pub(in crate::render::vulkanic) struct RetiredResource {
     pub handle: Handle,
     pub submission: SubmissionId,
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct RetirementQueue {
+pub(in crate::render::vulkanic) struct RetirementQueue {
     pending: VecDeque<RetiredResource>,
 }
 
@@ -47,10 +53,12 @@ impl RetirementQueue {
         retired
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.pending.len()
     }
 
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.pending.is_empty()
     }

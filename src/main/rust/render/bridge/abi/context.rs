@@ -14,6 +14,7 @@ pub enum FfiBackendKind {
 pub struct FfiContextCreateRequest {
     pub header: FfiHeader,
     pub backend_kind: u32,
+    /// 0 or 1. Still validated, but no longer used by the GAL.
     pub tracy_enabled: u32,
     pub label: FfiBytes,
 }
@@ -52,6 +53,7 @@ impl Default for FfiContextResult {
 pub struct FfiBorrowedOpenGlContextCreateRequest {
     pub header: FfiHeader,
     pub stable_window_id: u64,
+    /// 0 or 1. Still validated, but no longer used by the GAL.
     pub tracy_enabled: u32,
     pub reserved0: u32,
     pub label: FfiBytes,
@@ -62,6 +64,7 @@ pub struct FfiBorrowedOpenGlContextCreateRequest {
 pub struct FfiWindowedVulkanContextCreateRequest {
     pub header: FfiHeader,
     pub platform: u32,
+    /// 0 or 1. Still validated, but no longer used by the GAL.
     pub tracy_enabled: u32,
     pub stable_window_id: u64,
     pub native_display: u64,

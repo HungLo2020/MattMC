@@ -11,5 +11,6 @@ and link to source for implementation details. Follow the
 - [Project Architecture](PROJECT-ARCHITECTURE.md)
 - [Documentation Maintenance](DOCUMENTATION.md)
 - [Developer Tooling](tooling/index.md)
+- [Rendering](rendering/index.md)
 - [World Systems](world/index.md)
 - [Wiki Expansion Maintenance](wiki/index.md)

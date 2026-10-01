@@ -1,3 +1,24 @@
+//! VulkanicGAL: the graphics abstraction layer every renderer records into.
+//!
+//! The GAL owns one device through a private backend (Vulkan or OpenGL) and
+//! exposes resources by generational `Handle`, explicit command lists, and
+//! submissions identified by `SubmissionId`. It validates every descriptor and
+//! command against `BackendCapabilities`, rejects submissions whose resource
+//! accesses conflict without an explicit barrier between them, and defers
+//! destroying in-flight resources until their last submission completes. It knows nothing about the game: renderers decide
+//! what to draw, the GAL checks and executes it.
+//!
+//! - `create`: creating a GAL and choosing its backend (bridge only).
+//! - `gal`: `VulkanicGal`, the resource, command, submission and frame API.
+//! - `resources`: descriptors, formats, usages and backend capabilities.
+//! - `commands`: command ops, command lists and submission batches.
+//! - `frame`: swapchain surfaces and frame acquire/present.
+//! - `handles`, `sync`, `error`, `metrics`: handles, submission ids, errors
+//!   and profiling counters.
+//!
+//! Backends live in the private `backends` module; nothing outside this
+//! module names them (enforced by `architecture_boundary.rs`).
+#![warn(missing_docs)]
 #[cfg(test)]
 mod architecture_boundary;
 
@@ -30,7 +51,7 @@ pub use frame::{
 };
 pub use gal::VulkanicGal;
 pub use handles::{Handle, HandleKind};
-pub use metrics::{Metrics, TracyZone};
+pub use metrics::Metrics;
 pub use resources::{
     AccessFlags, BackendCapabilities, BackendFeature, BackendFeatureFlags, BackendLimits,
     BlendMode, BufferDesc, BufferUsage, ColorFormat, CompareOp, ComputePipelineDesc, CullMode,
@@ -41,7 +62,7 @@ pub use resources::{
     ShaderStage, TextureDesc, TextureDimension, TextureFormat, TextureSubresourceRange,
     TextureUsage, TextureViewDesc,
 };
-pub use sync::{RetirementQueue, SubmissionId, SyncToken};
+pub use sync::{SubmissionId, SyncToken};
 
 #[cfg(test)]
 mod tests;

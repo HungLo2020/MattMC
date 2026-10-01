@@ -94,13 +94,10 @@ fn isolated_loaded_raster(
     provoking: Option<ProvokingVertex>,
 ) {
     let mut gal = if opengl {
-        VulkanicGal::new_with_backend(
-            Box::new(
+        VulkanicGal::new_with_backend(Box::new(
                 super::opengl::OpenGlBackend::new("explicit provoking vertex OpenGL conformance")
                     .expect("OpenGL required for provoking vertex readback"),
-            ),
-            false,
-        )
+            ))
     } else {
         let backend =
             match super::vulkan::VulkanBackend::new("MattMC VulkanicGAL vignette conformance") {
@@ -119,7 +116,7 @@ fn isolated_loaded_raster(
                     return;
                 }
             };
-        VulkanicGal::new_with_backend(Box::new(backend), false)
+        VulkanicGal::new_with_backend(Box::new(backend))
     };
     let extent = Extent3d {
         width: 1,
@@ -1376,14 +1373,8 @@ impl BackendKind {
 
 fn gal_for(backend: BackendKind, label: &str) -> Result<VulkanicGal, GalError> {
     match backend {
-        BackendKind::Vulkan => Ok(VulkanicGal::new_with_backend(
-            Box::new(super::vulkan::VulkanBackend::new(label)?),
-            false,
-        )),
-        BackendKind::OpenGl => Ok(VulkanicGal::new_with_backend(
-            Box::new(super::opengl::OpenGlBackend::new(label)?),
-            false,
-        )),
+        BackendKind::Vulkan => Ok(VulkanicGal::new_with_backend(Box::new(super::vulkan::VulkanBackend::new(label)?))),
+        BackendKind::OpenGl => Ok(VulkanicGal::new_with_backend(Box::new(super::opengl::OpenGlBackend::new(label)?))),
     }
 }
 

@@ -24,21 +24,15 @@ fn barrier(resource: Handle, before: TextureUsageState, after: TextureUsageState
 fn graphics_storage_observes_every_vertex_and_fragment_with_explicit_reset_copy_and_retirement() {
     for opengl in [false, true] {
         let mut gal = if opengl {
-            VulkanicGal::new_with_backend(
-                Box::new(
+            VulkanicGal::new_with_backend(Box::new(
                     super::opengl::OpenGlBackend::new("graphics storage OpenGL")
                         .expect("OpenGL required for storage conformance"),
-                ),
-                false,
-            )
+                ))
         } else {
-            VulkanicGal::new_with_backend(
-                Box::new(
+            VulkanicGal::new_with_backend(Box::new(
                     super::vulkan::VulkanBackend::new("graphics storage Vulkan")
                         .expect("Vulkan required for storage conformance"),
-                ),
-                false,
-            )
+                ))
         };
         let mut owned = Vec::new();
         macro_rules! own {

@@ -92,18 +92,17 @@ really run and match Vulkan. Rust GL next gap: `CopyFrameTargetToTexture` (GL al
 **Render restructure (10-01).** `vulkanic` = GAL + backends only; code motion, census nothing
 lost, giant fns intact: `render/{shaderpack,scene,shared,worldrender,guirender}` (GUI reaches world
 atlases via `GuiAtlasOwner`). GUI move: day 2.64/gun 2.47/pane 2.53 equal on the pre-move snapshot
-(day back to 2.38 next session, no render change: session variation, cause unknown); DH 4.49-4.95 vs
-4.46 = noise; A/B noDH fps +0.70+/-0.41, DH +0.11+/-0.29.
-**Bridge move (10-01).** `vulkanic/ffi` -> `render/bridge` (abi/ by family, gui/, world/, wire,
-capabilities, accounting, status, context, ...). Exported symbols (272), 36 entry signatures and
-133 `#[repr(C)]` layouts identical (nm + source census). GALs created only by the bridge via public
-`VulkanicGal::create*`/`BackendChoice`. Fixed GAL->renderer leaks the old fixed-file boundary test
-missed: frame profile split (GAL `SubmitProfile` inside `worldrender` `WholeFrameProfile`), upload-
-capture bound GAL-owned. Warnings 114 -> 91 (test-only helpers `cfg(test)`). Rust 1926 pass; Java:
-only the 28 Mockito/JDK25 failures. Frozen day 2.38, glass 7.46, down 7.13, off 0.23, gun 2.19,
-pane 2.38, 0 VUIDs; DH 5.01/4.36 vs 4.85 snapshot same session (noise). Real config Vulkan shaders
-on/off clean; GL creates its context, then the known CopyFrameTarget gap. A/B 5+5: noDH fps
-+0.28+/-0.58, DH +0.64+/-0.54; bridge decode ~413 us/frame both sides (+/-2 us).
+(MAE varies by session, cause unknown); DH = noise; A/B noDH fps +0.70+/-0.41, DH +0.11+/-0.29.
+**Bridge move (10-01).** `vulkanic/ffi` -> `render/bridge`; ABI identical (272 symbols, 133 layouts);
+only the bridge creates GALs; profile split (`SubmitProfile` in `WholeFrameProfile`). A/B equal.
+**GAL split + API audit (10-01).** `gal.rs` 5.3k lines -> `gal/` (17 concern modules), tests ->
+`tests/` (11). API audited: internal items narrowed, test-only code `cfg(test)`, renderer-used items
+public; the never-used Tracy zone timer and its GAL flag deleted (ABI field kept, ignored). All
+public items documented; `#![warn(missing_docs)]` kept by a boundary test. Rust 1936 pass. Frozen
+day/glass/down/gun equal to the pre-split snapshot same session (2.61/7.47/7.29/2.43 vs
+2.62/7.44/7.25/2.47); off 0.04, pane 2.54, DH 4.52, 0 VUIDs; settle timeouts hit both trees.
+A/B: noDH fps +0.11+/-0.42, DH +0.73+/-0.47; GAL submit ~1.4 ms, +8+/-12 / -46+/-17 us.
+Docs: new `docs/development/rendering/` (architecture, GAL, bridge, verification).
 Ported while pruning: VoxelMap world map (regions staged as Rust raw images, released on
 unload), VoxelMap init (packet bridge was null on Rust), F3 GPU% (`TimerQuery` on Rust Vulkan
 timestamps via `mattmc_vulkanic_gal_set_gpu_timestamps_requested`), pack `weatherParticles`,

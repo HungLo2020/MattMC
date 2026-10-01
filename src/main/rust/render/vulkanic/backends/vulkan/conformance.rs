@@ -462,7 +462,7 @@ fn distant_horizons_lod_opaque_pipeline_uses_explicit_two_set_gal_layout() {
                 return;
             }
         };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     create_distant_horizons_lod_opaque_pipeline(&mut gal, "dh-lod.vulkan")
         .expect("Rust-owned DH LOD pipeline must lower through Vulkan");
 }
@@ -684,7 +684,7 @@ fn lowered_complete_complementary_terrain_pair_creates_vulkan_modules() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let stages = TerrainSourceStages {
         vertex: TerrainSourceStage {
@@ -739,7 +739,7 @@ fn lowered_complete_complementary_hand_pair_creates_vulkan_modules() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let contract = derive_hand_contract(&source, TerrainProgramScope::Overworld)
         .expect("the bundled Complementary scope must expose gbuffers_hand");
@@ -773,7 +773,7 @@ fn lowered_complete_complementary_textured_material_pair_creates_vulkan_modules(
                 return;
             }
         };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let contract = derive_textured_material_contract(&source, TerrainProgramScope::Overworld)
         .expect("the bundled Complementary scope must expose gbuffers_textured");
@@ -810,7 +810,7 @@ fn lowered_complete_complementary_weather_pair_creates_vulkan_modules() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let contract = derive_weather_pass_contract(&source, TerrainProgramScope::Overworld)
         .expect("the bundled Complementary scope must expose gbuffers_weather");
@@ -846,7 +846,7 @@ fn lowered_complete_complementary_shadow_pair_creates_vulkan_modules() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let stages = shadow_source_stages_for_scope(&source, TerrainProgramScope::Overworld)
         .expect("the bundled Complementary source must expose an Overworld shadow pair");
@@ -930,7 +930,7 @@ fn lowered_complete_complementary_source_pairs_create_vulkan_graphics_pipelines(
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let declarations = TerrainSourceResourceBindings::from_source(&source).unwrap();
 
@@ -1240,7 +1240,7 @@ fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
                 return;
             }
         };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
 
     for uses_colored_voxel_light in [false, true] {
         let suffix = if uses_colored_voxel_light {
@@ -1574,7 +1574,7 @@ fn isolated_vulkan_conformance_round_trips_r8uint_d3_depth_slices() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     assert!(gal.capabilities().supports(BackendFeature::Texture3d));
     let pattern = (0_u8..32).collect::<Vec<_>>();
     let upload = gal
@@ -1831,7 +1831,7 @@ fn run_d3_storage_write_read_test(
             return None;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     assert!(gal.capabilities().supports(BackendFeature::StorageTextures));
     let volume = gal
         .create_texture(TextureDesc {
@@ -2259,7 +2259,7 @@ fn assert_conformance_conventions(report: &ConformanceReport) {
 /// terrain code so a failure pinpoints backend transport.
 fn run_dynamic_uniform_offset_conformance() -> GalResult<[u8; 4]> {
     let backend = VulkanBackend::new("MattMC dynamic UBO conformance")?;
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let extent = Extent3d {
         width: 8,
         height: 8,
@@ -2532,7 +2532,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
     trace::message("rust-vulkan-conformance-start");
     let validation = ValidationMode::from_env();
     let backend = VulkanBackend::new("MattMC VulkanicGAL conformance")?;
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), tracy_enabled_from_env());
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let capabilities_json = gal.capabilities().fingerprint_json();
     let _renderdoc_frame = super::renderdoc::RenderDocFrame::start_if_requested();
 
@@ -3118,12 +3118,6 @@ fn index_bytes() -> Vec<u8> {
         .into_iter()
         .flat_map(u32::to_ne_bytes)
         .collect()
-}
-
-fn tracy_enabled_from_env() -> bool {
-    std::env::var("MATTMC_RUST_TRACY")
-        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
 }
 
 fn write_report(report: &ConformanceReport, validation: ValidationMode) -> GalResult<()> {

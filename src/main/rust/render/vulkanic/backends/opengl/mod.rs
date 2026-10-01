@@ -550,7 +550,7 @@ mod tests {
                 return;
             }
         };
-        let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+        let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
         let surface = crate::render::vulkanic::frame::FrameSurfaceDesc {
             label: "borrowed-opengl-window".to_string(),
             extent: crate::render::vulkanic::resources::Extent3d {
@@ -602,7 +602,7 @@ mod tests {
                 return;
             }
         };
-        let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+        let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
         let src = gal
             .create_buffer(BufferDesc {
                 label: "copy-src".to_string(),

@@ -15,7 +15,9 @@ use super::gal::VulkanicGal;
 /// The graphics API a new GAL runs on.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendChoice {
+    /// The Vulkan backend.
     Vulkan,
+    /// The OpenGL backend.
     OpenGl,
 }
 
@@ -26,26 +28,24 @@ pub struct NativeWindow {
     pub platform: u32,
     /// Non-zero id that stays stable for the lifetime of the host window.
     pub stable_window_id: u64,
+    /// The host's native display handle (for example an X11 `Display*`).
     pub native_display: u64,
+    /// The host's native window handle.
     pub native_window: u64,
 }
 
 impl VulkanicGal {
     /// A GAL that owns its device and has no window of its own.
-    pub fn create(backend: BackendChoice, label: &str, tracy_enabled: bool) -> GalResult<Self> {
-        Ok(Self::new_with_backend(create_backend(backend, label)?, tracy_enabled))
+    pub fn create(backend: BackendChoice, label: &str) -> GalResult<Self> {
+        Ok(Self::new_with_backend(create_backend(backend, label)?))
     }
 
     /// An OpenGL GAL that renders through the host's current GL context.
-    pub fn create_borrowed_opengl(
-        label: &str,
-        stable_window_id: u64,
-        tracy_enabled: bool,
-    ) -> GalResult<Self> {
-        Ok(Self::new_with_backend(
-            create_borrowed_opengl_backend(label, stable_window_id)?,
-            tracy_enabled,
-        ))
+    pub fn create_borrowed_opengl(label: &str, stable_window_id: u64) -> GalResult<Self> {
+        Ok(Self::new_with_backend(create_borrowed_opengl_backend(
+            label,
+            stable_window_id,
+        )?))
     }
 
     /// A Vulkan GAL that presents to the host's native window.
@@ -53,7 +53,6 @@ impl VulkanicGal {
         label: &str,
         window: NativeWindow,
         surface: FrameSurfaceDesc,
-        tracy_enabled: bool,
     ) -> GalResult<Self> {
         Ok(Self::new_with_backend(
             create_native_windowed_vulkan_backend(
@@ -64,7 +63,6 @@ impl VulkanicGal {
                 window.native_window,
                 surface,
             )?,
-            tracy_enabled,
         ))
     }
 }
