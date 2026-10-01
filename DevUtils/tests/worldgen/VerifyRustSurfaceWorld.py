@@ -11,7 +11,7 @@ its server. No user worlds or production configuration are touched.
 from pathlib import Path
 import argparse,subprocess,json,time,os,hashlib,re
 ROOT=Path(__file__).resolve().parents[3]
-p=argparse.ArgumentParser();p.add_argument('label');p.add_argument('--seed',type=int,default=42);p.add_argument('--dimension',default='');p.add_argument('--radius',type=int,default=5);p.add_argument('--rounds',type=int,default=3);p.add_argument('--warmups',type=int,default=2);p.add_argument('--warm-radius',type=int,default=3);p.add_argument('--workers',type=int,default=3);p.add_argument('--cpus',default='2-5');p.add_argument('--reference',action='store_true');p.add_argument('--hash',action='store_true');p.add_argument('--serial',action='store_true');p.add_argument('--compare',help='Compare hashes with an earlier label in the output directory');p.add_argument('--output',default='build/rust-surface-world');p.add_argument('--classpath',default='build/rust-surface-verification/classpath.txt');p.add_argument("--native-dir", default="build/rust/native", help="Frozen native library directory for before/after comparisons");args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('label');p.add_argument('--seed',type=int,default=42);p.add_argument('--dimension',default='');p.add_argument('--radius',type=int,default=5);p.add_argument('--rounds',type=int,default=3);p.add_argument('--warmups',type=int,default=2);p.add_argument('--warm-radius',type=int,default=3);p.add_argument('--workers',type=int,default=3);p.add_argument('--cpus',default='2-5');p.add_argument('--reference',action='store_true');p.add_argument('--hash',action='store_true');p.add_argument('--serial',action='store_true');p.add_argument('--compare',help='Compare hashes with an earlier label in the output directory');p.add_argument('--output',default='build/rust-surface-world');p.add_argument('--classpath',default='build/rust-surface-verification/classpath.txt');p.add_argument("--native-dir", default="build/rust/native", help="Frozen native library directory for before/after comparisons");p.add_argument("--biomes", action="store_true", help="Include stored biome holders in all stage and FULL fingerprints");p.add_argument("--biome-oracle", action="store_true", help="Compare every production biome selection to original Java in the same thread/query order");args=p.parse_args()
 if not re.fullmatch(r'[A-Za-z0-9_-]+',args.label) or (args.compare and not re.fullmatch(r'[A-Za-z0-9_-]+',args.compare)):p.error('Use a simple directory name as label')
 if min(args.radius,args.rounds,args.warmups,args.warm_radius)<0 or args.workers<1:p.error('Invalid workload size')
 if args.compare and not args.hash:p.error('--compare requires --hash')
@@ -46,7 +46,11 @@ spawn-protection=0
 ''')
 cp=str(BASE/'audit-agent.jar')+':'+cp_file.read_text().strip()
 if args.reference:cp=str(reference)+':'+cp
-cmd=['taskset','-c',args.cpus,'java','-Xms1G','-Xmx8G','-XX:+UseZGC','-XX:+UseCompactObjectHeaders','-XX:+UnlockDiagnosticVMOptions','-XX:+DebugNonSafepoints','-XX:+PreserveFramePointer','--enable-native-access=ALL-UNNAMED',f'-Dmax.bg.threads={args.workers}',f'-Dmattmc.rust.natives.dir={NATIVE}',f'-Daudit.output={out}',f'-Daudit.serial={str(args.serial).lower()}',f'-Daudit.hash={str(args.hash).lower()}',f'-Daudit.radius={args.radius}',f'-Daudit.rounds={args.rounds}',f'-Daudit.warmRadius={args.warm_radius}',f'-Daudit.warmups={args.warmups}',f'-Daudit.dimension={args.dimension}',f'-javaagent:{BASE}/audit-agent.jar','-cp',cp,'net.minecraft.server.Main','--nogui','--port','0']
+if args.biome_oracle:
+ oracle=cp_file.parent/'oracle-classes'
+ if not oracle.is_dir():p.error('Prepare the independent biome oracle with VerifyRustBiome.py first')
+ cp=str(oracle)+':'+cp
+cmd=['taskset','-c',args.cpus,'java','-Xms1G','-Xmx8G','-XX:+UseZGC','-XX:+UseCompactObjectHeaders','-XX:+UnlockDiagnosticVMOptions','-XX:+DebugNonSafepoints','-XX:+PreserveFramePointer','--enable-native-access=ALL-UNNAMED',f'-Dmax.bg.threads={args.workers}',f'-Dmattmc.rust.natives.dir={NATIVE}',f'-Daudit.output={out}',f'-Daudit.serial={str(args.serial).lower()}',f'-Daudit.hash={str(args.hash).lower()}',f'-Daudit.biomes={str(args.biomes).lower()}',f'-Daudit.biomeOracle={str(args.biome_oracle).lower()}',f'-Daudit.radius={args.radius}',f'-Daudit.rounds={args.rounds}',f'-Daudit.warmRadius={args.warm_radius}',f'-Daudit.warmups={args.warmups}',f'-Daudit.dimension={args.dimension}',f'-javaagent:{BASE}/audit-agent.jar','-cp',cp,'net.minecraft.server.Main','--nogui','--port','0']
 (out/'command.json').write_text(json.dumps({'args':vars(args),'command':cmd,'head':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'native_sha256':hashlib.sha256((NATIVE/'mattmc_rust-linux-x64.so').read_bytes()).hexdigest()},indent=2))
 start=time.time();peak=0
 with (out/'server.log').open('w') as log:
@@ -68,6 +72,11 @@ with (out/'server.log').open('w') as log:
 (out/'process.json').write_text(json.dumps({'exit_code':proc.returncode,'elapsed_seconds':time.time()-start,'peak_rss_bytes':peak},indent=2))
 print(args.label,'exit',proc.returncode,'seconds',round(time.time()-start,1),'peak_RSS_MiB',round(peak/1048576),flush=True)
 if proc.returncode or not (out/'complete.json').exists():raise SystemExit('Run failed; inspect server.log')
+if args.biome_oracle:
+ oracle=json.loads((out/'biome-oracle.json').read_text())
+ if oracle['mismatches'] or oracle['scalar_queries']+oracle['section_queries']==0:raise SystemExit('Biome oracle did not pass')
+ if not args.reference and oracle['section_queries']==0:raise SystemExit('Production biome batching was not exercised')
+ print('Same-process biome oracle:',oracle,flush=True)
 
 if args.hash:
  rows=json.loads((out/'timings.json').read_text())

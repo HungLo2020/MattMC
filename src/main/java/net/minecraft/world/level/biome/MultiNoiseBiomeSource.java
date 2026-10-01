@@ -66,6 +66,17 @@ public class MultiNoiseBiomeSource extends BiomeSource {
 		return this.parameters().findValue(targetPoint);
 	}
 
+    /** Returns false before sampling when custom callbacks require scalar ordering. */
+    public boolean fillBiomeSection(Climate.Sampler sampler, int x, int y, int z, Holder<Biome>[] output) {
+        if (getClass() != MultiNoiseBiomeSource.class) return false;
+        var parameters = parameters();
+        if (parameters.getClass() != Climate.ParameterList.class
+                || !net.minecraft.world.level.levelgen.BiomeSamplerSafety.canBatch(sampler)) return false;
+        if (output.length < 64) throw new IllegalArgumentException("A biome section needs 64 outputs");
+        parameters.fillSection(sampler, x, y, z, output);
+        return true;
+    }
+
 	@Override
 	public void addDebugInfo(List<String> list, BlockPos blockPos, Climate.Sampler sampler) {
 		int i = QuartPos.fromBlock(blockPos.getX());

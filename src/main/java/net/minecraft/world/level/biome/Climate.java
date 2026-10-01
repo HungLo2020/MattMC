@@ -179,8 +179,23 @@ public class Climate {
 		}
 
 		public T findValueIndex(Climate.TargetPoint targetPoint) {
-			return this.findValueIndex(targetPoint, Climate.RTree.Node::distance);
+			return this.getClass() == ParameterList.class ? this.index.searchNative(targetPoint)
+                : this.findValueIndex(targetPoint, Climate.RTree.Node::distance);
 		}
+
+        /** Ordered bulk lookup; output entries and per-thread search history match scalar calls. */
+        public void findValues(Climate.TargetPoint[] points, T[] output) {
+            java.util.Objects.requireNonNull(points);
+            java.util.Objects.requireNonNull(output);
+            if (output.length < points.length) throw new IllegalArgumentException("Output shorter than input");
+            if (this.getClass() == ParameterList.class) this.index.nativeTree.search(points, output, this.index.lastResult);
+            else for (int i = 0; i < points.length; i++) output[i] = this.findValue(points[i]);
+        }
+
+        /** Internal route after MultiNoiseBiomeSource checks sampling and list eligibility. */
+        void fillSection(Climate.Sampler sampler, int x, int y, int z, T[] output) {
+            this.index.nativeTree.searchSection(sampler, x, y, z, output, this.index.lastResult);
+        }
 
 		protected T findValueIndex(Climate.TargetPoint targetPoint, Climate.DistanceMetric<T> distanceMetric) {
 			return this.index.search(targetPoint, distanceMetric);
@@ -229,10 +244,12 @@ public class Climate {
 	protected static final class RTree<T> {
 		private static final int CHILDREN_PER_NODE = 6;
 		private final Climate.RTree.Node<T> root;
+        private final NativeClimateTree<T> nativeTree;
 		private final ThreadLocal<Climate.RTree.Leaf<T>> lastResult = new ThreadLocal();
 
 		private RTree(Climate.RTree.Node<T> node) {
 			this.root = node;
+            this.nativeTree = new NativeClimateTree<>(node);
 		}
 
 		public static <T> Climate.RTree<T> create(List<Pair<Climate.ParameterPoint, T>> list) {
@@ -365,6 +382,17 @@ public class Climate {
 			}
 		}
 
+        private T searchNative(Climate.TargetPoint point) {
+            java.util.Objects.requireNonNull(point);
+            if (this.root instanceof Leaf<T> constant) {
+                this.lastResult.set(constant);
+                return constant.value;
+            }
+            var leaf = this.nativeTree.search(point, this.lastResult.get());
+            this.lastResult.set(leaf);
+            return leaf.value;
+        }
+
 		public T search(Climate.TargetPoint targetPoint, Climate.DistanceMetric<T> distanceMetric) {
 			long[] ls = targetPoint.toParameterArray();
 			Climate.RTree.Leaf<T> leaf = this.root.search(ls, (Climate.RTree.Leaf<T>)this.lastResult.get(), distanceMetric);
@@ -374,6 +402,7 @@ public class Climate {
 
 		static final class Leaf<T> extends Climate.RTree.Node<T> {
 			final T value;
+            int nativeIndex;
 
 			Leaf(Climate.ParameterPoint parameterPoint, T object) {
 				super(parameterPoint.parameterSpace());

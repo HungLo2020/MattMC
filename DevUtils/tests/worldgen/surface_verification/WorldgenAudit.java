@@ -14,17 +14,21 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 public final class WorldgenAudit {
  static final boolean HASH=Boolean.getBoolean("audit.hash");
+ static String fingerprint(ChunkAccess chunk) throws Exception {
+  String blocks=net.minecraft.world.level.levelgen.NativeSurfaceVerification.fingerprint(chunk);
+  return Boolean.getBoolean("audit.biomes") ? blocks+":"+net.minecraft.world.level.levelgen.NativeBiomeWorldVerification.fingerprint(chunk) : blocks;
+ }
  static volatile boolean hashEnabled;
  static final java.util.concurrent.ConcurrentMap<String,String> surfaceHashes=new java.util.concurrent.ConcurrentHashMap<>();
  static final java.util.concurrent.ConcurrentMap<String,String> carverHashes=new java.util.concurrent.ConcurrentHashMap<>();
  public static void recordCarvers(Object value) {
   if(!hashEnabled)return;
-  try {var chunk=(ChunkAccess)value;carverHashes.put(chunk.getPos().toString(),net.minecraft.world.level.levelgen.NativeSurfaceVerification.fingerprint(chunk));}
+  try {var chunk=(ChunkAccess)value;carverHashes.put(chunk.getPos().toString(),fingerprint(chunk));}
   catch(Exception e){throw new RuntimeException(e);}
  }
  public static void recordSurface(Object value) {
   if(!hashEnabled)return;
-  try {var chunk=(ChunkAccess)value;surfaceHashes.put(chunk.getPos().toString(),net.minecraft.world.level.levelgen.NativeSurfaceVerification.fingerprint(chunk));}
+  try {var chunk=(ChunkAccess)value;surfaceHashes.put(chunk.getPos().toString(),fingerprint(chunk));}
   catch(Exception e){throw new RuntimeException(e);}
  }
  static final AtomicBoolean started=new AtomicBoolean();
@@ -53,7 +57,7 @@ public final class WorldgenAudit {
   long end=System.nanoTime(),cpuEnd=os.getProcessCpuTime(),allocEnd=allocated();
   long checksum=0;for(var f:futures){ChunkAccess c=f.join().orElse(null);if(c==null)throw new IllegalStateException("Chunk generation failed: "+f.join().getError());if(!c.getPersistedStatus().isOrAfter(ChunkStatus.FULL))throw new IllegalStateException("Incomplete chunk");checksum=31*checksum+c.getPos().toLong();}
   Map<String,String> fullHashes=new TreeMap<>();
-  if(HASH && label.startsWith("measure"))for(var f:futures){var c=f.join().orElse(null);fullHashes.put(c.getPos().toString(),net.minecraft.world.level.levelgen.NativeSurfaceVerification.fingerprint(c));}
+  if(HASH && label.startsWith("measure"))for(var f:futures){var c=f.join().orElse(null);fullHashes.put(c.getPos().toString(),fingerprint(c));}
   Map<String,Object> row=new LinkedHashMap<>();if(!fullHashes.isEmpty())row.put("full_fingerprints",fullHashes);row.put("label",label);row.put("dimension",level.dimension().location().toString());row.put("target_chunks",ps.size());row.put("first_chunk_x",ps.getFirst().x);row.put("first_chunk_z",ps.getFirst().z);row.put("wall_seconds",(end-wall)/1e9);row.put("process_cpu_seconds",(cpuEnd-cpu)/1e9);row.put("allocated_bytes",allocEnd-alloc);row.put("gc_ms",gcTime()-gc);row.put("gc_count",gcCount()-gcn);row.put("jit_ms",ManagementFactory.getCompilationMXBean().getTotalCompilationTime()-jit);Arrays.sort(latencies);row.put("chunk_request_p50_ms",latencies[latencies.length/2]/1e6);row.put("chunk_request_p95_ms",latencies[Math.min(latencies.length-1,(int)Math.floor(latencies.length*.95))]/1e6);row.put("checksum",checksum);row.put("heap_used_bytes",ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed());
   System.out.println("AUDIT_RESULT "+new Gson().toJson(row));results.add(row);write();
   return row;
@@ -89,6 +93,7 @@ public final class WorldgenAudit {
      release(server,level,ps);
     }
    }
+   if(Boolean.getBoolean("audit.biomeOracle"))Files.writeString(output.resolve("biome-oracle.json"),gson.toJson(BiomeShadow.results()));
    Files.writeString(output.resolve("complete.json"),gson.toJson(Map.of("success",true,"rows",results.size(),"pid",ProcessHandle.current().pid())));
    System.out.println("AUDIT_COMPLETE");server.halt(false);
   }catch(Throwable t){t.printStackTrace();try{Files.writeString(output.resolve("failed.txt"),t.toString());}catch(Exception ignored){}server.halt(false);}

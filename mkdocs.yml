@@ -45,6 +45,7 @@ nav:
       - Tooling: development/tooling/index.md
       - World:
           - Overview: development/world/index.md
+          - Biomes: development/world/biome/index.md
           - World Generation: development/world/levelgen/index.md
   - Changelog: changelog/CHANGELOG.md
   - Changes: changes/changes.md

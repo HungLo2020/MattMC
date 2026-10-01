@@ -183,7 +183,19 @@ public class LevelChunkSection {
 
 	public void fillBiomesFromNoise(BiomeResolver biomeResolver, Climate.Sampler sampler, int i, int j, int k) {
 		PalettedContainer<Holder<Biome>> palettedContainer = this.biomes.recreate();
-		int l = 4;
+        if (biomeResolver instanceof net.minecraft.world.level.biome.MultiNoiseBiomeSource source) {
+            @SuppressWarnings("unchecked")
+            Holder<Biome>[] values = (Holder<Biome>[])new Holder<?>[64];
+            if (source.fillBiomeSection(sampler, i, j, k, values)) {
+                int index = 0;
+                for (int dx = 0; dx < 4; dx++) for (int dy = 0; dy < 4; dy++) for (int dz = 0; dz < 4; dz++) {
+                    palettedContainer.getAndSetUnchecked(dx, dy, dz, values[index++]);
+                }
+                this.biomes = palettedContainer;
+                return;
+            }
+        }
+        int l = 4;
 
 		for (int m = 0; m < 4; m++) {
 			for (int n = 0; n < 4; n++) {

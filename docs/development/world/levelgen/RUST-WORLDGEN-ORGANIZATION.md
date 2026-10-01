@@ -4,8 +4,9 @@
 
 World generation lives under `src/main/rust/world/level/levelgen/`. Noise
 synthesis (`synth`), density evaluation (`density`), aquifer evaluation (`aquifer`),
-and surface evaluation (`surface`) are separate domains. Fiddled-distance biome corner selection lives
-under `world/level/biome/`; surface evaluation consumes its column results.
+and surface evaluation (`surface`) are separate domains. Biome corner selection and
+[climate lookup](../biome/RUST-CLIMATE.md) live under `world/level/biome/`.
+Surface evaluation consumes biome corner selection's column results.
 
 The original organization change was a structural refactor. Seed construction, Java graph/cache ownership,
 native state layouts, exported symbol names, array bounds, and callback/write
@@ -13,7 +14,9 @@ order are preserved. The native library is still one Cargo `cdylib`.
 
 ```text
 world/level/
-├── biome/fiddled_distance.rs
+├── biome/
+│   ├── fiddled_distance.rs
+│   └── climate/     # Ordered climate search, SIMD distances and FFI
 └── levelgen/
     ├── math.rs
     ├── synth/       # Noise families, their optimized kernels, state and FFI

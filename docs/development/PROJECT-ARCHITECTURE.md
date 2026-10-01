@@ -34,6 +34,7 @@ src/main/rust/
 └── world/
     └── level/
         ├── biome/
+        │   └── climate/
         ├── color_map_color_util.rs
         └── levelgen/
             ├── synth/
@@ -56,7 +57,7 @@ Shared engine primitives belong here. Use this for low-level types, algorithms, 
 
 World simulation and world data helpers belong here. Current code includes
 `world/level/color_map_color_util.rs` for Java color-map behavior,
-`world/level/biome/` for biome corner selection, and `world/level/levelgen/` for
+`world/level/biome/` for biome corner selection and [climate lookup](world/biome/RUST-CLIMATE.md), and `world/level/levelgen/` for
 noise synthesis, density evaluation, aquifers, and surface evaluation. See
 [Rust World-Generation Organization](world/levelgen/RUST-WORLDGEN-ORGANIZATION.md) for module
 ownership, native boundaries, and recorded verification.

@@ -523,6 +523,8 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
             this.function=densityFunction;this.evaluator=evaluator;
         }
 
+        DensityFunction evaluator() { return this.evaluator; }
+
 		@Override
 		public double compute(DensityFunction.FunctionContext functionContext) {
 			int i = functionContext.blockX();
