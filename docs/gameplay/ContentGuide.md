@@ -24,6 +24,9 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Creeper](mobs/Creeper.md) and [Skeleton](mobs/Skeleton.md): spawning, combat, drops, and special rewards
 - [Gunpowder](items/Gunpowder.md), [Bone](items/Bone.md), and [Arrow](items/Arrow.md): hostile-mob resources and verified uses
 
+- [Brewing](brewing/Brewing.md) and [Brewing Stand](blocks/BrewingStand.md): verified potion chains, fuel, modifiers, splash/lingering forms
+- [Nether Wart](blocks/NetherWart.md), [Blaze Powder](items/BlazePowder.md), and [Glass Bottle](items/GlassBottle.md): brewing inputs and acquisition
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

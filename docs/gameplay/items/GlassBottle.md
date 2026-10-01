@@ -1,17 +1,30 @@
 # Glass Bottle
 
-## Obtaining
+Glass Bottle is an empty container registered as `minecraft:glass_bottle`. It can collect water for brewing, honey from a full hive, or qualifying dragon-breath clouds.
 
-Glass Bottle can be obtained from the Creative Menu and from its normal survival sources when those sources are available.
+## Crafting and filling with water
 
-## Usage
+Place three Glass blocks in a V-shaped arrangement: two separated across the upper row and one centered beneath them. The recipe produces **three Glass Bottles**.
 
-Glass Bottle is used as a crafting ingredient, utility item, or interaction item depending on the recipe and gameplay system.
+Use a bottle while targeting a water source. The item checks interaction permission and water-tag fluid, then creates a Water Bottle. That is the ordinary starting container for [brewing](../brewing/Brewing.md).
 
-## Behavior
+## Other collection uses
 
-It is a stackable item unless its item properties define a different stack limit or use behavior.
+- Use a Glass Bottle on a Beehive or Bee Nest at honey level 5 to collect a Honey Bottle. Hive harvesting has bee-release and smoke conditions; see [Honeycomb](Honeycomb.md#harvesting) for the shared hive-safety context.
+- Near a living area-effect cloud owned by an Ender Dragon, the bottle can create Dragon's Breath and reduce the cloud's radius by 0.5. This is a specific owner/type check, not a way to bottle every lingering-effect cloud.
 
-## Notes
+The item checks for qualifying nearby dragon clouds before its water-targeting branch. These behaviors are source-reviewed; this page does not promise safe access to a dragon encounter.
 
-* This item is registered as `minecraft:glass_bottle`.
+## Related pages
+
+- [Brewing Stand](../blocks/BrewingStand.md)
+- [Nether Wart](NetherWart.md)
+- [Items](Items.md)
+
+## Sources and verification
+
+Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No in-game brewing, growth, or collection test was run.
+
+- [Bottle recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/glass_bottle.json)
+- [Water and dragon-cloud collection](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/BottleItem.java)
+- [Honey collection](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/BeehiveBlock.java#L147-L189)

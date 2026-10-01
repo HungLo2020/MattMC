@@ -6,6 +6,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 - [Crafting Table](CraftingTable.md): 3 × 3 crafting, recipe tags, and grid cleanup
 - [Furnace](Furnace.md): crafting, fuels, processing, and troubleshooting
+- [Brewing Stand](BrewingStand.md): fueled three-bottle potion batches
 - [Chest](Chest.md): storage, double-chest placement, and blocked lids
 
 - [Beds](Bed.md): sleeping, respawn conditions, and dimension hazards
@@ -34,6 +35,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 ## Farming
 
 - [Farmland](Farmland.md): tilling, hydration, and protecting plots
+- [Nether Wart](NetherWart.md): Soul Sand planting and brewing harvest
 - [Wheat crop](Wheat.md): growth and MattMC's right-click / hoe-area harvesting
 
 ## Eggs
