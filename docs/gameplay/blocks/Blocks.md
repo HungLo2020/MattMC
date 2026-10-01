@@ -17,6 +17,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Stone and construction
 
+- [Iron, Copper, and Diamond ores](OreResources.md): tool requirements, drops, Fortune/Silk Touch, and processing
+
 - [Stone](Stone.md): mining drops, Silk Touch, smelting, and basic recipes
 
 - [Limestone family](Limestone.md): forms and current Survival acquisition limits
