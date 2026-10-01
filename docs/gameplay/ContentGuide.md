@@ -27,6 +27,9 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Brewing](brewing/Brewing.md) and [Brewing Stand](blocks/BrewingStand.md): verified potion chains, fuel, modifiers, splash/lingering forms
 - [Nether Wart](blocks/NetherWart.md), [Blaze Powder](items/BlazePowder.md), and [Glass Bottle](items/GlassBottle.md): brewing inputs and acquisition
 
+- [Smithing](smithing/Smithing.md): equipment upgrades, trims, and component preservation
+- [Netherite Scrap](items/NetheriteScrap.md), [Ingot](items/NetheriteIngot.md), and [Upgrade Template](items/SmithingTemplateNetheriteUpgrade.md): material progression and template duplication
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
