@@ -104,6 +104,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Vallumraptor](mobs/Vallumraptor.md) and [Grottoceratops](mobs/Grottoceratops.md): theft, flower grazing, owner differences, and species-egg limits
 
+- [Atlatitan](mobs/Atlatitan.md) and [Serene Salad](items/SereneSalad.md): the active temporary mounting route and remaining breeding/control limits
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)
