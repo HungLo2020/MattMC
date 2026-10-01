@@ -8,6 +8,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 - [Furnace](Furnace.md): crafting, fuels, processing, and troubleshooting
 - [Chest](Chest.md): storage, double-chest placement, and blocked lids
 
+- [Beds](Bed.md): sleeping, respawn conditions, and dimension hazards
+
 ## Stone and construction
 
 - [Stone](Stone.md): mining drops, Silk Touch, smelting, and basic recipes
@@ -16,6 +18,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 - [Pewen family](Pewen.md): tree growth, shaped recipes, and wood integration caveats
 
 ## Lighting and integrated content
+
+- [Torch](Torch.md): crafting, support requirements, and light values
 
 - [Amber](Amber.md): transparent construction and harvesting caveats
 - [Ambersol](Ambersol.md): overhead column lighting from integrated Alex's Caves content, with Survival acquisition limits clearly marked

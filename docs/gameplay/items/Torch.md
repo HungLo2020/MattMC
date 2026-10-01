@@ -1,17 +1,23 @@
 # Torch
 
-## Obtaining
+Torch is the inventory item for standing and wall-mounted [Torches](../blocks/Torch.md). Its item ID is `minecraft:torch`.
 
-Torch can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Obtaining and use
 
-## Usage
+Craft four Torches with one Coal or Charcoal above one Stick. Place one on a suitable supporting top or side face to create a light-level-14 torch.
 
-Torch is a building, utility, redstone, technical, decorative, or progression block.
+The same item selects the standing or wall form during placement. Neither form uses a fuel slot or refueling timer in the checked implementation. For exact support requirements and comparisons with Soul, Copper, and Redstone Torches, use the block guide.
 
-## Behavior
+## Related pages
 
-It follows its configured block rules for placement, mining, drops, and interaction.
+- [Torch block](../blocks/Torch.md)
+- [Coal](Coal.md), [Charcoal](Charcoal.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:torch` block.
+Reviewed at source `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No in-game placement, sleeping, respawn, or mining test was performed.
+
+- [Recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/torch.json)
+- [Standing/wall item](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/Items.java#L464-L468)
+- [Light registration](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/Blocks.java#L1193-L1202)

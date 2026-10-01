@@ -13,6 +13,9 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Game modes](gamemodes/Gamemodes.md): all four modes and permission-aware switching
 - [Hunger and healing](mechanics/Hunger.md): food, saturation, sprinting, and regeneration
 
+- [Beds](blocks/Bed.md) and [Torches](blocks/Torch.md): sleeping safety and basic lighting
+- [Coal](items/Coal.md) and [Charcoal](items/Charcoal.md): fuel, torch ingredients, and recipe distinctions
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

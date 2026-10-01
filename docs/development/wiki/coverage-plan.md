@@ -79,11 +79,18 @@ Navigation updated: Gameplay, Blocks, Items, Mobs, and Development indexes. New 
 - Updated Content Guide and this checkpoint. Source remains `9bd57e1d0057903f6a9196e592d5e2a087c9248a`.
 - Validation: checker and strict build passed on 2,107 pages / 33 indexes; source targets and whitespace checked. No gameplay test.
 
+## Seventh batch: beds, lighting, and fuel
+
+- Added canonical Bed and Torch block guides, with dimension hazards, sleep/respawn conditions, torch support and source-defined light values.
+- Expanded White Bed, Torch, Coal, and Charcoal items with exact current recipes and fuel/tag distinctions.
+- Updated Blocks, Content Guide, and this checkpoint. Source remains `9bd57e1d0057903f6a9196e592d5e2a087c9248a`.
+- Validation: checker and strict build passed on 2,109 pages / 33 indexes; source targets and whitespace checked. No gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
 2. Extend the completed Limestone/Pewen/Amber family guides with substantive branch/pines/sap behavior and remaining item cross-links. Do not claim the documented integration gaps are repaired.
-3. Continue vanilla essentials beyond the completed crafting table/furnace/chest and crafting/smelting guides: wood/ore tool requirements, food, beds, torches, and basic exploration.
+3. Continue vanilla essentials beyond the completed workstations, food mechanics, beds, torches, fuels, and modes: ore/tool tiers, farming, basic exploration, and redstone.
 4. Work through Alex's Mobs by related biome or interaction, pairing mobs with their drops, breeding items, buckets, and equipment. Use registry IDs and active spawn/config sources to track completeness.
 5. Work through integrated Alex's Caves by actually registered biome, mob, block and item clusters; do not assume all upstream biomes exist.
 6. Broaden all 17 gameplay categories, including world/dimension discovery, effects/enchantments, structures, redstone, trading, and commands. Select content from the current registries/data, not an external wiki page list.
