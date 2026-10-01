@@ -37,6 +37,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Dimensions](dimensions/Dimensions.md): Nether linking/anchors, End arrival/return, and the custom Primordial Caves route
 
+- [Commands](commands/Commands.md): permission-aware examples, targeting, and shared time/weather scope
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
