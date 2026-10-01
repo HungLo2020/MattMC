@@ -55,6 +55,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Emu](mobs/Emu.md): seeds, egg production, and throwable eggs
 - [Gazelle](mobs/Gazelle.md): herd panic and the unverified breeding-food route
 - [Raccoon](mobs/Raccoon.md) and [Capuchin Monkey](mobs/CapuchinMonkey.md): food behavior, owner controls, retaliation, and missing bundled taming routes
+- [Elephant](mobs/Elephant.md) and [Kangaroo](mobs/Kangaroo.md): owner controls, riding versus pouch use, food routes, and storage caveats
 - [All mobs](mobs/Mobs.md): the existing mob directory, including other integrated animals
 
 ## Alex's Caves additions

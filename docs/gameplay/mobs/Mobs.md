@@ -4,7 +4,7 @@ For detailed source-reviewed examples, see [Grizzly Bear](GrizzlyBear.md), [Tril
 
 For source-reviewed hostile encounters, see [Creeper](Creeper.md) and [Skeleton](Skeleton.md).
 
-Raccoon and Capuchin Monkey are listed as neutral here because their active goals include retaliation; their articles separate owner controls from missing bundled taming foods.
+Elephant, Raccoon, and Capuchin Monkey are listed as neutral here because their active goals include retaliation; their articles separate owner controls from missing bundled taming foods.
 
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
@@ -27,7 +27,6 @@ MattMC mobs grouped by behavior. Each section is alphabetized.
 - [Cosmic Cod](CosmicCod.md)
 - [Cow](Cow.md)
 - [Donkey](Donkey.md)
-- [Elephant](Elephant.md)
 - [Endergrade](Endergrade.md)
 - [Flying Fish](FlyingFish.md)
 - [Fox](Fox.md)
@@ -84,6 +83,7 @@ MattMC mobs grouped by behavior. Each section is alphabetized.
 - [Crocodile](Crocodile.md)
 - [Crow](Crow.md)
 - [Dolphin](Dolphin.md)
+- [Elephant](Elephant.md)
 - [Emu](Emu.md)
 - [Enderman](Enderman.md)
 - [Frilled Shark](FrilledShark.md)
