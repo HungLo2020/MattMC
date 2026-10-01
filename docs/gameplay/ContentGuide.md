@@ -39,6 +39,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Commands](commands/Commands.md): permission-aware examples, targeting, and shared time/weather scope
 
+- [Trading](trading/Trading.md), [Villagers](mobs/Villager.md), and [Emeralds](items/Emerald.md): professions, stock, prices, and optional trade-rebalance rules
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

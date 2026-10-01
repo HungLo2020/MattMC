@@ -13,6 +13,8 @@ Scope is wiki documentation and necessary wiki navigation only. Do not modify ga
 3. Fetch the default branch and wiki branch. Record both exact SHAs and their merge base. Start from the current wiki tip, never from a stale local copy or an older checkpoint.
 4. Reinspect workflow triggers before any branch update. At the initial snapshot, Wiki Pages deploys only on `master`; release workflows are manual or reusable. Do not assume that remains true after a sync.
 
+The coordinated three-hour review covers wiki, monthly changelog, and issue tracking. Continuous wiki work may remain active between reviews. At review time, first ask the active writer for its published tip, source checkpoint, pending batch, and verified issue evidence; do not start a second writer. The documentation owner incorporates any verified changelog evidence in its next bounded batch. Group routine user-facing progress while preserving the exact per-batch mutation ledger.
+
 ## Sync without rewriting history
 
 - If the default tip is an ancestor of the wiki branch, no source sync is needed.
