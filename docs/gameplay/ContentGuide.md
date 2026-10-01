@@ -83,6 +83,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Pewen Branch](items/PewenBranch.md), [Pines](items/PewenPines.md), [Pine Nuts](items/PineNuts.md), and [Sap](items/PewenSap.md): decorative support, harvesting, food, and unverified sap use
 
+- [Relicheirus](mobs/Relicheirus.md), [Tremorsaurus](mobs/Tremorsaurus.md), and [their placed eggs](blocks/DinosaurEggs.md): food, combat, ownership, and breeding/integration limits
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)
