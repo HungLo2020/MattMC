@@ -4,6 +4,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Vanilla-derived gameplay
 
+- [Buckets](items/Bucket.md), [Water](items/WaterBucket.md), and [Lava](items/LavaBucket.md): source collection, waterlogging, dimension restrictions, source pools, and fuel
+
 - [Blaze](mobs/Blaze.md), [Wither Skeleton](mobs/WitherSkeleton.md), and [Skulls](items/WitherSkeletonSkull.md): fortress spawning, combat, loot, and boss-summoning materials
 
 - [Bees](mobs/Bee.md) and [Bee housing](blocks/BeeHousing.md): colony growth, safe flowers, nectar/honey, smoke, harvesting, and relocation
