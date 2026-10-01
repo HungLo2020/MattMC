@@ -30,6 +30,11 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 	private final Strategy<T> strategy;
 	private final ThreadingDetector threadingDetector = new ThreadingDetector("PalettedContainer");
 
+	// Borrow a consistent storage/palette pair for the chunk's bulk heightmap reader.
+	// The caller observes the same ownership/exclusion rules as ordinary reads.
+	Data<T> dataForHeightmaps() { return this.data; }
+	net.minecraft.core.IdMap<T> registryForHeightmaps() { return this.strategy.globalMap(); }
+
 	public void acquire() {
 		this.threadingDetector.checkAndLock();
 	}

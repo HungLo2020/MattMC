@@ -41,6 +41,12 @@ public class Heightmap {
 	}
 
 	public static void primeHeightmaps(ChunkAccess chunkAccess, Set<Heightmap.Types> set) {
+		if (net.minecraft.world.level.chunk.NativeHeightmap.prime(chunkAccess, set)) return;
+		primeHeightmapsJava(chunkAccess, set);
+	}
+
+	// Compatibility path for custom chunk/section/storage implementations.
+	static void primeHeightmapsJava(ChunkAccess chunkAccess, Set<Heightmap.Types> set) {
 		if (!set.isEmpty()) {
 			int i = set.size();
 			ObjectList<Heightmap> objectList = new ObjectArrayList<>(i);

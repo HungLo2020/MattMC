@@ -4,6 +4,7 @@ Start with the affected evaluator's guide before changing world generation.
 Preserve seed compatibility, evaluation order, and Java/native ownership rules.
 
 - [Feature Generation](feature/index.md): ore geometry and placement verification.
+- [Heightmaps](heightmap/index.md): packed chunk-column reconstruction and parity checks.
 - [Noise Evaluation](RUST-NOISE.md): sampler behavior and parity checks.
 - [Density Evaluation](RUST-DENSITY.md): expression evaluation, batching, and verification.
 - [Terrain Splines](RUST-SPLINE.md): native curve plans, coordinate bindings, and focused parity/performance checks.

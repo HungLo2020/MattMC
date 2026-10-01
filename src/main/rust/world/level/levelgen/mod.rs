@@ -3,6 +3,7 @@
 pub(crate) mod aquifer;
 pub(crate) mod density;
 pub(crate) mod feature;
+pub(crate) mod heightmap;
 pub(crate) mod math;
 pub(crate) mod surface;
 pub(crate) mod synth;

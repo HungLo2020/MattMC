@@ -76,6 +76,12 @@ column scan and rule loop, including its yields before external requests.
 for biome column selection. Java still owns ordered block commits and external
 conditions/rules.
 
+### Heightmaps
+
+Heightmap priming is in `heightmap/`, with the packed section bridge beside Java
+chunk storage. See [heightmap priming](heightmap/RUST-HEIGHTMAP.md) for ownership,
+compatibility paths and complete-caller verification.
+
 ### Feature geometry
 
 `feature/ore/` owns ore spheres and ordered spans. Java retains random sources,
