@@ -59,6 +59,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Hopper](blocks/Hopper.md): item transfer, redstone locking, and sided Furnace automation
 
+- [Armor](mechanics/Armor.md): current material values including Copper, toughness, repairs, and Chestplate progression
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
