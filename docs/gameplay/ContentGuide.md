@@ -4,6 +4,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Vanilla-derived gameplay
 
+- [Sugar Cane](blocks/SugarCane.md) and [Pumpkin and Melon farming](blocks/PumpkinAndMelon.md): planting, growth, harvesting, and crop resources
+
 - [Axolotl](mobs/Axolotl.md), [Dolphin](mobs/Dolphin.md), and [Bucket of Axolotl](items/BucketOfAxolotl.md): aquatic care, breeding, player assistance, structure guidance, and bucket-state preservation
 
 - [Buckets](items/Bucket.md), [Water](items/WaterBucket.md), and [Lava](items/LavaBucket.md): source collection, waterlogging, dimension restrictions, source pools, and fuel

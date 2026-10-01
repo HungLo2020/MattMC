@@ -47,6 +47,9 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Farming
 
+- [Sugar Cane](SugarCane.md): waterside planting, growth limits, harvesting, Sugar, and Paper
+- [Pumpkin and Melon farming](PumpkinAndMelon.md): stem layout, Bone Meal, fruit drops, carving, and repeat harvests
+
 - [Bee housing](BeeHousing.md): Bee Nests, Beehives, honey collection, smoke, and Silk Touch relocation
 
 - [Primordial decorative plants](PrimordialPlants.md): Fiddlehead, Cycad, and Archaic Vine propagation and support

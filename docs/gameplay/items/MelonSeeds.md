@@ -1,17 +1,21 @@
 # Melon Seeds
 
-## Obtaining
+**Melon Seeds** (`minecraft:melon_seeds`) plant a Melon stem when used on Farmland. A stem later grows a separate fruit beside itself; a Melon Slice or whole Melon does not directly plant that stem. [Registration][item]
 
-Melon Seeds can be obtained from the Creative Menu and from its normal survival sources when those sources are available.
+## Crafting
 
-## Usage
+Craft **1 Melon Slice into 1 Melon Seeds item**. This recipe is shapeless and fits in the inventory crafting grid. A whole Melon block is not the ingredient. [Recipe][recipe]
 
-Melon Seeds is a natural, resource, technical, or building block.
+## Other farm sources and use
 
-## Behavior
+Breaking a Melon stem can also drop seeds, but even a mature stem can yield zero. For repeated harvests, keep the stem and collect its fruit instead. See [Pumpkin and Melon farming](../blocks/PumpkinAndMelon.md) for exact drops, Farmland support, light, fruit space, and Bone Meal.
 
-It follows its configured block rules for placement, mining, drops, and interaction.
+Related: [Melon Slice](MelonSlice.md) · [Melon](Melon.md) · [Chicken food](../mobs/Chicken.md#food-and-breeding) · [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is registered as `minecraft:melon_seeds`.
+Source-reviewed on **2026-10-01** at `4285adff2e35307c277a3a5bf54ebd064aa5e64b`. The recipe uses the current [shapeless codec][codec]. These are confirmed farming acquisition routes, not an exhaustive list of chest loot or trade offers. No in-game planting, loot, or crafting test was run.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/item/Items.java#L1749
+[recipe]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/resources/data/minecraft/recipe/crafting/melon_seeds.json
+[codec]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/item/crafting/ShapelessRecipe.java#L89-L99
