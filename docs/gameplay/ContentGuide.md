@@ -130,3 +130,9 @@ A source-reviewed page names the repository snapshot used for its facts. This es
 “Not verified” means the described fact has not been established for MattMC. Registration, a Creative entry, a recipe, and natural spawning are separate checks. A mob or block can exist without a confirmed way to obtain it in Survival. Exact drop tables can also depend on tool conditions and active data packs.
 
 The detailed pages use original summaries of MattMC's source and data. Upstream wiki descriptions and artwork are not copied into this guide.
+
+## Armadillo resources and archaeology
+
+- [Armadillo](mobs/Armadillo.md): active savanna/badlands spawning, fear, breeding, and adult scute production
+- [Armadillo Scute](items/ArmadilloScute.md): brushing, shedding, Wolf Armor crafting and repair
+- [Brush](items/Brush.md): suspicious-block excavation, dispenser use, and broken-item interaction limits

@@ -20,7 +20,7 @@ The normal broken-stack guards affect several paths:
 - Normal weapon-hit hooks and mining-use hooks skip their item-specific processing
 - Ordinary equipment updates do not apply a broken item's attribute modifiers, and the break callback stops its equipped effects
 
-This is not a promise that every custom system checks the same guard. A mob or item handler that checks only an item ID can behave differently. See the [Wolf Armor warning](../items/WolfArmor.md#fully-damaged-armor-in-this-snapshot), where the special absorption check does not test the broken state.
+This is not a promise that every custom system checks the same guard. A mob or item handler that checks only an item ID can behave differently. See the [Wolf Armor warning](../items/WolfArmor.md#fully-damaged-armor-in-this-snapshot), where the special absorption check does not test the broken state. The [Brush guide](../items/Brush.md#fully-worn-brushes) also distinguishes guarded archaeology block-use from adult Armadillo and dispenser handlers.
 
 Soft blocks that do not require a correct tool are a separate case; a broken pickaxe is not a reliable way to collect tool-gated ores just because it can still break something.
 

@@ -8,6 +8,8 @@ Elephant, Raccoon, and Capuchin Monkey are listed as neutral here because their 
 
 For a source-reviewed boss encounter, see [Wither](Wither.md) and its [Nether Star reward](../items/NetherStar.md).
 
+For renewable Wolf Armor materials, see [Armadillo](Armadillo.md), [Scutes](../items/ArmadilloScute.md), and [Brush](../items/Brush.md).
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs
