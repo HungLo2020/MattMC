@@ -94,6 +94,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Alex's Mobs additions
 
+- [Tiger](mobs/Tiger.md) and [Tasmanian Devil](mobs/TasmanianDevil.md): dropped-food blessing, howling, Bone Meal conversion, and active versus legacy behavior
+
 - [Blue Jay](mobs/BlueJay.md) and [Crow](mobs/Crow.md): seed companionship, monster-highlighting song, taming, crop protection, and marked-container gathering
 
 - [Rhinoceros](mobs/Rhinoceros.md), [Komodo Dragon](mobs/KomodoDragon.md), and [Komodo Spit](items/KomodoSpit.md): trust, poisonous predation, missing food tags, and periodic item production

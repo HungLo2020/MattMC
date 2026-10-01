@@ -20,6 +20,8 @@ For apiary care, see [Bee](Bee.md) and [Bee housing](../blocks/BeeHousing.md).
 
 For fortress encounters, see [Blaze](Blaze.md) and [Wither Skeleton](WitherSkeleton.md), including spawning differences and skull rewards.
 
+For integrated predator interactions, see [Tiger](Tiger.md) and [Tasmanian Devil](TasmanianDevil.md), including blessing, howling, and source-defined limits.
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs
