@@ -22,6 +22,8 @@ For fortress encounters, see [Blaze](Blaze.md) and [Wither Skeleton](WitherSkele
 
 For integrated predator interactions, see [Tiger](Tiger.md) and [Tasmanian Devil](TasmanianDevil.md), including blessing, howling, and source-defined limits.
 
+For aquatic assistance and care, see [Axolotl](Axolotl.md) and [Dolphin](Dolphin.md), including breeding, breathing, combat support, and treasure-guidance limits.
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs
