@@ -62,13 +62,13 @@ public final class NativeHeightmap {
 
     private static boolean supported(PalettedContainer<BlockState> container) {
         if (container.getClass() != PalettedContainer.class) return false;
-        var data = container.dataForHeightmaps();
+        var data = container.dataForNativeScan();
         var storage = data.storage();
         if (storage.getClass() != SimpleBitStorage.class && storage.getClass() != ZeroBitStorage.class) return false;
         if (storage.getSize() != 4096) return false;
         var palette = data.palette();
         if (palette.getClass() == GlobalPalette.class) {
-            if (container.registryForHeightmaps() != Block.BLOCK_STATE_REGISTRY || palette.getSize() != MASKS.length) return false;
+            if (container.registryForNativeScan() != Block.BLOCK_STATE_REGISTRY || palette.getSize() != MASKS.length) return false;
             return GLOBAL_SUPPORTED;
         }
         if (palette.getClass() != SingleValuePalette.class && palette.getClass() != LinearPalette.class
@@ -123,7 +123,7 @@ public final class NativeHeightmap {
             var section = sections[sectionIndex];
             if (section.hasOnlyAir()) continue; // Exactly the original chunk read shortcut.
             if (!supported(section.getStates())) return false;
-            var data = section.getStates().dataForHeightmaps();
+            var data = section.getStates().dataForNativeScan();
             var storage = data.storage();
             var palette = data.palette();
             int count = palette.getSize();

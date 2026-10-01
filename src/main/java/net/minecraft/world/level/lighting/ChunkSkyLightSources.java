@@ -31,6 +31,12 @@ public class ChunkSkyLightSources {
 	}
 
 	public void fillFrom(ChunkAccess chunkAccess) {
+		if (net.minecraft.world.level.chunk.NativeSkyLightSources.fill(chunkAccess, this.minY, this.heightmap)) return;
+		this.fillFromJava(chunkAccess);
+	}
+
+	// Compatibility path for custom readers and unsupported packed layouts.
+	void fillFromJava(ChunkAccess chunkAccess) {
 		int i = chunkAccess.getHighestFilledSectionIndex();
 		if (i == -1) {
 			this.fill(this.minY);
