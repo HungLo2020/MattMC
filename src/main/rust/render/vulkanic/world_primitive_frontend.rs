@@ -7,6 +7,13 @@ use std::sync::{
     Arc, Mutex,
 };
 
+// Scene vocabulary now owned by `render::scene`; re-exported for this
+// frontend's users until the world renderer moves out of the GAL.
+pub use crate::render::scene::material::*;
+pub use crate::render::scene::mesh::*;
+pub use crate::render::scene::strata::*;
+pub(crate) use crate::render::scene::voxel_source::{TerrainVoxelSourceMesh, TerrainVoxelSourceVertex};
+
 mod animation_upload;
 mod background;
 mod crack;
@@ -51,23 +58,23 @@ use super::resources::{
     TextureViewDesc,
 };
 #[cfg(test)]
-use super::shader_pack::assets::TerrainShaderPackAssetBindings;
-use super::shader_pack::assets::{ShaderPackAssetStore, ShaderPackAssetUpdate, ShaderPackAssets};
-use super::shader_pack::cloud_contract::CloudBlend;
-use super::shader_pack::fullscreen::{
+use crate::render::shaderpack::source::assets::TerrainShaderPackAssetBindings;
+use crate::render::shaderpack::source::assets::{ShaderPackAssetStore, ShaderPackAssetUpdate, ShaderPackAssets};
+use crate::render::shaderpack::contracts::cloud::CloudBlend;
+use crate::render::shaderpack::runtime::fullscreen::{
     FullscreenSourceExecutionPlan, FullscreenSourcePassFrame, SourceFinalOutputCache,
     SourceFinalOutputPlan, SourceFinalOutputReservation, SourceFinalPresentationCapture,
 };
-use super::shader_pack::item_id_map::canonical_resource_location;
-use super::shader_pack::lightmap::VanillaLightmapBinding;
-use super::shader_pack::lowering::TerrainSourceUniformField;
-use super::shader_pack::material_contract::{
+use crate::render::shaderpack::properties::item_ids::canonical_resource_location;
+use crate::render::shaderpack::vanilla::lightmap::VanillaLightmapBinding;
+use crate::render::shaderpack::lowering::TerrainSourceUniformField;
+use crate::render::shaderpack::contracts::material::{
     pack_textured_material_source_primitives,
     stage_textured_material_primitive_with_vertex_modulation, TexturedMaterialPositionSpace,
     TexturedMaterialSourcePrimitive, TexturedMaterialSourceVertex,
     TexturedMaterialTextureCoordinates, TexturedMaterialWinding,
 };
-use super::shader_pack::programs::{
+use crate::render::shaderpack::programs::{
     minimal_compact_direct_terrain_program, minimal_direct_model_translucent_cutout_program,
     minimal_direct_standard_item_foil_program, minimal_direct_terrain_cutout_program,
     minimal_direct_terrain_solid_program, minimal_direct_terrain_translucent_program,
@@ -90,7 +97,7 @@ use super::shader_pack::programs::{
     STATIC_COMPACT_DIRECT_TERRAIN_TRANSLUCENT_PROGRAM_ID, TERRAIN_SOURCE_INSTANCE_BYTES,
     TERRAIN_SOURCE_VERTEX_BYTES, WORLD_DECAL_FOIL_PROGRAM_ID,
 };
-use super::shader_pack::runtime::{
+use crate::render::shaderpack::runtime::{
     append_indexed_draw, DistantHorizonsTranslucentSourceCandidate, EntitySourceDraw,
     IndexedDrawState, ShaderPackRuntimeExecutor, ShaderPackSourceColorFrameTransaction,
     TerrainCompositeUniforms, TerrainDepthHistoryPlan, TerrainDepthHistoryTargets,
@@ -102,12 +109,12 @@ use super::shader_pack::runtime::{
     TerrainTranslucentCaptureTargets, TexturedMaterialSourceDraw,
     TERRAIN_RUNTIME_COMPOSITE_UNIFORM_BYTES,
 };
-use super::shader_pack::source::{ShaderPackSourceStore, ShaderPackSourceUpdate};
-use super::shader_pack::source_targets::{
+use crate::render::shaderpack::source::{ShaderPackSourceStore, ShaderPackSourceUpdate};
+use crate::render::shaderpack::resources::color_targets::{
     ShaderPackColorBootstrapClearValues, ShaderPackColorTargets,
 };
-use super::shader_pack::vanilla_post_effect_executor::{
-    normalize_vulkan_fullscreen_source, normalize_vulkan_vertex_source_for_pass,
+use crate::render::shaderpack::vanilla::post_effect::executor::{
+    lower_post_effect_fragment_source, lower_post_effect_vertex_source_for_pass,
     pack_uniform_blocks,
 };
 
@@ -145,26 +152,26 @@ fn cleanup_fabulous_frame_blit_resources(
         let _ = destroy_fabulous_frame_blit_resources(gal, &resources);
     }
 }
-use super::shader_pack::source_temporal::{
+use crate::render::shaderpack::uniforms::temporal::{
     TerrainSourceTemporalKey, TerrainSourceTemporalUniforms,
 };
-use super::shader_pack::source_uniforms::{
+use crate::render::shaderpack::uniforms::source::{
     TerrainSourceUniformFrame, TerrainSourceUniformSemantic,
 };
-use super::shader_pack::terrain_contract::{TerrainPassOutput, TerrainProgramScope};
-use super::shader_pack::terrain_source_resources::{
+use crate::render::shaderpack::contracts::terrain::{TerrainPassOutput, TerrainProgramScope};
+use crate::render::shaderpack::resources::bindings::{
     TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet, TerrainSourceResourceAvailability,
     TerrainSourceResourceAvailabilitySet, TerrainSourceResourceRole,
 };
-use super::shader_pack::terrain_voxelization::PuddleOccupancyDescriptor;
+use crate::render::shaderpack::voxels::occupancy::PuddleOccupancyDescriptor;
 #[cfg(test)]
-use super::shader_pack::voxel_emission_table::VoxelEmissionTable;
-use super::shader_pack::voxel_light_volume::{
+use crate::render::shaderpack::voxels::emission_table::VoxelEmissionTable;
+use crate::render::shaderpack::voxels::light_volume::{
     invert_column_major_mat4, VoxelLightVolumeDescriptor, VoxelLightVolumeMapping,
     VoxelLightVolumeViewDirection,
 };
 #[cfg(test)]
-use super::shader_pack::voxel_material_map::VoxelMaterialMap;
+use crate::render::shaderpack::voxels::material_map::VoxelMaterialMap;
 use super::sync::SubmissionId;
 use super::{BufferImageCopyRegion, CommandList, CommandListDesc, CullMode};
 use xxhash_rust::xxh32::xxh32;
@@ -277,9 +284,6 @@ fn lowered_source_residency_allows(current_entries: usize) -> bool {
 fn lowered_source_pack_residency_allows(current_entries: usize) -> bool {
     current_entries < LOWERED_SOURCE_PACK_RESIDENCY
 }
-pub const WORLD_MESH_VERTEX_LAYOUT_V2: u32 = 2;
-/// Adds source-model midpoint bytes used only by private voxelization.
-pub const WORLD_MESH_VERTEX_LAYOUT_V3: u32 = 3;
 pub const WORLD_MESH_SECTION_ALL: u32 = u32::MAX;
 pub const WORLD_DEPTH_POLICY_DISABLED: u32 = 0;
 pub const WORLD_DEPTH_POLICY_TEST_WRITE: u32 = 1;
@@ -321,7 +325,7 @@ fn source_shadow_required_for_material_mode(material_mode: u32) -> bool {
 }
 
 fn source_shadow_instance_intersects(
-    frustum: &super::shader_pack::shadow_policy::AdvancedShadowCasterFrustum,
+    frustum: &crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum,
     instance: &WorldMeshInstanceRequest,
     distance_limit: Option<f32>,
 ) -> bool {
@@ -350,31 +354,6 @@ fn source_shadow_section_within_vanilla_distance(origin: [f32; 3], limit: f32) -
     closest[0] * closest[0] + closest[2] * closest[2] < limit * limit
         && closest[1].abs() < limit
 }
-/// The legacy/direct material path has no source-pack semantic interface.
-/// Such work remains outside selected-source admission.
-pub const WORLD_MATERIAL_SOURCE_UNSPECIFIED: u32 = 0;
-/// Generic Minecraft textured-material semantic. It is deliberately not a
-/// producer name: particles, markers, and later material users can share a
-/// source program only after their complete interface is admitted.
-pub const WORLD_MATERIAL_SOURCE_TEXTURED: u32 = 1;
-/// Copied entity-model quads using the explicit textured-material interface.
-pub const WORLD_MATERIAL_SOURCE_ENTITY_MODEL: u32 = 5;
-/// Semantic weather-material source family. It uses the same compact quad
-/// transport as generic material, but a distinct selected source pass and
-/// source-derived blend contract.
-pub const WORLD_MATERIAL_SOURCE_WEATHER: u32 = 2;
-/// Semantic vanilla cloud-face source family. It shares the compact material
-/// transport, but source-plan admission remains separate until a complete
-/// cloud pass contract is available.
-pub const WORLD_MATERIAL_SOURCE_CLOUDS: u32 = 3;
-/// Particle quads use the admitted textured shader ABI but retain producer identity.
-pub const WORLD_MATERIAL_SOURCE_PARTICLES: u32 = 4;
-/// Source UVs address the Rust-owned standalone material texture.
-pub const WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE: u32 = 0;
-/// Source UVs retain their original coordinates in the copied Minecraft block
-/// atlas. This is semantic texture-coordinate metadata, never an atlas object
-/// or backend texture identity.
-pub const WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS: u32 = 1;
 pub const WORLD_MESH_ANIMATION_INTERPOLATE_NONE: u32 = 0;
 pub const WORLD_MESH_ANIMATION_INTERPOLATE_LINEAR: u32 = 1;
 pub const WORLD_TOPOLOGY_TRIANGLES: u32 = 1;
@@ -387,8 +366,6 @@ pub const WORLD_CULL_BACK: u32 = 1;
 pub const WORLD_CULL_FRONT: u32 = 2;
 pub const WORLD_WINDING_CCW: u32 = 1;
 pub const WORLD_WINDING_CW: u32 = 2;
-pub const WORLD_STRATUM_WORLD_BORDER: u32 = 80;
-pub const WORLD_STRATUM_BLOCK_OUTLINE: u32 = 100;
 /// Semantic mesh-instance flag requesting outline-mask-only consumption.
 /// This is a callsite contract bit, never a backend or native handle.
 pub const WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY: u32 = 1;
@@ -402,25 +379,6 @@ pub const WORLD_MESH_INSTANCE_FLAG_UV_OFFSET_U: u32 = 0x8000_0000;
 pub const WORLD_MESH_INSTANCE_UV_OFFSET_SHIFT: u32 = 4;
 pub const WORLD_MESH_INSTANCE_UV_OFFSET_PAYLOAD: u32 = 0x7fff_fff0;
 pub const WORLD_MESH_INSTANCE_UV_OFFSET_MAX: u32 = 0x07ff_ffff;
-pub const WORLD_STRATUM_BLOCK_BREAKING_CRACK: u32 = 90;
-pub const WORLD_STRATUM_TERRAIN: u32 = 60;
-/// DH generic-object faces render into the private DH color/depth target.
-pub const WORLD_STRATUM_DH_GENERIC: u32 = 61;
-/// DH generic-object faces that participate in the private depth image before
-/// the Rust-owned DH SSAO pass. This value is internal to Rust decoding; Java
-/// can only request it through the compact generic-box SSAO semantic bit.
-pub const WORLD_STRATUM_DH_GENERIC_SSAO: u32 = 62;
-pub const WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY: u32 = 70;
-pub const WORLD_STRATUM_ORDINARY_BLOCK: u32 = 71;
-pub const WORLD_STRATUM_MOVING_MESH: u32 = 68;
-/// Generic copied entity-model mesh. The ordinary whole-frame frontend can
-/// batch it with other indexed meshes, while source-plan admission remains
-/// explicit until a selected shader profile has an entity material writer.
-pub const WORLD_STRATUM_ENTITY_MESH: u32 = 67;
-/// Shadow-only entity caster (the first-person local player in Iris's shadow
-/// pass). Never drawn by a camera writer; only the source shadow pass may
-/// admit it, per the pack's resolved shadow caster directives.
-pub const WORLD_STRATUM_ENTITY_SHADOW_CASTER: u32 = 69;
 pub const WORLD_BORDER_TEXTURE_FORCEFIELD: u32 = 1;
 pub const WORLD_MATERIAL_TEXTURE_STONE: u32 = 0x21df_896f;
 pub const WORLD_MATERIAL_TEXTURE_DIRT: u32 = 0x0b0b_bd25;
@@ -1201,49 +1159,8 @@ pub struct WorldMaterialAssetPayload {
     pub png_bytes: Vec<u8>,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct WorldMeshVertex {
-    pub position: [f32; 3],
-    pub uv: [f32; 2],
-    pub shader_atlas_uv: [f32; 2],
-    pub shader_block_id: i32,
-    pub shader_material_type: i32,
-    /// Sodium material byte: mip policy and alpha-cutoff class for direct
-    /// vanilla terrain rendering.
-    pub terrain_material_bits: u32,
-    pub mid_block_packed: u32,
-    pub color_argb: u32,
-    pub normal_packed: u32,
-    pub light: u32,
-}
 
-#[derive(Clone, Debug)]
-pub struct WorldMeshSection {
-    pub material_id: u32,
-    pub texture_id: u32,
-    pub material_mode: u32,
-    pub cull_policy: u32,
-    pub winding: u32,
-    pub index_offset: u32,
-    pub index_count: u32,
-    /// Sodium's baked quad facing (0..5); 6 is unassigned and always visible.
-    /// This remains asset metadata so each render pass can select its own cull policy.
-    pub source_facing: u32,
-}
 
-#[derive(Clone, Debug)]
-pub struct WorldMeshAsset {
-    pub mesh_key: u64,
-    pub mesh_generation: u64,
-    pub vertex_layout_version: u32,
-    pub index_type: IndexType,
-    pub vertices: Vec<WorldMeshVertex>,
-    pub index_bytes: Vec<u8>,
-    pub sections: Vec<WorldMeshSection>,
-    /// Canonical gameplay identity for a copied entity-model asset. Rust owns
-    /// the selected source-pack mapping; non-entity meshes use an empty value.
-    pub entity_identity: String,
-}
 
 /// The exact CPU vertex semantics that a source-pack route may need after the
 /// ordinary mesh has been packed for its own Rust-owned GPU ABI.  This is
@@ -2301,36 +2218,7 @@ struct PreparedTexturedMaterialSourceFrame {
     scalar_uniforms: Vec<u8>,
 }
 
-/// Compact, backend-neutral source data retained only for a future Rust-owned
-/// terrain voxelization pass. This is deliberately smaller than a render
-/// vertex and contains no atlas, pipeline, or native resource information.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct TerrainVoxelSourceVertex {
-    pub position: [f32; 3],
-    pub mid_block_packed: u32,
-    pub shader_material_id: i32,
-}
 
-/// One visible static-terrain mesh in a frame. This owns the compact source
-/// copy so a private shader runtime can stage it after ordinary frontend work
-/// without borrowing the frontend's mutable asset cache across submission.
-#[derive(Clone, Debug)]
-pub(crate) struct TerrainVoxelSourceMesh {
-    pub mesh_key: u64,
-    pub mesh_generation: u64,
-    /// Shared immutable data copied when the Rust-owned mesh asset was
-    /// registered. Per-frame source preparation may retain this without
-    /// copying vertex payloads or borrowing Java/native renderer buffers.
-    pub vertices: Arc<Vec<TerrainVoxelSourceVertex>>,
-    /// Decoded semantic triangle indices retained after asset validation.
-    pub indices: Arc<Vec<u32>>,
-    /// Indices belonging to translucent sections only. The copied semantic
-    /// split is needed by source-derived occupancy writers such as
-    /// Complementary's puddle field; it avoids inferring material layers from
-    /// vertex attributes or backend draw state.
-    pub translucent_indices: Arc<Vec<u32>>,
-    pub transform: [f32; 16],
-}
 
 #[derive(Clone, Debug)]
 pub struct WorldMeshSortedIndexUpdate {
@@ -2525,7 +2413,7 @@ pub struct WorldShaderEnvironmentFrame {
     /// Exact scalar inputs of Minecraft's dynamic 16x16 lightmap. Rust owns
     /// image reconstruction and resource lifetime; Java never transfers its
     /// generated GPU texture or a native view.
-    pub vanilla_lightmap: Option<super::shader_pack::lightmap::VanillaLightmapFrame>,
+    pub vanilla_lightmap: Option<crate::render::shaderpack::vanilla::lightmap::VanillaLightmapFrame>,
 }
 
 /// Explicit inventory of feature families that Java extracted for this frame
@@ -2649,7 +2537,7 @@ impl WorldFeatureCoverageFrame {
 
 #[derive(Clone, Debug)]
 pub struct WorldPrimitiveFrame {
-    pub(crate) engine_globals: Option<super::shader_pack::engine_globals::EngineGlobals>,
+    pub(crate) engine_globals: Option<crate::render::shaderpack::vanilla::engine_globals::EngineGlobals>,
     pub frame_id: u64,
     pub correlation_id: u64,
     pub viewport_width: u32,
@@ -3254,7 +3142,7 @@ struct GBufferFinalBindingResources {
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct SourceTerrainColorAttachmentKey {
-    output: super::shader_pack::terrain_contract::TerrainPassOutput,
+    output: crate::render::shaderpack::contracts::terrain::TerrainPassOutput,
     source_slot: u32,
     texture: Handle,
     view: Handle,
@@ -7064,7 +6952,7 @@ pub struct WorldPrimitiveFrontend {
     /// Private six-target Fabulous attachment graph. It is prepared only when
     /// translucent semantics are present, and remains unadmitted until the
     /// corresponding family routing and post-effect lowering are complete.
-    fabulous_attachment_set: Option<super::shader_pack::fabulous_targets::FabulousAttachmentSet>,
+    fabulous_attachment_set: Option<crate::render::shaderpack::vanilla::fabulous::FabulousAttachmentSet>,
     /// Whether the persistent Fabulous attachments have been written by a
     /// successful material submission.
     fabulous_attachment_set_initialized: bool,
@@ -7800,16 +7688,16 @@ impl WorldPrimitiveFrontend {
         let (contract, sources) = assets.resolve_post_effect_contract(identity, source)?;
         let (bundled_plan, bundled_sources) = match identity {
             "transparency" => (
-                super::shader_pack::vanilla_post_effect_executor::bundled_transparency_executor()?
+                crate::render::shaderpack::vanilla::post_effect::executor::bundled_transparency_executor()?
                     .plan()
                     .clone(),
-                super::shader_pack::vanilla_post_effect_executor::bundled_transparency_shader_sources()?,
+                crate::render::shaderpack::vanilla::post_effect::executor::bundled_transparency_shader_sources()?,
             ),
             "entity_outline" => (
-                super::shader_pack::vanilla_post_effect_executor::bundled_entity_outline_executor()?
+                crate::render::shaderpack::vanilla::post_effect::executor::bundled_entity_outline_executor()?
                     .plan()
                     .clone(),
-                super::shader_pack::vanilla_post_effect_executor::bundled_entity_outline_shader_sources()?,
+                crate::render::shaderpack::vanilla::post_effect::executor::bundled_entity_outline_shader_sources()?,
             ),
             _ => return Ok(false),
         };
@@ -7852,7 +7740,7 @@ impl WorldPrimitiveFrontend {
     fn custom_post_effect_sources_with_globals(
         &self,
         identity: &str,
-        globals: Option<super::shader_pack::engine_globals::EngineGlobals>,
+        globals: Option<crate::render::shaderpack::vanilla::engine_globals::EngineGlobals>,
         conventions: ShaderConventions,
     ) -> GalResult<Vec<CustomPostEffectSource>> {
         let source = self.shader_pack_sources.active().ok_or_else(|| {
@@ -7915,12 +7803,12 @@ impl WorldPrimitiveFrontend {
             .zip(sources)
             .map(|(pass, shader)| {
                 let mut pass = pass.clone();
-                let (vertex_source, fragment_source) = super::shader_pack::lowering::bind_simple_paired_varyings(
+                let (vertex_source, fragment_source) = crate::render::shaderpack::lowering::bind_simple_paired_varyings(
                     std::str::from_utf8(&shader.vertex_shader).map_err(|_| GalError::invalid_argument("post-effect vertex is not UTF-8"))?,
                     std::str::from_utf8(&shader.fragment_shader).map_err(|_| GalError::invalid_argument("post-effect fragment is not UTF-8"))?,
                 )?;
-                let vertex_globals = super::shader_pack::engine_globals::uses_globals(&vertex_source)?;
-                let fragment_globals = super::shader_pack::engine_globals::uses_globals(&fragment_source)?;
+                let vertex_globals = crate::render::shaderpack::vanilla::engine_globals::uses_globals(&vertex_source)?;
+                let fragment_globals = crate::render::shaderpack::vanilla::engine_globals::uses_globals(&fragment_source)?;
                 if vertex_globals || fragment_globals {
                     if pass.uniform_values.contains_key("Globals") {
                         return Err(GalError::unsupported_feature("post-effect definition cannot override engine Globals"));
@@ -7936,7 +7824,7 @@ impl WorldPrimitiveFrontend {
                         .map_err(|_| GalError::invalid_argument("post-effect vertex shader is not UTF-8"))?
                         .contains("uniform SamplerInfo");
                 if has_sampler_info {
-                    use super::shader_pack::vanilla_post_effect_contract::VanillaPostEffectUniform;
+                    use crate::render::shaderpack::vanilla::post_effect::contract::VanillaPostEffectUniform;
                     let names = std::iter::once("OutSize".to_owned())
                         .chain(pass.inputs.iter().map(|input| format!("{}Size", input.sampler_name)));
                     pass.uniform_values.insert("SamplerInfo".into(), names.map(|name|
@@ -7989,13 +7877,13 @@ impl WorldPrimitiveFrontend {
                     input_row_order: super::commands::TextureRowOrder::Reverse,
                     input_bilinear: pass.inputs.iter().map(|input| input.bilinear).collect(),
                     sampler_info_uniform,
-                    vertex_shader: normalize_vulkan_vertex_source_for_pass(
+                    vertex_shader: lower_post_effect_vertex_source_for_pass(
                         conventions,
                         vertex_source.as_bytes(),
                         &pass,
                         super::commands::TextureRowOrder::Reverse,
                     )?,
-                    fragment_shader: normalize_vulkan_fullscreen_source(
+                    fragment_shader: lower_post_effect_fragment_source(
                         conventions,
                         fragment_source.as_bytes(),
                         &pass,
@@ -8036,7 +7924,7 @@ impl WorldPrimitiveFrontend {
     pub(crate) fn validate_post_effect_request_with_globals(
         &self,
         identity: &[u8],
-        globals: Option<super::shader_pack::engine_globals::EngineGlobals>,
+        globals: Option<crate::render::shaderpack::vanilla::engine_globals::EngineGlobals>,
         conventions: ShaderConventions,
     ) -> GalResult<()> {
         if identity.is_empty() {
@@ -8086,7 +7974,7 @@ impl WorldPrimitiveFrontend {
         frame_target: Handle,
         frame: &WorldPrimitiveFrame,
         identity: &str,
-    ) -> GalResult<Option<super::shader_pack::vanilla_post_effect_executor::VanillaPostEffectExternalTargetBindings>>{
+    ) -> GalResult<Option<crate::render::shaderpack::vanilla::post_effect::executor::VanillaPostEffectExternalTargetBindings>>{
         let source = self.shader_pack_sources.active().ok_or_else(|| {
             GalError::unsupported_feature(
                 "custom post-effect requires a Rust-owned shader source snapshot",
@@ -8751,7 +8639,7 @@ impl WorldPrimitiveFrontend {
                 "entity shadow program generation does not match the active shader pack",
             ));
         }
-        let program = super::shader_pack::entity_contract::prepare_entity_shadow_source_program(
+        let program = crate::render::shaderpack::contracts::entity::prepare_entity_shadow_source_program(
             source,
             TerrainProgramScope::Overworld,
         )?;
@@ -8777,7 +8665,7 @@ impl WorldPrimitiveFrontend {
                 "line source program generation does not match the active shader pack",
             ));
         }
-        let program = super::shader_pack::line_contract::prepare_line_source_program(source, scope)?;
+        let program = crate::render::shaderpack::contracts::line::prepare_line_source_program(source, scope)?;
         self.line_source_program_cache = Some(((shader_pack_generation, scope), program.clone()));
         Ok(program)
     }
@@ -8873,7 +8761,7 @@ impl WorldPrimitiveFrontend {
                     }
                     positions[3] = positions[2];
                     uvs[3] = uvs[2];
-                    primitives.push(super::shader_pack::material_contract::stage_textured_material_primitive(
+                    primitives.push(crate::render::shaderpack::contracts::material::stage_textured_material_primitive(
                         positions,
                         uvs,
                         0xFFFF_FFFF,
@@ -8920,7 +8808,7 @@ impl WorldPrimitiveFrontend {
                 )
             })?;
         let program =
-            super::shader_pack::entity_contract::prepare_entity_glint_source_program(source, scope)?;
+            crate::render::shaderpack::contracts::entity::prepare_entity_glint_source_program(source, scope)?;
         self.entity_glint_source_program_cache =
             Some(((shader_pack_generation, scope), program.clone()));
         Ok(program)
@@ -8946,7 +8834,7 @@ impl WorldPrimitiveFrontend {
                 )
             })?;
         let program =
-            super::shader_pack::hand_contract::prepare_hand_glint_source_program(source, scope)?;
+            crate::render::shaderpack::contracts::hand::prepare_hand_glint_source_program(source, scope)?;
         self.hand_glint_source_program_cache =
             Some(((shader_pack_generation, scope), program.clone()));
         Ok(program)
@@ -8971,7 +8859,7 @@ impl WorldPrimitiveFrontend {
             ));
         }
         let program =
-            super::shader_pack::damaged_block_contract::prepare_damaged_block_source_program(
+            crate::render::shaderpack::contracts::damaged_block::prepare_damaged_block_source_program(
                 source, scope,
             )?;
         self.damaged_block_source_program_cache =
@@ -9726,7 +9614,7 @@ impl WorldPrimitiveFrontend {
         shader_pack_generation: u64,
         graph_generation: u64,
         extent: Extent3d,
-        color_attachments: Vec<super::shader_pack::source_targets::TerrainSourceColorAttachment>,
+        color_attachments: Vec<crate::render::shaderpack::resources::color_targets::TerrainSourceColorAttachment>,
         phase: TerrainSourceColorPassPhase,
         depth_texture: Handle,
         depth_view: Handle,
@@ -10417,7 +10305,7 @@ impl WorldPrimitiveFrontend {
     #[cfg(test)]
     pub(crate) fn shader_pack_source_candidate(
         &self,
-    ) -> Option<&super::shader_pack::runtime::TerrainSourceCandidateState> {
+    ) -> Option<&crate::render::shaderpack::runtime::TerrainSourceCandidateState> {
         self.shader_runtime
             .as_ref()
             .map(ShaderPackRuntimeExecutor::source_candidate)
@@ -18766,7 +18654,7 @@ impl WorldPrimitiveFrontend {
         let shadow_frustum = if terrain_program_scope_for_sky_type(frame.background.sky_type)?
             == Some(TerrainProgramScope::Overworld)
         {
-            Some(super::shader_pack::shadow_policy::AdvancedShadowCasterFrustum::from_frame(
+            Some(crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum::from_frame(
                 shadow_policy,
                 frame.shader_environment.time_of_day,
                 frame.projection_matrix,
@@ -19131,7 +19019,7 @@ impl WorldPrimitiveFrontend {
             {
                 Vec::new()
             } else {
-                let frustum = super::shader_pack::shadow_policy::AdvancedShadowCasterFrustum::from_frame(
+                let frustum = crate::render::shaderpack::properties::shadow::AdvancedShadowCasterFrustum::from_frame(
                     shadow_policy,
                     frame.shader_environment.time_of_day,
                     frame.projection_matrix,
@@ -23394,7 +23282,7 @@ impl WorldPrimitiveFrontend {
     }
 
     fn resolve_distant_horizons_shadow_pass(
-        source: &super::shader_pack::source::ShaderPackSource,
+        source: &crate::render::shaderpack::source::ShaderPackSource,
         scope: TerrainProgramScope,
     ) -> GalResult<bool> {
         let candidates: &[&str] = match scope {
@@ -23407,7 +23295,7 @@ impl WorldPrimitiveFrontend {
             return Ok(false);
         }
         let Some((properties, _)) =
-            super::shader_pack::fullscreen_contract::resolved_source_properties(source, scope)?
+            crate::render::shaderpack::contracts::fullscreen::resolved_source_properties(source, scope)?
         else {
             return Ok(true);
         };
@@ -24188,7 +24076,7 @@ impl WorldPrimitiveFrontend {
 
     fn source_execution_decision(
         override_value: Option<&str>,
-        active: Option<&super::shader_pack::source::ShaderPackSource>,
+        active: Option<&crate::render::shaderpack::source::ShaderPackSource>,
     ) -> bool {
         match override_value {
             Some(configured) => Self::selected_source_execution_env_enabled(Some(configured)),
@@ -25415,8 +25303,8 @@ impl WorldPrimitiveFrontend {
         material_id: u32,
         mode: u32,
         source: u32,
-    ) -> super::shader_pack::fabulous_targets::FabulousTargetRole {
-        use super::shader_pack::fabulous_targets::FabulousTargetRole;
+    ) -> crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole {
+        use crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole;
         // Celestial overlays need the actual sky destination for their blend.
         if mode != WORLD_MATERIAL_MODE_TRANSLUCENT
             || matches!(
@@ -25847,26 +25735,26 @@ impl WorldPrimitiveFrontend {
             }
         };
         for role in [
-            super::shader_pack::fabulous_targets::FabulousTargetRole::Main,
-            super::shader_pack::fabulous_targets::FabulousTargetRole::Translucent,
-            super::shader_pack::fabulous_targets::FabulousTargetRole::ItemEntity,
-            super::shader_pack::fabulous_targets::FabulousTargetRole::Particles,
-            super::shader_pack::fabulous_targets::FabulousTargetRole::Clouds,
-            super::shader_pack::fabulous_targets::FabulousTargetRole::Weather,
+            crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Main,
+            crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Translucent,
+            crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::ItemEntity,
+            crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Particles,
+            crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Clouds,
+            crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Weather,
         ] {
             let attachment = match role {
-                super::shader_pack::fabulous_targets::FabulousTargetRole::Main => &set.main,
-                super::shader_pack::fabulous_targets::FabulousTargetRole::Translucent => {
+                crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Main => &set.main,
+                crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Translucent => {
                     &set.translucent
                 }
-                super::shader_pack::fabulous_targets::FabulousTargetRole::ItemEntity => {
+                crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::ItemEntity => {
                     &set.item_entity
                 }
-                super::shader_pack::fabulous_targets::FabulousTargetRole::Particles => {
+                crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Particles => {
                     &set.particles
                 }
-                super::shader_pack::fabulous_targets::FabulousTargetRole::Clouds => &set.clouds,
-                super::shader_pack::fabulous_targets::FabulousTargetRole::Weather => &set.weather,
+                crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Clouds => &set.clouds,
+                crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Weather => &set.weather,
             };
             operations.push(CommandOp::Barrier(texture_barrier(
                 attachment.color_texture,
@@ -25894,7 +25782,7 @@ impl WorldPrimitiveFrontend {
                     load_op: AttachmentLoadOp::Clear,
                     store_op: AttachmentStoreOp::Store,
                     clear_color: Some(
-                        if role == super::shader_pack::fabulous_targets::FabulousTargetRole::Main {
+                        if role == crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Main {
                             main_clear_color
                         } else {
                             ClearColor {
@@ -25914,7 +25802,7 @@ impl WorldPrimitiveFrontend {
                 }),
             });
             let mut role_slots = BTreeMap::<MaterialResourceKey, usize>::new();
-            if role == super::shader_pack::fabulous_targets::FabulousTargetRole::Main
+            if role == crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Main
                 && draw_sky_disc
             {
                 let sky = &self.sky_disc_forward_resources[&(color_format, raster_y_direction)];
@@ -25970,12 +25858,12 @@ impl WorldPrimitiveFrontend {
             for (batch_index, batch) in
                 world_mesh_batches.iter().enumerate().filter(|(_, batch)| {
                     if batch.key.stratum == WORLD_STRATUM_ENTITY_MESH {
-                        role == super::shader_pack::fabulous_targets::FabulousTargetRole::ItemEntity
+                        role == crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::ItemEntity
                     } else if material_mode_uses_alpha_blending(batch.key.material_mode) {
                         role
-                            == super::shader_pack::fabulous_targets::FabulousTargetRole::Translucent
+                            == crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Translucent
                     } else {
-                        role == super::shader_pack::fabulous_targets::FabulousTargetRole::Main
+                        role == crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Main
                     }
                 })
             {
@@ -26020,7 +25908,7 @@ impl WorldPrimitiveFrontend {
                 });
             }
             operations.push(CommandOp::EndPass);
-            if role == super::shader_pack::fabulous_targets::FabulousTargetRole::Main {
+            if role == crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Main {
                 if let (Some(hand_frame), Some(hand_mesh_batches), Some(_)) = (
                     hand_frame.as_ref(),
                     hand_mesh_batches.as_ref(),
@@ -26195,7 +26083,7 @@ impl WorldPrimitiveFrontend {
         operations.extend(set.external_shader_read_barriers());
         operations.push(set.final_target_color_attachment_barrier());
         let executor =
-            super::shader_pack::vanilla_post_effect_executor::bundled_transparency_executor()?;
+            crate::render::shaderpack::vanilla::post_effect::executor::bundled_transparency_executor()?;
         let populated_roles = BTreeSet::from([
             "minecraft:main".to_owned(),
             "minecraft:translucent".to_owned(),
@@ -28954,21 +28842,21 @@ impl WorldPrimitiveFrontend {
         })?;
         let role_for_batch = |batch: &MaterialBatch| -> Option<(
             usize,
-            &super::shader_pack::fabulous_targets::FabulousAttachmentResources,
+            &crate::render::shaderpack::vanilla::fabulous::FabulousAttachmentResources,
         )> {
-            match super::shader_pack::fabulous_targets::FabulousTargetRole::for_material_source(
+            match crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::for_material_source(
                 batch.key.source_program,
             ) {
-                Some(super::shader_pack::fabulous_targets::FabulousTargetRole::Translucent) => {
+                Some(crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Translucent) => {
                     Some((0, &set.translucent))
                 }
-                Some(super::shader_pack::fabulous_targets::FabulousTargetRole::Particles) => {
+                Some(crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Particles) => {
                     Some((1, &set.particles))
                 }
-                Some(super::shader_pack::fabulous_targets::FabulousTargetRole::Clouds) => {
+                Some(crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Clouds) => {
                     Some((2, &set.clouds))
                 }
-                Some(super::shader_pack::fabulous_targets::FabulousTargetRole::Weather) => {
+                Some(crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Weather) => {
                     Some((3, &set.weather))
                 }
                 _ => None,
@@ -29424,7 +29312,7 @@ impl WorldPrimitiveFrontend {
             if quad.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT {
                 continue;
             }
-            if super::shader_pack::fabulous_targets::FabulousTargetRole::for_material_source(
+            if crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::for_material_source(
                 quad.source_program,
             )
             .is_none()
@@ -29489,7 +29377,7 @@ impl WorldPrimitiveFrontend {
         }
         self.fabulous_attachment_set_initialized = false;
         self.fabulous_attachment_set = Some(
-            crate::render::vulkanic::shader_pack::fabulous_targets::FabulousAttachmentSet::create_with_external_formats(
+            crate::render::shaderpack::vanilla::fabulous::FabulousAttachmentSet::create_with_external_formats(
                 gal,
                 extent,
                 color_format,
@@ -40398,7 +40286,7 @@ impl WorldPrimitiveFrontend {
     }
 
     fn source_frame_stream_payload_bytes(
-        interface: &super::shader_pack::programs::TerrainSourceExecutionInterface,
+        interface: &crate::render::shaderpack::programs::TerrainSourceExecutionInterface,
         instance_count: u64,
     ) -> GalResult<u64> {
         interface.validate()?;
@@ -45848,7 +45736,7 @@ fn fnv64_bytes(bytes: &[u8]) -> u64 {
 fn trace_builtin_terrain_lightmap_receipt(
     frame_id: u64,
     world_generation: u64,
-    frame: super::shader_pack::lightmap::VanillaLightmapFrame,
+    frame: crate::render::shaderpack::vanilla::lightmap::VanillaLightmapFrame,
     rgba: &[u8],
 ) {
     let Ok(root) = std::env::var("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_DIR") else {
@@ -54176,45 +54064,45 @@ mod tests {
         BufferDesc, BufferUsage, FrameTargetDesc, FrontFace, MemoryDomain, RenderTargetDesc,
         TextureDesc, TextureDimension, TextureSubresourceRange, TextureUsage, TextureViewDesc,
     };
-    use crate::render::vulkanic::shader_pack::assets::{
+    use crate::render::shaderpack::source::assets::{
         ShaderPackAssetFile, ShaderPackAssetUpdate,
     };
-    use crate::render::vulkanic::shader_pack::entity_contract::{
+    use crate::render::shaderpack::contracts::entity::{
         bind_entity_source_resources, derive_entity_contract, lower_entity_source_pair,
     };
-    use crate::render::vulkanic::shader_pack::hand_contract::{
+    use crate::render::shaderpack::contracts::hand::{
         bind_hand_source_resources, derive_hand_contract, lower_hand_source_pair,
     };
-    use crate::render::vulkanic::shader_pack::lightmap::{
+    use crate::render::shaderpack::vanilla::lightmap::{
         VanillaLightmapFrame, VanillaLightmapInputs,
     };
-    use crate::render::vulkanic::shader_pack::lowering::lower_terrain_source_pair;
-    use crate::render::vulkanic::shader_pack::preprocess::{
+    use crate::render::shaderpack::lowering::lower_terrain_source_pair;
+    use crate::render::shaderpack::source::preprocess::{
         complete_bundled_pack_source_for_test, preprocess_terrain_sources,
     };
-    use crate::render::vulkanic::shader_pack::programs::{
+    use crate::render::shaderpack::programs::{
         prepare_lowered_entity_source_program, prepare_lowered_hand_source_program,
         prepare_lowered_terrain_source_program,
     };
-    use crate::render::vulkanic::shader_pack::runtime::TerrainSourceCandidateState;
-    use crate::render::vulkanic::shader_pack::source::{
+    use crate::render::shaderpack::runtime::TerrainSourceCandidateState;
+    use crate::render::shaderpack::source::{
         ShaderPackSource, ShaderSourceFile, RUNTIME_ENVIRONMENT_PATH, RUNTIME_OPTIONS_PATH,
     };
-    use crate::render::vulkanic::shader_pack::source_targets::{
+    use crate::render::shaderpack::resources::color_targets::{
         ShaderPackColorBootstrapClearValues, TerrainSourceColorAttachment,
     };
-    use crate::render::vulkanic::shader_pack::terrain_contract::{
+    use crate::render::shaderpack::contracts::terrain::{
         bundled_complementary_hung_loified_source, derive_complementary_terrain_contract,
         TerrainPassContract, TerrainPassInput, TerrainPassOperation, TerrainPassOutput,
         TerrainSourcePassKind,
     };
-    use crate::render::vulkanic::shader_pack::terrain_source_resources::{
+    use crate::render::shaderpack::resources::bindings::{
         TerrainSourceOwnedResource, TerrainSourceResourceAvailability,
         TerrainSourceResourceAvailabilitySet, TerrainSourceResourceBindings,
         TerrainSourceSampledResourceShape, TERRAIN_RESOURCE_BINDINGS_PATH,
     };
-    use crate::render::vulkanic::shader_pack::voxel_emission_table::VoxelEmissionTable;
-    use crate::render::vulkanic::shader_pack::voxel_light_volume::{
+    use crate::render::shaderpack::voxels::emission_table::VoxelEmissionTable;
+    use crate::render::shaderpack::voxels::light_volume::{
         VoxelLightVolumeDescriptor, VoxelLightVolumeExtent, VoxelLightVolumeIdentity,
         VoxelLightVolumeMapping, VoxelLightVolumeRequirements,
     };
@@ -54685,7 +54573,7 @@ mod tests {
         assert!(evidence.contains("Rgba16Float"));
         assert!(evidence.contains("\"nonblack_rgb\":1"));
     }
-    use crate::render::vulkanic::shader_pack::voxel_material_map::VoxelMaterialMap;
+    use crate::render::shaderpack::voxels::material_map::VoxelMaterialMap;
     use xxhash_rust::xxh32::xxh32;
 
     #[test]
@@ -60445,7 +60333,7 @@ mod tests {
             .custom_post_effect_sources_with_globals(
                 "minecraft:spider",
                 Some(
-                    crate::render::vulkanic::shader_pack::engine_globals::EngineGlobals {
+                    crate::render::shaderpack::vanilla::engine_globals::EngineGlobals {
                         screen_width: 16,
                         screen_height: 16,
                         glint_alpha: 1.0,
@@ -60503,7 +60391,7 @@ mod tests {
 
     #[test]
     fn copied_engine_globals_are_visibly_consumed_and_updated_by_vulkan() {
-        use crate::render::vulkanic::shader_pack::engine_globals::EngineGlobals;
+        use crate::render::shaderpack::vanilla::engine_globals::EngineGlobals;
         let mut frontend = WorldPrimitiveFrontend::default();
         frontend.apply_shader_pack_source_update(ShaderPackSourceUpdate {
             pack_name: "globals-gpu-fixture".into(), generation: 1,
@@ -61609,7 +61497,7 @@ mod tests {
         // contract instead of admitting an invalid shader-pack manifest.
         frontend.generation = 1;
         frontend.fabulous_attachment_set = Some(
-            crate::render::vulkanic::shader_pack::fabulous_targets::FabulousAttachmentSet::create_with_external_formats(
+            crate::render::shaderpack::vanilla::fabulous::FabulousAttachmentSet::create_with_external_formats(
                 &mut gal,
                 Extent3d { width: 64, height: 64, depth: 1 },
                 ColorFormat::Bgra8Unorm,
@@ -61741,7 +61629,7 @@ mod tests {
         let mut gal = gal();
         let mut frontend = WorldPrimitiveFrontend::default();
         frontend.fabulous_attachment_set = Some(
-            crate::render::vulkanic::shader_pack::fabulous_targets::FabulousAttachmentSet::create_with_external_formats(
+            crate::render::shaderpack::vanilla::fabulous::FabulousAttachmentSet::create_with_external_formats(
                 &mut gal,
                 Extent3d { width: 64, height: 64, depth: 1 },
                 ColorFormat::Bgra8Unorm,
@@ -64054,7 +63942,7 @@ mod tests {
                 &quad
             ));
             assert_eq!(
-                super::super::shader_pack::fabulous_targets::FabulousTargetRole::Main,
+                crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Main,
                 WorldPrimitiveFrontend::fabulous_material_role(
                     id,
                     quad.material_mode,
@@ -64073,7 +63961,7 @@ mod tests {
             &ordinary
         ));
         assert_eq!(
-            super::super::shader_pack::fabulous_targets::FabulousTargetRole::Translucent,
+            crate::render::shaderpack::vanilla::fabulous::FabulousTargetRole::Translucent,
             WorldPrimitiveFrontend::fabulous_material_role(
                 ordinary.material_id,
                 ordinary.material_mode,
@@ -66913,11 +66801,11 @@ mod tests {
         let instance_f32 = WORLD_MESH_BATCH_HEADER_BYTES / 4;
         assert_eq!(146.0, read_f32(mesh_write, instance_f32 + 23));
         assert!(
-            crate::render::vulkanic::shader_pack::programs::MINIMAL_TERRAIN_MATERIAL_VERTEX
+            crate::render::shaderpack::programs::MINIMAL_TERRAIN_MATERIAL_VERTEX
                 .contains("(material_semantics & (128u | 512u)) != 0u")
         );
         assert!(
-            crate::render::vulkanic::shader_pack::programs::MINIMAL_TERRAIN_MATERIAL_VERTEX
+            crate::render::shaderpack::programs::MINIMAL_TERRAIN_MATERIAL_VERTEX
                 .contains("(material_semantics & (128u | 256u)) == 0u")
         );
     }
@@ -66989,7 +66877,7 @@ mod tests {
         let base = WORLD_MESH_BATCH_HEADER_BYTES / 4;
         assert_eq!(594.0, read_f32(mesh_write, base + 23));
         assert!(
-            crate::render::vulkanic::shader_pack::programs::MINIMAL_TERRAIN_MATERIAL_VERTEX
+            crate::render::shaderpack::programs::MINIMAL_TERRAIN_MATERIAL_VERTEX
                 .contains("(material_semantics & (128u | 512u)) != 0u")
         );
     }
@@ -67062,7 +66950,7 @@ mod tests {
         assert!((read_f32(mesh_write, base + 38) - 0.25).abs() < 0.000001);
         assert_eq!(0.0, read_f32(mesh_write, base + 39));
         assert!(
-            crate::render::vulkanic::shader_pack::programs::MINIMAL_TERRAIN_MATERIAL_VERTEX
+            crate::render::shaderpack::programs::MINIMAL_TERRAIN_MATERIAL_VERTEX
                 .contains("vec2(instance.texture_transform.z,")
         );
     }
@@ -73832,7 +73720,7 @@ mod tests {
             .main_hand_item_model_resource_location
             .clear();
         assert_eq!(
-            super::super::shader_pack::item_id_map::UNMAPPED_ITEM_ID,
+            crate::render::shaderpack::properties::item_ids::UNMAPPED_ITEM_ID,
             frontend
                 .source_hand_current_item_id(
                     &source_frame,
@@ -73868,7 +73756,7 @@ mod tests {
         );
         // A bare arm drawn while the new stack is already held is unmapped.
         assert_eq!(
-            super::super::shader_pack::item_id_map::UNMAPPED_ITEM_ID,
+            crate::render::shaderpack::properties::item_ids::UNMAPPED_ITEM_ID,
             frontend
                 .source_hand_current_item_id(
                     &source_frame,
@@ -79581,7 +79469,7 @@ mod tests {
 
     #[test]
     fn source_execution_follows_the_selected_pack_with_env_override() {
-        use crate::render::vulkanic::shader_pack::source::{ShaderPackSource, ShaderSourceFile};
+        use crate::render::shaderpack::source::{ShaderPackSource, ShaderSourceFile};
         let pack = ShaderPackSource::new(
             "Pack.zip",
             3,

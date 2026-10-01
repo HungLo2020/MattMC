@@ -31,9 +31,9 @@ use crate::render::vulkanic::resources::{
     ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension, TextureFormat,
     TextureUsage, TextureViewDesc,
 };
-use crate::render::vulkanic::shader_pack::distant_horizons_contract::DistantHorizonsPassKind;
-use crate::render::vulkanic::shader_pack::lightmap::VanillaLightmapBinding;
-use crate::render::vulkanic::shader_pack::programs::{
+use crate::render::shaderpack::contracts::distant_horizons::DistantHorizonsPassKind;
+use crate::render::shaderpack::vanilla::lightmap::VanillaLightmapBinding;
+use crate::render::shaderpack::programs::{
     distant_horizons_exact_atlas_source_resource_layout,
     distant_horizons_lod_exact_atlas_resource_layouts,
     distant_horizons_lod_opaque_resource_layouts,
@@ -47,12 +47,12 @@ use crate::render::vulkanic::shader_pack::programs::{
     MINIMAL_DISTANT_HORIZONS_DIRECT_COMPOSITE_VERTEX,
     MINIMAL_DISTANT_HORIZONS_DIRECT_FADE_FRAGMENT, MINIMAL_DISTANT_HORIZONS_SSAO_FRAGMENT,
 };
-use crate::render::vulkanic::shader_pack::source_targets::{
+use crate::render::shaderpack::resources::color_targets::{
     source_color_clear_color, ShaderPackColorTargets, TerrainSourceColorAttachment,
 };
-use crate::render::vulkanic::shader_pack::source_uniforms::TerrainSourceUniformFrame;
-use crate::render::vulkanic::shader_pack::terrain_contract::TerrainPassOutput;
-use crate::render::vulkanic::shader_pack::terrain_source_resources::{
+use crate::render::shaderpack::uniforms::source::TerrainSourceUniformFrame;
+use crate::render::shaderpack::contracts::terrain::TerrainPassOutput;
+use crate::render::shaderpack::resources::bindings::{
     TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet, TerrainSourceResourceAvailability,
     TerrainSourceResourceAvailabilitySet, TerrainSourceResourceRole,
     TerrainSourceSampledResourceShape,
@@ -8839,22 +8839,22 @@ mod tests {
         Extent3d, SamplerAddressMode, SamplerDesc, SamplerFilter, TextureDesc, TextureDimension,
         TextureUsage, TextureViewDesc,
     };
-    use crate::render::vulkanic::shader_pack::distant_horizons_contract::derive_distant_horizons_opaque_contract;
-    use crate::render::vulkanic::shader_pack::fullscreen::FullscreenSourcePassFrame;
-    use crate::render::vulkanic::shader_pack::lowering::lower_distant_horizons_source_pair;
-    use crate::render::vulkanic::shader_pack::lowering::{
+    use crate::render::shaderpack::contracts::distant_horizons::derive_distant_horizons_opaque_contract;
+    use crate::render::shaderpack::runtime::fullscreen::FullscreenSourcePassFrame;
+    use crate::render::shaderpack::lowering::lower_distant_horizons_source_pair;
+    use crate::render::shaderpack::lowering::{
         TerrainSourceOpaqueResourceBindingPlan, TerrainSourceOpaqueResourceKind,
     };
-    use crate::render::vulkanic::shader_pack::preprocess::{
+    use crate::render::shaderpack::source::preprocess::{
         complete_bundled_pack_source_for_test, preprocess_distant_horizons_sources,
     };
-    use crate::render::vulkanic::shader_pack::programs::{
+    use crate::render::shaderpack::programs::{
         prepare_lowered_distant_horizons_source_program, TerrainSourceTextureTransforms,
     };
-    use crate::render::vulkanic::shader_pack::runtime::ShaderPackRuntimeExecutor;
-    use crate::render::vulkanic::shader_pack::source_targets::ShaderPackColorBootstrapClearValues;
-    use crate::render::vulkanic::shader_pack::terrain_contract::TerrainProgramScope;
-    use crate::render::vulkanic::shader_pack::terrain_source_resources::{
+    use crate::render::shaderpack::runtime::ShaderPackRuntimeExecutor;
+    use crate::render::shaderpack::resources::color_targets::ShaderPackColorBootstrapClearValues;
+    use crate::render::shaderpack::contracts::terrain::TerrainProgramScope;
+    use crate::render::shaderpack::resources::bindings::{
         TerrainSourceOwnedResource, TerrainSourceOwnedResourceSet,
         TerrainSourceOwnedStorageResource, TerrainSourceResourceAvailability,
         TerrainSourceResourceAvailabilitySet, TerrainSourceResourceBindings,

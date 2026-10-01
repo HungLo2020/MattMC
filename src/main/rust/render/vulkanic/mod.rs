@@ -27,9 +27,10 @@ pub mod handles;
 mod item_foil;
 pub mod metrics;
 pub mod resources;
-pub mod shader_pack;
 mod special_item_foil;
 pub mod sync;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub mod terrain;
 mod texture_sampling;
 mod view_layering;

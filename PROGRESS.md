@@ -66,7 +66,6 @@ stale occupancy submissions dropped; empty GUI load/store passes stripped. Tours
 r128, F1/F3/inventory/pause/chat/F5, RD 16->6->10): 0 crashes. off 0.26-0.43 = water phase.
 **DH water:** dh_water now writes depth like DH TRANSPARENT (dhDepthTex0 vs 1): streaks
 gone, w-north 4.41 -> 4.13. Rings also appear without DH (RD8): deferred 09-26 water gap.
-**Scenarios:** r128 needs a pregenerated DB; water poses flake on DH payload churn.
 **Perf baseline 09-30 (bench.sh, g4src copy, shaders, RD10, 720p; Frozen forced OpenGL - the
 09-29 "Frozen 9.5 fps" ran Frozen's Java Vulkan backend, invalid):** fps Cur/Frz DH move
 38.8/215.6, DH static 43.8/242.5, noDH move 44.0/278.9, noDH static 55.9/226.7; RSS 12.3-12.5
@@ -98,6 +97,13 @@ or label branching in core GAL/backends. GL conformance tests had silently "skip
 containing "GL" counts as an environment gap); they now run and match Vulkan's pin. New dirs
 `render/{worldrender,guirender,shaderpack,shared,bridge}` (READMEs only). Rust GL next gap:
 `CopyFrameTargetToTexture` unimplemented (GL is allowed incomplete).
+**Shader-pack restructure (10-01).** `vulkanic/shader_pack` -> `render/shaderpack` (source,
+properties, contracts, lowering, programs/{model,lowered,builtin}, uniforms, plan, resources,
+voxels, vanilla, runtime); giant files split by concern (runtime 12.4k -> 331-line mod.rs +
+11 children; built-in GLSL in `programs/builtin/glsl/*.glsl`). Scene vocabulary (strata,
+material sources, mesh assets, voxel sources) in new `render/scene` (world frontend
+re-exports). Tests build GALs via `vulkanic::test_support`; boundary tests pin shaderpack to
+`scene` + public GAL. Code motion only; warnings = baseline (dead test-only items regrouped).
 Ported while pruning: VoxelMap world map (regions staged as Rust raw images, released on
 unload), VoxelMap init (packet bridge was null on Rust), F3 GPU% (`TimerQuery` on Rust Vulkan
 timestamps via `mattmc_vulkanic_gal_set_gpu_timestamps_requested`), pack `weatherParticles`,
@@ -124,10 +130,8 @@ energy swirl unadmitted (Iris: gbuffers_entities, ENTITIES_CUTOUT, pipeline's
 additive blend + texture matrix); no Iris program fallback chains;
 `texture2D(sampler2DShadow, vec2)` rejected; edited water sources unadmitted.
 
-**Glint (09-27):** Iris `ShaderKey.GLINT` (GLINT blend, EQUAL depth, no write/cull) in
-load-only passes; `invariant gl_Position` fixed EQUAL streaks; alpha tests after main.
-**Camera-motion smear (09-27):** same-frame `camera_history` returned previous =
-current (TAA saw no motion); fixed (sharpness 135 vs 256 -> 173 vs 183).
+**Glint / motion (09-27):** Iris GLINT key (EQUAL depth, no write) in load-only passes with
+`invariant gl_Position`; same-frame `camera_history` fixed (TAA saw no motion).
 **Held items / hand passes (09-27).** `currentRenderedItemId` resolves from the drawn mesh
 (equip-animation crash); block items use the pack's default-state material; Iris
 `isHandTranslucent` hands draw late into main depth; degenerate TaCZ quads no longer reject.
@@ -164,8 +168,8 @@ incremental (randomized equivalence test): per-box patches, in-place shift on
 cell crossings (walking p50 3.9/p95 20 ms). Gap: voxel vertex cache keeps pack material
 ids until the asset reloads. Entity/hand normals = Iris BufferBuilder face normal
 (cow 2.09, banner 2.22). Gun gap: muzzle cap/front sight px. TaCZ: 0 fallbacks.
-**Casters / outline (09-26).** Player casters: entity `shadow` stage only. Selection
-box: pack `gbuffers_line` after the opaque flush (LINES quads s,s,e,e); MAE .42/.70/.51.
+**Casters / outline (09-26).** Player casters: entity `shadow` stage only; selection box via
+pack `gbuffers_line` after the opaque flush (MAE .42/.70/.51).
 **Block breaking via `gbuffers_damagedblock` (2026-09-27).** Crumbling draws
 with the pack's damagedblock program after the outline, before
 `beginTranslucents` (vanilla CRUMBLING state, bias -1/-10, alphaTest default
@@ -177,12 +181,9 @@ re-queue first-use uploads; sorted-index updates retire cached geometry; Iris
 XHFP normals/tangents (flipped tangent drew a dark triangle over water); world
 stages flip every target access once (incl. `sampler2D` params; pack PNGs not
 flipped). Water pose 152.5,66,499.5,180,25: 16.6 -> 9.74/10.78/9.20.
-**Colored light + shadowtex1 (2026-09-26).** `IRIS_FEATURE_<X>` is defined
-for pack-requested `iris.features.optional` flags Rust supports
-(`CUSTOM_IMAGES`): floodfill compiles in. `shadowtex1` = Iris's pre-translucent shadow
-depth copy (own texture): underwater receivers take the caustic path. Water
-pair 10.79/13.10/10.62 (Current's water brighter). **Suspected Frozen behavior:** Frozen's
-gbuffers_water `color` drops to 0.77x before the reflection mix (GetReflection Step 3 only).
+**Colored light + shadowtex1 (09-26).** Supported `iris.features.optional` flags define
+`IRIS_FEATURE_<X>` (floodfill compiles); `shadowtex1` = pre-translucent shadow depth copy.
+Water pair 10.79/13.10/10.62 (Frozen's water `color` drops to 0.77x before reflection mix).
 **User: water gap deferred (2026-09-26).**
 **Shader menu (09-26):** works on Vulkan (`Iris.reload` parses a CPU-only menu
 pack, persists `<pack>.txt`; Rust applies saved options). The selected pack runs

@@ -311,26 +311,22 @@ fn shader_pack_policy_stays_out_of_ffi_and_backends() {
         rust_root.join("render/vulkanic/backends/vulkan"),
     ];
     let forbidden = [
-        "shader_pack::manifest",
-        "shader_pack::preprocess",
-        "shader_pack::pass_graph",
+        "shaderpack::source::manifest",
+        "shaderpack::source::preprocess",
+        "shaderpack::plan::pass_graph",
         "ShaderPackManifest",
         "PassGraph",
     ];
     let mut violations = Vec::new();
 
+    // Production code only: backend conformance suites use pack sources as
+    // fixtures.
     for root in checked_roots {
-        for file in rust_files(&root) {
-            let source = read_source(&file);
-            for (line_index, line) in source.lines().enumerate() {
+        for file in production_files(&root) {
+            for (line_number, line) in production_lines(&read_source(&file)) {
                 for token in forbidden {
                     if line.contains(token) {
-                        violations.push(format!(
-                            "{}:{}: {}",
-                            relative(&file),
-                            line_index + 1,
-                            line.trim()
-                        ));
+                        violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
                     }
                 }
             }
@@ -339,7 +335,7 @@ fn shader_pack_policy_stays_out_of_ffi_and_backends() {
 
     assert!(
         violations.is_empty(),
-        "Shader-pack policy must stay in the Rust shader_pack subsystem/frontends, not FFI/backends. Versioned source-file transport is allowed in FFI, but parsing and pass policy are not:\n{}",
+        "Shader-pack policy must stay in render::shaderpack and frontends, not FFI/backends. Versioned source-file transport is allowed in FFI, but parsing and pass policy are not:\n{}",
         violations.join("\n")
     );
 }
@@ -378,7 +374,7 @@ fn shader_pack_runtime_owns_whole_frame_pass_order() {
 
     assert!(
         violations.is_empty(),
-        "Whole-frame shader pass ordering belongs in shader_pack::runtime, not the world frontend:\n{}",
+        "Whole-frame shader pass ordering belongs in shaderpack::runtime, not the world frontend:\n{}",
         violations.join("\n")
     );
 }
@@ -387,7 +383,7 @@ fn shader_pack_runtime_owns_whole_frame_pass_order() {
 fn shader_pack_runtime_owns_private_terrain_volume_resources() {
     let rust_root = Path::new(RUST_ROOT);
     let world_frontend = rust_root.join("render/vulkanic/world_primitive_frontend.rs");
-    let runtime = rust_root.join("render/vulkanic/shader_pack/runtime.rs");
+    let runtime = rust_root.join("render/shaderpack/runtime/mod.rs");
     let world_source = read_source(&world_frontend);
     let production_world_source = world_source
         .split("#[cfg(test)]")
@@ -401,7 +397,7 @@ fn shader_pack_runtime_owns_private_terrain_volume_resources() {
     );
     assert!(
         runtime_source.contains("terrain_occupancy: Option<TerrainOccupancyRuntime>"),
-        "Private terrain volume residency must remain owned by shader_pack::runtime"
+        "Private terrain volume residency must remain owned by shaderpack::runtime"
     );
 }
 
@@ -520,7 +516,7 @@ fn core_gal_and_backends_do_not_depend_on_frontends() {
         "world_primitive_frontend",
         "gui_frontend",
         "gui_mesh_frontend",
-        "shader_pack",
+        "shaderpack",
         "vulkanic::terrain",
         "vulkanic::ffi",
         "super::ffi",
@@ -648,6 +644,73 @@ fn core_gal_and_backends_do_not_branch_on_resource_labels() {
     );
 }
 
+/// GAL modules that code outside `render::vulkanic` may use.
+const PUBLIC_GAL_MODULES: [&str; 7] =
+    ["gal", "resources", "commands", "handles", "error", "frame", "sync"];
+
+/// `render::vulkanic::X` modules named on a line, excluding the public GAL.
+fn non_public_gal_references(line: &str) -> Vec<String> {
+    line.match_indices("render::vulkanic::")
+        .filter_map(|(index, token)| {
+            let rest = &line[index + token.len()..];
+            let module: String = rest
+                .chars()
+                .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .collect();
+            (!PUBLIC_GAL_MODULES.contains(&module.as_str())).then_some(module)
+        })
+        .collect()
+}
+
+#[test]
+fn shaderpack_uses_only_the_scene_and_the_public_gal() {
+    let rust_root = Path::new(RUST_ROOT);
+    let shaderpack = rust_root.join("render/shaderpack");
+    assert!(
+        !rust_root.join("render/vulkanic/shader_pack").exists(),
+        "the shader pack lives in render/shaderpack, not inside the GAL"
+    );
+    let mut violations = Vec::new();
+    for file in production_files(&shaderpack) {
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            let names_renderer = ["worldrender", "guirender", "bridge"]
+                .iter()
+                .any(|layer| line.contains(&format!("render::{layer}")));
+            if !non_public_gal_references(&line).is_empty() || names_renderer {
+                violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "render::shaderpack may depend on render::scene and the public GAL modules {PUBLIC_GAL_MODULES:?} only:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn scene_is_data_without_rendering_dependencies() {
+    let rust_root = Path::new(RUST_ROOT);
+    let mut violations = Vec::new();
+    for file in production_files(&rust_root.join("render/scene")) {
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            let references_gal_objects = line.contains("render::vulkanic::")
+                && !line.contains("render::vulkanic::resources::");
+            let references_renderers = ["shaderpack", "worldrender", "guirender", "bridge"]
+                .iter()
+                .any(|layer| line.contains(&format!("render::{layer}")));
+            if references_gal_objects || references_renderers {
+                violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "render::scene holds data and wire vocabulary only (GAL resource value types allowed):\n{}",
+        violations.join("\n")
+    );
+}
+
 #[test]
 fn production_line_filter_drops_comments_and_test_items() {
     let source = "fn keep() {}\n// terrain comment\n#[cfg(test)]\nmod tests {\n    fn x() { let _ = \"}\"; }\n}\nfn after() {} // tail\n#[cfg(test)]\nmod more;\n";
@@ -680,6 +743,7 @@ fn production_files(root: &Path) -> Vec<PathBuf> {
             let in_tests_dir = file.components().any(|part| part.as_os_str() == "tests");
             !in_tests_dir
                 && name != "tests.rs"
+                && name != "test_support.rs"
                 && name != "architecture_boundary.rs"
                 && !name.ends_with("_tests.rs")
                 && !name.contains("conformance")

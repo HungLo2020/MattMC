@@ -12,7 +12,7 @@ use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
-use crate::render::vulkanic::shader_pack::programs::{
+use crate::render::shaderpack::programs::{
     distant_horizons_lod_opaque_resource_layouts,
     minimal_distant_horizons_lod_exact_atlas_opaque_program,
     minimal_distant_horizons_lod_opaque_program, minimal_distant_horizons_lod_transparent_program,
@@ -23,27 +23,31 @@ use crate::render::vulkanic::shader_pack::programs::{
     TerrainMaterialProgramKind, COMPLEMENTARY_TERRAIN_SUBSET_FRAGMENT,
     MINIMAL_TERRAIN_MATERIAL_VERTEX,
 };
-use crate::render::vulkanic::shader_pack::{
-    distant_horizons_contract::{
-        derive_distant_horizons_opaque_contract, derive_distant_horizons_translucent_contract,
-    },
-    hand_contract::{bind_hand_source_resources, derive_hand_contract, lower_hand_source_pair},
-    lowering::{
-        lower_distant_horizons_source_pair, lower_fullscreen_source_pair, lower_terrain_source_pair,
-    },
-    material_contract::{derive_textured_material_contract, lower_textured_material_source_pair},
-    preprocess::{
-        complete_bundled_pack_source_for_test, preprocess_distant_horizons_sources,
-        preprocess_source_stage_pair, preprocess_terrain_sources,
-    },
-    source::{ShaderPackSource, ShaderSourceFile, RUNTIME_OPTIONS_PATH},
-    terrain_contract::{
-        derive_complementary_terrain_contract, TerrainProgramScope, TerrainSourceStage,
-        TerrainSourceStages,
-    },
-    terrain_source_resources::{TerrainSourceResourceBindings, TERRAIN_RESOURCE_BINDINGS_PATH},
-    weather_contract::{derive_weather_pass_contract, lower_weather_source_pair},
-};
+use crate::render::shaderpack::contracts::distant_horizons::derive_distant_horizons_opaque_contract;
+use crate::render::shaderpack::contracts::distant_horizons::derive_distant_horizons_translucent_contract;
+use crate::render::shaderpack::contracts::hand::bind_hand_source_resources;
+use crate::render::shaderpack::contracts::hand::derive_hand_contract;
+use crate::render::shaderpack::contracts::hand::lower_hand_source_pair;
+use crate::render::shaderpack::lowering::lower_distant_horizons_source_pair;
+use crate::render::shaderpack::lowering::lower_fullscreen_source_pair;
+use crate::render::shaderpack::lowering::lower_terrain_source_pair;
+use crate::render::shaderpack::contracts::material::derive_textured_material_contract;
+use crate::render::shaderpack::contracts::material::lower_textured_material_source_pair;
+use crate::render::shaderpack::source::preprocess::complete_bundled_pack_source_for_test;
+use crate::render::shaderpack::source::preprocess::preprocess_distant_horizons_sources;
+use crate::render::shaderpack::source::preprocess::preprocess_source_stage_pair;
+use crate::render::shaderpack::source::preprocess::preprocess_terrain_sources;
+use crate::render::shaderpack::source::ShaderPackSource;
+use crate::render::shaderpack::source::ShaderSourceFile;
+use crate::render::shaderpack::source::RUNTIME_OPTIONS_PATH;
+use crate::render::shaderpack::contracts::terrain::derive_complementary_terrain_contract;
+use crate::render::shaderpack::contracts::terrain::TerrainProgramScope;
+use crate::render::shaderpack::contracts::terrain::TerrainSourceStage;
+use crate::render::shaderpack::contracts::terrain::TerrainSourceStages;
+use crate::render::shaderpack::resources::bindings::TerrainSourceResourceBindings;
+use crate::render::shaderpack::resources::bindings::TERRAIN_RESOURCE_BINDINGS_PATH;
+use crate::render::shaderpack::contracts::weather::derive_weather_pass_contract;
+use crate::render::shaderpack::contracts::weather::lower_weather_source_pair;
 
 const WIDTH: u32 = 96;
 const HEIGHT: u32 = 64;

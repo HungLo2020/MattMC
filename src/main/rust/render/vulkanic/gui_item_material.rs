@@ -5,7 +5,7 @@
 //! regions, packed tint colors, and GUI scheduling strata.
 
 use super::error::{GalError, GalResult};
-use super::shader_pack::lightmap::VanillaLightmapFrame;
+use crate::render::shaderpack::vanilla::lightmap::VanillaLightmapFrame;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GuiAffineMaterial {
@@ -96,7 +96,7 @@ impl GuiFlatItemLighting {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::vulkanic::shader_pack::lightmap::VanillaLightmapInputs;
+    use crate::render::shaderpack::vanilla::lightmap::VanillaLightmapInputs;
 
     fn frame() -> VanillaLightmapFrame {
         VanillaLightmapFrame {

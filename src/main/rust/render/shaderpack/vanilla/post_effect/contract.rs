@@ -1,0 +1,651 @@
+//! Backend-neutral contracts for vanilla fullscreen post-effect graphs.
+//!
+//! This layer only owns copied JSON semantics. It deliberately does not create
+//! GAL resources or admit a rendering route until a Rust fullscreen executor
+//! supplies the required shader and target implementations.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use serde_json::Value;
+
+use crate::render::shaderpack::source::ShaderPackSource;
+use crate::render::vulkanic::error::{GalError, GalResult};
+
+const MAX_TARGETS: usize = 64;
+const MAX_PASSES: usize = 64;
+const MAX_INPUTS_PER_PASS: usize = 32;
+const MAX_UNIFORM_BLOCKS_PER_PASS: usize = 16;
+const MAX_UNIFORMS_PER_BLOCK: usize = 64;
+const MAX_UNIFORM_NAME_LENGTH: usize = 128;
+const MAX_TEXTURE_INPUT_DIMENSION: u32 = 16_384;
+const MAIN_TARGET: &str = "minecraft:main";
+
+/// Targets supplied by the Rust frame coordinator rather than allocated by the
+/// post-effect graph itself. They remain named semantic attachments; no Java
+/// post-chain handle crosses this contract.
+const EXTERNAL_TARGETS: &[&str] = &[
+    "minecraft:main",
+    "minecraft:translucent",
+    "minecraft:item_entity",
+    "minecraft:particles",
+    "minecraft:clouds",
+    "minecraft:weather",
+    "minecraft:entity_outline",
+];
+
+fn is_external_target(target: &str) -> bool {
+    EXTERNAL_TARGETS.contains(&target)
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VanillaPostEffectPass {
+    pub vertex_shader: String,
+    pub fragment_shader: String,
+    pub inputs: Vec<VanillaPostEffectInput>,
+    pub output: String,
+    pub uniform_blocks: BTreeSet<String>,
+    pub uniform_values: BTreeMap<String, Vec<VanillaPostEffectUniform>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VanillaPostEffectUniform {
+    pub name: String,
+    pub value_type: String,
+    pub values: Vec<f32>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VanillaPostEffectInput {
+    pub sampler_name: String,
+    /// A target input is represented by `target`; a resource-pack texture
+    /// input is represented by `texture_path` and is deliberately kept
+    /// separate so it can never be mistaken for an external attachment.
+    pub target: String,
+    pub texture_path: Option<String>,
+    pub texture_width: Option<u32>,
+    pub texture_height: Option<u32>,
+    pub bilinear: bool,
+    pub use_depth_buffer: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VanillaPostEffectContract {
+    pub effect_name: String,
+    pub targets: BTreeSet<String>,
+    pub passes: Vec<VanillaPostEffectPass>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VanillaPostEffectExecutionPlan {
+    pub effect_name: String,
+    pub intermediate_targets: Vec<String>,
+    pub ordered_passes: Vec<VanillaPostEffectPass>,
+}
+
+impl VanillaPostEffectExecutionPlan {
+    /// External attachment roles which the frame coordinator must bind before
+    /// admitting this graph. Intermediate targets remain executor-private;
+    /// this inventory prevents a syntactically valid graph from silently
+    /// omitting a required layer such as particles, clouds, or weather.
+    pub fn required_external_targets(&self) -> BTreeSet<String> {
+        let mut required = BTreeSet::new();
+        for pass in &self.ordered_passes {
+            if is_external_target(&pass.output) {
+                required.insert(pass.output.clone());
+            }
+            for input in &pass.inputs {
+                if is_external_target(&input.target) {
+                    required.insert(input.target.clone());
+                }
+            }
+        }
+        required
+    }
+
+    /// Validates the coordinator's copied attachment-role inventory before any
+    /// GAL resource binding or command lowering occurs.  Missing roles are an
+    /// explicit admission failure; the caller must not replace them with a
+    /// Java post-chain target or a borrowed backend view.
+    pub fn validate_external_targets(&self, provided: &BTreeSet<String>) -> GalResult<()> {
+        let required = self.required_external_targets();
+        let missing = required.difference(provided).cloned().collect::<Vec<_>>();
+        if !missing.is_empty() {
+            return Err(GalError::unsupported_feature(format!(
+                "vanilla post effect {} is unavailable until Rust owns external targets: {}",
+                self.effect_name,
+                missing.join(", ")
+            )));
+        }
+        let extra = provided.difference(&required).cloned().collect::<Vec<_>>();
+        if !extra.is_empty() {
+            return Err(GalError::invalid_argument(format!(
+                "vanilla post effect {} received undeclared external targets: {}",
+                self.effect_name,
+                extra.join(", ")
+            )));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VanillaPostEffectShaderSource {
+    pub vertex_shader: Vec<u8>,
+    pub fragment_shader: Vec<u8>,
+}
+
+impl VanillaPostEffectContract {
+    pub fn parse(effect_name: impl Into<String>, bytes: &[u8]) -> GalResult<Self> {
+        let effect_name = effect_name.into();
+        let root: Value = serde_json::from_slice(bytes).map_err(|error| {
+            GalError::invalid_argument(format!(
+                "vanilla post effect {effect_name} is malformed JSON: {error}"
+            ))
+        })?;
+        let object = root.as_object().ok_or_else(|| {
+            GalError::invalid_argument(format!(
+                "vanilla post effect {effect_name} root must be an object"
+            ))
+        })?;
+
+        let mut targets = BTreeSet::new();
+        if let Some(value) = object.get("targets") {
+            let target_object = value.as_object().ok_or_else(|| {
+                GalError::invalid_argument(format!(
+                    "vanilla post effect {effect_name} targets must be an object"
+                ))
+            })?;
+            if target_object.len() > MAX_TARGETS {
+                return Err(GalError::invalid_argument(format!(
+                    "vanilla post effect {effect_name} exceeds target budget {MAX_TARGETS}"
+                )));
+            }
+            targets.extend(target_object.keys().cloned());
+        }
+
+        let pass_values = object
+            .get("passes")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                GalError::invalid_argument(format!(
+                    "vanilla post effect {effect_name} has no pass array"
+                ))
+            })?;
+        if pass_values.is_empty() || pass_values.len() > MAX_PASSES {
+            return Err(GalError::invalid_argument(format!(
+                "vanilla post effect {effect_name} pass count must be 1..={MAX_PASSES}"
+            )));
+        }
+
+        let mut passes = Vec::with_capacity(pass_values.len());
+        let mut produced_targets = BTreeSet::from([MAIN_TARGET.to_string()]);
+        for (index, value) in pass_values.iter().enumerate() {
+            let pass = value.as_object().ok_or_else(|| {
+                GalError::invalid_argument(format!(
+                    "vanilla post effect {effect_name} pass {index} must be an object"
+                ))
+            })?;
+            let shader = |key: &str| -> GalResult<String> {
+                pass.get(key)
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+                    .ok_or_else(|| {
+                        GalError::invalid_argument(format!(
+                            "vanilla post effect {effect_name} pass {index} lacks string {key}"
+                        ))
+                    })
+            };
+            let output = pass
+                .get("output")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| {
+                    GalError::invalid_argument(format!(
+                        "vanilla post effect {effect_name} pass {index} lacks output"
+                    ))
+                })?;
+            if !is_external_target(&output) && !targets.contains(&output) {
+                return Err(GalError::invalid_argument(format!(
+                    "vanilla post effect {effect_name} pass {index} writes undeclared target {output}"
+                )));
+            }
+            let mut inputs = Vec::new();
+            if let Some(input_values) = pass.get("inputs").and_then(Value::as_array) {
+                if input_values.len() > MAX_INPUTS_PER_PASS {
+                    return Err(GalError::invalid_argument(format!(
+                        "vanilla post effect {effect_name} pass {index} exceeds input budget {MAX_INPUTS_PER_PASS}"
+                    )));
+                }
+                for input in input_values {
+                    let input = input.as_object().ok_or_else(|| {
+                        GalError::invalid_argument(format!(
+                            "vanilla post effect {effect_name} pass {index} input must be an object"
+                        ))
+                    })?;
+                    let sampler_name = input.get("sampler_name").and_then(Value::as_str).ok_or_else(|| {
+                        GalError::invalid_argument(format!(
+                            "vanilla post effect {effect_name} pass {index} input lacks sampler_name"
+                        ))
+                    })?;
+                    if sampler_name.is_empty() || sampler_name.len() > 128 {
+                        return Err(GalError::invalid_argument(format!(
+                            "vanilla post effect {effect_name} pass {index} input sampler_name has invalid length"
+                        )));
+                    }
+                    let (target, texture_path, texture_width, texture_height) = if let Some(
+                        target,
+                    ) =
+                        input.get("target").and_then(Value::as_str)
+                    {
+                        if !is_external_target(target) && !targets.contains(target) {
+                            return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} reads undeclared target {target}"
+                                )));
+                        }
+                        if !is_external_target(target) && !produced_targets.contains(target) {
+                            return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} reads target {target} before it is produced"
+                                )));
+                        }
+                        (target.to_owned(), None, None, None)
+                    } else {
+                        let location = input.get("location").and_then(Value::as_str).ok_or_else(|| {
+                                GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} input lacks target or location"
+                                ))
+                            })?;
+                        if location.is_empty() || location.len() > 512 || location.contains('\0') {
+                            return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} texture location is invalid"
+                                )));
+                        }
+                        let width = input.get("width").and_then(Value::as_u64).and_then(|v| u32::try_from(v).ok()).ok_or_else(|| {
+                                GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} texture width is invalid"
+                                ))
+                            })?;
+                        let height = input.get("height").and_then(Value::as_u64).and_then(|v| u32::try_from(v).ok()).ok_or_else(|| {
+                                GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} texture height is invalid"
+                                ))
+                            })?;
+                        if width == 0
+                            || height == 0
+                            || width > MAX_TEXTURE_INPUT_DIMENSION
+                            || height > MAX_TEXTURE_INPUT_DIMENSION
+                        {
+                            return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} pass {index} texture dimensions exceed {MAX_TEXTURE_INPUT_DIMENSION}"
+                                )));
+                        }
+                        (
+                            String::new(),
+                            Some(location.to_owned()),
+                            Some(width),
+                            Some(height),
+                        )
+                    };
+                    let bilinear = input
+                        .get("bilinear")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
+                    let use_depth_buffer = input
+                        .get("use_depth_buffer")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
+                    inputs.push(VanillaPostEffectInput {
+                        sampler_name: sampler_name.to_owned(),
+                        target,
+                        texture_path,
+                        texture_width,
+                        texture_height,
+                        bilinear,
+                        use_depth_buffer,
+                    });
+                }
+            }
+            let mut uniform_blocks = BTreeSet::new();
+            let mut uniform_values = BTreeMap::new();
+            if let Some(uniforms) = pass.get("uniforms").and_then(Value::as_object) {
+                if uniforms.len() > MAX_UNIFORM_BLOCKS_PER_PASS {
+                    return Err(GalError::invalid_argument(format!(
+                        "vanilla post effect {effect_name} pass {index} exceeds uniform block budget {MAX_UNIFORM_BLOCKS_PER_PASS}"
+                    )));
+                }
+                uniform_blocks.extend(uniforms.keys().cloned());
+                for (block_name, entries) in uniforms {
+                    let entries = entries.as_array().ok_or_else(|| {
+                        GalError::invalid_argument(format!(
+                            "vanilla post effect {effect_name} pass {index} uniform block {block_name} must be an array"
+                        ))
+                    })?;
+                    if entries.len() > MAX_UNIFORMS_PER_BLOCK {
+                        return Err(GalError::invalid_argument(format!(
+                            "vanilla post effect {effect_name} pass {index} uniform block {block_name} exceeds entry budget {MAX_UNIFORMS_PER_BLOCK}"
+                        )));
+                    }
+                    let mut parsed = Vec::with_capacity(entries.len());
+                    let mut seen_uniform_names = BTreeSet::new();
+                    for entry in entries {
+                        let entry = entry.as_object().ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "vanilla post effect {effect_name} pass {index} uniform block {block_name} entry must be an object"
+                            ))
+                        })?;
+                        let name = entry.get("name").and_then(Value::as_str).ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "vanilla post effect {effect_name} pass {index} uniform block {block_name} entry lacks name"
+                            ))
+                        })?;
+                        let value_type = entry.get("type").and_then(Value::as_str).ok_or_else(|| {
+                            GalError::invalid_argument(format!(
+                                "vanilla post effect {effect_name} pass {index} uniform {name} lacks type"
+                            ))
+                        })?;
+                        if name.is_empty() || name.len() > MAX_UNIFORM_NAME_LENGTH {
+                            return Err(GalError::invalid_argument(format!(
+                                "vanilla post effect {effect_name} pass {index} uniform name has invalid length"
+                            )));
+                        }
+                        if !seen_uniform_names.insert(name.to_owned()) {
+                            return Err(GalError::invalid_argument(format!(
+                                "vanilla post effect {effect_name} pass {index} uniform block {block_name} repeats uniform {name}"
+                            )));
+                        }
+                        let expected_len = match value_type {
+                            "float" | "int" => 1,
+                            "vec2" | "ivec2" => 2,
+                            "vec3" | "ivec3" => 3,
+                            "vec4" | "ivec4" => 4,
+                            "matrix4x4" => 16,
+                            _ => {
+                                return Err(GalError::unsupported_feature(format!(
+                                    "vanilla post effect {effect_name} uses unsupported uniform type {value_type}"
+                                )))
+                            }
+                        };
+                        let values = entry.get("value").map_or_else(
+                            || Ok(Vec::new()),
+                            |value| {
+                                if expected_len == 1 {
+                                    value.as_f64().map(|value| vec![value as f32]).ok_or_else(|| {
+                                        GalError::invalid_argument(format!(
+                                            "vanilla post effect {effect_name} uniform {name} must contain a finite float"
+                                        ))
+                                    })
+                                } else {
+                                    value
+                                        .as_array()
+                                        .ok_or_else(|| GalError::invalid_argument(format!(
+                                            "vanilla post effect {effect_name} uniform {name} must contain {expected_len} numeric values"
+                                        )))?
+                                        .iter()
+                                        .map(|value| value.as_f64().map(|value| value as f32).ok_or_else(|| GalError::invalid_argument(format!(
+                                            "vanilla post effect {effect_name} uniform {name} contains a non-numeric value"
+                                        ))))
+                                        .collect()
+                                }
+                            },
+                        )?;
+                        if values.len() != expected_len
+                            || values.iter().any(|value| !value.is_finite())
+                        {
+                            return Err(GalError::invalid_argument(format!(
+                                "vanilla post effect {effect_name} uniform {name} has the wrong or non-finite value count"
+                            )));
+                        }
+                        if value_type == "int" || matches!(value_type, "ivec2" | "ivec3" | "ivec4")
+                        {
+                            if values.iter().any(|value| {
+                                value.fract() != 0.0
+                                    || *value < i32::MIN as f32
+                                    || *value > i32::MAX as f32
+                            }) {
+                                return Err(GalError::invalid_argument(format!(
+                                    "vanilla post effect {effect_name} integer uniform {name} must contain finite 32-bit integral values"
+                                )));
+                            }
+                        }
+                        parsed.push(VanillaPostEffectUniform {
+                            name: name.to_owned(),
+                            value_type: value_type.to_owned(),
+                            values,
+                        });
+                    }
+                    uniform_values.insert(block_name.clone(), parsed);
+                }
+            }
+            for required in
+                required_uniform_blocks(&shader("vertex_shader")?, &shader("fragment_shader")?)
+            {
+                if !uniform_blocks.contains(required) {
+                    return Err(GalError::invalid_argument(format!(
+                        "vanilla post effect {effect_name} pass {index} lacks required uniform block {required}"
+                    )));
+                }
+            }
+            let writes_intermediate = output != MAIN_TARGET;
+            if writes_intermediate {
+                produced_targets.insert(output.clone());
+            }
+            passes.push(VanillaPostEffectPass {
+                vertex_shader: shader("vertex_shader")?,
+                fragment_shader: shader("fragment_shader")?,
+                inputs,
+                output,
+                uniform_blocks,
+                uniform_values,
+            });
+        }
+        if passes
+            .last()
+            .is_none_or(|pass| !is_external_target(&pass.output))
+        {
+            return Err(GalError::invalid_argument(format!(
+                "vanilla post effect {effect_name} must finish by writing a Rust-owned external target"
+            )));
+        }
+        Ok(Self {
+            effect_name,
+            targets,
+            passes,
+        })
+    }
+
+    pub fn target_names(&self) -> BTreeMap<String, usize> {
+        self.targets
+            .iter()
+            .enumerate()
+            .map(|(index, name)| (name.clone(), index))
+            .collect()
+    }
+
+    /// Produces the immutable pass plan consumed by a future Rust fullscreen
+    /// executor. No GAL handles or Java post-chain state cross this boundary.
+    pub fn execution_plan(&self) -> VanillaPostEffectExecutionPlan {
+        VanillaPostEffectExecutionPlan {
+            effect_name: self.effect_name.clone(),
+            intermediate_targets: self.targets.iter().cloned().collect(),
+            ordered_passes: self.passes.clone(),
+        }
+    }
+
+    /// Resolves only bundled vanilla shader identities to copied source bytes.
+    /// A missing identity is an explicit admission failure, never a Java or
+    /// backend lookup fallback.
+    pub fn shader_sources(&self) -> GalResult<Vec<VanillaPostEffectShaderSource>> {
+        self.passes
+            .iter()
+            .map(|pass| {
+                let vertex_shader =
+                    bundled_shader_source(&pass.vertex_shader).ok_or_else(|| {
+                        GalError::unsupported_feature(format!(
+                            "vanilla post effect {} lacks owned vertex shader {}",
+                            self.effect_name, pass.vertex_shader
+                        ))
+                    })?;
+                let fragment_shader =
+                    bundled_shader_source(&pass.fragment_shader).ok_or_else(|| {
+                        GalError::unsupported_feature(format!(
+                            "vanilla post effect {} lacks owned fragment shader {}",
+                            self.effect_name, pass.fragment_shader
+                        ))
+                    })?;
+                Ok(VanillaPostEffectShaderSource {
+                    vertex_shader: vertex_shader.to_vec(),
+                    fragment_shader: fragment_shader.to_vec(),
+                })
+            })
+            .collect()
+    }
+
+    /// Resolves post-effect shader identities against a copied Rust-owned
+    /// shader-pack source snapshot, falling back to bundled vanilla sources
+    /// only when that snapshot does not provide the stage. This keeps custom
+    /// resource-pack/post-effect code on the semantic source boundary: no
+    /// Java ResourceProvider, Iris program, or backend handle is consulted.
+    pub fn shader_sources_from_source(
+        &self,
+        source: &ShaderPackSource,
+    ) -> GalResult<Vec<VanillaPostEffectShaderSource>> {
+        self.passes
+            .iter()
+            .map(|pass| {
+                let vertex_shader = resolve_shader_source(source, &pass.vertex_shader, "vsh")?;
+                let fragment_shader = resolve_shader_source(source, &pass.fragment_shader, "fsh")?;
+                Ok(VanillaPostEffectShaderSource {
+                    vertex_shader,
+                    fragment_shader,
+                })
+            })
+            .collect()
+    }
+
+    /// Resolve imports for the copied programmable graph. Bundled identity
+    /// comparisons retain their raw-source contract; compilation uses this
+    /// stage-local expansion over the same immutable resource generation.
+    pub fn expanded_shader_sources_from_source(
+        &self,
+        source: &ShaderPackSource,
+    ) -> GalResult<Vec<VanillaPostEffectShaderSource>> {
+        self.passes.iter().map(|pass| {
+            let expand = |identity: &str, extension: &str| -> GalResult<Vec<u8>> {
+                let bytes = resolve_shader_source(source, identity, extension)?;
+                let contents = std::str::from_utf8(&bytes)
+                    .map_err(|_| GalError::invalid_argument("post-effect source is not UTF-8"))?;
+                let (namespace, path) = identity.split_once(':').unwrap_or(("minecraft", identity));
+                let snapshot_namespace = self.effect_name.split_once(':')
+                    .map_or("minecraft", |(namespace, _)| namespace);
+                if !crate::render::shaderpack::vanilla::namespaces::qualified(source)? && namespace != snapshot_namespace {
+                    return Err(GalError::unsupported_feature(
+                        "cross-namespace post-effect stage requires a namespace-qualified source snapshot"));
+                }
+                let direct = format!("{path}.{extension}");
+                let program = format!("program/{path}.{extension}");
+                let resolved = if !crate::render::shaderpack::vanilla::namespaces::qualified(source)?
+                    && source.get(&direct).is_none() && source.get(&program).is_some() {
+                    &program
+                } else { &direct };
+                crate::render::shaderpack::vanilla::imports::expand(source, namespace, resolved, contents)
+                    .map(String::into_bytes)
+            };
+            Ok(VanillaPostEffectShaderSource {
+                vertex_shader: expand(&pass.vertex_shader, "vsh")?,
+                fragment_shader: expand(&pass.fragment_shader, "fsh")?,
+            })
+        }).collect()
+    }
+}
+
+fn resolve_shader_source(
+    source: &ShaderPackSource,
+    identity: &str,
+    extension: &str,
+) -> GalResult<Vec<u8>> {
+    if crate::render::shaderpack::vanilla::namespaces::qualified(source)? {
+        let (namespace, path) = identity.split_once(':').unwrap_or(("minecraft", identity));
+        let key = crate::render::shaderpack::vanilla::namespaces::key(namespace, &format!("{path}.{extension}"))?;
+        return source.get(&key).map(|contents| contents.as_bytes().to_vec())
+            .ok_or_else(|| GalError::unsupported_feature(format!(
+                "copied vanilla shader '{identity}.{extension}' is missing from its qualified source snapshot")));
+    }
+    let path = identity.split_once(':').map_or(identity, |(_, path)| path);
+    let candidates = [
+        format!("{path}.{extension}"),
+        format!("program/{path}.{extension}"),
+    ];
+    for candidate in candidates {
+        if let Some(contents) = source.get(&candidate) {
+            return Ok(contents.as_bytes().to_vec());
+        }
+    }
+    bundled_shader_source(identity)
+        .map(|contents| contents.to_vec())
+        .ok_or_else(|| {
+            GalError::unsupported_feature(format!(
+                "vanilla post effect {} lacks Rust-owned {extension} shader source {identity}",
+                source.name()
+            ))
+        })
+}
+
+fn bundled_shader_source(identity: &str) -> Option<&'static [u8]> {
+    Some(match identity {
+        "minecraft:core/screenquad" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/core/screenquad.vsh")
+        }
+        "minecraft:post/rotscale" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/post/rotscale.vsh")
+        }
+        "minecraft:post/invert" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/post/invert.fsh")
+        }
+        "minecraft:post/box_blur" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/post/box_blur.fsh")
+        }
+        "minecraft:post/entity_sobel" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/post/entity_sobel.fsh")
+        }
+        "minecraft:post/entity_outline_box_blur" => include_bytes!(
+            "../../../../../resources/assets/minecraft/shaders/post/entity_outline_box_blur.fsh"
+        ),
+        "minecraft:post/spiderclip" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/post/spiderclip.fsh")
+        }
+        "minecraft:post/color_convolve" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/post/color_convolve.fsh")
+        }
+        "minecraft:post/bits" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/post/bits.fsh")
+        }
+        "minecraft:post/blit" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/post/blit.fsh")
+        }
+        "minecraft:post/transparency" => {
+            include_bytes!("../../../../../resources/assets/minecraft/shaders/post/transparency.fsh")
+        }
+        _ => return None,
+    })
+}
+
+fn required_uniform_blocks(vertex_shader: &str, fragment_shader: &str) -> Vec<&'static str> {
+    let mut required = Vec::new();
+    match vertex_shader {
+        "minecraft:post/rotscale" => required.push("RotScaleConfig"),
+        _ => {}
+    }
+    match fragment_shader {
+        "minecraft:post/invert" => required.push("InvertConfig"),
+        "minecraft:post/box_blur" => required.push("BlurConfig"),
+        "minecraft:post/entity_outline_box_blur" => required.push("BlurConfig"),
+        "minecraft:post/spiderclip" => required.push("SpiderConfig"),
+        "minecraft:post/color_convolve" => required.push("ColorConfig"),
+        "minecraft:post/bits" => required.push("BitsConfig"),
+        "minecraft:post/blit" => required.push("BlitConfig"),
+        _ => {}
+    }
+    required
+}
+
+#[cfg(test)]
+mod tests;

@@ -774,14 +774,15 @@ impl VulkanicGal {
     /// an acquired frame target. Frontends may cache pass resources by this
     /// descriptor, but never receive a backend image, view, framebuffer, or
     /// presentation object.
-    pub(in crate::render::vulkanic) fn frame_target_desc(
+    pub fn frame_target_desc(
         &self,
         handle: Handle,
     ) -> GalResult<FrameTargetDesc> {
         Ok(self.frame_targets.get(handle)?.desc.clone())
     }
 
-    pub(in crate::render::vulkanic) fn pass_target_color_format(
+    /// Color format of a render or frame target's first color attachment.
+    pub fn pass_target_color_format(
         &self,
         handle: Handle,
     ) -> GalResult<ColorFormat> {
@@ -849,7 +850,7 @@ impl VulkanicGal {
         }
     }
 
-    pub(in crate::render::vulkanic) fn pass_target_color_attachment(
+    pub fn pass_target_color_attachment(
         &self,
         handle: Handle,
     ) -> GalResult<Handle> {
@@ -874,7 +875,7 @@ impl VulkanicGal {
         }
     }
 
-    pub(in crate::render::vulkanic) fn pass_target_depth_attachment(
+    pub fn pass_target_depth_attachment(
         &self,
         handle: Handle,
     ) -> GalResult<Option<(Handle, Handle)>> {
@@ -4720,6 +4721,14 @@ impl VulkanicGal {
         self.graphics_pipeline_descriptor_for_capture(handle)
     }
 
+    /// Makes the mock backend's next submission fail (test GALs only).
+    #[cfg(test)]
+    pub(crate) fn fail_next_submit_for_test(&mut self) {
+        self.mock_backend_mut()
+            .expect("GAL built by test_support::mock_gal")
+            .fail_next_submit();
+    }
+
     #[cfg(test)]
     pub(super) fn mock_backend_mut(&mut self) -> Option<&mut super::backends::mock::MockBackend> {
         self.backend.as_any_mut().downcast_mut()
@@ -4743,7 +4752,7 @@ impl VulkanicGal {
     }
 
     #[cfg(test)]
-    pub(super) fn retire_through_for_test(&mut self, id: SubmissionId) -> GalResult<Vec<Handle>> {
+    pub(crate) fn retire_through_for_test(&mut self, id: SubmissionId) -> GalResult<Vec<Handle>> {
         self.retire_through(id)
     }
 }

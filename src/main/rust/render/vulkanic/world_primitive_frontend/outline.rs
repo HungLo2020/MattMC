@@ -2,8 +2,8 @@ use super::*;
 use crate::render::vulkanic::commands::CommandOp;
 use crate::render::vulkanic::ffi::FFI_MAX_BATCH_ITEMS;
 use crate::render::vulkanic::handles::HandleKind;
-use crate::render::vulkanic::shader_pack::vanilla_post_effect_contract::VanillaPostEffectExecutionPlan;
-use crate::render::vulkanic::shader_pack::vanilla_post_effect_executor::{
+use crate::render::shaderpack::vanilla::post_effect::contract::VanillaPostEffectExecutionPlan;
+use crate::render::shaderpack::vanilla::post_effect::executor::{
     bundled_entity_outline_executor, bundled_entity_outline_shader_sources, pack_uniform_block,
     VanillaPostEffectExecutor, VanillaPostEffectInputBinding, VanillaPostEffectPassBinding,
 };
@@ -814,7 +814,7 @@ pub(crate) struct EntityOutlinePostEffectPlan {
     pub mask: EntityOutlineMaskPlan,
     pub effect: VanillaPostEffectExecutionPlan,
     pub shader_sources:
-        Vec<crate::render::vulkanic::shader_pack::vanilla_post_effect_contract::VanillaPostEffectShaderSource>,
+        Vec<crate::render::shaderpack::vanilla::post_effect::contract::VanillaPostEffectShaderSource>,
 }
 
 /// Packs the outline instances into the existing explicit mesh-instance ABI,

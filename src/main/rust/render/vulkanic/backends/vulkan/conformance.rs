@@ -15,7 +15,7 @@ use crate::render::vulkanic::error::{GalError, GalResult};
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::handles::Handle;
 use crate::render::vulkanic::resources::*;
-use crate::render::vulkanic::shader_pack::programs::{
+use crate::render::shaderpack::programs::{
     distant_horizons_lod_opaque_resource_layouts, minimal_compact_direct_terrain_program,
     minimal_distant_horizons_lod_exact_atlas_forward_opaque_program,
     minimal_distant_horizons_lod_exact_atlas_opaque_program,
@@ -29,30 +29,37 @@ use crate::render::vulkanic::shader_pack::programs::{
     MINIMAL_TERRAIN_MATERIAL_FRAGMENT, MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT,
     MINIMAL_TERRAIN_MATERIAL_VERTEX,
 };
-use crate::render::vulkanic::shader_pack::{
-    distant_horizons_contract::{
-        derive_distant_horizons_opaque_contract, derive_distant_horizons_translucent_contract,
-    },
-    hand_contract::{bind_hand_source_resources, derive_hand_contract, lower_hand_source_pair},
-    lowering::{
-        lower_distant_horizons_source_pair, lower_fullscreen_source_pair,
-        lower_fullscreen_source_pair_with_raster_primitive, lower_shadow_source_pair,
-        lower_terrain_source_pair, FullscreenSourceRasterPrimitive,
-    },
-    material_contract::{derive_textured_material_contract, lower_textured_material_source_pair},
-    preprocess::{
-        complete_bundled_pack_source_for_test, preprocess_distant_horizons_sources,
-        preprocess_source_stage_pair, preprocess_terrain_sources,
-    },
-    source::{ShaderPackSource, ShaderSourceFile, RUNTIME_CONSTANTS_PATH, RUNTIME_OPTIONS_PATH},
-    terrain_contract::{
-        derive_complementary_terrain_contract, derive_complementary_terrain_contract_for_scope,
-        shadow_source_stages_for_scope, TerrainProgramScope, TerrainSourceStage,
-        TerrainSourceStages,
-    },
-    terrain_source_resources::{TerrainSourceResourceBindings, TERRAIN_RESOURCE_BINDINGS_PATH},
-    weather_contract::{derive_weather_pass_contract, lower_weather_source_pair},
-};
+use crate::render::shaderpack::contracts::distant_horizons::derive_distant_horizons_opaque_contract;
+use crate::render::shaderpack::contracts::distant_horizons::derive_distant_horizons_translucent_contract;
+use crate::render::shaderpack::contracts::hand::bind_hand_source_resources;
+use crate::render::shaderpack::contracts::hand::derive_hand_contract;
+use crate::render::shaderpack::contracts::hand::lower_hand_source_pair;
+use crate::render::shaderpack::lowering::lower_distant_horizons_source_pair;
+use crate::render::shaderpack::lowering::lower_fullscreen_source_pair;
+use crate::render::shaderpack::lowering::lower_fullscreen_source_pair_with_raster_primitive;
+use crate::render::shaderpack::lowering::lower_shadow_source_pair;
+use crate::render::shaderpack::lowering::lower_terrain_source_pair;
+use crate::render::shaderpack::lowering::FullscreenSourceRasterPrimitive;
+use crate::render::shaderpack::contracts::material::derive_textured_material_contract;
+use crate::render::shaderpack::contracts::material::lower_textured_material_source_pair;
+use crate::render::shaderpack::source::preprocess::complete_bundled_pack_source_for_test;
+use crate::render::shaderpack::source::preprocess::preprocess_distant_horizons_sources;
+use crate::render::shaderpack::source::preprocess::preprocess_source_stage_pair;
+use crate::render::shaderpack::source::preprocess::preprocess_terrain_sources;
+use crate::render::shaderpack::source::ShaderPackSource;
+use crate::render::shaderpack::source::ShaderSourceFile;
+use crate::render::shaderpack::source::RUNTIME_CONSTANTS_PATH;
+use crate::render::shaderpack::source::RUNTIME_OPTIONS_PATH;
+use crate::render::shaderpack::contracts::terrain::derive_complementary_terrain_contract;
+use crate::render::shaderpack::contracts::terrain::derive_complementary_terrain_contract_for_scope;
+use crate::render::shaderpack::contracts::terrain::shadow_source_stages_for_scope;
+use crate::render::shaderpack::contracts::terrain::TerrainProgramScope;
+use crate::render::shaderpack::contracts::terrain::TerrainSourceStage;
+use crate::render::shaderpack::contracts::terrain::TerrainSourceStages;
+use crate::render::shaderpack::resources::bindings::TerrainSourceResourceBindings;
+use crate::render::shaderpack::resources::bindings::TERRAIN_RESOURCE_BINDINGS_PATH;
+use crate::render::shaderpack::contracts::weather::derive_weather_pass_contract;
+use crate::render::shaderpack::contracts::weather::lower_weather_source_pair;
 
 const WIDTH: u32 = 96;
 const HEIGHT: u32 = 64;
@@ -61,7 +68,7 @@ const HEIGHT: u32 = 64;
 fn terrain_coordinate_diagnostic_variants_compile_on_vulkan() {
     for mode in ["u-bits", "v-bits", "depth-bits", "clip-bits"] {
         let source =
-            crate::render::vulkanic::shader_pack::programs::terrain_fragment_coordinate_probe(
+            crate::render::shaderpack::programs::terrain_fragment_coordinate_probe(
                 MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT.to_owned(),
                 Some(mode),
             );
@@ -72,7 +79,7 @@ fn terrain_coordinate_diagnostic_variants_compile_on_vulkan() {
         )
         .expect("terrain diagnostic must compile on Vulkan");
         let vertex =
-            crate::render::vulkanic::shader_pack::programs::terrain_vertex_coordinate_probe(
+            crate::render::shaderpack::programs::terrain_vertex_coordinate_probe(
                 MINIMAL_TERRAIN_MATERIAL_VERTEX.to_owned(),
                 Some(mode),
             );
@@ -851,7 +858,7 @@ fn lowered_complete_complementary_shadow_pair_creates_vulkan_modules() {
         .bind_semantic_roles(&declarations)
         .unwrap();
     let program =
-        crate::render::vulkanic::shader_pack::programs::prepare_lowered_shadow_source_program(
+        crate::render::shaderpack::programs::prepare_lowered_shadow_source_program(
             source.name(),
             source.generation(),
             &lowered,
@@ -975,7 +982,7 @@ fn lowered_complete_complementary_source_pairs_create_vulkan_graphics_pipelines(
         .bind_semantic_roles(&declarations)
         .unwrap();
     let shadow_program =
-        crate::render::vulkanic::shader_pack::programs::prepare_lowered_shadow_source_program(
+        crate::render::shaderpack::programs::prepare_lowered_shadow_source_program(
             source.name(),
             source.generation(),
             &shadow_lowered,
@@ -1062,7 +1069,7 @@ fn prepared_lowered_terrain_program_compiles_at_the_vulkan_boundary() {
 
 #[test]
 fn model_translucent_cutout_spirv_discards_without_terrain_lod_bias() {
-    use crate::render::vulkanic::shader_pack::programs::{
+    use crate::render::shaderpack::programs::{
         minimal_direct_model_translucent_cutout_program, minimal_direct_terrain_translucent_program,
     };
     let instructions = |bytes: Vec<u8>| {
@@ -1141,7 +1148,7 @@ fn model_translucent_cutout_spirv_discards_without_terrain_lod_bias() {
 
 #[test]
 fn standard_item_foil_compiles_without_vertex_lighting_or_terrain_lod_bias() {
-    use crate::render::vulkanic::shader_pack::programs::minimal_direct_standard_item_foil_program;
+    use crate::render::shaderpack::programs::minimal_direct_standard_item_foil_program;
     let program = minimal_direct_standard_item_foil_program();
     let compile = |source: &str, kind| {
         let source =

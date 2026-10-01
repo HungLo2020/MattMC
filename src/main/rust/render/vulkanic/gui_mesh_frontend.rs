@@ -2556,7 +2556,7 @@ impl GuiMeshBatchRequest {
 
     pub fn resolve_item_lighting(
         &mut self,
-        frame: Option<super::shader_pack::lightmap::VanillaLightmapFrame>,
+        frame: Option<crate::render::shaderpack::vanilla::lightmap::VanillaLightmapFrame>,
     ) -> GalResult<()> {
         if self.requires_item_lightmap() {
             self.item_lighting = Some(GuiFlatItemLighting::prepare(frame.ok_or_else(|| {
@@ -5739,8 +5739,8 @@ mod tests {
         assert!(prepare_draws(&[combined]).is_err());
     }
 
-    fn flat_lightmap() -> super::super::shader_pack::lightmap::VanillaLightmapFrame {
-        use super::super::shader_pack::lightmap::{VanillaLightmapFrame, VanillaLightmapInputs};
+    fn flat_lightmap() -> crate::render::shaderpack::vanilla::lightmap::VanillaLightmapFrame {
+        use crate::render::shaderpack::vanilla::lightmap::{VanillaLightmapFrame, VanillaLightmapInputs};
         VanillaLightmapFrame {
             generation: 7,
             inputs: VanillaLightmapInputs {

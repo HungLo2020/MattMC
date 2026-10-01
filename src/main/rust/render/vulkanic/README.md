@@ -12,7 +12,9 @@ Rules, enforced by `architecture_boundary.rs`:
 - The core GAL and backends carry no game vocabulary, never branch on label
   text, and never import renderers (world, GUI, shader pack).
 - GPU profiling scopes are opaque indices assigned by renderers.
+- Code outside `vulkanic` uses the public GAL modules only; tests there build
+  GALs through `test_support` (test builds only).
 
 Everything else in this directory is a renderer awaiting its move to
-`render/worldrender`, `render/guirender`, `render/shaderpack`,
-`render/shared` or `render/bridge`.
+`render/worldrender`, `render/guirender`, `render/shared` or `render/bridge`
+(the shader pack has moved to `render/shaderpack`).

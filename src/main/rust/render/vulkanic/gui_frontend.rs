@@ -26,7 +26,7 @@ use super::resources::{
     ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension, TextureFormat,
     TextureSubresourceRange, TextureUsage, TextureViewDesc,
 };
-use super::shader_pack::vanilla_post_effect_executor::VanillaPostEffectExternalTargetBindings;
+use crate::render::shaderpack::vanilla::post_effect::executor::VanillaPostEffectExternalTargetBindings;
 use super::sync::SubmissionId;
 #[cfg(test)]
 #[path = "gui_item_raster_gpu_tests.rs"]
@@ -10201,7 +10201,7 @@ mod tests {
     #[test]
     fn vulkan_gui_flat_item_material_modulates_atlas_without_lighting_unlit_controls() {
         use crate::render::vulkanic::gui_item_material::GuiAffineMaterial;
-        use crate::render::vulkanic::shader_pack::lightmap::{
+        use crate::render::shaderpack::vanilla::lightmap::{
             VanillaLightmapFrame, VanillaLightmapInputs,
         };
         let mut material = GuiAffineMaterial::FlatItemPending;
@@ -11397,13 +11397,13 @@ void main() { fragColor = texture(InSampler, texCoord); }
         let (main_target, main_view, main_pass, main_sampler) = make_target("external-main");
         let (external_target, external_view, external_pass, external_sampler) =
             make_target("external-role");
-        let plan = super::super::shader_pack::vanilla_post_effect_contract::VanillaPostEffectExecutionPlan {
+        let plan = crate::render::shaderpack::vanilla::post_effect::contract::VanillaPostEffectExecutionPlan {
             effect_name: "minecraft:external-test".to_owned(),
             intermediate_targets: Vec::new(),
-            ordered_passes: vec![super::super::shader_pack::vanilla_post_effect_contract::VanillaPostEffectPass {
+            ordered_passes: vec![crate::render::shaderpack::vanilla::post_effect::contract::VanillaPostEffectPass {
                 vertex_shader: "vertex".to_owned(),
                 fragment_shader: "fragment".to_owned(),
-                inputs: vec![super::super::shader_pack::vanilla_post_effect_contract::VanillaPostEffectInput {
+                inputs: vec![crate::render::shaderpack::vanilla::post_effect::contract::VanillaPostEffectInput {
                     sampler_name: "InSampler".to_owned(),
                     target: "minecraft:main".to_owned(),
                     texture_path: None,
@@ -11417,12 +11417,12 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 uniform_values: BTreeMap::new(),
             }],
         };
-        let external = super::super::shader_pack::vanilla_post_effect_executor::VanillaPostEffectExternalTargetBindings::new(
+        let external = crate::render::shaderpack::vanilla::post_effect::executor::VanillaPostEffectExternalTargetBindings::new(
             &plan,
             BTreeMap::from([
                 (
                     "minecraft:main".to_owned(),
-                    super::super::shader_pack::vanilla_post_effect_executor::VanillaPostEffectExternalTargetBinding {
+                    crate::render::shaderpack::vanilla::post_effect::executor::VanillaPostEffectExternalTargetBinding {
                         render_pass: main_pass,
                         render_target: main_target,
                         color_attachment: main_view,
@@ -11434,7 +11434,7 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 ),
                 (
                     "minecraft:translucent".to_owned(),
-                    super::super::shader_pack::vanilla_post_effect_executor::VanillaPostEffectExternalTargetBinding {
+                    crate::render::shaderpack::vanilla::post_effect::executor::VanillaPostEffectExternalTargetBinding {
                         render_pass: external_pass,
                         render_target: external_target,
                         color_attachment: external_view,

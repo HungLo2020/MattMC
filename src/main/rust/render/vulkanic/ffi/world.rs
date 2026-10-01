@@ -1,5 +1,5 @@
 use super::*;
-use crate::render::vulkanic::shader_pack::lightmap::{VanillaLightmapFrame, VanillaLightmapInputs};
+use crate::render::shaderpack::vanilla::lightmap::{VanillaLightmapFrame, VanillaLightmapInputs};
 use crate::render::vulkanic::world_primitive_frontend::material as world_material_semantics;
 use crate::render::vulkanic::world_primitive_frontend::world_text::{
     WorldTextImageAsset, WorldTextImageFormat, WorldTextQuadRequest, MAX_WORLD_TEXT_IMAGES,
@@ -2272,7 +2272,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
                 0 => None,
                 1 => {
                     let values =
-                        crate::render::vulkanic::shader_pack::engine_globals::EngineGlobals {
+                        crate::render::shaderpack::vanilla::engine_globals::EngineGlobals {
                             screen_width: request.engine_screen_width,
                             screen_height: request.engine_screen_height,
                             game_ticks: request.engine_game_ticks,

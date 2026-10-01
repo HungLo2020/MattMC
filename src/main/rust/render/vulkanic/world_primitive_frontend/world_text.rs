@@ -22,7 +22,7 @@ use super::super::resources::{
     SamplerFilter, ShaderCodeFormat, ShaderModuleDesc, ShaderStage, TextureDesc, TextureDimension,
     TextureFormat, TextureUsage, TextureViewDesc,
 };
-use super::super::shader_pack::programs::shader_stage_code;
+use crate::render::shaderpack::programs::shader_stage_code;
 use super::super::{BufferImageCopyRegion, CullMode};
 
 pub(crate) const WORLD_TEXT_IMAGE_ALPHA8: u32 = 1;

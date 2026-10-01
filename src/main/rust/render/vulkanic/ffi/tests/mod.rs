@@ -4177,9 +4177,9 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
             main_hand_item_light_emission: 13,
             off_hand_item_light_emission: 7,
             vanilla_lightmap: Some(
-                crate::render::vulkanic::shader_pack::lightmap::VanillaLightmapFrame {
+                crate::render::shaderpack::vanilla::lightmap::VanillaLightmapFrame {
                     generation: 31,
-                    inputs: crate::render::vulkanic::shader_pack::lightmap::VanillaLightmapInputs {
+                    inputs: crate::render::shaderpack::vanilla::lightmap::VanillaLightmapInputs {
                         ambient_light_factor: 0.125,
                         sky_factor: 0.75,
                         block_factor: 1.5,

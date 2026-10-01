@@ -1,6 +1,6 @@
 use super::*;
-use crate::render::vulkanic::shader_pack::assets::{ShaderPackAssetFile, ShaderPackAssetUpdate};
-use crate::render::vulkanic::shader_pack::source::{ShaderPackSourceUpdate, ShaderSourceFile};
+use crate::render::shaderpack::source::assets::{ShaderPackAssetFile, ShaderPackAssetUpdate};
+use crate::render::shaderpack::source::{ShaderPackSourceUpdate, ShaderSourceFile};
 
 pub(crate) unsafe fn decode_shader_pack_source_update(
     request: *const FfiShaderPackSourceUpdateRequest,
