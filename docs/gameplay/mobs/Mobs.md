@@ -10,6 +10,8 @@ For a source-reviewed boss encounter, see [Wither](Wither.md) and its [Nether St
 
 For renewable Wolf Armor materials, see [Armadillo](Armadillo.md), [Scutes](../items/ArmadilloScute.md), and [Brush](../items/Brush.md).
 
+For integrated large-animal behavior and availability limits, see [Rhinoceros](Rhinoceros.md) and [Komodo Dragon](KomodoDragon.md).
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs

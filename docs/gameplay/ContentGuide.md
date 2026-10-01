@@ -84,6 +84,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Alex's Mobs additions
 
+- [Rhinoceros](mobs/Rhinoceros.md), [Komodo Dragon](mobs/KomodoDragon.md), and [Komodo Spit](items/KomodoSpit.md): trust, poisonous predation, missing food tags, and periodic item production
+
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
 - [Grizzly Bear Spawn Egg](items/GrizzlyBearSpawnEgg.md): direct placement and the baby-spawning difference
 - [Raw Cod](items/RawCod.md), [Cooked Cod](items/CookedCod.md), and [Honeycomb](items/Honeycomb.md): food and hive resources connected to bears
