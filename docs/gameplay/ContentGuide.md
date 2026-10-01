@@ -74,6 +74,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Gazelle](mobs/Gazelle.md): herd panic and the unverified breeding-food route
 - [Raccoon](mobs/Raccoon.md) and [Capuchin Monkey](mobs/CapuchinMonkey.md): food behavior, owner controls, retaliation, and missing bundled taming routes
 - [Elephant](mobs/Elephant.md) and [Kangaroo](mobs/Kangaroo.md): owner controls, riding versus pouch use, food routes, and storage caveats
+- [Caiman](mobs/Caiman.md), [Platypus](mobs/Platypus.md), and [Bucket of Platypus](items/BucketOfPlatypus.md): egg ownership, care, food, digging, and bucket-state limits
 - [All mobs](mobs/Mobs.md): the existing mob directory, including other integrated animals
 
 ## Alex's Caves additions
