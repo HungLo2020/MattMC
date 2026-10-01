@@ -25,6 +25,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Subterranodon](mobs/Subterranodon.md): taming and owner interactions, with flight-input and breeding caveats
 - [Subterranodon Egg](blocks/SubterranodonEgg.md): placed egg hatching and ownership
 
+- [Limestone family](blocks/Limestone.md) and [Pewen family](blocks/Pewen.md): Creative building forms and verified source limitations
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)

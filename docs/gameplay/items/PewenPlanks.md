@@ -1,18 +1,28 @@
 # Pewen Planks
 
+Pewen Planks is a building block and explicit ingredient in several Pewen-family recipes. Its ID is `minecraft:pewen_planks`.
+
 ## Obtaining
 
-Pewen Planks can be obtained from the Creative Menu and from its normal survival sources when those sources are available.
+The item is listed in Creative inventory. The bundled recipe intends to convert Pewen logs into four planks, but its ingredient uses an older JSON object format incompatible with the active ingredient codec. This review does **not** establish a working log-to-plank Survival recipe.
 
-## Usage
+## Building and crafting
 
-Pewen Planks is a core wood building block and crafting ingredient.
+Place planks directly or use the source-reviewed shaped recipes listed in the [Pewen family guide](../blocks/Pewen.md#construction-and-recipes), including stairs, slabs, fences, doors, signs, and a boat.
 
-## Behavior
+Pewen Planks are absent from the checked generic plank item tag. A recipe explicitly naming Pewen Planks and one accepting the generic planks tag are different: do not expect universal substitution in wooden tools, chests, or other generic recipes without checking the current data.
 
-It behaves like standard wooden construction material and can be used in many wood recipes.
+## Related pages
 
-## Notes
+- [Pewen Log](PewenLog.md)
+- [Pewen family](../blocks/Pewen.md)
+- [Items](Items.md)
 
-* This item is registered as `minecraft:pewen_planks`.
-* This item comes from bundled prehistoric tree content integrated into MattMC.
+## Sources and verification
+
+Reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. Source/data review only; no in-game placement, growth, harvesting, or crafting test.
+
+- [Planks registration](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/Blocks.java#L7010-L7017)
+- [Planks recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/pewen_planks.json)
+- [Ingredient codec](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/crafting/Ingredient.java)
+- [Generic planks tag](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/tags/item/planks.json)

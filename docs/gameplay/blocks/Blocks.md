@@ -6,6 +6,9 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 - [Stone](Stone.md): mining drops, Silk Touch, smelting, and basic recipes
 
+- [Limestone family](Limestone.md): forms and current Survival acquisition limits
+- [Pewen family](Pewen.md): tree growth, shaped recipes, and wood integration caveats
+
 ## Lighting and integrated content
 
 - [Amber](Amber.md): transparent construction and harvesting caveats
