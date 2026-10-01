@@ -45,6 +45,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Ender Pearl](items/EnderPearl.md), [Eye of Ender](items/EyeOfEnder.md), and [Blaze Rod](items/BlazeRod.md): teleport risks, portal supplies, recipes, and fuel
 
+- [Anvil](blocks/Anvil.md) and [anvil mechanics](mechanics/AnvilMechanics.md): repairs, enchantment combining, names, wear, and the 40-level payment cap
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

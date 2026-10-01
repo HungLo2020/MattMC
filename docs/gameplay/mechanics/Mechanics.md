@@ -4,6 +4,7 @@ Understand the systems behind everyday gameplay. Guides here explain current Mat
 
 - [Hunger, saturation, and healing](Hunger.md): food values, exhaustion, sprinting, healing, and starvation
 - [Mining tools and drops](Mining.md): tool families, material values, copper tier, and loot conditions
+- [Anvil operations](AnvilMechanics.md): repairs, names, combining, prior work, and MattMC's 40-level payment cap
 - [Game modes](../gamemodes/Gamemodes.md): Survival, Creative, Adventure, and Spectator
 - [Crafting](../crafting/Crafting.md)
 - [Smelting and cooking](../smelting/Smelting.md)
