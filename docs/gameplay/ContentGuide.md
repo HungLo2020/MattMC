@@ -4,6 +4,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Vanilla-derived gameplay
 
+- [Bees](mobs/Bee.md) and [Bee housing](blocks/BeeHousing.md): colony growth, safe flowers, nectar/honey, smoke, harvesting, and relocation
+
 - [Sheep](mobs/Sheep.md) and [Chickens](mobs/Chicken.md): breeding, fleece regrowth, [Wool](items/WhiteWool.md), egg variants, and [hatching](items/Egg.md)
 
 - [Bow](items/Bow.md) and [Crossbow](items/Crossbow.md): draw/load controls, ammunition selection, Infinity, rockets, enchantments, and wear

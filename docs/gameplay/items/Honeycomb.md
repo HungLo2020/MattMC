@@ -4,7 +4,9 @@ Honeycomb is a crafting and waxing item registered as `minecraft:honeycomb`. It 
 
 ## Harvesting
 
-Use [Shears](Shears.md) on a [Beehive](Beehive.md) or [Bee Nest](BeeNest.md) at **honey level 5**. The harvest loot table produces **three Honeycomb**, the interaction uses one point of shears durability, and the hive's honey level resets to zero.
+Use [Shears](Shears.md) on a [Beehive](Beehive.md) or [Bee Nest](BeeNest.md) at **honey level 5**. The harvest loot table produces **three Honeycomb**, the interaction normally applies one point of Shears wear, and the hive's honey level resets to zero.
+
+The block handler also leaves harvesting reachable with fully worn Shears in source; see the [broken-Shears limitation](../blocks/BeeHousing.md#fully-worn-shears). This has not been tested in-game.
 
 Provide campfire smoke at the hive before harvesting. If the location is not recognized as smoky, harvesting can anger nearby bees and trigger an emergency bee release. Smoke is a check on the hive's position, so a campfire merely somewhere nearby is not sufficient.
 
@@ -21,6 +23,8 @@ Grizzly Bears also raid honey-filled hives in their current behavior. Keep an ap
 This is a useful selection of verified uses, not an exhaustive copper-recipe list.
 
 ## Related pages
+
+- [Bee housing](../blocks/BeeHousing.md): colony care, smoke, dispenser harvesting, and Silk Touch relocation
 
 - [Grizzly Bear](../mobs/GrizzlyBear.md)
 - [Candle](Candle.md)

@@ -16,6 +16,8 @@ For renewable farm resources, see [Sheep](Sheep.md), [White Wool](../items/White
 
 For bird companionship and utility, see [Blue Jay](BlueJay.md) and [Crow](Crow.md), including verified feeding routes and missing integration details.
 
+For apiary care, see [Bee](Bee.md) and [Bee housing](../blocks/BeeHousing.md).
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs

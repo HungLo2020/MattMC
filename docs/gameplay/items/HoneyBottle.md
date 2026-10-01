@@ -26,6 +26,8 @@ One Honey Bottle in a shapeless recipe produces **three Sugar**. The item also c
 - [Glass Bottle](GlassBottle.md)
 - [Items](Items.md)
 
+See [Bee housing](../blocks/BeeHousing.md#harvesting) for shared manual/dispenser harvesting and smoke conditions.
+
 ## Sources and verification
 
 Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No in-game effect or consumption test was run.
