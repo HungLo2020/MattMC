@@ -23,6 +23,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 - [Stone](Stone.md): mining drops, Silk Touch, smelting, and basic recipes
 
 - [Limestone family](Limestone.md): forms and current Survival acquisition limits
+- [Oak family](Oak.md): harvesting, leaf drops, saplings, Bone Meal, stripping, and wood conversions
 - [Pewen family](Pewen.md): tree growth, shaped recipes, and wood integration caveats
 
 ## Lighting and integrated content
