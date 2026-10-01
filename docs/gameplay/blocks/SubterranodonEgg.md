@@ -18,7 +18,7 @@ New hatchlings start at age -24,000 game ticks. They are babies, and cannot be m
 
 ## Protecting and collecting eggs
 
-Keep player foot traffic away. The implementation can remove an egg when a player steps on it or falls onto it, and may make nearby animals of the same type target the trampler. Dinosaur entities are excluded from this trample check.
+Keep player foot traffic away. The active stepping callback can remove an egg when a player steps on it, and may make nearby animals of the same type target the trampler. The separate fall-trample method uses a legacy `float` parameter rather than the current `double` callback, so it is not invoked by normal landing dispatch. Dinosaur entities are excluded from this trample check.
 
 The bundled block loot table yields an egg item only for a tool with **Silk Touch**. It specifies one item, not a count scaled to the number of eggs in the block. Breaking and stacked-egg behavior should be tested before moving a valuable cluster; do not assume all four eggs are recovered.
 
@@ -39,3 +39,5 @@ Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No 
 - [Silk Touch loot](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/loot_table/blocks/subterranodon_egg.json)
 - [Item registration](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/Items.java#L876)
 - [Creative listing](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
+
+Landing-callback audit at `b81c01943c9f3254e713c365a1dd633392929cb2`: [egg methods](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/block/DinosaurEggBlock.java#L68-L80), [current Block callback](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/Block.java#L456-L458), and [normal entity landing dispatch](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/Entity.java#L1398-L1405). No gameplay landing test was run.

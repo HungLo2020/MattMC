@@ -10,7 +10,7 @@ Place a **Fishing Rod diagonally above-left of a Carrot** in the crafting grid t
 
 Hold it while you are the first passenger of a saddled pig to gain control. The pig follows your facing with a forward riding input. Merely holding the tool nearby attracts the pig but does not put you on it or provide a Saddle.
 
-Use the item while controlling the pig to request a boost. A successful boost costs **7 durability** before applicable durability modifiers; attempting another while already boosting does not start a second boost. A fresh ordinary tool therefore breaks on its fourth successful boost if no durability-saving effect applies. On break, the tool converts to a Fishing Rod.
+Use the item while controlling the pig to request a boost. A successful boost costs **7 durability** before applicable durability modifiers; attempting another while already boosting does not start a second boost. A fresh ordinary tool therefore reaches its broken state on its fourth successful boost if no durability-saving effect applies. **Do not expect a Fishing Rod back in this snapshot:** the conversion helper only replaces an empty stack, while the current durability path keeps a nonempty broken stack. Further use is rejected by the broken-item guard. This is a source-identified behavior difference, not a tested wear-out cycle.
 
 The steering implementation selects a duration parameter from **140–980 ticks** and varies the speed multiplier over the boost, rather than applying one constant speed increase. Boost progression is updated by the ridden handler, so this is not a guarantee of a wall-clock duration when the pig is no longer being controlled.
 
@@ -29,6 +29,8 @@ Source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. No 
 
 - [Recipe](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/recipe/crafting/carrot_on_a_stick.json)
 - [Durability, target, and boost cost](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/Items.java)
-- [Boost use and Fishing Rod conversion](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/FoodOnAStickItem.java)
+- [Boost use and conversion call](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/FoodOnAStickItem.java)
 - [Actual boost duration and speed curve](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/ItemBasedSteering.java)
 - [Pig control and attraction](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/animal/Pig.java)
+
+- [Retained broken stacks, use guard, and empty-stack conversion condition](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/ItemStack.java#L382-L526)

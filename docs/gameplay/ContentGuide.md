@@ -63,6 +63,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Zombie](mobs/Zombie.md) and [Spider](mobs/Spider.md): light rules, conditional behavior, doors/conversion, climbing, and drops
 
+- [Rotten Flesh](items/RottenFlesh.md), [String](items/String.md), [Spider Eye](items/SpiderEye.md), and [Fermented Spider Eye](items/FermentedSpiderEye.md): mob resources, food risks, recipes, brewing, and trades
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

@@ -37,6 +37,8 @@ When Git fetch works but authenticated Git push is unavailable, GitHub's Git-dat
 
 Pick a coherent small batch from the coverage plan. Review active implementation, add useful content, and keep directory indexes complete. Do not generate thousands of generic stubs or import upstream claims wholesale.
 
+For ported methods, verify the current base-class signature and actual call path before describing a method body as active behavior. An old overload with a similar name can compile without overriding the current callback. Trace helper calls through their actual state changes too; a method name such as a break/conversion helper does not establish that the returned item changes in the current implementation. Treat source presence, active dispatch, data registration, and runtime tests as separate evidence.
+
 Run the required documentation checker and strict build locally. Record what passed, failed, or could not run; source review is not gameplay verification. Recheck the exact published SHA and any workflow runs. No branch push should be described as a live wiki deployment.
 
 Update the checkpoint with the source SHA, pages changed, evidence gaps, tests, and next priority. Summarize every mutation in the requesting conversation, including source merges, all created/updated page paths, commits, and verification results. Scheduled continuation should run one batch at a time and retain this branch boundary indefinitely.

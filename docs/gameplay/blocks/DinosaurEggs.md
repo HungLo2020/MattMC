@@ -33,7 +33,7 @@ Read the [Tremorsaurus](../mobs/Tremorsaurus.md) and [Relicheirus](../mobs/Relic
 
 ## Protecting the egg
 
-The current trample check allows **players** to break these eggs; DinosaurEntity animals are explicitly excluded. A step has a one-in-one-hundred break check, and a fall has a one-in-three check. A successful trample removes an egg without an item drop; a multiple-egg Vallumraptor cluster can retain its remaining eggs.
+The current trample check allows **players** to break these eggs; DinosaurEntity animals are explicitly excluded. The active `stepOn` callback has a one-in-one-hundred break check. The class also contains a one-in-three fall check, but its `float` parameter does not override the current `double` landing callback; that separate check is not invoked by normal landing dispatch. A successful trample removes an egg without an item drop; a multiple-egg Vallumraptor cluster can retain its remaining eggs.
 
 A non-Creative player's successful trample can also make nearby living mobs of the egg's species target that player, except a tame animal owned by the trampler. Avoid walking on an egg even when you are only testing a Creative build: Creative prevents that anger branch, not the egg-destruction check.
 
@@ -66,3 +66,5 @@ Source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. No 
 - [Grottoceratops egg type](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/block/GrottoceratopsEggBlock.java)
 - [Vallumraptor egg loot](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/blocks/vallumraptor_egg.json)
 - [Grottoceratops egg loot](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/blocks/grottoceratops_egg.json)
+
+- [Current landing callback signature](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/block/Block.java#L456-L458) and [normal entity landing dispatch](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/Entity.java#L1398-L1405)
