@@ -852,7 +852,7 @@ mod tests {
                 return;
             }
         };
-        let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+        let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
         for frame_index in 0..2 {
             let acquired = gal
                 .acquire_frame(FrameAcquireDesc {
@@ -935,7 +935,7 @@ mod tests {
                 Ok(backend) => backend,
                 Err(_) => return,
             };
-            let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+            let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
             let acquired = gal
                 .acquire_frame(FrameAcquireDesc {
                     correlation_id: FrameCorrelationId(20 + u64::from(cycle)),
@@ -979,7 +979,7 @@ mod tests {
                 return;
             }
         };
-        let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+        let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
         let src = gal
             .create_buffer(BufferDesc {
                 label: "copy-src".to_string(),
@@ -1027,7 +1027,7 @@ mod tests {
                 return;
             }
         };
-        let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+        let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
         assert!(gal
             .capabilities()
             .limits
@@ -1102,7 +1102,7 @@ mod tests {
                 return;
             }
         };
-        let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+        let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
         let mut tokens = Vec::new();
         for batch_index in 0..12 {
             let src = gal

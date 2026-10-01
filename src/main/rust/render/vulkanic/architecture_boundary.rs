@@ -806,6 +806,16 @@ fn bridge_is_the_composition_root_over_the_public_gal() {
 }
 
 #[test]
+fn public_gal_api_stays_documented() {
+    // Every public GAL item is documented; the lint keeps new ones that way.
+    let source = read_source(&Path::new(RUST_ROOT).join("render/vulkanic/mod.rs"));
+    assert!(
+        source.lines().any(|line| line.trim() == "#![warn(missing_docs)]"),
+        "render/vulkanic/mod.rs must keep #![warn(missing_docs)] so the public GAL API stays documented"
+    );
+}
+
+#[test]
 fn shared_helpers_depend_only_on_the_public_gal() {
     let rust_root = Path::new(RUST_ROOT);
     let mut violations = Vec::new();

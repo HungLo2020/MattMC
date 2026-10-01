@@ -33,11 +33,16 @@ use super::sync::SubmissionId;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct BackendToken(pub u64);
 
+/// Bytes a completed submission read back from a buffer to the host.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompletedHostRead {
+    /// The submission that performed the read.
     pub submission: SubmissionId,
+    /// The buffer read from.
     pub buffer: Handle,
+    /// Byte offset of the read in the buffer.
     pub offset: u64,
+    /// The bytes read.
     pub bytes: Vec<u8>,
 }
 
@@ -46,45 +51,90 @@ pub struct CompletedHostRead {
 /// swapchain state, and GPU scope timestamps. Backend-neutral numbers only.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct BackendRuntimeMetrics {
+    /// Submission batches the backend executed (OpenGL).
     pub command_batches: u64,
+    /// Command lists executed (OpenGL).
     pub command_lists: u64,
+    /// Command ops executed (OpenGL).
     pub command_ops: u64,
+    /// Native API calls made (OpenGL).
     pub native_calls: u64,
+    /// Native flushes (OpenGL).
     pub native_flushes: u64,
+    /// Native finishes (OpenGL).
     pub native_finishes: u64,
+    /// Fences inserted (OpenGL).
     pub native_fences_inserted: u64,
+    /// Fence polls (OpenGL).
     pub native_fences_polled: u64,
+    /// Blocking fence waits (OpenGL).
     pub native_fences_waited: u64,
+    /// Fences deleted (OpenGL).
     pub native_fences_deleted: u64,
+    /// Cumulative Vulkan command-buffer allocation time (Vulkan).
     pub native_command_buffer_alloc_nanos: u64,
+    /// Cumulative Vulkan command-buffer begin time (Vulkan).
     pub native_command_buffer_begin_nanos: u64,
+    /// Cumulative time recording native commands (Vulkan).
     pub native_command_recording_nanos: u64,
+    /// Cumulative Vulkan command-buffer end time (Vulkan).
     pub native_command_buffer_end_nanos: u64,
+    /// Cumulative queue-submit time (Vulkan).
     pub native_queue_submit_nanos: u64,
+    /// Cumulative time polling the completion timeline (Vulkan).
     pub native_timeline_poll_nanos: u64,
+    /// Cumulative time blocked waiting on the completion timeline (Vulkan).
     pub native_timeline_wait_nanos: u64,
+    /// Cumulative time in device-wait-idle (Vulkan).
     pub native_device_wait_idle_nanos: u64,
+    /// Cumulative swapchain acquire time (Vulkan).
     pub native_acquire_nanos: u64,
+    /// Cumulative present time (Vulkan).
     pub native_present_nanos: u64,
+    /// Cumulative time waiting for presentation (Vulkan).
     pub native_present_wait_nanos: u64,
+    /// Cumulative command buffers allocated (Vulkan).
     pub native_command_buffers_allocated: u64,
+    /// Cumulative command buffers freed (Vulkan).
     pub native_command_buffers_freed: u64,
+    /// Cumulative blocking waits on the completion timeline (Vulkan).
     pub native_wait_count: u64,
+    /// Cumulative device-wait-idle calls (Vulkan).
     pub native_device_wait_idle_count: u64,
+    /// The present mode in use, as the raw Vulkan `VkPresentModeKHR` value.
     pub native_present_mode: u64,
+    /// The requested `PresentMode`, as its wire value.
     pub native_requested_present_mode: u64,
+    /// Present modes the surface supports, as a bitmask: bit 0 immediate,
+    /// bit 1 mailbox, bit 2 FIFO, bit 3 FIFO relaxed, bit 60 any other mode.
     pub native_supported_present_modes: u64,
+    /// Why the present mode in use was chosen: 1 the request was supported,
+    /// 2 auto-vsync chose FIFO, 3/4 auto-no-vsync chose mailbox/immediate,
+    /// 5-7 fallback to FIFO, immediate or FIFO relaxed.
     pub native_present_mode_fallback_reason: u64,
+    /// The swapchain image index last acquired.
     pub native_acquired_image_index: u64,
+    /// How many times the swapchain has been recreated.
     pub native_swapchain_generation: u64,
+    /// Images in the swapchain.
     pub native_swapchain_image_count: u64,
+    /// The surface's minimum image count.
     pub native_surface_min_image_count: u64,
+    /// The surface's maximum image count (0 means unlimited).
     pub native_surface_max_image_count: u64,
+    /// Frames in flight the surface was configured with.
     pub native_configured_frames_in_flight: u64,
+    /// Swapchain images currently acquired.
     pub native_images_in_flight: u64,
+    /// Frame slots free for the next acquire.
     pub native_available_frame_slots: u64,
+    /// 0 when no GPU timings are available; otherwise the id of the
+    /// presentation submission the GPU timings were measured for.
     pub gpu_timestamp_status: u64,
+    /// GPU nanoseconds per renderer-assigned profiling scope, for the frame
+    /// named by `gpu_timestamp_status`.
     pub gpu_scope_nanos: [u64; GPU_PROFILE_SCOPE_COUNT],
+    /// GPU nanoseconds for that whole frame.
     pub gpu_frame_total_nanos: u64,
 }
 

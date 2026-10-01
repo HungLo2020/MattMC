@@ -43,6 +43,12 @@ nav:
   - Development:
       - Overview: development/home.md
       - Tooling: development/tooling/index.md
+      - Rendering:
+          - Overview: development/rendering/index.md
+          - Render Architecture: development/rendering/RENDER-ARCHITECTURE.md
+          - VulkanicGAL: development/rendering/VULKANIC-GAL.md
+          - Java Bridge: development/rendering/JAVA-BRIDGE.md
+          - Render Verification: development/rendering/RENDER-VERIFICATION.md
       - World:
           - Overview: development/world/index.md
           - Biomes: development/world/biome/index.md

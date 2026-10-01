@@ -169,7 +169,7 @@ mod tests {
         let backend =
             super::super::backends::vulkan::VulkanBackend::new("upload history conformance")
                 .unwrap();
-        let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+        let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
         let desc = |label: &str| BufferDesc {
             label: label.into(),
             size: 16,

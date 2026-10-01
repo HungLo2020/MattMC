@@ -32,7 +32,7 @@ fn acquired_frame_load_preserves_owned_world_copy_and_explicit_clear() {
         surface.clone(),
     )
     .unwrap();
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     gal.configure_frame_surface(surface).unwrap();
     let acquired = gal
         .acquire_frame(FrameAcquireDesc {
@@ -506,10 +506,7 @@ fn compose_world_attachments(
     depth_rows: TextureRowOrder,
     gui_direction: RasterYDirection,
 ) -> Vec<u8> {
-    let mut gal = VulkanicGal::new_with_backend(
-        Box::new(super::vulkan::VulkanBackend::new("oriented world composition").unwrap()),
-        false,
-    );
+    let mut gal = VulkanicGal::new_with_backend(Box::new(super::vulkan::VulkanBackend::new("oriented world composition").unwrap()));
     let mut owned = Vec::new();
     macro_rules! own {
         ($call:expr) => {{
@@ -765,19 +762,13 @@ fn observe(
     cull_mode: CullMode,
 ) -> u32 {
     let mut gal = if opengl {
-        VulkanicGal::new_with_backend(
-            Box::new(
+        VulkanicGal::new_with_backend(Box::new(
                 super::opengl::OpenGlBackend::new("terrain interpolation observation").unwrap(),
-            ),
-            false,
-        )
+            ))
     } else {
-        VulkanicGal::new_with_backend(
-            Box::new(
+        VulkanicGal::new_with_backend(Box::new(
                 super::vulkan::VulkanBackend::new("terrain interpolation observation").unwrap(),
-            ),
-            false,
-        )
+            ))
     };
     let mut owned = Vec::new();
     macro_rules! own {

@@ -88,7 +88,7 @@ Content definitions and registries belong here. Use this for native representati
 
 ### `render/`
 
-Rendering systems belong here. This includes backend-independent render code, native render data structures, chunk rendering helpers, and backend-facing rendering subsystems.
+Rendering systems belong here. This includes backend-independent render code, native render data structures, chunk rendering helpers, and backend-facing rendering subsystems. For how to work on the renderer, start at the [Rendering](rendering/index.md) developer docs.
 
 Important current subdirectories:
 
@@ -133,13 +133,6 @@ Rust `render/vulkanic/backends/` is intentionally private. The architecture test
 - `glow` usage stays inside the OpenGL backend.
 - OpenGL and Vulkan backend modules do not depend on each other.
 
-The same tests (`render/vulkanic/architecture_boundary.rs`) enforce the renderer layering. Each layer may use the public GAL modules and the layers listed for it:
-
-- `scene` and `shared`: no renderers.
-- `shaderpack`: `scene`.
-- `guirender`: `scene`, `shared` and `shaderpack`. It never names `worldrender`; world-owned atlases reach it through the `GuiAtlasOwner` trait.
-- `worldrender`: `scene`, `shared`, `shaderpack` and `guirender`, which it composes on the whole-frame route.
-- `bridge`: everything above, as the composition root. It uses only the public GAL modules and is the only layer that creates GALs (`VulkanicGal::create*`).
-- The core GAL and backends import nothing above them: no scene, shared helpers, renderers or bridge.
+The same tests (`render/vulkanic/architecture_boundary.rs`) enforce the renderer layering: which render layer may depend on which, and that only the bridge creates GALs. See [Render Architecture](rendering/RENDER-ARCHITECTURE.md) for the rules and where new rendering code belongs.
 
 Java package names may still appear in Java source and Java tests. The Rust tree should use subsystem ownership instead of Java-style package paths.

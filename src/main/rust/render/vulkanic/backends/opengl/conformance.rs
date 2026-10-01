@@ -65,7 +65,7 @@ fn gui_panorama_material_compiles_through_the_opengl_lowering() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let (vertex, fragment) =
         crate::render::guirender::mesh::opengl_panorama_shader_sources_for_backend_test(
         );
@@ -99,7 +99,7 @@ fn distant_horizons_lod_opaque_program_compiles_at_the_opengl_boundary() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let program = minimal_distant_horizons_lod_opaque_program();
     for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
@@ -124,7 +124,7 @@ fn distant_horizons_lod_exact_atlas_program_compiles_at_the_opengl_boundary() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let program = minimal_distant_horizons_lod_exact_atlas_opaque_program();
     for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
@@ -149,7 +149,7 @@ fn selected_source_exact_atlas_distant_horizons_program_compiles_at_the_opengl_b
                 return;
             }
         };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let contract =
         derive_distant_horizons_opaque_contract(&source, TerrainProgramScope::Overworld).unwrap();
@@ -189,7 +189,7 @@ fn distant_horizons_lod_transparent_program_compiles_at_the_opengl_boundary() {
                 return;
             }
         };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let program = minimal_distant_horizons_lod_transparent_program();
     for module in program.shader_module_descriptors(crate::render::vulkanic::backends::opengl_capabilities().shader_conventions) {
         gal.create_shader_module(module).unwrap_or_else(|error| {
@@ -213,7 +213,7 @@ fn lowered_fullscreen_source_compiles_at_the_opengl_boundary_without_a_vertex_st
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = ShaderPackSource::new(
         "fullscreen-source-opengl",
         1,
@@ -282,7 +282,7 @@ fn lowered_complete_complementary_distant_horizons_pair_compiles_at_the_opengl_b
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let contract = derive_distant_horizons_opaque_contract(&source, TerrainProgramScope::Overworld)
         .expect("the bundled Complementary source must expose an Overworld DH pair");
@@ -322,7 +322,7 @@ fn lowered_complete_complementary_distant_horizons_water_pair_compiles_at_the_op
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let bundled = complete_bundled_pack_source_for_test();
     let source = ShaderPackSource::new(
         "complete-dh-water-opengl-boundary",
@@ -374,7 +374,7 @@ fn distant_horizons_lod_opaque_pipeline_uses_explicit_two_set_gal_layout() {
                 return;
             }
         };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let program = minimal_distant_horizons_lod_opaque_program();
     let [geometry_and_frame, lightmap] =
         distant_horizons_lod_opaque_resource_layouts("dh-lod.opengl");
@@ -426,7 +426,7 @@ fn prepared_lowered_terrain_program_compiles_at_the_opengl_boundary() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = ShaderPackSource::new(
         "prepared-source-opengl-boundary",
         37,
@@ -489,7 +489,7 @@ fn lowered_complete_complementary_textured_material_pair_compiles_at_the_opengl_
                 return;
             }
         };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let contract = derive_textured_material_contract(&source, TerrainProgramScope::Overworld)
         .expect("the bundled Complementary scope must expose gbuffers_textured");
@@ -527,7 +527,7 @@ fn lowered_complete_complementary_weather_pair_compiles_at_the_opengl_boundary()
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let contract = derive_weather_pass_contract(&source, TerrainProgramScope::Overworld)
         .expect("the bundled Complementary scope must expose gbuffers_weather");
@@ -561,7 +561,7 @@ fn lowered_complete_complementary_terrain_pair_compiles_at_the_opengl_boundary()
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let stages = TerrainSourceStages {
         vertex: TerrainSourceStage {
@@ -614,7 +614,7 @@ fn lowered_complete_complementary_hand_pair_compiles_at_the_opengl_boundary() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let source = complete_bundled_pack_source_for_test();
     let contract = derive_hand_contract(&source, TerrainProgramScope::Overworld)
         .expect("the bundled Complementary scope must expose gbuffers_hand");
@@ -646,7 +646,7 @@ fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
                 return;
             }
         };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
 
     for uses_colored_voxel_light in [false, true] {
         let suffix = if uses_colored_voxel_light {
@@ -934,7 +934,7 @@ fn isolated_opengl_conformance_round_trips_a_partial_r8uint_d3_box() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     assert!(gal.capabilities().supports(BackendFeature::Texture3d));
     let pattern = (0_u8..32).collect::<Vec<_>>();
     let upload = gal
@@ -1165,7 +1165,7 @@ fn isolated_opengl_conformance_dispatches_a_d3_storage_compute_shader() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     if !gal.capabilities().supports(BackendFeature::Compute) {
         return;
     }
@@ -1413,7 +1413,7 @@ fn run_d3_storage_write_read_test(
             return None;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     assert!(gal.capabilities().supports(BackendFeature::StorageTextures));
 
     let volume = gal
@@ -1736,7 +1736,7 @@ fn isolated_opengl_conformance_rejects_partial_failure_cleanly() {
             return;
         }
     };
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), false);
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let error = gal
         .create_texture(TextureDesc {
             label: "unsupported-format".to_string(),
@@ -1796,7 +1796,7 @@ pub(in crate::render::vulkanic::backends) fn run_conformance(
 ) -> GalResult<ConformanceReport> {
     super::trace::message("rust-opengl-conformance-start");
     let backend = OpenGlBackend::new("MattMC VulkanicGAL OpenGL conformance")?;
-    let mut gal = VulkanicGal::new_with_backend(Box::new(backend), tracy_enabled_from_env());
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
     let capabilities_json = gal.capabilities().fingerprint_json();
     let _renderdoc_frame = super::renderdoc::RenderDocFrame::start_if_requested();
 
@@ -2316,12 +2316,6 @@ fn index_bytes() -> Vec<u8> {
         .into_iter()
         .flat_map(u32::to_ne_bytes)
         .collect()
-}
-
-fn tracy_enabled_from_env() -> bool {
-    std::env::var("MATTMC_RUST_TRACY")
-        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
 }
 
 fn write_report(report: &ConformanceReport) -> GalResult<()> {

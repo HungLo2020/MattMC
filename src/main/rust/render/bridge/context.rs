@@ -203,11 +203,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
         ensure_context_capacity()?;
         let backend = backend_choice(request.backend_kind)?;
         let label = read_label(request.label, "context label")?;
-        let mut gal = VulkanicGal::create(
-            backend,
-            &label,
-            bool_flag(request.tracy_enabled, "tracy enabled")?,
-        )?;
+        // The ABI keeps the Tracy flag; it is validated but no longer used.
+        bool_flag(request.tracy_enabled, "tracy enabled")?;
+        let mut gal = VulkanicGal::create(backend, &label)?;
         gal.install_gpu_profile_classifier(
             crate::render::worldrender::diagnostics::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
@@ -296,11 +294,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
             ));
         }
         let label = read_label(request.label, "borrowed OpenGL context label")?;
-        let mut gal = VulkanicGal::create_borrowed_opengl(
-            &label,
-            request.stable_window_id,
-            bool_flag(request.tracy_enabled, "tracy enabled")?,
-        )?;
+        // The ABI keeps the Tracy flag; it is validated but no longer used.
+        bool_flag(request.tracy_enabled, "tracy enabled")?;
+        let mut gal = VulkanicGal::create_borrowed_opengl(&label, request.stable_window_id)?;
         gal.install_gpu_profile_classifier(
             crate::render::worldrender::diagnostics::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
@@ -409,12 +405,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
             native_display: request.native_display,
             native_window: request.native_window,
         };
-        let mut gal = VulkanicGal::create_native_windowed_vulkan(
-            &label,
-            window,
-            surface_desc,
-            bool_flag(request.tracy_enabled, "tracy enabled")?,
-        )?;
+        // The ABI keeps the Tracy flag; it is validated but no longer used.
+        bool_flag(request.tracy_enabled, "tracy enabled")?;
+        let mut gal = VulkanicGal::create_native_windowed_vulkan(&label, window, surface_desc)?;
         gal.install_gpu_profile_classifier(
             crate::render::worldrender::diagnostics::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );

@@ -1,10 +1,27 @@
 # vulkanic (VulkanicGAL)
 
-The graphics abstraction layer and nothing else: handles, resources,
-commands, frames, sync, capabilities and metrics (`gal.rs`, `resources.rs`,
-`commands.rs`, `frame.rs`, `sync.rs`, `handles.rs`, `error.rs`,
-`metrics.rs`), GAL creation (`create.rs`), and the private backends under
-`backends/` (`vulkan/`, `opengl/`).
+The graphics abstraction layer and nothing else. Developer guide:
+`docs/development/rendering/VULKANIC-GAL.md`; API reference: `cargo doc`
+(every public item is documented, enforced by `#![warn(missing_docs)]`).
+
+```
+mod.rs          overview, public re-exports, missing-docs lint
+create.rs       creating a GAL and choosing its backend (bridge only)
+gal/            VulkanicGal, one module per concern:
+  mod.rs          state, constructor, limits
+  buffers_textures, pipelines, passes, frame_targets   resource creation
+  bindings        resource-set validation
+  lifetime        destroy and the dependency graph
+  recording       command-recording scopes, command lists
+  command_validation, hazards, normalization, submission   submit path
+  frames          presentation surface
+  profiling, capture, test_hooks, arena
+resources.rs    descriptors, formats, usages, BackendCapabilities
+commands.rs     CommandOp, command lists, submission batches
+frame.rs, handles.rs, sync.rs, error.rs, metrics.rs
+backends/       private Vulkan and OpenGL backends (+ mock for tests)
+tests/          GAL tests by concern; test_support.rs builds GALs for others
+```
 
 Rules, enforced by `architecture_boundary.rs`:
 - `ash`/`shaderc` stay in `backends/vulkan`, `glow` in `backends/opengl`.
@@ -14,11 +31,10 @@ Rules, enforced by `architecture_boundary.rs`:
   (`BackendFeature`, `BackendLimits`, `ShaderConventions`).
 - The core GAL and backends carry no game vocabulary, never branch on label
   text, and import nothing above them (scene, shared, renderers, bridge).
-  Renderers keep their own profiles and embed the GAL's `SubmitProfile`.
-- GPU profiling scopes are opaque indices assigned by renderers.
+- An item is `pub` only if code outside `vulkanic` uses it, and is
+  documented; test hooks are `#[cfg(test)]` `*_for_test`.
 - Code outside `vulkanic` uses the public GAL modules only; tests there build
   GALs through `test_support` (test builds only).
 
-The Java FFI bridge lives in `render/bridge`; the shader pack, world renderer
-and GUI renderer in `render/shaderpack`, `render/worldrender` and
-`render/guirender`.
+Known large functions kept intact: the command-op validator
+(`gal/command_validation.rs`) and the hazard analysis (`gal/hazards.rs`).
