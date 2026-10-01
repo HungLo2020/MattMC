@@ -335,6 +335,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Content Guide, this checkpoint, and October branch-work log. Source remains `b81c01943c9f3254e713c365a1dd633392929cb2`; no source sync required.
 - Validation: checker and strict build passed on 2,144 pages / 34 indexes; source targets and whitespace checked. No mounting, steering, feeding, breeding, combat, or XP gameplay test.
 
+## Forty-second batch: wolves and armor care
+
+- Expanded Wolf and Wolf Armor with actual natural populations/variants, Bone taming, owner care, broad food tags, breeding, armor recipe/scute routes, repairs, removal, and dyeing.
+- Documented the retained-broken-armor absorption path precisely and clarified ordinary humanoid broken-armor attribute handling; no disappearance assumption, runtime reproduction, or indefinite-protection guarantee.
+- Updated Content Guide, this checkpoint, and October branch-work log. Source remains `b81c01943c9f3254e713c365a1dd633392929cb2`; no source sync required.
+- Validation: checker and strict build passed on 2,144 pages / 34 indexes; source targets and whitespace checked. No taming, breeding, armor, repair, shearing, dye, or combat gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
@@ -347,12 +354,14 @@ Reconcile missing August and September 2026 coverage against actual history befo
 
 ## Evidence gaps to carry forward
 
+- Luxtructosaurus is excluded at `b81c01943c9f3254e713c365a1dd633392929cb2`: no active entity/attribute/item registration or implementation was found. [Sauropod base comments](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/entity/living/SauropodBaseEntity.java#L49) explicitly describe it as not added; the [tag constant](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/misc/ACTagRegistry.java#L60) and stub world-data flags do not establish a boss or summoning route. Reassess only if active registration/runtime implementation changes; do not create an upstream-derived placeholder.
+
 - Source review does not establish in-game/runtime correctness.
 - Ambersol has a drop entry and a correct-tool requirement, but no matching mining-tool tag was found; Survival harvesting and natural-generation wiring remain unverified.
 - Verify natural spawning through actual biome/config registration rather than treating standalone spawn predicates as proof.
 - Existing untouched item/mob stubs are not newly verified by this batch.
 
-## Validation record
+## Initial batch validation record
 
 - Baseline: `python3 DevUtils/RunWiki.py check` passed on 2,090 pages and 32 indexes.
 - Final expanded-tree check: passed on 2,097 pages and 33 indexes.

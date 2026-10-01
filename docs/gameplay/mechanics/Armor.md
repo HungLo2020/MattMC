@@ -4,7 +4,7 @@ Armor supplies defensive attributes while worn in its matching equipment slots. 
 
 ## Ordinary humanoid armor values
 
-These are armor points from the default Helmet, Chestplate, Leggings, and Boots. They exclude enchantments, attribute modifications, Turtle Shell helmets, animal armor, and integrated special equipment.
+These are armor points from functional, unbroken default Helmets, Chestplates, Leggings, and Boots. They exclude enchantments, attribute modifications, Turtle Shell helmets, animal armor, and integrated special equipment.
 
 | Material | Helmet | Chestplate | Leggings | Boots | Full-set armor | Full-set toughness |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -43,7 +43,7 @@ Default durability is a material multiplier times the slot's base value: **Helme
 | [Iron](../items/IronChestplate.md) | 240 | 6 | 0 |
 | [Diamond](../items/DiamondChestplate.md) | 528 | 8 | 2 |
 
-Durability measures remaining item life, not extra health. Repair ingredients come from each armor material's tag. The checked Copper, Iron, and Diamond armor tags contain Copper Ingot, Iron Ingot, and Diamond respectively.
+Durability measures remaining functional use, not extra health. In this MattMC snapshot, reaching maximum damage retains the item as a **broken stack** rather than deleting it. The equipment-break callback stops its item attribute effects, and ordinary equipment updates exclude broken items from applying those effects. Repairing and reusing retained gear is distinct from finding a replacement. [Wolf Armor](../items/WolfArmor.md#fully-damaged-armor-in-this-snapshot) has a separate absorption path whose missing broken check is documented there. Repair ingredients come from each armor material's tag. The checked Copper, Iron, and Diamond armor tags contain Copper Ingot, Iron Ingot, and Diamond respectively.
 
 Use [Anvil mechanics](AnvilMechanics.md) for repair costs, material amounts, and preserving enchantments. A Grindstone can repair matching pieces but removes non-curse enchantments; choose the method deliberately.
 
@@ -86,3 +86,5 @@ Source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. No 
 - [Diamond chestplate recipe](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/recipe/crafting/diamond_chestplate.json)
 - [Diamond leggings recipe](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/recipe/crafting/diamond_leggings.json)
 - [Diamond boots recipe](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/recipe/crafting/diamond_boots.json)
+
+- [Retained broken-stack durability path](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/ItemStack.java#L449-L485), [broken equipment attribute gate](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/LivingEntity.java#L2650-L2683), and [equipment-break effects](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/LivingEntity.java#L3540-L3553)

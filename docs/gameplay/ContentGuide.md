@@ -65,6 +65,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Rotten Flesh](items/RottenFlesh.md), [String](items/String.md), [Spider Eye](items/SpiderEye.md), and [Fermented Spider Eye](items/FermentedSpiderEye.md): mob resources, food risks, recipes, brewing, and trades
 
+- [Wolf](mobs/Wolf.md) and [Wolf Armor](items/WolfArmor.md): real spawn/food routes, owner care, scute repairs, and fully damaged armor behavior
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
