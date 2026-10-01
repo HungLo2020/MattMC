@@ -35,6 +35,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Status effects](effects/Effects.md): Poison, Wither, Regeneration, and choosing Milk versus Honey
 
+- [Dimensions](dimensions/Dimensions.md): Nether linking/anchors, End arrival/return, and the custom Primordial Caves route
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
@@ -47,6 +49,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [All mobs](mobs/Mobs.md): the existing mob directory, including other integrated animals
 
 ## Alex's Caves additions
+
+- [Primordial Caves](dimensions/PrimordialCaves.md): the active Pitcher Pod portal route and current generation limits
 
 - [Trilocaris](mobs/Trilocaris.md): interaction and drop information; [bucket capture and release](items/BucketOfTrilocaris.md)
 - [Trilocaris Tail](items/TrilocarisTail.md) and [Cooked Trilocaris Tail](items/CookedTrilocarisTail.md): food values and cooking
