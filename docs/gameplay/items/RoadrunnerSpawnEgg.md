@@ -1,18 +1,24 @@
 # Roadrunner Spawn Egg
 
-## Obtaining
+Roadrunner Spawn Egg directly creates a [Roadrunner](../mobs/Roadrunner.md). Its item ID is `minecraft:roadrunner_spawn_egg`, and it is listed in Creative's spawn-egg inventory.
 
-The Roadrunner Spawn Egg is available from the Creative Menu.
+## Placement
 
-## Usage
+Use the egg on a block face with room for the mob. The general egg code places into an empty-collision clicked space or the adjacent face space otherwise. Permissions and server rules still apply.
 
-Use the Roadrunner Spawn Egg on a block to spawn a Roadrunner.
+Prepare an enclosure before placement: the bird has a fast movement attribute, and its name-based speed change can make containment harder.
 
-## Behavior
+No Survival recipe or loot source for this spawn egg is established here. A Creative egg and a registered mob do not establish natural biome spawning; the mob article records the current availability limits.
 
-Spawn eggs are creative utility items. They do not have durability and are primarily used for testing, mapmaking, creative building, and quickly placing mobs into the world.
+## Related pages
 
-## Notes
+- [Roadrunner behavior and care](../mobs/Roadrunner.md)
+- [Items](Items.md)
 
-* This item is registered as `minecraft:roadrunner_spawn_egg`.
-* This mob entry comes from bundled mod content integrated into MattMC.
+## Sources and verification
+
+Reviewed against `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. Source-defined behavior only; no in-game capture, breeding, combat, or persistence test.
+
+- [Spawn egg registry](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/Items.java)
+- [Creative egg inventory](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
+- [Generic placement behavior](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/SpawnEggItem.java)

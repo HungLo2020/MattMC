@@ -63,9 +63,17 @@ Navigation updated: Gameplay, Blocks, Items, Mobs, and Development indexes. New 
 - Updated Blocks and Content Guide navigation. Source remains `9bd57e1d0057903f6a9196e592d5e2a087c9248a`.
 - Validation: required checker and strict build passed on the final 2,104-page tree with 33 indexes; source targets and whitespace checked. No gameplay test.
 
+## Fifth batch: aquatic care and Roadrunner
+
+- Expanded Blobfish and Roadrunner with active-source attributes, interactions, care, breeding/resource mechanics, and natural-spawning verification limits.
+- Expanded Blobfish food, Blobfish bucket, Trilocaris bucket, Roadrunner Feather, and the three mobs' spawn eggs.
+- Explicitly documented Blobfish's Poison food effect, air-handler mismatch, and mismatched custom bucket-data component instead of promising upstream slime protection or full custom-state preservation.
+- Updated Content Guide and Mobs navigation. Source remains `9bd57e1d0057903f6a9196e592d5e2a087c9248a`.
+- Validation: checker and strict build passed on 2,104 pages / 33 indexes; whitespace and source targets checked. No in-game test.
+
 ## Next batches, in priority order
 
-1. Finish the remaining first-cluster item pages: Trilocaris bucket/spawn egg and additional fish/hive pages. Grizzly spawn egg, cod, honeycomb, and Subterranodon/egg now have substantive coverage.
+1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
 2. Extend the completed Limestone/Pewen/Amber family guides with substantive branch/pines/sap behavior and remaining item cross-links. Do not claim the documented integration gaps are repaired.
 3. Continue vanilla essentials beyond the completed crafting table/furnace/chest and crafting/smelting guides: wood/ore tool requirements, food, beds, torches, and basic exploration.
 4. Work through Alex's Mobs by related biome or interaction, pairing mobs with their drops, breeding items, buckets, and equipment. Use registry IDs and active spawn/config sources to track completeness.

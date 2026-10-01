@@ -1,18 +1,24 @@
 # Blobfish Spawn Egg
 
-## Obtaining
+Blobfish Spawn Egg directly creates a [Blobfish](../mobs/Blobfish.md). Its item ID is `minecraft:blobfish_spawn_egg`, and it is listed in Creative's spawn-egg inventory.
 
-The Blobfish Spawn Egg is available from the Creative Menu.
+## Placement
 
-## Usage
+Use the egg on a block face with room for the mob. The general egg code places into an empty-collision clicked space or the adjacent face space otherwise. Permissions and server rules still apply.
 
-Use the Blobfish Spawn Egg on a block to spawn a Blobfish.
+Prepare a water habitat before using the egg. The live mob can lose air on land; creating it successfully does not make dry placement safe.
 
-## Behavior
+No Survival recipe or loot source for this spawn egg is established here. A Creative egg and a registered mob do not establish natural biome spawning; the mob article records the current availability limits.
 
-Spawn eggs are creative utility items. They do not have durability and are primarily used for testing, mapmaking, creative building, and quickly placing mobs into the world.
+## Related pages
 
-## Notes
+- [Blobfish behavior and care](../mobs/Blobfish.md)
+- [Items](Items.md)
 
-* This item is registered as `minecraft:blobfish_spawn_egg`.
-* This mob entry comes from bundled mod content integrated into MattMC.
+## Sources and verification
+
+Reviewed against `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. Source-defined behavior only; no in-game capture, breeding, combat, or persistence test.
+
+- [Spawn egg registry](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/Items.java)
+- [Creative egg inventory](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
+- [Generic placement behavior](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/SpawnEggItem.java)
