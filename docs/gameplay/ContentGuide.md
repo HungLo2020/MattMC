@@ -4,6 +4,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Vanilla-derived gameplay
 
+- [Bow](items/Bow.md) and [Crossbow](items/Crossbow.md): draw/load controls, ammunition selection, Infinity, rockets, enchantments, and wear
+
 - [Transport](mechanics/Transport.md): boats, chest storage, minecart controls, track construction, and stopping safely
 
 - [Oak](blocks/Oak.md), [Logs](items/OakLog.md), [Planks](items/OakPlanks.md), [Saplings](items/OakSapling.md), and [Sticks](items/Stick.md): the renewable beginner wood loop
