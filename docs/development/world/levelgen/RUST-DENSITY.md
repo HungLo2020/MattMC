@@ -26,6 +26,10 @@ construction, context traversal, caches and interpolation. Supported chunk-bound
 transforms. Blending, Y-clamped gradients and unsupported spline contexts retain
 their Java implementations. Extension-owned functions retain their own behavior.
 
+[Structure terrain adjustment](RUST-BEARDIFIER.md) evaluates factory-owned
+Beardifier geometry across a complete terrain cell in Rust. Java retains scalar
+and custom-provider traversal; geometry is refreshed for every native fill.
+
 The [aquifer path](RUST-AQUIFER.md) consumes completed density cells. Normal block
 interpolation now defers unused Z lerps while retaining the same staging and read
 behavior; cell-filling interpolation order is unchanged.

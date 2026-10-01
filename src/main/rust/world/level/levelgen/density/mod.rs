@@ -1,4 +1,5 @@
 //! Density arithmetic, immutable programs and cell evaluation.
+mod beardifier;
 mod cell;
 mod end_islands;
 mod evaluator;

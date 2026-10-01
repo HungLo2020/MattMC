@@ -4,7 +4,7 @@
 
 World generation lives under `src/main/rust/world/level/levelgen/`. Noise
 synthesis (`synth`), density evaluation (`density`), aquifer evaluation (`aquifer`),
-and surface evaluation (`surface`) are separate domains. Biome corner selection and
+surface evaluation (`surface`), and feature geometry (`feature`) are separate domains. Biome corner selection and
 [climate lookup](../biome/RUST-CLIMATE.md) live under `world/level/biome/`.
 Surface evaluation consumes biome corner selection's column results.
 
@@ -21,6 +21,7 @@ world/level/
     ├── math.rs
     ├── synth/       # Noise families, their optimized kernels, state and FFI
     ├── density/     # Programs, evaluation, cell kernels, End islands and FFI
+    ├── feature/     # Ore sphere construction, pruning, rasterization and FFI
     ├── aquifer/     # Center search, material/fluid decisions, cell batches and FFI
     └── surface/     # Rule program, resumable frame, evaluation and FFI
 ```
@@ -59,6 +60,10 @@ existing symbol names, including `mattmc_noise_end_island` for ABI compatibility
 transforms and its FFI. See [terrain splines](RUST-SPLINE.md) for caller boundaries
 and focused verification.
 
+`beardifier/` owns structure terrain-cell geometry validation and ordered
+adjustment evaluation. See [structure terrain adjustment](RUST-BEARDIFIER.md)
+for the Java ownership boundary and original-Java replay checks.
+
 Shared interpolation lives in `levelgen/math.rs`; density no longer depends on
 the noise module for generic interpolation.
 
@@ -70,6 +75,12 @@ column scan and rule loop, including its yields before external requests.
 `ffi.rs` owns the existing surface exports, including the compatibility adapter
 for biome column selection. Java still owns ordered block commits and external
 conditions/rules.
+
+### Feature geometry
+
+`feature/ore/` owns ore spheres and ordered spans. Java retains random sources,
+block rules and writes. See [ore geometry](feature/RUST-ORE.md) for compatibility
+constraints and focused verification.
 
 ### Java integration
 

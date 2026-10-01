@@ -18,7 +18,7 @@ import net.minecraft.world.level.levelgen.structure.pools.JigsawJunction;
 import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
 import org.jetbrains.annotations.Nullable;
 
-public class Beardifier implements DensityFunctions.BeardifierOrMarker {
+public class JavaBeardifier implements DensityFunctions.BeardifierOrMarker {
 	public static final int BEARD_KERNEL_RADIUS = 12;
 	private static final int BEARD_KERNEL_SIZE = 24;
 	private static final float[] BEARD_KERNEL = Util.make(new float[13824], fs -> {
@@ -30,30 +30,20 @@ public class Beardifier implements DensityFunctions.BeardifierOrMarker {
 			}
 		}
 	});
-	public static final Beardifier EMPTY = new Beardifier(List.of(), List.of(), null);
-	private final List<Beardifier.Rigid> pieces;
+	public static final JavaBeardifier EMPTY = new JavaBeardifier(List.of(), List.of(), null);
+	private final List<JavaBeardifier.Rigid> pieces;
 	private final List<JigsawJunction> junctions;
 	@Nullable
 	private final BoundingBox affectedBox;
-    @Nullable
-    private final NativeBeardifier nativeCells;
 
-    // The table is constructed using the original Java Math.pow operation.
-    // Native evaluation consumes these exact float bits, avoiding libm differences.
-    static float[] nativeKernel() { return BEARD_KERNEL; }
-
-    static Beardifier forGeometry(List<Rigid> pieces, List<JigsawJunction> junctions, BoundingBox bounds) {
-        return new Beardifier(List.copyOf(pieces), List.copyOf(junctions), bounds, true);
-    }
-
-	public static Beardifier forStructuresInChunk(StructureManager structureManager, ChunkPos chunkPos) {
+	public static JavaBeardifier forStructuresInChunk(StructureManager structureManager, ChunkPos chunkPos) {
 		List<StructureStart> list = structureManager.startsForStructure(chunkPos, structure -> structure.terrainAdaptation() != TerrainAdjustment.NONE);
 		if (list.isEmpty()) {
 			return EMPTY;
 		} else {
 			int i = chunkPos.getMinBlockX();
 			int j = chunkPos.getMinBlockZ();
-			List<Beardifier.Rigid> list2 = new ArrayList();
+			List<JavaBeardifier.Rigid> list2 = new ArrayList();
 			List<JigsawJunction> list3 = new ArrayList();
 			BoundingBox boundingBox = null;
 
@@ -65,7 +55,7 @@ public class Beardifier implements DensityFunctions.BeardifierOrMarker {
 						if (structurePiece instanceof PoolElementStructurePiece poolElementStructurePiece) {
 							StructureTemplatePool.Projection projection = poolElementStructurePiece.getElement().getProjection();
 							if (projection == StructureTemplatePool.Projection.RIGID) {
-								list2.add(new Beardifier.Rigid(poolElementStructurePiece.getBoundingBox(), terrainAdjustment, poolElementStructurePiece.getGroundLevelDelta()));
+								list2.add(new JavaBeardifier.Rigid(poolElementStructurePiece.getBoundingBox(), terrainAdjustment, poolElementStructurePiece.getGroundLevelDelta()));
 								boundingBox = includeBoundingBox(boundingBox, structurePiece.getBoundingBox());
 							}
 
@@ -79,7 +69,7 @@ public class Beardifier implements DensityFunctions.BeardifierOrMarker {
 								}
 							}
 						} else {
-							list2.add(new Beardifier.Rigid(structurePiece.getBoundingBox(), terrainAdjustment, 0));
+							list2.add(new JavaBeardifier.Rigid(structurePiece.getBoundingBox(), terrainAdjustment, 0));
 							boundingBox = includeBoundingBox(boundingBox, structurePiece.getBoundingBox());
 						}
 					}
@@ -90,7 +80,7 @@ public class Beardifier implements DensityFunctions.BeardifierOrMarker {
 				return EMPTY;
 			} else {
 				BoundingBox boundingBox3 = boundingBox.inflatedBy(24);
-				return forGeometry(list2, list3, boundingBox3);
+				return new JavaBeardifier(List.copyOf(list2), List.copyOf(list3), boundingBox3);
 			}
 		}
 	}
@@ -100,25 +90,16 @@ public class Beardifier implements DensityFunctions.BeardifierOrMarker {
 	}
 
 	@VisibleForTesting
-	public Beardifier(List<Beardifier.Rigid> list, List<JigsawJunction> list2, @Nullable BoundingBox boundingBox) {
-        this(list, list2, boundingBox, false);
-    }
-
-    private Beardifier(List<Beardifier.Rigid> list, List<JigsawJunction> list2, @Nullable BoundingBox boundingBox, boolean owned) {
+	public JavaBeardifier(List<JavaBeardifier.Rigid> list, List<JigsawJunction> list2, @Nullable BoundingBox boundingBox) {
 		this.pieces = list;
 		this.junctions = list2;
 		this.affectedBox = boundingBox;
-        this.nativeCells = owned ? NativeBeardifier.create(list, list2, boundingBox) : null;
 	}
 
 	@Override
 	public void fillArray(double[] ds, DensityFunction.ContextProvider contextProvider) {
 		if (this.affectedBox == null) {
 			Arrays.fill(ds, 0.0);
-		} else if (this.nativeCells != null && this.getClass() == Beardifier.class
-            && contextProvider.getClass() == NoiseChunk.class
-            && this.nativeCells.fill(ds, (NoiseChunk)contextProvider)) {
-            // The native cell restores the same final provider coordinates/index.
 		} else {
 			DensityFunctions.BeardifierOrMarker.super.fillArray(ds, contextProvider);
 		}
@@ -137,7 +118,7 @@ public class Beardifier implements DensityFunctions.BeardifierOrMarker {
 			} else {
 				double d = 0.0;
 
-				for (Beardifier.Rigid rigid : this.pieces) {
+				for (JavaBeardifier.Rigid rigid : this.pieces) {
 					BoundingBox boundingBox = rigid.box();
 					int l = rigid.groundLevelDelta();
 					int m = Math.max(0, Math.max(boundingBox.minX() - i, i - boundingBox.maxX()));
