@@ -6,6 +6,7 @@ mod ffi;
 mod math;
 mod operations;
 mod program;
+mod spline;
 #[cfg(test)]
 mod tests;
 mod unary;

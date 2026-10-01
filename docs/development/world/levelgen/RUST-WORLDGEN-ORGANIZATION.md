@@ -55,6 +55,10 @@ evaluation and specialized terrain, unary, and AVX2 kernels. `end_islands.rs`
 owns End terrain policy and consumes Simplex synthesis. `ffi.rs` keeps all
 existing symbol names, including `mattmc_noise_end_island` for ABI compatibility.
 
+`spline/` owns validated curve layouts, exact float evaluation, fused coordinate
+transforms and its FFI. See [terrain splines](RUST-SPLINE.md) for caller boundaries
+and focused verification.
+
 Shared interpolation lives in `levelgen/math.rs`; density no longer depends on
 the noise module for generic interpolation.
 

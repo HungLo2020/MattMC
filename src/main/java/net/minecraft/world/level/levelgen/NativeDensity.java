@@ -18,6 +18,7 @@ final class NativeDensity implements DensityFunction {
             else if(f instanceof NativeUnary n)f=n.source;
             else if(f instanceof NativeOperands n)f=n.source;
             else if(f instanceof NativeCellDensity n)f=n.source;
+            else if(f instanceof NativeSpline n)f=n.source;
             else return f;
         }
     }

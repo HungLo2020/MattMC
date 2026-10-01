@@ -1109,7 +1109,7 @@ public final class DensityFunctions {
 
 		@Override
 		public DensityFunction mapAll(DensityFunction.Visitor visitor) {
-			return visitor.apply(new DensityFunctions.Spline(this.spline.mapAll(coordinate -> coordinate.mapAll(visitor))));
+			return NativeSpline.mapSpline(this, visitor);
 		}
 
 		@Override

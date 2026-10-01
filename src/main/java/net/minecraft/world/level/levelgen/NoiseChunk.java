@@ -33,6 +33,9 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 	final List<NoiseChunk.NoiseInterpolator> interpolators;
 	final List<NoiseChunk.CacheAllInCell> cellCaches;
 	private final Map<DensityFunction, DensityFunction> wrapped = new HashMap();
+    private final DensityFunction.Visitor wrappingVisitor = getClass() == NoiseChunk.class
+        ? (NativeSpline.StableVisitor)this::wrap : this::wrap;
+    DensityFunction.Visitor splineWrappingVisitor() { return wrappingVisitor; }
 	private final Long2IntMap preliminarySurfaceLevelCache = new Long2IntOpenHashMap();
 	private final Aquifer aquifer;
 	private final DensityFunction preliminarySurfaceLevel;
@@ -151,7 +154,7 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		}
 
 		NoiseRouter noiseRouter = randomState.router();
-		NoiseRouter noiseRouter2 = noiseRouter.mapAll(this::wrap);
+		NoiseRouter noiseRouter2 = noiseRouter.mapAll(this.wrappingVisitor);
 		this.preliminarySurfaceLevel = this.randomState.optimizeUnary(noiseRouter2.preliminarySurfaceLevel());
 		if (!noiseGeneratorSettings.isAquifersEnabled()) {
 			this.aquifer = Aquifer.createDisabled(fluidPicker);
@@ -165,7 +168,7 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		DensityFunction densityFunction = DensityFunctions.cacheAllInCell(
 				DensityFunctions.add(noiseRouter2.finalDensity(), DensityFunctions.BeardifierMarker.INSTANCE)
 			)
-			.mapAll(this::wrap);
+			.mapAll(this.wrappingVisitor);
 		if (densityFunction instanceof CacheAllInCell cache) this.aquiferDensity = cache;
         if(this.aquifer instanceof Aquifer.NoiseBasedAquifer enabled) {
             list.add(context -> enabled.computeMaterial(context,densityFunction.compute(context)));
@@ -181,12 +184,12 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 
 	protected Climate.Sampler cachedClimateSampler(NoiseRouter noiseRouter, List<Climate.ParameterPoint> list) {
 		return new Climate.Sampler(
-			noiseRouter.temperature().mapAll(this::wrap),
-			noiseRouter.vegetation().mapAll(this::wrap),
-			noiseRouter.continents().mapAll(this::wrap),
-			noiseRouter.erosion().mapAll(this::wrap),
-			noiseRouter.depth().mapAll(this::wrap),
-			noiseRouter.ridges().mapAll(this::wrap),
+			noiseRouter.temperature().mapAll(this.wrappingVisitor),
+			noiseRouter.vegetation().mapAll(this.wrappingVisitor),
+			noiseRouter.continents().mapAll(this.wrappingVisitor),
+			noiseRouter.erosion().mapAll(this.wrappingVisitor),
+			noiseRouter.depth().mapAll(this.wrappingVisitor),
+			noiseRouter.ridges().mapAll(this.wrappingVisitor),
 			list
 		);
 	}
@@ -658,6 +661,19 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 	}
 
 	class FlatCache implements DensityFunctions.MarkerOrMarked, NoiseChunk.NoiseChunkDensityFunction {
+		boolean containsSplinePoint(DensityFunction.FunctionContext context) {
+			return this.splineCacheIndex(context) >= 0;
+		}
+		boolean sameSplineGrid(FlatCache other) {
+			return this.sizeXZ == other.sizeXZ && this.gridX() == other.gridX() && this.gridZ() == other.gridZ();
+		}
+		private int gridX() { return NoiseChunk.this.firstNoiseX; }
+		private int gridZ() { return NoiseChunk.this.firstNoiseZ; }
+		int splineCacheIndex(DensityFunction.FunctionContext context) {
+			int x = QuartPos.fromBlock(context.blockX()) - NoiseChunk.this.firstNoiseX;
+			int z = QuartPos.fromBlock(context.blockZ()) - NoiseChunk.this.firstNoiseZ;
+			return x >= 0 && z >= 0 && x < this.sizeXZ && z < this.sizeXZ ? x + z * this.sizeXZ : -1;
+		}
 		private final DensityFunction noiseFiller;
         private final DensityFunction evaluator;
 		final double[] values;

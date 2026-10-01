@@ -60,7 +60,9 @@ final class NativeUnary implements DensityFunction {
         DensityFunction cell=NativeCellDensity.compile(f,cells);
         if(cell!=f){seen.put(f,cell);return cell;}
         DensityFunction result=f;
-        if(f instanceof DensityFunctions.Mapped n) {
+        if(f instanceof DensityFunctions.Spline n) {
+            result=NativeSpline.compile(n);
+        } else if(f instanceof DensityFunctions.Mapped n) {
             result=new DensityFunctions.Mapped(n.type(),tree(n.input(),programs,operands,cells,seen,depth+1),n.minValue(),n.maxValue());
         } else if(f instanceof DensityFunctions.MulOrAdd n) {
             result=new DensityFunctions.MulOrAdd(n.specificType(),tree(n.input(),programs,operands,cells,seen,depth+1),n.minValue(),n.maxValue(),n.argument());

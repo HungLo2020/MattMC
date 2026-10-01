@@ -21,10 +21,10 @@ the sealed, read-only `synth.NativeNoiseState` view, which adds no allocation
 and preserves snapshot identity. See [module organization](RUST-WORLDGEN-ORGANIZATION.md).
 
 Java still owns graph construction, metadata bounds, serialization, seed/state
-construction, context traversal, caches and interpolation. Operations that were
-never migrated, such as spline evaluation, blending and Y-clamped gradients,
-retain their existing Java implementations. Extension-owned functions likewise
-retain their own behavior; this cutover does not port arbitrary plugin code.
+construction, context traversal, caches and interpolation. Supported chunk-bound
+[terrain splines](RUST-SPLINE.md) use private Rust plans with fused coordinate
+transforms. Blending, Y-clamped gradients and unsupported spline contexts retain
+their Java implementations. Extension-owned functions retain their own behavior.
 
 The [aquifer path](RUST-AQUIFER.md) consumes completed density cells. Normal block
 interpolation now defers unused Z lerps while retaining the same staging and read
