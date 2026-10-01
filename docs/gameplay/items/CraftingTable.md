@@ -1,17 +1,21 @@
 # Crafting Table
 
-## Obtaining
+Crafting Table is the placeable item for the [Crafting Table block](../blocks/CraftingTable.md), which opens a 3 × 3 crafting grid. Its ID is `minecraft:crafting_table`.
 
-Crafting Table is crafted from matching wood materials and can also be obtained from the Creative Menu.
+## Obtaining and use
 
-## Usage
+Craft four planks-tag items in a 2 × 2 square. Place the result and interact with the block to use it. The block article owns the complete recipe, collection rules, and operating guidance.
 
-Crafting Table is used for travel across water. Place it, enter it, and steer it like other small watercraft.
+Tags determine accepted ingredients; similarly named integrated materials are not automatically interchangeable. See the block page before assuming a custom block can substitute in this recipe.
 
-## Behavior
+## Related pages
 
-It can carry riders and can be broken to return itself as an item. Chest variants also provide mobile storage and drop their contents when broken.
+- [Crafting Table: recipe and block behavior](../blocks/CraftingTable.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:crafting_table` block.
+Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. This is not a gameplay test; data packs and later builds can change recipes and tags.
+
+- [Crafting recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/crafting_table.json)
+- [Item registration](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/Items.java)

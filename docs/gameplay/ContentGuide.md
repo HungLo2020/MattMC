@@ -7,6 +7,9 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Stone](blocks/Stone.md): collecting stone instead of cobblestone, smelting, and construction recipes
 - [Cow](mobs/Cow.md): food, breeding, milking, and drops
 
+- [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations and storage
+- [Crafting](crafting/Crafting.md) and [Smelting](smelting/Smelting.md): current recipes, device types, and troubleshooting
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

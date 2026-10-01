@@ -55,11 +55,19 @@ Navigation updated: Gameplay, Blocks, Items, Mobs, and Development indexes. New 
 - Updated Blocks and Content Guide navigation. Source remains `9bd57e1d0057903f6a9196e592d5e2a087c9248a`; no source sync was required at batch start.
 - Validation: required checker and strict build passed on the final 2,101-page tree with 33 indexes; source paths and whitespace checked. No gameplay test.
 
+## Fourth batch: workstations and player guides
+
+- Added Crafting Table, Furnace, and Chest block articles with recipes, ingredient-tag conditions, operation, fuel/capacity details, and troubleshooting.
+- Rewrote the three corresponding item pages to point to their canonical block guides.
+- Expanded the formerly heading-only Crafting and Smelting category pages into practical introductions with verified recipes and device distinctions.
+- Updated Blocks and Content Guide navigation. Source remains `9bd57e1d0057903f6a9196e592d5e2a087c9248a`.
+- Validation: required checker and strict build passed on the final 2,104-page tree with 33 indexes; source targets and whitespace checked. No gameplay test.
+
 ## Next batches, in priority order
 
 1. Finish the remaining first-cluster item pages: Trilocaris bucket/spawn egg and additional fish/hive pages. Grizzly spawn egg, cod, honeycomb, and Subterranodon/egg now have substantive coverage.
 2. Extend the completed Limestone/Pewen/Amber family guides with substantive branch/pines/sap behavior and remaining item cross-links. Do not claim the documented integration gaps are repaired.
-3. Add source-reviewed vanilla essentials: crafting table, furnace, chest, wood/ore tool requirements and food. Upgrade related crafting/smelting category guides with actual recipes.
+3. Continue vanilla essentials beyond the completed crafting table/furnace/chest and crafting/smelting guides: wood/ore tool requirements, food, beds, torches, and basic exploration.
 4. Work through Alex's Mobs by related biome or interaction, pairing mobs with their drops, breeding items, buckets, and equipment. Use registry IDs and active spawn/config sources to track completeness.
 5. Work through integrated Alex's Caves by actually registered biome, mob, block and item clusters; do not assume all upstream biomes exist.
 6. Broaden all 17 gameplay categories, including world/dimension discovery, effects/enchantments, structures, redstone, trading, and commands. Select content from the current registries/data, not an external wiki page list.

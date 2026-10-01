@@ -2,6 +2,12 @@
 
 Blocks are the placed parts of the world: terrain, building materials, plants, lighting, and functional objects. This index is being expanded with MattMC-specific behavior and acquisition details.
 
+## Workstations and storage
+
+- [Crafting Table](CraftingTable.md): 3 × 3 crafting, recipe tags, and grid cleanup
+- [Furnace](Furnace.md): crafting, fuels, processing, and troubleshooting
+- [Chest](Chest.md): storage, double-chest placement, and blocked lids
+
 ## Stone and construction
 
 - [Stone](Stone.md): mining drops, Silk Touch, smelting, and basic recipes
