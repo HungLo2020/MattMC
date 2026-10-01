@@ -12,6 +12,8 @@ For renewable Wolf Armor materials, see [Armadillo](Armadillo.md), [Scutes](../i
 
 For integrated large-animal behavior and availability limits, see [Rhinoceros](Rhinoceros.md) and [Komodo Dragon](KomodoDragon.md).
 
+For renewable farm resources, see [Sheep](Sheep.md), [White Wool](../items/WhiteWool.md), [Chicken](Chicken.md), and [Egg](../items/Egg.md).
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs
