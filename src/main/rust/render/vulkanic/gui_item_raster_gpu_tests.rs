@@ -6,9 +6,9 @@ use crate::render::vulkanic::gui_item_material::{GuiAffineMaterial, GuiFlatItemL
 use crate::render::vulkanic::gui_item_raster::{
     GuiItemRasterLayout, GuiItemRasterRows, GuiItemRasterTarget,
 };
-use crate::render::vulkanic::world_primitive_frontend::{
-    WorldMeshTextureAssetPayload, WorldPrimitiveFrontend, WORLD_MATERIAL_TEXTURE_STONE,
-};
+use crate::render::worldrender::WorldMeshTextureAssetPayload;
+use crate::render::worldrender::WorldPrimitiveFrontend;
+use crate::render::scene::textures::WORLD_MATERIAL_TEXTURE_STONE;
 
 const ITEM_TINTS: [u32; 9] = [
     0xFFFF8040, 0xFF40FF80, 0xFF8040FF, 0xFFFFFFFF, 0xFF80FFFF, 0xFFFF80FF, 0xFFFFFF80, 0xFF808080,
@@ -997,7 +997,7 @@ fn raster_and_composite_animation(
         for (frame_scale, generation) in lifecycle_frames {
             let tinted = (6..22).contains(&generation);
             if generation == 22 {
-                use crate::render::vulkanic::sprite_interpolation::{
+                use crate::render::shared::sprite_interpolation::{
                     AtlasAnimationTickEvent, OwnedAtlasAnimationUpdate, OwnedSpriteAnimation,
                     SpriteAnimationClock, SpriteAnimationFrame, SpriteAtlasRegion, SpriteMipSheet,
                 };

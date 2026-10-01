@@ -1,29 +1,43 @@
 use super::*;
 use crate::render::shaderpack::vanilla::lightmap::{VanillaLightmapFrame, VanillaLightmapInputs};
-use crate::render::vulkanic::world_primitive_frontend::material as world_material_semantics;
-use crate::render::vulkanic::world_primitive_frontend::world_text::{
+use crate::render::worldrender::frame::material_quads as world_material_semantics;
+use crate::render::worldrender::features::world_text::{
     WorldTextImageAsset, WorldTextImageFormat, WorldTextQuadRequest, MAX_WORLD_TEXT_IMAGES,
     MAX_WORLD_TEXT_IMAGE_BYTES_TOTAL, WORLD_TEXT_DEPTH_NORMAL, WORLD_TEXT_DEPTH_POLYGON_OFFSET,
     WORLD_TEXT_DEPTH_SEE_THROUGH,
 };
-use crate::render::vulkanic::world_primitive_frontend::{
-    WorldDistantHorizonsGenericBoxRequest, WorldFeatureCoverageFrame, WorldFirstPersonFrame,
-    WorldLodRenderFrame, WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_MAX_COLUMNS,
-    WORLD_LOD_MAX_NORMAL_INDEX, WORLD_LOD_MAX_SEGMENTS_PER_COLUMN,
-    WORLD_LOD_MAX_VERTICES_PER_SEGMENT, WORLD_LOD_MAX_VISIBLE_SEGMENTS,
-    WORLD_MATERIAL_SOURCE_CLOUDS, WORLD_MATERIAL_SOURCE_ENTITY_MODEL,
-    WORLD_MATERIAL_SOURCE_PARTICLES, WORLD_MATERIAL_SOURCE_TEXTURED,
-    WORLD_MATERIAL_SOURCE_UNSPECIFIED, WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
-    WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS, WORLD_MATERIAL_SOURCE_WEATHER,
-    WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS, WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY,
-    WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY,
-    WORLD_MESH_SECTION_ALL, WORLD_STRATUM_DH_GENERIC,
-};
+use crate::render::worldrender::WorldDistantHorizonsGenericBoxRequest;
+use crate::render::worldrender::WorldFeatureCoverageFrame;
+use crate::render::worldrender::WorldFirstPersonFrame;
+use crate::render::worldrender::WorldLodRenderFrame;
+use crate::render::worldrender::WorldShaderEnvironmentFrame;
+use crate::render::worldrender::WorldVoxelVolumeFrame;
+use crate::render::worldrender::WORLD_LOD_MAX_COLUMNS;
+use crate::render::worldrender::WORLD_LOD_MAX_NORMAL_INDEX;
+use crate::render::worldrender::WORLD_LOD_MAX_SEGMENTS_PER_COLUMN;
+use crate::render::worldrender::WORLD_LOD_MAX_VERTICES_PER_SEGMENT;
+use crate::render::worldrender::WORLD_LOD_MAX_VISIBLE_SEGMENTS;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_CLOUDS;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_ENTITY_MODEL;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_PARTICLES;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_TEXTURED;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_UNSPECIFIED;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_WEATHER;
+use crate::render::scene::mesh::WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS;
+use crate::render::scene::mesh::WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY;
+use crate::render::scene::mesh::WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY;
+use crate::render::scene::mesh::WORLD_MESH_SECTION_ALL;
+use crate::render::scene::strata::WORLD_STRATUM_DH_GENERIC;
 #[cfg(test)]
-use crate::render::vulkanic::world_primitive_frontend::{
-    WORLD_MATERIAL_ID_OPAQUE_TEXTURED, WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
-    WORLD_MATERIAL_TEXTURE_GENERATED_WHITE, WORLD_STRATUM_DH_GENERIC_SSAO,
-};
+use crate::render::scene::material::WORLD_MATERIAL_ID_OPAQUE_TEXTURED;
+#[cfg(test)]
+use crate::render::scene::material::WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+#[cfg(test)]
+use crate::render::scene::textures::WORLD_MATERIAL_TEXTURE_GENERATED_WHITE;
+#[cfg(test)]
+use crate::render::scene::strata::WORLD_STRATUM_DH_GENERIC_SSAO;
 use std::collections::BTreeSet;
 
 const DH_GENERIC_BOX_FACE_COUNT: usize = 6;
@@ -275,8 +289,8 @@ fn decode_model_submission_order(instance: &FfiWorldMeshInstanceRecord) -> GalRe
 
 fn decode_world_item_foil(
     instance: &FfiWorldMeshInstanceRecord,
-) -> GalResult<Option<super::super::item_foil::StandardItemFoil>> {
-    let foil = super::super::item_foil::StandardItemFoil::decode(
+) -> GalResult<Option<crate::render::shared::item_foil::StandardItemFoil>> {
+    let foil = crate::render::shared::item_foil::StandardItemFoil::decode(
         instance.item_foil_mode,
         instance.item_foil_clock_millis,
         instance.item_foil_speed,
@@ -298,8 +312,8 @@ fn decode_world_item_foil(
 fn decode_world_decal_foil(
     instance: &FfiWorldMeshInstanceRecord,
     first_person: bool,
-) -> GalResult<Option<super::super::world_item_foil::WorldDecalFoilProjection>> {
-    let decal = super::super::world_item_foil::WorldDecalFoilProjection::decode(
+) -> GalResult<Option<crate::render::worldrender::features::decal_foil::WorldDecalFoilProjection>> {
+    let decal = crate::render::worldrender::features::decal_foil::WorldDecalFoilProjection::decode(
         instance.decal_foil_mode,
         instance.decal_normal_mode,
         instance.decal_model_pose,
@@ -307,7 +321,7 @@ fn decode_world_decal_foil(
     )?;
     if let Some(value) = decal {
         let foil = decode_world_item_foil(instance)?;
-        if !matches!(foil, Some(f) if f.kind == super::super::item_foil::StandardFoilKind::Item)
+        if !matches!(foil, Some(f) if f.kind == crate::render::shared::item_foil::StandardFoilKind::Item)
             || value.first_person != first_person
             || value.model_pose != instance.transform
         {
@@ -326,7 +340,7 @@ fn is_world_mesh_stratum(stratum: u32) -> bool {
             | WORLD_STRATUM_OPAQUE_TEXTURED_GEOMETRY
             | WORLD_STRATUM_MOVING_MESH
             | WORLD_STRATUM_ENTITY_MESH
-            | super::super::world_primitive_frontend::WORLD_STRATUM_ENTITY_SHADOW_CASTER
+            | crate::render::scene::strata::WORLD_STRATUM_ENTITY_SHADOW_CASTER
     )
 }
 
@@ -366,7 +380,7 @@ fn validate_mesh_instance_semantic_identity(
             format!("{label} contains invalid packed vanilla UV2 light"),
         ));
     }
-    super::super::view_layering::validate_flags(
+    crate::render::shared::view_layering::validate_flags(
         if instance.stratum == WORLD_STRATUM_TERRAIN {
             instance.flags & !WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY
         } else {
@@ -381,7 +395,7 @@ fn validate_mesh_instance_semantic_identity(
         & !(WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY
             | WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS
             | WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY
-            | super::super::view_layering::FLAGS)
+            | crate::render::shared::view_layering::FLAGS)
         != 0
     {
         return Err(GalError::ffi(
@@ -442,7 +456,7 @@ fn decode_mesh_instance_transform(instance: &FfiWorldMeshInstanceRecord) -> GalR
                     1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                 ] =>
         {
-            crate::render::vulkanic::terrain::placement::TerrainSectionPlacement {
+            crate::render::worldrender::terrain::placement::TerrainSectionPlacement {
                 origin: instance.terrain_origin,
                 camera: instance.terrain_camera,
             }
@@ -1021,8 +1035,8 @@ pub(crate) fn merge_particle_semantics(
                 "invalid particle surface or material ordering",
             ));
         }
-        let surface = crate::render::vulkanic::world_primitive_frontend::particle::ParticleSurface::from_wire(p.surface_kind)?;
-        let quad = crate::render::vulkanic::world_primitive_frontend::particle::ParticleQuad {
+        let surface = crate::render::worldrender::features::particle::ParticleSurface::from_wire(p.surface_kind)?;
+        let quad = crate::render::worldrender::features::particle::ParticleQuad {
             center: p.center,
             rotation: p.rotation,
             size: p.size,
@@ -1169,7 +1183,7 @@ pub(crate) fn merge_experience_orb_instances(
                 "invalid orb placement ordering or reserved bits",
             ));
         }
-        let instance = crate::render::vulkanic::world_primitive_frontend::experience_orb::ExperienceOrbPlacement {
+        let instance = crate::render::worldrender::features::experience_orb::ExperienceOrbPlacement {
             entity_transform: orb.entity_transform,
             camera_orientation: orb.camera_orientation,
             entity_id: orb.entity_id,
@@ -1504,7 +1518,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
     }
     // Material quads have their own frame bound (clouds at the default
     // cloud range exceed the generic 65,536 FFI item bound).
-    let max_material_quads = super::super::world_primitive_frontend::WORLD_MAX_MATERIAL_QUADS;
+    let max_material_quads = crate::render::worldrender::WORLD_MAX_MATERIAL_QUADS;
     if raw_materials.len() > max_material_quads {
         return Err(GalError::ffi(
             StatusCode::InvalidArgument,
@@ -3140,7 +3154,7 @@ pub(crate) fn decode_world_background_request(
         store_intent: request.store_intent,
         viewport_width,
         viewport_height,
-        sky: crate::render::vulkanic::world_primitive_frontend::WorldSkyRequest {
+        sky: crate::render::worldrender::WorldSkyRequest {
             visible: bool_flag(request.sky_visible, "world sky visible")?,
             sunrise_or_sunset: bool_flag(
                 request.sky_sunrise_or_sunset,
@@ -3439,14 +3453,14 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_whole_frame_submit(
                         "whole-frame.gpu-profile frame={} total_nanos={} dh_opaque_nanos={} terrain_opaque_nanos={} terrain_cutout_nanos={} shadow_nanos={} deferred_nanos={} composite0_nanos={} composite1_nanos={} final_nanos={}",
                         world_frame_id,
                         world_stats.profile.gpu_frame_total_nanos,
-                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::DISTANT_HORIZONS_OPAQUE)],
-                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::TERRAIN_OPAQUE)],
-                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::TERRAIN_CUTOUT)],
-                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::SHADOW_DEPTH)],
-                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::DEFERRED_LIGHTING)],
-                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::COMPOSITE_0)],
-                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::COMPOSITE_1)],
-                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::FINAL_OUTPUT)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::DISTANT_HORIZONS_OPAQUE)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::TERRAIN_OPAQUE)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::TERRAIN_CUTOUT)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::SHADOW_DEPTH)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::DEFERRED_LIGHTING)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::COMPOSITE_0)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::COMPOSITE_1)],
+                        world_stats.profile.gpu_scope_nanos[usize::from(crate::render::worldrender::diagnostics::gpu_profile_scopes::FINAL_OUTPUT)],
                     ));
                     if let Some((parents, children)) = tiled_receipt {
                         eprintln!("whole-frame.gui-tiles.submitted frame={} parents={} children={}",

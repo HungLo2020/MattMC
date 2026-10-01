@@ -1,6 +1,6 @@
 use super::*;
 use crate::render::vulkanic::metrics::WholeFrameProfile;
-use crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes as scopes;
+use crate::render::worldrender::diagnostics::gpu_profile_scopes as scopes;
 
 pub fn status_result_from_error(error: &GalError) -> FfiStatusResult {
     FfiStatusResult {

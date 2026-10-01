@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash as hashing;
 
 use super::backends::{
-    Backend, BackendCreateDesc, BackendRuntimeMetrics, BackendToken, CompletedHostRead,
+    Backend, BackendCreateDesc, BackendRuntimeMetrics, BackendToken,
 };
 use super::commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, CommandList, CommandListDesc,
@@ -19,6 +19,8 @@ use super::frame::{
 use super::handles::{Handle, HandleKind, MAX_GENERATION};
 use super::metrics::{elapsed_nanos_u64, Metrics, WholeFrameProfile};
 use super::resources::*;
+/// Bytes read back from a buffer by a completed submission.
+pub use super::backends::CompletedHostRead;
 use super::sync::{RetirementQueue, SubmissionId, SyncToken};
 
 /// Hard ceiling for one explicit handle arena. Frontend-specific residency
@@ -200,12 +202,12 @@ struct PendingDestroy {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct TextureViewInfo {
-    pub(super) texture: Handle,
-    pub(super) format: TextureFormat,
-    pub(super) extent: Extent3d,
-    pub(super) range: TextureSubresourceRange,
-    pub(super) usages: Vec<TextureUsage>,
+pub(crate) struct TextureViewInfo {
+    pub(crate) texture: Handle,
+    pub(crate) format: TextureFormat,
+    pub(crate) extent: Extent3d,
+    pub(crate) range: TextureSubresourceRange,
+    pub(crate) usages: Vec<TextureUsage>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -533,7 +535,7 @@ impl VulkanicGal {
     /// Backend-neutral debug capture for tests: the active backend starts a
     /// RenderDoc capture if requested, ending when the guard drops.
     #[cfg(test)]
-    pub(in crate::render::vulkanic) fn begin_debug_capture(&self) -> Option<Box<dyn std::any::Any>> {
+    pub(crate) fn begin_debug_capture(&self) -> Option<Box<dyn std::any::Any>> {
         self.backend.begin_debug_capture()
     }
 
@@ -808,7 +810,7 @@ impl VulkanicGal {
     /// Returns the semantic extent of a render or acquired frame target.
     /// Frontends use this to size private intermediate resources without
     /// reaching into backend framebuffers or native images.
-    pub(in crate::render::vulkanic) fn pass_target_extent(
+    pub fn pass_target_extent(
         &self,
         handle: Handle,
     ) -> GalResult<Extent3d> {
@@ -825,7 +827,7 @@ impl VulkanicGal {
     /// Resolves the color attachment texture behind an owned render target.
     /// This is an explicit GAL resource identity, never a backend/native
     /// handle, and is intentionally unavailable for acquired frame targets.
-    pub(in crate::render::vulkanic) fn pass_target_color_texture(
+    pub fn pass_target_color_texture(
         &self,
         handle: Handle,
     ) -> GalResult<Handle> {
@@ -910,7 +912,7 @@ impl VulkanicGal {
         }
     }
 
-    pub(in crate::render::vulkanic) fn frame_target_owned_depth_attachment(
+    pub fn frame_target_owned_depth_attachment(
         &self,
         handle: Handle,
     ) -> GalResult<(Handle, Handle)> {
@@ -932,7 +934,7 @@ impl VulkanicGal {
             })
     }
 
-    pub(in crate::render::vulkanic) fn begin_frame_target_depth_write(
+    pub fn begin_frame_target_depth_write(
         &mut self,
         handle: Handle,
     ) -> GalResult<()> {
@@ -953,7 +955,7 @@ impl VulkanicGal {
         Ok(())
     }
 
-    pub(in crate::render::vulkanic) fn commit_frame_target_depth_write(
+    pub fn commit_frame_target_depth_write(
         &mut self,
         handle: Handle,
     ) -> GalResult<()> {
@@ -963,7 +965,7 @@ impl VulkanicGal {
         Ok(())
     }
 
-    pub(in crate::render::vulkanic) fn rollback_frame_target_depth_write(
+    pub fn rollback_frame_target_depth_write(
         &mut self,
         handle: Handle,
     ) {
@@ -1823,7 +1825,7 @@ impl VulkanicGal {
     /// Opens a nestable command-recording lifetime. Destruction remains
     /// dependency checked, but the handle slot is not released until the
     /// outermost scope closes after submission or command abandonment.
-    pub(in crate::render::vulkanic) fn begin_command_recording(&mut self) -> GalResult<()> {
+    pub fn begin_command_recording(&mut self) -> GalResult<()> {
         self.command_recording_depth =
             self.command_recording_depth.checked_add(1).ok_or_else(|| {
                 GalError::invalid_argument("GAL command-recording scope depth exhausted")
@@ -1831,13 +1833,13 @@ impl VulkanicGal {
         Ok(())
     }
 
-    pub(in crate::render::vulkanic) fn command_recording_deferred_destroy_count(&self) -> usize {
+    pub fn command_recording_deferred_destroy_count(&self) -> usize {
         self.command_recording_destroys.len()
     }
 
     /// Closes one command-recording lifetime and applies deferred destroys in
     /// their original dependency order at the outermost boundary.
-    pub(in crate::render::vulkanic) fn finish_command_recording(&mut self) -> GalResult<()> {
+    pub fn finish_command_recording(&mut self) -> GalResult<()> {
         if self.command_recording_depth == 0 {
             return Err(GalError::invalid_argument(
                 "GAL command-recording scope is not active",
@@ -2185,7 +2187,7 @@ impl VulkanicGal {
         Ok(retired)
     }
 
-    pub(in crate::render::vulkanic) fn poll_completed(&mut self) -> SubmissionId {
+    pub fn poll_completed(&mut self) -> SubmissionId {
         let completed = self.backend.completed_submission();
         if completed > self.completed_submission {
             self.completed_submission = completed;
@@ -2193,7 +2195,7 @@ impl VulkanicGal {
         self.completed_submission
     }
 
-    pub(in crate::render::vulkanic) fn latest_submission_id(&self) -> SubmissionId {
+    pub fn latest_submission_id(&self) -> SubmissionId {
         self.latest_accepted_submission
     }
 
@@ -2207,11 +2209,11 @@ impl VulkanicGal {
     /// Exposes the id that the immediately following submission will receive.
     /// Frontends use this to protect transient stream ranges until that
     /// submission completes; taking this value must be followed by one submit.
-    pub(in crate::render::vulkanic) fn next_submission_id(&self) -> SubmissionId {
+    pub fn next_submission_id(&self) -> SubmissionId {
         SubmissionId(self.next_submission)
     }
 
-    pub(in crate::render::vulkanic) fn retire_through(
+    pub fn retire_through(
         &mut self,
         id: SubmissionId,
     ) -> GalResult<Vec<Handle>> {
@@ -2236,7 +2238,7 @@ impl VulkanicGal {
         Ok(retired)
     }
 
-    pub(in crate::render::vulkanic) fn completed_host_reads(&self) -> Vec<CompletedHostRead> {
+    pub fn completed_host_reads(&self) -> Vec<CompletedHostRead> {
         self.backend.completed_host_reads()
     }
 
@@ -4055,7 +4057,7 @@ impl VulkanicGal {
         }
     }
 
-    pub(super) fn texture_view_info(&self, view: Handle) -> GalResult<TextureViewInfo> {
+    pub(crate) fn texture_view_info(&self, view: Handle) -> GalResult<TextureViewInfo> {
         let view_record = self.texture_views.get(view)?;
         let texture_record = self.textures.get(view_record.desc.texture)?;
         Ok(TextureViewInfo {
@@ -4637,20 +4639,20 @@ impl VulkanicGal {
     }
 
     #[cfg(test)]
-    pub(super) fn mock_backend(&self) -> Option<&super::backends::mock::MockBackend> {
+    pub(crate) fn mock_backend(&self) -> Option<&super::backends::mock::MockBackend> {
         self.backend.as_any().downcast_ref()
     }
 
     #[cfg(test)]
-    pub(super) fn sampler_descriptor_for_test(&self, handle: Handle) -> GalResult<&SamplerDesc> {
+    pub(crate) fn sampler_descriptor_for_test(&self, handle: Handle) -> GalResult<&SamplerDesc> {
         self.sampler_descriptor_for_capture(handle)
     }
 
-    pub(super) fn sampler_descriptor_for_capture(&self, handle: Handle) -> GalResult<&SamplerDesc> {
+    pub fn sampler_descriptor_for_capture(&self, handle: Handle) -> GalResult<&SamplerDesc> {
         Ok(&self.samplers.get(handle)?.desc)
     }
 
-    pub(super) fn watch_buffer_upload_for_capture(
+    pub fn watch_buffer_upload_for_capture(
         &mut self,
         buffer: Handle,
         offset: u64,
@@ -4668,7 +4670,7 @@ impl VulkanicGal {
         self.buffer_upload_capture.watch(buffer, offset, size)
     }
 
-    pub(super) fn buffer_upload_for_capture(
+    pub fn buffer_upload_for_capture(
         &self,
         buffer: Handle,
         offset: u64,
@@ -4679,7 +4681,7 @@ impl VulkanicGal {
             .get(buffer, offset, size)
             .ok_or_else(|| GalError::invalid_argument("missing accepted buffer upload proof"))
     }
-    pub(super) fn unwatch_buffer_upload_for_capture(
+    pub fn unwatch_buffer_upload_for_capture(
         &mut self,
         buffer: Handle,
         offset: u64,
@@ -4689,7 +4691,7 @@ impl VulkanicGal {
     }
 
     #[cfg(test)]
-    pub(super) fn resource_set_descriptor_for_test(
+    pub(crate) fn resource_set_descriptor_for_test(
         &self,
         handle: Handle,
     ) -> GalResult<&ResourceSetDesc> {
@@ -4698,7 +4700,7 @@ impl VulkanicGal {
 
     /// Immutable GAL declaration for a selected submission diagnostic. This
     /// exposes no backend descriptor, native handle, or reconstructed state.
-    pub(super) fn resource_set_descriptor_for_capture(
+    pub fn resource_set_descriptor_for_capture(
         &self,
         handle: Handle,
     ) -> GalResult<&ResourceSetDesc> {
@@ -4706,7 +4708,7 @@ impl VulkanicGal {
     }
 
     /// Immutable GAL pipeline declaration; no backend GPU state is exposed.
-    pub(super) fn graphics_pipeline_descriptor_for_capture(
+    pub fn graphics_pipeline_descriptor_for_capture(
         &self,
         handle: Handle,
     ) -> GalResult<&GraphicsPipelineDesc> {
@@ -4714,7 +4716,7 @@ impl VulkanicGal {
     }
 
     #[cfg(test)]
-    pub(super) fn graphics_pipeline_descriptor_for_test(
+    pub(crate) fn graphics_pipeline_descriptor_for_test(
         &self,
         handle: Handle,
     ) -> GalResult<&GraphicsPipelineDesc> {
@@ -4730,13 +4732,25 @@ impl VulkanicGal {
     }
 
     #[cfg(test)]
-    pub(super) fn mock_backend_mut(&mut self) -> Option<&mut super::backends::mock::MockBackend> {
+    pub(crate) fn mock_backend_mut(&mut self) -> Option<&mut super::backends::mock::MockBackend> {
         self.backend.as_any_mut().downcast_mut()
     }
 
     #[cfg(test)]
     pub(super) fn vulkan_backend(&self) -> Option<&super::backends::vulkan::VulkanBackend> {
         self.backend.as_any().downcast_ref()
+    }
+
+    /// Clears an acquired presentation frame on the Vulkan backend (test GALs only).
+    #[cfg(test)]
+    pub(crate) fn clear_acquired_frame_for_test(
+        &mut self,
+        frame: super::frame::FrameId,
+        color: [f32; 4],
+    ) -> GalResult<()> {
+        self.vulkan_backend_mut()
+            .ok_or_else(|| GalError::backend("acquired-frame clear requires a Vulkan test GAL"))?
+            .clear_acquired_frame_for_test(frame, color)
     }
 
     #[cfg(test)]

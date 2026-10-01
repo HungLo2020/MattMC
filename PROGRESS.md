@@ -85,18 +85,10 @@ the 28 pre-existing Mockito/JDK25 failures (obsolete route/source-contract tests
 Regressions after deletion: day 2.39, glass 7.49, down 7.15, off 0.14-0.25, gun 2.20, pane 2.38,
 DH generic 4.88/4.96/3.09, 0 VUIDs; real config shaders on/off: joins, route active, no crash.
 bench.sh after deletion (Current, moving): DH 38.8 -> 45.0 fps, noDH 44.0 -> 45.9; RSS ~12.5 GB.
-**Architecture boundaries (09-30).** `BackendApi` removed: frontends use capabilities
-(`ShaderConventions` = GLSL dialect/clip depth/UV flip/readback rows; `DeviceLocalMemory`,
-`Texture3dPackedFormats`, `IndirectDraw`, `TextureRowReversal`). GPU timing/statistics use opaque
-`GpuProfileTag` scopes; names/label rules live in `world_primitive_frontend/gpu_profile_scopes.rs`.
-Game-named blend modes renamed by math; `vulkan_*`/`gl_*` GAL metrics -> `native_*` (FFI ABI names
-unchanged). GL backend lowers separate texture/sampler GLSL generically and reads bindings from
-source (no game names); GL shader variants declare bindings. `architecture_boundary.rs` enforces:
-no backend identity, no backend names outside `backends/`, no frontend imports or game vocabulary
-or label branching in core GAL/backends. GL conformance tests had silently "skipped" (any error
-containing "GL" counts as an environment gap); they now run and match Vulkan's pin. New dirs
-`render/{worldrender,guirender,shaderpack,shared,bridge}` (READMEs only). Rust GL next gap:
-`CopyFrameTargetToTexture` unimplemented (GL is allowed incomplete).
+**Architecture boundaries (09-30).** No backend identity in the GAL API (capabilities +
+`ShaderConventions`); opaque `GpuProfileTag` scopes named by the world renderer; GL backend
+lowers GLSL generically; `architecture_boundary.rs` enforces layering. GL conformance tests now
+really run and match Vulkan. Rust GL next gap: `CopyFrameTargetToTexture` (GL allowed incomplete).
 **Shader-pack restructure (10-01).** `vulkanic/shader_pack` -> `render/shaderpack` (source,
 properties, contracts, lowering, programs/{model,lowered,builtin}, uniforms, plan, resources,
 voxels, vanilla, runtime); giant files split by concern (runtime 12.4k -> 331-line mod.rs +
@@ -104,6 +96,14 @@ voxels, vanilla, runtime); giant files split by concern (runtime 12.4k -> 331-li
 material sources, mesh assets, voxel sources) in new `render/scene` (world frontend
 re-exports). Tests build GALs via `vulkanic::test_support`; boundary tests pin shaderpack to
 `scene` + public GAL. Code motion only; warnings = baseline (dead test-only items regrouped).
+**World-renderer restructure (10-01).** `vulkanic/world_primitive_frontend*` + `terrain/` ->
+`render/worldrender` (81k-line file -> ~100 files, largest ~3k): frame/, vanilla/, source/
+(admission, programs/, frames/, plans/, resources/, receipts/, ...), lod/, assets/, geometry/,
+passes/, features/, diagnostics/, submit, fabulous, post_effects. All `WORLD_*` wire constants ->
+`render/scene`; world+GUI helpers -> `render/shared`. GAL APIs the renderer needs made public
+(depth-write tracking, retirement, capture descriptors, `CompletedHostRead`). Item census: no
+Rust item lost. Giant fns (vanilla recording 2.8k, named-source plans/submit, whole-frame
+submit, Fabulous frame) moved intact; splitting them is a separate logic refactor.
 Ported while pruning: VoxelMap world map (regions staged as Rust raw images, released on
 unload), VoxelMap init (packet bridge was null on Rust), F3 GPU% (`TimerQuery` on Rust Vulkan
 timestamps via `mattmc_vulkanic_gal_set_gpu_timestamps_requested`), pack `weatherParticles`,

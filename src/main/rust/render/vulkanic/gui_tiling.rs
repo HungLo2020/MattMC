@@ -2,7 +2,8 @@
 //! No Java texture objects, GPU handles, pipeline state, or presenter enter here.
 //! Expansion is preflighted before allocation and feeds ordered frame submission.
 
-use super::{GalError, GalResult, SEMANTIC_MAX_VIEWPORT_AXIS};
+use super::{GalError, GalResult};
+use crate::render::scene::SEMANTIC_MAX_VIEWPORT_AXIS;
 
 /// Same finite expanded-segment bound as the existing copied GUI path. A large
 /// window is not rejected at Java's separate 4096-geometric-tile threshold.

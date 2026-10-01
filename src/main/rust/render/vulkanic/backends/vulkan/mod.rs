@@ -580,7 +580,7 @@ impl Drop for VulkanBackend {
 }
 
 #[cfg(all(test, target_os = "linux"))]
-pub(in crate::render::vulkanic) struct WinitTestWindow {
+pub(crate) struct WinitTestWindow {
     _window: winit::window::Window,
     raw_display: raw_window_handle::RawDisplayHandle,
     raw_window: raw_window_handle::RawWindowHandle,
@@ -674,7 +674,7 @@ impl SurfaceOwner for WinitTestWindow {
 }
 
 #[cfg(all(test, target_os = "linux"))]
-pub(in crate::render::vulkanic) fn winit_event_loop() -> GalResult<winit::event_loop::EventLoop<()>>
+pub(crate) fn winit_event_loop() -> GalResult<winit::event_loop::EventLoop<()>>
 {
     use winit::event_loop::EventLoop;
 
@@ -689,7 +689,7 @@ pub(in crate::render::vulkanic) fn winit_event_loop() -> GalResult<winit::event_
 }
 
 #[cfg(all(test, target_os = "linux"))]
-pub(in crate::render::vulkanic) fn winit_test_window(
+pub(crate) fn winit_test_window(
     event_loop: &winit::event_loop::EventLoop<()>,
     width: u32,
     height: u32,

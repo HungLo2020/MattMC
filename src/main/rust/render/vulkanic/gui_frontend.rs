@@ -44,7 +44,7 @@ pub(crate) const GUI_MAX_RAW_IMAGE_PIXELS: usize = 16 * 1024 * 1024;
 /// replacement map independently of the per-image pixel limit.
 pub(crate) const GUI_MAX_RAW_IMAGE_BYTES_TOTAL: usize = 256 * 1024 * 1024;
 /// Maximum semantic GUI viewport axis accepted by the Rust frontend.
-pub(crate) const GUI_MAX_VIEWPORT_AXIS: i32 = super::SEMANTIC_MAX_VIEWPORT_AXIS;
+pub(crate) const GUI_MAX_VIEWPORT_AXIS: i32 = crate::render::scene::SEMANTIC_MAX_VIEWPORT_AXIS;
 
 pub const GUI_MAX_PACKED_SPRITES: usize = 256;
 /// Hard cap for one semantic GUI submission. Java's coordinator enforces the
@@ -65,7 +65,7 @@ const GUI_ADDITIVE_BLIT_STRATUM: u32 = 795;
 const GUI_LEQUAL_DEPTH_BLIT_STRATUM: u32 = 805;
 const GUI_UNIFORM_BYTES: usize = 96;
 const GUI_PACKED_UNIFORM_BYTES: u64 = (GUI_MAX_PACKED_SPRITES * GUI_UNIFORM_BYTES) as u64;
-pub(super) const MAX_CUSTOM_POST_EFFECT_PASSES: usize = 10;
+pub(crate) const MAX_CUSTOM_POST_EFFECT_PASSES: usize = 10;
 const MAX_CUSTOM_POST_EFFECT_INTERMEDIATES: usize = 4;
 const MAX_CUSTOM_POST_EFFECT_UNIFORM_BYTES: usize = 1024 * 1024;
 const MAX_CUSTOM_POST_EFFECT_UNIFORM_GRAPH_BYTES: usize = 2 * 1024 * 1024;
@@ -2019,7 +2019,7 @@ impl GuiFrontend {
     pub(crate) fn stage_owned_atlas_references(
         &mut self,
         gal: &mut VulkanicGal,
-        world: &super::world_primitive_frontend::WorldPrimitiveFrontend,
+        world: &crate::render::worldrender::WorldPrimitiveFrontend,
         revision: u64,
         references: &[GuiAtlasReference],
     ) -> GalResult<()> {
@@ -2049,7 +2049,7 @@ impl GuiFrontend {
     pub(crate) fn prepare_owned_atlas_view(
         &mut self,
         gal: &mut VulkanicGal,
-        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
+        world: &mut crate::render::worldrender::WorldPrimitiveFrontend,
         asset: u64,
     ) -> GalResult<Handle> {
         let reference = self
@@ -2101,7 +2101,7 @@ impl GuiFrontend {
     pub(crate) fn prepare_owned_atlas_binding(
         &mut self,
         gal: &mut VulkanicGal,
-        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
+        world: &mut crate::render::worldrender::WorldPrimitiveFrontend,
         asset: u64,
         sampling: SamplerFilter,
         color: ColorFormat,
@@ -2117,7 +2117,7 @@ impl GuiFrontend {
     fn prepare_owned_atlas_binding_group(
         &mut self,
         gal: &mut VulkanicGal,
-        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
+        world: &mut crate::render::worldrender::WorldPrimitiveFrontend,
         group: TextureGroup,
         color: ColorFormat,
         depth: Option<TextureFormat>,
@@ -2239,7 +2239,7 @@ impl GuiFrontend {
     pub(crate) fn append_owned_atlas_quads(
         &mut self,
         gal: &mut VulkanicGal,
-        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
+        world: &mut crate::render::worldrender::WorldPrimitiveFrontend,
         frame_pass: Handle,
         target: Handle,
         color_view: Handle,
@@ -2278,7 +2278,7 @@ impl GuiFrontend {
     pub(crate) fn append_owned_item_raster_quads(
         &mut self,
         gal: &mut VulkanicGal,
-        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
+        world: &mut crate::render::worldrender::WorldPrimitiveFrontend,
         frame_pass: Handle,
         target: Handle,
         color_view: Handle,
@@ -2326,7 +2326,7 @@ impl GuiFrontend {
     fn append_scheduled_owned_atlas_quads(
         &mut self,
         gal: &mut VulkanicGal,
-        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
+        world: &mut crate::render::worldrender::WorldPrimitiveFrontend,
         frame_pass: Handle,
         target: Handle,
         color_view: Handle,
@@ -2629,7 +2629,7 @@ impl GuiFrontend {
     pub(crate) fn submit_frame_with_owned_atlases(
         &mut self,
         gal: &mut VulkanicGal,
-        world: Option<&mut super::world_primitive_frontend::WorldPrimitiveFrontend>,
+        world: Option<&mut crate::render::worldrender::WorldPrimitiveFrontend>,
         generation: u64,
         frame_target: Handle,
         requests: Vec<GuiSpriteRequest>,
@@ -2920,7 +2920,7 @@ impl GuiFrontend {
     pub(crate) fn append_frame_ops_with_owned_atlases_and_blur_boundary(
         &mut self,
         gal: &mut VulkanicGal,
-        mut world: Option<&mut super::world_primitive_frontend::WorldPrimitiveFrontend>,
+        mut world: Option<&mut crate::render::worldrender::WorldPrimitiveFrontend>,
         generation: u64,
         render_target: Handle,
         color_attachment: Handle,
@@ -5310,7 +5310,7 @@ impl GuiFrontend {
     fn prepare_full_item_rasters(
         &mut self,
         gal: &mut VulkanicGal,
-        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
+        world: &mut crate::render::worldrender::WorldPrimitiveFrontend,
         ordered: &[GuiFrameRequest],
         color: ColorFormat,
         depth: Option<TextureFormat>,
@@ -5356,7 +5356,7 @@ impl GuiFrontend {
     fn prepare_item_raster_groups(
         &mut self,
         gal: &mut VulkanicGal,
-        world: &mut super::world_primitive_frontend::WorldPrimitiveFrontend,
+        world: &mut crate::render::worldrender::WorldPrimitiveFrontend,
         items: &[GuiItemRasterGroup],
         color: ColorFormat,
         depth: Option<TextureFormat>,
@@ -5579,7 +5579,7 @@ impl GuiFrontend {
 
     fn preflight_owned_atlas_commands(
         &self,
-        world: Option<&super::world_primitive_frontend::WorldPrimitiveFrontend>,
+        world: Option<&crate::render::worldrender::WorldPrimitiveFrontend>,
         affine_quads: &[GuiAffineQuadRequest],
         tiled_quads: &[GuiTiledQuadRequest],
     ) -> GalResult<bool> {
@@ -5628,7 +5628,7 @@ impl GuiFrontend {
 
     fn preflight_mesh_atlas_commands(
         &self,
-        world: Option<&super::world_primitive_frontend::WorldPrimitiveFrontend>,
+        world: Option<&crate::render::worldrender::WorldPrimitiveFrontend>,
         batches: &[GuiMeshBatchRequest],
     ) -> GalResult<()> {
         for batch in batches {
@@ -5667,7 +5667,7 @@ impl GuiFrontend {
     pub(crate) fn append_frame_ops_with_owned_atlases_to_target(
         &mut self,
         gal: &mut VulkanicGal,
-        mut world: Option<&mut super::world_primitive_frontend::WorldPrimitiveFrontend>,
+        mut world: Option<&mut crate::render::worldrender::WorldPrimitiveFrontend>,
         generation: u64,
         render_target: Handle,
         color_attachment: Handle,
@@ -6109,7 +6109,7 @@ impl GuiFrontend {
     pub(crate) fn append_mesh_items_to_target(
         &mut self,
         gal: &mut VulkanicGal,
-        mut world: Option<&mut super::world_primitive_frontend::WorldPrimitiveFrontend>,
+        mut world: Option<&mut crate::render::worldrender::WorldPrimitiveFrontend>,
         generation: u64,
         render_target: Handle,
         color_attachment: Handle,
@@ -10334,11 +10334,10 @@ mod tests {
             })
             .unwrap();
         let mut frontend = GuiFrontend::default();
-        let mut world = super::super::world_primitive_frontend::WorldPrimitiveFrontend::default();
+        let mut world = crate::render::worldrender::WorldPrimitiveFrontend::default();
         let atlas_reference = if let Some([x, y, width, region_height]) = atlas_region {
-            use super::super::world_primitive_frontend::{
-                WorldMeshTextureAssetPayload, WORLD_MATERIAL_TEXTURE_STONE,
-            };
+            use crate::render::worldrender::WorldMeshTextureAssetPayload;
+            use crate::render::scene::textures::WORLD_MATERIAL_TEXTURE_STONE;
             let image_width = (pixels.len() / 4) as u32 / height;
             let mut encoded = Vec::new();
             {
@@ -12560,8 +12559,8 @@ void main() { fragColor = texture(InSampler, texCoord); }
                 };
                 request.alpha_cutoff = if i == 2 { 0.1 } else { 0.0 };
                 if i == 2 {
-                    request.item_foil = Some(super::super::item_foil::StandardItemFoil {
-                        kind: super::super::item_foil::StandardFoilKind::Entity,
+                    request.item_foil = Some(crate::render::shared::item_foil::StandardItemFoil {
+                        kind: crate::render::shared::item_foil::StandardFoilKind::Entity,
                         clock_millis: 0,
                         speed: 0.,
                         strength: 0.5,
@@ -12903,9 +12902,9 @@ void main() { fragColor = texture(InSampler, texCoord); }
     #[test]
     fn inventory_mesh_atlas_uses_explicit_owner_and_native_sprite_uv_mapping() {
         for (block_lit, overlay) in [(false, false), (true, false), (false, true)] {
-            use super::super::world_primitive_frontend::{
-                WorldMeshTextureAssetPayload, WorldPrimitiveFrontend, WORLD_MATERIAL_TEXTURE_STONE,
-            };
+            use crate::render::worldrender::WorldMeshTextureAssetPayload;
+            use crate::render::worldrender::WorldPrimitiveFrontend;
+            use crate::render::scene::textures::WORLD_MATERIAL_TEXTURE_STONE;
             let mut gal = mock_gal();
             let target = frame_target(&mut gal);
             let mut world = WorldPrimitiveFrontend::default();

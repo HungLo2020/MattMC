@@ -1,7 +1,7 @@
 //! Owned animation resource staging and explicit semantic tick delivery.
 //! No normal-game animation admission is implied by these transport endpoints.
 use super::*;
-use crate::render::vulkanic::sprite_interpolation::{
+use crate::render::shared::sprite_interpolation::{
     OwnedAtlasAnimationUpdate, OwnedSpriteAnimation, SpriteAnimationClock, SpriteAnimationFrame,
     SpriteAtlasRegion, SpriteMipSheet,
 };
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_atlas_animation_tick(
                 .world_primitive_frontend
                 .advance_atlas_animation_before_frame(
                     &mut context.gal,
-                    crate::render::vulkanic::sprite_interpolation::AtlasAnimationTickEvent {
+                    crate::render::shared::sprite_interpolation::AtlasAnimationTickEvent {
                         texture_id,
                         generation,
                         tick,
@@ -315,7 +315,7 @@ pub(crate) unsafe fn decode_atlas_animation_update(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::vulkanic::sprite_interpolation::{
+    use crate::render::shared::sprite_interpolation::{
         apply_sprite_sheet_update, SpriteFrameUpdate,
     };
 

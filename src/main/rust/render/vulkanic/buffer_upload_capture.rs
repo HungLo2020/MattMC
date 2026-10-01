@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 // Persistent allocations span animation poses, not just one frame of draws.
 // Bound metadata by the owned mesh residency and exact retained bytes separately.
-const MAX_RANGES: usize = 2 * super::world_primitive_frontend::WORLD_MESH_GEOMETRY_RESIDENCY;
+const MAX_RANGES: usize = 2 * crate::render::worldrender::WORLD_MESH_GEOMETRY_RESIDENCY;
 const MAX_TOTAL_BYTES: usize = 5 * 1024 * 1024;
 const MAX_BYTES: usize = 512 * 80;
 type Range = (Handle, u64, usize);

@@ -18,7 +18,7 @@ use super::gal::VulkanicGal;
 use super::gui_frontend::GUI_MAX_VIEWPORT_AXIS;
 pub use super::gui_item_material::GuiFlatItemLighting;
 use super::handles::Handle;
-pub use super::item_foil::StandardItemFoil as GuiItemFoil;
+pub use crate::render::shared::item_foil::StandardItemFoil as GuiItemFoil;
 use super::resources::{
     AccessFlags, BlendMode, GlslDialect, BufferDesc, BufferUsage, ColorFormat, CompareOp, Extent3d,
     GraphicsPipelineDesc, IndexType, MemoryDomain, PipelineLayoutDesc, PipelineStageFlags,
@@ -522,7 +522,7 @@ impl GuiDecalFoilProjection {
     fn prepare(
         self,
         native_model: Option<[f32; 16]>,
-    ) -> GalResult<super::special_item_foil::SpecialFoilProjection> {
+    ) -> GalResult<crate::render::shared::special_item_foil::SpecialFoilProjection> {
         if self.native_item_layout {
             if self
                 .model_pose
@@ -534,7 +534,7 @@ impl GuiDecalFoilProjection {
                     "native item decal layout cannot carry caller raster poses",
                 ));
             }
-            return super::special_item_foil::SpecialFoilProjection::from_native_gui_model(
+            return crate::render::shared::special_item_foil::SpecialFoilProjection::from_native_gui_model(
                 native_model.ok_or_else(|| {
                     GalError::invalid_argument(
                         "native decal layout requires native item raster semantics",
@@ -547,10 +547,10 @@ impl GuiDecalFoilProjection {
                 "emitted-space decal poses cannot be used as model-space item poses",
             ));
         }
-        super::special_item_foil::SpecialFoilProjection::new(
+        crate::render::shared::special_item_foil::SpecialFoilProjection::new(
             self.model_pose,
             self.normal_pose,
-            super::special_item_foil::FoilDisplayContext::Gui,
+            crate::render::shared::special_item_foil::FoilDisplayContext::Gui,
         )
     }
 }
@@ -2729,12 +2729,12 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
     }
     if let Some(foil) = batch.item_foil {
         foil.validate()?;
-        if foil.kind == super::item_foil::StandardFoilKind::Armor {
+        if foil.kind == crate::render::shared::item_foil::StandardFoilKind::Armor {
             return Err(GalError::invalid_argument(
                 "perspective armor foil is not a GUI entity-preview material",
             ));
         }
-        if foil.kind == super::item_foil::StandardFoilKind::ArmorOrthographic
+        if foil.kind == crate::render::shared::item_foil::StandardFoilKind::ArmorOrthographic
             && (batch.lighting_mode != GuiMeshLightingMode::EntityPreview
                 || batch.item_raster_scale != 0
                 || batch.block_item_raster.is_some()
@@ -2744,7 +2744,7 @@ pub fn validate_batch(batch: &GuiMeshBatchRequest) -> GalResult<()> {
                 "orthographic armor foil requires explicit GUI entity-preview semantics",
             ));
         }
-        if foil.kind == super::item_foil::StandardFoilKind::Entity
+        if foil.kind == crate::render::shared::item_foil::StandardFoilKind::Entity
             && (batch.item_raster_scale == 0
                 || batch.block_item_raster.is_some()
                 || batch.decal_foil.is_some()
@@ -4145,7 +4145,7 @@ mod tests {
             full_model,
             patterned,
             GuiItemFoil {
-                kind: super::super::item_foil::StandardFoilKind::Item,
+                kind: crate::render::shared::item_foil::StandardFoilKind::Item,
                 clock_millis: 0,
                 speed: 0.0,
                 strength: 0.5,
@@ -4200,7 +4200,7 @@ mod tests {
                         true,
                         true,
                         GuiItemFoil {
-                            kind: super::super::item_foil::StandardFoilKind::Item,
+                            kind: crate::render::shared::item_foil::StandardFoilKind::Item,
                             clock_millis,
                             speed: 0.5,
                             strength: 0.5,
@@ -4287,7 +4287,7 @@ mod tests {
                 false,
                 false,
                 GuiItemFoil {
-                    kind: super::super::item_foil::StandardFoilKind::Item,
+                    kind: crate::render::shared::item_foil::StandardFoilKind::Item,
                     clock_millis: 0,
                     speed: 0.0,
                     strength: 0.0,
@@ -4312,7 +4312,7 @@ mod tests {
         let frozen: Vec<_> = rows.into_iter().flatten().collect();
         assert_eq!(frozen.len(), 1024);
         let foil = GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::Item,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Item,
             clock_millis: observed["frozen_scaled_ticks"].as_u64().unwrap() / 4,
             speed: 0.5,
             strength: 0.5,
@@ -5456,7 +5456,7 @@ mod tests {
         foil.alpha_cutoff = 0.1;
         foil.item_lighting = None;
         foil.item_foil = Some(GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::Item,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Item,
             clock_millis: 0,
             speed: 0.0,
             strength: 0.5,
@@ -5481,7 +5481,7 @@ mod tests {
         foil.material_mode = GuiMeshMaterialMode::Glint;
         foil.item_lighting = None;
         let semantics = GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::Entity,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Entity,
             clock_millis: 12345,
             speed: 0.5,
             strength: 0.375,
@@ -5503,7 +5503,7 @@ mod tests {
         }
         let mut legacy = foil.clone();
         legacy.item_foil = Some(GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::Armor,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Armor,
             ..semantics
         });
         assert!(
@@ -5514,7 +5514,7 @@ mod tests {
         legacy.render_extent = [48, 48];
         legacy.lighting_mode = GuiMeshLightingMode::EntityPreview;
         legacy.item_foil = Some(GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::ArmorOrthographic,
+            kind: crate::render::shared::item_foil::StandardFoilKind::ArmorOrthographic,
             ..semantics
         });
         assert!(
@@ -5760,7 +5760,7 @@ mod tests {
     #[test]
     fn native_flat_decal_projection_is_scale_and_layout_independent() {
         let foil = GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::Item,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Item,
             clock_millis: 12345,
             speed: 0.5,
             strength: 0.375,
@@ -5814,7 +5814,7 @@ mod tests {
         request.material_mode = GuiMeshMaterialMode::Glint;
         request.lighting_mode = GuiMeshLightingMode::Flat;
         let foil = GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::Item,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Item,
             clock_millis: 12_345,
             speed: 0.5,
             strength: 0.37,
@@ -5881,7 +5881,7 @@ mod tests {
         });
         assert!(prepare_draws(&[request.clone()]).is_err());
         request.item_foil = Some(GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::Item,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Item,
             clock_millis: 0,
             speed: 0.,
             strength: 0.5,
@@ -5904,7 +5904,7 @@ mod tests {
         request.lighting_mode = GuiMeshLightingMode::Flat;
         request.alpha_cutoff = 0.1;
         request.item_foil = Some(GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::Item,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Item,
             clock_millis: 0,
             speed: 0.5,
             strength: 0.5,
@@ -5937,7 +5937,7 @@ mod tests {
         request.lighting_mode = GuiMeshLightingMode::Flat;
         request.alpha_cutoff = 0.1;
         request.item_foil = Some(GuiItemFoil {
-            kind: super::super::item_foil::StandardFoilKind::Item,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Item,
             clock_millis: 12_345,
             speed: 0.5,
             strength: 0.5,

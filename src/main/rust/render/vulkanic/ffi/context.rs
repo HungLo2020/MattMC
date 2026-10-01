@@ -204,7 +204,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create(
             bool_flag(request.tracy_enabled, "tracy enabled")?,
         );
         gal.install_gpu_profile_classifier(
-            crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
+            crate::render::worldrender::diagnostics::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {
@@ -297,7 +297,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_borrowed_opengl(
             bool_flag(request.tracy_enabled, "tracy enabled")?,
         );
         gal.install_gpu_profile_classifier(
-            crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
+            crate::render::worldrender::diagnostics::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {
@@ -411,7 +411,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_create_windowed_vulkan(
             bool_flag(request.tracy_enabled, "tracy enabled")?,
         );
         gal.install_gpu_profile_classifier(
-            crate::render::vulkanic::world_primitive_frontend::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
+            crate::render::worldrender::diagnostics::gpu_profile_scopes::WORLD_GPU_PROFILE_CLASSIFIER,
         );
         let capabilities = gal.capabilities();
         let context_id = with_registry_mut(|registry| -> GalResult<u64> {

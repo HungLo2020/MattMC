@@ -589,7 +589,7 @@ pub(crate) unsafe fn decode_gui_mesh_batches(
             )?,
             item_raster_scale: batch.item_raster_scale,
             item_lighting: None,
-            item_foil: super::super::item_foil::StandardItemFoil::decode(
+            item_foil: crate::render::shared::item_foil::StandardItemFoil::decode(
                 batch.item_foil_mode,
                 batch.item_foil_clock_millis,
                 batch.item_foil_speed,

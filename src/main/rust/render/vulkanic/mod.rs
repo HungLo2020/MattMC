@@ -4,7 +4,6 @@ mod architecture_boundary;
 mod backends;
 
 // Private resource-processing prerequisite; not yet admitted through terrain FFI.
-mod sprite_interpolation;
 
 mod buffer_upload_capture;
 pub mod commands;
@@ -14,9 +13,9 @@ pub mod frame;
 pub mod gal;
 pub mod gui_frontend;
 // Explicit same-context atlas references; private until native GUI sampling is wired.
-mod gui_atlas_reference;
+pub(crate) mod gui_atlas_reference;
 mod gui_item_layout;
-mod gui_item_material;
+pub(crate) mod gui_item_material;
 mod gui_item_raster;
 /// Backend-neutral GUI mesh semantics. This is not an FFI-admitted route
 /// until the owned offscreen renderer consumes it.
@@ -24,23 +23,12 @@ pub mod gui_mesh_frontend;
 /// Private semantic tiled-GUI lowering; not yet a frame/FFI-admitted route.
 mod gui_tiling;
 pub mod handles;
-mod item_foil;
 pub mod metrics;
 pub mod resources;
-mod special_item_foil;
 pub mod sync;
 #[cfg(test)]
 pub(crate) mod test_support;
-pub mod terrain;
-mod texture_sampling;
-mod view_layering;
-mod world_item_foil;
-pub mod world_primitive_frontend;
 
-/// Maximum viewport axis admitted by semantic frame and GUI submissions.
-/// Keeping this finite prevents hostile FFI dimensions from driving unbounded
-/// staging, attachment, or uniform allocations.
-pub(crate) const SEMANTIC_MAX_VIEWPORT_AXIS: i32 = 16_384;
 
 pub use commands::{
     AttachmentLoadOp, AttachmentStoreOp, BufferImageCopyRegion, ClearColor, CommandList,

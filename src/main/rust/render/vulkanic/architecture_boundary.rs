@@ -343,9 +343,8 @@ fn shader_pack_policy_stays_out_of_ffi_and_backends() {
 #[test]
 fn shader_pack_runtime_owns_whole_frame_pass_order() {
     let rust_root = Path::new(RUST_ROOT);
-    let world_frontend = rust_root.join("render/vulkanic/world_primitive_frontend.rs");
-    let source = read_source(&world_frontend);
-    let production_source = source.split("#[cfg(test)]").next().unwrap_or(&source);
+    let world_frontend = rust_root.join("render/worldrender");
+    let production_source = world_renderer_production_source(rust_root);
     let forbidden = [
         "ShaderPackRuntimePlan::terrain_material_multipass_v1",
         "builtin_terrain_material_pass_graph",
@@ -382,13 +381,8 @@ fn shader_pack_runtime_owns_whole_frame_pass_order() {
 #[test]
 fn shader_pack_runtime_owns_private_terrain_volume_resources() {
     let rust_root = Path::new(RUST_ROOT);
-    let world_frontend = rust_root.join("render/vulkanic/world_primitive_frontend.rs");
     let runtime = rust_root.join("render/shaderpack/runtime/mod.rs");
-    let world_source = read_source(&world_frontend);
-    let production_world_source = world_source
-        .split("#[cfg(test)]")
-        .next()
-        .unwrap_or(&world_source);
+    let production_world_source = world_renderer_production_source(rust_root);
     let runtime_source = read_source(&runtime);
 
     assert!(
@@ -404,16 +398,19 @@ fn shader_pack_runtime_owns_private_terrain_volume_resources() {
 #[test]
 fn source_terrain_execution_is_rust_owned_and_never_an_ffi_or_iris_route() {
     let rust_root = Path::new(RUST_ROOT);
-    let world_frontend = rust_root.join("render/vulkanic/world_primitive_frontend.rs");
     let ffi_dir = rust_root.join("render/vulkanic/ffi");
-    let source = read_source(&world_frontend);
+    let source = world_renderer_source(rust_root);
 
     assert!(
         source.contains("#[cfg(test)]\n    candidate_subset_execution_enabled: bool,"),
         "the internal fixture selector must not exist in production builds"
     );
     assert!(
-        source.contains("#[cfg(not(test))]\n    fn candidate_subset_programs_for_frame")
+        ["", "pub(crate) ", "pub(super) "].iter().any(|visibility| {
+            source.contains(&format!(
+                "#[cfg(not(test))]\n    {visibility}fn candidate_subset_programs_for_frame"
+            ))
+        })
             && source.contains("Ok(None)")
             && source.contains("prepared_lowered_terrain_source_program(TerrainMaterialProgramKind::Opaque)")
             && source.contains("prepared_lowered_shadow_source_program()?"),
@@ -645,21 +642,37 @@ fn core_gal_and_backends_do_not_branch_on_resource_labels() {
 }
 
 /// GAL modules that code outside `render::vulkanic` may use.
-const PUBLIC_GAL_MODULES: [&str; 7] =
-    ["gal", "resources", "commands", "handles", "error", "frame", "sync"];
+const PUBLIC_GAL_MODULES: [&str; 8] =
+    ["gal", "resources", "commands", "handles", "error", "frame", "sync", "metrics"];
 
-/// `render::vulkanic::X` modules named on a line, excluding the public GAL.
+/// `render::vulkanic::X` modules named on a line, excluding the public GAL
+/// modules and the items the GAL re-exports at its root (`GalError`, ...).
 fn non_public_gal_references(line: &str) -> Vec<String> {
-    line.match_indices("render::vulkanic::")
-        .filter_map(|(index, token)| {
-            let rest = &line[index + token.len()..];
-            let module: String = rest
+    let mut modules = Vec::new();
+    for (index, token) in line.match_indices("render::vulkanic::") {
+        let rest = &line[index + token.len()..];
+        let segments: Vec<String> = if let Some(group) = rest.strip_prefix('{') {
+            group
+                .split('}')
+                .next()
+                .unwrap_or("")
+                .split(',')
+                .map(|member| member.trim().split("::").next().unwrap_or("").to_string())
+                .collect()
+        } else {
+            vec![rest
                 .chars()
                 .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
-                .collect();
-            (!PUBLIC_GAL_MODULES.contains(&module.as_str())).then_some(module)
-        })
-        .collect()
+                .collect()]
+        };
+        for segment in segments {
+            let root_item = segment.chars().next().is_some_and(|c| c.is_ascii_uppercase());
+            if !segment.is_empty() && !root_item && !PUBLIC_GAL_MODULES.contains(&segment.as_str()) {
+                modules.push(segment);
+            }
+        }
+    }
+    modules
 }
 
 #[test]
@@ -684,6 +697,62 @@ fn shaderpack_uses_only_the_scene_and_the_public_gal() {
     assert!(
         violations.is_empty(),
         "render::shaderpack may depend on render::scene and the public GAL modules {PUBLIC_GAL_MODULES:?} only:\n{}",
+        violations.join("\n")
+    );
+}
+
+/// GUI modules the world renderer still shares with `vulkanic` until the GUI
+/// renderer moves out of the GAL. Shrink this list; never grow it.
+const TRANSITIONAL_WORLD_GUI_MODULES: [&str; 4] =
+    ["gui_frontend", "gui_mesh_frontend", "gui_atlas_reference", "gui_item_material"];
+
+#[test]
+fn worldrender_uses_the_public_gal_and_lower_layers_only() {
+    let rust_root = Path::new(RUST_ROOT);
+    for removed in ["render/vulkanic/world_primitive_frontend.rs", "render/vulkanic/world_primitive_frontend", "render/vulkanic/terrain"] {
+        assert!(
+            !rust_root.join(removed).exists(),
+            "{removed} moved to render/worldrender and must not return"
+        );
+    }
+    let mut violations = Vec::new();
+    for file in production_files(&rust_root.join("render/worldrender")) {
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            let gal_violation = non_public_gal_references(&line)
+                .iter()
+                .any(|module| !TRANSITIONAL_WORLD_GUI_MODULES.contains(&module.as_str()));
+            let names_upper_layer = ["guirender", "bridge"]
+                .iter()
+                .any(|layer| line.contains(&format!("render::{layer}")));
+            if gal_violation || names_upper_layer {
+                violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "render::worldrender may use render::{{scene, shared, shaderpack}}, the public GAL modules {PUBLIC_GAL_MODULES:?} and, until the GUI moves, {TRANSITIONAL_WORLD_GUI_MODULES:?}:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn shared_helpers_depend_only_on_the_public_gal() {
+    let rust_root = Path::new(RUST_ROOT);
+    let mut violations = Vec::new();
+    for file in production_files(&rust_root.join("render/shared")) {
+        for (line_number, line) in production_lines(&read_source(&file)) {
+            let names_renderer = ["worldrender", "guirender", "shaderpack", "bridge"]
+                .iter()
+                .any(|layer| line.contains(&format!("render::{layer}")));
+            if !non_public_gal_references(&line).is_empty() || names_renderer {
+                violations.push(format!("{}:{}: {}", relative(&file), line_number, line.trim()));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "render::shared sits below the renderers and may use the public GAL only:\n{}",
         violations.join("\n")
     );
 }
@@ -718,6 +787,25 @@ fn production_line_filter_drops_comments_and_test_items() {
     let text: Vec<&str> = lines.iter().map(|(_, line)| line.trim()).filter(|line| !line.is_empty()).collect();
     assert_eq!(vec!["fn keep() {}", "fn after() {}"], text);
     assert_eq!(7, lines.iter().find(|(_, line)| line.contains("after")).unwrap().0);
+}
+
+/// Concatenated source of every file of the world renderer.
+fn world_renderer_source(rust_root: &Path) -> String {
+    rust_files(&rust_root.join("render/worldrender"))
+        .iter()
+        .map(|file| read_source(file))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Concatenated production code (no comments or test items) of the world
+/// renderer.
+fn world_renderer_production_source(rust_root: &Path) -> String {
+    production_files(&rust_root.join("render/worldrender"))
+        .iter()
+        .flat_map(|file| production_lines(&read_source(file)).into_iter().map(|(_, line)| line))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Core GAL files (backend-neutral API and bookkeeping) plus backend

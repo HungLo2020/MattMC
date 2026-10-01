@@ -2,19 +2,29 @@ use super::*;
 use crate::render::vulkanic::resources::{
     BackendFeatureFlags, GlslDialect, ShaderConventions, BackendLimits, BlendMode,
 };
-use crate::render::vulkanic::world_primitive_frontend::world_text::WORLD_TEXT_DEPTH_POLYGON_OFFSET;
-use crate::render::vulkanic::world_primitive_frontend::{
-    WorldShaderEnvironmentFrame, WorldVoxelVolumeFrame, WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED,
-    WORLD_LOD_LAYER_OPAQUE, WORLD_LOD_VARIANT_EXACT, WORLD_LOD_VERTEX_LAYOUT_V1,
-    WORLD_MATERIAL_ID_OPAQUE_TEXTURED, WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED,
-    WORLD_MATERIAL_SOURCE_CLOUDS, WORLD_MATERIAL_SOURCE_ENTITY_MODEL,
-    WORLD_MATERIAL_SOURCE_PARTICLES, WORLD_MATERIAL_SOURCE_TEXTURED,
-    WORLD_MATERIAL_SOURCE_UNSPECIFIED, WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE,
-    WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS, WORLD_MATERIAL_SOURCE_WEATHER,
-    WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB, WORLD_MATERIAL_TEXTURE_GENERATED_WHITE,
-    WORLD_MATERIAL_TEXTURE_STONE, WORLD_MAX_MESH_VERTICES, WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
-    WORLD_STRATUM_DH_GENERIC,
-};
+use crate::render::worldrender::features::world_text::WORLD_TEXT_DEPTH_POLYGON_OFFSET;
+use crate::render::worldrender::WorldShaderEnvironmentFrame;
+use crate::render::worldrender::WorldVoxelVolumeFrame;
+use crate::render::scene::lod::WORLD_LOD_FLAG_RUST_OPAQUE_ROUTE_SELECTED;
+use crate::render::scene::lod::WORLD_LOD_LAYER_OPAQUE;
+use crate::render::scene::lod::WORLD_LOD_VARIANT_EXACT;
+use crate::render::scene::lod::WORLD_LOD_VERTEX_LAYOUT_V1;
+use crate::render::scene::material::WORLD_MATERIAL_ID_OPAQUE_TEXTURED;
+use crate::render::scene::material::WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_CLOUDS;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_ENTITY_MODEL;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_PARTICLES;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_TEXTURED;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_UNSPECIFIED;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS;
+use crate::render::scene::material::WORLD_MATERIAL_SOURCE_WEATHER;
+use crate::render::scene::textures::WORLD_MATERIAL_TEXTURE_EXPERIENCE_ORB;
+use crate::render::scene::textures::WORLD_MATERIAL_TEXTURE_GENERATED_WHITE;
+use crate::render::scene::textures::WORLD_MATERIAL_TEXTURE_STONE;
+use crate::render::worldrender::WORLD_MAX_MESH_VERTICES;
+use crate::render::scene::textures::WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS;
+use crate::render::scene::strata::WORLD_STRATUM_DH_GENERIC;
 
 fn test_capabilities() -> BackendCapabilities {
     BackendCapabilities {
@@ -295,9 +305,9 @@ fn particle_semantic_transport_lowers_owned_geometry_in_the_whole_frame() {
 
 #[test]
 fn terrain_surface_transport_uses_rust_block_atlas_and_cutout_policy() {
-    use crate::render::vulkanic::world_primitive_frontend::{
-        WORLD_MATERIAL_MODE_CUTOUT, WORLD_MATERIAL_MODE_OPAQUE, WORLD_MATERIAL_MODE_TRANSLUCENT,
-    };
+    use crate::render::scene::material::WORLD_MATERIAL_MODE_CUTOUT;
+    use crate::render::scene::material::WORLD_MATERIAL_MODE_OPAQUE;
+    use crate::render::scene::material::WORLD_MATERIAL_MODE_TRANSLUCENT;
     for surface_kind in [2, 3, 4] {
         let mut p = semantic_particle_record();
         p.surface_kind = surface_kind;
@@ -1465,7 +1475,7 @@ fn gui_mesh_foil_transport_preserves_semantics_and_rejects_invalid_modes() {
     assert_eq!(
         copied.item_foil.unwrap(),
         super::super::gui_mesh_frontend::GuiItemFoil {
-            kind: crate::render::vulkanic::item_foil::StandardFoilKind::Item,
+            kind: crate::render::shared::item_foil::StandardFoilKind::Item,
             clock_millis: 12_345,
             speed: 0.5,
             strength: 0.5,
@@ -3292,9 +3302,8 @@ fn whole_frame_mesh_instance_ffi_rejects_zero_semantic_identity_before_copying()
 
 #[test]
 fn whole_frame_ffi_preserves_explicit_camera_sort_for_depth_writing_terrain() {
-    use crate::render::vulkanic::world_primitive_frontend::{
-        WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS, WORLD_MESH_SECTION_ALL,
-    };
+    use crate::render::scene::mesh::WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS;
+    use crate::render::scene::mesh::WORLD_MESH_SECTION_ALL;
     let mut instances = vec![mesh_instance()];
     instances[0].stratum = WORLD_STRATUM_TERRAIN;
     instances[0].mesh_section_index = WORLD_MESH_SECTION_ALL;
@@ -3714,8 +3723,8 @@ fn world_and_hand_standard_foil_transport_copies_and_rejects_noncanonical_payloa
     };
     let (_, _, frame, _) =
         unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
-    let expected = crate::render::vulkanic::item_foil::StandardItemFoil {
-        kind: crate::render::vulkanic::item_foil::StandardFoilKind::Item,
+    let expected = crate::render::shared::item_foil::StandardItemFoil {
+        kind: crate::render::shared::item_foil::StandardFoilKind::Item,
         clock_millis: 12345,
         speed: 0.125,
         strength: 0.1234567,
@@ -3730,8 +3739,8 @@ fn world_and_hand_standard_foil_transport_copies_and_rejects_noncanonical_payloa
     source.item_foil_clock_millis = 12345;
     let (_, _, entity_frame, _) =
         unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap();
-    let entity_expected = crate::render::vulkanic::item_foil::StandardItemFoil {
-        kind: crate::render::vulkanic::item_foil::StandardFoilKind::Entity,
+    let entity_expected = crate::render::shared::item_foil::StandardItemFoil {
+        kind: crate::render::shared::item_foil::StandardFoilKind::Entity,
         ..expected
     };
     assert_eq!(
@@ -3745,11 +3754,11 @@ fn world_and_hand_standard_foil_transport_copies_and_rejects_noncanonical_payloa
     for (mode, projection) in [
         (
             3,
-            crate::render::vulkanic::item_foil::FoilProjection::Perspective,
+            crate::render::shared::item_foil::FoilProjection::Perspective,
         ),
         (
             4,
-            crate::render::vulkanic::item_foil::FoilProjection::Orthographic,
+            crate::render::shared::item_foil::FoilProjection::Orthographic,
         ),
     ] {
         source.item_foil_mode = mode;
@@ -5218,7 +5227,7 @@ fn world_material_asset_ffi_rejects_oversized_batches_before_copying() {
 
 #[test]
 fn whole_frame_terrain_placement_is_lowered_from_owned_full_precision_inputs() {
-    use crate::render::vulkanic::world_primitive_frontend::WORLD_MESH_SECTION_ALL;
+    use crate::render::scene::mesh::WORLD_MESH_SECTION_ALL;
     let mut instance = mesh_instance();
     instance.stratum = WORLD_STRATUM_TERRAIN;
     instance.mesh_section_index = WORLD_MESH_SECTION_ALL;
@@ -5569,7 +5578,7 @@ fn world_mesh_asset_ffi_copies_payload_memory() {
     assert_eq!(1, owned_textures[0].requested_mip_levels);
     assert_eq!(
         owned_textures[0].sampling,
-        Some(super::super::texture_sampling::TextureSampling::from_texture_metadata(true, true))
+        Some(crate::render::shared::texture_sampling::TextureSampling::from_texture_metadata(true, true))
     );
 }
 

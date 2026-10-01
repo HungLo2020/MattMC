@@ -3,7 +3,7 @@
 use crate::render::vulkanic::commands::*;
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::vulkanic::resources::*;
-use crate::render::vulkanic::world_primitive_frontend::oriented_target::{
+use crate::render::worldrender::passes::oriented_target::{
     OrientedWorldTarget, WorldAttachmentStates, WorldTargetDesc,
 };
 

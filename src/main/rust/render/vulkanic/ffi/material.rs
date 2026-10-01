@@ -1,10 +1,14 @@
 use super::*;
-use crate::render::vulkanic::world_primitive_frontend::{
-    material as world_material_semantics, WorldMeshAnimationFrame, WORLD_MAX_MESH_ANIMATION_FRAMES,
-    WORLD_MAX_MESH_INDEX_BYTES, WORLD_MAX_MESH_SECTIONS, WORLD_MAX_MESH_TEXTURE_ASSETS,
-    WORLD_MAX_MESH_TEXTURE_DECODED_BYTES, WORLD_MAX_MESH_VERTICES, WORLD_MESH_ASSET_RESIDENCY,
-    WORLD_MESH_TEXTURE_RESIDENCY,
-};
+use crate::render::worldrender::frame::material_quads as world_material_semantics;
+use crate::render::worldrender::WorldMeshAnimationFrame;
+use crate::render::worldrender::WORLD_MAX_MESH_ANIMATION_FRAMES;
+use crate::render::worldrender::WORLD_MAX_MESH_INDEX_BYTES;
+use crate::render::worldrender::WORLD_MAX_MESH_SECTIONS;
+use crate::render::worldrender::WORLD_MAX_MESH_TEXTURE_ASSETS;
+use crate::render::worldrender::WORLD_MAX_MESH_TEXTURE_DECODED_BYTES;
+use crate::render::worldrender::WORLD_MAX_MESH_VERTICES;
+use crate::render::worldrender::WORLD_MESH_ASSET_RESIDENCY;
+use crate::render::worldrender::WORLD_MESH_TEXTURE_RESIDENCY;
 
 const MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL: usize = WORLD_MAX_MESH_TEXTURE_DECODED_BYTES;
 const MAX_WORLD_MATERIAL_ASSET_COUNT: usize = WORLD_MAX_MESH_TEXTURE_ASSETS;
@@ -262,7 +266,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             interpolation_policy: texture.interpolation_policy,
             animation_frames,
             coordinate_origin: texture.reserved0,
-            sampling: super::super::texture_sampling::TextureSampling::decode(
+            sampling: crate::render::shared::texture_sampling::TextureSampling::decode(
                 texture.sampling_filter,
                 texture.sampling_address,
             )?,
@@ -413,7 +417,7 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
                 "duplicate world mesh/orb asset identity",
             ));
         }
-        meshes.push(crate::render::vulkanic::world_primitive_frontend::experience_orb::ExperienceOrbAppearance {
+        meshes.push(crate::render::worldrender::features::experience_orb::ExperienceOrbAppearance {
             icon: orb.icon, red: orb.red as u8, blue: orb.blue as u8, packed_light: orb.packed_light,
         }.mesh(orb.mesh_key, orb.mesh_generation)?);
     }

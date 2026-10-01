@@ -30,7 +30,7 @@ use super::resources::{
 use super::sync::SubmissionId;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(super) struct BackendToken(pub u64);
+pub(crate) struct BackendToken(pub u64);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::render::vulkanic) enum BackendKind {
@@ -39,11 +39,11 @@ pub(in crate::render::vulkanic) enum BackendKind {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(in crate::render::vulkanic) struct CompletedHostRead {
-    pub(in crate::render::vulkanic) submission: SubmissionId,
-    pub(in crate::render::vulkanic) buffer: Handle,
-    pub(in crate::render::vulkanic) offset: u64,
-    pub(in crate::render::vulkanic) bytes: Vec<u8>,
+pub struct CompletedHostRead {
+    pub submission: SubmissionId,
+    pub buffer: Handle,
+    pub offset: u64,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -339,7 +339,7 @@ pub(super) fn opengl_capabilities() -> BackendCapabilities {
 }
 
 #[cfg(test)]
-pub(super) mod mock {
+pub(crate) mod mock {
     use std::collections::{BTreeMap, VecDeque};
 
     use super::*;
@@ -349,43 +349,43 @@ pub(super) mod mock {
     };
 
     #[derive(Default)]
-    pub(in crate::render::vulkanic) struct MockBackend {
-        pub(in crate::render::vulkanic) creates: Vec<(Handle, HandleKind)>,
-        pub(in crate::render::vulkanic) destroys: Vec<(Handle, HandleKind)>,
-        pub(in crate::render::vulkanic) submissions: Vec<SubmissionId>,
-        pub(in crate::render::vulkanic) encoded_batches: usize,
-        pub(in crate::render::vulkanic) completed: SubmissionId,
-        pub(in crate::render::vulkanic) fail_next_create: bool,
-        pub(in crate::render::vulkanic) fail_create_after: Option<usize>,
-        pub(in crate::render::vulkanic) fail_next_submit: bool,
-        pub(in crate::render::vulkanic) fail_retire_at: Option<SubmissionId>,
-        pub(in crate::render::vulkanic) retire_requests: Vec<SubmissionId>,
-        pub(in crate::render::vulkanic) capabilities: Option<BackendCapabilities>,
-        pub(in crate::render::vulkanic) live: BTreeMap<Handle, BackendToken>,
+    pub(crate) struct MockBackend {
+        pub(crate) creates: Vec<(Handle, HandleKind)>,
+        pub(crate) destroys: Vec<(Handle, HandleKind)>,
+        pub(crate) submissions: Vec<SubmissionId>,
+        pub(crate) encoded_batches: usize,
+        pub(crate) completed: SubmissionId,
+        pub(crate) fail_next_create: bool,
+        pub(crate) fail_create_after: Option<usize>,
+        pub(crate) fail_next_submit: bool,
+        pub(crate) fail_retire_at: Option<SubmissionId>,
+        pub(crate) retire_requests: Vec<SubmissionId>,
+        pub(crate) capabilities: Option<BackendCapabilities>,
+        pub(crate) live: BTreeMap<Handle, BackendToken>,
         next_token: u64,
-        pub(in crate::render::vulkanic) submitted_labels: VecDeque<String>,
-        pub(in crate::render::vulkanic) frame_surface: Option<FrameSurfaceDesc>,
-        pub(in crate::render::vulkanic) acquired_frames: Vec<FrameId>,
-        pub(in crate::render::vulkanic) presented_frames: Vec<FrameId>,
-        pub(in crate::render::vulkanic) next_frame: u64,
-        pub(in crate::render::vulkanic) minimized: bool,
+        pub(crate) submitted_labels: VecDeque<String>,
+        pub(crate) frame_surface: Option<FrameSurfaceDesc>,
+        pub(crate) acquired_frames: Vec<FrameId>,
+        pub(crate) presented_frames: Vec<FrameId>,
+        pub(crate) next_frame: u64,
+        pub(crate) minimized: bool,
     }
 
     impl MockBackend {
-        pub(in crate::render::vulkanic) fn fail_next_create(&mut self) {
+        pub(crate) fn fail_next_create(&mut self) {
             self.fail_next_create = true;
         }
 
         #[cfg(test)]
-        pub(in crate::render::vulkanic) fn fail_next_submit(&mut self) {
+        pub(crate) fn fail_next_submit(&mut self) {
             self.fail_next_submit = true;
         }
 
-        pub(in crate::render::vulkanic) fn complete_through(&mut self, id: SubmissionId) {
+        pub(crate) fn complete_through(&mut self, id: SubmissionId) {
             self.completed = id;
         }
 
-        pub(in crate::render::vulkanic) fn with_capabilities(
+        pub(crate) fn with_capabilities(
             capabilities: BackendCapabilities,
         ) -> Self {
             Self {
