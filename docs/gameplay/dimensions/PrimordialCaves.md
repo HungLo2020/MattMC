@@ -29,7 +29,7 @@ Beds are permitted by its `bed_works` setting and the type is natural, but ordin
 
 ## What currently generates?
 
-The bundled Normal preset chooses **Primordial Plains and Dry Midlands** for this destination. The server's missing-dimension fallback instead uses the Primordial Plains biome preset. These are distinct source paths; do not assume all world setups produce identical biome selection.
+The bundled Normal preset chooses **[Primordial Plains](../biomes/PrimordialPlains.md) and [Dry Midlands](../biomes/DryMidlands.md)** for this destination. The server's missing-dimension fallback instead uses the Primordial Plains biome preset. These are distinct source paths; do not assume all world setups produce identical biome selection.
 
 A scoped review of those active biome definitions found no positive natural-spawn wiring for the currently documented Grizzly Bear, Trilocaris, Subterranodon, or Emu. Primordial Plains references ordinary plains-tree selection rather than establishing Pewen placement. Those facts leave the individual pages' natural-availability notes unverified, rather than proving universal absence under every possible world/data pack.
 

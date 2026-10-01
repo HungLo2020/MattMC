@@ -4,7 +4,8 @@
 
 - Working branch: `docs/wiki-expansion`
 - Source default branch: `master`
-- Last source snapshot integrated: `9bd57e1d0057903f6a9196e592d5e2a087c9248a`
+- Last source snapshot integrated: `b81c01943c9f3254e713c365a1dd633392929cb2`
+- Latest source sync: real two-parent merge `c1c36ba1c0dc353b6a4ecc99b36229ee526c09f4`, preserving published wiki history and bringing in palette packing/histograms from master without conflicts.
 - Source sync: fast-forwarded from `fffe4a073f0b8d867902b067a6dd022cda31926f` to the newer render-bridge refactor while preserving all wiki edits; inspected changes do not touch this batch's gameplay sources
 - Initial branch created from `fffe4a073f0b8d867902b067a6dd022cda31926f` on 2026-10-01
 - No merge back to the default branch or deployment is authorized
@@ -171,6 +172,13 @@ Navigation updated: Gameplay, Blocks, Items, Mobs, and Development indexes. New 
 ## Historical changelog backlog
 
 Reconcile missing August and September 2026 coverage against actual history before creating summaries. Also verify the January 2026 file's December heading before changing historical dating. These are review tasks, not completed or invented changelog entries.
+
+## Nineteenth batch: custom biome reference
+
+- Expanded Biomes and added Primordial Plains and Dry Midlands with actual surface/features, candidate spawn weights/groups, and explicit light/sky/placement restrictions.
+- Documented missing Dry Midlands replacement tags separately from geode generation; no gameplay fix or successful generation test is claimed.
+- Linked the guides from Primordial Caves and Content Guide and appended one concise October branch-work changelog entry.
+- Validation: checker and strict build passed on 2,131 pages / 34 indexes after merging source `b81c01943c9f3254e713c365a1dd633392929cb2`; source targets and whitespace checked. Reviewed gameplay sources are unchanged from the pinned `9bd57e1d0057903f6a9196e592d5e2a087c9248a` snapshot.
 
 ## Next batches, in priority order
 

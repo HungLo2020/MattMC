@@ -52,6 +52,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Alex's Caves additions
 
+- [Primordial Plains](biomes/PrimordialPlains.md) and [Dry Midlands](biomes/DryMidlands.md): wired features, candidate mobs, and generation/spawn constraints
+
 - [Primordial Caves](dimensions/PrimordialCaves.md): the active Pitcher Pod portal route and current generation limits
 
 - [Trilocaris](mobs/Trilocaris.md): interaction and drop information; [bucket capture and release](items/BucketOfTrilocaris.md)
