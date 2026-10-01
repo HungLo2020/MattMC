@@ -2,6 +2,8 @@
 
 For detailed source-reviewed examples, see [Grizzly Bear](GrizzlyBear.md), [Trilocaris](Trilocaris.md), [Cow](Cow.md), [Subterranodon](Subterranodon.md), [Blobfish](Blobfish.md), and [Roadrunner](Roadrunner.md). The [content guide](../ContentGuide.md) explains verification labels. Behavior categories below are the existing browsing groups; individual pages may describe conditional behavior and integration limits.
 
+For source-reviewed hostile encounters, see [Creeper](Creeper.md) and [Skeleton](Skeleton.md).
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs

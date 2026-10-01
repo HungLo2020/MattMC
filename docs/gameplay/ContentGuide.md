@@ -21,6 +21,9 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Redstone basics](redstone/Redstone.md): lever/button inputs, wire connections, and troubleshooting
 
+- [Creeper](mobs/Creeper.md) and [Skeleton](mobs/Skeleton.md): spawning, combat, drops, and special rewards
+- [Gunpowder](items/Gunpowder.md), [Bone](items/Bone.md), and [Arrow](items/Arrow.md): hostile-mob resources and verified uses
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
