@@ -8,7 +8,13 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Lighting and integrated content
 
+- [Amber](Amber.md): transparent construction and harvesting caveats
 - [Ambersol](Ambersol.md): overhead column lighting from integrated Alex's Caves content, with Survival acquisition limits clearly marked
+
+
+## Eggs
+
+- [Subterranodon Egg](SubterranodonEgg.md): Creative placement, hatching, ownership, and incomplete breeding source
 
 ## Browse related content
 

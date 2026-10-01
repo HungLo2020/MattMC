@@ -10,6 +10,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
+- [Grizzly Bear Spawn Egg](items/GrizzlyBearSpawnEgg.md): direct placement and the baby-spawning difference
+- [Raw Cod](items/RawCod.md), [Cooked Cod](items/CookedCod.md), and [Honeycomb](items/Honeycomb.md): food and hive resources connected to bears
 - [All mobs](mobs/Mobs.md): the existing mob directory, including other integrated animals
 
 ## Alex's Caves additions
@@ -17,6 +19,11 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Trilocaris](mobs/Trilocaris.md): interaction and drop information
 - [Trilocaris Tail](items/TrilocarisTail.md) and [Cooked Trilocaris Tail](items/CookedTrilocarisTail.md): food values and cooking
 - [Ambersol block](blocks/Ambersol.md): downward lighting behavior and acquisition limitations
+
+- [Amber](blocks/Amber.md): transparent construction and current harvesting limits
+
+- [Subterranodon](mobs/Subterranodon.md): taming and owner interactions, with flight-input and breeding caveats
+- [Subterranodon Egg](blocks/SubterranodonEgg.md): placed egg hatching and ownership
 
 ## Browse by topic
 
