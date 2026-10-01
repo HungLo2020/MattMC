@@ -14,6 +14,8 @@ For integrated large-animal behavior and availability limits, see [Rhinoceros](R
 
 For renewable farm resources, see [Sheep](Sheep.md), [White Wool](../items/WhiteWool.md), [Chicken](Chicken.md), and [Egg](../items/Egg.md).
 
+For bird companionship and utility, see [Blue Jay](BlueJay.md) and [Crow](Crow.md), including verified feeding routes and missing integration details.
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs
