@@ -38,6 +38,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Farming
 
+- [Primordial decorative plants](PrimordialPlants.md): Fiddlehead, Cycad, and Archaic Vine propagation and support
+
 - [Root crops](RootCrops.md): Carrots, Potatoes, and Beetroots, including harvest/reset controls
 
 - [Farmland](Farmland.md): tilling, hydration, and protecting plots
