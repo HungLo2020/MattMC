@@ -6,6 +6,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 - [Crafting Table](CraftingTable.md): 3 × 3 crafting, recipe tags, and grid cleanup
 - [Furnace](Furnace.md): crafting, fuels, processing, and troubleshooting
+- [Enchanting Table](EnchantingTable.md): eligible offers, shelves, and lapis
 - [Smithing Table](SmithingTable.md): equipment upgrades and armor trims
 - [Brewing Stand](BrewingStand.md): fueled three-bottle potion batches
 - [Chest](Chest.md): storage, double-chest placement, and blocked lids
