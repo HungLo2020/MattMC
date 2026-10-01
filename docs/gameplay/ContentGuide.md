@@ -61,6 +61,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Armor](mechanics/Armor.md): current material values including Copper, toughness, repairs, and Chestplate progression
 
+- [Zombie](mobs/Zombie.md) and [Spider](mobs/Spider.md): light rules, conditional behavior, doors/conversion, climbing, and drops
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
