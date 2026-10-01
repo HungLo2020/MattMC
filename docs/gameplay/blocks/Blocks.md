@@ -25,6 +25,11 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 - [Ambersol](Ambersol.md): overhead column lighting from integrated Alex's Caves content, with Survival acquisition limits clearly marked
 
 
+## Farming
+
+- [Farmland](Farmland.md): tilling, hydration, and protecting plots
+- [Wheat crop](Wheat.md): growth and MattMC's right-click / hoe-area harvesting
+
 ## Eggs
 
 - [Subterranodon Egg](SubterranodonEgg.md): Creative placement, hatching, ownership, and incomplete breeding source

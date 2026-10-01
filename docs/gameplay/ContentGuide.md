@@ -16,6 +16,9 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Beds](blocks/Bed.md) and [Torches](blocks/Torch.md): sleeping safety and basic lighting
 - [Coal](items/Coal.md) and [Charcoal](items/Charcoal.md): fuel, torch ingredients, and recipe distinctions
 
+- [Wheat farming](blocks/Wheat.md) and [Farmland](blocks/Farmland.md): hydration, growth, and MattMC's area-harvest controls
+- [Mining tools](mechanics/Mining.md): material stats and correct-drop rules, including Copper
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences
