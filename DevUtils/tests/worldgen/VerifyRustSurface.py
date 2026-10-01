@@ -15,7 +15,7 @@ import re
 import statistics
 import subprocess
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 REFERENCE = "0719ec4bd5f4956ceb9f341c9c641ad7294ef632"
 PACKAGE = "src/main/java/net/minecraft/world/level/levelgen/"
 

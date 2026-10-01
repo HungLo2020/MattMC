@@ -17,11 +17,11 @@ import statistics
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 REFERENCE = "ee1692c10cf96a806c22c7e195bad01abb588a2e"
 JAVA_PACKAGE = "src/main/java/net/minecraft/world/level/levelgen/"
 REFERENCE_FILES = [JAVA_PACKAGE + name + ".java" for name in
-                   ["DensityFunctions", "NoiseChunk", "RandomState", "NoiseRouterData"]]
+                   ["DensityFunctions", "NoiseChunk", "RandomState", "NoiseRouterData", "Aquifer"]]
 REFERENCE_FILES += [JAVA_PACKAGE + "synth/" + name + ".java" for name in
                     ["ImprovedNoise", "SimplexNoise", "PerlinNoise", "PerlinSimplexNoise", "NormalNoise", "BlendedNoise"]]
 

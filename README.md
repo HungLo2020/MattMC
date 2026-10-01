@@ -27,6 +27,9 @@ May need to launch with "code --disable-gpu" on linux. stupid.
 
 ## Agents
 
+- Reserve the `DevUtils/` root for tools the user explicitly requests there.
+  Put test and verification drivers in `DevUtils/tests/<subsystem>/` and other
+  new tooling in an appropriate subdirectory.
 - Before changing a subsystem, start at [the documentation index](docs/index.md)
   and read the relevant development, testing, and feature documentation.
 - Update affected documentation alongside code changes. Keep documented

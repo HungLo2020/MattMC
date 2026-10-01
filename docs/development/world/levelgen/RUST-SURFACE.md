@@ -83,7 +83,7 @@ reference classpath under `build/`.
 rustc --edition=2021 --test src/test/rust/worldgen.rs \
   -o build/surface-rust-tests
 build/surface-rust-tests
-python3 DevUtils/VerifyRustSurface.py --forks 3
+python3 DevUtils/tests/worldgen/VerifyRustSurface.py --forks 3
 ```
 
 The focused Gradle invocation excludes the repository-wide Rust test task,
@@ -111,9 +111,9 @@ is subtracted from each Java sample before calculating the gate.
 Full-world checks use isolated servers and fresh worlds under `build/`:
 
 ```sh
-python3 DevUtils/VerifyRustSurfaceWorld.py parity-java --reference --hash \
+python3 DevUtils/tests/worldgen/VerifyRustSurfaceWorld.py parity-java --reference --hash \
   --serial --workers 1 --radius 2 --rounds 1 --warmups 0
-python3 DevUtils/VerifyRustSurfaceWorld.py parity-native --hash \
+python3 DevUtils/tests/worldgen/VerifyRustSurfaceWorld.py parity-native --hash \
   --serial --workers 1 --radius 2 --rounds 1 --warmups 0 --compare parity-java
 ```
 

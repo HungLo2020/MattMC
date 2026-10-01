@@ -20,7 +20,7 @@ import shutil
 import statistics
 import subprocess
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 LIBRARY = "mattmc_rust-linux-x64.so"
 
 

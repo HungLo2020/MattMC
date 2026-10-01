@@ -61,7 +61,7 @@ final class NativeWorldFingerprintProbe {
                     for(var f:functions)hashLong(digest,Double.doubleToLongBits(f.compute(new DensityFunction.SinglePointContext(pos[0],y,pos[1]))));
                 var ns=config.noiseSettings();int cw=ns.getCellWidth(),ch=ns.getCellHeight();
                 var chunk=new NoiseChunk(16/cw,random,pos[0],pos[1],ns,DensityFunctions.BeardifierMarker.INSTANCE,config,
-                    (x,y,z)->new Aquifer.FluidStatus(config.seaLevel(),config.defaultFluid()),Blender.empty());
+                    Boolean.getBoolean("mattmc.test.aquiferPicker") ? new AquiferFluidPicker(config.seaLevel(),config.defaultFluid()) : (x,y,z)->new Aquifer.FluidStatus(config.seaLevel(),config.defaultFluid()),Blender.empty());
                 // Exercise cached biome-climate values both inside and outside
                 // the flat-cache footprint, before terrain interpolation begins.
                 var climate=chunk.cachedClimateSampler(router,config.spawnTarget());
@@ -110,7 +110,7 @@ final class NativeWorldTimingProbe {
         for(int[] pos:positions) {
                 var ns=config.noiseSettings();int cw=ns.getCellWidth(),ch=ns.getCellHeight();
                 var chunk=new NoiseChunk(16/cw,random,pos[0],pos[1],ns,DensityFunctions.BeardifierMarker.INSTANCE,config,
-                    (x,y,z)->new Aquifer.FluidStatus(config.seaLevel(),config.defaultFluid()),Blender.empty());
+                    Boolean.getBoolean("mattmc.test.aquiferPicker") ? new AquiferFluidPicker(config.seaLevel(),config.defaultFluid()) : (x,y,z)->new Aquifer.FluidStatus(config.seaLevel(),config.defaultFluid()),Blender.empty());
                 chunk.initializeForFirstCellX();
                 for(int cx=0;cx<16/cw;cx++) {
                     chunk.advanceCellX(cx);
@@ -157,8 +157,8 @@ final class NativeWorldTimingProbe {
 
         int[][] positions={{0,0},{-16,16},{1024,2048},{-16384,-32768},{29999968,-29999968}};
         for(var holder:settings) {
-            if(args.length>0 && !holder.key().location().getPath().equals(args[0]))continue;
-            var config=holder.value();var random=RandomState.create(config,noises,42);
+            if(args.length>0 && !java.util.Set.of(args[0].split(",")).contains(holder.key().location().getPath()))continue;
+            var config=holder.value();var random=RandomState.create(config,noises,Long.getLong("mattmc.test.seed",42L));
             // Whole-chunk gains are smaller than leaf-kernel gains. Longer windows
             // include more GC cycles and reduce sensitivity to scheduling delays.
             var result=NativeWorldTimingSupport.run(repeats->measure(config,random,positions,repeats),positions.length,1_000_000_000L,10_000_000_000L,0.08);

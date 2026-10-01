@@ -70,7 +70,7 @@ The six copied Java noise implementations, migration parity/benchmark drivers,
 source tree. The benchmark-only Rust export and Java binding were removed too.
 Focused Rust unit checks remain alongside the production modules. Java tests
 cover the density plans and boundary contracts. The opt-in
-`DevUtils/VerifyRustWorld.py` extracts reference classes into build output and
+`DevUtils/tests/worldgen/VerifyRustWorld.py` extracts reference classes into build output and
 compares original-Java and native terrain generation; see `RUST-DENSITY.md`.
 
 Local audit evidence is retained under the ignored `build/noise-validation`,

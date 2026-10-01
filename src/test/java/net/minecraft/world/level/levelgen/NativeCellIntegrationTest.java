@@ -52,6 +52,50 @@ class NativeCellIntegrationTest {
         };
     }
 
+    @Test void lazyBlockInterpolationMatchesEagerJavaForArbitraryStagingAndReads() {
+        for(boolean subclass:new boolean[]{false,true}) {
+            var owner=chunk(subclass?new AtomicInteger():null);
+            var interpolator=owner.new NoiseInterpolator(DensityFunctions.zero());
+            owner.interpolating=true;
+            var rng=new java.util.Random(921334);
+            double[] corners=new double[8],xz=new double[4],zv=new double[2];double expected=0;
+            for(int step=0;step<100000;step++) {
+                int op=rng.nextInt(6);double fraction=step%17==0?Double.longBitsToDouble(rng.nextLong()):rng.nextDouble();
+                switch(op) {
+                    case 0 -> {
+                        owner.updateForY(0,fraction);
+                        xz[0]=net.minecraft.util.Mth.lerp(fraction,corners[0],corners[2]);
+                        xz[1]=net.minecraft.util.Mth.lerp(fraction,corners[1],corners[3]);
+                        xz[2]=net.minecraft.util.Mth.lerp(fraction,corners[4],corners[6]);
+                        xz[3]=net.minecraft.util.Mth.lerp(fraction,corners[5],corners[7]);
+                    }
+                    case 1 -> {owner.updateForX(0,fraction);zv[0]=net.minecraft.util.Mth.lerp(fraction,xz[0],xz[1]);zv[1]=net.minecraft.util.Mth.lerp(fraction,xz[2],xz[3]);}
+                    case 2 -> {owner.updateForZ(0,fraction);expected=net.minecraft.util.Mth.lerp(fraction,zv[0],zv[1]);}
+                    case 3 -> {
+                        for(int i=0;i<8;i++)corners[i]=step%3==0?Double.longBitsToDouble(rng.nextLong()):rng.nextDouble()*4-2;
+                        interpolator.slice0[0][0]=corners[0];interpolator.slice1[0][0]=corners[1];
+                        interpolator.slice0[0][1]=corners[2];interpolator.slice1[0][1]=corners[3];
+                        interpolator.slice0[1][0]=corners[4];interpolator.slice1[1][0]=corners[5];
+                        interpolator.slice0[1][1]=corners[6];interpolator.slice1[1][1]=corners[7];
+                        interpolator.selectCellYZ(0,0);
+                    }
+                    case 4 -> {interpolator.updateForZ(fraction);expected=net.minecraft.util.Mth.lerp(fraction,zv[0],zv[1]);}
+                    default -> {}
+                }
+                if(rng.nextBoolean())assertEquals(Double.doubleToLongBits(expected),Double.doubleToLongBits(interpolator.compute(owner)),"step "+step);
+            }
+        }
+    }
+
+    @Test void interpolationOverridesStillReceiveEveryZUpdate() {
+        var owner=chunk(null);var visits=new AtomicInteger();
+        owner.new NoiseInterpolator(DensityFunctions.zero()) {
+            @Override void updateForZ(double fraction) {visits.incrementAndGet();super.updateForZ(fraction);}
+        };
+        for(int i=0;i<25;i++)owner.updateForZ(i,(double)i/4);
+        assertEquals(25,visits.get());
+    }
+
     private record Fixture(NoiseChunk chunk, NoiseChunk.NoiseInterpolator first,
                            DensityFunction source, DensityFunction compiled) {}
 

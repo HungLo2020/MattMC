@@ -26,6 +26,10 @@ never migrated, such as spline evaluation, blending and Y-clamped gradients,
 retain their existing Java implementations. Extension-owned functions likewise
 retain their own behavior; this cutover does not port arbitrary plugin code.
 
+The [aquifer path](RUST-AQUIFER.md) consumes completed density cells. Normal block
+interpolation now defers unused Z lerps while retaining the same staging and read
+behavior; cell-filling interpolation order is unchanged.
+
 ## Traversal and batching
 
 `DensityBatch` records raw coordinates and input values in their original Java
@@ -146,7 +150,7 @@ signed zero, infinities, NaNs and subnormal values.
 The copied Java implementations and old migration-only Gradle tasks remain
 removed.
 
-`DevUtils/VerifyRustWorld.py` is the retained, opt-in end-to-end comparison. It
+`DevUtils/tests/worldgen/VerifyRustWorld.py` is the retained, opt-in end-to-end comparison. It
 extracts the original Java implementation from commit
 `ee1692c10cf96a806c22c7e195bad01abb588a2e` into ignored build output and runs the
 same `NativeWorldVerification` driver against reference and production classes.
@@ -154,13 +158,13 @@ No copied Java sampling algorithm is added to production or retained test source
 
 ```sh
 # Exact terrain fingerprints only:
-python3 DevUtils/VerifyRustWorld.py --parity-only
+python3 DevUtils/tests/worldgen/VerifyRustWorld.py --parity-only
 
 # Full parity and three independent JVM forks per implementation, all settings:
-python3 DevUtils/VerifyRustWorld.py --forks 3 --cpu 2
+python3 DevUtils/tests/worldgen/VerifyRustWorld.py --forks 3 --cpu 2
 
 # Narrow a performance investigation to one setting:
-python3 DevUtils/VerifyRustWorld.py --world overworld --forks 3 --cpu 2
+python3 DevUtils/tests/worldgen/VerifyRustWorld.py --world overworld --forks 3 --cpu 2
 ```
 
 The script builds release natives by default; `--skip-build` requires an existing

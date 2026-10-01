@@ -3,11 +3,11 @@
 ## Ownership
 
 World generation lives under `src/main/rust/world/level/levelgen/`. Noise
-synthesis (`synth`), density evaluation (`density`), and surface evaluation
-(`surface`) are separate domains. Fiddled-distance biome corner selection lives
+synthesis (`synth`), density evaluation (`density`), aquifer evaluation (`aquifer`),
+and surface evaluation (`surface`) are separate domains. Fiddled-distance biome corner selection lives
 under `world/level/biome/`; surface evaluation consumes its column results.
 
-This is a structural refactor. Seed construction, Java graph/cache ownership,
+The original organization change was a structural refactor. Seed construction, Java graph/cache ownership,
 native state layouts, exported symbol names, array bounds, and callback/write
 order are preserved. The native library is still one Cargo `cdylib`.
 
@@ -18,6 +18,7 @@ world/level/
     ├── math.rs
     ├── synth/       # Noise families, their optimized kernels, state and FFI
     ├── density/     # Programs, evaluation, cell kernels, End islands and FFI
+    ├── aquifer/     # Center search, material/fluid decisions, cell batches and FFI
     └── surface/     # Rule program, resumable frame, evaluation and FFI
 ```
 
@@ -92,10 +93,10 @@ post-refactor release libraries **and Java classes**, including boundary costs:
 
 ```sh
 # Before editing, after a release testClasses build and classpath preparation:
-python3 DevUtils/VerifyRustWorldgenRefactor.py --capture-baseline \
+python3 DevUtils/tests/worldgen/VerifyRustWorldgenRefactor.py --capture-baseline \
   --classpath build/rust-surface-verification/classpath.txt
 # After rebuilding the candidate:
-python3 DevUtils/VerifyRustWorldgenRefactor.py --forks 3 \
+python3 DevUtils/tests/worldgen/VerifyRustWorldgenRefactor.py --forks 3 \
   --classpath build/rust-surface-verification/classpath.txt
 ```
 

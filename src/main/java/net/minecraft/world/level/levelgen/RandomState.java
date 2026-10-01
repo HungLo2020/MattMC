@@ -14,6 +14,13 @@ import net.minecraft.world.level.levelgen.synth.BlendedNoise;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 public final class RandomState {
+    private volatile Boolean aquiferBatchSafe;
+    boolean aquiferBatchSafe() {
+        Boolean result=aquiferBatchSafe;
+        if(result==null)aquiferBatchSafe=result=NativeAquiferSources.safe(router);
+        return result;
+    }
+
 	final PositionalRandomFactory random;
 	private final HolderGetter<NormalNoise.NoiseParameters> noises;
 	private final NoiseRouter router;

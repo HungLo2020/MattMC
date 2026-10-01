@@ -65,17 +65,7 @@ public final class NoiseBasedChunkGenerator extends ChunkGenerator {
 	}
 
 	private static Aquifer.FluidPicker createFluidPicker(NoiseGeneratorSettings noiseGeneratorSettings) {
-		Aquifer.FluidStatus fluidStatus = new Aquifer.FluidStatus(-54, Blocks.LAVA.defaultBlockState());
-		int i = noiseGeneratorSettings.seaLevel();
-		Aquifer.FluidStatus fluidStatus2 = new Aquifer.FluidStatus(i, noiseGeneratorSettings.defaultFluid());
-		Aquifer.FluidStatus fluidStatus3 = new Aquifer.FluidStatus(DimensionType.MIN_Y * 2, Blocks.AIR.defaultBlockState());
-		return (j, k, l) -> {
-			if (SharedConstants.DEBUG_DISABLE_FLUID_GENERATION) {
-				return fluidStatus3;
-			} else {
-				return k < Math.min(-54, i) ? fluidStatus : fluidStatus2;
-			}
-		};
+		return new AquiferFluidPicker(noiseGeneratorSettings.seaLevel(), noiseGeneratorSettings.defaultFluid());
 	}
 
 	@Override

@@ -36,6 +36,7 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 	private final Long2IntMap preliminarySurfaceLevelCache = new Long2IntOpenHashMap();
 	private final Aquifer aquifer;
 	private final DensityFunction preliminarySurfaceLevel;
+    CacheAllInCell aquiferDensity;
 	private final NoiseChunk.BlockStateFiller blockStateRule;
 	private final Blender blender;
 	private final NoiseChunk.FlatCache blendAlpha;
@@ -55,6 +56,9 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 	int inCellY;
 	int inCellZ;
 	long interpolationCounter;
+    private long blockZEpoch;
+    private double blockZFraction;
+    private boolean lazyBlockInterpolation = this.getClass() == NoiseChunk.class;
 	long arrayInterpolationCounter;
 	int arrayIndex;
 	private final DensityFunction.ContextProvider sliceFillingContextProvider = new DensityBatch.Provider() {
@@ -162,7 +166,12 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 				DensityFunctions.add(noiseRouter2.finalDensity(), DensityFunctions.BeardifierMarker.INSTANCE)
 			)
 			.mapAll(this::wrap);
-		list.add((NoiseChunk.BlockStateFiller)functionContext -> this.aquifer.computeSubstance(functionContext, densityFunction.compute(functionContext)));
+		if (densityFunction instanceof CacheAllInCell cache) this.aquiferDensity = cache;
+        if(this.aquifer instanceof Aquifer.NoiseBasedAquifer enabled) {
+            list.add(context -> enabled.computeMaterial(context,densityFunction.compute(context)));
+        } else {
+            list.add(context -> this.aquifer.computeSubstance(context,densityFunction.compute(context)));
+        }
 		if (noiseGeneratorSettings.oreVeinsEnabled()) {
 			list.add(OreVeinifier.create(noiseRouter2.veinToggle(), noiseRouter2.veinRidged(), noiseRouter2.veinGap(), randomState.oreRandom()));
 		}
@@ -303,6 +312,7 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 	}
 
 	private final RandomState randomState;
+    boolean aquiferBatchSafe() { return randomState.aquiferBatchSafe(); }
 	private final DensityBatch noiseBatch = new DensityBatch();
 
 	public void selectCellYZ(int i, int j) {
@@ -343,9 +353,15 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		this.inCellZ = i - this.cellStartBlockZ;
 		this.interpolationCounter++;
 
-		for (NoiseChunk.NoiseInterpolator noiseInterpolator : this.interpolators) {
-			noiseInterpolator.updateForZ(d);
-		}
+        // Material decisions usually read only a subset of the interpolators.
+        // Defer their final lerp; updateForX flushes the preceding value before
+        // replacing its operands, preserving reads between staging calls too.
+        if(!this.lazyBlockInterpolation) {
+            for(NoiseInterpolator interpolator:this.interpolators)interpolator.updateForZ(d);
+            return;
+        }
+        this.blockZFraction=d;
+        this.blockZEpoch++;
 	}
 
 	public void stopInterpolation() {
@@ -728,8 +744,11 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		private double valueZ0;
 		private double valueZ1;
 		private double value;
+        private long valueZEpoch;
 
 		NoiseInterpolator(final DensityFunction densityFunction) {
+			this.valueZEpoch=NoiseChunk.this.blockZEpoch;
+            if(this.getClass()!=NoiseInterpolator.class)NoiseChunk.this.lazyBlockInterpolation=false;
 			this.noiseFiller = densityFunction;
             this.evaluator = NoiseChunk.this.randomState.optimizeUnary(densityFunction);
 			this.slice0 = this.allocateSlice(NoiseChunk.this.cellCountY, NoiseChunk.this.cellCountXZ);
@@ -768,13 +787,22 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		}
 
 		void updateForX(double d) {
+            this.synchronizeValue();
 			this.valueZ0 = Mth.lerp(d, this.valueXZ00, this.valueXZ10);
 			this.valueZ1 = Mth.lerp(d, this.valueXZ01, this.valueXZ11);
 		}
 
 		void updateForZ(double d) {
 			this.value = Mth.lerp(d, this.valueZ0, this.valueZ1);
+            this.valueZEpoch=NoiseChunk.this.blockZEpoch;
 		}
+        private double synchronizeValue() {
+            if(this.valueZEpoch!=NoiseChunk.this.blockZEpoch) {
+                this.value=Mth.lerp(NoiseChunk.this.blockZFraction,this.valueZ0,this.valueZ1);
+                this.valueZEpoch=NoiseChunk.this.blockZEpoch;
+            }
+            return this.value;
+        }
 
 		@Override
 		public double compute(DensityFunction.FunctionContext functionContext) {
@@ -797,7 +825,7 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 						this.noise011,
 						this.noise111
 					)
-					: this.value;
+					: this.synchronizeValue();
 			}
 		}
 
