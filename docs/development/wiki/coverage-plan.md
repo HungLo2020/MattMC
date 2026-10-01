@@ -4,8 +4,9 @@
 
 - Working branch: `docs/wiki-expansion`
 - Source default branch: `master`
-- Last source snapshot integrated: `b81c01943c9f3254e713c365a1dd633392929cb2`
-- Latest source sync: real two-parent merge `c1c36ba1c0dc353b6a4ecc99b36229ee526c09f4`, preserving published wiki history and bringing in palette packing/histograms from master without conflicts.
+- Last source snapshot integrated: `4285adff2e35307c277a3a5bf54ebd064aa5e64b`
+- Latest source sync: real two-parent merge `0b73e6fe0303fcdf2b86ce5c58ebf1436ba4d71a`, preserving published wiki history and bringing in renderer cleanup/documentation from master without conflicts. Java gameplay, bundled game data, and workflows were unchanged.
+- Previous source sync: real two-parent merge `c1c36ba1c0dc353b6a4ecc99b36229ee526c09f4` integrated palette packing/histograms without conflicts.
 - Source sync: fast-forwarded from `fffe4a073f0b8d867902b067a6dd022cda31926f` to the newer render-bridge refactor while preserving all wiki edits; inspected changes do not touch this batch's gameplay sources
 - Initial branch created from `fffe4a073f0b8d867902b067a6dd022cda31926f` on 2026-10-01
 - No merge back to the default branch or deployment is authorized
@@ -355,6 +356,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Traced the crafting repair recipe's fresh result, curse retention, and lost custom components; linked the previously documented steering-tool and Wolf Armor special cases.
 - Updated Mechanics, Mining, Armor, Anvil Mechanics, Crafting, Content Guide, this checkpoint, and October branch-work log. Source remains `b81c01943c9f3254e713c365a1dd633392929cb2`; no source sync required.
 - Validation: checker and strict build passed on 2,145 pages / 34 indexes; source targets and whitespace checked. No wear-out, repair, data-retention, mining, or equipment gameplay test.
+
+## Forty-fifth batch: Wither and Nether Star
+
+- Expanded Wither and Nether Star with active summon pattern/gates, charge/explosion, combat phases, skull effects, terrain risk, custom death drop, XP, and Beacon recipe.
+- Distinguished arrow-family/Wind Charge immunity from all projectiles, power from blast radius, and the fresh boss drop's extended lifetime from later dropped stacks.
+- Updated Mobs, Content Guide, this checkpoint, and October branch-work log. Integrated master `4285adff2e35307c277a3a5bf54ebd064aa5e64b` through the real merge above; cited Java/data sources remain unchanged from `b81c01943c9f3254e713c365a1dd633392929cb2`. Also recorded the verified renderer refactor in October's landed-master section.
+- Validation: checker and strict build passed on 2,150 pages / 35 indexes; source targets and whitespace checked. No summoning, combat, containment, loot, despawn, or crafting gameplay test.
 
 ## Next batches, in priority order
 

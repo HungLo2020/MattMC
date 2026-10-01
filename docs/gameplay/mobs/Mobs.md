@@ -6,6 +6,8 @@ For source-reviewed hostile or conditional encounters, see [Creeper](Creeper.md)
 
 Elephant, Raccoon, and Capuchin Monkey are listed as neutral here because their active goals include retaliation; their articles separate owner controls from missing bundled taming foods.
 
+For a source-reviewed boss encounter, see [Wither](Wither.md) and its [Nether Star reward](../items/NetherStar.md).
+
 MattMC mobs grouped by behavior. Each section is alphabetized.
 
 ## Passive Mobs
