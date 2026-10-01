@@ -108,6 +108,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Relicheirus](mobs/Relicheirus.md), [Tremorsaurus](mobs/Tremorsaurus.md), and [their placed eggs](blocks/DinosaurEggs.md): food, combat, ownership, and breeding/integration limits
 
+- [Dinosaur Chop](blocks/DinosaurChop.md) and [Primal Magma](blocks/PrimalMagma.md): placed food, heat conversion, and source-verified hazard/integration limits
+
 - [Primordial decorative plants](blocks/PrimordialPlants.md): Fiddlehead spreading, Cycad bone-meal growth, and non-climbable Archaic Vine
 
 - [Vallumraptor](mobs/Vallumraptor.md) and [Grottoceratops](mobs/Grottoceratops.md): theft, flower grazing, owner differences, and species-egg limits

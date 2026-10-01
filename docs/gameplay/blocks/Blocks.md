@@ -33,6 +33,11 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 - [Ambersol](Ambersol.md): overhead column lighting from integrated Alex's Caves content, with Survival acquisition limits clearly marked
 
 
+## Prehistoric food and hazards
+
+- [Dinosaur Chop](DinosaurChop.md): four-serving placed food, cooking, bone remainder, and collection limits
+- [Primal Magma and Fissure](PrimalMagma.md): conditional hot-floor hazards, collision, and scheduled replacement
+
 ## Redstone components
 
 - [Lever](Lever.md): sustained on/off input
