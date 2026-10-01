@@ -49,6 +49,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Grindstone](blocks/Grindstone.md): free repair, enchantment removal, curse retention, and experience refunds
 
+- [Root crops](blocks/RootCrops.md): Carrot, Potato, and Beetroot growth, custom harvesting, food, and cooking
+
 ## Alex's Mobs additions
 
 - [Grizzly Bear](mobs/GrizzlyBear.md): food interactions, taming, and current implementation differences

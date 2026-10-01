@@ -38,6 +38,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Farming
 
+- [Root crops](RootCrops.md): Carrots, Potatoes, and Beetroots, including harvest/reset controls
+
 - [Farmland](Farmland.md): tilling, hydration, and protecting plots
 - [Nether Wart](NetherWart.md): Soul Sand planting and brewing harvest
 - [Wheat crop](Wheat.md): growth and MattMC's right-click / hoe-area harvesting
