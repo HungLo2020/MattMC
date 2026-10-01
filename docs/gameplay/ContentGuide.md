@@ -100,6 +100,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Primordial decorative plants](blocks/PrimordialPlants.md): Fiddlehead spreading, Cycad bone-meal growth, and non-climbable Archaic Vine
 
+- [Vallumraptor](mobs/Vallumraptor.md) and [Grottoceratops](mobs/Grottoceratops.md): theft, flower grazing, owner differences, and species-egg limits
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)

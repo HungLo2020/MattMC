@@ -51,7 +51,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Eggs
 
-- [Placed dinosaur eggs](DinosaurEggs.md): Tremorsaurus and Relicheirus hatching, collection, and ownership differences
+- [Placed dinosaur eggs](DinosaurEggs.md): four species, Vallumraptor clusters, collection, and ownership differences
 
 - [Subterranodon Egg](SubterranodonEgg.md): Creative placement, hatching, ownership, and incomplete breeding source
 

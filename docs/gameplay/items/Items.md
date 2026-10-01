@@ -1743,6 +1743,7 @@ Find inventory objects here, including block items, food, equipment, and spawn e
 - [Ursus Military Standard Silencer](UrsusMilitaryStandardSilencer.md)
 - [UZI](UZI.md)
 #### V
+- [Vallumraptor Egg](VallumraptorEgg.md)
 - [Vallumraptor Spawn Egg](VallumraptorSpawnEgg.md)
 - [Vault](Vault.md)
 - [Vector SMG](VectorSMG.md)
