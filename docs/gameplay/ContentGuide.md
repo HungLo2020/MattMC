@@ -70,6 +70,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Exploration, archaeology, and trade
 
+- [Shipwreck](structures/Shipwreck.md), [Ocean Ruins](structures/OceanRuins.md), and [Buried Treasure](structures/BuriedTreasure.md): chest layouts, archaeology, treasure maps, and safe search limits
+
 - [Structures](structures/Structures.md): prepare for [Nether Fortresses](structures/NetherFortress.md) and [Strongholds](structures/Stronghold.md), including optional rooms and portal hazards
 - [Dimensions](dimensions/Dimensions.md): Nether linking/anchors, End arrival/return, and the custom Primordial Caves route
 - [Ender Pearl](items/EnderPearl.md), [Eye of Ender](items/EyeOfEnder.md), and [Blaze Rod](items/BlazeRod.md): teleport risks, portal supplies, recipes, and fuel

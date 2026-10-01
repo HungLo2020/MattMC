@@ -8,6 +8,9 @@ Structures give exploration a destination: a place to collect supplies, face a p
 | --- | --- | --- |
 | [Nether Fortress](NetherFortress.md) | Nether biomes | Blazes, Nether Wart where a stalk room generates, and corridor-chest loot |
 | [Stronghold](Stronghold.md) | Overworld | An End portal room, with possible libraries and other loot rooms |
+| [Shipwreck](Shipwreck.md) | Overworld oceans, Beach, and Snowy Beach | Supply/treasure chests and possible treasure maps |
+| [Ocean Ruins](OceanRuins.md) | Eligible warm or cold Overworld oceans | Chest rewards, archaeology, and possible treasure maps |
+| [Buried Treasure](BuriedTreasure.md) | Beach and Snowy Beach | Heart of the Sea and other buried-chest loot |
 
 These are the structures reviewed in this section so far, not a list of every structure in MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
 
@@ -30,7 +33,7 @@ A failed search is not proof that a structure does not exist anywhere. Check the
 
 New structure starts require the world's structure-generation option to be enabled. The generator then uses the world's loaded structure sets, placement rules, and allowed biomes. A biome being eligible means a structure may start there, not that every patch of that biome contains one.
 
-The guides describe bundled data and the normal world preset. Data packs, custom presets, and older already-generated terrain can differ. In particular, the bundled Primordial Caves preset uses Dry Midlands and Primordial Plains; neither biome belongs to these two structures' allowed biome tags. Do not carry a fortress or stronghold search into [Primordial Caves](../dimensions/PrimordialCaves.md) expecting the default Nether or Overworld result.
+The guides describe bundled data and the normal world preset. Data packs, custom presets, and older already-generated terrain can differ. In particular, the bundled Primordial Caves preset uses Dry Midlands and Primordial Plains; neither biome belongs to the fortress or stronghold allowed biome tags. Do not carry a fortress or stronghold search into [Primordial Caves](../dimensions/PrimordialCaves.md) expecting the default Nether or Overworld result.
 
 ## Before entering
 
