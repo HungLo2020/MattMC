@@ -69,6 +69,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 - [Limestone family](blocks/Limestone.md) and [Pewen family](blocks/Pewen.md): Creative building forms and verified source limitations
 
+- [Pewen Branch](items/PewenBranch.md), [Pines](items/PewenPines.md), [Pine Nuts](items/PineNuts.md), and [Sap](items/PewenSap.md): decorative support, harvesting, food, and unverified sap use
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)

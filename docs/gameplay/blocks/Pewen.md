@@ -43,6 +43,12 @@ These caveats describe the checked source and data. Runtime recipe-loading error
 
 Pewen logs and wood are axis-oriented with hardness 2. Planks have hardness 2 and blast resistance 3. Most building forms use cherry-wood sounds; doors and trapdoors use the cherry block-set behavior. The button is configured for **30 ticks** per activation. Signs and fence gates use the oak wood-type implementation, so visual or sound assumptions from upstream are not guaranteed.
 
+## Branches, Pines, and resources
+
+[Pewen Branches](../items/PewenBranch.md) form supported horizontal chains in eight orientations and can be waterlogged. Removing their connecting support causes break checks that can propagate to nearby branches. The outward neighbor controls the leafy-tip state. [Pewen Pines](../items/PewenPines.md) is a separate non-colliding plant placed above the trunk, needing a sturdy upper face below it.
+
+Shears or Silk Touch recover the decorative blocks. Other harvests can yield saplings and a separate resource pool containing Sticks or [Pine Nuts](../items/PineNuts.md); these are chance-based, not guaranteed. [Pewen Sap](../items/PewenSap.md) is registered and listed in Creative, but a bundled extraction or Survival-use route was not found.
+
 ## Related items
 
 - [Pewen Log](../items/PewenLog.md), [Pewen Wood](../items/PewenWood.md)
@@ -80,3 +86,5 @@ Reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. Source/dat
 - [Pewen pressure plate recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/pewen_pressure_plate.json)
 - [Pewen sign recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/pewen_sign.json)
 - [Pewen boat recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/pewen_boat.json)
+
+Additional branch/foliage review at `b81c01943c9f3254e713c365a1dd633392929cb2`: [branch behavior](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/block/PewenBranchBlock.java), [Pines support](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/block/PewenPinesBlock.java), and [branch loot](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/blocks/pewen_branch.json).
