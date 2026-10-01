@@ -41,6 +41,8 @@ src/main/rust/
     └── level/
         ├── biome/
         │   └── climate/
+        ├── chunk/
+        │   └── palette/
         ├── lighting/
         │   └── skylight_sources/
         ├── color_map_color_util.rs
@@ -66,10 +68,15 @@ Shared engine primitives belong here. Use this for low-level types, algorithms, 
 World simulation and world data helpers belong here. Current code includes
 `world/level/color_map_color_util.rs` for Java color-map behavior,
 `world/level/biome/` for biome corner selection and [climate lookup](world/biome/RUST-CLIMATE.md), [skylight-source reconstruction](world/lighting/RUST-SKYLIGHT-SOURCES.md) under
-`world/level/lighting/`, and `world/level/levelgen/` for
+`world/level/lighting/`, [block-section save packing](world/chunk/RUST-PALETTE-PACKING.md)
+under `world/level/chunk/palette/`, and `world/level/levelgen/` for
 noise synthesis, density evaluation, aquifers, and surface evaluation. See
 [Rust World-Generation Organization](world/levelgen/RUST-WORLDGEN-ORGANIZATION.md) for module
 ownership, native boundaries, and recorded verification.
+
+Packed chunk storage also uses [palette histograms](world/chunk/RUST-PALETTE-HISTOGRAM.md)
+under `world/level/chunk/palette/histogram/` for ordered counting and section
+counter reconstruction.
 
 ### `gameplay/`
 

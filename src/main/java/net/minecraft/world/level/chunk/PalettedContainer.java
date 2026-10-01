@@ -235,6 +235,10 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
 		PalettedContainerRO.PackedData var14;
 		try {
+			if (this.getClass() == PalettedContainer.class) {
+				var packed = NativePalettePacking.pack(this.data.storage, this.data.palette, this.strategy, strategy);
+				if (packed != null) return packed;
+			}
 			BitStorage bitStorage = this.data.storage;
 			Palette<T> palette = this.data.palette;
 			HashMapPalette<T> hashMapPalette = new HashMapPalette<>(bitStorage.getBits());
@@ -308,6 +312,18 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		if (this.data.palette.getSize() == 1) {
 			countConsumer.accept(this.data.palette.valueFor(0), this.data.storage.getSize());
 		} else {
+			if (this.getClass() == PalettedContainer.class) {
+				var counts = NativePaletteHistogram.scan(this.data.storage);
+				if (counts != null) {
+					try (counts) {
+						for (int i = 0; i < counts.size; i++) {
+							long entry = counts.entry(i);
+							countConsumer.accept(this.data.palette.valueFor((int)entry), (int)(entry >>> 32));
+						}
+					}
+					return;
+				}
+			}
 			Int2IntOpenHashMap int2IntOpenHashMap = new Int2IntOpenHashMap();
 			this.data.storage.getAll(i -> int2IntOpenHashMap.addTo(i, 1));
 			int2IntOpenHashMap.int2IntEntrySet().forEach(entry -> countConsumer.accept(this.data.palette.valueFor(entry.getIntKey()), entry.getIntValue()));
