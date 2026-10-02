@@ -28,6 +28,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Farming, food, and animal care
 
+- [Bison](mobs/Bison.md) and [Moose](mobs/Moose.md): browser/egg access, source-verified breeding, dispenser Fur harvesting, Antler shedding, and missing natural/recipe resource routes
+
 - [Alligator Snapping Turtle](mobs/AlligatorSnappingTurtle.md), [Catfish](mobs/Catfish.md), and [Lobster](mobs/Lobster.md): breathing/enclosure care, collecting items, bucket risks and separate food supplies
 
 - [Food reference](items/FoodReference.md): exact hunger/saturation values, consumption differences, and the distinction between handheld food, drinks, and placed food
