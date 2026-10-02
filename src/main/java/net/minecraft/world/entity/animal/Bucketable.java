@@ -26,6 +26,11 @@ public interface Bucketable {
 
 	void loadFromBucketTag(CompoundTag compoundTag);
 
+	/** Loads the bucket component; entities may override for item-format compatibility. */
+	default void loadFromBucketItem(ItemStack itemStack) {
+		this.loadFromBucketTag(itemStack.getOrDefault(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY).copyTag());
+	}
+
 	ItemStack getBucketItemStack();
 
 	SoundEvent getPickupSound();
