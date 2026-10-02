@@ -68,6 +68,8 @@ Leaving the water/rain condition, leaving range, or breaking the structure stops
 
 ## What Conduit Power actually supplies
 
+The [water and fire effects guide](../effects/WaterAndFireEffects.md#conduit-power) compares Conduit Power with Water Breathing and Breath of the Nautilus.
+
 - **Underwater breathing:** the active air-supply check treats Conduit Power as water breathing, preventing ordinary drowning-air depletion while the effect remains
 - **Mining assistance:** Conduit Power I gives the shared digging-speed calculation a **20% multiplier increase**. If Haste is also present, the helper uses the higher amplifier rather than adding both bonuses
 - **Underwater visibility input:** with the player's eyes in water, the current client feeds Conduit Power into its night-vision lightmap factor using the player's water-vision value
