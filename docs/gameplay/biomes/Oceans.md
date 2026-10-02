@@ -49,6 +49,8 @@ Plan surface travel with the [Boat/transport guide](../mechanics/Transport.md), 
 
 ## Integrated ocean content is separate
 
+For exact inland/coastal comparisons use [Rivers and shores](RiversAndShores.md); [Primordial Ocean](SpecialBiomes.md#primordial-ocean) has a separate loaded-dimension route.
+
 The registered **Primordial Ocean** definition is not one of these nine Overworld choices. It is included in the loaded bundled [Primordial Caves dimension source](../dimensions/PrimordialCaves.md#what-currently-generates), which takes precedence over the literal Normal preset's two-biome definition. This establishes a source candidate, not a surveyed ocean location, guaranteed portal landing or completed generation test. [Primordial Ocean definition][primordial]
 
 Similarly, [Orca](../mobs/Orca.md), [Hammerhead Shark](../mobs/HammerheadShark.md), [Cachalot Whale](../mobs/CachalotWhale.md), and [Giant Squid](../mobs/GiantSquid.md) have separate integration limits. None is listed in these checked ocean biome spawn tables. Do not assume that choosing a warm or deep ocean completes their absent bundled spawning routes.

@@ -1147,6 +1147,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,348 pages / 37 indexes. All 13 authored paths are documentation; 693 local links/anchors and 291 tracked reference uses resolve, with zero rendered citation candidates. One shared attack-family owner is counted separately from seven exact material-item corrections.
 
+## Batch 141: Overworld and special biome comparisons
+
+- Added nine substantive family guides covering the remaining 47 bundled biome resource IDs, alongside the previously reviewed 21 ocean, Nether, End and custom IDs. The Biomes index now provides all 68 exact IDs alphabetically with 65 verified English names, three disclosed custom-name fallbacks and precise family/section routes.
+- Traced Normal selection and resource loading, selected surface/vegetation/ore chains, mob-specific spawning constraints and structure-start tags/sets. Primordial Ocean uses the corrected loaded-dimension precedence; The Void is explicitly a separate flat setup. Feature attempts, candidate weights and climate parameters are not presented as measured terrain, yields, encounter rates or geographic directions.
+- Source checkpoint: `aaeea0b263d995334061e562cd5b71a853540f7f`; 363 immutable source pairs match current source. Independent rendered-reference checks and bounded semantic checks found no remaining concrete correction. No terrain survey, generation-rate, structure-search or gameplay test was run. This adds useful biome coverage without claiming all wiki systems or every biome detail are complete.
+
+- Validation: required checker and strict build passed on 2,357 pages / 37 indexes. All 15 authored paths are documentation; 884 local links/anchors and 791 tracked reference uses resolve, with zero rendered citation candidates. The alphabetical biome directory has exactly 68 unique source IDs, 65 translated names and three disclosed fallback labels; every new family section is reachable.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.
