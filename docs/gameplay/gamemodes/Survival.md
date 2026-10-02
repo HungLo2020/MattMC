@@ -2,6 +2,8 @@
 
 Survival is MattMC's default game mode. It grants ordinary building ability but does not grant Creative instant-build, flight, or invulnerable abilities. Resources, tools, food, and safe movement matter.
 
+MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) supports requesting ordinary listed items in Survival as well as Creative. Browser insertion is separate from crafting/loot acquisition and from the additional permissions needed for operator entries.
+
 ## A practical start
 
 1. Collect materials that match current recipe tags. Familiar integrated materials can have missing tag wiring; ordinary oak planks are in the bundled planks tag.

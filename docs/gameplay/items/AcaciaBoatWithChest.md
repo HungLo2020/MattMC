@@ -4,7 +4,7 @@
 
 The Acacia Boat with Chest is crafted by combining an Acacia Boat with a Chest. It can also be obtained from MattMC's JEI-style combined creative menu.
 
-Breaking an Acacia Boat with Chest returns the boat-with-chest item. Its stored contents are preserved with the item.
+In Survival with entity drops enabled, breaking an Acacia Boat with Chest returns its matching boat-with-chest item and spills its cargo as separate item entities. **The dropped boat item does not preserve its stored contents.** [Chest-boat destruction](https://github.com/HungLo2020/MattMC/blob/d1bff20a6235d5a7052eff0e7e2191da8fbb00c4/src/main/java/net/minecraft/world/entity/vehicle/AbstractChestBoat.java#L64-L75) · [Fresh vehicle-item drop](https://github.com/HungLo2020/MattMC/blob/d1bff20a6235d5a7052eff0e7e2191da8fbb00c4/src/main/java/net/minecraft/world/entity/vehicle/VehicleEntity.java#L68-L74)
 
 ## Usage
 

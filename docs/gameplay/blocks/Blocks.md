@@ -210,7 +210,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cake with White Candle** — [Cake](Cake.md#white-candle-cake) (related guide); `minecraft:white_candle_cake`
 - **Cake with Yellow Candle** — [Cake](Cake.md#yellow-candle-cake) (related guide); `minecraft:yellow_candle_cake`
 - **Calcite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#calcite) (related guide); `minecraft:calcite`
-- **Calibrated Sculk Sensor** — article needed; `minecraft:calibrated_sculk_sensor`
+- **Calibrated Sculk Sensor** — [Sculk Sensors and calibration](SculkSensors.md#calibrated-sculk-sensor) (related guide); `minecraft:calibrated_sculk_sensor`
 - **Campfire** — [Campfires](Campfires.md#variants-and-crafting) (related guide); `minecraft:campfire`
 - **Candle** — [Candles](Candles.md#candle) (related guide); `minecraft:candle`
 - **Carmine Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#carmine-froglight) (related guide); `minecraft:carmine_froglight`
@@ -1004,11 +1004,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Sandstone Stairs** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:sandstone_stairs`
 - **Sandstone Wall** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:sandstone_wall`
 - **Scaffolding** — [Scaffolding](Scaffolding.md) (related guide); `minecraft:scaffolding`
-- **Sculk** — article needed; `minecraft:sculk`
-- **Sculk Catalyst** — article needed; `minecraft:sculk_catalyst`
-- **Sculk Sensor** — article needed; `minecraft:sculk_sensor`
-- **Sculk Shrieker** — article needed; `minecraft:sculk_shrieker`
-- **Sculk Vein** — article needed; `minecraft:sculk_vein`
+- **Sculk** — [Sculk, veins and catalysts](Sculk.md#sculk) (related guide); `minecraft:sculk`
+- **Sculk Catalyst** — [Sculk, veins and catalysts](Sculk.md#sculk-catalyst) (related guide); `minecraft:sculk_catalyst`
+- **Sculk Sensor** — [Sculk Sensors and calibration](SculkSensors.md#sculk-sensor) (related guide); `minecraft:sculk_sensor`
+- **Sculk Shrieker** — [Sculk Shrieker](SculkShrieker.md#sculk-shrieker) (related guide); `minecraft:sculk_shrieker`
+- **Sculk Vein** — [Sculk, veins and catalysts](Sculk.md#sculk-vein) (related guide); `minecraft:sculk_vein`
 - **Sea Lantern** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#sea-lantern) (related guide); `minecraft:sea_lantern`
 - **Sea Pickle** — [Sea Pickle](SeaPickle.md) (related guide); `minecraft:sea_pickle`
 - **Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:seagrass`
@@ -1433,6 +1433,9 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Sandstone and Red Sandstone](Sandstone.md)
 - [Saplings and Azalea growth](SaplingsAndAzaleas.md)
 - [Scaffolding](Scaffolding.md)
+- [Sculk Sensors and calibration](SculkSensors.md)
+- [Sculk Shrieker](SculkShrieker.md)
+- [Sculk, veins and catalysts](Sculk.md)
 - [Sea Pickle](SeaPickle.md)
 - [Seagrass](Seagrass.md)
 - [Shrubs and Dry Grass](ShrubsAndDryGrass.md)

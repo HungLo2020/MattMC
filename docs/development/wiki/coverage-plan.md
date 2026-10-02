@@ -996,13 +996,23 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,310 pages / 37 indexes. All 19 authored paths are documentation and 2,132 local links/anchors resolve. The draft audit verified 118 unique pinned source links; integrated rendering of all 19 changed pages found zero citation ambiguity or unresolved-bracket candidates, including the spaced reference labels omitted by the older shortcut counter. The directory preserves 1,211 alphabetical IDs, with 1,167 related-guide routes and 44 explicit article gaps, not a completion score.
 
+## Batch 124: Sculk systems and bounded item corrections
+
+- Added three canonical guides and corrected six sculk item pages. All six sculk IDs now link to precise owners, with harvesting/XP, Catalyst growth, ordinary/calibrated detection, all 40 base frequency events, resonance, water/Wool/sneaking distinctions, and Shrieker warning/summoning gates traced through active callers.
+- Natural and ordinary placed/catalyst-grown Shrieker states remain distinct. Direct step callbacks, waterlogged sensor events and an already-shrieking block’s removal response are documented without promising a safe cancellation method or guaranteed Warden spawn.
+- Corrected the existing Soul Heart page: it is a plain lure item, not a placeable block; held-item/nearest-player checks and the verified ordinary-category inventory-browser route are now explicit, while recipes/natural loot remain unverified. Corrected only the false Acacia chest-boat cargo-retention claim: normal cargo spills separately and is not stored in the dropped boat item. The other ten chest-boat/raft variants were checked for that specific wording and did not repeat the claim.
+- Added the central inventory-browser guide after tracing the complete user-interface/client/server path: ordinary category entries intentionally support Survival insertion, while operator entries require instant-build plus permission level 2. The guide distinguishes this route from recipes/natural loot and does not assume every registry item is listed. Creative/Survival owners now crosslink it.
+- Source checkpoint: `b823010659d7b5095ed021b1c99cf85627e2082a`; all 86 distinct pinned sculk/correction/browser source pairs match the integrated source, and the new correction citations have valid bounds. No gameplay, signal timing, Warden spawning, lure or cargo-recovery runtime test is claimed.
+
+- Validation: required checker and strict build passed on 2,314 pages / 37 indexes. All 21 authored paths are documentation; 2,034 local links/anchors and 217 tracked reference uses resolve, with zero rendered citation ambiguity or unresolved-bracket candidates. The inventory/browser source chain and all new correction citation bounds were checked independently. The alphabetical directory preserves 1,211 IDs, with 1,173 related-guide routes and 38 explicit article gaps; neither this nor the page count implies broad completion.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Finish the isolated Sculk, animal-egg and custom redstone drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+2. Finish the isolated animal-egg and custom redstone drafts, then Fire/Chorus, portal and operator-block reviews. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
 3. Fill remaining practical gaps such as fuel/storage utility blocks, sculk devices and imported nature/redstone blocks, following actual active behavior and acquisition routes.
 4. Cover remaining terrain/material, plant and technical families, including Fire/Soul Fire, Chorus, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
-5. Preserve the ready Swords and undead drafts for later source revalidation; continue broader item, mob, biome, effect, structure and gameplay-system coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.
+5. Preserve the ready Swords and undead drafts for later source revalidation; replace remaining generic mob/item pages, including Warden and the missing Nautilus owners, and add stronger combat, health/death/experience, expedition, effect and enchantment coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.
 
 ## Coordinated source and issue review, 2026-10-02 02:45 UTC
 

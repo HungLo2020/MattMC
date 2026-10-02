@@ -2,6 +2,7 @@
 
 Understand the systems behind everyday gameplay. Guides here explain current MattMC rules and point out which conditions depend on game rules, difficulty, or incomplete integration.
 
+- [Inventory item browser](InventoryBrowser.md): item requests in Survival/Creative, category visibility and operator gates
 - [Hunger, saturation, and healing](Hunger.md): food values, exhaustion, sprinting, healing, and starvation
 - [Axes and Hoes](AxesAndHoes.md): all seven materials, combat values, wood/copper conversions, tilling, and crop harvesting
 - [Pickaxes and Shovels](PickaxesAndShovels.md): all seven materials, exact recipes, tool actions, upkeep, and recycling

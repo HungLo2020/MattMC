@@ -2,6 +2,8 @@
 
 Creative grants flight, instant-build, and invulnerable player abilities. It is useful for construction, inspection, and trying registered MattMC content without first establishing a Survival acquisition route.
 
+MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) supports requesting ordinary listed items in Survival as well as Creative. Browser insertion is separate from crafting/loot acquisition and from the additional permissions needed for operator entries.
+
 ## Using Creative for integrated content
 
 The Creative inventory includes registered building materials, foods, and spawn eggs. For example, [Ambersol](../blocks/Ambersol.md) can be placed to inspect its lighting, while a [Grizzly Bear Spawn Egg](../items/GrizzlyBearSpawnEgg.md) places that mob directly.
