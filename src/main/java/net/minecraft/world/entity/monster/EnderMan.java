@@ -286,7 +286,7 @@ public class EnderMan extends Monster implements NeutralMob {
 		BlockState blockState = this.level().getBlockState(mutableBlockPos);
 		boolean bl = blockState.blocksMotion();
 		boolean bl2 = blockState.getFluidState().is(FluidTags.WATER);
-		if (bl && !bl2) {
+		if (bl && !bl2 && !blockState.is(Blocks.BEDROCK)) {
 			Vec3 vec3 = this.position();
 			boolean bl3 = this.randomTeleport(d, e, f, true);
 			if (bl3) {
@@ -355,6 +355,10 @@ public class EnderMan extends Monster implements NeutralMob {
 	public boolean hurtServer(ServerLevel serverLevel, DamageSource damageSource, float f) {
 		if (this.isInvulnerableTo(serverLevel, damageSource)) {
 			return false;
+		} else if (this.isPassenger()
+			&& damageSource.is(DamageTypeTags.IS_PROJECTILE)
+			&& !(damageSource.getDirectEntity() instanceof AbstractThrownPotion)) {
+			return super.hurtServer(serverLevel, damageSource, f);
 		} else {
 			AbstractThrownPotion abstractThrownPotion2 = damageSource.getDirectEntity() instanceof AbstractThrownPotion abstractThrownPotion
 				? abstractThrownPotion

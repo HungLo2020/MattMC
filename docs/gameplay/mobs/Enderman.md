@@ -29,9 +29,9 @@ Looking away does not immediately clear anger. Its starting persistent-anger tim
 ## Teleportation and defenses
 
 - **Use clearance to your advantage.** A shelter with two blocks of clear interior height cannot fit the normal 2.9-block-tall body. Stay back from the opening so an enderman outside cannot reach you. This is a hitbox-based precaution, not a tested invulnerable shelter design.
-- **Ordinary arrows are not a reliable attack.** Its projectile-damage branch skips normal damage and tries teleporting instead. The bundled projectile tag includes arrows and tridents. Clean-water thrown potions have a separate damaging exception.
+- **Ordinary arrows are not a reliable attack against an unmounted enderman.** It skips normal projectile damage and tries teleporting instead. While riding another entity, such as a boat or minecart, it takes normal damage from the bundled projectile types, including arrows, tridents, and bullets. Dismounting restores projectile avoidance. Clean-water thrown potions keep their separate damaging exception. [Current projectile handling][current-enderman] · [Projectile tag][projectiles]
 - **Water and rain hurt it.** Endermen avoid water in pathfinding, take water/rain damage attempts, and often teleport after non-living-source damage. Water can create breathing room, but does not itself erase an anger target.
-- **A teleport needs a valid destination.** The destination search looks for supporting ground; the final body position must be collision-free and contain no liquid. Teleport attempts can fail.
+- **A teleport needs a valid destination.** The destination search looks for supporting ground and rejects bedrock. The final body position must still be collision-free and contain no liquid. Teleport attempts can fail. [Current destination checks][current-enderman] · [Final teleport clearance][teleport]
 
 It does not have the zombie-style sunlight-burning routine. Exposed bright daytime conditions can make it clear its current target and try teleporting after the code's minimum waiting period, but the check is random rather than a fixed departure deadline. [Teleportation, projectile handling, water sensitivity, and daytime behavior][enderman] · [Projectile tag][projectiles] · [Water/rain damage][water] · [Final teleport clearance][teleport] · [Melee reach][melee-reach]
 
@@ -51,9 +51,13 @@ If it dies carrying a block, that block's drops are evaluated as though harveste
 
 Source-reviewed on **2026-10-01** at `b81c01943c9f3254e713c365a1dd633392929cb2`, using active MattMC code and bundled data. No in-game gaze, teleport, shelter, spawning, or loot test was run. Data packs can change biome tables, tags, and loot; game rules, effects, and entity data can alter encounters.
 
+The riding-projectile and bedrock-destination fixes passed **49 automated cases** on **2026-10-02** in the [entity regression suite][behavior-tests]. These cover mounting transitions, potion compatibility, the synchronized-health-data path, and teleport success/failure paths with mocked world responses. No actual network or in-game session was tested.
+
 Related: [Ender Pearl](../items/EnderPearl.md) · [Endermite](Endermite.md) · [End](../dimensions/End.md) · [Mobs](Mobs.md)
 
 [enderman]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/monster/EnderMan.java
+[current-enderman]: https://github.com/HungLo2020/MattMC/blob/fix/issue-767-enderman-behavior/src/main/java/net/minecraft/world/entity/monster/EnderMan.java
+[behavior-tests]: https://github.com/HungLo2020/MattMC/blob/fix/issue-767-enderman-behavior/src/test/misc/net/minecraft/world/entity/monster/EnderManBehaviorTest.java
 [defaults]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/ai/attributes/DefaultAttributes.java
 [registration]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/EntityType.java#L529-L537
 [player-damage]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/player/Player.java#L722-L750
