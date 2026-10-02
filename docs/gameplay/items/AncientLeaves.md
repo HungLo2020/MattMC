@@ -1,18 +1,28 @@
 # Ancient Leaves
 
+**Ancient Leaves** (`minecraft:ancient_leaves`) are a placeable canopy block, explicitly listed in Natural Blocks Creative and used by the active Ancient Tree feature. [Registration][blocks] [items] [creative] · [Tree feature][tree]
+
 ## Obtaining
 
-Ancient Leaves can be obtained from the Creative Menu. In survival worlds, they are associated with Ancient Trees from the bundled Alex's Caves content.
+Use **Shears or Silk Touch** to recover the leaf block. Other harvesting follows the separate sapling/stick chances in [Ancient Leaves loot](../blocks/AncientPlants.md#ancient-leaves-decoration-decay-and-drops). Growing an Ancient Sapling supplies leaves once a sapling is available; a naturally generated starter supply remains unverified. [Loot][loot-ancient-leaves]
 
 ## Usage
 
-Ancient Leaves are used for prehistoric tree canopies, overgrown builds, and natural decoration.
+Manually placed leaves become persistent and can be waterlogged. Read the [decay and tag distinctions](../blocks/AncientPlants.md#ancient-leaves-decoration-decay-and-drops) before treating them like every ordinary leaf type. In particular, they cannot support [Tree Stars](../blocks/AncientPlants.md#tree-star) in the bundled data. [Leaf behavior][leaves] · [Leaf tag and attachment][leaves-tag] [star]
 
-## Behavior
+## Related pages
 
-They behave like leaves and are used by Ancient Tree generation.
+- [Ancient trees and plants](../blocks/AncientPlants.md), [Ancient Sapling](AncientSapling.md), and [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:ancient_leaves` block.
-* It appears in the Natural Blocks creative tab.
+Source-reviewed at `e87cde38c872d30ae86139bbee181937603af769` on 2026-10-02. No gameplay test was run.
+
+[blocks]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/Blocks.java
+[items]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/Items.java
+[creative]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/CreativeModeTabs.java
+[tree]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/alexscaves/server/level/feature/AncientTreeFeature.java
+[loot-ancient-leaves]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/resources/data/minecraft/loot_table/blocks/ancient_leaves.json
+[leaves]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/LeavesBlock.java
+[leaves-tag]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/resources/data/minecraft/tags/block/leaves.json
+[star]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/custom/TreeStarBlock.java

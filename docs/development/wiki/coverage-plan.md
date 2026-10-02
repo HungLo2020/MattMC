@@ -790,6 +790,14 @@ The 2026-10-02 audit at `c87803e75d339e5d643ca812efc70a6def06a401` found **1,211
 
 The user requested an alphabetical Blocks main page like Items, with separate category pages. Keep this as the default layout. Do not use word counts or article-file totals as a completion measure. Each block family needs practical obtaining/mining, placement/use, variants, recipes/loot, and important MattMC caveats before calling its player guidance complete.
 
+## Batch 102: snow, ice, tree growth and imported plants
+
+- Added six canonical guides: Snow/Powder Snow, Ice families, Saplings/Azaleas, Crimson/Warped Fungi, Ancient plants, and Flood Basalt/Fern Thatch. Corrected thirteen existing item articles, including Snowball's former generic building description.
+- Reviewed seven snow/ice IDs, thirteen growth-plant IDs, and seven imported-family IDs (Potted Ancient Sapling keeps the existing Flower Pot guide). Exact recipes, loot, tool gates, selected growth configurations, support, weather, melting/freezing and active callbacks were checked. Natural starter gaps and inactive giant Ancient-tree wiring are explicit.
+- Preserved the alphabetical main directory and separate category lists. Related-guide routes describe navigation scope, not completed behavior coverage; broad catch-up remains incomplete.
+- Reconciled 201 distinct cited source paths against the integrated master snapshot; all remain unchanged from their pins. Incoming mob fixes and the voxel rotation migration are preserved. No gameplay tests were run.
+- Validation: required checker and strict build passed on 2,241 pages and 37 indexes. Checked 1,930 local links/anchors, 533 citation uses, all 1,211 alphabetical IDs, seven snow/ice loot tables, thirteen growth-plant loot tables and seven imported-family loot tables. The directory now offers 788 related-guide routes with 423 explicit article gaps; these are navigation counts, not a completeness score.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and category catalogs as source changes; expand genuine article coverage from the now-visible gaps. The initial directory, twelve-terrain guide, Crafter correction, and Rabbit/Fox citation repair are recorded in batch 97.

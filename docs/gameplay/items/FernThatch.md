@@ -1,18 +1,27 @@
 # Fern Thatch
 
+**Fern Thatch** (`minecraft:fern_thatch`) is a full green building block, not a soil-dependent plant. It is also explicitly listed in Natural Blocks Creative. [Registration][blocks] [items] [creative]
+
 ## Obtaining
 
-Fern Thatch can be obtained from the Creative Menu and from its normal survival sources when those sources are available.
+Use the [Fern Thatch recipe](../blocks/FloodBasaltAndFernThatch.md#fern-thatch-crafting-and-collecting): four Fern/Large Fern ingredients in a 2 × 2 square produce one block, and those two ingredients can be mixed. Ordinary harvesting returns one Fern Thatch even by hand; Silk Touch is unnecessary and Fortune adds nothing. [Recipe/tag][thatch-recipe] [ferns] · [Loot and tool requirement][loot-fern-thatch] [blocks]
 
 ## Usage
 
-Fern Thatch is used as vegetation, natural decoration, or plant-related building detail.
+Place it as a wall, roof or floor. It has full collision, no directional state and no Bone Meal growth behavior. Follow [building with thatch](../blocks/FloodBasaltAndFernThatch.md#building-with-thatch) for the placed properties and a small example. [Plain block registration][blocks] [properties]
 
-## Behavior
+## Related pages
 
-It can be placed on valid supporting blocks and follows the normal placement and growth behavior for its plant type.
+- [Flood Basalt and Fern Thatch](../blocks/FloodBasaltAndFernThatch.md), [Fern](Fern.md), [Large Fern](LargeFern.md), and [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is registered as `minecraft:fern_thatch`.
-* This item comes from bundled natural content integrated into MattMC.
+Source-reviewed at `e87cde38c872d30ae86139bbee181937603af769` on 2026-10-02. No gameplay test was run.
+
+[blocks]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/Blocks.java
+[items]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/Items.java
+[creative]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/CreativeModeTabs.java
+[thatch-recipe]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/resources/data/minecraft/recipe/fern_thatch.json
+[ferns]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/resources/data/minecraft/tags/item/ferns.json
+[loot-fern-thatch]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/resources/data/minecraft/loot_table/blocks/fern_thatch.json
+[properties]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/state/BlockBehaviour.java

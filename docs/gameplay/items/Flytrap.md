@@ -1,18 +1,27 @@
 # Flytrap
 
+**Flytrap** (`minecraft:flytrap`) places a decorative plant that opens and closes. Its explicit Creative listing is in Natural Blocks; a natural starter supply or crafting recipe was not established in the checked data. [Registration][blocks] [items] [creative]
+
 ## Obtaining
 
-Flytrap can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+An existing plant returns one Flytrap when ordinarily harvested. Bone Meal can produce one extra Flytrap item while preserving the original plant; this needs block item drops enabled. See [Flytrap propagation and timing](../blocks/AncientPlants.md#flytrap). [Loot][loot-flytrap] · [Bone Meal callback][flytrap] [block]
 
 ## Usage
 
-Flytrap is used as vegetation, natural decoration, or plant-related building detail.
+Place it on dirt-tag ground or Farmland. The plant is non-colliding; its open state and fly particles do not provide an active prey-catching or damage mechanic. [Placement support][plant-support] · [Active plant class][flytrap]
 
-## Behavior
+## Related pages
 
-It can be placed on valid supporting blocks and follows the normal placement and growth behavior for its plant type.
+- [Ancient trees, Flytraps and Tree Stars](../blocks/AncientPlants.md), [Tree Star](TreeStar.md), and [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:flytrap` block.
-* This item comes from bundled natural content integrated into MattMC.
+Source-reviewed at `e87cde38c872d30ae86139bbee181937603af769` on 2026-10-02. No gameplay test was run.
+
+[blocks]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/Blocks.java
+[items]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/Items.java
+[creative]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/CreativeModeTabs.java
+[loot-flytrap]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/resources/data/minecraft/loot_table/blocks/flytrap.json
+[flytrap]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/custom/FlytrapBlock.java
+[block]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/Block.java
+[plant-support]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/VegetationBlock.java

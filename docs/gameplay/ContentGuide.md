@@ -8,6 +8,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Getting started and survival
 
+- [Snow and Powder Snow](blocks/Snow.md) and [Ice families](blocks/Ice.md): collecting, layering, melting, freezing, weather and slippery floors
+
 - [Tree logs and roots](blocks/TreeLogsAndRoots.md) and [Leaves/Propagules](blocks/TreeLeaves.md): exact timber variants, stripping, leaf drops/decay and mangrove materials
 - [Water and Lava](blocks/WaterAndLava.md) and [Bubble Columns](blocks/BubbleColumns.md): fluid sources/flow, bucket rules, reusable pools and vertical transport
 
@@ -25,6 +27,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Commands](commands/Commands.md): permission-aware examples, targeting, and shared time/weather scope
 
 ### Farming, food, and animal care
+
+- [Saplings and Azaleas](blocks/SaplingsAndAzaleas.md) and [Crimson/Warped Fungi](blocks/NetherFungi.md): planting patterns, Bone Meal, growth space and recovery
 
 - [Rabbit](mobs/Rabbit.md) and [Fox](mobs/Fox.md): breeding/coats/trust, crop and berry interactions, carried items, and Rabbit food/material drops
 - [Cat](mobs/Cat.md) and [Ocelot](mobs/Ocelot.md): ownership versus trust, spawning, food/breeding, controls, gifts, predators, and persistence
@@ -159,6 +163,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [All mobs](mobs/Mobs.md): the existing mob directory, including other integrated animals
 
 ## Alex's Caves additions
+
+- [Ancient trees, Flytraps and Tree Stars](blocks/AncientPlants.md): actual growth, leaf drops, propagation and support limits
+- [Flood Basalt and Fern Thatch](blocks/FloodBasaltAndFernThatch.md): orientation, mining-tag limits and the renewable fern recipe
 
 - [Primordial Plains](biomes/PrimordialPlains.md) and [Dry Midlands](biomes/DryMidlands.md): wired features, candidate mobs, and generation/spawn constraints
 

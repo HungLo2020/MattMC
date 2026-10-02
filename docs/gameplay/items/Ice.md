@@ -1,17 +1,28 @@
 # Ice
 
+**Ice** (`minecraft:ice`) is a slippery, light-sensitive building block. [Registration][blocks] [items]
+
 ## Obtaining
 
-Ice can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Ordinary Ice has no crafting recipe. It can form through [cold-surface freezing](../blocks/Ice.md#freezing-ordinary-ice). Use **Silk Touch** to collect a placed block; without it there is no item drop. A pickaxe mines it efficiently, but the block has no correct-tool material gate. [Loot][loot-ice] · [Properties and mining tag][blocks] [pickaxe]
 
 ## Usage
 
-Ice is a slippery translucent block used for building, transport, and cold biome decoration.
+Without Silk Touch, breaking it can leave water depending on its support and dimension. Bright block light can also melt it. See the [exact melting and breaking conditions](../blocks/Ice.md#ordinary-ice-melting-and-breaking). [Placed implementation][blocks] [ice]
 
-## Behavior
+See [Ice types and friction](../blocks/Ice.md#registered-ice-blocks) for the comparison and [recipes](../blocks/Ice.md#harvesting-and-recipes) for packing costs. Fortune does not increase this block's loot. [Loot][loot-ice]
 
-Ice can melt under bright enough light and behaves as a slippery block when entities move across it.
+## Related pages
 
-## Notes
+- [Ice family](../blocks/Ice.md), [Snow and Powder Snow](../blocks/Snow.md), and [Transport](../mechanics/Transport.md)
+- [Items](Items.md)
 
-* This item is the item form of the `minecraft:ice` block.
+## Sources and verification
+
+Source-reviewed at `e87cde38c872d30ae86139bbee181937603af769` on 2026-10-02. No gameplay test was run.
+
+[blocks]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/Blocks.java
+[items]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/Items.java
+[loot-ice]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/resources/data/minecraft/loot_table/blocks/ice.json
+[pickaxe]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[ice]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/IceBlock.java
