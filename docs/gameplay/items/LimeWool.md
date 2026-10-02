@@ -1,17 +1,31 @@
 # Lime Wool
 
+**Lime Wool** (`minecraft:lime_wool`) is the lime member of the [Wool and Carpet family](../blocks/WoolAndCarpet.md). Use it for colored builds or make matching [carpet](LimeCarpet.md#crafting). [Block and item registration][blocks] · [Item registration][items]
+
 ## Obtaining
 
-Lime Wool can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+- **Recolor harvested wool:** combine **one [Lime Dye](LimeDye.md)** with **one wool of any other bundled color**, shapeless, to obtain **one lime wool**. The input list includes all 15 other colors; it excludes lime wool itself. [Recipe][dye]
+- **Shear a lime [Sheep](../mobs/Sheep.md#shearing-and-regrowth):** an eligible living, adult, unsheared sheep gives **1–3 lime wool**. Dye a sheep with fleece to establish a renewable supply; the [Sheep guide](../mobs/Sheep.md#dyeing-and-offspring-color) explains dyeing and regrowth. [Color routing][shear-routing] · [Color loot][shear]
+- **Death drop:** an unsheared adult sheep of this color drops **one lime wool** with mob loot enabled. Looting does not increase this wool count. [Color selection][death-routing] · [Color loot][death] · [Adult and mob-loot gate][adult]
 
-## Usage
+Breaking the placed block normally returns **one lime wool**, not carpet or dye. Its loot needs no Silk Touch and has an explosion-survival condition. See the [family mining guide](../blocks/WoolAndCarpet.md#mining-and-drops) for tools and shared restrictions. [Block loot][loot]
 
-Lime Wool is a colored textile block used for building, beds, banners, and decoration.
+## Building and crafting
 
-## Behavior
+Use the [Lime Carpet recipe](LimeCarpet.md#crafting) for a thin floor covering. For placement, fire precautions, furnace fuel, and vibration behavior, use the [shared block guide](../blocks/WoolAndCarpet.md#placement-and-support).
 
-Wool is flammable and can be mined quickly with shears.
+Related: [Sheep](../mobs/Sheep.md) · [Shears](Shears.md) · [All wool and carpet colors](../blocks/WoolAndCarpet.md#colors-and-item-ids) · [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:lime_wool` block.
+Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. This page covers the checked crafting and sheep routes, not every structure or merchant source. No gameplay test was run. Data packs can change recipes, tags, and loot.
+
+[items]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java#L326-L341
+[blocks]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L811-L889
+[shear-routing]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/shearing/sheep.json
+[death-routing]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/entities/sheep.json
+[adult]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/entity/LivingEntity.java#L561-L567
+[dye]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/recipe/crafting/dye_lime_wool.json
+[shear]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/shearing/sheep/lime.json
+[death]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/entities/sheep/lime.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/blocks/lime_wool.json

@@ -40,6 +40,8 @@ With mob loot enabled, an adult drops **1–2 [Raw Mutton](../items/RawMutton.md
 
 Lambs do not drop ordinary death loot or experience. A qualifying player-attributed adult kill has a base reward of **1–3 experience**; breeding gives **1–7 experience** with mob loot enabled. [Baby restrictions][babies] · [Death XP conditions][death] · [Animal rewards][animal]
 
+For the complete color/material family, see [Wool and Carpet](../blocks/WoolAndCarpet.md).
+
 Related: [White Wool](../items/WhiteWool.md) · [Shears](../items/Shears.md) · [Cow](Cow.md) · [Chicken](Chicken.md) · [Mobs](Mobs.md)
 
 ## Sources and verification

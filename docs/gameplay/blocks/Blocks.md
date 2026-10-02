@@ -20,6 +20,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Stone and construction
 
+- [Wool and Carpet](WoolAndCarpet.md): all 16 colors, dye recipes, support, harvesting, fuel, and vibration distinctions
+
 - [Iron, Copper, and Diamond ores](OreResources.md): tool requirements, drops, Fortune/Silk Touch, and processing
 
 - [Stone](Stone.md): mining drops, Silk Touch, smelting, and basic recipes

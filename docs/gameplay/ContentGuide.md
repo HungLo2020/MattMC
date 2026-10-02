@@ -66,6 +66,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Building, redstone, and travel
 
+- [Wool and Carpet](blocks/WoolAndCarpet.md): complete 16-color families with exact dye/craft/drop rules and quiet-building distinctions
+
 - [Redstone basics](redstone/Redstone.md): lever/button inputs, wire connections, and troubleshooting
 - [Hopper](blocks/Hopper.md): item transfer, redstone locking, and sided Furnace automation
 - [Transport](mechanics/Transport.md): boats, chest storage, minecart controls, track construction, and stopping safely
