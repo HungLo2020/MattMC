@@ -905,10 +905,20 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,278 pages / 37 indexes. All 18 authored paths are documentation; 3,797 local links/anchors and 256 citation uses resolve. All 145 distinct pinned article-source references match the integrated source. Both corrected item labels occur once in their S/T sections with old paths retained. The 1,211-ID alphabetical Blocks directory has 1,074 related-guide routes and 137 explicit article gaps, not a completeness score.
 
+## Batch 115: resource storage, pottery and sound blocks
+
+- Added four placed guides covering ten resource-block IDs, Decorated Pot, Bell and Jukebox; corrected ten related inventory pages. Existing OreResources and Vault now link the new canonical storage/pot guides.
+- Resource review checks every harvest tier, full loot and pack/unpack recipe, default Coal fuel and relevant Beacon/golem/Piglin/Redstone paths. Copper and broader device mechanics retain their existing owners.
+- Pottery review distinguishes four face ingredients from the stored stack, normal recovery from shattering and spilled contents, source-water placement from bucket insertion, and the current 25 accepted sherds versus 23 mapped patterns. Corrected unsupported Dinosaur/Footprint sherd promises; their ingredient identities remain retained despite plain-face fallback, and Survival archaeology acquisition remains unverified. No code fix is claimed.
+- Bell review separates repeated ringing from the entity-search cache and traces actual Villager/Raider response. Jukebox review covers all 21 song records, padded logical playback, disc-specific comparator values, ordinary Hopper locking, saved timer versus audio restart and separate disc recovery.
+- Source checkpoint: `fc47f0654e74d1e5bd3b7f3522cc1e8117694418`; all authored changes are documentation. No gameplay, listening, rendered-pattern or timing tests were run.
+
+- Validation: required checker and strict build passed on 2,282 pages / 37 indexes. All 23 authored paths are documentation; 2,045 local links/anchors and 720 citation uses resolve. Integrated citation QA caught and corrected two undefined Pot shorthand references before publication. All 176 distinct pinned source references in the fourteen article files match the integrated source. The 1,211-ID alphabetical directory has 1,087 related-guide routes and 124 article gaps, not a completion score.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and separate category catalogs as source changes; use explicit article gaps to choose new work. A related family link is not proof that every detail of a variant is reviewed.
-2. Finish the current bounded Decorated Pot and remaining resource/storage reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
+2. Finish the current bounded Prismarine and remaining utility/material reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
 3. Expand remaining functional blocks: Trial Spawner/Vault, Bell, Cartography/Fletching Tables, Decorated Pot, Target/Daylight Detector, Campfires, TNT, Sculk and other registry-backed gaps. Keep shared mechanics in canonical family guides and link exact variants.
 4. Fill remaining terrain/resource, flora, technical and imported-block gaps, including refined resource blocks, Resin, Dripleaves, dry vegetation, heads and custom workbenches. Reassess current source rather than extrapolating from upstream implementations.
 5. Preserve ready Swords and undead drafts for later; continue remaining mobs, biomes, effects, structures and gameplay systems after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw page or route counts.

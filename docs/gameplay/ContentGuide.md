@@ -231,6 +231,10 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Trial Spawner](blocks/TrialSpawner.md) and [Vault](blocks/Vault.md): finite encounters, key rewards, ominous configurations and per-player openings
 - [Shrubs and Dry Grass](blocks/ShrubsAndDryGrass.md): exact item identities, harvesting, Bone Meal, light and starter sources
 
+- [Resource Storage Blocks](blocks/ResourceStorageBlocks.md): ten exact compression families, mining tiers, fuel and device uses
+- [Decorated Pot](blocks/DecoratedPot.md): face ingredients, storage, water and intact versus shattered recovery
+- [Bell](blocks/Bell.md) and [Jukebox](blocks/Jukebox.md): ringing, Raider outlines, disc playback and redstone
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)

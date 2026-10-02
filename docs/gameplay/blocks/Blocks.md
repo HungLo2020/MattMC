@@ -81,7 +81,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Bee Nest** — [Bee housing](BeeHousing.md) (related guide); `minecraft:bee_nest`
 - **Beehive** — [Bee housing](BeeHousing.md) (related guide); `minecraft:beehive`
 - **Beetroots** — [Root crops](RootCrops.md) (related guide); `minecraft:beetroots`
-- **Bell** — article needed; `minecraft:bell`
+- **Bell** — [Bell](Bell.md#mounting-and-support) (related guide); `minecraft:bell`
 - **Big Dripleaf** — [Dripleaves](Dripleaves.md#big-dripleaf) (related guide); `minecraft:big_dripleaf`
 - **Big Dripleaf Stem** — [Dripleaves](Dripleaves.md#big-dripleaf-stem) (related guide); `minecraft:big_dripleaf_stem`
 - **Birch Button** — [Buttons](Buttons.md#birch-button) (related guide); `minecraft:birch_button`
@@ -122,19 +122,19 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Blast Furnace** — [Furnace, Blast Furnace and Smoker](Furnace.md#blast-furnace) (related guide); `minecraft:blast_furnace`
 - **Block of Amethyst** — [Amethyst, buds and clusters](Amethyst.md#amethyst-block) (related guide); `minecraft:amethyst_block`
 - **Block of Bamboo** — article needed; `minecraft:bamboo_block`
-- **Block of Coal** — article needed; `minecraft:coal_block`
+- **Block of Coal** — [Resource Storage Blocks](ResourceStorageBlocks.md#coal-block) (related guide); `minecraft:coal_block`
 - **Block of Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:copper_block`
-- **Block of Diamond** — article needed; `minecraft:diamond_block`
-- **Block of Emerald** — article needed; `minecraft:emerald_block`
-- **Block of Gold** — article needed; `minecraft:gold_block`
-- **Block of Iron** — article needed; `minecraft:iron_block`
-- **Block of Lapis Lazuli** — article needed; `minecraft:lapis_block`
-- **Block of Netherite** — article needed; `minecraft:netherite_block`
+- **Block of Diamond** — [Resource Storage Blocks](ResourceStorageBlocks.md#diamond-block) (related guide); `minecraft:diamond_block`
+- **Block of Emerald** — [Resource Storage Blocks](ResourceStorageBlocks.md#emerald-block) (related guide); `minecraft:emerald_block`
+- **Block of Gold** — [Resource Storage Blocks](ResourceStorageBlocks.md#gold-block) (related guide); `minecraft:gold_block`
+- **Block of Iron** — [Resource Storage Blocks](ResourceStorageBlocks.md#iron-block) (related guide); `minecraft:iron_block`
+- **Block of Lapis Lazuli** — [Resource Storage Blocks](ResourceStorageBlocks.md#lapis-block) (related guide); `minecraft:lapis_block`
+- **Block of Netherite** — [Resource Storage Blocks](ResourceStorageBlocks.md#netherite-block) (related guide); `minecraft:netherite_block`
 - **Block of Quartz** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:quartz_block`
 - **Block of Raw Copper** — [Raw Copper storage](RawCopperStorage.md#collecting-and-processing) (related guide); `minecraft:raw_copper_block`
-- **Block of Raw Gold** — article needed; `minecraft:raw_gold_block`
-- **Block of Raw Iron** — article needed; `minecraft:raw_iron_block`
-- **Block of Redstone** — article needed; `minecraft:redstone_block`
+- **Block of Raw Gold** — [Resource Storage Blocks](ResourceStorageBlocks.md#raw-gold-block) (related guide); `minecraft:raw_gold_block`
+- **Block of Raw Iron** — [Resource Storage Blocks](ResourceStorageBlocks.md#raw-iron-block) (related guide); `minecraft:raw_iron_block`
+- **Block of Redstone** — [Resource Storage Blocks](ResourceStorageBlocks.md#redstone-block) (related guide); `minecraft:redstone_block`
 - **Block of Resin** — article needed; `minecraft:resin_block`
 - **Block of Stripped Bamboo** — article needed; `minecraft:stripped_bamboo_block`
 - **Blue Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:blue_banner`
@@ -384,7 +384,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dead Tube Coral Block** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral_block`
 - **Dead Tube Coral Fan** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral_fan`
 - **Dead Tube Coral Wall Fan** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral_wall_fan`
-- **Decorated Pot** — article needed; `minecraft:decorated_pot`
+- **Decorated Pot** — [Decorated Pot](DecoratedPot.md#decorated-pot) (related guide); `minecraft:decorated_pot`
 - **Deepslate** — [Deepslate](Deepslate.md#orienting-ordinary-deepslate) (related guide); `minecraft:deepslate`
 - **Deepslate Brick Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_slab`
 - **Deepslate Brick Stairs** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_stairs`
@@ -548,7 +548,7 @@ Names use English localization where available. A † marks one of 25 readable r
 
 - **Jack o'Lantern** — article needed; `minecraft:jack_o_lantern`
 - **Jigsaw Block** — article needed; `minecraft:jigsaw`
-- **Jukebox** — article needed; `minecraft:jukebox`
+- **Jukebox** — [Jukebox](Jukebox.md#inserting-and-ejecting-discs) (related guide); `minecraft:jukebox`
 - **Jungle Button** — [Buttons](Buttons.md#jungle-button) (related guide); `minecraft:jungle_button`
 - **Jungle Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:jungle_door`
 - **Jungle Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:jungle_fence`
@@ -1322,6 +1322,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Beacon](Beacon.md)
 - [Beds](Bed.md)
 - [Bee housing](BeeHousing.md)
+- [Bell](Bell.md)
 - [Blackstone and Basalt](BlackstoneAndBasalt.md)
 - [Bookshelves](Bookshelves.md)
 - [Brewing Stand](BrewingStand.md)
@@ -1348,6 +1349,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Crimson and Warped Fungi](NetherFungi.md)
 - [Daylight Detector](DaylightDetector.md)
 - [Dead Bush](DeadBush.md)
+- [Decorated Pot](DecoratedPot.md)
 - [Deepslate](Deepslate.md)
 - [Dinosaur Chop](DinosaurChop.md)
 - [Dispenser and Dropper](DispenserAndDropper.md)
@@ -1370,6 +1372,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md)
 - [Hopper](Hopper.md)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
+- [Jukebox](Jukebox.md)
 - [Kelp](Kelp.md)
 - [Lanterns and Soul Lanterns](Lanterns.md)
 - [Lectern](Lectern.md)
@@ -1403,6 +1406,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Redstone Lamp](RedstoneLamp.md)
 - [Redstone Repeater](RedstoneRepeater.md)
 - [Redstone Torch](RedstoneTorch.md)
+- [Resource Storage Blocks](ResourceStorageBlocks.md)
 - [Respawn Anchor](RespawnAnchor.md)
 - [Root crops](RootCrops.md)
 - [Sandstone and Red Sandstone](Sandstone.md)

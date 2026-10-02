@@ -11,7 +11,7 @@ Names use English localization where available. A † marks a readable registry-
 | Block | Registry ID / source | Related placed-block guide |
 | --- | --- | --- |
 | Activator Rail | [`minecraft:activator_rail`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2899) | [Rails](../Rails.md) |
-| Block of Redstone | [`minecraft:redstone_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2860) | Article needed |
+| Block of Redstone | [`minecraft:redstone_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2860) | [Resource Storage Blocks](../ResourceStorageBlocks.md#redstone-block) |
 | Calibrated Sculk Sensor | [`minecraft:calibrated_sculk_sensor`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6072) | Article needed |
 | Daylight Detector | [`minecraft:daylight_detector`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2855) | [Daylight Detector](../DaylightDetector.md#daylight-detector) |
 | Detector Rail | [`minecraft:detector_rail`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L685) | [Rails](../Rails.md) |

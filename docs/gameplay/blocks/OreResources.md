@@ -83,6 +83,8 @@ Redstone Ore and its Deepslate variant have a temporary **lit state with light l
 
 ## Storage and availability
 
+Use [Resource Storage Blocks](ResourceStorageBlocks.md) for the non-Copper blocks' exact packing/unpacking recipes, harvesting tiers and placed uses.
+
 Raw-metal storage recipes are described under [processing](#processing-raw-metal). Storage blocks and ore blocks are separate items; processing rules for one do not imply processing rules for the other.
 
 ### Generation examples and limits

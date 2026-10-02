@@ -33,7 +33,7 @@ Neither key nor the Vault has a bundled crafting recipe. Both keys have Creative
 
 [Key registrations and Creative entries][items] [creative-keys] · [Spawner key tables][key-loot] [ominous-key-loot] · [Normal reward defaults][spawner-defaults] · [Ominous reward configuration][ominous-spawner] · [Active reward dispatch][spawner-reward] [spawner-eject] · [Entrance chest and pot loot][entrance-loot] [pot-loot]
 
-The checked chamber templates actually assign the entrance and corridor-pot loot tables to those containers. Pot loot is resolved through its randomizable container and can be recovered when its contents spill. These sources can produce a Trial Key; finding a particular chest or pot does not guarantee one. See [Trial Spawner](TrialSpawner.md) for completion conditions and encounter rewards. [Entrance template][entrance-template] · [Pot template][pot-template] · [Connected corridor/decor pools][corridor-pool] [decor-pool] · [Pot loot access][pot] [container-loot] · [Container spill][container-spill]
+The checked chamber templates actually assign the entrance and corridor-pot loot tables to those containers. [Decorated Pot](DecoratedPot.md) loot is resolved through its randomizable container and can be recovered when its contents spill. These sources can produce a Trial Key; finding a particular chest or pot does not guarantee one. See [Trial Spawner](TrialSpawner.md) for completion conditions and encounter rewards. [Entrance template][entrance-template] · [Pot template][pot-template] · [Connected corridor/decor pools][corridor-pool] [decor-pool] · [Pot loot access][pot] [container-loot] · [Container spill][container-spill]
 
 ## Activating and using a Vault
 
