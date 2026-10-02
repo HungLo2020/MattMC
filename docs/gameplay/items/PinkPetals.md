@@ -1,17 +1,24 @@
 # Pink Petals
 
+**Pink Petals** (`minecraft:pink_petals`) is the matching item for the [placed Pink Petals form](../blocks/FlowerbedsAndLeafLitter.md#pink-petals). [Cover items] · [Display names]
+
 ## Obtaining
 
-Pink Petals can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Break a placed Pink Petals flowerbed to recover **one item per segment**, without Shears. Cherry Grove generation and Bone Meal routes are covered in [the ground-cover guide](../blocks/FlowerbedsAndLeafLitter.md#finding-and-making-ground-cover).
 
 ## Usage
 
-Pink Petals is used as vegetation, natural decoration, farming, or plant-related building detail.
+Place or increase a flowerbed, [multiply it with Bone Meal](../blocks/FlowerbedsAndLeafLitter.md#bone-meal), craft Pink Dye, feed Bees, or compost it. See [the exact uses](../blocks/FlowerbedsAndLeafLitter.md#dye-bees-compost-and-fuel).
 
 ## Behavior
 
-It can be placed on valid supporting blocks and follows the normal behavior for its plant type.
+Up to four items share one cell as horizontal coverage. [Support and facing](../blocks/FlowerbedsAndLeafLitter.md#ground-coverage-and-facing) differ from an ordinary single-stem flower.
 
 ## Notes
 
-* This item is the item form of the `minecraft:pink_petals` block.
+The [Flowerbeds and Leaf Litter guide](../blocks/FlowerbedsAndLeafLitter.md) is the canonical source for placed behavior, collection conditions, and source citations. Source-reviewed on **2026-10-02** at `20354edd390fadb09b43132d712facf4188c4119`; no gameplay test was run.
+
+Related: [Items](Items.md) · [Blocks](../blocks/Blocks.md)
+
+[Cover items]: https://github.com/HungLo2020/MattMC/blob/20354edd390fadb09b43132d712facf4188c4119/src/main/java/net/minecraft/world/item/Items.java#L371-L373
+[Display names]: https://github.com/HungLo2020/MattMC/blob/20354edd390fadb09b43132d712facf4188c4119/src/main/resources/assets/minecraft/lang/en_us.json

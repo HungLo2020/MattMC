@@ -25,7 +25,7 @@ Hold an item in the Bee food tag to tempt Bees toward you. Feed a suitable item 
 
 The accepted tag is broader than just small flowers. It includes Dandelion, Poppy, tulips and other flowers, plus items such as Flowering Azalea, Flowering Azalea Leaves, Cherry Leaves, Pink Petals, Wildflowers, and Cactus Flower. Honeycomb and Honey Bottles are not in this food tag. [Bundled Bee food][food]
 
-**Avoid Open Eyeblossom and Wither Rose for Bee care.** Both appear in the food tag, but their special flower interaction takes precedence over breeding: feeding an Open Eyeblossom applies Poison to the Bee, and feeding a Wither Rose applies Wither. Their placed blocks can also harm Bees under their contact-effect conditions. Use ordinary safe flowers for an apiary. [Special feeding path][food-use] · [Eyeblossom effect][eyeblossom] · [Wither Rose effect][wither-rose]
+**Avoid [Open Eyeblossom](../blocks/Eyeblossoms.md#bees-and-harmful-effects) and Wither Rose for Bee care.** Both appear in the food tag, but their special flower interaction takes precedence over breeding: feeding an Open Eyeblossom applies Poison to the Bee, and feeding a Wither Rose applies Wither. Their placed blocks can also harm Bees under their contact-effect conditions. Use ordinary safe flowers for an apiary. [Special feeding path][food-use] · [Eyeblossom effect][eyeblossom] · [Wither Rose effect][wither-rose]
 
 ## Flowers and pollination
 

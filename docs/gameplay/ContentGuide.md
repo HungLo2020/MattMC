@@ -241,6 +241,7 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Mud, Packed Mud and Mud Bricks](blocks/MudAndMudBricks.md): soil conversion, renewable materials and six building forms
 - [Dripstone](blocks/Dripstone.md): spike placement, natural growth, falling hazards and distinct cauldron/Mud setups
 - [Cocoa](blocks/Cocoa.md) and [Sweet Berry Bush](blocks/SweetBerryBush.md): support, growth, harvesting and food/dye uses
+- [Grass and Ferns](blocks/GrassAndFerns.md), [flowerbeds/Leaf Litter](blocks/FlowerbedsAndLeafLitter.md) and [Eyeblossoms](blocks/Eyeblossoms.md): exact collection, propagation, coverage and day/night behavior
 - [Torchflower](blocks/Torchflower.md) and [Pitcher Plant](blocks/PitcherPlant.md): actual Sniffer acquisition, crop-to-flower lifecycles and separate harvest rules
 - [Note Block](blocks/NoteBlock.md): tuning, all instrument types, head sounds and timed redstone examples
 - [TNT](blocks/TNT.md) and [Trapped Chest](blocks/TrappedChest.md): priming/fuse rules, counted opening signals and storage automation

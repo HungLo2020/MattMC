@@ -258,7 +258,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Chorus Flower** — article needed; `minecraft:chorus_flower`
 - **Chorus Plant** — article needed; `minecraft:chorus_plant`
 - **Clay** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:clay`
-- **Closed Eyeblossom** — article needed; `minecraft:closed_eyeblossom`
+- **Closed Eyeblossom** — [Eyeblossoms](Eyeblossoms.md#closed-eyeblossom) (related guide); `minecraft:closed_eyeblossom`
 - **Coal Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:coal_ore`
 - **Coarse Dirt** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#coarse-dirt-recipe) (related guide); `minecraft:coarse_dirt`
 - **Cobbled Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cobbled_deepslate`
@@ -451,7 +451,7 @@ Names use English localization where available. A † marks one of 25 readable r
 ### F
 
 - **Farmland** — [Farmland](Farmland.md) (related guide); `minecraft:farmland`
-- **Fern** — article needed; `minecraft:fern`
+- **Fern** — [Grass and Ferns](GrassAndFerns.md#fern) (related guide); `minecraft:fern`
 - **Fern Thatch** — [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md#fern-thatch-crafting-and-collecting) (related guide); `minecraft:fern_thatch`
 - **Fiddlehead** — [Primordial decorative plants](PrimordialPlants.md) (related guide); `minecraft:fiddlehead`
 - **Fire** — article needed; `minecraft:fire`
@@ -579,10 +579,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Lantern** — [Lanterns and Soul Lanterns](Lanterns.md#crafting-and-obtaining) (related guide); `minecraft:lantern`
 - **Lapis Lazuli Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:lapis_ore`
 - **Large Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#large-bud) (related guide); `minecraft:large_amethyst_bud`
-- **Large Fern** — article needed; `minecraft:large_fern`
+- **Large Fern** — [Grass and Ferns](GrassAndFerns.md#large-fern) (related guide); `minecraft:large_fern`
 - **Lava** — [Water and Lava](WaterAndLava.md) (related guide); `minecraft:lava`
 - **Lava Cauldron** — [Cauldrons](Cauldrons.md#lava-cauldron) (related guide); `minecraft:lava_cauldron`
-- **Leaf Litter** — article needed; `minecraft:leaf_litter`
+- **Leaf Litter** — [Flowerbeds and Leaf Litter](FlowerbedsAndLeafLitter.md#leaf-litter) (related guide); `minecraft:leaf_litter`
 - **Leafcutter Ant Chamber** — article needed; `minecraft:leafcutter_ant_chamber`
 - **Leafcutter Anthill** — article needed; `minecraft:leafcutter_anthill`
 - **Lectern** — [Lectern](Lectern.md#lectern) (related guide); `minecraft:lectern`
@@ -738,7 +738,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Observer** — [Observer](Observer.md) (related guide); `minecraft:observer`
 - **Obsidian** — [Obsidian and Crying Obsidian](Obsidian.md#obsidian) (related guide); `minecraft:obsidian`
 - **Ochre Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#ochre-verdant-and-pearlescent) (related guide); `minecraft:ochre_froglight`
-- **Open Eyeblossom** — article needed; `minecraft:open_eyeblossom`
+- **Open Eyeblossom** — [Eyeblossoms](Eyeblossoms.md#open-eyeblossom) (related guide); `minecraft:open_eyeblossom`
 - **Orange Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:orange_banner`
 - **Orange Bed** — [Beds](Bed.md) (related guide); `minecraft:orange_bed`
 - **Orange Candle** — [Candles](Candles.md#orange-candle) (related guide); `minecraft:orange_candle`
@@ -822,7 +822,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pink Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:pink_concrete`
 - **Pink Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:pink_concrete_powder`
 - **Pink Glazed Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:pink_glazed_terracotta`
-- **Pink Petals** — article needed; `minecraft:pink_petals`
+- **Pink Petals** — [Flowerbeds and Leaf Litter](FlowerbedsAndLeafLitter.md#pink-petals) (related guide); `minecraft:pink_petals`
 - **Pink Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:pink_shulker_box`
 - **Pink Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:pink_stained_glass`
 - **Pink Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:pink_stained_glass_pane`
@@ -1013,7 +1013,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Sea Pickle** — [Sea Pickle](SeaPickle.md) (related guide); `minecraft:sea_pickle`
 - **Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:seagrass`
 - **Short Dry Grass** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#short-dry-grass) (related guide); `minecraft:short_dry_grass`
-- **Short Grass** — article needed; `minecraft:short_grass`
+- **Short Grass** — [Grass and Ferns](GrassAndFerns.md#short-grass) (related guide); `minecraft:short_grass`
 - **Shroomlight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#shroomlight) (related guide); `minecraft:shroomlight`
 - **Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:shulker_box`
 - **Skeleton Skull** — [Heads and Skulls](HeadsAndSkulls.md#skeleton-skulls) (related guide); `minecraft:skeleton_skull`
@@ -1120,7 +1120,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **TaCZ Attachment Table** — [TaCZ Workbenches](TaCZWorkbenches.md#attachment-table) (related guide); `minecraft:attachment_workbench`
 - **TaCZ Gun Smith Table** — [TaCZ Workbenches](TaCZWorkbenches.md#gun-smith-table) (related guide); `minecraft:gun_smith_table`
 - **Tall Dry Grass** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#tall-dry-grass) (related guide); `minecraft:tall_dry_grass`
-- **Tall Grass** — article needed; `minecraft:tall_grass`
+- **Tall Grass** — [Grass and Ferns](GrassAndFerns.md#tall-grass) (related guide); `minecraft:tall_grass`
 - **Tall Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:tall_seagrass`
 - **Target** — [Target](Target.md#target) (related guide); `minecraft:target`
 - **Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:terracotta`
@@ -1266,7 +1266,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **White Tulip** — [Small and tall flowers](Flowers.md#white-tulip) (related guide); `minecraft:white_tulip`
 - **White Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:white_wall_banner`
 - **White Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:white_wool`
-- **Wildflowers** — article needed; `minecraft:wildflowers`
+- **Wildflowers** — [Flowerbeds and Leaf Litter](FlowerbedsAndLeafLitter.md#wildflowers) (related guide); `minecraft:wildflowers`
 - **Wither Rose** — [Small and tall flowers](Flowers.md#wither-rose) (related guide); `minecraft:wither_rose`
 - **Wither Skeleton Skull** — [Heads and Skulls](HeadsAndSkulls.md#wither-skeleton-skulls) (related guide); `minecraft:wither_skeleton_skull`
 - **Wither Skeleton Wall Skull** — [Heads and Skulls](HeadsAndSkulls.md#wither-skeleton-skulls) (related guide); `minecraft:wither_skeleton_wall_skull`
@@ -1364,16 +1364,19 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [End Rod](EndRod.md)
 - [End Stone and Purpur](EndStoneAndPurpur.md)
 - [Ender Chest](EnderChest.md)
+- [Eyeblossoms](Eyeblossoms.md)
 - [Farmland](Farmland.md)
 - [Fletching Table](FletchingTable.md)
 - [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md)
 - [Flower Pot](FlowerPot.md)
+- [Flowerbeds and Leaf Litter](FlowerbedsAndLeafLitter.md)
 - [Frogspawn](Frogspawn.md)
 - [Furnace, Blast Furnace and Smoker](Furnace.md)
 - [Glass and Glass Panes](GlassAndPanes.md)
 - [Glow Lichen](GlowLichen.md)
 - [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md)
 - [Granite, Diorite, Andesite and Calcite](DecorativeStone.md)
+- [Grass and Ferns](GrassAndFerns.md)
 - [Grindstone](Grindstone.md)
 - [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md)
 - [Heads and Skulls](HeadsAndSkulls.md)

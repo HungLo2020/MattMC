@@ -987,10 +987,19 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,307 pages / 37 indexes. All 26 authored paths are documentation; 2,543 local links/anchors and 352 tracked references resolve, with zero rendered ambiguity/unresolved-bracket candidates. The full alphabetical directory retains 1,211 IDs, with 1,158 related-guide routes and 53 explicit article gaps. The route counts do not establish finished variant or broad wiki coverage.
 
+## Batch 123: Ground cover and Eyeblossoms
+
+- Added three canonical grouped guides and corrected nine item pages, preserving 45 existing item anchors. Nine registered IDs gain precise owner anchors; Flowers and Bee care link the new behavior owners.
+- Grass/Fern review distinguishes short versus tall loot, Shears versus Fortune-sensitive seed routes, paired-half harvesting, Bone Meal multiplication, and actual village-chest tall-item acquisition. Source tables return two short plants from a sheared intact tall plant.
+- Flowerbed/Leaf Litter review verifies segmented coverage and facing, different support rules, Bone Meal duplication versus leaf smelting, generation/trader routes, dye/compost/fuel and Bee tags. Eyeblossom review separates time-driven state changes, potted ownership, no emitted light, stew/dye forms and Bee-specific contact/feeding effects.
+- Source checkpoint: `d1bff20a6235d5a7052eff0e7e2191da8fbb00c4`; all 104 distinct pinned draft-source paths match the integrated source. No generation, harvesting, propagation, timing, lighting or Bee runtime test is claimed.
+
+- Validation: required checker and strict build passed on 2,310 pages / 37 indexes. All 19 authored paths are documentation and 2,132 local links/anchors resolve. The draft audit verified 118 unique pinned source links; integrated rendering of all 19 changed pages found zero citation ambiguity or unresolved-bracket candidates, including the spaced reference labels omitted by the older shortcut counter. The directory preserves 1,211 alphabetical IDs, with 1,167 related-guide routes and 44 explicit article gaps, not a completion score.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Finish the isolated grasses/ferns, flowerbed/leaf-litter and Eyeblossom drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+2. Finish the isolated Sculk, animal-egg and custom redstone drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
 3. Fill remaining practical gaps such as fuel/storage utility blocks, sculk devices and imported nature/redstone blocks, following actual active behavior and acquisition routes.
 4. Cover remaining terrain/material, plant and technical families, including Fire/Soul Fire, Chorus, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
 5. Preserve the ready Swords and undead drafts for later source revalidation; continue broader item, mob, biome, effect, structure and gameplay-system coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.
