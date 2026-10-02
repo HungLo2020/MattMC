@@ -68,7 +68,7 @@ Wandering Trader offers also include **1 Emerald → 2 Moss Blocks**, **1 Emeral
 
 Besides the two carpet recipes, **one Moss Block plus one Cobblestone → one Mossy Cobblestone**, and **one Moss Block plus one Stone Bricks → one Mossy Stone Bricks**. Both are shapeless. Pale Moss Block is not an interchangeable ingredient. [Recipes][recipe-mossy_cobblestone_from_moss_block] [recipe-mossy_stone_bricks_from_moss_block] · [Stone construction guide](Stone.md#mossy-variants)
 
-The bundled recipes contain no recipe creating either full moss block or Pale Hanging Moss. For composting, the two full blocks each have a 65% configured chance, and both carpets and Pale Hanging Moss each have 30%; the composter's first accepted item advances an empty composter directly. [Composter entries and processing][compost]
+The bundled recipes contain no recipe creating either full moss block or Pale Hanging Moss. For composting, the two full blocks each have a 65% configured chance, and both carpets and Pale Hanging Moss each have 30%; the [Composter's](Composter.md) first accepted item advances an empty composter directly. [Composter entries and processing][compost]
 
 ## Small starting patch
 

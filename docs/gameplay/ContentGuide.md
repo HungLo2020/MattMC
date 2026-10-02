@@ -218,6 +218,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Nylium and Nether vegetation](blocks/NetherGroundAndVegetation.md): renewable ground, roots, sprouts and fungus-cap blocks
 - [Glowstone, Sea Lanterns, Shroomlights and Froglights](blocks/LuminousBlocks.md) and [Lanterns](blocks/Lanterns.md): acquisition, light, recovery tools and placement
 
+- [Composter](blocks/Composter.md) and [Stonecutter](blocks/Stonecutter.md): accepted inputs, output transactions, automation limits and village jobs
+- [Wooden Shelves](blocks/Shelves.md): full-stack storage, powered hotbar exchange, rear comparator output and moving contents
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)

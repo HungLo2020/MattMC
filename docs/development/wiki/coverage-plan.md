@@ -864,10 +864,22 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,266 pages / 37 indexes. The 17 authored documentation paths resolve 2,106 local links/anchors and 158 citation uses. All 118 distinct pinned source references remain unchanged. The 1,211-ID alphabetical directory now has 1,041 related-guide routes and 170 article gaps; these are navigation counts, not completeness.
 
+## Batch 111: Composter, Stonecutter and wooden Shelves
+
+- Added a canonical Composter guide with all 115 explicitly accepted ingredients and five chance groups, first-item guarantee, scheduled maturation, level-dependent loot, automation, comparator and Farmer behavior. Expanded existing Stonecutter coverage while preserving anchors and material-recipe ownership; corrected both inventory guides.
+- Reviewed two crafting recipes, two loot tables and all 254 bundled stonecutting recipes. Source audit distinguishes private menu input from placed storage and follows current server selection, consumption and cleanup paths.
+- The Composter output-Hopper rollback trace predicts a potential lost batch only when extraction is attempted without compatible Bone Meal capacity. This is explicitly source-only, not a gameplay reproduction or fixed issue; the separate exact audit was forwarded for independent tracker triage.
+- Source checkpoint: `96e5604a6abaec697de2004b1ba9775e303bfba7`; no source changes since the drafts were pinned. Authored changes are documentation only.
+
+- Added the twelve-variant Shelf family with all twelve recipes and loot tables, three representative item corrections, front-only full-stack exchange, powered hotbar groups, rear occupancy encoding, automation and ordinary contents spilling versus data-copy items. Preserved Chiseled Bookshelf ownership; source-derived behavior is not gameplay-tested.
+- Redirected three existing plant-guide composting links to the new canonical placed-block guide.
+
+- Validation: required checker and strict build passed on 2,268 pages / 37 indexes. All 17 authored paths are documentation; 2,073 local links/anchors and 296 citation uses resolve. The eight new or rewritten article files have 110 pinned source references checked unchanged. The alphabetical directory retains 1,211 IDs, with 1,054 related-guide routes and 157 explicit article gaps, not a completed-content score.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and separate category catalogs as source changes; use explicit article gaps to choose new work. A related family link is not proof that every detail of a variant is reviewed.
-2. Finish the current bounded Stonecutter/Composter, wooden Shelf and ordinary Mushroom reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
+2. Finish the current bounded ordinary Mushroom, Cartography/Fletching Table and Dripleaf reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
 3. Expand remaining functional blocks: Trial Spawner/Vault, Bell, Cartography/Fletching Tables, Decorated Pot, Target/Daylight Detector, Campfires, TNT, Sculk and other registry-backed gaps. Keep shared mechanics in canonical family guides and link exact variants.
 4. Fill remaining terrain/resource, flora, technical and imported-block gaps, including refined resource blocks, Resin, Dripleaves, dry vegetation, heads and custom workbenches. Reassess current source rather than extrapolating from upstream implementations.
 5. Preserve ready Swords and undead drafts for later; continue remaining mobs, biomes, effects, structures and gameplay systems after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw page or route counts.

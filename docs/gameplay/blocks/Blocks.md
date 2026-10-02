@@ -21,7 +21,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Acacia Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:acacia_planks`
 - **Acacia Pressure Plate** — [Pressure plates](PressurePlates.md#acacia-pressure-plate) (related guide); `minecraft:acacia_pressure_plate`
 - **Acacia Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#acacia-sapling) (related guide); `minecraft:acacia_sapling`
-- **Acacia Shelf** — article needed; `minecraft:acacia_shelf`
+- **Acacia Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:acacia_shelf`
 - **Acacia Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:acacia_sign`
 - **Acacia Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:acacia_slab`
 - **Acacia Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:acacia_stairs`
@@ -65,7 +65,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Bamboo Mosaic Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:bamboo_mosaic_stairs`
 - **Bamboo Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:bamboo_planks`
 - **Bamboo Pressure Plate** — [Pressure plates](PressurePlates.md#bamboo-pressure-plate) (related guide); `minecraft:bamboo_pressure_plate`
-- **Bamboo Shelf** — article needed; `minecraft:bamboo_shelf`
+- **Bamboo Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:bamboo_shelf`
 - **Bamboo Shoot** — [Bamboo](Bamboo.md) (related guide); `minecraft:bamboo_sapling`
 - **Bamboo Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:bamboo_sign`
 - **Bamboo Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:bamboo_slab`
@@ -94,7 +94,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Birch Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:birch_planks`
 - **Birch Pressure Plate** — [Pressure plates](PressurePlates.md#birch-pressure-plate) (related guide); `minecraft:birch_pressure_plate`
 - **Birch Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#birch-sapling) (related guide); `minecraft:birch_sapling`
-- **Birch Shelf** — article needed; `minecraft:birch_shelf`
+- **Birch Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:birch_shelf`
 - **Birch Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:birch_sign`
 - **Birch Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:birch_slab`
 - **Birch Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:birch_stairs`
@@ -232,7 +232,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cherry Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:cherry_planks`
 - **Cherry Pressure Plate** — [Pressure plates](PressurePlates.md#cherry-pressure-plate) (related guide); `minecraft:cherry_pressure_plate`
 - **Cherry Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#cherry-sapling) (related guide); `minecraft:cherry_sapling`
-- **Cherry Shelf** — article needed; `minecraft:cherry_shelf`
+- **Cherry Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:cherry_shelf`
 - **Cherry Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:cherry_sign`
 - **Cherry Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:cherry_slab`
 - **Cherry Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:cherry_stairs`
@@ -272,7 +272,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cobweb** — article needed; `minecraft:cobweb`
 - **Cocoa** — article needed; `minecraft:cocoa`
 - **Command Block** — article needed; `minecraft:command_block`
-- **Composter** — article needed; `minecraft:composter`
+- **Composter** — [Composter](Composter.md#composter) (related guide); `minecraft:composter`
 - **Conduit** — [Conduit](Conduit.md#build-a-valid-frame) (related guide); `minecraft:conduit`
 - **Cooked Dinosaur Chop** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:cooked_dinosaur_chop`
 - **Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:copper_bulb`
@@ -306,7 +306,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Crimson Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:crimson_planks`
 - **Crimson Pressure Plate** — [Pressure plates](PressurePlates.md#crimson-pressure-plate) (related guide); `minecraft:crimson_pressure_plate`
 - **Crimson Roots** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#crimson-roots) (related guide); `minecraft:crimson_roots`
-- **Crimson Shelf** — article needed; `minecraft:crimson_shelf`
+- **Crimson Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:crimson_shelf`
 - **Crimson Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:crimson_sign`
 - **Crimson Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:crimson_slab`
 - **Crimson Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:crimson_stairs`
@@ -351,7 +351,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dark Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:dark_oak_planks`
 - **Dark Oak Pressure Plate** — [Pressure plates](PressurePlates.md#dark-oak-pressure-plate) (related guide); `minecraft:dark_oak_pressure_plate`
 - **Dark Oak Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#dark-oak-sapling) (related guide); `minecraft:dark_oak_sapling`
-- **Dark Oak Shelf** — article needed; `minecraft:dark_oak_shelf`
+- **Dark Oak Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:dark_oak_shelf`
 - **Dark Oak Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:dark_oak_sign`
 - **Dark Oak Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:dark_oak_slab`
 - **Dark Oak Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:dark_oak_stairs`
@@ -559,7 +559,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Jungle Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:jungle_planks`
 - **Jungle Pressure Plate** — [Pressure plates](PressurePlates.md#jungle-pressure-plate) (related guide); `minecraft:jungle_pressure_plate`
 - **Jungle Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#jungle-sapling) (related guide); `minecraft:jungle_sapling`
-- **Jungle Shelf** — article needed; `minecraft:jungle_shelf`
+- **Jungle Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:jungle_shelf`
 - **Jungle Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:jungle_sign`
 - **Jungle Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:jungle_slab`
 - **Jungle Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:jungle_stairs`
@@ -667,7 +667,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Mangrove Pressure Plate** — [Pressure plates](PressurePlates.md#mangrove-pressure-plate) (related guide); `minecraft:mangrove_pressure_plate`
 - **Mangrove Propagule** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#planted-mangrove-propagules) (related guide); `minecraft:mangrove_propagule`
 - **Mangrove Roots** — [Tree logs and roots](TreeLogsAndRoots.md#mangrove-roots) (related guide); `minecraft:mangrove_roots`
-- **Mangrove Shelf** — article needed; `minecraft:mangrove_shelf`
+- **Mangrove Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:mangrove_shelf`
 - **Mangrove Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:mangrove_sign`
 - **Mangrove Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:mangrove_slab`
 - **Mangrove Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:mangrove_stairs`
@@ -727,7 +727,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:oak_planks`
 - **Oak Pressure Plate** — [Pressure plates](PressurePlates.md#oak-pressure-plate) (related guide); `minecraft:oak_pressure_plate`
 - **Oak Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#oak-sapling) (related guide); `minecraft:oak_sapling`
-- **Oak Shelf** — article needed; `minecraft:oak_shelf`
+- **Oak Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:oak_shelf`
 - **Oak Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:oak_sign`
 - **Oak Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:oak_slab`
 - **Oak Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:oak_stairs`
@@ -784,7 +784,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pale Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:pale_oak_planks`
 - **Pale Oak Pressure Plate** — [Pressure plates](PressurePlates.md#pale-oak-pressure-plate) (related guide); `minecraft:pale_oak_pressure_plate`
 - **Pale Oak Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#pale-oak-sapling) (related guide); `minecraft:pale_oak_sapling`
-- **Pale Oak Shelf** — article needed; `minecraft:pale_oak_shelf`
+- **Pale Oak Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:pale_oak_shelf`
 - **Pale Oak Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:pale_oak_sign`
 - **Pale Oak Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:pale_oak_slab`
 - **Pale Oak Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:pale_oak_stairs`
@@ -1062,7 +1062,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Spruce Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:spruce_planks`
 - **Spruce Pressure Plate** — [Pressure plates](PressurePlates.md#spruce-pressure-plate) (related guide); `minecraft:spruce_pressure_plate`
 - **Spruce Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#spruce-sapling) (related guide); `minecraft:spruce_sapling`
-- **Spruce Shelf** — article needed; `minecraft:spruce_shelf`
+- **Spruce Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:spruce_shelf`
 - **Spruce Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:spruce_sign`
 - **Spruce Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:spruce_slab`
 - **Spruce Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:spruce_stairs`
@@ -1080,7 +1080,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Stone Pressure Plate** — [Pressure plates](PressurePlates.md#stone-pressure-plate) (related guide); `minecraft:stone_pressure_plate`
 - **Stone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_slab`
 - **Stone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_stairs`
-- **Stonecutter** — [Stonecutter](Stonecutter.md) (related guide); `minecraft:stonecutter`
+- **Stonecutter** — [Stonecutter](Stonecutter.md#stonecutter) (related guide); `minecraft:stonecutter`
 - **Stripped Acacia Log** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:stripped_acacia_log`
 - **Stripped Acacia Wood** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:stripped_acacia_wood`
 - **Stripped Birch Log** — [Tree logs and roots](TreeLogsAndRoots.md#birch-timber) (related guide); `minecraft:stripped_birch_log`
@@ -1177,7 +1177,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Warped Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:warped_planks`
 - **Warped Pressure Plate** — [Pressure plates](PressurePlates.md#warped-pressure-plate) (related guide); `minecraft:warped_pressure_plate`
 - **Warped Roots** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#warped-roots) (related guide); `minecraft:warped_roots`
-- **Warped Shelf** — article needed; `minecraft:warped_shelf`
+- **Warped Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:warped_shelf`
 - **Warped Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:warped_sign`
 - **Warped Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:warped_slab`
 - **Warped Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:warped_stairs`
@@ -1334,6 +1334,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Cauldrons](Cauldrons.md)
 - [Chest](Chest.md)
 - [Clay and Bricks](ClayAndBricks.md)
+- [Composter](Composter.md)
 - [Concrete and Concrete Powder](Concrete.md)
 - [Conduit](Conduit.md)
 - [Copper Chests](CopperChests.md)
@@ -1424,6 +1425,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Water and Lava](WaterAndLava.md)
 - [Wheat crop](Wheat.md)
 - [Wood construction](WoodConstruction.md)
+- [Wooden Shelves](Shelves.md)
 - [Wool and Carpet](WoolAndCarpet.md)
 
 ## Inventory and related pages

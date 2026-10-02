@@ -101,7 +101,7 @@ The biome-decoration loop runs the selected placed features, and each still need
 
 ## Composting
 
-Both Roots have a **65%** compost-advance value, Nether Sprouts **50%**, and both Wart Blocks **85%**. These apply to adding an item to a partially filled [Composter](../items/Composter.md); the first accepted item in an empty composter advances it automatically. Composting consumes the material and is not a route back to loose Nether Wart. [Root compost values] · [Sprout compost value] · [Wart-block compost values] · [Compost chance and first layer]
+Both Roots have a **65%** compost-advance value, Nether Sprouts **50%**, and both Wart Blocks **85%**. These apply to adding an item to a partially filled [Composter](Composter.md); the first accepted item in an empty composter advances it automatically. Composting consumes the material and is not a route back to loose Nether Wart. [Root compost values] · [Sprout compost value] · [Wart-block compost values] · [Compost chance and first layer]
 
 Related: [Nether Fungi](NetherFungi.md) · [Nether Wart crop](NetherWart.md) · [Vines](Vines.md) · [Tree Logs and Roots](TreeLogsAndRoots.md) · [Bone Meal](../items/BoneMeal.md) · [Blocks](Blocks.md)
 

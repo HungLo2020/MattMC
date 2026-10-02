@@ -82,7 +82,7 @@ All 17 flowers are in both the **Bee food item tag** and **Bee-attractive block 
 
 All thirteen small species can be displayed in a [Flower Pot](FlowerPot.md#supported-plants). The four tall flowers have no filled-pot registration. Potting, removal, filled-pot drops, and the pot's distinct support behavior are covered there.
 
-An **Oxeye Daisy plus one Paper** crafts **one [Flower Banner Pattern](../items/FlowerBannerPattern.md)**, using a shapeless recipe. All 17 flower items are also accepted by the [Composter](../items/Composter.md) with a **65% configured chance** to advance a partially filled composter; the first accepted item in an empty composter advances it automatically. [Flower banner-pattern recipe] · [Flower compost values] · [Compost chance and first layer]
+An **Oxeye Daisy plus one Paper** crafts **one [Flower Banner Pattern](../items/FlowerBannerPattern.md)**, using a shapeless recipe. All 17 flower items are also accepted by the [Composter](Composter.md) with a **65% configured chance** to advance a partially filled composter; the first accepted item in an empty composter advances it automatically. [Flower banner-pattern recipe] · [Flower compost values] · [Compost chance and first layer]
 
 Related: [Bone Meal](../items/BoneMeal.md) · [Suspicious Stew](../items/SuspiciousStew.md) · [Soil, sand, and gravel](SoilSandAndGravel.md) · [Blocks](Blocks.md)
 
