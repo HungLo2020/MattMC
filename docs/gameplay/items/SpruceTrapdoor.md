@@ -1,17 +1,29 @@
 # Spruce Trapdoor
 
+`minecraft:spruce_trapdoor` places a **single-block hinged panel**. Its top/bottom setting chooses the panel's position within that block space. [Item binding][item] · [Block type][block]
+
 ## Obtaining
 
-Spruce Trapdoor can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Use Spruce Planks in the [shared trapdoor crafting layout](../blocks/WoodConstruction.md#crafting-construction-shapes); the recipe requires this exact plank material. [Recipe][recipe]
+
+This ordinary [inventory-browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) entry is also available in Survival as well as Creative, subject to the browser's limits. [Category listing][listing]
 
 ## Usage
 
-Spruce Trapdoor is placed as a two-block-tall doorway. Interact with it or power it with redstone to open and close it.
+It opens by hand or redstone. The [Trapdoor guide](../blocks/WoodConstruction.md#trapdoors) explains placement and attachment, and [power rules](../blocks/WoodConstruction.md#waterlogging-and-power) explain later signal changes.
 
 ## Behavior
 
-It has upper and lower block halves and follows standard door behavior for its material.
+It can be waterlogged. Normal hand mining returns **one matching trapdoor**, with no Silk Touch requirement; explosion recovery is conditional. See [collection rules](../blocks/WoodConstruction.md#mining-and-drops). [Exact loot][loot]
 
 ## Notes
 
-* This item is the item form of the `minecraft:spruce_trapdoor` block.
+Fire spread, lava ignition, and furnace fuel have separate rules; use the [material-specific guide](../blocks/WoodConstruction.md#fire-and-furnace-fuel).
+
+Item binding, recipe, listing, and ordinary loot reviewed at `1d7e3e91f2a2694339f78b8673993e98d496ca5f` on 2026-10-02. Shared behavior remains in the linked family guide; no gameplay test.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/1d7e3e91f2a2694339f78b8673993e98d496ca5f/src/main/java/net/minecraft/world/item/Items.java#L1091-L1091
+[block]: https://github.com/HungLo2020/MattMC/blob/1d7e3e91f2a2694339f78b8673993e98d496ca5f/src/main/java/net/minecraft/world/level/block/Blocks.java#L2149-L2159
+[recipe]: https://github.com/HungLo2020/MattMC/blob/1d7e3e91f2a2694339f78b8673993e98d496ca5f/src/main/resources/data/minecraft/recipe/crafting/spruce_trapdoor.json
+[listing]: https://github.com/HungLo2020/MattMC/blob/1d7e3e91f2a2694339f78b8673993e98d496ca5f/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L102
+[loot]: https://github.com/HungLo2020/MattMC/blob/1d7e3e91f2a2694339f78b8673993e98d496ca5f/src/main/resources/data/minecraft/loot_table/blocks/spruce_trapdoor.json

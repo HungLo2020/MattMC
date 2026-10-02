@@ -1327,3 +1327,10 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Expanded Panda, Parrot and Toucan owners with actual acquisition, food/breeding or taming, care, variants and loot limits, plus four discovery links in three existing owners.
 - Preserved fork-specific Panda one-stalk Bamboo breeding checks, Parrot Cookie/shoulder/imitation controls, and Toucan breeding-versus-planting inputs and current missing natural population route. A single Apple interaction can reach both inherited feeding and a separate planting gift when conditions permit.
 - Independent review corrected Parrot release attempts to distinguish ignored early triggers from queued release, qualified Cookie consumption for ordinary Survival, and cited the active TamableAnimal Lead override. Source/render checks and final strict documentation build are required before promotion; no live feeding, breeding, shoulder, planting, sound or loot test is claimed.
+
+## Batch 161: Standard Trapdoor inventory correction
+
+- Replaced 12 legacy standard Trapdoor entries with precise single-block panel/top-bottom state descriptions, exact material recipes, browser access, matching ordinary hand-mining drops and scoped Wood Construction links. Ten had incorrectly described two-block doors; Acacia fire wording is now bounded by the material owner.
+- Preserved all 60 existing anchors and 60 other inspected authored item pages. Crimson/Warped fuel exclusions remain explicit. These are existing inventory-page corrections, not 12 new exhaustive behavior articles.
+- Clarified resource audit instructions: TaCZ actively reads some plural recipes paths through its own loader, so ordinary RecipeManager directory scope must not be confused with universal resource inactivity.
+- Independent source/data/render checks and final documentation checker/strict build are required before promotion. No placement, power, waterlogging, mining, fire or recipe gameplay test is claimed.
