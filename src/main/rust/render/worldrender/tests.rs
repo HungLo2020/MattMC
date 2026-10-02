@@ -11146,6 +11146,18 @@ fn atlas_animation_independent_incarnations_keep_clocks_pixels_and_pending_event
         .advance_atlas_animation(&mut gal, event(202, 2, 1))
         .unwrap());
     assert_eq!(frontend.mesh_texture_assets[&202].rgba[0], 150);
+    // A caller which advances after a failed upload must not freeze forever.
+    gal.mock_backend_mut().unwrap().completed = gal.latest_submission_id();
+    gal.mock_backend_mut().unwrap().fail_next_submit = true;
+    assert!(frontend.advance_atlas_animation(&mut gal, event(202, 2, 2)).is_err());
+    let mut invalid_retry = event(202, 2, 3);
+    invalid_retry.visible.insert(999);
+    assert!(frontend.advance_atlas_animation(&mut gal, invalid_retry).is_err());
+    assert!(frontend.retry_atlas_animation_events.is_empty());
+    gal.mock_backend_mut().unwrap().fail_next_submit = true;
+    assert!(frontend.advance_atlas_animation(&mut gal, event(202, 2, 3)).is_err());
+    assert!(frontend.advance_atlas_animation_before_frame(&mut gal, event(202, 2, 4)).unwrap());
+    assert!(frontend.pending_atlas_animation_event.is_none());
     frontend.reset(&mut gal);
     assert!(frontend.staged_atlas_animations.is_empty());
     assert!(frontend.pending_atlas_animation.is_none());
@@ -18984,6 +18996,7 @@ fn vulkan_standard_foil_draw_pixels_preserve_strength_cutoff_and_depth_domain() 
 
 #[test]
 fn vulkan_equipment_capture_observes_bound_uploads_and_rejects_missing_writes() {
+    let _capture = crate::core::environment::scoped_override("MATTMC_GRAPHICS_AUDIT", "equipment");
     use crate::render::shared::item_foil::StandardItemFoil;
     for (hand, wolf) in [(false, false), (true, false), (false, true), (true, true)] {
         for translucent_base in [false] {
@@ -21035,6 +21048,7 @@ fn fabulous_submission_confirms_lightmap_before_next_generation() {
             .lightmap_generation
     );
 
+    gal.retire_through(gal.latest_submission_id()).unwrap();
     frontend.reset(&mut gal);
     gal.destroy(target).unwrap();
     assert_eq!(
@@ -23335,52 +23349,18 @@ fn render_shader_mesh_scene(
         depth_stencil_view: Some(depth_view),
         extent,
     })?;
-    let clear_pass = gal.create_render_pass(RenderPassDesc {
-        label: format!("{label}.shader-clear-pass"),
-        target,
-        color_formats: vec![TextureFormat::Rgba8Unorm],
-        depth_format: Some(TextureFormat::Depth32Float),
-    })?;
     let readback = gal.create_buffer(BufferDesc {
         label: format!("{label}.shader-readback"),
         size: u64::from(width) * u64::from(height) * 4,
         memory: MemoryDomain::Readback,
         usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead],
     })?;
-    let mut ops = vec![
-        CommandOp::Barrier(texture_barrier(
-            color,
-            TextureUsageState::Undefined,
-            TextureUsageState::ColorAttachment,
-        )),
-        CommandOp::Barrier(texture_barrier(
-            depth,
-            TextureUsageState::Undefined,
-            TextureUsageState::DepthStencilAttachment,
-        )),
-        CommandOp::BeginPass {
-            pass: clear_pass,
-            target,
-            colors: vec![PassAttachment {
-                view: color_view,
-                load_op: AttachmentLoadOp::Clear,
-                store_op: AttachmentStoreOp::Store,
-                clear_color: Some(ClearColor {
-                    r: 0.02,
-                    g: 0.06,
-                    b: 0.09,
-                    a: 1.0,
-                }),
-            }],
-            depth_stencil: Some(PassAttachment {
-                view: depth_view,
-                load_op: AttachmentLoadOp::Clear,
-                store_op: AttachmentStoreOp::Store,
-                clear_color: None,
-            }),
-        },
-        CommandOp::EndPass,
-    ];
+    // The renderer owns the background/depth clear in this fixture.
+    let mut ops = vec![CommandOp::Barrier(texture_barrier(
+        color,
+        TextureUsageState::Undefined,
+        TextureUsageState::ColorAttachment,
+    ))];
     let (mut mesh_ops, mut stats) = frontend.append_frame_ops_inner(
         gal,
         generation,
@@ -27001,4 +26981,48 @@ fn gal_upload_capture_covers_twice_the_mesh_geometry_residency() {
         2 * WORLD_MESH_GEOMETRY_RESIDENCY
             <= crate::render::vulkanic::test_support::BUFFER_UPLOAD_CAPTURE_MAX_RANGES
     );
+}
+
+#[test]
+fn rejected_mesh_update_preserves_retirements_and_asset_generation() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend.apply_world_mesh_asset_update(&mut gal, 1, vec![mesh_asset(81, 1, IndexType::U16)], vec![]).unwrap();
+    let mut invalid = mesh_asset(82, 1, IndexType::U16);
+    invalid.index_bytes = vec![255, 255];
+    assert!(frontend.apply_world_mesh_asset_update_with_sorted_and_retirements(
+        &mut gal, 2, vec![invalid], vec![], vec![], vec![(81, 1)]).is_err());
+    assert_eq!(frontend.mesh_asset_generation, 1);
+    assert!(frontend.mesh_assets.contains_key(&81));
+    assert!(!frontend.mesh_assets.contains_key(&82));
+}
+
+#[test]
+fn failed_world_upload_keeps_the_retry_payload() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    let buffer = gal.create_buffer(BufferDesc { label: "retry-upload".into(), size: 4,
+        memory: MemoryDomain::Upload, usages: vec![BufferUsage::HostWrite] }).unwrap();
+    frontend.pending_world_upload_ops.push(CommandOp::HostWriteBuffer { buffer, offset: 0, data: vec![1, 2, 3, 4] });
+    gal.mock_backend_mut().unwrap().fail_next_submit = true;
+    assert!(frontend.flush_pending_world_uploads(&mut gal).is_err());
+    assert_eq!(frontend.pending_world_upload_ops.len(), 1);
+    frontend.flush_pending_world_uploads(&mut gal).unwrap();
+    assert!(frontend.pending_world_upload_ops.is_empty());
+}
+
+#[test]
+fn resource_creation_failures_restore_world_upload_mode() {
+    for offset in 0..24 {
+        let mut gal = gal();
+        let target = frame_target(&mut gal, 1, 128, 128);
+        let mut frontend = WorldPrimitiveFrontend::default();
+        frontend.apply_world_mesh_asset_update(&mut gal, 1, vec![mesh_asset(81, 1, IndexType::U16)], vec![]).unwrap();
+        let mut frame = frame(Vec::new());
+        frame.mesh_instances.push(mesh_instance(81, 1));
+        let backend = gal.mock_backend_mut().unwrap();
+        backend.fail_create_after = Some(backend.creates.len() + offset);
+        let _ = frontend.append_frame_ops(&mut gal, 1, target, frame);
+        assert!(!frontend.defer_world_uploads, "creation failure at offset {offset} stranded upload mode");
+    }
 }

@@ -15,7 +15,7 @@ impl WorldPrimitiveFrontend {
     ) {
         if !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -23,7 +23,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let stages = programs
@@ -115,14 +115,14 @@ impl WorldPrimitiveFrontend {
         frame: &WorldPrimitiveFrame,
         programs: &[Arc<LoweredFullscreenSourceProgram>],
     ) {
-        let Ok(mode) = std::env::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE") else {
+        let Ok(mode) = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE") else {
             return;
         };
         let mode = mode.trim();
         if mode.is_empty()
             || !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -130,7 +130,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let Some(program) = programs.iter().find(|program| {
@@ -191,7 +191,7 @@ impl WorldPrimitiveFrontend {
     ) {
         if !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -199,7 +199,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let stages = sky
@@ -248,13 +248,13 @@ impl WorldPrimitiveFrontend {
         bytes: &[u8],
     ) {
         if !matches!(
-            std::env::var("MATTMC_RUST_SELECTED_SOURCE_SKY_UNIFORM_RECEIPT")
+            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_SKY_UNIFORM_RECEIPT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) || !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -263,7 +263,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         const NAMES: &[&str] = &[
@@ -330,13 +330,13 @@ impl WorldPrimitiveFrontend {
         bytes: &[u8],
     ) {
         if !matches!(
-            std::env::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_UNIFORM_RECEIPT")
+            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_UNIFORM_RECEIPT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) || !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -344,7 +344,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let fields = program
@@ -418,13 +418,13 @@ impl WorldPrimitiveFrontend {
         program: &LoweredFullscreenSourceProgram,
     ) {
         if !matches!(
-            std::env::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROGRAM_RECEIPT")
+            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROGRAM_RECEIPT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) || !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -433,7 +433,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let dir = Path::new(&dir);
@@ -483,13 +483,13 @@ impl WorldPrimitiveFrontend {
         program: &LoweredFullscreenSourceProgram,
     ) {
         if !matches!(
-            std::env::var("MATTMC_RUST_SELECTED_SOURCE_SKY_PROGRAM_RECEIPT")
+            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_SKY_PROGRAM_RECEIPT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) || !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -498,7 +498,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let dir = Path::new(&dir);

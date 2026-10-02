@@ -771,21 +771,21 @@ pub(super) fn private_dh_compositor_blend_mode() -> BlendMode {
 
 pub(super) fn private_dh_compositor_depth_compare() -> Option<CompareOp> {
     let enabled = matches!(
-        std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_DEPTH_TEST").as_deref(),
+        crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_DEPTH_TEST").as_deref(),
         Ok("1") | Ok("true") | Ok("TRUE")
     ) && matches!(
-        std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+        crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
         Ok("1") | Ok("true") | Ok("TRUE")
     );
     if !enabled {
         return None;
     }
     let greater = matches!(
-        std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_DEPTH_GREATER").as_deref(),
+        crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_DEPTH_GREATER").as_deref(),
         Ok("1") | Ok("true") | Ok("TRUE")
     );
     let strict_less = matches!(
-        std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_DEPTH_LESS").as_deref(),
+        crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_DEPTH_LESS").as_deref(),
         Ok("1") | Ok("true") | Ok("TRUE")
     );
     Some(if greater {

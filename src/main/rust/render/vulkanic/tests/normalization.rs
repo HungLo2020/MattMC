@@ -353,3 +353,19 @@ fn command_normalization_keeps_distinct_state_changes() {
     assert_eq!(stats.index_buffer_binds_removed, 0);
     assert_eq!(operations.len(), 9);
 }
+
+#[test]
+fn repeated_clears_and_discarded_attachments_keep_pass_boundaries() {
+    for (load_op, store_op) in [(AttachmentLoadOp::Clear, AttachmentStoreOp::Store),
+        (AttachmentLoadOp::DontCare, AttachmentStoreOp::Store),
+        (AttachmentLoadOp::Load, AttachmentStoreOp::DontCare)] {
+        let mut begin = minimal_begin_pass();
+        if let CommandOp::BeginPass { colors, .. } = &mut begin {
+            colors[0].load_op = load_op;
+            colors[0].store_op = store_op;
+        }
+        let original = vec![begin.clone(), CommandOp::EndPass, begin, CommandOp::EndPass];
+        let (_, normalized) = normalize_ops_for_test(original.clone());
+        assert_eq!(normalized, original);
+    }
+}

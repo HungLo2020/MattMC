@@ -221,9 +221,9 @@ fn selected_source_instance_translation_probe_is_idempotent_and_semantic_guarded
 fn selected_source_wave_probe_removes_only_the_pack_position_mutation() {
     let mut source =
         "void main() { DoWave(position.xyz, mat); gl_Position = ftransform(); }".to_string();
-    std::env::set_var("MATTMC_RUST_SELECTED_SOURCE_WAVE_PROBE", "disable");
+    crate::core::environment::set_var("MATTMC_RUST_SELECTED_SOURCE_WAVE_PROBE", "disable");
     apply_selected_source_wave_probe(&mut source).unwrap();
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_WAVE_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_WAVE_PROBE");
     assert!(!source.contains("DoWave(position.xyz, mat);"));
     assert!(source.contains("gl_Position = ftransform();"));
 }
@@ -233,11 +233,11 @@ fn selected_source_taa_probe_is_idempotent_and_only_replaces_jitter_assignment()
     let mut source =
         "void main() { gl_Position.xy = TAAJitter(gl_Position.xy, gl_Position.w); }"
             .to_string();
-    std::env::set_var("MATTMC_RUST_SELECTED_SOURCE_TAA_PROBE", "disable");
+    crate::core::environment::set_var("MATTMC_RUST_SELECTED_SOURCE_TAA_PROBE", "disable");
     apply_selected_source_taa_probe(&mut source).unwrap();
     let once = source.clone();
     apply_selected_source_taa_probe(&mut source).unwrap();
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_TAA_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_TAA_PROBE");
     assert_eq!(once, source);
     assert!(source.contains("selected-source diagnostic probe: TAA disabled"));
     assert!(!source.contains("TAAJitter(gl_Position.xy"));
@@ -528,13 +528,13 @@ fn fullscreen_depth_probe_reads_the_named_distant_depth_at_the_primary_output() 
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
     lowered = lowered.replace("gl_FragData[0]", "out_vulkanic_source_color_primary");
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "distant-horizons-depth",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains(
         "out_vulkanic_source_color_primary = vec4(vec3(texelFetch(dhDepthTex, texelCoord, 0).r), 1.0);"
@@ -553,13 +553,13 @@ fn fullscreen_depth_routing_probe_exposes_the_exact_deferred_dh_predicate() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "distant-horizons-depth-routing",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains(
         "float z0 = texelFetch(depthtex0, texelCoord, 0).r; float vulkanicDhDepthProbe = texelFetch(dhDepthTex, texelCoord, 0).r;"
@@ -581,13 +581,13 @@ fn fullscreen_depth_coordinate_probe_exposes_current_and_mirrored_dh_texels() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "distant-horizons-depth-coordinate",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains(
         "vec4(vulkanicDhDepthProbe, texelFetch(dhDepthTex, ivec2(texelCoord.x, int(viewHeight) - 1 - texelCoord.y), 0).r, texCoord.y, 1.0);"
@@ -609,13 +609,13 @@ fn fullscreen_fog_input_probe_reads_deferred_dh_values_inside_the_fog_branch() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "distant-horizons-fog-inputs",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains(
         "float z0 = texelFetch(depthtex0, texelCoord, 0).r; float vulkanicDhDepthProbe = texelFetch(dhDepthTex, texelCoord, 0).r; vec3 vulkanicDhFogInputs = vec3(0.0);"
@@ -643,13 +643,13 @@ fn fullscreen_fog_effect_probe_keeps_the_fog_call_and_encodes_its_effect() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "distant-horizons-fog-effect",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains(
         "vec3 vulkanicFogInputColor = color.rgb; DoFog(color.rgb, skyFade, lViewPos, playerPos, VdotU, VdotS, dither); vulkanicDhFogInputs = vec3("
@@ -676,13 +676,13 @@ fn fullscreen_gbuffer_input_probe_exposes_normal_and_material_targets() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "gbuffer-inputs",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains(
         "texelFetch(colortex5, texelCoord, 0).rgb, texelFetch(colortex6, texelCoord, 0).r"
@@ -702,13 +702,13 @@ fn fullscreen_gbuffer_primary_probe_exposes_current_primary_target() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "gbuffer-primary",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains(
         "vec4(texelFetch(colortex0, texelCoord, 0).rgb, 1.0); // selected-source fullscreen diagnostic probe: gbuffer-primary"
@@ -727,13 +727,13 @@ fn fullscreen_depth_input_probe_exposes_deferred_depth() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "depth-input",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains(
         "vec4(vec3(z0), 1.0); // selected-source fullscreen diagnostic probe: depth-input"
@@ -752,13 +752,13 @@ fn fullscreen_depth_input_flipped_probe_uses_explicit_mirrored_texel() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "depth-input-flipped",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains("ivec2(texelCoord.x, int(viewHeight) - 1 - texelCoord.y)"));
 }
@@ -775,13 +775,13 @@ fn fullscreen_deferred_fog_probe_exposes_depth_distance_and_sky_fade() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "deferred-fog-inputs",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/deferred1.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert!(lowered.contains("vec3 vulkanicDeferredFogInputs"));
     assert!(
@@ -801,13 +801,13 @@ fn fullscreen_depth_probe_leaves_unrelated_source_stages_unchanged() {
         role: TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
         semantic_name: "out_vulkanic_source_color_primary".to_string(),
     }];
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "distant-horizons-depth",
     );
     let result =
         apply_selected_source_fullscreen_probe(&mut lowered, &outputs, "world0/composite4.fsh");
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
     result.unwrap();
     assert_eq!(
         "out_vulkanic_source_color_primary = vec4(color, 1.0);",
@@ -1058,7 +1058,7 @@ fn fullscreen_source_composite7_fxaa_probe_only_suppresses_the_targeted_call() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let prior = std::env::var_os("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "composite7-without-fxaa",
     );
@@ -1075,8 +1075,8 @@ fn fullscreen_source_composite7_fxaa_probe_only_suppresses_the_targeted_call() {
     assert!(unrelated.contains("FXAA311(color);"));
 
     match prior {
-        Some(value) => std::env::set_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE", value),
-        None => std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE"),
+        Some(value) => crate::core::environment::set_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE", value),
+        None => crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE"),
     }
 }
 
@@ -1086,7 +1086,7 @@ fn fullscreen_source_composite5_fog_probe_exposes_depth_and_distance_only_for_ta
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let prior = std::env::var_os("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE");
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE",
         "composite5-fog-inputs",
     );
@@ -1109,8 +1109,8 @@ fn fullscreen_source_composite5_fog_probe_exposes_depth_and_distance_only_for_ta
     assert_eq!(composite5, unrelated);
 
     match prior {
-        Some(value) => std::env::set_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE", value),
-        None => std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE"),
+        Some(value) => crate::core::environment::set_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE", value),
+        None => crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE"),
     }
 }
 
@@ -1776,12 +1776,12 @@ fn distant_horizons_fragment_probe_replaces_only_the_final_named_output() {
         outputs: vec![DistantHorizonsFragmentOutput::LitColor],
         remaining_dialect: analyze_glsl_text("dh_terrain.fsh", source),
     };
-    std::env::set_var(
+    crate::core::environment::set_var(
         "MATTMC_RUST_SELECTED_SOURCE_DH_FRAGMENT_PROBE",
         "constant-red",
     );
     let result = apply_selected_source_distant_horizons_fragment_probe(&mut fragment);
-    std::env::remove_var("MATTMC_RUST_SELECTED_SOURCE_DH_FRAGMENT_PROBE");
+    crate::core::environment::remove_var("MATTMC_RUST_SELECTED_SOURCE_DH_FRAGMENT_PROBE");
 
     result.unwrap();
     assert!(fragment

@@ -28,6 +28,7 @@ pub struct GuiMeshOffscreenTarget {
 #[derive(Default)]
 pub struct GuiMeshOffscreenTargetCache {
     pub(super) targets: BTreeMap<OffscreenTargetKey, GuiMeshOffscreenTarget>,
+    usage: BTreeMap<Handle, crate::render::vulkanic::commands::SubmissionUsage>,
 }
 
 pub(super) const GUI_MESH_MAX_NAMED_ITEM_TARGETS_PER_GENERATION: usize = 63;
@@ -209,7 +210,60 @@ impl GuiMeshOffscreenTargetCache {
             .copied()
     }
 
+    /// Retain the target (and its composite bindings) while commands are prepared.
+    pub fn track_use(&mut self, target: Handle) -> CommandOp {
+        CommandOp::TrackSubmission(self.usage.entry(target).or_default().clone())
+    }
+
+    /// Whether this frame no longer needs a cached identity/extent.
+    pub fn has_obsolete_items(&self, generation: u64, needed: &[(u64, Extent3d)]) -> bool {
+        if self
+            .usage
+            .values()
+            .any(|usage| usage.has_pending_commands())
+        {
+            return false;
+        }
+        self.targets.keys().any(|key| {
+            key.generation != generation
+                || !needed.iter().any(|(id, extent)| {
+                    key.item_identity == *id
+                        && key.width == extent.width
+                        && key.height == extent.height
+                })
+        })
+    }
+
+    /// Call after releasing composite resource sets that sample these targets.
+    pub fn retain_items(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        needed: &[(u64, Extent3d)],
+    ) {
+        let obsolete: Vec<_> = self
+            .targets
+            .keys()
+            .copied()
+            .filter(|key| {
+                key.generation != generation
+                    || !needed.iter().any(|(id, extent)| {
+                        key.item_identity == *id
+                            && key.width == extent.width
+                            && key.height == extent.height
+                    })
+            })
+            .collect();
+        for key in obsolete {
+            if let Some(target) = self.targets.remove(&key) {
+                self.usage.remove(&target.target);
+                destroy_target(gal, target);
+            }
+        }
+    }
+
     pub fn clear(&mut self, gal: &mut VulkanicGal) {
+        self.usage.clear();
         let targets = std::mem::take(&mut self.targets);
         for (_, target) in targets {
             destroy_target(gal, target);
@@ -225,6 +279,7 @@ impl GuiMeshOffscreenTargetCache {
             .collect::<Vec<_>>();
         for key in stale {
             if let Some(target) = self.targets.remove(&key) {
+                self.usage.remove(&target.target);
                 destroy_target(gal, target);
             }
         }

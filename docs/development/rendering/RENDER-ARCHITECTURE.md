@@ -63,7 +63,36 @@ that knows about blocks, entities, the GUI or shader packs belongs in a
 renderer. If a renderer needs a backend difference, add a capability rather
 than checking the backend.
 
+## Resource ownership and retries
+
+Keep upload data and its owner retryable until submission succeeds. Mesh and
+sorted-index replacements must validate and submit before publishing the new
+CPU state or retiring old assets. Atlas recovery replays accepted updates in
+order; rejected uploads must not advance animation clocks or lose pending work.
+
+Release descriptor sets and cached pass bindings before their textures,
+samplers or residency buffers. Cache eviction must account for prepared
+commands as well as submitted work. GUI stream reservations remain owned
+through command preparation and submission; frame-local reservations must be
+released when preparation fails. Shader reloads retire bindings and pipelines
+only after the replacement source generation is accepted.
+
+## Shader controls at startup
+
+Shader selection, pack options and key bindings remain Java-owned configuration.
+`Minecraft` initializes that configuration before constructing `Options`, which
+must include registered keys before loading saved mappings. Client ticks process
+the shader controls; changes request a fresh source snapshot through
+`RustGalFrameCoordinator`. Rust still owns shader execution and GPU resources.
+Do not remove these configuration hooks when removing Java renderer lifecycle
+code. The integrated distribution also needs a version-label fallback when no
+separate Iris mod container exists.
+
 ## Troubleshooting
+
+- **Shader Packs is missing from Video Settings.** Check that the CPU shader
+  configuration initialized before `Options`; the menu hides that page when
+  `Iris.getIrisConfig()` is null.
 
 - **A boundary test fails after a change.** Its message names the file, line
   and rule. Move the code to the layer allowed to know about it, or expose what

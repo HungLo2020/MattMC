@@ -4,6 +4,50 @@
 
 use crate::render::bridge::*;
 
+const MAX_REQUEST_BYTES: usize = 512 * 1024 * 1024;
+thread_local! {
+    static REQUEST_BYTES: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+}
+
+pub(crate) struct RequestBudget(Option<usize>);
+impl RequestBudget {
+    pub(crate) fn begin() -> Self {
+        Self(REQUEST_BYTES.with(|n| n.replace(Some(0))))
+    }
+    pub(crate) fn bytes(&self) -> usize {
+        REQUEST_BYTES.with(|n| n.get().unwrap_or(0))
+    }
+}
+impl Drop for RequestBudget {
+    fn drop(&mut self) {
+        REQUEST_BYTES.with(|n| n.set(self.0));
+    }
+}
+
+fn charge_input(bytes: usize) -> GalResult<()> {
+    if bytes > MAX_REQUEST_BYTES || bytes > isize::MAX as usize {
+        return Err(GalError::ffi(
+            StatusCode::LengthOverflow,
+            "FFI input exceeds request byte budget",
+        ));
+    }
+    REQUEST_BYTES.with(|counter| {
+        if let Some(used) = counter.get() {
+            let total = used
+                .checked_add(bytes)
+                .filter(|n| *n <= MAX_REQUEST_BYTES)
+                .ok_or_else(|| {
+                    GalError::ffi(
+                        StatusCode::LengthOverflow,
+                        "aggregate FFI input budget exceeded",
+                    )
+                })?;
+            counter.set(Some(total));
+        }
+        Ok(())
+    })
+}
+
 pub fn validate_header<T>(header: FfiHeader) -> GalResult<()> {
     if !matches!(
         header.version,
@@ -59,6 +103,7 @@ pub unsafe fn read_bytes<'a>(bytes: FfiBytes, nullable: bool, label: &str) -> Ga
             format!("{label} length does not fit usize"),
         )
     })?;
+    charge_input(len)?;
     Ok(slice::from_raw_parts(bytes.ptr, len))
 }
 
@@ -94,12 +139,13 @@ pub unsafe fn read_slice<'a, T>(
             format!("{label} count does not fit usize"),
         )
     })?;
-    count.checked_mul(size_of::<T>()).ok_or_else(|| {
+    let byte_count = count.checked_mul(size_of::<T>()).ok_or_else(|| {
         GalError::ffi(
             StatusCode::LengthOverflow,
             format!("{label} byte length overflows usize"),
         )
     })?;
+    charge_input(byte_count)?;
     Ok(slice::from_raw_parts(slice_desc.ptr, count))
 }
 
@@ -221,6 +267,7 @@ pub(crate) unsafe fn read_struct<T: Copy>(ptr: *const T, label: &str) -> GalResu
             format!("{label} pointer is not aligned to {}", align_of::<T>()),
         ));
     }
+    charge_input(size_of::<T>())?;
     Ok(*ptr)
 }
 
@@ -229,14 +276,13 @@ pub(crate) unsafe fn read_limited_slice<'a, T>(
     nullable: bool,
     label: &str,
 ) -> GalResult<&'a [T]> {
-    let items = read_slice(slice_desc, nullable, label)?;
-    if items.len() > FFI_MAX_BATCH_ITEMS {
+    if slice_desc.count > FFI_MAX_BATCH_ITEMS as u64 {
         return Err(GalError::ffi(
             StatusCode::LengthOverflow,
             format!("{label} count exceeds ABI maximum"),
         ));
     }
-    Ok(items)
+    read_slice(slice_desc, nullable, label)
 }
 
 pub(crate) fn validate_item_size<T>(byte_size: u32, label: &str) -> GalResult<()> {
@@ -258,14 +304,13 @@ pub(crate) unsafe fn read_bounded_bytes(
     max_bytes: usize,
     label: &str,
 ) -> GalResult<Vec<u8>> {
-    let bytes = read_bytes(bytes, nullable, label)?;
-    if bytes.len() > max_bytes {
+    if bytes.len > max_bytes as u64 {
         return Err(GalError::ffi(
             StatusCode::LengthOverflow,
             format!("{label} length exceeds ABI maximum"),
         ));
     }
-    Ok(bytes.to_vec())
+    Ok(read_bytes(bytes, nullable, label)?.to_vec())
 }
 
 pub(crate) unsafe fn read_label(label: FfiBytes, label_name: &str) -> GalResult<String> {
@@ -318,5 +363,34 @@ pub(crate) fn bool_flag(raw: u32, label: &str) -> GalResult<bool> {
             StatusCode::UnknownEnum,
             format!("{label} must be 0 or 1"),
         )),
+    }
+}
+
+#[cfg(test)]
+mod audit_budget_tests {
+    use super::*;
+    #[test]
+    fn nested_request_budget_is_checked_and_restored() {
+        let outer = RequestBudget::begin();
+        charge_input(MAX_REQUEST_BYTES - 8).unwrap();
+        {
+            let _inner = RequestBudget::begin();
+            charge_input(16).unwrap();
+        }
+        assert!(charge_input(9).is_err());
+        assert_eq!(outer.bytes(), MAX_REQUEST_BYTES - 8);
+    }
+    #[test]
+    fn oversized_foreign_ranges_are_rejected_before_constructing_slices() {
+        let invalid = FfiBytes {
+            ptr: std::ptr::NonNull::dangling().as_ptr(),
+            len: u64::MAX,
+        };
+        assert!(unsafe { read_bytes(invalid, true, "oversized") }.is_err());
+        let invalid = FfiSlice::<u64> {
+            ptr: std::ptr::NonNull::dangling().as_ptr(),
+            count: u64::MAX,
+        };
+        assert!(unsafe { read_limited_slice(invalid, true, "oversized") }.is_err());
     }
 }

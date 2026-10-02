@@ -59,7 +59,7 @@ fn gui_panorama_material_compiles_through_the_opengl_lowering() {
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL panorama setup failure: {text}"
             );
             return;
@@ -93,7 +93,7 @@ fn distant_horizons_lod_opaque_program_compiles_at_the_opengl_boundary() {
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL DH LOD setup failure: {text}"
             );
             return;
@@ -118,7 +118,7 @@ fn distant_horizons_lod_exact_atlas_program_compiles_at_the_opengl_boundary() {
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL exact-atlas DH LOD setup failure: {text}"
             );
             return;
@@ -143,7 +143,7 @@ fn selected_source_exact_atlas_distant_horizons_program_compiles_at_the_opengl_b
             Err(error) => {
                 let text = error.to_string();
                 assert!(
-                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    context_unavailable(&text),
                     "unexpected OpenGL selected-source exact-atlas DH setup failure: {text}"
                 );
                 return;
@@ -183,7 +183,7 @@ fn distant_horizons_lod_transparent_program_compiles_at_the_opengl_boundary() {
             Err(error) => {
                 let text = error.to_string();
                 assert!(
-                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    context_unavailable(&text),
                     "unexpected OpenGL transparent DH LOD setup failure: {text}"
                 );
                 return;
@@ -207,7 +207,7 @@ fn lowered_fullscreen_source_compiles_at_the_opengl_boundary_without_a_vertex_st
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL fullscreen source setup failure: {text}"
             );
             return;
@@ -276,7 +276,7 @@ fn lowered_complete_complementary_distant_horizons_pair_compiles_at_the_opengl_b
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL complete source DH setup failure: {text}"
             );
             return;
@@ -316,7 +316,7 @@ fn lowered_complete_complementary_distant_horizons_water_pair_compiles_at_the_op
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL complete source DH water setup failure: {text}"
             );
             return;
@@ -368,7 +368,7 @@ fn distant_horizons_lod_opaque_pipeline_uses_explicit_two_set_gal_layout() {
             Err(error) => {
                 let text = error.to_string();
                 assert!(
-                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    context_unavailable(&text),
                     "unexpected OpenGL DH LOD setup failure: {text}"
                 );
                 return;
@@ -420,7 +420,7 @@ fn prepared_lowered_terrain_program_compiles_at_the_opengl_boundary() {
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL source-terrain setup failure: {text}"
             );
             return;
@@ -483,7 +483,7 @@ fn lowered_complete_complementary_textured_material_pair_compiles_at_the_opengl_
             Err(error) => {
                 let text = error.to_string();
                 assert!(
-                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    context_unavailable(&text),
                     "unexpected OpenGL complete source textured-material setup failure: {text}"
                 );
                 return;
@@ -521,7 +521,7 @@ fn lowered_complete_complementary_weather_pair_compiles_at_the_opengl_boundary()
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL complete source weather setup failure: {text}"
             );
             return;
@@ -555,7 +555,7 @@ fn lowered_complete_complementary_terrain_pair_compiles_at_the_opengl_boundary()
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL complete source terrain setup failure: {text}"
             );
             return;
@@ -608,7 +608,7 @@ fn lowered_complete_complementary_hand_pair_compiles_at_the_opengl_boundary() {
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL complete source hand setup failure: {text}"
             );
             return;
@@ -640,7 +640,7 @@ fn selected_terrain_pipeline_layout_matches_optional_colored_voxel_interface() {
             Err(error) => {
                 let text = error.to_string();
                 assert!(
-                    text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                    context_unavailable(&text),
                     "unexpected selected terrain pipeline setup failure: {text}"
                 );
                 return;
@@ -914,7 +914,7 @@ fn isolated_opengl_conformance_renders_indexed_textured_draw() {
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL conformance failure: {text}"
             );
         }
@@ -928,7 +928,7 @@ fn isolated_opengl_conformance_round_trips_a_partial_r8uint_d3_box() {
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL D3 setup failure: {text}"
             );
             return;
@@ -1159,7 +1159,7 @@ fn isolated_opengl_conformance_dispatches_a_d3_storage_compute_shader() {
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL D3 compute setup failure: {text}"
             );
             return;
@@ -1407,7 +1407,7 @@ fn run_d3_storage_write_read_test(
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL D3 storage setup failure: {text}"
             );
             return None;
@@ -1689,7 +1689,7 @@ fn isolated_opengl_conformance_pins_gal_coordinate_and_state_conventions() {
         Err(error) => {
             let text = error.to_string();
             assert!(
-                text.contains("OpenGL") || text.contains("EGL") || text.contains("GL"),
+                context_unavailable(&text),
                 "unexpected OpenGL convention conformance failure: {text}"
             );
         }
@@ -2466,3 +2466,10 @@ void main() {
     out_color = texture(tex0, v_uv) * vec4(1.0, 1.0, 1.0, 0.75);
 }
 "#;
+
+// Skip only environment setup failures, never shader, validation or draw errors.
+fn context_unavailable(text: &str) -> bool {
+    ["failed to load libEGL.so.1", "failed to load libGL.so.1", "EGL initialization failed",
+     "EGL returned no display", "EGL OpenGL context creation failed", "EGL could not choose an isolated OpenGL config"]
+        .iter().any(|reason| text.contains(reason))
+}

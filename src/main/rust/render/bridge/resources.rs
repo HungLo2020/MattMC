@@ -496,92 +496,116 @@ pub(crate) fn execute_resource_batch(
         ));
     }
     let mut results = Vec::with_capacity(create_result_capacity_required(&batch));
-    for item in &batch.buffers {
-        execute_create(&mut results, item, || {
-            context.gal.create_buffer(item.desc.clone())
-        })?;
-    }
-    for item in &batch.textures {
-        execute_create(&mut results, item, || {
-            context.gal.create_texture(item.desc.clone())
-        })?;
-    }
-    for item in &batch.texture_views {
-        execute_create(&mut results, item, || {
-            context.gal.create_texture_view(item.desc.clone())
-        })?;
-    }
-    for item in &batch.samplers {
-        execute_create(&mut results, item, || {
-            context.gal.create_sampler(item.desc.clone())
-        })?;
-    }
-    for item in &batch.shaders {
-        execute_create(&mut results, item, || {
-            context.gal.create_shader_module(item.desc.clone())
-        })?;
-    }
-    for item in &batch.resource_layouts {
-        execute_create(&mut results, item, || {
-            context.gal.create_resource_layout(item.desc.clone())
-        })?;
-    }
-    for item in &batch.resource_sets {
-        execute_create(&mut results, item, || {
-            context.gal.create_resource_set(item.desc.clone())
-        })?;
-    }
-    for item in &batch.pipeline_layouts {
-        execute_create(&mut results, item, || {
-            context.gal.create_pipeline_layout(item.desc.clone())
-        })?;
-    }
-    for item in &batch.graphics_pipelines {
-        execute_create(&mut results, item, || {
-            context.gal.create_graphics_pipeline(item.desc.clone())
-        })?;
-    }
-    for item in &batch.compute_pipelines {
-        execute_create(&mut results, item, || {
-            context.gal.create_compute_pipeline(item.desc.clone())
-        })?;
-    }
-    for item in &batch.render_targets {
-        execute_create(&mut results, item, || {
-            context.gal.create_render_target(item.desc.clone())
-        })?;
-    }
-    for item in &batch.render_passes {
-        execute_create(&mut results, item, || {
-            context.gal.create_render_pass(item.desc.clone())
-        })?;
-    }
-    if !batch.buffer_updates.is_empty() {
-        let operations = batch
-            .buffer_updates
-            .into_iter()
-            .map(|update| CommandOp::HostWriteBuffer {
-                buffer: update.buffer,
-                offset: update.offset,
-                data: update.data,
-            })
-            .collect();
-        let list = context.gal.create_command_list(CommandListDesc {
-            label: "ffi.resource-buffer-updates".to_string(),
-            operations,
-        })?;
-        let _ = context.gal.submit(SubmissionBatch {
-            label: "ffi.resource-buffer-update-submit".to_string(),
-            command_lists: vec![list],
-        })?;
-        context.gal.retire_completed()?;
-    }
-    for (handle, _kind) in batch.destroys {
-        context
-            .frame_targets
-            .retain(|_identity, cached| cached.handle != handle);
-        context.stale_frame_targets.retain(|stale| *stale != handle);
-        context.gal.destroy(handle)?;
+    let mut destroyed = std::collections::BTreeSet::new();
+    let execution = (|| -> GalResult<()> {
+        for item in &batch.buffers {
+            execute_create(&mut results, item, || {
+                context.gal.create_buffer(item.desc.clone())
+            })?;
+        }
+        for item in &batch.textures {
+            execute_create(&mut results, item, || {
+                context.gal.create_texture(item.desc.clone())
+            })?;
+        }
+        for item in &batch.texture_views {
+            execute_create(&mut results, item, || {
+                context.gal.create_texture_view(item.desc.clone())
+            })?;
+        }
+        for item in &batch.samplers {
+            execute_create(&mut results, item, || {
+                context.gal.create_sampler(item.desc.clone())
+            })?;
+        }
+        for item in &batch.shaders {
+            execute_create(&mut results, item, || {
+                context.gal.create_shader_module(item.desc.clone())
+            })?;
+        }
+        for item in &batch.resource_layouts {
+            execute_create(&mut results, item, || {
+                context.gal.create_resource_layout(item.desc.clone())
+            })?;
+        }
+        for item in &batch.resource_sets {
+            execute_create(&mut results, item, || {
+                context.gal.create_resource_set(item.desc.clone())
+            })?;
+        }
+        for item in &batch.pipeline_layouts {
+            execute_create(&mut results, item, || {
+                context.gal.create_pipeline_layout(item.desc.clone())
+            })?;
+        }
+        for item in &batch.graphics_pipelines {
+            execute_create(&mut results, item, || {
+                context.gal.create_graphics_pipeline(item.desc.clone())
+            })?;
+        }
+        for item in &batch.compute_pipelines {
+            execute_create(&mut results, item, || {
+                context.gal.create_compute_pipeline(item.desc.clone())
+            })?;
+        }
+        for item in &batch.render_targets {
+            execute_create(&mut results, item, || {
+                context.gal.create_render_target(item.desc.clone())
+            })?;
+        }
+        for item in &batch.render_passes {
+            execute_create(&mut results, item, || {
+                context.gal.create_render_pass(item.desc.clone())
+            })?;
+        }
+        if !batch.buffer_updates.is_empty() {
+            let operations = batch
+                .buffer_updates
+                .into_iter()
+                .map(|update| CommandOp::HostWriteBuffer {
+                    buffer: update.buffer,
+                    offset: update.offset,
+                    data: update.data,
+                })
+                .collect();
+            let list = context.gal.create_command_list(CommandListDesc {
+                label: "ffi.resource-buffer-updates".to_string(),
+                operations,
+            })?;
+            let _ = context.gal.submit(SubmissionBatch {
+                label: "ffi.resource-buffer-update-submit".to_string(),
+                command_lists: vec![list],
+            })?;
+            context.gal.retire_completed()?;
+        }
+        for (handle, _kind) in batch.destroys {
+            context
+                .frame_targets
+                .retain(|_identity, cached| cached.handle != handle);
+            context.stale_frame_targets.retain(|stale| *stale != handle);
+            context.gal.destroy(handle)?;
+            destroyed.insert(handle);
+        }
+        Ok(())
+    })();
+    if let Err(error) = execution {
+        // Dependents are created after their dependencies; unwind in reverse.
+        let mut error = error;
+        for entry in results
+            .iter()
+            .rev()
+            .filter(|entry| entry.status == StatusCode::Ok as i32)
+        {
+            let handle = entry.handle.into();
+            if !destroyed.contains(&handle) {
+                if let Err(cleanup) = context.gal.destroy(handle) {
+                    error
+                        .message
+                        .push_str(&format!("; rollback of {handle:?}: {cleanup}"));
+                }
+            }
+        }
+        return Err(error);
     }
     Ok(results)
 }
@@ -606,7 +630,10 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_resource_batch(
         let input_bytes = if batch.is_null() {
             0
         } else {
-            input_bytes_for_resource_batch(&*batch)
+            read_struct(batch, "input accounting")
+                .as_ref()
+                .map(input_bytes_for_resource_batch)
+                .unwrap_or(0)
         };
         context.ffi_calls += 1;
         context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
@@ -616,6 +643,9 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_resource_batch(
             .saturating_add(output_bytes_for_resource_results(results_capacity));
         let result = match decode_resource_batch(batch, context.gal.capabilities()).and_then(|owned| {
         let required = create_result_capacity_required(&owned);
+        if required > 0 && (results_out as usize) % align_of::<FfiCreateResultEntry>() != 0 {
+            return Err(GalError::ffi(StatusCode::Alignment, "create results pointer is misaligned"));
+        }
         if required > 0 && results_out.is_null() {
             return Err(GalError::ffi(StatusCode::NullPointer, "create results pointer is null"));
         }

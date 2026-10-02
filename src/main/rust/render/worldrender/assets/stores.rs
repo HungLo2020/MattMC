@@ -216,6 +216,7 @@ impl WorldPrimitiveFrontend {
         &mut self,
         update: ShaderPackAssetUpdate,
     ) -> GalResult<()> {
+        self.post_effect_source_cache.get_mut().clear();
         let source = self.shader_pack_sources.active().ok_or_else(|| {
             GalError::invalid_argument(
                 "shader-pack assets require an active matching source generation",
@@ -747,11 +748,6 @@ impl WorldPrimitiveFrontend {
             .filter(|key| retirement_keys.contains(&key.mesh_key))
             .cloned()
             .collect::<Vec<_>>();
-        self.destroy_mesh_resources_for_keys(gal, retired_resource_keys);
-        self.destroy_lowered_source_terrain_resources_for_keys(gal, retired_lowered_source_keys);
-        for mesh_key in &retirement_keys {
-            self.mesh_assets.remove(mesh_key);
-        }
         let mut incoming_texture_ids = BTreeSet::new();
         if textures.len() > WORLD_MAX_MESH_TEXTURE_ASSETS {
             return Err(GalError::ffi(
@@ -996,10 +992,10 @@ impl WorldPrimitiveFrontend {
             .into_iter()
             .map(|update| validate_mesh_sorted_index_update(&update).map(|_| update))
             .collect::<GalResult<Vec<_>>>()?;
-        let projected_mesh_assets = self.mesh_assets.len()
+        let projected_mesh_assets = self.mesh_assets.len().saturating_sub(retirement_keys.len())
             + incoming_mesh_keys
                 .iter()
-                .filter(|key| !self.mesh_assets.contains_key(key))
+                .filter(|key| !self.mesh_assets.contains_key(key) || retirement_keys.contains(key))
                 .count();
         if projected_mesh_assets > WORLD_MESH_ASSET_RESIDENCY {
             return Err(GalError::invalid_argument(format!(
@@ -1046,6 +1042,45 @@ impl WorldPrimitiveFrontend {
             })
             .cloned()
             .collect::<Vec<_>>();
+        // Validate the complete future asset view before retiring or replacing anything.
+        let mut sorted_keys = BTreeSet::new();
+        let mut sorted_uploads = Vec::new();
+        for update in &decoded_sorted_indices {
+            if !sorted_keys.insert(update.mesh_key) {
+                return Err(GalError::invalid_argument("duplicate sorted-index mesh update"));
+            }
+            let asset = decoded_meshes.iter().find(|(key, _)| *key == update.mesh_key).map(|(_, asset)| asset)
+                .or_else(|| if retirement_keys.contains(&update.mesh_key) { None } else { self.mesh_assets.get(&update.mesh_key) })
+                .ok_or_else(|| GalError::invalid_argument("sorted-index update references absent mesh"))?;
+            if asset.mesh_generation != update.mesh_generation || update.index_generation <= asset.index_generation {
+                return Err(GalError::invalid_argument("sorted-index update has stale mesh/index generation"));
+            }
+            validate_mesh_sorted_index_payload(asset, update)?;
+            // Existing resident ranges can be updated atomically in one submission.
+            if !incoming_mesh_keys.contains(&update.mesh_key) && asset.index_bytes.len() == update.index_bytes.len() {
+                let keys: BTreeSet<_> = self.mesh_resources.iter().filter(|(key, _)| key.mesh_key == update.mesh_key)
+                    .map(|(_, resources)| resources.geometry_key)
+                    .chain(self.source_mesh_resources.iter().filter(|(key, _)| key.mesh.mesh_key == update.mesh_key)
+                        .map(|(_, resources)| resources.geometry_key)).collect();
+                for key in keys {
+                    if let Some(resources) = self.mesh_geometry_resources.get(&key) {
+                        sorted_uploads.push(CommandOp::HostWriteBuffer { buffer: resources.index_buffer,
+                            offset: resources.index_offset, data: update.index_bytes.clone() });
+                        sorted_uploads.push(CommandOp::Barrier(buffer_barrier(resources.index_buffer,
+                            TextureUsageState::TransferDst, TextureUsageState::IndexRead)));
+                    }
+                }
+            }
+        }
+        if !sorted_uploads.is_empty() {
+            gal.submit(SubmissionBatch { label: "world-mesh.sorted-index-transaction".into(),
+                command_lists: vec![CommandList::from(CommandListDesc { label: "sorted-indices".into(), operations: sorted_uploads })] })?;
+        }
+        self.destroy_mesh_resources_for_keys(gal, retired_resource_keys);
+        self.destroy_lowered_source_terrain_resources_for_keys(gal, retired_lowered_source_keys);
+        for mesh_key in &retirement_keys {
+            self.mesh_assets.remove(mesh_key);
+        }
         self.mesh_asset_generation = generation;
         self.mesh_asset_payload_bytes = payload_bytes;
         // A selected source frame owns local mesh textures separately from
@@ -1076,7 +1111,10 @@ impl WorldPrimitiveFrontend {
             {
                 self.pending_atlas_animation = None;
                 self.pending_atlas_animation_event = None;
+                self.pending_atlas_animation_failed = false;
+                self.retry_atlas_animation_events.clear();
             }
+            self.retry_atlas_animation_events.retain(|event| event.texture_id != texture_id);
             self.mesh_texture_assets.insert(texture_id, texture);
             self.mesh_texture_animation_generation =
                 self.mesh_texture_animation_generation.wrapping_add(1);
@@ -1359,10 +1397,10 @@ impl WorldPrimitiveFrontend {
             // Do not infer effective filtering from the options menu or CPU pixels.
             if texture_id == WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS
                 && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true")
                 )
-                && std::env::var_os("MATTMC_ATLAS_TRACE_SPRITE").is_some()
+                && crate::core::environment::var_os("MATTMC_ATLAS_TRACE_SPRITE").is_some()
             {
                 static OBSERVATIONS: AtomicUsize = AtomicUsize::new(0);
                 if OBSERVATIONS

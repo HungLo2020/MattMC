@@ -560,3 +560,16 @@ fn resource_set_binding_requires_the_active_pipeline_layout() {
         super::StatusCode::InvalidArgument,
     );
 }
+
+#[test]
+fn static_buffer_binding_range_is_bounded() {
+    let mut gal = gal();
+    let buffer = gal.create_buffer(BufferDesc { label: "small".into(), size: 16,
+        memory: MemoryDomain::Upload, usages: vec![BufferUsage::Uniform] }).unwrap();
+    let layout = gal.create_resource_layout(ResourceLayoutDesc { label: "layout".into(),
+        bindings: vec![layout_binding(0, ResourceBindingKind::UniformBuffer, PipelineStageFlags::DRAW)] }).unwrap();
+    let mut binding = resource_binding(0, buffer, ResourceBindingKind::UniformBuffer, AccessFlags::READ);
+    binding.buffer_range = Some(17);
+    binding.dynamic_offsets.clear();
+    assert_code(gal.create_resource_set(ResourceSetDesc { label: "overflow".into(), layout, bindings: vec![binding] }), StatusCode::InvalidArgument);
+}

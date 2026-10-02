@@ -821,7 +821,7 @@ pub(crate) fn source_color_clear_color(
     // or material execution.
     if source_slot == 0
         && matches!(
-            std::env::var("MATTMC_RUST_SELECTED_SOURCE_CLEAR_PROBE")
+            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_CLEAR_PROBE")
                 .ok()
                 .as_deref()
                 .map(str::trim),

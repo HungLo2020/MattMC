@@ -8,7 +8,7 @@ use super::*;
 pub(super) fn apply_selected_source_hand_vertex_probe(
     source: &mut LoweredTerrainVertexSource,
 ) -> GalResult<()> {
-    let mode = std::env::var("MATTMC_RUST_SELECTED_SOURCE_HAND_VERTEX_PROBE").ok();
+    let mode = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_HAND_VERTEX_PROBE").ok();
     apply_selected_source_vertex_position_probe_mode(
         &mut source.source,
         mode.as_deref().map(str::trim),
@@ -22,7 +22,7 @@ pub(super) fn apply_selected_source_hand_vertex_probe(
 pub(super) fn apply_selected_source_entity_fragment_probe(
     fragment: &mut LoweredTerrainFragmentSource,
 ) -> GalResult<()> {
-    let mode = std::env::var("MATTMC_RUST_SELECTED_SOURCE_ENTITY_FRAGMENT_PROBE").ok();
+    let mode = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_ENTITY_FRAGMENT_PROBE").ok();
     apply_selected_source_entity_fragment_probe_mode(fragment, mode.as_deref())
 }
 
@@ -130,7 +130,7 @@ impl SelectedSourceFragmentTarget for LoweredTranslucentTerrainFragmentSource {
 pub(super) fn apply_selected_source_fragment_probe<T: SelectedSourceFragmentTarget>(
     fragment: &mut T,
 ) -> GalResult<()> {
-    let mode = std::env::var("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE").ok();
+    let mode = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE").ok();
     apply_selected_source_fragment_probe_mode(fragment, mode.as_deref())
 }
 
@@ -408,7 +408,7 @@ pub(super) fn apply_selected_source_fragment_probe_mode<T: SelectedSourceFragmen
 pub(super) fn apply_selected_source_distant_horizons_fragment_probe(
     fragment: &mut LoweredDistantHorizonsFragmentSource,
 ) -> GalResult<()> {
-    let Some(mode) = std::env::var("MATTMC_RUST_SELECTED_SOURCE_DH_FRAGMENT_PROBE")
+    let Some(mode) = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_DH_FRAGMENT_PROBE")
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
@@ -449,7 +449,7 @@ pub(super) fn apply_selected_source_distant_horizons_fragment_probe(
 }
 
 pub(super) fn dump_selected_source_lowered_shader(entry_path: &str, stage: &str, source: &str) {
-    let Ok(dir) = std::env::var("MATTMC_RUST_SHADER_DUMP_DIR") else {
+    let Ok(dir) = crate::core::environment::var("MATTMC_RUST_SHADER_DUMP_DIR") else {
         return;
     };
     let safe_name = entry_path
@@ -466,7 +466,7 @@ pub(super) fn dump_selected_source_lowered_shader(entry_path: &str, stage: &str,
 /// normal source route retains the pack's jitter; this replacement is never
 /// admitted by route selection.
 pub(super) fn apply_selected_source_taa_probe(source: &mut String) -> GalResult<()> {
-    let Some(mode) = std::env::var("MATTMC_RUST_SELECTED_SOURCE_TAA_PROBE")
+    let Some(mode) = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_TAA_PROBE")
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
@@ -497,7 +497,7 @@ pub(super) fn apply_selected_source_taa_probe(source: &mut String) -> GalResult<
 /// distinguish a vertex-buffer field failure from a stage-interface failure.
 /// Normal source execution never observes this opt-in environment key.
 pub(super) fn apply_selected_source_vertex_probe(source: &mut String) -> GalResult<()> {
-    let mode = std::env::var("MATTMC_RUST_SELECTED_SOURCE_VERTEX_PROBE").ok();
+    let mode = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_VERTEX_PROBE").ok();
     if matches!(
         mode.as_deref().map(str::trim),
         Some("direct-model-transform-water") | Some("clip-quad-water")
@@ -511,7 +511,7 @@ pub(super) fn apply_selected_source_vertex_probe_for_entry(
     source: &mut String,
     entry_path: &str,
 ) -> GalResult<()> {
-    let mode = std::env::var("MATTMC_RUST_SELECTED_SOURCE_VERTEX_PROBE").ok();
+    let mode = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_VERTEX_PROBE").ok();
     if matches!(
         mode.as_deref().map(str::trim),
         Some("direct-model-transform-water") | Some("clip-quad-water")
@@ -756,7 +756,7 @@ pub(super) fn apply_selected_source_vertex_position_probe_mode(
 /// call with a no-op distinguishes pack animation semantics from the explicit
 /// transform/attachment path. This is never enabled by normal execution.
 pub(super) fn apply_selected_source_wave_probe(source: &mut String) -> GalResult<()> {
-    let Some(mode) = std::env::var("MATTMC_RUST_SELECTED_SOURCE_WAVE_PROBE")
+    let Some(mode) = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_WAVE_PROBE")
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
@@ -792,7 +792,7 @@ pub(super) fn apply_selected_source_sky_fragment_probe(
     source: &mut String,
     entry_path: &str,
 ) -> GalResult<()> {
-    let Some(mode) = std::env::var("MATTMC_RUST_SELECTED_SOURCE_SKY_FRAGMENT_PROBE")
+    let Some(mode) = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_SKY_FRAGMENT_PROBE")
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
@@ -838,7 +838,7 @@ pub(super) fn apply_selected_source_fullscreen_probe(
     outputs: &[FullscreenSourceFragmentOutput],
     entry_path: &str,
 ) -> GalResult<()> {
-    let Some(mode) = std::env::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE")
+    let Some(mode) = crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_FULLSCREEN_PROBE")
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())

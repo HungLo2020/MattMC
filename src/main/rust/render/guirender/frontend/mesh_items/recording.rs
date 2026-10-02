@@ -27,6 +27,19 @@ impl GuiFrontend {
             self.destroy_render_resources(gal);
             self.generation = generation;
         }
+        let mut needed_targets = Vec::new();
+        for batch in &mesh_batches {
+            let (extent, _, _) = resolve_gui_mesh_item_raster(batch)?;
+            needed_targets.push((batch.item_cache.map(|cache| cache.identity).unwrap_or(0),
+                Extent3d { width: extent[0], height: extent[1], depth: 1 }));
+        }
+        if self.mesh_targets.has_obsolete_items(generation, &needed_targets) {
+            // Composite programs may be shared: release borrowers before owners.
+            let mut composites: Vec<_> = std::mem::take(&mut self.mesh_composites).into_values().collect();
+            composites.sort_by_key(|resources| resources.owns_shared_resources());
+            for resources in composites { resources.destroy(gal); }
+            self.mesh_targets.retain_items(gal, generation, &needed_targets);
+        }
         // Static item rasters are already retained by the Rust-owned target
         // cache. Once a prior submission has accepted that raster, composing
         // it does not require transforming every source vertex again. Keep
@@ -168,7 +181,7 @@ impl GuiFrontend {
                         first.material_mode,
                         first.front_face,
                     )?;
-                    let raster = GuiMeshPassResources::create_with_shared_program(
+                    let mut raster = GuiMeshPassResources::create_with_shared_streams(
                         gal,
                         &format!(
                             "minecraft.gui.panorama.asset{}.gen{}",
@@ -177,7 +190,9 @@ impl GuiFrontend {
                         texture_view,
                         sampler,
                         shared_program,
+                        self.mesh_geometry_streams,
                     )?;
+                    self.mesh_geometry_streams = Some(raster.transfer_geometry_ownership());
                     self.mesh_rasters.insert(raster_key, raster);
                     stats.resource_creates = stats.resource_creates.saturating_add(1);
                 }
@@ -234,6 +249,7 @@ impl GuiFrontend {
                 },
                 item_identity,
             )?;
+            operations.push(self.mesh_targets.track_use(target.target));
             // A cached offscreen target cannot be rasterized again while its
             // previous pixels are still in COLOR_ATTACHMENT state. Flush all
             // pending composites before reusing that target; unique targets
@@ -308,7 +324,7 @@ impl GuiFrontend {
                         draw.material_mode,
                         draw.front_face,
                     )?;
-                    let raster = GuiMeshPassResources::create_with_shared_program(
+                    let mut raster = GuiMeshPassResources::create_with_shared_streams(
                         gal,
                         &format!(
                             "minecraft.gui.mesh.asset{}.gen{}",
@@ -317,7 +333,9 @@ impl GuiFrontend {
                         texture_view,
                         sampler,
                         shared_program,
+                        self.mesh_geometry_streams,
                     )?;
+                    self.mesh_geometry_streams = Some(raster.transfer_geometry_ownership());
                     self.mesh_rasters.insert(raster_key, raster);
                     stats.resource_creates = stats.resource_creates.saturating_add(1);
                 }

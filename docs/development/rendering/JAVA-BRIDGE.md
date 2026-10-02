@@ -33,7 +33,7 @@ back. It makes no rendering decisions.
 4. Bump `FFI_ABI_VERSION` and Java's `ABI_VERSION` together, with a one-line
    note in `abi/version.rs`.
 5. Bound the new input: payload limits live in `abi/limits.rs`, and per-request
-   input-byte bounds in `bridge/accounting.rs`.
+   input-byte bounds in the checked readers in `bridge/memory.rs`.
 6. Decode into renderer types in the matching module (`gui/`, `world/`, ...)
    and keep it decode-and-copy only; rendering decisions belong to renderers.
 
@@ -62,3 +62,13 @@ the release library before and after:
 ```sh
 nm -D --defined-only src/main/rust/target/release/libmattmc_rust.so | awk '{print $3}' | sort > symbols.txt
 ```
+
+## Request memory budget
+
+Checked FFI readers charge all nested reads against a 512 MiB budget per bridge
+request. Counts and byte limits are checked before constructing foreign slices;
+profiling does not dereference nested pointers ahead of decoding. The byte
+counter measures validated reads (including repeated reads), not unique Java
+allocation size. Java must still supply live memory for the duration of the call.
+Failed resource creation batches release successful creates before reporting
+failure, and result alignment/capacity are checked before execution.

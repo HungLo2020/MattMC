@@ -4,6 +4,16 @@ use crate::render::worldrender::vanilla::*;
 
 impl WorldPrimitiveFrontend {
     pub(crate) fn append_frame_ops_inner(
+        &mut self, gal: &mut VulkanicGal, generation: u64, frame_target: Handle,
+        frame: WorldPrimitiveFrame, clear_background: bool, raster_y_direction: RasterYDirection,
+    ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
+        let previous = self.defer_world_uploads;
+        let result = self.record_frame_ops(gal, generation, frame_target, frame, clear_background, raster_y_direction);
+        self.defer_world_uploads = previous;
+        result
+    }
+
+    fn record_frame_ops(
         &mut self,
         gal: &mut VulkanicGal,
         generation: u64,
@@ -324,11 +334,11 @@ impl WorldPrimitiveFrontend {
         // whole-frame ordering.
         if frame.lod_render_frame.rust_route_selected()
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_ISOLATE_VANILLA").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_ISOLATE_VANILLA").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
         {
@@ -336,11 +346,11 @@ impl WorldPrimitiveFrontend {
         }
         if frame.lod_render_frame.rust_route_selected()
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_DISABLE_VANILLA_TRANSLUCENT").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_DISABLE_VANILLA_TRANSLUCENT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
         {
@@ -350,11 +360,11 @@ impl WorldPrimitiveFrontend {
         }
         if frame.lod_render_frame.rust_route_selected()
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_DISABLE_VANILLA_OPAQUE").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_DISABLE_VANILLA_OPAQUE").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
         {
@@ -471,7 +481,7 @@ impl WorldPrimitiveFrontend {
         })();
         if resource_upload_result.is_err() {
             self.defer_world_uploads = previous_defer_world_uploads;
-            self.pending_world_upload_ops.clear();
+            // Keep queued uploads for resources already cached; retry must publish them.
         }
         resource_upload_result?;
         profile.world_prepare_material_resource_nanos =
@@ -537,7 +547,7 @@ impl WorldPrimitiveFrontend {
         })();
         self.defer_world_uploads = previous_defer_world_uploads;
         if mesh_upload_result.is_err() {
-            self.pending_world_upload_ops.clear();
+            // Keep queued uploads for resources already cached; retry must publish them.
         }
         mesh_upload_result?;
         if !previous_defer_world_uploads && batch_staged_uploads {
@@ -869,37 +879,37 @@ impl WorldPrimitiveFrontend {
         let defer_dh_composite_until_after_opaque = frame.lod_render_frame.rust_route_selected()
             && (vanilla_fade_mode > 0.0
                 || (matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_AFTER_OPAQUE").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_COMPOSITE_AFTER_OPAQUE").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 )));
         let skip_dh_composite_for_audit = frame.lod_render_frame.rust_route_selected()
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_SKIP_COMPOSITE").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_SKIP_COMPOSITE").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
         let skip_final_double_pass_for_audit = double_pass_vanilla_fade
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_SKIP_FINAL_DOUBLE_PASS").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_SKIP_FINAL_DOUBLE_PASS").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
         let skip_opaque_double_pass_for_audit = double_pass_vanilla_fade
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_SKIP_OPAQUE_DOUBLE_PASS").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_SKIP_OPAQUE_DOUBLE_PASS").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
         let mut deferred_dh_composite_ops = Vec::new();
@@ -1355,7 +1365,7 @@ impl WorldPrimitiveFrontend {
                     stats.profile.world_prepare_mesh_stream_required_bytes,
                     source_terrain_programs.is_none()
                         && gal.capabilities().supports(BackendFeature::IndirectDraw),
-                    std::env::var_os("MATTMC_RUST_DISABLE_TRANSLUCENT_PAGE_INDIRECT").is_none(),
+                    crate::core::environment::var_os("MATTMC_RUST_DISABLE_TRANSLUCENT_PAGE_INDIRECT").is_none(),
                 )?;
                 stats.profile.world_mesh_stream_payload_pack_nanos =
                     elapsed_nanos_u64(mesh_pack_started);
@@ -1775,10 +1785,10 @@ impl WorldPrimitiveFrontend {
                 // math from private-target geometry without changing the
                 // production contract.
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_NO_FOG").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_NO_FOG").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[16] = 0.0;
@@ -1789,73 +1799,73 @@ impl WorldPrimitiveFrontend {
                 // deterministic frame can distinguish a real write from the
                 // cleared value before fog math is changed.
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_DEPTH_DEBUG").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_DEPTH_DEBUG").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[16] = -1.0;
                 }
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_FOG_RECONSTRUCTION").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_FOG_RECONSTRUCTION").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[19] = -1.0;
                 }
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_FOG_FACTOR_DEBUG").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_FOG_FACTOR_DEBUG").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[19] = -2.0;
                 }
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_VANILLA_COLOR_DEBUG").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_VANILLA_COLOR_DEBUG").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[19] = -3.0;
                 }
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_VANILLA_FADE_FACTOR_DEBUG").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_VANILLA_FADE_FACTOR_DEBUG").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[19] = -4.0;
                 }
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COVERAGE_MASK_DEBUG").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_COVERAGE_MASK_DEBUG").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[19] = -5.0;
                 }
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_FADE_HEIGHT_GUARD_DEBUG").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_FADE_HEIGHT_GUARD_DEBUG").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[19] = -6.0;
                 }
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COLOR_DEBUG").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_COLOR_DEBUG").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[18] = -3.0;
@@ -1865,10 +1875,10 @@ impl WorldPrimitiveFrontend {
                 // only asks the fullscreen audit shader to invert the
                 // sampled private depth for one comparison run.
                 if matches!(
-                    std::env::var("MATTMC_CAPTURE_DH_PRIVATE_INVERT_DEPTH").as_deref(),
+                    crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_INVERT_DEPTH").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) && matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
                     compositor_dh_fog_parameters[18] = -4.0;
@@ -2853,7 +2863,7 @@ impl WorldPrimitiveFrontend {
         if !hand.enabled || hand_instances.is_empty() {
             return Ok((Vec::new(), WorldPrimitiveSubmitStats::default()));
         }
-        if std::env::var_os("MATTMC_STANDARD_FOIL_TRACE").is_some() {
+        if crate::core::environment::var_os("MATTMC_STANDARD_FOIL_TRACE").is_some() {
             static TRACES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             if TRACES.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 4 {
                 for instance in &hand_instances {

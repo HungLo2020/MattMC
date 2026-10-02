@@ -418,6 +418,12 @@ impl FabulousAttachmentSet {
                 src_queue: crate::render::vulkanic::resources::QueueClass::Graphics,
                 dst_queue: crate::render::vulkanic::resources::QueueClass::Graphics,
             }));
+            ops.push(CommandOp::Barrier(ResourceBarrier {
+                resource: attachment.depth_texture, subresources: None,
+                before: persistent_before, after: TextureUsageState::DepthStencilAttachment,
+                src_queue: crate::render::vulkanic::resources::QueueClass::Graphics,
+                dst_queue: crate::render::vulkanic::resources::QueueClass::Graphics,
+            }));
             ops.push(CommandOp::BeginPass {
                 pass: attachment.render_pass,
                 target: attachment.render_target,
@@ -432,7 +438,10 @@ impl FabulousAttachmentSet {
                         a: 0.0,
                     }),
                 }],
-                depth_stencil: None,
+                depth_stencil: Some(PassAttachment {
+                    view: attachment.depth_view, load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::Store, clear_color: None,
+                }),
             });
             ops.push(CommandOp::EndPass);
             ops.push(CommandOp::Barrier(ResourceBarrier {
@@ -440,6 +449,12 @@ impl FabulousAttachmentSet {
                 subresources: None,
                 before: TextureUsageState::ColorAttachment,
                 after: TextureUsageState::ShaderRead,
+                src_queue: crate::render::vulkanic::resources::QueueClass::Graphics,
+                dst_queue: crate::render::vulkanic::resources::QueueClass::Graphics,
+            }));
+            ops.push(CommandOp::Barrier(ResourceBarrier {
+                resource: attachment.depth_texture, subresources: None,
+                before: TextureUsageState::DepthStencilAttachment, after: TextureUsageState::ShaderRead,
                 src_queue: crate::render::vulkanic::resources::QueueClass::Graphics,
                 dst_queue: crate::render::vulkanic::resources::QueueClass::Graphics,
             }));
@@ -462,7 +477,7 @@ impl FabulousAttachmentSet {
             FabulousTargetRole::Translucent,
             extent,
             TextureUsageState::ShaderRead,
-            persistent_before,
+            if deferred_translucent_initialized { persistent_before } else { TextureUsageState::ShaderRead },
             deferred_row_order,
         )?;
         for (role_index, role) in [

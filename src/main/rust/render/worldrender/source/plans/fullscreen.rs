@@ -153,7 +153,7 @@ impl WorldPrimitiveFrontend {
             append_unique(distant_horizons.depth_targets.semantic_resources()?)?;
         }
         if matches!(
-            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             eprintln!(

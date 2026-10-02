@@ -1,4 +1,5 @@
-//! Upper bounds on the input bytes each request reads, checked before decoding.
+//! Header/table-size estimates only: never follow nested foreign pointers.
+//! Checked memory readers account for actual bytes within the request budget.
 
 use crate::render::bridge::*;
 
@@ -280,13 +281,7 @@ pub(crate) fn input_bytes_for_gui_asset_update(request: &FfiGuiAssetUpdateReques
         .assets
         .count
         .saturating_mul(size_of::<FfiGuiAssetPayload>() as u64);
-    let payload_bytes = unsafe { read_slice(request.assets, true, "GUI asset payloads") }
-        .map(|items| {
-            items
-                .iter()
-                .fold(0u64, |sum, item| sum.saturating_add(item.png_bytes.len))
-        })
-        .unwrap_or(0);
+    let payload_bytes = 0u64;
     (size_of::<FfiGuiAssetUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
@@ -297,13 +292,7 @@ pub(crate) fn input_bytes_for_gui_raw_image_update(request: &FfiGuiRawImageUpdat
         .assets
         .count
         .saturating_mul(size_of::<FfiGuiRawImageAssetPayload>() as u64);
-    let payload_bytes = unsafe { read_slice(request.assets, true, "raw GUI image payloads") }
-        .map(|items| {
-            items
-                .iter()
-                .fold(0u64, |sum, item| sum.saturating_add(item.pixels.len))
-        })
-        .unwrap_or(0);
+    let payload_bytes = 0u64;
     (size_of::<FfiGuiRawImageUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
@@ -316,13 +305,7 @@ pub(crate) fn input_bytes_for_world_text_image_update(
         .assets
         .count
         .saturating_mul(size_of::<FfiWorldTextImageAssetPayload>() as u64);
-    let payload_bytes = unsafe { read_slice(request.assets, true, "world text image assets") }
-        .map(|items| {
-            items
-                .iter()
-                .fold(0u64, |sum, item| sum.saturating_add(item.pixels.len))
-        })
-        .unwrap_or(0);
+    let payload_bytes = 0u64;
     (size_of::<FfiWorldTextImageUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
@@ -341,13 +324,7 @@ pub(crate) fn input_bytes_for_world_crack_asset_update(
         .assets
         .count
         .saturating_mul(size_of::<FfiWorldCrackAssetPayload>() as u64);
-    let payload_bytes = unsafe { read_slice(request.assets, true, "world crack asset payloads") }
-        .map(|items| {
-            items
-                .iter()
-                .fold(0u64, |sum, item| sum.saturating_add(item.png_bytes.len))
-        })
-        .unwrap_or(0);
+    let payload_bytes = 0u64;
     (size_of::<FfiWorldCrackAssetUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
@@ -361,13 +338,7 @@ pub(crate) fn input_bytes_for_world_material_asset_update(
         .count
         .saturating_mul(size_of::<FfiWorldMaterialAssetPayload>() as u64);
     let payload_bytes =
-        unsafe { read_slice(request.assets, true, "world material asset payloads") }
-            .map(|items| {
-                items
-                    .iter()
-                    .fold(0u64, |sum, item| sum.saturating_add(item.png_bytes.len))
-            })
-            .unwrap_or(0);
+        0u64;
     (size_of::<FfiWorldMaterialAssetUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
@@ -392,19 +363,7 @@ pub(crate) fn input_bytes_for_world_mesh_asset_update(
         .retirements
         .count
         .saturating_mul(size_of::<FfiWorldMeshAssetRetirementRecord>() as u64);
-    let sorted_index_payload_bytes = unsafe {
-        read_slice(
-            request.sorted_indices,
-            true,
-            "world mesh sorted index updates",
-        )
-    }
-    .map(|items| {
-        items
-            .iter()
-            .fold(0u64, |sum, item| sum.saturating_add(item.index_bytes.len))
-    })
-    .unwrap_or(0);
+    let sorted_index_payload_bytes = 0u64;
     (size_of::<FfiWorldMeshAssetUpdateRequest>() as u64)
         .saturating_add(mesh_headers)
         .saturating_add(
@@ -419,97 +378,10 @@ pub(crate) fn input_bytes_for_world_mesh_asset_update(
         .saturating_add(sorted_index_payload_bytes)
 }
 
-pub(crate) fn input_bytes_for_world_lod_asset_update(
-    request: &FfiWorldLodAssetUpdateRequest,
-) -> u64 {
-    let retirement_headers = request
-        .retirements
-        .count
-        .saturating_mul(size_of::<FfiWorldLodColumnRetirementRecord>() as u64);
-    let asset_bytes =
-        unsafe { read_slice(request.assets, true, "world LOD assets") }
-            .map(|assets| {
-                assets.iter().fold(0u64, |sum, asset| {
-                    let segment_bytes =
-                        unsafe { read_slice(asset.segments, true, "world LOD asset segments") }
-                            .map(|segments| {
-                                segments.iter().fold(0u64, |segment_sum, segment| {
-                                    segment_sum
-                            .saturating_add(size_of::<FfiWorldLodSegmentRecord>() as u64)
-                            .saturating_add(
-                                segment.vertices.count.saturating_mul(
-                                    size_of::<FfiWorldLodVertex>() as u64,
-                                ),
-                            )
-                                })
-                            })
-                            .unwrap_or(0);
-                    sum.saturating_add(size_of::<FfiWorldLodColumnAssetRecord>() as u64)
-                        .saturating_add(segment_bytes)
-                })
-            })
-            .unwrap_or(0);
-    let provenance_bytes = unsafe {
-        read_slice(
-            request.material_provenance,
-            true,
-            "world LOD material provenance",
-        )
-    }
-    .map(|columns| {
-        columns.iter().fold(0u64, |sum, column| {
-            let identity_bytes =
-                unsafe { read_slice(column.identities, true, "world LOD material identities") }
-                    .map(|identities| {
-                        identities.iter().fold(0u64, |identity_sum, identity| {
-                            identity_sum
-                                .saturating_add(
-                                    size_of::<FfiWorldLodMaterialIdentityRecord>() as u64
-                                )
-                                .saturating_add(identity.block_state_identity_utf8.len)
-                                .saturating_add(identity.biome_identity_utf8.len)
-                        })
-                    })
-                    .unwrap_or(0);
-            let segment_bytes = unsafe {
-                read_slice(
-                    column.segments,
-                    true,
-                    "world LOD segment material provenance",
-                )
-            }
-            .map(|segments| {
-                segments.iter().fold(0u64, |segment_sum, segment| {
-                    segment_sum
-                        .saturating_add(
-                            size_of::<FfiWorldLodSegmentMaterialProvenanceRecord>() as u64
-                        )
-                        .saturating_add(
-                            segment
-                                .quad_material_ids
-                                .count
-                                .saturating_mul(size_of::<u32>() as u64),
-                        )
-                        .saturating_add(segment.quad_variant_states.count)
-                        .saturating_add(
-                            segment
-                                .quad_variant_positions
-                                .count
-                                .saturating_mul(size_of::<u64>() as u64),
-                        )
-                })
-            })
-            .unwrap_or(0);
-            sum.saturating_add(size_of::<FfiWorldLodColumnMaterialProvenanceRecord>() as u64)
-                .saturating_add(identity_bytes)
-                .saturating_add(segment_bytes)
-        })
-    })
-    .unwrap_or(0);
+pub(crate) fn input_bytes_for_world_lod_asset_update(request: &FfiWorldLodAssetUpdateRequest) -> u64 {
     (size_of::<FfiWorldLodAssetUpdateRequest>() as u64)
-        .saturating_add(asset_bytes)
-        .saturating_add(retirement_headers)
-        .saturating_add(provenance_bytes)
+        .saturating_add(request.assets.count.saturating_mul(size_of::<FfiWorldLodColumnAssetRecord>() as u64))
+        .saturating_add(request.retirements.count.saturating_mul(size_of::<FfiWorldLodColumnRetirementRecord>() as u64))
 }
 
 pub(crate) fn input_bytes_for_shader_pack_source_update(
@@ -519,14 +391,7 @@ pub(crate) fn input_bytes_for_shader_pack_source_update(
         .files
         .count
         .saturating_mul(size_of::<FfiShaderPackSourceFile>() as u64);
-    let file_bytes = unsafe { read_slice(request.files, true, "shader-pack source files") }
-        .map(|files| {
-            files.iter().fold(0u64, |sum, file| {
-                sum.saturating_add(file.path_utf8.len)
-                    .saturating_add(file.contents_utf8.len)
-            })
-        })
-        .unwrap_or(0);
+    let file_bytes = 0u64;
     (size_of::<FfiShaderPackSourceUpdateRequest>() as u64)
         .saturating_add(request.pack_name_utf8.len)
         .saturating_add(file_headers)
@@ -540,14 +405,7 @@ pub(crate) fn input_bytes_for_shader_pack_asset_update(
         .files
         .count
         .saturating_mul(size_of::<FfiShaderPackAssetFile>() as u64);
-    let file_bytes = unsafe { read_slice(request.files, true, "shader-pack asset files") }
-        .map(|files| {
-            files.iter().fold(0u64, |sum, file| {
-                sum.saturating_add(file.path_utf8.len)
-                    .saturating_add(file.contents.len)
-            })
-        })
-        .unwrap_or(0);
+    let file_bytes = 0u64;
     (size_of::<FfiShaderPackAssetUpdateRequest>() as u64)
         .saturating_add(request.pack_name_utf8.len)
         .saturating_add(file_headers)

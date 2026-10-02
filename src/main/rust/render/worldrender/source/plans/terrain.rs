@@ -1437,7 +1437,7 @@ impl WorldPrimitiveFrontend {
             scope_programs.extend(translucent_program.as_ref());
             self.open_source_terrain_batch_scope(frame.frame_id, &scope_programs)?;
             let source_draw_trace = matches!(
-                std::env::var("MATTMC_RUST_SOURCE_DRAW_TRACE").as_deref(),
+                crate::core::environment::var("MATTMC_RUST_SOURCE_DRAW_TRACE").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
             let mut transform_probes = Vec::new();

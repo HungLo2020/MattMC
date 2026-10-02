@@ -233,6 +233,7 @@ fn preprocess_artifact_with_protected_defines(
         &mut active_protected_defines,
         inject_after_version.then_some(external_defines.as_str()),
         &mut out,
+        &mut (4 * PreprocessedShaderSource::MAX_EXPANDED_BYTES),
     )?;
     if out.len() > PreprocessedShaderSource::MAX_EXPANDED_BYTES {
         return Err(GalError::invalid_argument(format!(
@@ -566,7 +567,11 @@ fn expand_file(
     active_protected_defines: &mut BTreeSet<String>,
     external_defines_after_version: Option<&str>,
     out: &mut String,
+    remaining_work: &mut usize,
 ) -> GalResult<()> {
+    if include_stack.len() >= 64 {
+        return Err(GalError::invalid_argument("shader include nesting exceeds 64"));
+    }
     let path = normalize_path(path)?;
     if !include_stack.insert(path.clone()) {
         return Err(GalError::invalid_argument(format!(
@@ -587,6 +592,7 @@ fn expand_file(
         active_protected_defines,
         external_defines_after_version,
         out,
+        remaining_work,
     );
     include_stack.remove(&path);
     result
@@ -602,14 +608,26 @@ fn expand_contents(
     active_protected_defines: &mut BTreeSet<String>,
     external_defines_after_version: Option<&str>,
     out: &mut String,
+    remaining_work: &mut usize,
 ) -> GalResult<()> {
     let mut frames = Vec::<ConditionalFrame>::new();
     let mut active = true;
     let mut injected_external_defines = false;
-    for raw in contents.lines() {
+    // Splice continuations before recognizing directives, as GLSL requires.
+    let logical_contents = contents.replace("\\\r\n", "").replace("\\\n", "");
+    let mut in_block_comment = false;
+    for raw in logical_contents.lines() {
+        *remaining_work = remaining_work.checked_sub(raw.len().saturating_add(1))
+            .ok_or_else(|| GalError::invalid_argument("shader preprocessing work budget exceeded"))?;
+        if out.len().saturating_add(raw.len()).saturating_add(1)
+            > PreprocessedShaderSource::MAX_EXPANDED_BYTES || frames.len() >= 256 {
+            return Err(GalError::invalid_argument("expanded shader source exceeds byte budget or conditional nesting limit"));
+        }
+        let directive_line = strip_directive_comments(raw, &mut in_block_comment);
+        let directive = directive_line.trim().strip_prefix('#').map(str::trim).map(strip_line_comment).map(str::trim);
         if !injected_external_defines
             && external_defines_after_version.is_some()
-            && raw.trim_start().starts_with("#version")
+            && directive.is_some_and(|line| directive_argument(line, "version").is_some())
         {
             out.push_str(raw);
             out.push('\n');
@@ -617,9 +635,8 @@ fn expand_contents(
             injected_external_defines = true;
             continue;
         }
-        let directive = raw.trim().strip_prefix('#').map(str::trim);
         if let Some(directive) = directive {
-            if let Some(expression) = directive.strip_prefix("if ") {
+            if let Some(expression) = directive_argument(directive, "if") {
                 // A disabled parent suppresses the entire nested conditional.
                 // Do not reject expressions in that unreachable branch: selected
                 // packs often leave optional feature expressions there.
@@ -638,7 +655,7 @@ fn expand_contents(
                 frames.push(frame);
                 continue;
             }
-            if let Some(name) = directive.strip_prefix("ifdef ") {
+            if let Some(name) = directive_argument(directive, "ifdef") {
                 let condition = defines.contains_key(strip_line_comment(name).trim());
                 let frame = ConditionalFrame {
                     parent_active: active,
@@ -650,7 +667,7 @@ fn expand_contents(
                 frames.push(frame);
                 continue;
             }
-            if let Some(name) = directive.strip_prefix("ifndef ") {
+            if let Some(name) = directive_argument(directive, "ifndef") {
                 let condition = !defines.contains_key(strip_line_comment(name).trim());
                 let frame = ConditionalFrame {
                     parent_active: active,
@@ -662,7 +679,7 @@ fn expand_contents(
                 frames.push(frame);
                 continue;
             }
-            if let Some(expression) = directive.strip_prefix("elif ") {
+            if let Some(expression) = directive_argument(directive, "elif") {
                 let frame = frames.last_mut().ok_or_else(|| {
                     GalError::invalid_argument(format!("shader #elif without #if in {path}"))
                 })?;
@@ -703,7 +720,7 @@ fn expand_contents(
                 active = frame.parent_active;
                 continue;
             }
-            if let Some(include) = parse_include(raw) {
+            if let Some(include) = directive_argument(directive, "include").and_then(parse_include_argument) {
                 if active {
                     let include_path = resolve_include(path, include)?;
                     expand_file(
@@ -715,11 +732,12 @@ fn expand_contents(
                         active_protected_defines,
                         None,
                         out,
+                        remaining_work,
                     )?;
                 }
                 continue;
             }
-            if let Some(rest) = directive.strip_prefix("define ") {
+            if let Some(rest) = directive_argument(directive, "define") {
                 if active {
                     let (key, value) = parse_define(rest)?;
                     if !active_protected_defines.contains(&key) {
@@ -730,7 +748,7 @@ fn expand_contents(
                 }
                 continue;
             }
-            if let Some(name) = directive.strip_prefix("undef ") {
+            if let Some(name) = directive_argument(directive, "undef") {
                 if active {
                     let name = strip_line_comment(name).trim();
                     defines.remove(name);
@@ -760,20 +778,44 @@ fn expand_contents(
 }
 
 fn root_declares_version(source: &str) -> bool {
-    source
-        .lines()
-        .any(|line| line.trim_start().starts_with("#version"))
+    let mut block = false;
+    source.lines().any(|line| {
+        let clean = strip_directive_comments(line, &mut block);
+        clean.trim().strip_prefix('#').map(str::trim)
+            .is_some_and(|directive| directive_argument(directive, "version").is_some())
+    })
 }
 
-fn parse_include(line: &str) -> Option<&str> {
-    let trimmed = line.trim();
-    let rest = trimmed.strip_prefix("#include")?.trim();
-    rest.strip_prefix('"')
-        .and_then(|include| include.strip_suffix('"'))
-        .or_else(|| {
-            rest.strip_prefix('<')
-                .and_then(|include| include.strip_suffix('>'))
-        })
+fn strip_directive_comments(line: &str, block: &mut bool) -> String {
+    let mut clean = String::new();
+    let mut remaining = line;
+    loop {
+        if *block {
+            let Some(end) = remaining.find("*/") else { return clean; };
+            remaining = &remaining[end + 2..];
+            *block = false;
+            clean.push(' ');
+        }
+        let Some(start) = remaining.find("/*") else { clean.push_str(remaining); return clean; };
+        // A line comment ends preprocessing tokens for this line.
+        if remaining.find("//").is_some_and(|comment| comment < start) {
+            clean.push_str(remaining); return clean;
+        }
+        clean.push_str(&remaining[..start]);
+        remaining = &remaining[start + 2..];
+        *block = true;
+    }
+}
+
+fn directive_argument<'a>(directive: &'a str, keyword: &str) -> Option<&'a str> {
+    let rest = directive.strip_prefix(keyword)?;
+    if rest.starts_with(|c: char| c == '_' || c.is_ascii_alphanumeric()) { return None; }
+    Some(rest.trim())
+}
+
+fn parse_include_argument(rest: &str) -> Option<&str> {
+    rest.strip_prefix('"').and_then(|s| s.strip_suffix('"'))
+        .or_else(|| rest.strip_prefix('<').and_then(|s| s.strip_suffix('>')))
 }
 
 fn parse_define(rest: &str) -> GalResult<(String, String)> {
@@ -848,15 +890,24 @@ fn resolve_include(parent: &str, include: &str) -> GalResult<String> {
 }
 
 fn evaluate_condition(expression: &str, defines: &BTreeMap<String, String>) -> GalResult<bool> {
+    evaluate_condition_inner(expression, defines, 0, &mut (1024 * 1024))
+}
+
+fn evaluate_condition_inner(expression: &str, defines: &BTreeMap<String, String>, depth: usize, remaining_work: &mut usize) -> GalResult<bool> {
+    *remaining_work = remaining_work.checked_sub(expression.len().max(1))
+        .ok_or_else(|| GalError::invalid_argument("shader condition evaluation work budget exceeded"))?;
+    if depth >= 128 || expression.len() > 16_384 {
+        return Err(GalError::invalid_argument("shader condition complexity limit exceeded"));
+    }
     let expression = trim_outer_parens(strip_line_comment(expression).trim());
     if let Some((left, right)) = split_top(expression, "||") {
-        return Ok(evaluate_condition(left, defines)? || evaluate_condition(right, defines)?);
+        return Ok(evaluate_condition_inner(left, defines, depth + 1, remaining_work)? || evaluate_condition_inner(right, defines, depth + 1, remaining_work)?);
     }
     if let Some((left, right)) = split_top(expression, "&&") {
-        return Ok(evaluate_condition(left, defines)? && evaluate_condition(right, defines)?);
+        return Ok(evaluate_condition_inner(left, defines, depth + 1, remaining_work)? && evaluate_condition_inner(right, defines, depth + 1, remaining_work)?);
     }
     if let Some(rest) = expression.strip_prefix('!') {
-        return Ok(!evaluate_condition(rest, defines)?);
+        return Ok(!evaluate_condition_inner(rest, defines, depth + 1, remaining_work)?);
     }
     for operator in [">=", "<=", "==", "!=", ">", "<"] {
         if let Some((left, right)) = split_top(expression, operator) {
@@ -873,12 +924,11 @@ fn evaluate_condition(expression: &str, defines: &BTreeMap<String, String>) -> G
             });
         }
     }
-    let defined = expression
-        .strip_prefix("defined(")
-        .and_then(|value| value.strip_suffix(')'))
-        .or_else(|| expression.strip_prefix("defined "))
-        .map(str::trim);
-    if let Some(name) = defined {
+    if let Some(rest) = directive_argument(expression, "defined") {
+        let name = trim_outer_parens(rest.trim());
+        if name.is_empty() || !name.bytes().all(|b| b == b'_' || b.is_ascii_alphanumeric()) {
+            return Err(GalError::invalid_argument("invalid defined operand"));
+        }
         return Ok(defines.contains_key(name));
     }
     if expression.parse::<f64>().is_ok() {
@@ -888,10 +938,10 @@ fn evaluate_condition(expression: &str, defines: &BTreeMap<String, String>) -> G
         .bytes()
         .all(|byte| byte == b'_' || byte.is_ascii_alphanumeric())
     {
-        return Ok(defines
-            .get(expression)
-            .map(|value| value != "0")
-            .unwrap_or(false));
+        return match defines.get(expression) {
+            Some(value) => evaluate_condition_inner(value, defines, depth + 1, remaining_work),
+            None => Ok(false),
+        };
     }
     Err(GalError::unsupported_feature(format!(
         "unsupported shader preprocessor condition {expression}"
@@ -918,6 +968,9 @@ fn numeric_define_value_inner(
         return Err(GalError::unsupported_feature(format!(
             "unsupported numeric shader preprocessor value {value}"
         )));
+    }
+    if visited.len() >= 128 {
+        return Err(GalError::invalid_argument("shader define nesting limit exceeded"));
     }
     if !visited.insert(value.to_string()) {
         return Err(GalError::invalid_argument(format!(

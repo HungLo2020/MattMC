@@ -28,7 +28,7 @@ impl WorldPrimitiveFrontend {
     ) {
         if !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -36,7 +36,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let bindings = opaque_program
@@ -153,7 +153,7 @@ impl WorldPrimitiveFrontend {
     ) {
         if !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -161,7 +161,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
 
@@ -293,14 +293,14 @@ impl WorldPrimitiveFrontend {
         visible: &[lod::WorldLodGpuDraw],
     ) {
         if !matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT")
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let directory = Path::new(&dir);
@@ -321,15 +321,15 @@ impl WorldPrimitiveFrontend {
             return;
         }
         let private_color_debug = matches!(
-            std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COLOR_DEBUG").as_deref(),
+            crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_COLOR_DEBUG").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         );
         let private_depth_debug = matches!(
-            std::env::var("MATTMC_CAPTURE_DH_PRIVATE_DEPTH_DEBUG").as_deref(),
+            crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_DEPTH_DEBUG").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         );
         let private_isolate_vanilla = matches!(
-            std::env::var("MATTMC_CAPTURE_DH_PRIVATE_ISOLATE_VANILLA").as_deref(),
+            crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_ISOLATE_VANILLA").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         );
         let private_direct_route_eligible = frame.lod_render_frame.dh_fog_parameters[16] >= 0.5;
@@ -640,14 +640,14 @@ impl WorldPrimitiveFrontend {
         draws: &[lod::WorldLodGpuDraw],
     ) {
         if !matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT")
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let directory = Path::new(&dir);

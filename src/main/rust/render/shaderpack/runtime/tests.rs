@@ -2325,6 +2325,11 @@ fn normal_terrain_and_distant_horizons_resolve_the_same_named_color_generation()
 
 #[test]
 fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
+    use crate::render::vulkanic::resources::{
+        AccessFlags, ComputePipelineDesc, PipelineLayoutDesc, PipelineStageFlags,
+        ResourceBinding, ResourceBindingDesc, ResourceBindingKind, ResourceLayoutDesc,
+        ResourceSetDesc, ShaderCodeFormat, ShaderModuleDesc, ShaderStage,
+    };
     let source = complete_bundled_pack_source_for_test();
     let mut executor = ShaderPackRuntimeExecutor::terrain_material_multipass_v1(7).unwrap();
     executor.observe_source_candidate_for_scope(&source, TerrainProgramScope::Overworld);
@@ -2408,11 +2413,50 @@ fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
             &mut operations,
         )
         .unwrap();
+    // Model the sky's sampled main-depth access before terrain clears it.
+    // Submit the recorded commands so hazard validation checks the dependency,
+    // rather than only checking the shape of the generated barrier.
+    let sampled_layout = gal.create_resource_layout(ResourceLayoutDesc {
+        label: "sky-depth-layout".into(),
+        bindings: vec![ResourceBindingDesc {
+            binding: 0, kind: ResourceBindingKind::SampledTexture,
+            stages: PipelineStageFlags::COMPUTE, array_count: 1,
+            optional: false, dynamic_offset_count: 0,
+        }],
+    }).unwrap();
+    let sampled_set = gal.create_resource_set(ResourceSetDesc {
+        label: "sky-depth-set".into(), layout: sampled_layout,
+        bindings: vec![ResourceBinding {
+            binding: 0, array_index: 0, resource: depth_view,
+            kind: ResourceBindingKind::SampledTexture, access: AccessFlags::READ,
+            dynamic_offsets: Vec::new(), buffer_range: None,
+        }],
+    }).unwrap();
+    let sampled_pipeline_layout = gal.create_pipeline_layout(PipelineLayoutDesc {
+        label: "sky-depth-pipeline-layout".into(), resource_layouts: vec![sampled_layout],
+    }).unwrap();
+    let sampled_shader = gal.create_shader_module(ShaderModuleDesc {
+        label: "sky-depth-shader".into(), stage: ShaderStage::Compute,
+        code_format: ShaderCodeFormat::Spirv, code: vec![3, 2, 35, 7],
+        entry_point: "main".into(),
+    }).unwrap();
+    let sampled_pipeline = gal.create_compute_pipeline(ComputePipelineDesc {
+        label: "sky-depth-pipeline".into(), layout: sampled_pipeline_layout,
+        shader: sampled_shader,
+    }).unwrap();
+    operations.extend([
+        CommandOp::BindComputePipeline(sampled_pipeline),
+        CommandOp::BindResourceSet {
+            pipeline_layout: sampled_pipeline_layout, set_index: 0,
+            set: sampled_set, dynamic_offsets: Vec::new(),
+        },
+        CommandOp::Dispatch { groups_x: 1, groups_y: 1, groups_z: 1 },
+    ]);
     executor
         .append_terrain_source_color_pass(
             &mut operations,
             &TerrainSourceColorPassTargets {
-                phase: TerrainSourceColorPassPhase::Bootstrap,
+                phase: TerrainSourceColorPassPhase::BootstrapAfterSky,
                 color_attachments: color_attachments.clone(),
                 clear_values: ShaderPackColorBootstrapClearValues {
                     fog_color: ClearColor {
@@ -2430,6 +2474,15 @@ fn normal_terrain_source_pass_uses_named_color_targets_and_explicit_depth() {
             &[],
         )
         .unwrap();
+    gal.submit(SubmissionBatch {
+        label: "sky-before-terrain".into(),
+        command_lists: vec![CommandList::from(CommandListDesc {
+            label: "sky-before-terrain".into(), operations: operations.clone(),
+        })],
+    }).expect("terrain must synchronize the sky's depth read before clearing depth");
+    for handle in [sampled_pipeline, sampled_shader, sampled_set, sampled_pipeline_layout, sampled_layout] {
+        gal.destroy(handle).unwrap();
+    }
     executor
         .append_terrain_source_color_pass(
             &mut operations,

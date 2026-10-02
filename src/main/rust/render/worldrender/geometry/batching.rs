@@ -735,7 +735,7 @@ pub(in crate::render::worldrender) fn material_batch_plan_key(
 pub(in crate::render::worldrender) fn material_batch_plan_cache_disabled() -> bool {
     static DISABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *DISABLED.get_or_init(|| matches!(
-        std::env::var("MATTMC_RUST_DISABLE_WORLD_MATERIAL_BATCH_PLAN_CACHE")
+        crate::core::environment::var("MATTMC_RUST_DISABLE_WORLD_MATERIAL_BATCH_PLAN_CACHE")
             .ok()
             .as_deref(),
         Some("1") | Some("true") | Some("TRUE")
@@ -849,7 +849,7 @@ pub(in crate::render::worldrender) fn source_terrain_multidraw_enabled() -> bool
     source_terrain_geometry_pages_enabled()
         && !*DISABLED.get_or_init(|| {
             matches!(
-                std::env::var("MATTMC_RUST_DISABLE_SOURCE_TERRAIN_MULTIDRAW").as_deref(),
+                crate::core::environment::var("MATTMC_RUST_DISABLE_SOURCE_TERRAIN_MULTIDRAW").as_deref(),
                 Ok("1") | Ok("true") | Ok("yes")
             )
         })
@@ -861,7 +861,7 @@ pub(in crate::render::worldrender) fn source_terrain_geometry_pages_enabled() ->
     static DISABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     !*DISABLED.get_or_init(|| {
         matches!(
-            std::env::var("MATTMC_RUST_DISABLE_SOURCE_TERRAIN_PAGES").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_DISABLE_SOURCE_TERRAIN_PAGES").as_deref(),
             Ok("1") | Ok("true") | Ok("yes")
         )
     })
@@ -872,7 +872,7 @@ pub(in crate::render::worldrender) fn per_section_terrain_animation_disabled() -
     static DISABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *DISABLED.get_or_init(|| {
         matches!(
-            std::env::var("MATTMC_RUST_DISABLE_PER_SECTION_TERRAIN_ANIMATION").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_DISABLE_PER_SECTION_TERRAIN_ANIMATION").as_deref(),
             Ok("1") | Ok("true") | Ok("yes")
         )
     })

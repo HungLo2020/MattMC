@@ -2,7 +2,41 @@
 
 use super::*;
 
+type ResolvedPostEffect = (
+    crate::render::shaderpack::vanilla::post_effect::contract::VanillaPostEffectContract,
+    Vec<crate::render::shaderpack::vanilla::post_effect::contract::VanillaPostEffectShaderSource>,
+);
+pub(super) type PostEffectSourceCache =
+    std::cell::RefCell<BTreeMap<(u64, String, bool), ResolvedPostEffect>>;
+
 impl WorldPrimitiveFrontend {
+    fn cached_post_effect_contract(
+        &self,
+        identity: &str,
+        expanded: bool,
+    ) -> GalResult<ResolvedPostEffect> {
+        let source = self.shader_pack_sources.active().ok_or_else(|| {
+            GalError::unsupported_feature("post effect requires an active source snapshot")
+        })?;
+        let assets = self.active_shader_pack_assets()?;
+        let key = (source.generation(), identity.to_owned(), expanded);
+        if let Some(value) = self.post_effect_source_cache.borrow().get(&key) {
+            return Ok(value.clone());
+        }
+        let (contract, mut sources) = assets.resolve_post_effect_contract(identity, source)?;
+        if expanded {
+            sources = contract.expanded_shader_sources_from_source(source)?;
+        }
+        let value = (contract, sources);
+        let mut cache = self.post_effect_source_cache.borrow_mut();
+        cache.retain(|(generation, _, _), _| *generation == source.generation());
+        if cache.len() >= 64 {
+            cache.clear();
+        }
+        cache.insert(key, value.clone());
+        Ok(value)
+    }
+
     /// Dedicated vanilla executors are only interchangeable with the generic
     /// post-effect identity when the active copied definition *and* shader
     /// stages are byte-for-byte equivalent to the bundled Rust graph.  A
@@ -15,18 +49,17 @@ impl WorldPrimitiveFrontend {
         // missing or stale resource-pack override cannot be mistaken for the
         // bundled graph.
         #[cfg(test)]
-        let source = match self.shader_pack_sources.active() {
+        let _source = match self.shader_pack_sources.active() {
             Some(source) => source,
             None => return Ok(true),
         };
         #[cfg(not(test))]
-        let source = self.shader_pack_sources.active().ok_or_else(|| {
+        let _source = self.shader_pack_sources.active().ok_or_else(|| {
             GalError::unsupported_feature(
                 "dedicated post-effect requires a Rust-owned shader source snapshot",
             )
         })?;
-        let assets = self.active_shader_pack_assets()?;
-        let (contract, sources) = assets.resolve_post_effect_contract(identity, source)?;
+        let (contract, sources) = self.cached_post_effect_contract(identity, false)?;
         let (bundled_plan, bundled_sources) = match identity {
             "transparency" => (
                 crate::render::shaderpack::vanilla::post_effect::executor::bundled_transparency_executor()?
@@ -84,14 +117,8 @@ impl WorldPrimitiveFrontend {
         globals: Option<crate::render::shaderpack::vanilla::engine_globals::EngineGlobals>,
         conventions: ShaderConventions,
     ) -> GalResult<Vec<CustomPostEffectSource>> {
-        let source = self.shader_pack_sources.active().ok_or_else(|| {
-            GalError::unsupported_feature(
-                "custom post-effect requires a Rust-owned shader source snapshot",
-            )
-        })?;
         let assets = self.active_shader_pack_assets()?;
-        let (contract, _) = assets.resolve_post_effect_contract(identity, source)?;
-        let sources = contract.expanded_shader_sources_from_source(source)?;
+        let (contract, sources) = self.cached_post_effect_contract(identity, true)?;
         let plan = contract.execution_plan();
         let external_targets = plan.required_external_targets();
         let private_targets = plan
@@ -123,7 +150,8 @@ impl WorldPrimitiveFrontend {
             valid
         });
         if plan.ordered_passes.is_empty()
-            || plan.ordered_passes.len() > crate::render::guirender::frontend::MAX_CUSTOM_POST_EFFECT_PASSES
+            || plan.ordered_passes.len()
+                > crate::render::guirender::frontend::MAX_CUSTOM_POST_EFFECT_PASSES
             || private_targets.len() > 4
             || !final_output_is_main
             || !private_graph_is_sequential
@@ -316,13 +344,7 @@ impl WorldPrimitiveFrontend {
         frame: &WorldPrimitiveFrame,
         identity: &str,
     ) -> GalResult<Option<crate::render::shaderpack::vanilla::post_effect::executor::VanillaPostEffectExternalTargetBindings>>{
-        let source = self.shader_pack_sources.active().ok_or_else(|| {
-            GalError::unsupported_feature(
-                "custom post-effect requires a Rust-owned shader source snapshot",
-            )
-        })?;
-        let assets = self.active_shader_pack_assets()?;
-        let (contract, _) = assets.resolve_post_effect_contract(identity, source)?;
+        let (contract, _) = self.cached_post_effect_contract(identity, false)?;
         let plan = contract.execution_plan();
         let required = plan.required_external_targets();
         if required.iter().all(|target| target == "minecraft:main") {
@@ -358,7 +380,10 @@ impl WorldPrimitiveFrontend {
 }
 
 impl WorldPrimitiveFrontend {
-    pub(super) fn custom_external_fabulous_frame_is_admissible(&self, frame: &WorldPrimitiveFrame) -> bool {
+    pub(super) fn custom_external_fabulous_frame_is_admissible(
+        &self,
+        frame: &WorldPrimitiveFrame,
+    ) -> bool {
         // Dedicated Fabulous lowers outlines itself. Arbitrary custom external
         // effects have not established that ownership contract and stay closed.
         Self::fabulous_material_frame_content_is_supported(frame)

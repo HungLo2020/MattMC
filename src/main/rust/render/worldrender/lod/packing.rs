@@ -85,12 +85,12 @@ pub(super) fn world_lod_face_material_index(
 /// explicit graphics-audit process and never changes normal admission.
 pub(super) fn world_lod_audit_face_layer_limit() -> Option<u32> {
     let audit_enabled = matches!(
-        std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+        crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
         Ok("1") | Ok("true") | Ok("TRUE")
     );
     audit_enabled
         .then(|| {
-            std::env::var("MATTMC_RUST_DH_EXACT_ATLAS_MAX_FACE_LAYER")
+            crate::core::environment::var("MATTMC_RUST_DH_EXACT_ATLAS_MAX_FACE_LAYER")
                 .ok()
                 .and_then(|value| value.trim().parse::<u32>().ok())
         })

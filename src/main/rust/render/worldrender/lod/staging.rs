@@ -14,7 +14,7 @@ pub(in crate::render::worldrender) enum WorldLodAuditExactAtlasMode {
 
 pub(in crate::render::worldrender) fn world_lod_audit_exact_atlas_mode() -> WorldLodAuditExactAtlasMode {
     let audit_enabled = matches!(
-        std::env::var("MATTMC_GRAPHICS_AUDIT")
+        crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
             .as_deref()
             .map(str::trim),
         Ok("1") | Ok("true") | Ok("TRUE")
@@ -23,7 +23,7 @@ pub(in crate::render::worldrender) fn world_lod_audit_exact_atlas_mode() -> Worl
         return WorldLodAuditExactAtlasMode::Default;
     }
     world_lod_audit_exact_atlas_mode_from(
-        std::env::var("MATTMC_RUST_DH_SOURCE_STREAM")
+        crate::core::environment::var("MATTMC_RUST_DH_SOURCE_STREAM")
             .ok()
             .as_deref(),
     )
@@ -50,9 +50,9 @@ pub(in crate::render::worldrender) fn world_lod_draw_isolation_enabled_from(
 /// probe scoped to DH draw admission and avoids enabling every unrelated
 /// fail-closed graphics-audit fixture in a real saved world.
 pub(in crate::render::worldrender) fn world_lod_draw_isolation_enabled(variable: &str) -> bool {
-    let requested = std::env::var(variable).ok();
-    let graphics_audit = std::env::var("MATTMC_GRAPHICS_AUDIT").ok();
-    let performance_isolation = std::env::var("MATTMC_RUST_DH_PERF_ISOLATION").ok();
+    let requested = crate::core::environment::var(variable).ok();
+    let graphics_audit = crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").ok();
+    let performance_isolation = crate::core::environment::var("MATTMC_RUST_DH_PERF_ISOLATION").ok();
     world_lod_draw_isolation_enabled_from(
         requested.as_deref(),
         graphics_audit.as_deref(),
@@ -180,10 +180,6 @@ impl WorldPrimitiveFrontend {
         match result {
             Ok(()) => {
                 let reconcile_started = std::time::Instant::now();
-                self.lod_gpu_residency
-                    .reconcile_assets(gal, &self.lod_gpu_column_assets);
-                self.lod_textured_gpu_residency
-                    .reconcile_assets(gal, &self.lod_textured_gpu_column_assets);
                 self.lod_opaque_pass_resources
                     .reconcile_assets(gal, &self.lod_gpu_column_assets);
                 self.lod_forward_opaque_pass_resources
@@ -226,8 +222,13 @@ impl WorldPrimitiveFrontend {
                     .reconcile_assets(gal, &self.lod_gpu_column_assets);
                 self.lod_source_pass_resources
                     .reconcile_assets(gal, &self.lod_gpu_column_assets);
+                // Release descriptor dependencies before the residency buffers.
+                self.lod_gpu_residency
+                    .reconcile_assets(gal, &self.lod_gpu_column_assets);
+                self.lod_textured_gpu_residency
+                    .reconcile_assets(gal, &self.lod_textured_gpu_column_assets);
                 if matches!(
-                    std::env::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
+                    crate::core::environment::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
                     Ok("1" | "true" | "TRUE")
                 ) {
                     println!(
@@ -439,7 +440,7 @@ impl WorldPrimitiveFrontend {
             });
         self.lod_asset_generation = generation;
         if matches!(
-            std::env::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
             Ok("1" | "true" | "TRUE")
         ) {
             println!(
@@ -826,80 +827,80 @@ impl WorldPrimitiveFrontend {
                 || frame.lod_render_frame.ssao_parameters[0] >= 0.5);
         let audit_private_flip_y = direct_dh_fog_composition
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_FLIP_Y").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_FLIP_Y").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
         let audit_private_no_depth_remap = direct_dh_fog_composition
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_NO_DEPTH_REMAP").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_NO_DEPTH_REMAP").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
         let audit_private_column_ids = direct_dh_fog_composition
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_COLUMN_IDS").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_COLUMN_IDS").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
         let audit_private_no_fade = direct_dh_fog_composition
             && matches!(
-                std::env::var("MATTMC_CAPTURE_DH_PRIVATE_NO_FADE").as_deref(),
+                crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_NO_FADE").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             )
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
         let audit_private_raw_transparent_color = matches!(
-            std::env::var("MATTMC_CAPTURE_DH_TRANSPARENT_RAW_COLOR").as_deref(),
+            crate::core::environment::var("MATTMC_CAPTURE_DH_TRANSPARENT_RAW_COLOR").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) && matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         );
         let audit_private_water_debug_color = matches!(
-            std::env::var("MATTMC_CAPTURE_DH_WATER_DEBUG_COLOR").as_deref(),
+            crate::core::environment::var("MATTMC_CAPTURE_DH_WATER_DEBUG_COLOR").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) && matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         );
         let audit_private_raw_lightmap_color = matches!(
-            std::env::var("MATTMC_CAPTURE_DH_LIGHTMAP_RAW_COLOR").as_deref(),
+            crate::core::environment::var("MATTMC_CAPTURE_DH_LIGHTMAP_RAW_COLOR").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) && matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         );
         let audit_private_raw_exact_atlas_color = matches!(
-            std::env::var("MATTMC_CAPTURE_DH_EXACT_ATLAS_RAW_COLOR").as_deref(),
+            crate::core::environment::var("MATTMC_CAPTURE_DH_EXACT_ATLAS_RAW_COLOR").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) && matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         );
         let audit_private_exact_atlas_base_mip = matches!(
-            std::env::var("MATTMC_CAPTURE_DH_EXACT_ATLAS_BASE_MIP").as_deref(),
+            crate::core::environment::var("MATTMC_CAPTURE_DH_EXACT_ATLAS_BASE_MIP").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) && matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         );
         let audit_private_dither_y = matches!(
-            std::env::var("MATTMC_CAPTURE_DH_PRIVATE_DITHER_Y").as_deref(),
+            crate::core::environment::var("MATTMC_CAPTURE_DH_PRIVATE_DITHER_Y").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) && matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         );
         // The same bounded audit selector used by the source-derived path is
@@ -911,7 +912,7 @@ impl WorldPrimitiveFrontend {
         // their frame-sized transform vector and vertex scans entirely out of
         // normal gameplay; the draw/material route is unchanged.
         let audit_receipts_enabled = matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT")
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
@@ -1716,14 +1717,14 @@ impl WorldPrimitiveFrontend {
         unresolved_index_count: u64,
     ) {
         if !matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT")
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let directory = Path::new(&dir);

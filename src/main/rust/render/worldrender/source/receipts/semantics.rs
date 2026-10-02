@@ -232,10 +232,10 @@ impl WorldPrimitiveFrontend {
         program: &LoweredTerrainSourceProgram,
         bytes: &[u8],
     ) {
-        if std::env::var_os("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE").is_none()
+        if crate::core::environment::var_os("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE").is_none()
             || !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -243,7 +243,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let fields = program
@@ -307,7 +307,7 @@ impl WorldPrimitiveFrontend {
         if probes.is_empty()
             || !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -315,7 +315,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let records = probes

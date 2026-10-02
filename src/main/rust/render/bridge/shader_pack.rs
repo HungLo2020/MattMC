@@ -199,7 +199,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_shader_pack_update_sources(
         let input_bytes = if request.is_null() {
             0
         } else {
-            input_bytes_for_shader_pack_source_update(&*request)
+            read_struct(request, "input accounting").as_ref().map(input_bytes_for_shader_pack_source_update).unwrap_or(0)
         };
         context.ffi_calls += 1;
         context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
@@ -247,7 +247,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_shader_pack_update_assets(
         let input_bytes = if request.is_null() {
             0
         } else {
-            input_bytes_for_shader_pack_asset_update(&*request)
+            read_struct(request, "input accounting").as_ref().map(input_bytes_for_shader_pack_asset_update).unwrap_or(0)
         };
         context.ffi_calls += 1;
         context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);

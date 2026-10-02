@@ -59,10 +59,20 @@ print(np.abs(a - b)[m].mean(0))
 
 ## 3. Real-config session
 
+Set diagnostic environment options before launching. Production renderer
+options are snapshotted on first access through `core/environment.rs`; changing
+the environment later does not reconfigure that process. Unit fixtures can
+use thread-local scoped overrides to exercise different diagnostic modes.
+
 Run the game with your own settings (`python3 DevUtils/RunDev.py` uses the
 release native profile) with shaders on and off, join a world, and watch the
 log for `panicked`, `Game crashed` or `VUID`. The shader route should report
-`shader route active` after warm-up.
+`shader route active` after warm-up. Capture both stdout and stderr: native
+shader diagnostics are not necessarily copied into `run/logs/latest.log`.
+An `active` message immediately followed by `vanilla fallback` is a failed
+shader frame, not successful shader rendering. Verify that Shader Packs appears
+in Video Settings and that toggling the configured pack changes the rendered
+world; unit tests alone do not exercise the complete startup and live pass graph.
 
 ## 4. Performance A/B
 

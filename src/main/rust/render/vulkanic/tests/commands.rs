@@ -474,3 +474,20 @@ fn malformed_submission_is_rejected_before_backend_encoding() {
     assert!(gal.mock_backend().unwrap().submissions.is_empty());
     assert_ne!(stale_view, color_view);
 }
+
+#[test]
+fn copies_and_vertex_offsets_reject_overflow_and_exact_end() {
+    let mut gal = gal();
+    let make = |label: &str| BufferDesc { label: label.into(), size: 16,
+        memory: MemoryDomain::DeviceLocal,
+        usages: vec![BufferUsage::Vertex, BufferUsage::TransferSrc, BufferUsage::TransferDst] };
+    let src = gal.create_buffer(make("source")).unwrap();
+    let dst = gal.create_buffer(make("destination")).unwrap();
+    for op in [CommandOp::CopyBuffer { src, dst, size: 17 },
+        CommandOp::CopyBufferRegion { src, dst, src_offset: 15, dst_offset: 0, size: 2 },
+        CommandOp::CopyBufferRegion { src, dst, src_offset: 0, dst_offset: u64::MAX, size: 2 },
+        CommandOp::SetVertexBuffer { slot: 0, buffer: src, offset: 16 }] {
+        assert_code(gal.create_command_list(CommandListDesc { label: "invalid-range".into(), operations: vec![op] }), StatusCode::InvalidArgument);
+    }
+    gal.create_command_list(CommandListDesc { label: "exact-fit".into(), operations: vec![CommandOp::CopyBuffer { src, dst, size: 16 }] }).unwrap();
+}
