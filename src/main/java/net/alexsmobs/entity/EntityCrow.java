@@ -220,7 +220,10 @@ public class EntityCrow extends TamableAnimal implements ITargetsDroppedItems {
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         final ItemStack itemstack = player.getItemInHand(hand);
         final InteractionResult type = super.mobInteract(player, hand);
-        if (!this.getMainHandItem().isEmpty() && type != InteractionResult.SUCCESS) {
+        if (type.consumesAction()) {
+            return type;
+        }
+        if (!this.getMainHandItem().isEmpty()) {
             if (!this.level().isClientSide()) {
                 this.spawnAtLocation((ServerLevel) this.level(), this.getMainHandItem().copy(), 0.0F);
             }
@@ -228,7 +231,7 @@ public class EntityCrow extends TamableAnimal implements ITargetsDroppedItems {
             return InteractionResult.SUCCESS;
         } else {
             final InteractionResult interactionresult = itemstack.interactLivingEntity(player, this, hand);
-            if (interactionresult != InteractionResult.SUCCESS && type != InteractionResult.SUCCESS && isTame() && isOwnedBy(player) && !isFood(itemstack)) {
+            if (interactionresult != InteractionResult.SUCCESS && isTame() && isOwnedBy(player) && !isFood(itemstack)) {
                 if (isCrowEdible(itemstack) && this.getMainHandItem().isEmpty()) {
                     ItemStack cop = itemstack.copy();
                     cop.setCount(1);
@@ -248,7 +251,7 @@ public class EntityCrow extends TamableAnimal implements ITargetsDroppedItems {
                 this.setOrderedToSit(sit);
                 return InteractionResult.SUCCESS;
             }
-            return super.mobInteract(player, hand);
+            return type;
         }
     }
 
