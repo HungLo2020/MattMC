@@ -1,17 +1,25 @@
 # Dirt Path
 
-## Obtaining
+**Dirt Path** (`minecraft:dirt_path`) is a terrain block item. The [Soil, Sand, and Gravel guide](../blocks/SoilSandAndGravel.md) covers its placed behavior, support, conversions, and collection. [Item registration][registration] · [Block registration][block-registration]
 
-Dirt Path can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Collecting and moving it
 
-## Usage
+Ordinary mining gives **1 Dirt**, including with Silk Touch. The checked loot table has no Dirt Path item branch. The usual documented route makes a **placed Path** by using a shovel on a supported soil type. [Block loot][loot]
 
-Dirt Path is a building, resource, or decorative block used in construction, crafting, or world interaction.
+A shovel is the efficient mining tool. No tool material tier is required for this block’s ordinary loot. [Mining tag][shovel-tag] · [Player harvest gate][player]
 
-## Behavior
+## Placed uses
 
-It behaves as a block and follows its normal mining, tool, placement, and interaction rules.
+Read [Dirt Path placement and cover](../blocks/SoilSandAndGravel.md#dirt-path-placement-and-cover) for its 15/16 height and conversion back to Dirt under unsuitable cover. A hoe can make Farmland when the tool-use conditions are met.
 
-## Notes
+Follow the shared guide for the exact conditions and recipe sources. [Soil, Sand, and Gravel](../blocks/SoilSandAndGravel.md) · [Blocks](../blocks/Blocks.md) · [Items](Items.md)
 
-* This item is the item form of the `minecraft:dirt_path` block.
+## Sources and verification
+
+Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. No in-game placement, mining, spread, or conversion test was run. This page covers the checked collection route and links the shared placed-block mechanics; it is not an exhaustive acquisition or world-generation inventory.
+
+[registration]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/Items.java#L711
+[block-registration]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/block/Blocks.java#L4281-L4285
+[loot]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/loot_table/blocks/dirt_path.json
+[shovel-tag]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/tags/block/mineable/shovel.json
+[player]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/player/Player.java#L623-L656

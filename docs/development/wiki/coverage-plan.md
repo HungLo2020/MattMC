@@ -4,8 +4,9 @@
 
 - Working branch: `docs/wiki-expansion`
 - Source default branch: `master`
-- Latest default-branch snapshot integrated: `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; older gameplay citations remain pinned to their reviewed snapshots where the relevant behavior is unchanged.
-- Latest source sync: fast-forward from promoted cutoff `84e9628b0fbd2fe8ea1769278feaa4ce82259fd2` to master `2d4b7646eac8561a23f41f873e261d86f0cff5a2`, preserving the two incoming prompt-document reorganizations and all eight pending Cat/Ocelot documents in place. No source code or workflows changed in that incoming commit.
+- Latest default-branch snapshot integrated: `fb7d6979fb8d9773cfe05f084c6085f35feb885c`; older gameplay citations remain pinned to their reviewed snapshots where the relevant behavior is unchanged.
+- Latest source sync: fast-forward from promoted cutoff `c87803e75d339e5d643ca812efc70a6def06a401` to master `fb7d6979fb8d9773cfe05f084c6085f35feb885c`, preserving all 39 pending documentation paths byte-for-byte and all twelve incoming merged-fix paths. PRs #787, #786 and #785 landed Rhinoceros, Ambersol and Grizzly corrections plus tests and guides; README, AGENTS and workflows were unchanged.
+- Previous source sync: fast-forward from promoted cutoff `84e9628b0fbd2fe8ea1769278feaa4ce82259fd2` to master `2d4b7646eac8561a23f41f873e261d86f0cff5a2`, preserving the two incoming prompt-document reorganizations and all eight pending Cat/Ocelot documents in place. No source code or workflows changed in that incoming commit.
 - Previous source sync: fast-forward from promoted cutoff `959ad4e7ec6e1347ee00ef5799ae99cf4a478db8` to master `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`, preserving all 23 incoming voxel-box/skill paths and all eight pending Oceans documents in place. The new repository sync-and-push skill was read; README, AGENTS, and workflows were unchanged.
 - Previous source sync: real two-parent merge `9fc7874be6328503aabf794c757584c4c0d11514`, integrating all 93 incoming rendering/shader-control paths exactly from master without conflicts. Incoming README, AGENTS, and workflows were unchanged.
 - Previous source sync: real two-parent merge `226ad2d5499924128d0e21c0390c69820320d8f2`, preserving published wiki history and integrating palette resize/unpacking and voxel-join migrations without conflicts. Incoming workflow definitions were unchanged.
@@ -739,22 +740,40 @@ At `987ab0a72e971d40dbcdfc6d4ee5ae52c2a95564`, 513 gameplay paths differ from th
 - Latest integrated default source remains `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; unchanged evidence is pinned to gameplay source `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. This completed batch follows standing promotion and deployment verification.
 - Validation: checker and strict build passed on 2,199 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, breeding, trust, crops, berries, held items, cooking, or loot gameplay test.
 
+## Ninety-seventh batch: alphabetical Blocks and missing core behavior
+
+- Replaced the incomplete Blocks main list with all 1,211 active built-in registrations in displayed-name alphabetical order, retaining exact IDs and related-guide scope labels. Added twelve separate material/use category lists and one category index; every ID appears exactly once in each inventory view.
+- The registry inventory is complete at `c87803e75d339e5d643ca812efc70a6def06a401`; placed-block behavior coverage remains substantially incomplete. No item stubs are used as substitutes, no empty variant articles were generated, and no word/file-count completeness score is claimed.
+- Added source-grounded core block guidance and corrected the Crafter item's false boat template. Repaired missing source-reference definitions in six Rabbit/Fox articles without changing their behavior claims.
+- Updated continuation rules and priority order for the requested alphabetical main directory, separate categories, and registry-based article expansion. Linked the coordinated source/issue review while keeping draft fixes explicitly unmerged.
+- Source advanced during validation: fast-forwarded from `c87803e7` to `fb7d6979fb8d9773cfe05f084c6085f35feb885c`, preserving the user-merged Grizzly, Rhino and Ambersol fixes. Updated current checkpoints and remaining Grizzly egg/mining caveats; historical citations remain pinned where unchanged. Final validation and publication follow the standing procedure.
+- Validation: required checker and strict build passed after the source fast-forward on 2,214 pages / 37 directory indexes; all 1,211 IDs, alphabetical order, category membership, source line starts, article links/anchors and reference definitions checked. English labels match bundled localization where present; 25 fallback labels are identified. No gameplay test.
+
+## Current block coverage audit and priority
+
+The 2026-10-02 audit at `c87803e75d339e5d643ca812efc70a6def06a401` found **1,211 built-in block registrations**, resolving six pumpkin/melon ResourceKey names. The registry has one active write site and is bootstrapped through `Blocks.AIR`; this is a source inventory, not an in-game registry dump. The earlier 62 placed-block guides provide candidate related-guide routes for 344 IDs, leaving 867 without an identified placed-block guide. Those figures describe navigation scope, **not completed behavior coverage**. Family edge cases and partially covered articles still need review.
+
+The user requested an alphabetical Blocks main page like Items, with separate category pages. Keep this as the default layout. Do not use word counts or article-file totals as a completion measure. Each block family needs practical obtaining/mining, placement/use, variants, recipes/loot, and important MattMC caveats before calling its player guidance complete.
+
 ## Next batches, in priority order
 
-1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
-2. Extend the completed Limestone/Pewen/Amber and Pewen foliage/resource guides with remaining substantive item cross-links. Do not claim the documented integration gaps are repaired.
-3. Continue vanilla essentials beyond the completed workstations, food mechanics, beds, torches, fuels, and modes: ore/tool tiers, farming, basic exploration, and redstone.
-4. Work through Alex's Mobs by related biome or interaction, pairing mobs with their drops, breeding items, buckets, and equipment. Use registry IDs and active spawn/config sources to track completeness.
-5. Work through integrated Alex's Caves by actually registered biome, mob, block and item clusters; do not assume all upstream biomes exist.
-6. Broaden all 17 gameplay categories, including world/dimension discovery, effects/enchantments, structures, redstone, trading, and commands. Select content from the current registries/data, not an external wiki page list.
-7. Periodically reconcile registry IDs against page coverage and prioritize missing mechanics or incorrect stubs over raw article count. Record semantic coverage separately from file count.
+1. Maintain the complete alphabetical Blocks directory and category catalogs as source changes; expand genuine article coverage from the now-visible gaps. The initial directory, twelve-terrain guide, Crafter correction, and Rabbit/Fox citation repair are recorded in batch 97.
+2. Expand stone/cobblestone, deepslate, tuff, sandstone, Nether/End masonry and broad mineral/ore families with meaningful placed behavior and variant routes.
+3. Expand non-Oak/Pewen woods and their actual doors, trapdoors, fences, signs, shelves, and other building behavior; do not assume every imported wood has vanilla recipe/tool wiring.
+4. Cover Copper oxidation/waxing and its many building/functional variants, then Beacon/Conduit, Trial Spawner/Vault and remaining functional families.
+5. Preserve ready Swords and undead drafts for later; finish them after the immediate Blocks correction. Continue remaining mobs, biomes, effects, structures and gameplay systems without claiming broad catch-up is complete.
+
+## Coordinated source and issue review, 2026-10-02 02:45 UTC
+
+- [Voxel-box checkpoint on #770](https://github.com/HungLo2020/MattMC/issues/770#issuecomment-5944675511) and [renderer/resource/shader checkpoint on #747](https://github.com/HungLo2020/MattMC/issues/747#issuecomment-5944676593) distinguish inspected source and author-recorded tests from independent reruns.
+- Draft fixes [#785](https://github.com/HungLo2020/MattMC/pull/785), [#786](https://github.com/HungLo2020/MattMC/pull/786), and [#787](https://github.com/HungLo2020/MattMC/pull/787) address [#778](https://github.com/HungLo2020/MattMC/issues/778#issuecomment-5944683569), [#779](https://github.com/HungLo2020/MattMC/issues/779#issuecomment-5944684597), and [#783](https://github.com/HungLo2020/MattMC/issues/783#issuecomment-5944685794), respectively. They were unmerged at the 02:45 review, then the user merged #787 at 02:56:51 UTC, #786 at 02:57:13, and #785 at 02:57:27. Their twelve incoming paths are now preserved from master `fb7d6979fb8d9773cfe05f084c6085f35feb885c`; issues #783, #779 and #778 are closed. This later merge status supersedes the earlier draft checkpoint. Crow (#784), Platypus and Bucket of Platypus (#782) remain reserved for separate unmerged fix proposals.
 
 ## Evidence gaps to carry forward
 
 - Luxtructosaurus is excluded at `b81c01943c9f3254e713c365a1dd633392929cb2`: no active entity/attribute/item registration or implementation was found. [Sauropod base comments](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/entity/living/SauropodBaseEntity.java#L49) explicitly describe it as not added; the [tag constant](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/misc/ACTagRegistry.java#L60) and stub world-data flags do not establish a boss or summoning route. Reassess only if active registration/runtime implementation changes; do not create an upstream-derived placeholder.
 
 - Source review does not establish in-game/runtime correctness.
-- Ambersol has a drop entry and a correct-tool requirement, but no matching mining-tool tag was found; Survival harvesting and natural-generation wiring remain unverified.
+- Ambersol’s mining-tag omission was fixed on master through #779 / PR #786. Use its updated block guide for the stone-or-better pickaxe requirement. Natural-generation wiring and live gameplay collection remain separate verification gaps.
 - Verify natural spawning through actual biome/config registration rather than treating standalone spawn predicates as proof.
 - Existing untouched item/mob stubs are not newly verified by this batch.
 

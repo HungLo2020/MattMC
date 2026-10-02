@@ -2,9 +2,13 @@
 
 MattMC combines vanilla-derived Minecraft content with integrated additions. Use the pages below to find current recipes, interactions, and limitations. A familiar name from a mod does not guarantee that all of its original systems are available in MattMC.
 
+Browse all registered blocks in the [alphabetical Blocks directory](blocks/Blocks.md), or by [material and purpose](blocks/catalog/index.md). These inventories expose missing articles explicitly; they do not imply that detailed block coverage is finished.
+
 ## Vanilla-derived gameplay
 
 ### Getting started and survival
+
+- [Soil, Sand, and Gravel](blocks/SoilSandAndGravel.md): collection, Grass/Mycelium spread, tool conversions, falling terrain, Flint, and suspicious-block care
 
 - [Game modes](gamemodes/Gamemodes.md): all four modes and permission-aware switching
 - [Oak](blocks/Oak.md), [Logs](items/OakLog.md), [Planks](items/OakPlanks.md), [Saplings](items/OakSapling.md), and [Sticks](items/Stick.md): the renewable beginner wood loop
@@ -76,6 +80,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 - [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
 
 ### Building, redstone, and travel
+
+- [Crafter](blocks/Crafter.md): redstone crafting, slot controls, ingredient distribution, output overflow, and comparator signals
 
 - [Stonecutter](blocks/Stonecutter.md): choosing recipe outputs, single-block conversion, stair yields, and temporary menu storage
 - [Clay and Bricks](blocks/ClayAndBricks.md) and [Flower Pots](blocks/FlowerPot.md): material conversion, dripstone Clay, masonry, and all supported potted plants

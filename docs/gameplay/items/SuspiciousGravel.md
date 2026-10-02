@@ -1,17 +1,24 @@
 # Suspicious Gravel
 
-## Obtaining
+**Suspicious Gravel** (`minecraft:suspicious_gravel`) is registered as a block item, but ordinary mining is not a way to recover it. Its block-loot table has no item pools, including no Silk Touch branch. [Item registration][registration] · [Block registration][sand-reg] · [Loot][loot]
 
-Suspicious Gravel can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Work on the placed block
 
-## Usage
+Keep it supported and follow the [Brush archaeology instructions](Brush.md#archaeology-basics). Successful brushing emits any configured stored loot and leaves ordinary [Gravel](Gravel.md). A block without stored contents does not gain an artifact merely from being suspicious. [Brush call][brush-use] · [Completion][brush-finish]
 
-Suspicious Gravel is placed in the world as a block and used for building, decoration, utility, or environmental detail.
+Removing support can start a fall after the scheduled check. Its ordinary landing cancels placement and item recovery, unlike the normal falling-Gravel route. See [suspicious terrain handling](../blocks/SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel) before excavating around it. [Falling callback][brush-fall] · [Cancellation flag][cancel-fall] · [Landing branch][fall-land]
 
-## Behavior
+Related: [Soil, Sand, and Gravel](../blocks/SoilSandAndGravel.md) · [Brush](Brush.md) · [Blocks](../blocks/Blocks.md) · [Items](Items.md)
 
-When placed, it behaves as the corresponding block. Breaking the block returns drops according to the block's normal loot rules.
+## Sources and verification
 
-## Notes
+Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. No in-game archaeology or falling test was run. Acquisition by structures, commands, or inventory placement and every possible stored loot table are outside this page’s scope.
 
-* This item is the item form of the `minecraft:suspicious_gravel` block.
+[registration]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/Items.java#L147
+[sand-reg]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/block/Blocks.java#L313-L347
+[loot]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/loot_table/blocks/suspicious_gravel.json
+[brush-use]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/BrushItem.java#L68-L98
+[brush-finish]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/block/entity/BrushableBlockEntity.java#L117-L145
+[brush-fall]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/block/BrushableBlock.java#L62-L98
+[cancel-fall]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/item/FallingBlockEntity.java#L311-L313
+[fall-land]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/item/FallingBlockEntity.java#L180-L232

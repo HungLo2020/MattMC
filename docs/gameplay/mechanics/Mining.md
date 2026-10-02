@@ -8,7 +8,7 @@ Use [Pickaxes and Shovels](PickaxesAndShovels.md) for exact per-item recipes, ma
 
 Tools have rules for their intended block groups, such as pickaxe-mineable stone or axe-mineable wood. A block that requires a correct tool can fail its drop check even when its loot table names an item. If no matching correct-for-drops rule is found, the tool rule returns false.
 
-This matters for imported content: [Amber](../blocks/Amber.md), [Ambersol](../blocks/Ambersol.md), and [Limestone](../blocks/Limestone.md) currently have documented mining-tag gaps. Their familiar appearance is not proof that a particular tool works.
+This matters for imported content: [Amber](../blocks/Amber.md) and [Limestone](../blocks/Limestone.md) have documented mining-tag gaps. [Ambersol](../blocks/Ambersol.md) now has its pickaxe and stone-tier tags after the merged [#779 fix](https://github.com/HungLo2020/MattMC/issues/779); use its current harvesting guide. A familiar appearance alone is not proof that a particular tool works.
 
 ## Material values
 
