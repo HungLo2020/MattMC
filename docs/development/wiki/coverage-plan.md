@@ -1163,6 +1163,15 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,357 pages / 37 indexes. All 18 authored paths are documentation; 925 local links/anchors and 377 tracked reference uses resolve, with zero rendered citation candidates and all prior replacement anchors retained. Six substantial mob replacements are counted separately from eight support-item corrections.
 
+## Batch 143: Coordinated 14:45 UTC review
+
+- Rechecked the published documentation cutoff at `4a0205977d3c1c10a9432c35b18092cac7d4ab5e`; game source remains `cf8cd5371bd1de61411ae5e7e144aabe3edb1e54`. Batches 128–142 have verified successful Wiki Pages build/deployment results. The Primordial selection correction in batch 137 supersedes the earlier preset-only exclusion inference without implying existing-chunk regeneration.
+- Linked the existing Spectre crouch-release warning to newly verified [#799](https://github.com/HungLo2020/MattMC/issues/799), narrowly covering the cleared-holder read rather than redesigning its separate distance behavior.
+- Linked the existing broken-Mace Breach warning to [#800](https://github.com/HungLo2020/MattMC/issues/800). That issue also covers Turtle Shell refresh with an explicit passive-effect policy decision; it does not establish a universal rule for all passive effects. The expanded Turtle Shell draft will carry the same link when integrated.
+- These are source-reviewed limitations and new tracker records, not gameplay fixes or reproduced runtime failures. Existing issues #795–798 and draft fixes #791/#794 were unchanged at the coordinated review; other evidence leads remain queued rather than being labeled implemented or disproved.
+
+- Validation: required checker and strict build passed on 2,357 pages / 37 indexes. The four authored paths are documentation; 215 local links/anchors and 70 tracked reference uses resolve, with zero rendered citation candidates. Both new issue bodies were independently read back before adding their links.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.

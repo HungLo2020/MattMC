@@ -26,7 +26,7 @@ Ordinary damage is rejected by the active invulnerability callback. Magic, falli
 
 The inherited mob rules allow a lead because the Spectre is an Animal, not an Enemy. While a non-fence entity holds its lead, the Spectre's tick clears that holder's fall distance, slows downward movement, and adds a pull toward itself when the holder is more than 10 blocks away. A fence knot does not receive this transport behavior. [Leash eligibility][leashable] · [Holder movement][holder]
 
-**Do not rely on this as safe void transport.** The current base leash tick still breaks the lead beyond its **12-block** distance threshold. Also, sneaking drops the leash before the Spectre's same tick reads the holder again without a new null check. The source contains these compatibility problems; a safe release or rescue was not verified in game. [Base leash call][leash-tick] · [Break distance][leash-break] · [Spectre release path][holder]
+**Do not rely on this as safe void transport.** The current base leash tick still breaks the lead beyond its **12-block** distance threshold. Also, sneaking drops the leash before the Spectre's same tick reads the holder again without a new null check. The cleared-holder failure after crouch release is tracked in [#799](https://github.com/HungLo2020/MattMC/issues/799). The separate distance limit remains unchanged; a safe release or rescue was not verified in game. [Base leash call][leash-tick] · [Break distance][leash-break] · [Spectre release path][holder]
 
 ## Drops
 

@@ -52,7 +52,7 @@ Repair it on an [Anvil](../mechanics/AnvilMechanics.md) with **Breeze Rods**, re
 
 MattMC retains a fully worn Mace as a **broken stack**. Its ordinary weapon attributes, smash bonus, hit hooks, and attacker post-hit enchantment effects stop working. Repair it before relying on it for a smash landing. [Retained stack and guarded hooks][stack] · [Attack guards][player] · [Equipment attributes][living] · [Post-hit guard][enchantment-helper]
 
-There is a checked exception: **Breach is still read during the target's armor calculation even when the held Mace is broken**. That path does not test the broken state. This is a source-level behavior, not an in-game-tested reason to use broken equipment; it does not restore the Mace's damage attributes or smash. [Weapon lookup][damage-source] · [Armor path][armor] · [Enchantment iteration][enchantment-helper]
+There is a checked exception: **Breach is still read during the target's armor calculation even when the held Mace is broken**. That path does not test the broken state; the effect-gating follow-up is tracked in [#800](https://github.com/HungLo2020/MattMC/issues/800). This is a source-level behavior, not an in-game-tested reason to use broken equipment; it does not restore the Mace's damage attributes or smash. [Weapon lookup][damage-source] · [Armor path][armor] · [Enchantment iteration][enchantment-helper]
 
 ## Notes
 
