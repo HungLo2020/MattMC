@@ -2,7 +2,7 @@
 
 Flowers provide movable decoration, dye ingredients, Bee forage, and selected Suspicious Stew effects. This guide covers **13 small flowers and four two-block flowers**, with exact IDs below. Collect a tall flower to start a renewable supply through Bone Meal; collect small flowers from suitable terrain or use the biome-dependent Grass Block route. [Small-flower registrations] · [Tall-flower registrations] · [Small-flower items] · [Tall-flower items]
 
-[Torchflower](../items/Torchflower.md) and [Pitcher Plant](../items/PitcherPlant.md) belong to separate crop lifecycles. [Pink Petals](../items/PinkPetals.md), [Wildflowers](../items/Wildflowers.md), Eyeblossoms, Firefly Bush, and imported Primordial plants are outside this comparison. Potted forms belong to [Flower Pot](FlowerPot.md#supported-plants).
+[Torchflower](Torchflower.md) and [Pitcher Plant](PitcherPlant.md) belong to separate crop lifecycles. [Pink Petals](../items/PinkPetals.md), [Wildflowers](../items/Wildflowers.md), Eyeblossoms, Firefly Bush, and imported Primordial plants are outside this comparison. Potted forms belong to [Flower Pot](FlowerPot.md#supported-plants).
 
 ## Small-flower variants
 

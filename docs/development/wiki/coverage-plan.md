@@ -968,10 +968,19 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,297 pages / 37 indexes. All 18 authored paths are documentation; 1,978 local links/anchors and 317 tracked references resolve, with zero rendered reference ambiguity or unresolved bracket candidates. The directory preserves 1,211 alphabetical IDs, with 1,142 related-guide routes and 69 explicit article gaps. These are navigation counts, not article-completion scores.
 
+## Batch 121: Cocoa, Sweet Berries and ancient crops
+
+- Added four canonical block guides and corrected six item pages, preserving their 31 existing anchors, including Pitcher Pod portal conversion. Six registered crop/plant IDs now link to their owners, and Flowers links the separate ancient-crop lifecycles.
+- Cocoa review checks the four accepted Jungle timber forms, growth and Bone Meal, break/replant harvesting, recipes and composting. Sweet Berry review separates ordinary picking from Fortune-sensitive breaking, actual soil/light rules, contact damage and Fox harvesting.
+- Torchflower/Pitcher review follows active Sniffer state/tick/gift-loot acquisition, exact support and growth gates, their different mature-block transitions, seed/pod consumption and drops, decorative planting, dye/stew/compost uses and absence of ordinary mature-crop use/hoe controls. Torchflower’s level-7 light and Pitcher’s brightness-8 growth gate are checked MattMC properties.
+- Source checkpoint: `20354edd390fadb09b43132d712facf4188c4119`; all 62 distinct pinned article-source paths match the integrated source. No crop growth, harvest, Sniffer, lighting, Bone Meal, contact or portal runtime test is claimed.
+
+- Validation: required checker and strict build passed on 2,301 pages / 37 indexes. All 16 authored paths are documentation; 2,027 local links/anchors and 287 tracked reference uses resolve, with zero rendered citation ambiguity or unresolved-bracket candidates. The alphabetical directory retains 1,211 IDs, with 1,148 related-guide routes and 63 explicit article gaps. Broad article coverage remains incomplete.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Finish the isolated Cocoa, Sweet Berry, Torchflower and Pitcher crop drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+2. Finish the isolated TaCZ workbench, remaining material and Slime/Honey block drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
 3. Fill remaining practical gaps such as fuel/storage utility blocks and the imported weapon workbenches, following actual active behavior and acquisition routes. The isolated material review also covers Bamboo full blocks, Bone Block, Netherrack and Petrified Oak Slab.
 4. Cover remaining terrain/material, plant and technical families, including Netherrack/Bone Block, Bamboo full blocks, Fire/Soul Fire, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
 5. Preserve the ready Swords and undead drafts for later source revalidation; continue broader item, mob, biome, effect, structure and gameplay-system coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.

@@ -270,7 +270,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cobblestone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_stairs`
 - **Cobblestone Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_wall`
 - **Cobweb** — article needed; `minecraft:cobweb`
-- **Cocoa** — article needed; `minecraft:cocoa`
+- **Cocoa** — [Cocoa](Cocoa.md) (related guide); `minecraft:cocoa`
 - **Command Block** — article needed; `minecraft:command_block`
 - **Composter** — [Composter](Composter.md#composter) (related guide); `minecraft:composter`
 - **Conduit** — [Conduit](Conduit.md#build-a-valid-frame) (related guide); `minecraft:conduit`
@@ -832,8 +832,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pink Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:pink_wool`
 - **Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:piston`
 - **Piston Head** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:piston_head`
-- **Pitcher Crop** — article needed; `minecraft:pitcher_crop`
-- **Pitcher Plant** — article needed; `minecraft:pitcher_plant`
+- **Pitcher Crop** — [Pitcher Plant and Pitcher Crop](PitcherPlant.md) (related guide); `minecraft:pitcher_crop`
+- **Pitcher Plant** — [Pitcher Plant and Pitcher Crop](PitcherPlant.md) (related guide); `minecraft:pitcher_plant`
 - **Platypus Egg** — article needed; `minecraft:platypus_egg`
 - **Player Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_head`
 - **Player Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_wall_head`
@@ -1112,7 +1112,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Sunflower** — [Small and tall flowers](Flowers.md#sunflower) (related guide); `minecraft:sunflower`
 - **Suspicious Gravel** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel) (related guide); `minecraft:suspicious_gravel`
 - **Suspicious Sand** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel) (related guide); `minecraft:suspicious_sand`
-- **Sweet Berry Bush** — article needed; `minecraft:sweet_berry_bush`
+- **Sweet Berry Bush** — [Sweet Berry Bush](SweetBerryBush.md) (related guide); `minecraft:sweet_berry_bush`
 
 ### T
 
@@ -1131,8 +1131,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Tinted Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:tinted_glass`
 - **TNT** — [TNT](TNT.md#tnt) (related guide); `minecraft:tnt`
 - **Torch** — [Torch](Torch.md) (related guide); `minecraft:torch`
-- **Torchflower** — article needed; `minecraft:torchflower`
-- **Torchflower Crop** — article needed; `minecraft:torchflower_crop`
+- **Torchflower** — [Torchflower and Torchflower Crop](Torchflower.md) (related guide); `minecraft:torchflower`
+- **Torchflower Crop** — [Torchflower and Torchflower Crop](Torchflower.md) (related guide); `minecraft:torchflower_crop`
 - **Trapped Chest** — [Trapped Chest](TrappedChest.md#opening-signal-and-counted-users) (related guide); `minecraft:trapped_chest`
 - **Tree Star** — [Ancient trees, Flytraps and Tree Stars](AncientPlants.md#tree-star) (related guide); `minecraft:tree_star`
 - **Tremorsaurus Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:tremorsaurus_egg`
@@ -1336,6 +1336,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Cauldrons](Cauldrons.md)
 - [Chest](Chest.md)
 - [Clay and Bricks](ClayAndBricks.md)
+- [Cocoa](Cocoa.md)
 - [Composter](Composter.md)
 - [Concrete and Concrete Powder](Concrete.md)
 - [Conduit](Conduit.md)
@@ -1403,6 +1404,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Ores and Ancient Debris](OreResources.md)
 - [Pewen family](Pewen.md)
 - [Piston and Sticky Piston](Pistons.md)
+- [Pitcher Plant and Pitcher Crop](PitcherPlant.md)
 - [Placed dinosaur eggs](DinosaurEggs.md)
 - [Pressure plates](PressurePlates.md)
 - [Primal Magma and Fissure Primal Magma](PrimalMagma.md)
@@ -1439,10 +1441,12 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Stonecutter](Stonecutter.md)
 - [Subterranodon Egg](SubterranodonEgg.md)
 - [Sugar Cane](SugarCane.md)
+- [Sweet Berry Bush](SweetBerryBush.md)
 - [Target](Target.md)
 - [Terracotta and Glazed Terracotta](Terracotta.md)
 - [TNT](TNT.md)
 - [Torch](Torch.md)
+- [Torchflower and Torchflower Crop](Torchflower.md)
 - [Trapped Chest](TrappedChest.md)
 - [Tree leaves and Mangrove Propagules](TreeLeaves.md)
 - [Tree logs and roots](TreeLogsAndRoots.md)
