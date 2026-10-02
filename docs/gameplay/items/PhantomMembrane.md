@@ -4,6 +4,8 @@
 
 Phantom Membrane can be obtained from the Creative Menu and from its normal survival sources when those sources are available.
 
+For the conditional mob-drop route, see [Phantom drops](../mobs/Phantom.md#drops). MattMC disables insomnia spawning by default; the guide explains the settings and encounter checks.
+
 ## Usage
 
 Phantom Membrane is used as a crafting ingredient, decoration item, or utility item depending on the recipe and gameplay system.

@@ -89,6 +89,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Combat and mob resources
 
+- [Bat](mobs/Bat.md), [Phantom](mobs/Phantom.md), [Silverfish](mobs/Silverfish.md), and [Endermite](mobs/Endermite.md): ambient cave behavior, insomnia settings, infestation, Pearl-spawn conditions and persistence
+
 - [Witch](mobs/Witch.md), [Bogged](mobs/Bogged.md), [Stray](mobs/Stray.md), and [Breeze](mobs/Breeze.md): potion choices, special-arrow effects, shearing, Trial Spawner routes and wind hazards
 
 - [Ghast](mobs/Ghast.md), [Hoglin](mobs/Hoglin.md), [Zoglin](mobs/Zoglin.md), and [Zombified Piglin](mobs/ZombifiedPiglin.md): Nether encounter routes, fireball rewards, food/breeding, zombification and group anger

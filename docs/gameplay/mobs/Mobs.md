@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Small mobs and night encounters:** [Bat](Bat.md), [Phantom](Phantom.md), [Silverfish](Silverfish.md), and [Endermite](Endermite.md): cave wildlife, default-off insomnia, infestation and Pearl-spawn lifetimes
+
 - **Potion and wind encounters:** [Witch](Witch.md), [Bogged](Bogged.md), [Stray](Stray.md), and [Breeze](Breeze.md): splash effects, special arrows, shearing and Trial Chamber wind attacks
 
 - **Nether encounters:** [Ghast](Ghast.md), [Hoglin](Hoglin.md), [Zoglin](Zoglin.md), and [Zombified Piglin](ZombifiedPiglin.md): fireball returns, breeding/repellents, conversion and group anger

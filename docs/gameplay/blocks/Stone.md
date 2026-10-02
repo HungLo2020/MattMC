@@ -99,7 +99,7 @@ These placed forms do not fall or require a supporting block beneath them. Shape
 
 ## Infested stone variants
 
-An infested block can resemble ordinary masonry but release a **Silverfish** when broken. The registered stone-family forms and their Silk Touch outputs are:
+An infested block can resemble ordinary masonry but release a **[Silverfish](../mobs/Silverfish.md)** when broken. The registered stone-family forms and their Silk Touch outputs are:
 
 | Infested ID | Silk Touch output |
 | --- | --- |

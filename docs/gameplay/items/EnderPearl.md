@@ -36,7 +36,7 @@ The impact must resolve an eligible owner. For a player in the same dimension, t
 
 The pearl itself has an additional restriction when leaving the End for the Overworld: a player owner must have seen the credits. This is not a guide to building a cross-dimension pearl system.
 
-The player-teleport branch also has a **5% Endermite-spawn check** when the pearl's world allows monster spawning. Be ready for a mob as well as the destination terrain.
+The player-teleport branch also has a **5% [Endermite](../mobs/Endermite.md#ender-pearl-spawns) spawn check** when the pearl's world allows monster spawning. Be ready for a mob as well as the destination terrain.
 
 The default `enderPearlsVanishOnDeath` rule is true. Under that rule, an ordinary dead player's thrown pearls are discarded. Persistent pearl setups, logout/rejoin behavior, and chunk-loading arrangements are outside this page's verification; do not depend on one as an untested recovery plan.
 

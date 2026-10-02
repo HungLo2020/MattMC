@@ -1334,3 +1334,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Preserved all 60 existing anchors and 60 other inspected authored item pages. Crimson/Warped fuel exclusions remain explicit. These are existing inventory-page corrections, not 12 new exhaustive behavior articles.
 - Clarified resource audit instructions: TaCZ actively reads some plural recipes paths through its own loader, so ordinary RecipeManager directory scope must not be confused with universal resource inactivity.
 - Independent source/data/render checks and final documentation checker/strict build are required before promotion. No placement, power, waterlogging, mining, fire or recipe gameplay test is claimed.
+
+## Batch 162: Small mobs and night encounters
+
+- Expanded Bat, Phantom, Silverfish and Endermite with actual creation/spawn callers, care and combat limits, persistence and loot, plus seven discovery links. Phantom Membrane receives a conditional acquisition crosslink, not a completed item-owner claim.
+- Documented default-off insomnia, conditional Phantom scheduling/rest checks and the size-zero damage-initialization caveat; Bat seasonal/local-ground conditions; Silverfish infestation, effect and configured spawner routes; and Endermite Pearl-position/lifetime/Enderman-target distinctions.
+- Independent caller review and final unchanged-source/check/build/render validation are required before promotion. Spawn predicates are checked with their inherited and caller gates; no live spawn, combat, light-control, timing or loot test is claimed.
