@@ -648,6 +648,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Clay/Bricks cross-link, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,189 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, cutting, collection, Hopper, collision, or villager gameplay test.
 
+## Eighty-sixth batch: large ocean animals and crystals
+
+- Expanded Cachalot Whale/Giant Squid and their spawn eggs; corrected Prismarine Crystals from a block stub to an actual material/reward guide with checked Guardian loot and Sea Lantern crafting.
+- Traced current whale rescue attribution/reward persistence, echo/charge and block breaking, air handling, variant selection, and disabled squid capture/multipart paths without claiming upstream rewards or natural spawning.
+- Updated Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,189 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, rescue, combat, block damage, breathing, or loot gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

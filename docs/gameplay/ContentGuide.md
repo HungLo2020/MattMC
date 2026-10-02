@@ -103,6 +103,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Alex's Mobs additions
 
+- [Cachalot Whale](mobs/CachalotWhale.md) and [Giant Squid](mobs/GiantSquid.md): breathing/care, whale rescue rewards and building hazards, combat, and current capture/multipart limits
 - [Rattlesnake](mobs/Rattlesnake.md) and [Jerboa](mobs/Jerboa.md): conditional attacks, seed befriending/Speed, active breeding differences, and current venom/spawn limits
 - [Gorilla](mobs/Gorilla.md) and [Gelada Monkey](mobs/GeladaMonkey.md): group behavior, active Dead Bush breeding/Wheat clearing, and food/combat integration limits
 - [Orca](mobs/Orca.md) and [Hammerhead Shark](mobs/HammerheadShark.md): swimming benefits, conditional predation, spawn-egg access, and current natural-spawn/breeding limits
