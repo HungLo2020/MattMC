@@ -89,6 +89,11 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Building, redstone, and travel
 
+- [Coral](blocks/Coral.md): all living/dead blocks, plants and fans, exact Silk Touch/tool rules, water/support and renewable sources
+
+- [Beacon](blocks/Beacon.md) and [Conduit](blocks/Conduit.md): complete base/frame layouts, activation, effect ranges, payment and target limits
+- [Soul Sand, Soul Soil and Magma Blocks](blocks/SoulSandSoilAndMagma.md): movement, harvesting, crop support, columns and hot-floor safety
+
 - [Quartz](blocks/Quartz.md) and [End Stone/Purpur](blocks/EndStoneAndPurpur.md): exact finishes, mixed crafting inputs, stonecutting, pillars and Dragon interactions
 
 - [Copper lighting](blocks/CopperLighting.md), [Copper Chests](blocks/CopperChests.md), [Lightning Rods](blocks/LightningRods.md), [Golem Statues](blocks/CopperGolemStatues.md), and [Raw Copper storage](blocks/RawCopperStorage.md): device controls, sorting, variant changes and collection

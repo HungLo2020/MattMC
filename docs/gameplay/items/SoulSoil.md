@@ -1,17 +1,23 @@
 # Soul Soil
 
+**Soul Soil** (`minecraft:soul_soil`) is the inventory form of a placed block.
+
 ## Obtaining
 
-Soul Soil can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Collect Soul Soil by hand or with a shovel from its terrain. A Soul Campfire broken without Silk Touch returns one Soul Soil, including when that campfire was crafted using Soul Sand.
 
-## Usage
+## Use
 
-Soul Soil is a building, natural, utility, redstone, decorative, or workstation block.
+Placed Soul Soil is a full-height block without Soul Sand’s ordinary slowdown. It supports Soul Fire, participates in the Soul Speed block tag, and can be used in the verified Lava/Blue Ice Basalt-making layout. It does not grow Nether Wart or start a rising Bubble Column.
 
-## Behavior
+See [Soul Sand, Soul Soil and Magma Blocks](../blocks/SoulSandSoilAndMagma.md#soul-soil) for exact collection rules, acquisition sources, conversion recipes and placed behavior. Ordinary block drops are one item, without a Fortune bonus or a Silk Touch requirement for this block itself.
 
-It follows its configured block rules for placement, mining, drops, and interaction.
+## Related pages
 
-## Notes
+- [Bubble Columns](../blocks/BubbleColumns.md)
+- [The Nether](../dimensions/Nether.md)
+- [Items](Items.md)
 
-* This item is the item form of the `minecraft:soul_soil` block.
+## Sources and verification
+
+Source-reviewed at `be4ac3081f175ffb862938ab118b20e6457110d8` on 2026-10-02; no gameplay test. The [canonical block guide](../blocks/SoulSandSoilAndMagma.md#sources-and-verification) contains the checked registrations, loot, tool tags, recipes and interaction sources.

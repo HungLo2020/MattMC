@@ -76,7 +76,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Barrel** — article needed; `minecraft:barrel`
 - **Barrier** — article needed; `minecraft:barrier`
 - **Basalt** — [Blackstone and Basalt](BlackstoneAndBasalt.md#basalt-variants-and-orientation) (related guide); `minecraft:basalt`
-- **Beacon** — article needed; `minecraft:beacon`
+- **Beacon** — [Beacon](Beacon.md#build-the-base) (related guide); `minecraft:beacon`
 - **Bedrock** — article needed; `minecraft:bedrock`
 - **Bee Nest** — [Bee housing](BeeHousing.md) (related guide); `minecraft:bee_nest`
 - **Beehive** — [Bee housing](BeeHousing.md) (related guide); `minecraft:beehive`
@@ -154,10 +154,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Blue Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:blue_wool`
 - **Bone Block** — article needed; `minecraft:bone_block`
 - **Bookshelf** — article needed; `minecraft:bookshelf`
-- **Brain Coral** — article needed; `minecraft:brain_coral`
-- **Brain Coral Block** — article needed; `minecraft:brain_coral_block`
-- **Brain Coral Fan** — article needed; `minecraft:brain_coral_fan`
-- **Brain Coral Wall Fan** — article needed; `minecraft:brain_coral_wall_fan`
+- **Brain Coral** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral`
+- **Brain Coral Block** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral_block`
+- **Brain Coral Fan** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral_fan`
+- **Brain Coral Wall Fan** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral_wall_fan`
 - **Brewing Stand** — [Brewing Stand](BrewingStand.md) (related guide); `minecraft:brewing_stand`
 - **Brick Slab** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:brick_slab`
 - **Brick Stairs** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:brick_stairs`
@@ -179,10 +179,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Brown Wall Banner †** — article needed; `minecraft:brown_wall_banner`
 - **Brown Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:brown_wool`
 - **Bubble Column** — [Bubble Columns](BubbleColumns.md) (related guide); `minecraft:bubble_column`
-- **Bubble Coral** — article needed; `minecraft:bubble_coral`
-- **Bubble Coral Block** — article needed; `minecraft:bubble_coral_block`
-- **Bubble Coral Fan** — article needed; `minecraft:bubble_coral_fan`
-- **Bubble Coral Wall Fan** — article needed; `minecraft:bubble_coral_wall_fan`
+- **Bubble Coral** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral`
+- **Bubble Coral Block** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral_block`
+- **Bubble Coral Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral_fan`
+- **Bubble Coral Wall Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral_wall_fan`
 - **Budding Amethyst** — article needed; `minecraft:budding_amethyst`
 - **Bush** — article needed; `minecraft:bush`
 
@@ -273,7 +273,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cocoa** — article needed; `minecraft:cocoa`
 - **Command Block** — article needed; `minecraft:command_block`
 - **Composter** — article needed; `minecraft:composter`
-- **Conduit** — article needed; `minecraft:conduit`
+- **Conduit** — [Conduit](Conduit.md#build-a-valid-frame) (related guide); `minecraft:conduit`
 - **Cooked Dinosaur Chop** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:cooked_dinosaur_chop`
 - **Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:copper_bulb`
 - **Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:copper_chest`
@@ -363,27 +363,27 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dark Prismarine Slab** — article needed; `minecraft:dark_prismarine_slab`
 - **Dark Prismarine Stairs** — article needed; `minecraft:dark_prismarine_stairs`
 - **Daylight Detector** — article needed; `minecraft:daylight_detector`
-- **Dead Brain Coral** — article needed; `minecraft:dead_brain_coral`
-- **Dead Brain Coral Block** — article needed; `minecraft:dead_brain_coral_block`
-- **Dead Brain Coral Fan** — article needed; `minecraft:dead_brain_coral_fan`
-- **Dead Brain Coral Wall Fan** — article needed; `minecraft:dead_brain_coral_wall_fan`
-- **Dead Bubble Coral** — article needed; `minecraft:dead_bubble_coral`
-- **Dead Bubble Coral Block** — article needed; `minecraft:dead_bubble_coral_block`
-- **Dead Bubble Coral Fan** — article needed; `minecraft:dead_bubble_coral_fan`
-- **Dead Bubble Coral Wall Fan** — article needed; `minecraft:dead_bubble_coral_wall_fan`
+- **Dead Brain Coral** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral`
+- **Dead Brain Coral Block** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral_block`
+- **Dead Brain Coral Fan** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral_fan`
+- **Dead Brain Coral Wall Fan** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral_wall_fan`
+- **Dead Bubble Coral** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral`
+- **Dead Bubble Coral Block** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral_block`
+- **Dead Bubble Coral Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral_fan`
+- **Dead Bubble Coral Wall Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral_wall_fan`
 - **Dead Bush** — [Dead Bush](DeadBush.md) (related guide); `minecraft:dead_bush`
-- **Dead Fire Coral** — article needed; `minecraft:dead_fire_coral`
-- **Dead Fire Coral Block** — article needed; `minecraft:dead_fire_coral_block`
-- **Dead Fire Coral Fan** — article needed; `minecraft:dead_fire_coral_fan`
-- **Dead Fire Coral Wall Fan** — article needed; `minecraft:dead_fire_coral_wall_fan`
-- **Dead Horn Coral** — article needed; `minecraft:dead_horn_coral`
-- **Dead Horn Coral Block** — article needed; `minecraft:dead_horn_coral_block`
-- **Dead Horn Coral Fan** — article needed; `minecraft:dead_horn_coral_fan`
-- **Dead Horn Coral Wall Fan** — article needed; `minecraft:dead_horn_coral_wall_fan`
-- **Dead Tube Coral** — article needed; `minecraft:dead_tube_coral`
-- **Dead Tube Coral Block** — article needed; `minecraft:dead_tube_coral_block`
-- **Dead Tube Coral Fan** — article needed; `minecraft:dead_tube_coral_fan`
-- **Dead Tube Coral Wall Fan** — article needed; `minecraft:dead_tube_coral_wall_fan`
+- **Dead Fire Coral** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral`
+- **Dead Fire Coral Block** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral_block`
+- **Dead Fire Coral Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral_fan`
+- **Dead Fire Coral Wall Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral_wall_fan`
+- **Dead Horn Coral** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:dead_horn_coral`
+- **Dead Horn Coral Block** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:dead_horn_coral_block`
+- **Dead Horn Coral Fan** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:dead_horn_coral_fan`
+- **Dead Horn Coral Wall Fan** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:dead_horn_coral_wall_fan`
+- **Dead Tube Coral** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral`
+- **Dead Tube Coral Block** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral_block`
+- **Dead Tube Coral Fan** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral_fan`
+- **Dead Tube Coral Wall Fan** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral_wall_fan`
 - **Decorated Pot** — article needed; `minecraft:decorated_pot`
 - **Deepslate** — [Deepslate](Deepslate.md#orienting-ordinary-deepslate) (related guide); `minecraft:deepslate`
 - **Deepslate Brick Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_slab`
@@ -455,10 +455,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Fern Thatch** — [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md#fern-thatch-crafting-and-collecting) (related guide); `minecraft:fern_thatch`
 - **Fiddlehead** — [Primordial decorative plants](PrimordialPlants.md) (related guide); `minecraft:fiddlehead`
 - **Fire** — article needed; `minecraft:fire`
-- **Fire Coral** — article needed; `minecraft:fire_coral`
-- **Fire Coral Block** — article needed; `minecraft:fire_coral_block`
-- **Fire Coral Fan** — article needed; `minecraft:fire_coral_fan`
-- **Fire Coral Wall Fan** — article needed; `minecraft:fire_coral_wall_fan`
+- **Fire Coral** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral`
+- **Fire Coral Block** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_block`
+- **Fire Coral Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_fan`
+- **Fire Coral Wall Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_wall_fan`
 - **Firefly Bush** — article needed; `minecraft:firefly_bush`
 - **Fissure Primal Magma †** — [Primal Magma and Fissure Primal Magma](PrimalMagma.md) (related guide); `minecraft:fissure_primal_magma`
 - **Fletching Table** — article needed; `minecraft:fletching_table`
@@ -523,10 +523,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Honey Block** — article needed; `minecraft:honey_block`
 - **Honeycomb Block** — article needed; `minecraft:honeycomb_block`
 - **Hopper** — [Hopper](Hopper.md) (related guide); `minecraft:hopper`
-- **Horn Coral** — article needed; `minecraft:horn_coral`
-- **Horn Coral Block** — article needed; `minecraft:horn_coral_block`
-- **Horn Coral Fan** — article needed; `minecraft:horn_coral_fan`
-- **Horn Coral Wall Fan** — article needed; `minecraft:horn_coral_wall_fan`
+- **Horn Coral** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:horn_coral`
+- **Horn Coral Block** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:horn_coral_block`
+- **Horn Coral Fan** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:horn_coral_fan`
+- **Horn Coral Wall Fan** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:horn_coral_wall_fan`
 
 ### I
 
@@ -655,7 +655,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Magenta Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:magenta_terracotta`
 - **Magenta Wall Banner †** — article needed; `minecraft:magenta_wall_banner`
 - **Magenta Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:magenta_wool`
-- **Magma Block** — article needed; `minecraft:magma_block`
+- **Magma Block** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#magma-block) (related guide); `minecraft:magma_block`
 - **Mangrove Button** — article needed; `minecraft:mangrove_button`
 - **Mangrove Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:mangrove_door`
 - **Mangrove Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:mangrove_fence`
@@ -1046,8 +1046,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Soul Campfire** — article needed; `minecraft:soul_campfire`
 - **Soul Fire** — article needed; `minecraft:soul_fire`
 - **Soul Lantern** — article needed; `minecraft:soul_lantern`
-- **Soul Sand** — article needed; `minecraft:soul_sand`
-- **Soul Soil** — article needed; `minecraft:soul_soil`
+- **Soul Sand** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-sand) (related guide); `minecraft:soul_sand`
+- **Soul Soil** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-soil) (related guide); `minecraft:soul_soil`
 - **Soul Torch** — article needed; `minecraft:soul_torch`
 - **Soul Wall Torch** — article needed; `minecraft:soul_wall_torch`
 - **Sponge** — article needed; `minecraft:sponge`
@@ -1139,10 +1139,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Trial Spawner** — article needed; `minecraft:trial_spawner`
 - **Tripwire** — [Tripwire and Tripwire Hooks](Tripwire.md) (related guide); `minecraft:tripwire`
 - **Tripwire Hook** — [Tripwire and Tripwire Hooks](Tripwire.md) (related guide); `minecraft:tripwire_hook`
-- **Tube Coral** — article needed; `minecraft:tube_coral`
-- **Tube Coral Block** — article needed; `minecraft:tube_coral_block`
-- **Tube Coral Fan** — article needed; `minecraft:tube_coral_fan`
-- **Tube Coral Wall Fan** — article needed; `minecraft:tube_coral_wall_fan`
+- **Tube Coral** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:tube_coral`
+- **Tube Coral Block** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:tube_coral_block`
+- **Tube Coral Fan** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:tube_coral_fan`
+- **Tube Coral Wall Fan** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:tube_coral_wall_fan`
 - **Tuff** — [Tuff](Tuff.md#obtaining-and-mining) (related guide); `minecraft:tuff`
 - **Tuff Brick Slab** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_brick_slab`
 - **Tuff Brick Stairs** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_brick_stairs`
@@ -1316,6 +1316,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Ancient trees, Flytraps and Tree Stars](AncientPlants.md)
 - [Anvil](Anvil.md)
 - [Bamboo](Bamboo.md)
+- [Beacon](Beacon.md)
 - [Beds](Bed.md)
 - [Bee housing](BeeHousing.md)
 - [Blackstone and Basalt](BlackstoneAndBasalt.md)
@@ -1327,10 +1328,12 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Chest](Chest.md)
 - [Clay and Bricks](ClayAndBricks.md)
 - [Concrete and Concrete Powder](Concrete.md)
+- [Conduit](Conduit.md)
 - [Copper Chests](CopperChests.md)
 - [Copper construction](CopperConstruction.md)
 - [Copper Golem Statues](CopperGolemStatues.md)
 - [Copper lighting](CopperLighting.md)
+- [Coral](Coral.md)
 - [Crafter](Crafter.md)
 - [Crafting Table](CraftingTable.md)
 - [Crimson and Warped Fungi](NetherFungi.md)
@@ -1386,6 +1389,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Smithing Table](SmithingTable.md)
 - [Snow and Powder Snow](Snow.md)
 - [Soil, Sand, and Gravel](SoilSandAndGravel.md)
+- [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md)
 - [Stone](Stone.md)
 - [Stonecutter](Stonecutter.md)
 - [Subterranodon Egg](SubterranodonEgg.md)

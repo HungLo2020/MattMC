@@ -1,17 +1,23 @@
 # Soul Sand
 
+**Soul Sand** (`minecraft:soul_sand`) is the inventory form of a placed block.
+
 ## Obtaining
 
-Soul Sand can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Collect the block by hand or more quickly with a shovel. Adult Piglin bartering can also return 2–8 as one possible result.
 
-## Usage
+## Use
 
-Soul Sand is a building, natural, utility, redstone, decorative, or workstation block.
+Placed Soul Sand slows ordinary horizontal movement and has a 14/16-block collision height. It supports Nether Wart and creates upward Bubble Columns above a suitable source-water base. Soul Soil does not substitute for either function.
 
-## Behavior
+See [Soul Sand, Soul Soil and Magma Blocks](../blocks/SoulSandSoilAndMagma.md#soul-sand) for exact collection rules, acquisition sources, conversion recipes and placed behavior. Ordinary block drops are one item, without a Fortune bonus or a Silk Touch requirement for this block itself.
 
-It follows its configured block rules for placement, mining, drops, and interaction.
+## Related pages
 
-## Notes
+- [Bubble Columns](../blocks/BubbleColumns.md)
+- [The Nether](../dimensions/Nether.md)
+- [Items](Items.md)
 
-* This item is the item form of the `minecraft:soul_sand` block.
+## Sources and verification
+
+Source-reviewed at `be4ac3081f175ffb862938ab118b20e6457110d8` on 2026-10-02; no gameplay test. The [canonical block guide](../blocks/SoulSandSoilAndMagma.md#sources-and-verification) contains the checked registrations, loot, tool tags, recipes and interaction sources.

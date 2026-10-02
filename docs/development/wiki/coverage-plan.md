@@ -798,6 +798,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Reconciled 201 distinct cited source paths against the integrated master snapshot; all remain unchanged from their pins. Incoming mob fixes and the voxel rotation migration are preserved. No gameplay tests were run.
 - Validation: required checker and strict build passed on 2,241 pages and 37 indexes. Checked 1,930 local links/anchors, 533 citation uses, all 1,211 alphabetical IDs, seven snow/ice loot tables, thirteen growth-plant loot tables and seven imported-family loot tables. The directory now offers 788 related-guide routes with 423 explicit article gaps; these are navigation counts, not a completeness score.
 
+## Batch 103: Beacon, Conduit, Coral and Nether utility blocks
+
+- Added four canonical block guides: Beacon, Conduit, Coral, and Soul Sand/Soul Soil/Magma. Corrected nine existing item pages with specific acquisition/use and links to the canonical block behavior.
+- Reviewed Beacon tiers/payment/effects, Conduit water/frame/range/targeting, all forty living/dead Coral forms and thirty shared/direct loot tables, and three Nether utility blocks' harvesting, movement, conversion, column and damage rules. Geometry and source-defined conditions are distinguished from runtime verification.
+- Kept existing Nether Star crafting, glass beam-color, Bubble Column, Nether Wart, Wither and Basalt article ownership. All forty Coral IDs route to actual species anchors; wall fans retain their shared item/loot distinction.
+- No source advance was needed from published `be4ac3081f175ffb862938ab118b20e6457110d8` at batch start. The authored diff is documentation only; no gameplay tests were run.
+- Validation: required checker and strict build passed on 2,245 pages / 37 indexes. Checked 1,789 local links/anchors, 307 citation uses, 164 pinned source paths unchanged against the integrated head, all 1,211 alphabetical IDs, and exact 2/40/3 block-family maps. The directory has 833 related-guide routes and 378 explicit article gaps, not a completion score.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and category catalogs as source changes; expand genuine article coverage from the now-visible gaps. The initial directory, twelve-terrain guide, Crafter correction, and Rabbit/Fox citation repair are recorded in batch 97.

@@ -1,17 +1,23 @@
 # Magma Block
 
+**Magma Block** (`minecraft:magma_block`) is the inventory form of a placed block.
+
 ## Obtaining
 
-Magma Block can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft four Magma Cream in a 2 × 2 square to make one Magma Block. Recover a placed block with an unbroken pickaxe, including Wood; hand mining fails its correct-tool drop gate.
 
-## Usage
+## Use
 
-Magma Block is a natural, resource, technical, or building block.
+Placed Magma emits light level 3, starts descending Bubble Columns above suitable water, and has a hot-floor callback for living entities that are not stepping carefully. Sneaking, Fire Resistance and equipped Frost Walker have the distinct protections explained in the block guide. It is separate from Primal Magma.
 
-## Behavior
+See [Soul Sand, Soul Soil and Magma Blocks](../blocks/SoulSandSoilAndMagma.md#magma-block) for exact collection rules, acquisition sources, conversion recipes and placed behavior. Ordinary block drops are one item, without a Fortune bonus or a Silk Touch requirement for this block itself.
 
-It follows its configured block rules for placement, mining, drops, and interaction.
+## Related pages
 
-## Notes
+- [Bubble Columns](../blocks/BubbleColumns.md)
+- [The Nether](../dimensions/Nether.md)
+- [Items](Items.md)
 
-* This item is the item form of the `minecraft:magma_block` block.
+## Sources and verification
+
+Source-reviewed at `be4ac3081f175ffb862938ab118b20e6457110d8` on 2026-10-02; no gameplay test. The [canonical block guide](../blocks/SoulSandSoilAndMagma.md#sources-and-verification) contains the checked registrations, loot, tool tags, recipes and interaction sources.
