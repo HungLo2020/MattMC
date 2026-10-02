@@ -18,7 +18,7 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Game modes](gamemodes/Gamemodes.md): all four modes and permission-aware switching
 - [Oak](blocks/Oak.md), [Logs](items/OakLog.md), [Planks](items/OakPlanks.md), [Saplings](items/OakSapling.md), and [Sticks](items/Stick.md): the renewable beginner wood loop
 - [Stone](blocks/Stone.md) and [Deepslate](blocks/Deepslate.md): ordinary/mossy/brick construction, exact crafting/stonecutting choices, shaped placement, infestation, and reinforced-block limits
-- [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations and storage
+- [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations, storage, and the Blast Furnace/Smoker recipe and fuel comparison
 - [Crafting](crafting/Crafting.md) and [Smelting](smelting/Smelting.md): current recipes, device types, and troubleshooting
 - [Beds](blocks/Bed.md) and [Torches](blocks/Torch.md): sleeping safety and basic lighting
 - [Coal](items/Coal.md) and [Charcoal](items/Charcoal.md): fuel, torch ingredients, and recipe distinctions
@@ -90,6 +90,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
 
 ### Building, redstone, and travel
+
+- [Signs and Hanging Signs](blocks/Signs.md): all material forms, placement, two-sided writing, dye/glow/wax and Pewen integration gaps
+- [Candles](blocks/Candles.md) and [Cake](blocks/Cake.md): colors, stacked light, water/ignition, slices, candle recovery and comparator output
 
 - [Coral](blocks/Coral.md): all living/dead blocks, plants and fans, exact Silk Touch/tool rules, water/support and renewable sources
 

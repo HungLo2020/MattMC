@@ -1,17 +1,27 @@
 # Candle
 
+The item places `minecraft:candle`, the uncolored candle used as the ingredient for every dyed-candle recipe.
+
 ## Obtaining
 
-Candle can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft one with the [String-and-Honeycomb recipe](Honeycomb.md#waxing-and-crafting). Mine a standalone group to recover its full count of matching items; no special tool or Silk Touch is needed.
 
 ## Usage
 
-Candle is used as a small decorative light source.
+Place one on valid center support and add matching candles to group up to four in one block. Ignite a dry group with Flint and Steel or Fire Charge; its light is 3 per candle, up to 12. Use an empty hand to extinguish it.
 
 ## Behavior
 
-Candles can be lit, extinguished, grouped on a block, and placed on compatible cakes.
+Standalone candles can waterlog and cannot be lit while waterlogged. One candle can also be added to an untouched Cake; eating the first slice returns it. See the [Candles guide](../blocks/Candles.md) for exact support-loss behavior, water rules, lighting, grouping, and all colors.
 
 ## Notes
 
-* This item is the item form of the `minecraft:candle` block.
+The [Cake guide](../blocks/Cake.md#adding-and-recovering-a-candle) explains the separate candle-cake block and its eating interaction. [Recipe][recipe] · [Loot][loot] · [Registration][reg]
+
+## Sources and verification
+
+Source-reviewed at `beaa5747b36af51b001a13ce8b6648319ba6faf5` on 2026-10-02. The linked block guides contain the full placed-behavior evidence. No gameplay test of support removal, eating, lighting, water, or redstone output was run.
+
+[recipe]: https://github.com/HungLo2020/MattMC/blob/beaa5747b36af51b001a13ce8b6648319ba6faf5/src/main/resources/data/minecraft/recipe/crafting/candle.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/beaa5747b36af51b001a13ce8b6648319ba6faf5/src/main/resources/data/minecraft/loot_table/blocks/candle.json
+[reg]: https://github.com/HungLo2020/MattMC/blob/beaa5747b36af51b001a13ce8b6648319ba6faf5/src/main/java/net/minecraft/world/level/block/Blocks.java#L5884-L5884

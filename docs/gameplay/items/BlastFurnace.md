@@ -1,17 +1,23 @@
 # Blast Furnace
 
+A **Blast Furnace** (`minecraft:blast_furnace`) places a three-slot cooking device for **blasting recipes**.
+
 ## Obtaining
 
-Blast Furnace can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft it with five Iron Ingots, one Furnace and three Smooth Stone. Use an unbroken pickaxe, including Wood, to recover a placed device. Its loot returns one item and preserves a custom name; inventory contents drop separately.
 
-## Usage
+## Use
 
-Blast Furnace is placed in the world as a block and used for building, decoration, utility, or environmental detail.
+Place it, add a matching input and fuel, and leave output space. The current blasting recipes take 100 game ticks, while this device halves the default fuel duration: it cooks those recipes faster than the standard Furnace without doubling items per fuel. It does not accept every smelting recipe.
 
-## Behavior
+It is also the Armorer villager job-site block, subject to ordinary employment rules. The [Furnace family guide](../blocks/Furnace.md#blast-furnace) gives the exact crafting pattern, fuel comparison, Hopper access, comparator behavior and collection rules.
 
-When placed, it behaves as the corresponding block. Breaking the block returns drops according to the block's normal loot rules.
+## Related pages
 
-## Notes
+- [Smelting](../smelting/Smelting.md)
+- [Villager trading](../trading/Trading.md)
+- [Items](Items.md)
 
-* This item is the item form of the `minecraft:blast_furnace` block.
+## Sources and verification
+
+Reviewed at `60699a119c4728a7bcaf15196f3c839cfcfd69dc` on 2026-10-02; no gameplay test. [Family source record](../blocks/Furnace.md#family-verification).

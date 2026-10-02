@@ -814,6 +814,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Reconciled 151 pinned source references against published head `beaa5747b36af51b001a13ce8b6648319ba6faf5`. Master advanced during publication to `cf8cd5371bd1de61411ae5e7e144aabe3edb1e54`; preserved incoming #781/#767 fixes and guides, then updated the related Biomes/Ore Resources caveats and monthly log. Final validation was repeated after sync. All authored edits are documentation; no gameplay tests were run.
 - Validation: required check and strict build passed on 2,246 pages / 37 indexes; 1,796 local links/anchors, 391 citations, all 1,211 alphabetical IDs, all thirty-two control recipe/loot mappings and six Amethyst loot tables were checked. Existing control anchors are retained. The directory has 863 related-guide routes and 348 explicit article gaps, not a completion score.
 
+## Batch 105: Signs, Cake/Candles and cooking-device families
+
+- Added canonical Signs/Hanging Signs, Cake and Candles guides; expanded Furnace with Blast Furnace/Smoker construction, recipes, fuel consumption, placement, collection, automation, comparator and employment differences. Corrected nine existing item pages.
+- Reviewed all fifty-two sign forms, thirty-five Cake/candle forms and three cooking devices. Pewen signs are explicitly flagged for the source-predicted block-entity placement failure, unresolved chain recipe and missing wall-hanging loot; they are not advertised as functioning labels.
+- Preserved existing food/recipe, Honeycomb, glass, Hopper and Furnace anchors/ownership. Checked exact sign text-face/wax persistence, support differences, Cake eating/candle recovery and current water/ignition paths rather than assuming upstream parity.
+- Source checkpoint remains published `60699a119c4728a7bcaf15196f3c839cfcfd69dc` at batch start. All authored paths are documentation; no gameplay tests were run.
+- Validation: required check and strict build passed on 2,249 pages / 37 indexes; 1,917 local links/anchors, 447 citation uses, all 1,211 alphabetical IDs and exact 52/35/3 family maps checked. Reconciled 220 newly introduced pinned source references; audited all 113 cooking recipes and the sign/candle recipe/loot matrices. Directory: 948 related-guide routes and 263 explicit article gaps, not a completeness score.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and category catalogs as source changes; expand genuine article coverage from the now-visible gaps. The initial directory, twelve-terrain guide, Crafter correction, and Rabbit/Fox citation repair are recorded in batch 97.
