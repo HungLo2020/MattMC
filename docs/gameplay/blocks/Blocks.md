@@ -184,7 +184,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Bubble Coral Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral_fan`
 - **Bubble Coral Wall Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral_wall_fan`
 - **Budding Amethyst** — [Amethyst, buds and clusters](Amethyst.md#budding-amethyst) (related guide); `minecraft:budding_amethyst`
-- **Bush** — article needed; `minecraft:bush`
+- **Bush** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#bush) (related guide); `minecraft:bush`
 
 ### C
 
@@ -371,7 +371,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dead Bubble Coral Block** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral_block`
 - **Dead Bubble Coral Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral_fan`
 - **Dead Bubble Coral Wall Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral_wall_fan`
-- **Dead Bush** — [Dead Bush](DeadBush.md) (related guide); `minecraft:dead_bush`
+- **Dead Bush** — [Dead Bush](DeadBush.md#finding-and-collecting) (related guide); `minecraft:dead_bush`
 - **Dead Fire Coral** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral`
 - **Dead Fire Coral Block** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral_block`
 - **Dead Fire Coral Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral_fan`
@@ -459,7 +459,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Fire Coral Block** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_block`
 - **Fire Coral Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_fan`
 - **Fire Coral Wall Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_wall_fan`
-- **Firefly Bush** — article needed; `minecraft:firefly_bush`
+- **Firefly Bush** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#firefly-bush) (related guide); `minecraft:firefly_bush`
 - **Fissure Primal Magma †** — [Primal Magma and Fissure Primal Magma](PrimalMagma.md) (related guide); `minecraft:fissure_primal_magma`
 - **Fletching Table** — [Fletching Table](FletchingTable.md#fletching-table) (related guide); `minecraft:fletching_table`
 - **Flood Basalt** — [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md#flood-basalt-access-and-the-mining-limitation) (related guide); `minecraft:flood_basalt`
@@ -1012,7 +1012,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Sea Lantern** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#sea-lantern) (related guide); `minecraft:sea_lantern`
 - **Sea Pickle** — [Sea Pickle](SeaPickle.md) (related guide); `minecraft:sea_pickle`
 - **Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:seagrass`
-- **Short Dry Grass** — article needed; `minecraft:short_dry_grass`
+- **Short Dry Grass** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#short-dry-grass) (related guide); `minecraft:short_dry_grass`
 - **Short Grass** — article needed; `minecraft:short_grass`
 - **Shroomlight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#shroomlight) (related guide); `minecraft:shroomlight`
 - **Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:shulker_box`
@@ -1119,7 +1119,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **TaCZ Ammo Assembly Table** — article needed; `minecraft:ammo_workbench`
 - **TaCZ Attachment Table** — article needed; `minecraft:attachment_workbench`
 - **TaCZ Gun Smith Table** — article needed; `minecraft:gun_smith_table`
-- **Tall Dry Grass** — article needed; `minecraft:tall_dry_grass`
+- **Tall Dry Grass** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#tall-dry-grass) (related guide); `minecraft:tall_dry_grass`
 - **Tall Grass** — article needed; `minecraft:tall_grass`
 - **Tall Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:tall_seagrass`
 - **Target** — [Target](Target.md#target) (related guide); `minecraft:target`
@@ -1136,7 +1136,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Trapped Chest** — article needed; `minecraft:trapped_chest`
 - **Tree Star** — [Ancient trees, Flytraps and Tree Stars](AncientPlants.md#tree-star) (related guide); `minecraft:tree_star`
 - **Tremorsaurus Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:tremorsaurus_egg`
-- **Trial Spawner** — article needed; `minecraft:trial_spawner`
+- **Trial Spawner** — [Trial Spawner](TrialSpawner.md#trial-spawner) (related guide); `minecraft:trial_spawner`
 - **Tripwire** — [Tripwire and Tripwire Hooks](Tripwire.md) (related guide); `minecraft:tripwire`
 - **Tripwire Hook** — [Tripwire and Tripwire Hooks](Tripwire.md) (related guide); `minecraft:tripwire_hook`
 - **Tube Coral** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:tube_coral`
@@ -1158,7 +1158,7 @@ Names use English localization where available. A † marks one of 25 readable r
 ### V
 
 - **Vallumraptor Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:vallumraptor_egg`
-- **Vault** — article needed; `minecraft:vault`
+- **Vault** — [Vault](Vault.md#normal-and-ominous-vaults) (related guide); `minecraft:vault`
 - **Verdant Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#ochre-verdant-and-pearlescent) (related guide); `minecraft:verdant_froglight`
 - **Vines** — [Vines and Glow Berries](Vines.md#vine) (related guide); `minecraft:vine`
 - **Void Air** — article needed; `minecraft:void_air`
@@ -1410,6 +1410,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Scaffolding](Scaffolding.md)
 - [Sea Pickle](SeaPickle.md)
 - [Seagrass](Seagrass.md)
+- [Shrubs and Dry Grass](ShrubsAndDryGrass.md)
 - [Shulker Box](ShulkerBox.md)
 - [Signs and Hanging Signs](Signs.md)
 - [Small and tall flowers](Flowers.md)
@@ -1426,8 +1427,10 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Torch](Torch.md)
 - [Tree leaves and Mangrove Propagules](TreeLeaves.md)
 - [Tree logs and roots](TreeLogsAndRoots.md)
+- [Trial Spawner](TrialSpawner.md)
 - [Tripwire and Tripwire Hooks](Tripwire.md)
 - [Tuff](Tuff.md)
+- [Vault](Vault.md)
 - [Vines and Glow Berries](Vines.md)
 - [Water and Lava](WaterAndLava.md)
 - [Wheat crop](Wheat.md)

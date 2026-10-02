@@ -61,7 +61,7 @@ Names use English localization where available. A † marks a readable registry-
 | TaCZ Attachment Table | [`minecraft:attachment_workbench`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6820) | Article needed |
 | TaCZ Gun Smith Table | [`minecraft:gun_smith_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6810) | Article needed |
 | Trapped Chest | [`minecraft:trapped_chest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2834) | Article needed |
-| Vault | [`minecraft:vault`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6787) | Article needed |
+| Vault | [`minecraft:vault`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6787) | [Vault](../Vault.md#normal-and-ominous-vaults) |
 | Water Cauldron | [`minecraft:water_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2531) | [Cauldrons](../Cauldrons.md#water-cauldron) |
 | Wet Sponge | [`minecraft:wet_sponge`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L617) | Article needed |
 

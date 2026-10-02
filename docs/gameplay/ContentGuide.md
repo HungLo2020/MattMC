@@ -228,6 +228,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Campfires](blocks/Campfires.md): four-slot cooking, damage, extinguishing and smoke
 - [Target](blocks/Target.md) and [Daylight Detector](blocks/DaylightDetector.md): projectile pulses, skylight signals and source-derived circuits
 
+- [Trial Spawner](blocks/TrialSpawner.md) and [Vault](blocks/Vault.md): finite encounters, key rewards, ominous configurations and per-player openings
+- [Shrubs and Dry Grass](blocks/ShrubsAndDryGrass.md): exact item identities, harvesting, Bone Meal, light and starter sources
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)

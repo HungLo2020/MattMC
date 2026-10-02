@@ -895,10 +895,20 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,275 pages / 37 indexes. All 19 authored paths are documentation; 1,940 local links/anchors and 261 citation uses resolve. All 153 distinct pinned source references in the twelve articles were checked unchanged. The 1,211-ID alphabetical directory now offers 1,068 related-guide routes and retains 143 explicit article gaps; family links are not completed-article claims.
 
+## Batch 114: Trial encounters, Vaults and shrubs
+
+- Added Trial Spawner, Vault and shrub family guides, with seven inventory corrections. Trial Spawner and Vault link directly to one another; ordinary Monster Spawner and Dead Bush retain their canonical ownership. Exact new routes cover six previously unlinked block IDs.
+- Trial review follows activation, registered-player quotas, tracked mob clearance, one encounter-wide reward-table selection, per-ejection contents, cooldown and ominous transitions. Representative real chamber routes and all 28 bundled configurations were audited; no runtime encounter or loot-frequency test is claimed.
+- Vault review distinguishes template key/reward configuration from appearance, component-sensitive key use, delayed loose-item ejection, preview versus reward rolls, and saved per-Vault player history with its 128-entry limit. The 7.5% Heavy Core example is derived from the checked ominous loot weights, not measured play or a guarantee.
+- Shrub review preserves Dead Bush while covering four new plants, support/water, Bone Meal, harvesting, fuel/compost, and Firefly light/particles/sound. Corrected the two dry-grass item IDs and names, preserved old filenames/anchors, and moved their Items directory links into their correct S/T alphabetical positions.
+- Source checkpoint: `8d065c943710a8d4e3d609b0406dda95ed62cc63`; all authored changes are documentation only.
+
+- Validation: required checker and strict build passed on 2,278 pages / 37 indexes. All 18 authored paths are documentation; 3,797 local links/anchors and 256 citation uses resolve. All 145 distinct pinned article-source references match the integrated source. Both corrected item labels occur once in their S/T sections with old paths retained. The 1,211-ID alphabetical Blocks directory has 1,074 related-guide routes and 137 explicit article gaps, not a completeness score.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and separate category catalogs as source changes; use explicit article gaps to choose new work. A related family link is not proof that every detail of a variant is reviewed.
-2. Finish the current bounded Trial Spawner, Vault and low-shrub reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
+2. Finish the current bounded Decorated Pot and remaining resource/storage reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
 3. Expand remaining functional blocks: Trial Spawner/Vault, Bell, Cartography/Fletching Tables, Decorated Pot, Target/Daylight Detector, Campfires, TNT, Sculk and other registry-backed gaps. Keep shared mechanics in canonical family guides and link exact variants.
 4. Fill remaining terrain/resource, flora, technical and imported-block gaps, including refined resource blocks, Resin, Dripleaves, dry vegetation, heads and custom workbenches. Reassess current source rather than extrapolating from upstream implementations.
 5. Preserve ready Swords and undead drafts for later; continue remaining mobs, biomes, effects, structures and gameplay systems after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw page or route counts.
