@@ -669,6 +669,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,192 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No farming, placement, support removal, collision, climbing, damage, or fuel gameplay test.
 
+## Eighty-ninth batch: Llama caravans and Camels
+
+- Expanded three transport-animal guides and three spawn eggs with exact food/temper, strength-based cargo, carpet equipment, ten-animal single-anchor caravan bound, Trader Llama timer/mixed breeding, and Camel controls/retention.
+- Traced Camel Desert/Dry Midlands and village routes, two-player mounting, dash cooldown, fixed baby-feeding gains, and current merchant-leash/despawn interactions; preserved existing transport/equipment recipe ownership.
+- Updated Mobs, Transport, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,192 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No taming, feeding, breeding, caravan, merchant retention, dash, or travel gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
