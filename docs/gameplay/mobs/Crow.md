@@ -59,7 +59,7 @@ This implementation writes directly into container slots and has not been tested
 
 Feed **Pumpkin Seeds to two tamed adults** to enter love mode. Breeding produces a live crow chick. Its creation path does not copy an owner or tame state, so plan to tame the offspring separately. Babies cannot enter the crow's flying state.
 
-There is an interaction edge case: the handler can call ordinary animal feeding twice. Feeding a tamed chick from a stack can therefore consume a second seed and apply growth twice. Adult breeding also runs before command/item-return logic; clear its beak and check its command afterward. These are source-identified concerns, not in-game test results. The repeated feeding and handled-result fallthrough are tracked in [issue #784](https://github.com/HungLo2020/MattMC/issues/784); the separate perch concern is outside that issue.
+Each successful feeding interaction is handled once. Feeding a tamed chick consumes one seed outside Creative and applies one growth step. Feeding a ready adult puts it into love mode. Successful feeding leaves the crow's command and carried item unchanged, including when the last seed is used. Interactions that do not feed the crow retain the existing item-return and owner-command behavior. The separate perch concern remains outside this correction.
 
 ## Wild behavior and combat
 
@@ -73,6 +73,8 @@ No dedicated Crow death-loot table or unique Crow resource item was found. Carri
 
 Source-reviewed on **2026-10-01** at `b81c01943c9f3254e713c365a1dd633392929cb2`. No in-game spawning, taming, breeding, riding, gathering, combat, or persistence test was run.
 
+The breeding interaction description includes the correction for [issue #784](https://github.com/HungLo2020/MattMC/issues/784) on `fix/issue-784-crow-feeding`. Focused automated interaction tests are provided; a live gameplay round trip is still needed. Other behavior remains from the baseline audit.
+
 ## Related pages
 
 - [Blue Jay](BlueJay.md)
@@ -81,6 +83,8 @@ Source-reviewed on **2026-10-01** at `b81c01943c9f3254e713c365a1dd633392929cb2`.
 - [Mobs](Mobs.md)
 
 ## Sources
+
+- [Corrected feeding dispatch](https://github.com/HungLo2020/MattMC/blob/fix/issue-784-crow-feeding/src/main/java/net/alexsmobs/entity/EntityCrow.java#L219-L257)
 
 - [Stats, goals, damage, interactions, feeding, perch, saves, and offspring](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityCrow.java#L94-L480)
 - [Food selection and dropped-item ownership](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityCrow.java#L575-L601)
