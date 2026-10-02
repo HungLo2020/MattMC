@@ -538,11 +538,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Infested Mossy Stone Bricks** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_mossy_stone_bricks`
 - **Infested Stone** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_stone`
 - **Infested Stone Bricks** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_stone_bricks`
-- **Iron Bars** — article needed; `minecraft:iron_bars`
-- **Iron Chain** — article needed; `minecraft:iron_chain`
-- **Iron Door** — article needed; `minecraft:iron_door`
+- **Iron Bars** — [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md#iron-bars) (related guide); `minecraft:iron_bars`
+- **Iron Chain** — [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md#iron-chain) (related guide); `minecraft:iron_chain`
+- **Iron Door** — [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md#iron-door) (related guide); `minecraft:iron_door`
 - **Iron Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:iron_ore`
-- **Iron Trapdoor** — article needed; `minecraft:iron_trapdoor`
+- **Iron Trapdoor** — [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md#iron-trapdoor) (related guide); `minecraft:iron_trapdoor`
 
 ### J
 
@@ -575,7 +575,7 @@ Names use English localization where available. A † marks one of 25 readable r
 
 ### L
 
-- **Ladder** — article needed; `minecraft:ladder`
+- **Ladder** — [Ladder](Ladder.md) (related guide); `minecraft:ladder`
 - **Lantern** — [Lanterns and Soul Lanterns](Lanterns.md#crafting-and-obtaining) (related guide); `minecraft:lantern`
 - **Lapis Lazuli Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:lapis_ore`
 - **Large Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#large-bud) (related guide); `minecraft:large_amethyst_bud`
@@ -1129,11 +1129,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Test Instance Block** — article needed; `minecraft:test_instance_block`
 - **Thin Bone** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:thin_bone`
 - **Tinted Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:tinted_glass`
-- **TNT** — article needed; `minecraft:tnt`
+- **TNT** — [TNT](TNT.md#tnt) (related guide); `minecraft:tnt`
 - **Torch** — [Torch](Torch.md) (related guide); `minecraft:torch`
 - **Torchflower** — article needed; `minecraft:torchflower`
 - **Torchflower Crop** — article needed; `minecraft:torchflower_crop`
-- **Trapped Chest** — article needed; `minecraft:trapped_chest`
+- **Trapped Chest** — [Trapped Chest](TrappedChest.md#opening-signal-and-counted-users) (related guide); `minecraft:trapped_chest`
 - **Tree Star** — [Ancient trees, Flytraps and Tree Stars](AncientPlants.md#tree-star) (related guide); `minecraft:tree_star`
 - **Tremorsaurus Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:tremorsaurus_egg`
 - **Trial Spawner** — [Trial Spawner](TrialSpawner.md#trial-spawner) (related guide); `minecraft:trial_spawner`
@@ -1376,9 +1376,11 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Heads and Skulls](HeadsAndSkulls.md)
 - [Hopper](Hopper.md)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
+- [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md)
 - [Jack o'Lantern](JackOLantern.md)
 - [Jukebox](Jukebox.md)
 - [Kelp](Kelp.md)
+- [Ladder](Ladder.md)
 - [Lanterns and Soul Lanterns](Lanterns.md)
 - [Lectern](Lectern.md)
 - [Lever](Lever.md)
@@ -1439,7 +1441,9 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Sugar Cane](SugarCane.md)
 - [Target](Target.md)
 - [Terracotta and Glazed Terracotta](Terracotta.md)
+- [TNT](TNT.md)
 - [Torch](Torch.md)
+- [Trapped Chest](TrappedChest.md)
 - [Tree leaves and Mangrove Propagules](TreeLeaves.md)
 - [Tree logs and roots](TreeLogsAndRoots.md)
 - [Trial Spawner](TrialSpawner.md)

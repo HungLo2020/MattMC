@@ -958,11 +958,21 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,293 pages / 37 indexes. All 23 authored paths are documentation; 2,491 local links/anchors and 512 tracked citation uses resolve, with zero rendered ambiguity or unresolved-bracket candidates. All 1,211 exact registered IDs remain alphabetical, with 1,135 related-guide routes and 76 explicit article gaps, not a completion score.
 
+## Batch 120: TNT, Trapped Chest and iron fixtures
+
+- Added four canonical block guides and corrected seven item pages, with seven exact registered IDs linked to their owners. Ordinary Chest now links the placed Trapped Chest guide; TNT and Trapped Chest link their shared trap/priming context.
+- TNT review follows all active priming routes, normal versus explosion-chain fuse lengths, moving/fluid behavior, terrain versus entity effects, drop decay, permissions and actual exploration/loot routes. Disabling TNT explosions is not described as preserving blocks already consumed by fire or destructive blasts.
+- Trapped Chest review verifies same-type double pairing, obstruction, counted users including Copper Golems, directional power, distinct Comparator/Hopper access, inventory persistence/removal, Piglins and the inspected Mansion template hazard.
+- Iron fixtures/Ladder review checks exact recipes, Iron Door’s hand-drop exception, other iron forms’ correct-pickaxe gates, connections/shapes/support/water, hand versus power/Wind Charge controls, climbing exits, fuel and verified generation examples. No circuit, physics, mining, movement, save/reload or world-generation runtime test is claimed.
+- Source checkpoint: `beb4335362d5983b867ef84d66a74ce668b6ef7d`; all 112 distinct pinned draft-source references match the integrated source. All authored changes are documentation.
+
+- Validation: required checker and strict build passed on 2,297 pages / 37 indexes. All 18 authored paths are documentation; 1,978 local links/anchors and 317 tracked references resolve, with zero rendered reference ambiguity or unresolved bracket candidates. The directory preserves 1,211 alphabetical IDs, with 1,142 related-guide routes and 69 explicit article gaps. These are navigation counts, not article-completion scores.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Finish the isolated TNT, Trapped Chest and iron-fixture/Ladder drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
-3. Fill remaining practical gaps such as TNT, Trapped Chest, ladders/bars/chains, fuel/storage utility blocks, and the imported weapon workbenches, following actual active behavior and acquisition routes.
+2. Finish the isolated Cocoa, Sweet Berry, Torchflower and Pitcher crop drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+3. Fill remaining practical gaps such as fuel/storage utility blocks and the imported weapon workbenches, following actual active behavior and acquisition routes. The isolated material review also covers Bamboo full blocks, Bone Block, Netherrack and Petrified Oak Slab.
 4. Cover remaining terrain/material, plant and technical families, including Netherrack/Bone Block, Bamboo full blocks, Fire/Soul Fire, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
 5. Preserve the ready Swords and undead drafts for later source revalidation; continue broader item, mob, biome, effect, structure and gameplay-system coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.
 

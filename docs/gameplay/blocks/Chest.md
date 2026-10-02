@@ -20,7 +20,7 @@ The block can be waterlogged. It also exposes an analog comparator signal based 
 
 Opening a chest calls the nearby-piglin anger behavior, so a storage action can have consequences around piglins. The exact anger radius and exceptions are outside this page's verified scope.
 
-This article covers ordinary chests. [Trapped Chests](../items/TrappedChest.md), [Ender Chests](../items/EnderChest.md), and integrated copper storage have distinct behavior and should not be assumed interchangeable.
+This article covers ordinary chests. [Trapped Chests](TrappedChest.md), [Ender Chests](../items/EnderChest.md), and integrated copper storage have distinct behavior and should not be assumed interchangeable.
 
 ## Related pages
 
