@@ -1015,10 +1015,19 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,317 pages / 37 indexes. All 20 authored paths are documentation; 2,056 local links/anchors and 334 tracked references resolve, with zero rendered citation ambiguity or unresolved-bracket candidates. The directory keeps all 1,211 IDs alphabetical, with 1,180 related-guide routes and 31 explicit article gaps. Five mob edits are crosslinks only, not newly completed species guides.
 
+## Batch 126: Fire, Chorus and portals
+
+- Added four canonical placed-block guides and corrected four real item pages, covering nine exact registered IDs. Existing dimension guides now link to the detailed portal owners.
+- Fire review distinguishes ordinary spread, support, rain and rule gates from Soul Fire, and separates contact damage from block burning. Chorus review covers support, age, growth, collection and the actual fruit teleport attempt/cooldown behavior.
+- Portal review covers frame geometry, activation, destination scaling/search, entry rules and cooldowns; Primordial portal support and return destination remain distinct. End rings, arrival-platform replacement and same-dimension gateway travel have explicit scope and safety limits. Ordinary listed frame/Chorus acquisition links to the verified inventory browser, separately from recipe and mining routes.
+- Source checkpoint: `8897c74857515a7bad4b5f616f78e404ee9c32ec`; 115 distinct pinned draft-source pairs were checked unchanged against the current game source. No portal travel, fire spread, crop growth or fruit teleport runtime test is claimed.
+
+- Validation: required checker and strict build passed on 2,321 pages / 37 indexes. All 17 authored paths are documentation; 1,896 local links/anchors and 351 tracked reference uses resolve, with zero rendered citation ambiguity or unresolved-bracket candidates. The alphabetical inventory retains 1,211 IDs, with 1,189 related-guide routes and 22 explicit article gaps; this does not establish complete variant coverage.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Integrate the reviewed Fire/Chorus, portal and operator-block drafts, then finish remaining nature, storage/core, Cobweb/Dried Ghast and Warden reviews. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+2. Integrate the reviewed operator-block drafts, then finish remaining nature, storage/core, Cobweb/Dried Ghast and Warden reviews. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
 3. Fill remaining practical gaps such as fuel/storage utility blocks, sculk devices and imported nature/redstone blocks, following actual active behavior and acquisition routes.
 4. Cover remaining terrain/material, plant and technical families, including Fire/Soul Fire, Chorus, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
 5. Preserve the ready Swords and undead drafts for later source revalidation; replace remaining generic mob/item pages, including Warden and the missing Nautilus owners, and add stronger combat, health/death/experience, expedition, effect and enchantment coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.

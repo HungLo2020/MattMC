@@ -4,6 +4,8 @@ The End (`minecraft:the_end`) is the destination of activated End portals and th
 
 ## Reaching the End
 
+[End portals and frames](../blocks/EndPortals.md#end-portal-frame) covers hand-built rings, the inventory-browser frame route in Survival and Creative, and activation details. [End Gateways](../blocks/EndPortals.md#end-gateway) covers gateway creation and linking.
+
 1. Craft Eyes of Ender from one Ender Pearl and one Blaze Powder per eye, using the shapeless recipe
 2. Use an eye away from an End Portal Frame to launch it toward a located stronghold. The bundled eye-location structure tag contains strongholds; a world must have an applicable structure for this search to succeed
 3. Find the stronghold's portal room and fill its empty frame sockets with eyes. The generated ring has 12 frames, and some may already contain eyes

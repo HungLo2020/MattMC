@@ -4,6 +4,8 @@ Primordial Caves is a MattMC destination registered as `minecraft:primordial_cav
 
 ## Entering: convert a Nether portal
 
+The [placed portal guide](../blocks/NetherPortals.md#primordial-caves-portal) explains its support checks, distinct exit search and arrival limits.
+
 1. Prepare a complete, active Nether portal. Keep a separate ordinary Nether route if you still need one.
 2. Separate **one [Pitcher Pod](../items/PitcherPod.md)** from your inventory stack.
 3. Drop that single pod as an item into the portal. The active block interaction replaces the connected Nether portal blocks with Primordial Caves portal blocks.

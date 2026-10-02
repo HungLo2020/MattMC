@@ -255,8 +255,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Chiseled Stone Bricks** — [Stone](Stone.md#stone-bricks) (related guide); `minecraft:chiseled_stone_bricks`
 - **Chiseled Tuff** — [Tuff](Tuff.md#variants) (related guide); `minecraft:chiseled_tuff`
 - **Chiseled Tuff Bricks** — [Tuff](Tuff.md#variants) (related guide); `minecraft:chiseled_tuff_bricks`
-- **Chorus Flower** — article needed; `minecraft:chorus_flower`
-- **Chorus Plant** — article needed; `minecraft:chorus_plant`
+- **Chorus Flower** — [Chorus Plants and Flowers](Chorus.md#chorus-flower) (related guide); `minecraft:chorus_flower`
+- **Chorus Plant** — [Chorus Plants and Flowers](Chorus.md#chorus-plant) (related guide); `minecraft:chorus_plant`
 - **Clay** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:clay`
 - **Closed Eyeblossom** — [Eyeblossoms](Eyeblossoms.md#closed-eyeblossom) (related guide); `minecraft:closed_eyeblossom`
 - **Coal Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:coal_ore`
@@ -425,9 +425,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Elevator** — [Elevator](Elevator.md#elevator) (related guide); `minecraft:elevator`
 - **Emerald Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:emerald_ore`
 - **Enchanting Table** — [Enchanting Table](EnchantingTable.md) (related guide); `minecraft:enchanting_table`
-- **End Gateway** — article needed; `minecraft:end_gateway`
-- **End Portal** — article needed; `minecraft:end_portal`
-- **End Portal Frame** — article needed; `minecraft:end_portal_frame`
+- **End Gateway** — [End portals, frames, and gateways](EndPortals.md#end-gateway) (related guide); `minecraft:end_gateway`
+- **End Portal** — [End portals, frames, and gateways](EndPortals.md#end-portal) (related guide); `minecraft:end_portal`
+- **End Portal Frame** — [End portals, frames, and gateways](EndPortals.md#end-portal-frame) (related guide); `minecraft:end_portal_frame`
 - **End Rod** — [End Rod](EndRod.md#facing-support-and-collision) (related guide); `minecraft:end_rod`
 - **End Stone** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone`
 - **End Stone Brick Slab** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_slab`
@@ -454,7 +454,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Fern** — [Grass and Ferns](GrassAndFerns.md#fern) (related guide); `minecraft:fern`
 - **Fern Thatch** — [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md#fern-thatch-crafting-and-collecting) (related guide); `minecraft:fern_thatch`
 - **Fiddlehead** — [Primordial decorative plants](PrimordialPlants.md) (related guide); `minecraft:fiddlehead`
-- **Fire** — article needed; `minecraft:fire`
+- **Fire** — [Fire and Soul Fire](Fire.md#fire) (related guide); `minecraft:fire`
 - **Fire Coral** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral`
 - **Fire Coral Block** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_block`
 - **Fire Coral Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_fan`
@@ -707,7 +707,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Nether Brick Wall** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:nether_brick_wall`
 - **Nether Bricks** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:nether_bricks`
 - **Nether Gold Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:nether_gold_ore`
-- **Nether Portal** — article needed; `minecraft:nether_portal`
+- **Nether Portal** — [Nether and Primordial Caves portals](NetherPortals.md#nether-portal) (related guide); `minecraft:nether_portal`
 - **Nether Quartz Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:nether_quartz_ore`
 - **Nether Sprouts** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#nether-sprouts) (related guide); `minecraft:nether_sprouts`
 - **Nether Wart** — [Nether Wart crop](NetherWart.md) (related guide); `minecraft:nether_wart`
@@ -913,7 +913,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Powder Snow Cauldron** — [Cauldrons](Cauldrons.md#powder-snow-cauldron) (related guide); `minecraft:powder_snow_cauldron`
 - **Powered Rail** — [Rails](Rails.md) (related guide); `minecraft:powered_rail`
 - **Primal Magma** — [Primal Magma and Fissure Primal Magma](PrimalMagma.md) (related guide); `minecraft:primal_magma`
-- **Primordial Caves Portal †** — article needed; `minecraft:primordial_caves_portal`
+- **Primordial Caves Portal †** — [Nether and Primordial Caves portals](NetherPortals.md#primordial-caves-portal) (related guide); `minecraft:primordial_caves_portal`
 - **Prismarine** — [Prismarine construction](Prismarine.md#prismarine-forms) (related guide); `minecraft:prismarine`
 - **Prismarine Brick Slab** — [Prismarine construction](Prismarine.md#prismarine-brick-forms) (related guide); `minecraft:prismarine_brick_slab`
 - **Prismarine Brick Stairs** — [Prismarine construction](Prismarine.md#prismarine-brick-forms) (related guide); `minecraft:prismarine_brick_stairs`
@@ -1044,7 +1044,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Snow** — [Snow and Powder Snow](Snow.md#placing-layers-and-keeping-their-support) (related guide); `minecraft:snow`
 - **Snow Block** — [Snow and Powder Snow](Snow.md#collecting-and-crafting-snow) (related guide); `minecraft:snow_block`
 - **Soul Campfire** — [Campfires](Campfires.md#variants-and-crafting) (related guide); `minecraft:soul_campfire`
-- **Soul Fire** — article needed; `minecraft:soul_fire`
+- **Soul Fire** — [Fire and Soul Fire](Fire.md#soul-fire) (related guide); `minecraft:soul_fire`
 - **Soul Lantern** — [Lanterns and Soul Lanterns](Lanterns.md#crafting-and-obtaining) (related guide); `minecraft:soul_lantern`
 - **Soul Sand** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-sand) (related guide); `minecraft:soul_sand`
 - **Soul Soil** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-soil) (related guide); `minecraft:soul_soil`
@@ -1337,6 +1337,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Cartography Table](CartographyTable.md)
 - [Cauldrons](Cauldrons.md)
 - [Chest](Chest.md)
+- [Chorus Plants and Flowers](Chorus.md)
 - [Clay and Bricks](ClayAndBricks.md)
 - [Cocoa](Cocoa.md)
 - [Composter](Composter.md)
@@ -1362,11 +1363,13 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Dripstone](Dripstone.md)
 - [Elevator](Elevator.md)
 - [Enchanting Table](EnchantingTable.md)
+- [End portals, frames, and gateways](EndPortals.md)
 - [End Rod](EndRod.md)
 - [End Stone and Purpur](EndStoneAndPurpur.md)
 - [Ender Chest](EnderChest.md)
 - [Eyeblossoms](Eyeblossoms.md)
 - [Farmland](Farmland.md)
+- [Fire and Soul Fire](Fire.md)
 - [Fletching Table](FletchingTable.md)
 - [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md)
 - [Flower Pot](FlowerPot.md)
@@ -1400,6 +1403,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Moss and Pale Moss](MossAndPaleMoss.md)
 - [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md)
 - [Mushrooms](Mushrooms.md)
+- [Nether and Primordial Caves portals](NetherPortals.md)
 - [Nether Bricks](NetherBricks.md)
 - [Nether Wart crop](NetherWart.md)
 - [Netherrack](Netherrack.md)

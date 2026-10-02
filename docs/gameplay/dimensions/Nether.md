@@ -4,6 +4,8 @@ The Nether (`minecraft:the_nether`) is reached through an obsidian portal. Its h
 
 ## Building and using a portal
 
+See [Nether and Primordial Caves portals](../blocks/NetherPortals.md#nether-portal) for support checks, linking limits, entry cooldowns and server controls.
+
 1. Build an upright rectangular frame of ordinary Obsidian. The open interior must be 2–21 blocks wide and 3–21 blocks tall, with a complete frame along its sides, top, and bottom.
 2. Light the interior, for example with Flint and Steel. The verified Flint and Steel recipe combines one Iron Ingot and one Flint, without a shaped layout.
 3. Enter the portal and remain inside for the server's configured portal delay. Player delay is controlled by game rules, with separate normal and Creative-delay settings.
