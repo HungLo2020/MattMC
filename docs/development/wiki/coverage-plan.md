@@ -732,6 +732,13 @@ At `987ab0a72e971d40dbcdfc6d4ee5ae52c2a95564`, 513 gameplay paths differ from th
 - Latest integrated default source remains `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; unchanged evidence is pinned to gameplay source `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. This completed batch follows standing promotion and deployment verification.
 - Validation: checker and strict build passed on 2,199 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, combat, conversions, tilling, crop harvesting, repairs, or recycling gameplay test.
 
+## Ninety-sixth batch: Rabbits, Foxes, and resources
+
+- Expanded Rabbit/Fox and four Rabbit resource/food pages with natural/custom-biome conditions, coats, breeding/trust, crop/berry interactions, carried items, persistence, loot, cooking, crafting, and brewing links.
+- Distinguished the Foot's Looting-adjusted chance from count, Fox mouth drops from ordinary loot gates, and fresh-offspring prey-goal initialization from later loaded behavior; preserved Brewing recipe ownership.
+- Latest integrated default source remains `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; unchanged evidence is pinned to gameplay source `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. This completed batch follows standing promotion and deployment verification.
+- Validation: checker and strict build passed on 2,199 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, breeding, trust, crops, berries, held items, cooking, or loot gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

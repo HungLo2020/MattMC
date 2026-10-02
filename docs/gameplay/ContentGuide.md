@@ -19,6 +19,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Farming, food, and animal care
 
+- [Rabbit](mobs/Rabbit.md) and [Fox](mobs/Fox.md): breeding/coats/trust, crop and berry interactions, carried items, and Rabbit food/material drops
 - [Cat](mobs/Cat.md) and [Ocelot](mobs/Ocelot.md): ownership versus trust, spawning, food/breeding, controls, gifts, predators, and persistence
 - [Kelp](blocks/Kelp.md), [Seagrass](blocks/Seagrass.md), and [Sea Pickles](blocks/SeaPickle.md): water rules, harvests, Bone Meal, underwater light, and dried food/fuel
 - [Llama](mobs/Llama.md), [Trader Llama](mobs/TraderLlama.md), and [Camel](mobs/Camel.md): cargo/caravans, merchant retention, two-player travel, feeding, breeding, and dash controls
