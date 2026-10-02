@@ -153,18 +153,17 @@ public class BuildingWandItem extends Item {
 	}
 
 	private boolean tryPlaceFromSource(Level level, Player player, UseOnContext context, BlockItem blockItem, BlockPos sourcePos, Direction face) {
-		BlockPos targetPos = sourcePos.relative(face);
-		if (!level.mayInteract(player, targetPos)) {
-			return false;
-		}
-
 		ItemStack placementStack = this.findPlacementStack(player, blockItem);
 		if (placementStack.isEmpty()) {
 			return false;
 		}
 
-		BlockHitResult hitResult = new BlockHitResult(hitLocationForFace(sourcePos, face), face, sourcePos, false);
-		UseOnContext placementContext = new UseOnContext(level, player, context.getHand(), placementStack, hitResult);
+		UseOnContext placementContext = placementContext(level, player, context, placementStack, sourcePos, face);
+		BlockPos targetPos = new BlockPlaceContext(placementContext).getClickedPos();
+		if (!level.mayInteract(player, targetPos)) {
+			return false;
+		}
+
 		if (!placementStack.useOn(placementContext).consumesAction()) {
 			return false;
 		}
@@ -177,14 +176,14 @@ public class BuildingWandItem extends Item {
 	}
 
 	private static boolean canPlaceFromSource(Level level, Player player, UseOnContext context, BlockItem blockItem, BlockPos sourcePos, Direction face) {
-		BlockPos targetPos = sourcePos.relative(face);
+		UseOnContext placementContext = placementContext(level, player, context, new ItemStack(blockItem), sourcePos, face);
+		BlockPlaceContext blockPlaceContext = new BlockPlaceContext(placementContext);
+		BlockPos targetPos = blockPlaceContext.getClickedPos();
 		if (!level.mayInteract(player, targetPos)) {
 			return false;
 		}
 
-		BlockHitResult hitResult = new BlockHitResult(hitLocationForFace(sourcePos, face), face, sourcePos, false);
-		UseOnContext placementContext = new UseOnContext(level, player, context.getHand(), new ItemStack(blockItem), hitResult);
-		return new BlockPlaceContext(placementContext).canPlace();
+		return blockPlaceContext.canPlace();
 	}
 
 	private static void playPlaceSoundForPlayer(ServerPlayer player, Level level, BlockPos targetPos) {
@@ -235,12 +234,11 @@ public class BuildingWandItem extends Item {
 		};
 	}
 
-	private static Vec3 hitLocationForFace(BlockPos sourcePos, Direction face) {
-		return new Vec3(
-			sourcePos.getX() + 0.5 + face.getStepX() * 0.5,
-			sourcePos.getY() + 0.5 + face.getStepY() * 0.5,
-			sourcePos.getZ() + 0.5 + face.getStepZ() * 0.5
-		);
+	private static UseOnContext placementContext(Level level, Player player, UseOnContext context, ItemStack placementStack, BlockPos sourcePos, Direction face) {
+		// Preserve the clicked half of slabs and other hit-sensitive blocks throughout the plane.
+		Vec3 hitLocation = context.getClickLocation().add(Vec3.atLowerCornerOf(sourcePos.subtract(context.getClickedPos())));
+		BlockHitResult hitResult = new BlockHitResult(hitLocation, face, sourcePos, context.isInside());
+		return new UseOnContext(level, player, context.getHand(), placementStack, hitResult);
 	}
 
 	@FunctionalInterface
