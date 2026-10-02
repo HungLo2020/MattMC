@@ -4,13 +4,14 @@
 
 - Working branch: `docs/wiki-expansion`
 - Source default branch: `master`
-- Last source snapshot integrated: `3e85592c4c78ebb420302360667a6c230dc0318d`
+- Last gameplay source snapshot integrated: `3e85592c4c78ebb420302360667a6c230dc0318d`
 - Latest source sync: real two-parent merge `226ad2d5499924128d0e21c0390c69820320d8f2`, preserving published wiki history and integrating palette resize/unpacking and voxel-join migrations without conflicts. Incoming workflow definitions were unchanged.
 - Previous source sync: real two-parent merge `0b73e6fe0303fcdf2b86ce5c58ebf1436ba4d71a` integrated renderer cleanup/documentation; Java gameplay and bundled game data were unchanged then.
 - Previous source sync: real two-parent merge `c1c36ba1c0dc353b6a4ecc99b36229ee526c09f4` integrated palette packing/histograms without conflicts.
 - Source sync: fast-forwarded from `fffe4a073f0b8d867902b067a6dd022cda31926f` to the newer render-bridge refactor while preserving all wiki edits; inspected changes do not touch this batch's gameplay sources
 - Initial branch created from `fffe4a073f0b8d867902b067a6dd022cda31926f` on 2026-10-01
-- No merge back to the default branch or deployment is authorized
+- One-off promotion: on 2026-10-02 UTC, an explicit instruction authorized fast-forwarding master from `3e85592c4c78ebb420302360667a6c230dc0318d` to `239a8cb570ae75443f9d7865d3caaa1b239a4300`, including batches 1–72. The 379 changed paths were all documentation Markdown; final check/build/whitespace passed on 2,176 pages and 36 indexes.
+- Future work remains branch-only; the one-off promotion does not authorize another default-branch update or deployment
 - Continue using [safe synchronization](continuation.md) before each batch
 
 ## Initial coverage inventory

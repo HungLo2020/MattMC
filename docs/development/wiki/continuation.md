@@ -4,6 +4,8 @@
 
 Work only on `docs/wiki-expansion`. The source-of-truth default branch is currently `master`; resolve the actual default branch again on each run. Pull changes **from** the default branch into the wiki branch. Never update, push, merge, or open a publication request into `master` or `main` without a new explicit instruction.
 
+The one-time master fast-forward to `239a8cb570ae75443f9d7865d3caaa1b239a4300` on 2026-10-02 UTC was explicitly authorized and completed. It is a historical exception, not standing permission for future promotion.
+
 Scope is wiki documentation and necessary wiki navigation only. Do not modify gameplay code, workflows, repository settings, release tags, published Pages, or external issue trackers in this workflow.
 
 ## Start a batch
