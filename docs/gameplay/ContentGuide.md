@@ -28,6 +28,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Farming, food, and animal care
 
+- [Alligator Snapping Turtle](mobs/AlligatorSnappingTurtle.md), [Catfish](mobs/Catfish.md), and [Lobster](mobs/Lobster.md): breathing/enclosure care, collecting items, bucket risks and separate food supplies
+
 - [Food reference](items/FoodReference.md): exact hunger/saturation values, consumption differences, and the distinction between handheld food, drinks, and placed food
 
 - [Mooshroom](mobs/Mooshroom.md), [Goat](mobs/Goat.md), and [Polar Bear](mobs/PolarBear.md): stew/milk routes, horn collection, breeding differences and cub safety

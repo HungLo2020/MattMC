@@ -1275,3 +1275,10 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Added a registered-food reference covering all 59 checked FOOD items, 19 MattMC additions, three separate nonfood drinks, and placed-food exclusions. Nutrition, saturation, use duration, stacking, remainder and effect distinctions follow actual registrations and active callers.
 - Expanded Bread, Baked Potato and Cooked Mutton with exact recipes, bounded loot examples and the ordinary inventory-browser route; added index, content-guide and hunger discovery links.
 - Independent review checked the complete registration inventory, nine recipes, four bounded loot claims, 218 citation uses and 36 source files. Final documentation check/build, local links, retained anchors and rendered citations are required before promotion. No eating, timing, production or loot runtime test is claimed.
+
+## Batch 153: Imported water animals and food supplies
+
+- Replaced eleven generic owners: Alligator Snapping Turtle, Catfish, Lobster, four filled buckets and four food items. Added care/acquisition discovery routes without importing upstream mechanics.
+- Checked 68 biome definitions, 34 structure definitions and 1,202 templates separately from standalone predicates; no natural population route for these three species was found. Actual browser/egg routes, breeding, moss/dispenser harvest, cargo and swallowed-creature controls, persistence and food/device recipes are documented.
+- Kept source-confirmed incomplete Catfish entity addition, Lobster bucket-color component mismatch and Snapping Turtle breathing limits explicit. These are implementation findings, not live reproduction or completed fixes. Common bucket health/name components and dispenser durability handling are precisely qualified.
+- Independent rendering/source review and final documentation check/build/local-anchor validation are required before promotion. No creature release, storage-loss, drowning, breeding, farming or loot runtime test is claimed.

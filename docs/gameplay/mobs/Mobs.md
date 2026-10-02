@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Imported water creatures:** [Alligator Snapping Turtle](AlligatorSnappingTurtle.md), [Catfish](Catfish.md), and [Lobster](Lobster.md): care, collection, bucket limitations and actual acquisition
+
 - **Fungal and mountain animals:** [Mooshroom](Mooshroom.md), [Goat](Goat.md), and [Polar Bear](PolarBear.md): food/variant care, horns, and cub-protection limits
 
 - **Allay collection:** [Allay](Allay.md): loose-item matching, player/Note Block deliveries, Jukebox dancing and duplication
