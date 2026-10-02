@@ -4,14 +4,15 @@
 
 - Working branch: `docs/wiki-expansion`
 - Source default branch: `master`
-- Last gameplay source snapshot integrated: `3e85592c4c78ebb420302360667a6c230dc0318d`
-- Latest source sync: real two-parent merge `226ad2d5499924128d0e21c0390c69820320d8f2`, preserving published wiki history and integrating palette resize/unpacking and voxel-join migrations without conflicts. Incoming workflow definitions were unchanged.
+- Latest default-branch snapshot integrated: `4efea14485328238a3a4981162c8a7e8400914b4`; older gameplay citations remain pinned to their reviewed snapshots where the relevant behavior is unchanged.
+- Latest source sync: real two-parent merge `9fc7874be6328503aabf794c757584c4c0d11514`, integrating all 93 incoming rendering/shader-control paths exactly from master without conflicts. Incoming README, AGENTS, and workflows were unchanged.
+- Previous source sync: real two-parent merge `226ad2d5499924128d0e21c0390c69820320d8f2`, preserving published wiki history and integrating palette resize/unpacking and voxel-join migrations without conflicts. Incoming workflow definitions were unchanged.
 - Previous source sync: real two-parent merge `0b73e6fe0303fcdf2b86ce5c58ebf1436ba4d71a` integrated renderer cleanup/documentation; Java gameplay and bundled game data were unchanged then.
 - Previous source sync: real two-parent merge `c1c36ba1c0dc353b6a4ecc99b36229ee526c09f4` integrated palette packing/histograms without conflicts.
 - Source sync: fast-forwarded from `fffe4a073f0b8d867902b067a6dd022cda31926f` to the newer render-bridge refactor while preserving all wiki edits; inspected changes do not touch this batch's gameplay sources
 - Initial branch created from `fffe4a073f0b8d867902b067a6dd022cda31926f` on 2026-10-01
 - One-off promotion: on 2026-10-02 UTC, an explicit instruction authorized fast-forwarding master from `3e85592c4c78ebb420302360667a6c230dc0318d` to `239a8cb570ae75443f9d7865d3caaa1b239a4300`, including batches 1–72. The 379 changed paths were all documentation Markdown; final check/build/whitespace passed on 2,176 pages and 36 indexes.
-- Future work remains branch-only; the one-off promotion does not authorize another default-branch update or deployment
+- Standing publication instruction issued on 2026-10-02 UTC supersedes the earlier branch-only restriction: after each completed validated wiki batch, including three-hour reviews, promote the preserved documentation history to master and verify the expected Wiki Pages deployment. Author on the wiki branch, preserve concurrent source changes, use no force-push, and coordinate one deployment at a time.
 - Continue using [safe synchronization](continuation.md) before each batch
 
 ## Initial coverage inventory
@@ -686,6 +687,20 @@ Reconcile missing August and September 2026 coverage against actual history befo
 ### Coverage measurement at the preceding published cutoff
 
 At `987ab0a72e971d40dbcdfc6d4ee5ae52c2a95564`, 513 gameplay paths differ from the underlying gameplay source snapshot. Of those, 467 non-index articles contain pinned/source links and at least 150 whitespace-separated words: 316 items, 66 mobs, 59 blocks, 8 mechanics, 6 structures, 4 game modes, 3 dimensions, 3 effects, and 2 biomes. This is a rough substantial-article proxy, not a claim that every article is complete or runtime-tested. Variant families share canonical behavior guides; remaining untouched stubs and sparse biome/effect/structure coverage remain work.
+
+## Ninety-first batch: underwater plants and dried Kelp
+
+- Added Kelp, Seagrass, and Sea Pickle block guides plus five item rewrites with actual water/support predicates, growth/harvest/Shears, Bone Meal, light, cooking, food, packing, and fuel rules.
+- Distinguished age-limited Kelp from a fixed height cap, amount-8 water from source-type placement, tall Seagrass harvest pairing, living-Coral-only Sea Pickle multiplication, and the 4,001-tick Dried Kelp Block fuel value.
+- Updated Blocks, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,195 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No planting, harvesting, Bone Meal, lighting, cooking, eating, or fuel gameplay test.
+
+## Standing promotion policy and rendering source synchronization
+
+- The later explicit instruction authorizes routine promotion of completed validated wiki work back into master, superseding the initial one-off-only publication boundary. The [continuation procedure](continuation.md) now requires fresh source synchronization, a documentation-only authored difference, guarded nonforced promotion, remote readback, and deployment verification before reporting live publication.
+- Source merge `9fc7874be6328503aabf794c757584c4c0d11514` preserves both wiki history and master `4efea14485328238a3a4981162c8a7e8400914b4`. All incoming entries match master; no gameplay or renderer edits were authored by the wiki workflow.
+- Preserved and restored the pending underwater-plant batch with exact file hashes. The incoming rendering changes do not alter those reviewed plant, recipe, loot, or fuel rules. Source-author code-test claims are separate from the documentation checks run here.
+- Reconciled October status wording and added the verified rendering commit as landed work without inventing issue associations. Completed documentation outcomes are recorded once; deployment status remains separately verified.
 
 ## Next batches, in priority order
 

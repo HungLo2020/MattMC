@@ -73,6 +73,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Farming
 
+- [Kelp](Kelp.md), [Seagrass](Seagrass.md), and [Sea Pickles](SeaPickle.md): underwater planting, harvesting, growth, and multiplication
 - [Cactus](Cactus.md): growth/flowers, harvesting, Green Dye, and contact hazards
 - [Bamboo](Bamboo.md): shoots/stalks, growth and Bone Meal, resource uses, and fuel
 - [Dead Bush](DeadBush.md): dry vegetation, Shears collection, placement, and Gelada breeding supply
