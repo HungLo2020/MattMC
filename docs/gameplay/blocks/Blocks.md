@@ -47,6 +47,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Redstone components
 
+- [Pistons](Pistons.md): block movement, sticky retraction, load limits, and power/update rules
+- [Dispenser and Dropper](DispenserAndDropper.md): item actions, transfer, random slot selection, and trigger timing
 - [Repeater](RedstoneRepeater.md): directional strength restoration, delay, and locking
 - [Comparator](RedstoneComparator.md): compare/subtract modes and container fullness
 - [Observer](Observer.md): watched-side updates and short output pulses

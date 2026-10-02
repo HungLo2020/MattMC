@@ -66,6 +66,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Building, redstone, and travel
 
+- [Pistons](blocks/Pistons.md) and [Dispenser/Dropper](blocks/DispenserAndDropper.md): movement limits, power response, item actions, and controlled transfer
 - [Shulker Boxes](blocks/ShulkerBox.md): portable storage in all 17 variants, recoloring/washing, contents preservation, and automation limits
 - [Glass and Glass Panes](blocks/GlassAndPanes.md): every stained color plus ordinary and tinted glass, with recipes, collection, connections, light, and beacon choices
 - [Repeater](blocks/RedstoneRepeater.md), [Comparator](blocks/RedstoneComparator.md), and [Observer](blocks/Observer.md): directional signals, timing, locking, container readings, and block updates

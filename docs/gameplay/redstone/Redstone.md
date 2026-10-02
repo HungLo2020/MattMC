@@ -4,6 +4,8 @@ Redstone components carry signals and control blocks. Start with a source, a sup
 
 ## Core components
 
+- [Pistons](../blocks/Pistons.md) move blocks within load and pushability limits
+- [Dispenser and Dropper](../blocks/DispenserAndDropper.md) perform item actions or transfer/eject selected items
 - [Repeater](../blocks/RedstoneRepeater.md): directional strength restoration, adjustable delay, and locking
 - [Comparator](../blocks/RedstoneComparator.md): compare/subtract modes and analog container readings
 - [Observer](../blocks/Observer.md): watched-side updates and short pulses

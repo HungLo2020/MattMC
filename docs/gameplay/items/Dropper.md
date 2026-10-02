@@ -1,17 +1,22 @@
 # Dropper
 
-## Obtaining
+The Dropper item places `minecraft:dropper`, a nine-slot device that transfers one selected item into a container in front or ejects it as a loose item when no container is found.
 
-Dropper can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Obtaining and use
 
-## Usage
+Craft it from seven Cobblestone and one Redstone Dust using the [shared device recipe](../blocks/DispenserAndDropper.md#crafting-and-collecting). Collect a placed Dropper with a pickaxe. Its ordinary mined item does not retain its loaded contents.
 
-Dropper is a redstone or technical utility block.
+Face the output toward the destination, load items, and give it a redstone activation. A full or incompatible container leaves the selected item in the Dropper. It needs another activation for another attempt. The [Dispenser and Dropper guide](../blocks/DispenserAndDropper.md) covers timing, random slot choice, upward transfer, persistence, and a button-controlled example.
 
-## Behavior
+## Related pages
 
-It provides its configured redstone or item-handling behavior when placed in the world.
+- [Placed device mechanics](../blocks/DispenserAndDropper.md)
+- [Dispenser](Dispenser.md) and [Hopper](../blocks/Hopper.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:dropper` block.
+Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. No gameplay test was run. The canonical block guide supplies recipe, mining, drop, and behavior evidence. The item has a Redstone Creative entry.
+
+- [Block-item registrations](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java)
+- [Redstone Creative entries](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)

@@ -549,6 +549,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Connected Shell and Hopper guidance, Blocks, Content Guide, this checkpoint, and October log. Source remains integrated master `3e85592c4c78ebb420302360667a6c230dc0318d`.
 - Validation: checker and strict build passed on 2,174 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No storage, coloring, washing, breaking, automation, damage, or expiry gameplay test.
 
+## Seventy-second batch: block movement and item devices
+
+- Added canonical Pistons and Dispenser/Dropper guides plus four connected item pages with exact recipes, mining/drop requirements, power response, load limits, random-slot selection, sided transfer, and active item actions.
+- Distinguished queued Piston events from scheduled item-device actions, ordinary container spills from portable storage, and source-derived examples from untested gameplay.
+- Updated Blocks, Redstone, Hopper, Content Guide, this checkpoint, and October log. Source remains integrated master `3e85592c4c78ebb420302360667a6c230dc0318d`.
+- Validation: checker and strict build passed on 2,176 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No motion, dispensing, transfer, timing, or save/reload gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

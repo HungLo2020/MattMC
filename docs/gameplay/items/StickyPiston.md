@@ -1,17 +1,22 @@
 # Sticky Piston
 
-## Obtaining
+The Sticky Piston item places `minecraft:sticky_piston`, a Piston that can pull an eligible block back as its head retracts.
 
-Sticky Piston can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Obtaining and use
 
-## Usage
+Place one [Slimeball](Slimeball.md) directly above one ordinary [Piston](Piston.md) in the crafting grid. See the [shared block guide](../blocks/Pistons.md#crafting-and-collecting) for both recipes and collection rules.
 
-Sticky Piston is a building, natural, utility, redstone, decorative, or workstation block.
+A Sticky Piston does not pull every block or undo every brief pulse. Face its head toward the load, provide a clear movement path, and use the [Piston guide](../blocks/Pistons.md) for the 12-block limit, sticky branches, short-pulse caveat, and a retractable-block example.
 
-## Behavior
+## Related pages
 
-It follows its configured block rules for placement, mining, drops, and interaction.
+- [Placed Piston mechanics](../blocks/Pistons.md)
+- [Redstone basics](../redstone/Redstone.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:sticky_piston` block.
+Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. No gameplay test was run. The canonical block guide supplies recipe, mining, drop, and behavior evidence. The item has a Redstone Creative entry.
+
+- [Block-item registrations](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java)
+- [Redstone Creative entries](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)

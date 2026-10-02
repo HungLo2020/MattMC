@@ -20,7 +20,7 @@ Its inventory is saved as separate block-entity contents. On ordinary removal, t
 
 The outlet can point **down or horizontally**, never upward. Placement uses the face clicked: a horizontal face points the outlet back toward the clicked block, while either vertical face produces a downward outlet. Check the outlet before filling the system.
 
-The Hopper pulls from the container directly **above it**, regardless of the output direction. Its outlet pushes into a container at the adjacent output position. Pointing at open air does not make it spit items like a Dropper.
+The Hopper pulls from the container directly **above it**, regardless of the output direction. Its outlet pushes into a container at the adjacent output position. Pointing at open air does not make it spit items like a [Dropper](DispenserAndDropper.md#dropper-transfer-and-ejection).
 
 ## Transfer behavior and rate
 
