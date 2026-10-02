@@ -221,6 +221,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Composter](blocks/Composter.md) and [Stonecutter](blocks/Stonecutter.md): accepted inputs, output transactions, automation limits and village jobs
 - [Wooden Shelves](blocks/Shelves.md): full-stack storage, powered hotbar exchange, rear comparator output and moving contents
 
+- [Mushrooms](blocks/Mushrooms.md): light and support, spreading, huge growth, cap/stem recovery and building faces
+- [Cartography Table](blocks/CartographyTable.md) and [Fletching Table](blocks/FletchingTable.md): implemented map operations, job sites and workstation limits
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)

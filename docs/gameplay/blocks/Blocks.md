@@ -170,8 +170,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Brown Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:brown_concrete`
 - **Brown Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:brown_concrete_powder`
 - **Brown Glazed Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:brown_glazed_terracotta`
-- **Brown Mushroom** — article needed; `minecraft:brown_mushroom`
-- **Brown Mushroom Block** — article needed; `minecraft:brown_mushroom_block`
+- **Brown Mushroom** — [Mushrooms](Mushrooms.md#brown-mushroom) (related guide); `minecraft:brown_mushroom`
+- **Brown Mushroom Block** — [Mushrooms](Mushrooms.md#brown-mushroom-block) (related guide); `minecraft:brown_mushroom_block`
 - **Brown Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:brown_shulker_box`
 - **Brown Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:brown_stained_glass`
 - **Brown Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:brown_stained_glass_pane`
@@ -215,7 +215,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Candle** — [Candles](Candles.md#candle) (related guide); `minecraft:candle`
 - **Carmine Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#carmine-froglight) (related guide); `minecraft:carmine_froglight`
 - **Carrots** — [Root crops](RootCrops.md) (related guide); `minecraft:carrots`
-- **Cartography Table** — [Cartography Table](CartographyTable.md) (related guide); `minecraft:cartography_table`
+- **Cartography Table** — [Cartography Table](CartographyTable.md#cartography-table) (related guide); `minecraft:cartography_table`
 - **Carved Pumpkin** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:carved_pumpkin`
 - **Cauldron** — [Cauldrons](Cauldrons.md#empty-cauldron) (related guide); `minecraft:cauldron`
 - **Cave Air** — article needed; `minecraft:cave_air`
@@ -461,7 +461,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Fire Coral Wall Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_wall_fan`
 - **Firefly Bush** — article needed; `minecraft:firefly_bush`
 - **Fissure Primal Magma †** — [Primal Magma and Fissure Primal Magma](PrimalMagma.md) (related guide); `minecraft:fissure_primal_magma`
-- **Fletching Table** — article needed; `minecraft:fletching_table`
+- **Fletching Table** — [Fletching Table](FletchingTable.md#fletching-table) (related guide); `minecraft:fletching_table`
 - **Flood Basalt** — [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md#flood-basalt-access-and-the-mining-limitation) (related guide); `minecraft:flood_basalt`
 - **Flower Pot** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:flower_pot`
 - **Flowering Azalea** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#flowering-azalea) (related guide); `minecraft:flowering_azalea`
@@ -696,7 +696,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Mud Brick Wall** — article needed; `minecraft:mud_brick_wall`
 - **Mud Bricks** — article needed; `minecraft:mud_bricks`
 - **Muddy Mangrove Roots** — [Tree logs and roots](TreeLogsAndRoots.md#muddy-mangrove-roots) (related guide); `minecraft:muddy_mangrove_roots`
-- **Mushroom Stem** — article needed; `minecraft:mushroom_stem`
+- **Mushroom Stem** — [Mushrooms](Mushrooms.md#mushroom-stem) (related guide); `minecraft:mushroom_stem`
 - **Mycelium** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#grass-block-and-mycelium) (related guide); `minecraft:mycelium`
 
 ### N
@@ -958,8 +958,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Red Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:red_concrete`
 - **Red Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:red_concrete_powder`
 - **Red Glazed Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:red_glazed_terracotta`
-- **Red Mushroom** — article needed; `minecraft:red_mushroom`
-- **Red Mushroom Block** — article needed; `minecraft:red_mushroom_block`
+- **Red Mushroom** — [Mushrooms](Mushrooms.md#red-mushroom) (related guide); `minecraft:red_mushroom`
+- **Red Mushroom Block** — [Mushrooms](Mushrooms.md#red-mushroom-block) (related guide); `minecraft:red_mushroom_block`
 - **Red Nether Brick Slab** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:red_nether_brick_slab`
 - **Red Nether Brick Stairs** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:red_nether_brick_stairs`
 - **Red Nether Brick Wall** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:red_nether_brick_wall`
@@ -1354,6 +1354,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [End Stone and Purpur](EndStoneAndPurpur.md)
 - [Ender Chest](EnderChest.md)
 - [Farmland](Farmland.md)
+- [Fletching Table](FletchingTable.md)
 - [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md)
 - [Flower Pot](FlowerPot.md)
 - [Frogspawn](Frogspawn.md)
@@ -1375,6 +1376,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Loom](Loom.md)
 - [Monster Spawner](MonsterSpawner.md)
 - [Moss and Pale Moss](MossAndPaleMoss.md)
+- [Mushrooms](Mushrooms.md)
 - [Nether Bricks](NetherBricks.md)
 - [Nether Wart crop](NetherWart.md)
 - [Nylium and Nether vegetation](NetherGroundAndVegetation.md)
