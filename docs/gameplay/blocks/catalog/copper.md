@@ -10,8 +10,9 @@ Names use English localization where available. A † marks a readable registry-
 
 | Block | Registry ID / source | Related placed-block guide |
 | --- | --- | --- |
-| Chiseled Copper | [`minecraft:chiseled_copper`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6160) | Article needed |
 | Block of Copper | [`minecraft:copper_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6097) | Article needed |
+| Block of Raw Copper | [`minecraft:raw_copper_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6722) | Article needed |
+| Chiseled Copper | [`minecraft:chiseled_copper`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6160) | Article needed |
 | Copper Bulb | [`minecraft:copper_bulb`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6355) | Article needed |
 | Copper Chest | [`minecraft:copper_chest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6391) | Article needed |
 | Copper Door | [`minecraft:copper_door`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6239) | Article needed |
@@ -50,9 +51,8 @@ Names use English localization where available. A † marks a readable registry-
 | Oxidized Cut Copper Slab | [`minecraft:oxidized_cut_copper_slab`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6195) | Article needed |
 | Oxidized Cut Copper Stairs | [`minecraft:oxidized_cut_copper_stairs`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6175) | Article needed |
 | Oxidized Lightning Rod | [`minecraft:oxidized_lightning_rod`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6506) | Article needed |
-| Block of Raw Copper | [`minecraft:raw_copper_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6722) | Article needed |
-| Waxed Chiseled Copper | [`minecraft:waxed_chiseled_copper`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6174) | Article needed |
 | Waxed Block of Copper | [`minecraft:waxed_copper_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6215) | Article needed |
+| Waxed Chiseled Copper | [`minecraft:waxed_chiseled_copper`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6174) | Article needed |
 | Waxed Copper Bulb | [`minecraft:waxed_copper_bulb`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6381) | Article needed |
 | Waxed Copper Chest | [`minecraft:waxed_copper_chest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6417) | Article needed |
 | Waxed Copper Door | [`minecraft:waxed_copper_door`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6259) | Article needed |

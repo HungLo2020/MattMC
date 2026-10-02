@@ -12,7 +12,7 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 - [Game modes](gamemodes/Gamemodes.md): all four modes and permission-aware switching
 - [Oak](blocks/Oak.md), [Logs](items/OakLog.md), [Planks](items/OakPlanks.md), [Saplings](items/OakSapling.md), and [Sticks](items/Stick.md): the renewable beginner wood loop
-- [Stone](blocks/Stone.md): collecting stone instead of cobblestone, smelting, and construction recipes
+- [Stone](blocks/Stone.md) and [Deepslate](blocks/Deepslate.md): ordinary/mossy/brick construction, exact crafting/stonecutting choices, shaped placement, infestation, and reinforced-block limits
 - [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations and storage
 - [Crafting](crafting/Crafting.md) and [Smelting](smelting/Smelting.md): current recipes, device types, and troubleshooting
 - [Beds](blocks/Bed.md) and [Torches](blocks/Torch.md): sleeping safety and basic lighting
@@ -80,6 +80,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
 
 ### Building, redstone, and travel
+
+- [Wood construction](blocks/WoodConstruction.md): twelve materials, Bamboo Mosaic, exact shape recipes, placement/connections, waterlogging, power, and fire/fuel differences
 
 - [Crafter](blocks/Crafter.md): redstone crafting, slot controls, ingredient distribution, output overflow, and comparator signals
 

@@ -1,17 +1,23 @@
 # Smooth Stone
 
-## Obtaining
+**Smooth Stone** (`minecraft:smooth_stone`) is a placeable finished stone block, distinct from ordinary Stone. [Item registration][items]
 
-Smooth Stone can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Obtaining and use
 
-## Usage
+Smelt Stone in a Furnace to make Smooth Stone. Starting from Cobblestone takes two smelting steps, detailed in the [Stone family guide](../blocks/Stone.md#smooth-stone). A placed Smooth Stone block drops itself when mined with an **unbroken pickaxe**; Silk Touch is not required. [Smelting][smelting-smooth-stone] · [Loot][loot-smooth-stone] · [Mining tag][pickaxe]
 
-Smooth Stone is a building, natural, utility, redstone, decorative, or workstation block.
+Use it as a full building block, make [Smooth Stone Slabs](SmoothStoneSlab.md), or use it in the [Blast Furnace](BlastFurnace.md) recipe. The [shape guide](../blocks/Stone.md#stairs-slabs-and-walls) gives exact yields. There is no registered Smooth Stone stair or wall. [Slab recipe][crafting-smooth-stone-slab] · [Blast Furnace recipe][crafting-blast-furnace] · [Registry][blocks]
 
-## Behavior
+Related: [Stone](Stone.md) · [Cobblestone](Cobblestone.md) · [Items](Items.md)
 
-It follows its configured block rules for placement, mining, drops, and interaction.
+## Sources and verification
 
-## Notes
+Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`; registration, relevant recipes and mining loot checked. No in-game collection, crafting or placement test was run.
 
-* This item is the item form of the `minecraft:smooth_stone` block.
+[items]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/Items.java
+[smelting-smooth-stone]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/recipe/smelting/smooth_stone.json
+[loot-smooth-stone]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/loot_table/blocks/smooth_stone.json
+[pickaxe]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[crafting-smooth-stone-slab]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/recipe/crafting/smooth_stone_slab.json
+[crafting-blast-furnace]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/recipe/crafting/blast_furnace.json
+[blocks]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/block/Blocks.java

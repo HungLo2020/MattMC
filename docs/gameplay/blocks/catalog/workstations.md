@@ -11,9 +11,7 @@ Names use English localization where available. A † marks a readable registry-
 | Block | Registry ID / source | Related placed-block guide |
 | --- | --- | --- |
 | Amber | [`minecraft:amber`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5959) | [Amber](../Amber.md) |
-| TaCZ Ammo Assembly Table | [`minecraft:ammo_workbench`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6815) | Article needed |
 | Anvil | [`minecraft:anvil`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2804) | [Anvil](../Anvil.md) |
-| TaCZ Attachment Table | [`minecraft:attachment_workbench`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6820) | Article needed |
 | Barrel | [`minecraft:barrel`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5311) | Article needed |
 | Beacon | [`minecraft:beacon`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2640) | Article needed |
 | Bee Nest | [`minecraft:bee_nest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5748) | [Bee housing](../BeeHousing.md) |
@@ -42,7 +40,6 @@ Names use English localization where available. A † marks a readable registry-
 | Fletching Table | [`minecraft:fletching_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5341) | Article needed |
 | Furnace | [`minecraft:furnace`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1292) | [Furnace](../Furnace.md) |
 | Grindstone | [`minecraft:grindstone`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5345) | [Grindstone](../Grindstone.md) |
-| TaCZ Gun Smith Table | [`minecraft:gun_smith_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6810) | Article needed |
 | Hay Bale | [`minecraft:hay_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L3189) | Article needed |
 | Honeycomb Block | [`minecraft:honeycomb_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5763) | Article needed |
 | Iron Bars | [`minecraft:iron_bars`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2307) | Article needed |
@@ -60,6 +57,9 @@ Names use English localization where available. A † marks a readable registry-
 | Smoker | [`minecraft:smoker`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5316) | Article needed |
 | Sponge | [`minecraft:sponge`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L614) | Article needed |
 | Stonecutter | [`minecraft:stonecutter`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5375) | [Stonecutter](../Stonecutter.md) |
+| TaCZ Ammo Assembly Table | [`minecraft:ammo_workbench`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6815) | Article needed |
+| TaCZ Attachment Table | [`minecraft:attachment_workbench`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6820) | Article needed |
+| TaCZ Gun Smith Table | [`minecraft:gun_smith_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6810) | Article needed |
 | Trapped Chest | [`minecraft:trapped_chest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2834) | Article needed |
 | Vault | [`minecraft:vault`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6787) | Article needed |
 | Water Cauldron | [`minecraft:water_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2531) | Article needed |

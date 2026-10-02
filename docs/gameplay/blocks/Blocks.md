@@ -12,20 +12,20 @@ Names use English localization where available. A † marks one of 25 readable r
 ### A
 
 - **Acacia Button** — article needed; `minecraft:acacia_button`
-- **Acacia Door** — article needed; `minecraft:acacia_door`
-- **Acacia Fence** — article needed; `minecraft:acacia_fence`
-- **Acacia Fence Gate** — article needed; `minecraft:acacia_fence_gate`
+- **Acacia Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:acacia_door`
+- **Acacia Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:acacia_fence`
+- **Acacia Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:acacia_fence_gate`
 - **Acacia Hanging Sign** — article needed; `minecraft:acacia_hanging_sign`
 - **Acacia Leaves** — article needed; `minecraft:acacia_leaves`
 - **Acacia Log** — article needed; `minecraft:acacia_log`
-- **Acacia Planks** — article needed; `minecraft:acacia_planks`
+- **Acacia Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:acacia_planks`
 - **Acacia Pressure Plate** — article needed; `minecraft:acacia_pressure_plate`
 - **Acacia Sapling** — article needed; `minecraft:acacia_sapling`
 - **Acacia Shelf** — article needed; `minecraft:acacia_shelf`
 - **Acacia Sign** — article needed; `minecraft:acacia_sign`
-- **Acacia Slab** — article needed; `minecraft:acacia_slab`
-- **Acacia Stairs** — article needed; `minecraft:acacia_stairs`
-- **Acacia Trapdoor** — article needed; `minecraft:acacia_trapdoor`
+- **Acacia Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:acacia_slab`
+- **Acacia Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:acacia_stairs`
+- **Acacia Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:acacia_trapdoor`
 - **Acacia Wall Hanging Sign** — article needed; `minecraft:acacia_wall_hanging_sign`
 - **Acacia Wall Sign** — article needed; `minecraft:acacia_wall_sign`
 - **Acacia Wood** — article needed; `minecraft:acacia_wood`
@@ -56,21 +56,21 @@ Names use English localization where available. A † marks one of 25 readable r
 
 - **Bamboo** — [Bamboo](Bamboo.md) (related guide); `minecraft:bamboo`
 - **Bamboo Button** — article needed; `minecraft:bamboo_button`
-- **Bamboo Door** — article needed; `minecraft:bamboo_door`
-- **Bamboo Fence** — article needed; `minecraft:bamboo_fence`
-- **Bamboo Fence Gate** — article needed; `minecraft:bamboo_fence_gate`
+- **Bamboo Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:bamboo_door`
+- **Bamboo Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:bamboo_fence`
+- **Bamboo Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:bamboo_fence_gate`
 - **Bamboo Hanging Sign** — article needed; `minecraft:bamboo_hanging_sign`
-- **Bamboo Mosaic** — article needed; `minecraft:bamboo_mosaic`
-- **Bamboo Mosaic Slab** — article needed; `minecraft:bamboo_mosaic_slab`
-- **Bamboo Mosaic Stairs** — article needed; `minecraft:bamboo_mosaic_stairs`
-- **Bamboo Planks** — article needed; `minecraft:bamboo_planks`
+- **Bamboo Mosaic** — [Wood construction](WoodConstruction.md#bamboo-mosaic) (related guide); `minecraft:bamboo_mosaic`
+- **Bamboo Mosaic Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:bamboo_mosaic_slab`
+- **Bamboo Mosaic Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:bamboo_mosaic_stairs`
+- **Bamboo Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:bamboo_planks`
 - **Bamboo Pressure Plate** — article needed; `minecraft:bamboo_pressure_plate`
 - **Bamboo Shelf** — article needed; `minecraft:bamboo_shelf`
 - **Bamboo Shoot** — [Bamboo](Bamboo.md) (related guide); `minecraft:bamboo_sapling`
 - **Bamboo Sign** — article needed; `minecraft:bamboo_sign`
-- **Bamboo Slab** — article needed; `minecraft:bamboo_slab`
-- **Bamboo Stairs** — article needed; `minecraft:bamboo_stairs`
-- **Bamboo Trapdoor** — article needed; `minecraft:bamboo_trapdoor`
+- **Bamboo Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:bamboo_slab`
+- **Bamboo Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:bamboo_stairs`
+- **Bamboo Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:bamboo_trapdoor`
 - **Bamboo Wall Hanging Sign** — article needed; `minecraft:bamboo_wall_hanging_sign`
 - **Bamboo Wall Sign** — article needed; `minecraft:bamboo_wall_sign`
 - **Barrel** — article needed; `minecraft:barrel`
@@ -85,20 +85,20 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Big Dripleaf** — article needed; `minecraft:big_dripleaf`
 - **Big Dripleaf Stem** — article needed; `minecraft:big_dripleaf_stem`
 - **Birch Button** — article needed; `minecraft:birch_button`
-- **Birch Door** — article needed; `minecraft:birch_door`
-- **Birch Fence** — article needed; `minecraft:birch_fence`
-- **Birch Fence Gate** — article needed; `minecraft:birch_fence_gate`
+- **Birch Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:birch_door`
+- **Birch Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:birch_fence`
+- **Birch Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:birch_fence_gate`
 - **Birch Hanging Sign** — article needed; `minecraft:birch_hanging_sign`
 - **Birch Leaves** — article needed; `minecraft:birch_leaves`
 - **Birch Log** — article needed; `minecraft:birch_log`
-- **Birch Planks** — article needed; `minecraft:birch_planks`
+- **Birch Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:birch_planks`
 - **Birch Pressure Plate** — article needed; `minecraft:birch_pressure_plate`
 - **Birch Sapling** — article needed; `minecraft:birch_sapling`
 - **Birch Shelf** — article needed; `minecraft:birch_shelf`
 - **Birch Sign** — article needed; `minecraft:birch_sign`
-- **Birch Slab** — article needed; `minecraft:birch_slab`
-- **Birch Stairs** — article needed; `minecraft:birch_stairs`
-- **Birch Trapdoor** — article needed; `minecraft:birch_trapdoor`
+- **Birch Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:birch_slab`
+- **Birch Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:birch_stairs`
+- **Birch Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:birch_trapdoor`
 - **Birch Wall Hanging Sign** — article needed; `minecraft:birch_wall_hanging_sign`
 - **Birch Wall Sign** — article needed; `minecraft:birch_wall_sign`
 - **Birch Wood** — article needed; `minecraft:birch_wood`
@@ -223,20 +223,20 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cave Vines Plant** — article needed; `minecraft:cave_vines_plant`
 - **Chain Command Block** — article needed; `minecraft:chain_command_block`
 - **Cherry Button** — article needed; `minecraft:cherry_button`
-- **Cherry Door** — article needed; `minecraft:cherry_door`
-- **Cherry Fence** — article needed; `minecraft:cherry_fence`
-- **Cherry Fence Gate** — article needed; `minecraft:cherry_fence_gate`
+- **Cherry Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:cherry_door`
+- **Cherry Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:cherry_fence`
+- **Cherry Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:cherry_fence_gate`
 - **Cherry Hanging Sign** — article needed; `minecraft:cherry_hanging_sign`
 - **Cherry Leaves** — article needed; `minecraft:cherry_leaves`
 - **Cherry Log** — article needed; `minecraft:cherry_log`
-- **Cherry Planks** — article needed; `minecraft:cherry_planks`
+- **Cherry Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:cherry_planks`
 - **Cherry Pressure Plate** — article needed; `minecraft:cherry_pressure_plate`
 - **Cherry Sapling** — article needed; `minecraft:cherry_sapling`
 - **Cherry Shelf** — article needed; `minecraft:cherry_shelf`
 - **Cherry Sign** — article needed; `minecraft:cherry_sign`
-- **Cherry Slab** — article needed; `minecraft:cherry_slab`
-- **Cherry Stairs** — article needed; `minecraft:cherry_stairs`
-- **Cherry Trapdoor** — article needed; `minecraft:cherry_trapdoor`
+- **Cherry Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:cherry_slab`
+- **Cherry Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:cherry_stairs`
+- **Cherry Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:cherry_trapdoor`
 - **Cherry Wall Hanging Sign** — article needed; `minecraft:cherry_wall_hanging_sign`
 - **Cherry Wall Sign** — article needed; `minecraft:cherry_wall_sign`
 - **Cherry Wood** — article needed; `minecraft:cherry_wood`
@@ -244,7 +244,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Chipped Anvil** — [Anvil](Anvil.md) (related guide); `minecraft:chipped_anvil`
 - **Chiseled Bookshelf** — article needed; `minecraft:chiseled_bookshelf`
 - **Chiseled Copper** — article needed; `minecraft:chiseled_copper`
-- **Chiseled Deepslate** — article needed; `minecraft:chiseled_deepslate`
+- **Chiseled Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:chiseled_deepslate`
 - **Chiseled Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_chiseled`
 - **Chiseled Nether Bricks** — article needed; `minecraft:chiseled_nether_bricks`
 - **Chiseled Polished Blackstone** — article needed; `minecraft:chiseled_polished_blackstone`
@@ -252,7 +252,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Chiseled Red Sandstone** — article needed; `minecraft:chiseled_red_sandstone`
 - **Chiseled Resin Bricks** — article needed; `minecraft:chiseled_resin_bricks`
 - **Chiseled Sandstone** — article needed; `minecraft:chiseled_sandstone`
-- **Chiseled Stone Bricks** — article needed; `minecraft:chiseled_stone_bricks`
+- **Chiseled Stone Bricks** — [Stone](Stone.md#stone-bricks) (related guide); `minecraft:chiseled_stone_bricks`
 - **Chiseled Tuff** — article needed; `minecraft:chiseled_tuff`
 - **Chiseled Tuff Bricks** — article needed; `minecraft:chiseled_tuff_bricks`
 - **Chorus Flower** — article needed; `minecraft:chorus_flower`
@@ -261,14 +261,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Closed Eyeblossom** — article needed; `minecraft:closed_eyeblossom`
 - **Coal Ore** — article needed; `minecraft:coal_ore`
 - **Coarse Dirt** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#coarse-dirt-recipe) (related guide); `minecraft:coarse_dirt`
-- **Cobbled Deepslate** — article needed; `minecraft:cobbled_deepslate`
-- **Cobbled Deepslate Slab** — article needed; `minecraft:cobbled_deepslate_slab`
-- **Cobbled Deepslate Stairs** — article needed; `minecraft:cobbled_deepslate_stairs`
-- **Cobbled Deepslate Wall** — article needed; `minecraft:cobbled_deepslate_wall`
-- **Cobblestone** — article needed; `minecraft:cobblestone`
-- **Cobblestone Slab** — article needed; `minecraft:cobblestone_slab`
-- **Cobblestone Stairs** — article needed; `minecraft:cobblestone_stairs`
-- **Cobblestone Wall** — article needed; `minecraft:cobblestone_wall`
+- **Cobbled Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cobbled_deepslate`
+- **Cobbled Deepslate Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cobbled_deepslate_slab`
+- **Cobbled Deepslate Stairs** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cobbled_deepslate_stairs`
+- **Cobbled Deepslate Wall** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cobbled_deepslate_wall`
+- **Cobblestone** — [Stone](Stone.md#stone-and-cobblestone) (related guide); `minecraft:cobblestone`
+- **Cobblestone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_slab`
+- **Cobblestone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_stairs`
+- **Cobblestone Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_wall`
 - **Cobweb** — article needed; `minecraft:cobweb`
 - **Cocoa** — article needed; `minecraft:cocoa`
 - **Command Block** — article needed; `minecraft:command_block`
@@ -285,33 +285,33 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Copper Trapdoor** — article needed; `minecraft:copper_trapdoor`
 - **Copper Wall Torch** — article needed; `minecraft:copper_wall_torch`
 - **Cornflower** — article needed; `minecraft:cornflower`
-- **Cracked Deepslate Bricks** — article needed; `minecraft:cracked_deepslate_bricks`
-- **Cracked Deepslate Tiles** — article needed; `minecraft:cracked_deepslate_tiles`
+- **Cracked Deepslate Bricks** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cracked_deepslate_bricks`
+- **Cracked Deepslate Tiles** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cracked_deepslate_tiles`
 - **Cracked Nether Bricks** — article needed; `minecraft:cracked_nether_bricks`
 - **Cracked Polished Blackstone Bricks** — article needed; `minecraft:cracked_polished_blackstone_bricks`
-- **Cracked Stone Bricks** — article needed; `minecraft:cracked_stone_bricks`
+- **Cracked Stone Bricks** — [Stone](Stone.md#stone-bricks) (related guide); `minecraft:cracked_stone_bricks`
 - **Crafter** — [Crafter](Crafter.md) (related guide); `minecraft:crafter`
 - **Crafting Table** — [Crafting Table](CraftingTable.md) (related guide); `minecraft:crafting_table`
 - **Creaking Heart** — article needed; `minecraft:creaking_heart`
 - **Creeper Head** — article needed; `minecraft:creeper_head`
 - **Creeper Wall Head** — article needed; `minecraft:creeper_wall_head`
 - **Crimson Button** — article needed; `minecraft:crimson_button`
-- **Crimson Door** — article needed; `minecraft:crimson_door`
-- **Crimson Fence** — article needed; `minecraft:crimson_fence`
-- **Crimson Fence Gate** — article needed; `minecraft:crimson_fence_gate`
+- **Crimson Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:crimson_door`
+- **Crimson Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:crimson_fence`
+- **Crimson Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:crimson_fence_gate`
 - **Crimson Fungus** — article needed; `minecraft:crimson_fungus`
 - **Crimson Hanging Sign** — article needed; `minecraft:crimson_hanging_sign`
 - **Crimson Hyphae** — article needed; `minecraft:crimson_hyphae`
 - **Crimson Nylium** — article needed; `minecraft:crimson_nylium`
-- **Crimson Planks** — article needed; `minecraft:crimson_planks`
+- **Crimson Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:crimson_planks`
 - **Crimson Pressure Plate** — article needed; `minecraft:crimson_pressure_plate`
 - **Crimson Roots** — article needed; `minecraft:crimson_roots`
 - **Crimson Shelf** — article needed; `minecraft:crimson_shelf`
 - **Crimson Sign** — article needed; `minecraft:crimson_sign`
-- **Crimson Slab** — article needed; `minecraft:crimson_slab`
-- **Crimson Stairs** — article needed; `minecraft:crimson_stairs`
+- **Crimson Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:crimson_slab`
+- **Crimson Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:crimson_stairs`
 - **Crimson Stem** — article needed; `minecraft:crimson_stem`
-- **Crimson Trapdoor** — article needed; `minecraft:crimson_trapdoor`
+- **Crimson Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:crimson_trapdoor`
 - **Crimson Wall Hanging Sign** — article needed; `minecraft:crimson_wall_hanging_sign`
 - **Crimson Wall Sign** — article needed; `minecraft:crimson_wall_sign`
 - **Crying Obsidian** — article needed; `minecraft:crying_obsidian`
@@ -342,20 +342,20 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Damaged Anvil** — [Anvil](Anvil.md) (related guide); `minecraft:damaged_anvil`
 - **Dandelion** — article needed; `minecraft:dandelion`
 - **Dark Oak Button** — article needed; `minecraft:dark_oak_button`
-- **Dark Oak Door** — article needed; `minecraft:dark_oak_door`
-- **Dark Oak Fence** — article needed; `minecraft:dark_oak_fence`
-- **Dark Oak Fence Gate** — article needed; `minecraft:dark_oak_fence_gate`
+- **Dark Oak Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:dark_oak_door`
+- **Dark Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:dark_oak_fence`
+- **Dark Oak Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:dark_oak_fence_gate`
 - **Dark Oak Hanging Sign** — article needed; `minecraft:dark_oak_hanging_sign`
 - **Dark Oak Leaves** — article needed; `minecraft:dark_oak_leaves`
 - **Dark Oak Log** — article needed; `minecraft:dark_oak_log`
-- **Dark Oak Planks** — article needed; `minecraft:dark_oak_planks`
+- **Dark Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:dark_oak_planks`
 - **Dark Oak Pressure Plate** — article needed; `minecraft:dark_oak_pressure_plate`
 - **Dark Oak Sapling** — article needed; `minecraft:dark_oak_sapling`
 - **Dark Oak Shelf** — article needed; `minecraft:dark_oak_shelf`
 - **Dark Oak Sign** — article needed; `minecraft:dark_oak_sign`
-- **Dark Oak Slab** — article needed; `minecraft:dark_oak_slab`
-- **Dark Oak Stairs** — article needed; `minecraft:dark_oak_stairs`
-- **Dark Oak Trapdoor** — article needed; `minecraft:dark_oak_trapdoor`
+- **Dark Oak Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:dark_oak_slab`
+- **Dark Oak Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:dark_oak_stairs`
+- **Dark Oak Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:dark_oak_trapdoor`
 - **Dark Oak Wall Hanging Sign** — article needed; `minecraft:dark_oak_wall_hanging_sign`
 - **Dark Oak Wall Sign** — article needed; `minecraft:dark_oak_wall_sign`
 - **Dark Oak Wood** — article needed; `minecraft:dark_oak_wood`
@@ -385,11 +385,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dead Tube Coral Fan** — article needed; `minecraft:dead_tube_coral_fan`
 - **Dead Tube Coral Wall Fan** — article needed; `minecraft:dead_tube_coral_wall_fan`
 - **Decorated Pot** — article needed; `minecraft:decorated_pot`
-- **Deepslate** — article needed; `minecraft:deepslate`
-- **Deepslate Brick Slab** — article needed; `minecraft:deepslate_brick_slab`
-- **Deepslate Brick Stairs** — article needed; `minecraft:deepslate_brick_stairs`
-- **Deepslate Brick Wall** — article needed; `minecraft:deepslate_brick_wall`
-- **Deepslate Bricks** — article needed; `minecraft:deepslate_bricks`
+- **Deepslate** — [Deepslate](Deepslate.md#orienting-ordinary-deepslate) (related guide); `minecraft:deepslate`
+- **Deepslate Brick Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_slab`
+- **Deepslate Brick Stairs** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_stairs`
+- **Deepslate Brick Wall** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_wall`
+- **Deepslate Bricks** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_bricks`
 - **Deepslate Coal Ore** — article needed; `minecraft:deepslate_coal_ore`
 - **Deepslate Copper Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:deepslate_copper_ore`
 - **Deepslate Diamond Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:deepslate_diamond_ore`
@@ -398,10 +398,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Deepslate Iron Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:deepslate_iron_ore`
 - **Deepslate Lapis Lazuli Ore** — article needed; `minecraft:deepslate_lapis_ore`
 - **Deepslate Redstone Ore** — article needed; `minecraft:deepslate_redstone_ore`
-- **Deepslate Tile Slab** — article needed; `minecraft:deepslate_tile_slab`
-- **Deepslate Tile Stairs** — article needed; `minecraft:deepslate_tile_stairs`
-- **Deepslate Tile Wall** — article needed; `minecraft:deepslate_tile_wall`
-- **Deepslate Tiles** — article needed; `minecraft:deepslate_tiles`
+- **Deepslate Tile Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_tile_slab`
+- **Deepslate Tile Stairs** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_tile_stairs`
+- **Deepslate Tile Wall** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_tile_wall`
+- **Deepslate Tiles** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_tiles`
 - **Detector Rail** — [Rails](Rails.md) (related guide); `minecraft:detector_rail`
 - **Diamond Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:diamond_ore`
 - **Dinosaur Chop** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:dinosaur_chop`
@@ -531,13 +531,13 @@ Names use English localization where available. A † marks one of 25 readable r
 ### I
 
 - **Ice** — article needed; `minecraft:ice`
-- **Infested Chiseled Stone Bricks** — article needed; `minecraft:infested_chiseled_stone_bricks`
-- **Infested Cobblestone** — article needed; `minecraft:infested_cobblestone`
-- **Infested Cracked Stone Bricks** — article needed; `minecraft:infested_cracked_stone_bricks`
-- **Infested Deepslate** — article needed; `minecraft:infested_deepslate`
-- **Infested Mossy Stone Bricks** — article needed; `minecraft:infested_mossy_stone_bricks`
-- **Infested Stone** — article needed; `minecraft:infested_stone`
-- **Infested Stone Bricks** — article needed; `minecraft:infested_stone_bricks`
+- **Infested Chiseled Stone Bricks** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_chiseled_stone_bricks`
+- **Infested Cobblestone** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_cobblestone`
+- **Infested Cracked Stone Bricks** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_cracked_stone_bricks`
+- **Infested Deepslate** — [Deepslate](Deepslate.md#infested-deepslate) (related guide); `minecraft:infested_deepslate`
+- **Infested Mossy Stone Bricks** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_mossy_stone_bricks`
+- **Infested Stone** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_stone`
+- **Infested Stone Bricks** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_stone_bricks`
 - **Iron Bars** — article needed; `minecraft:iron_bars`
 - **Iron Chain** — article needed; `minecraft:iron_chain`
 - **Iron Door** — article needed; `minecraft:iron_door`
@@ -550,20 +550,20 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Jigsaw Block** — article needed; `minecraft:jigsaw`
 - **Jukebox** — article needed; `minecraft:jukebox`
 - **Jungle Button** — article needed; `minecraft:jungle_button`
-- **Jungle Door** — article needed; `minecraft:jungle_door`
-- **Jungle Fence** — article needed; `minecraft:jungle_fence`
-- **Jungle Fence Gate** — article needed; `minecraft:jungle_fence_gate`
+- **Jungle Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:jungle_door`
+- **Jungle Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:jungle_fence`
+- **Jungle Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:jungle_fence_gate`
 - **Jungle Hanging Sign** — article needed; `minecraft:jungle_hanging_sign`
 - **Jungle Leaves** — article needed; `minecraft:jungle_leaves`
 - **Jungle Log** — article needed; `minecraft:jungle_log`
-- **Jungle Planks** — article needed; `minecraft:jungle_planks`
+- **Jungle Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:jungle_planks`
 - **Jungle Pressure Plate** — article needed; `minecraft:jungle_pressure_plate`
 - **Jungle Sapling** — article needed; `minecraft:jungle_sapling`
 - **Jungle Shelf** — article needed; `minecraft:jungle_shelf`
 - **Jungle Sign** — article needed; `minecraft:jungle_sign`
-- **Jungle Slab** — article needed; `minecraft:jungle_slab`
-- **Jungle Stairs** — article needed; `minecraft:jungle_stairs`
-- **Jungle Trapdoor** — article needed; `minecraft:jungle_trapdoor`
+- **Jungle Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:jungle_slab`
+- **Jungle Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:jungle_stairs`
+- **Jungle Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:jungle_trapdoor`
 - **Jungle Wall Hanging Sign** — article needed; `minecraft:jungle_wall_hanging_sign`
 - **Jungle Wall Sign** — article needed; `minecraft:jungle_wall_sign`
 - **Jungle Wood** — article needed; `minecraft:jungle_wood`
@@ -657,21 +657,21 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Magenta Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:magenta_wool`
 - **Magma Block** — article needed; `minecraft:magma_block`
 - **Mangrove Button** — article needed; `minecraft:mangrove_button`
-- **Mangrove Door** — article needed; `minecraft:mangrove_door`
-- **Mangrove Fence** — article needed; `minecraft:mangrove_fence`
-- **Mangrove Fence Gate** — article needed; `minecraft:mangrove_fence_gate`
+- **Mangrove Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:mangrove_door`
+- **Mangrove Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:mangrove_fence`
+- **Mangrove Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:mangrove_fence_gate`
 - **Mangrove Hanging Sign** — article needed; `minecraft:mangrove_hanging_sign`
 - **Mangrove Leaves** — article needed; `minecraft:mangrove_leaves`
 - **Mangrove Log** — article needed; `minecraft:mangrove_log`
-- **Mangrove Planks** — article needed; `minecraft:mangrove_planks`
+- **Mangrove Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:mangrove_planks`
 - **Mangrove Pressure Plate** — article needed; `minecraft:mangrove_pressure_plate`
 - **Mangrove Propagule** — article needed; `minecraft:mangrove_propagule`
 - **Mangrove Roots** — article needed; `minecraft:mangrove_roots`
 - **Mangrove Shelf** — article needed; `minecraft:mangrove_shelf`
 - **Mangrove Sign** — article needed; `minecraft:mangrove_sign`
-- **Mangrove Slab** — article needed; `minecraft:mangrove_slab`
-- **Mangrove Stairs** — article needed; `minecraft:mangrove_stairs`
-- **Mangrove Trapdoor** — article needed; `minecraft:mangrove_trapdoor`
+- **Mangrove Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:mangrove_slab`
+- **Mangrove Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:mangrove_stairs`
+- **Mangrove Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:mangrove_trapdoor`
 - **Mangrove Wall Hanging Sign** — article needed; `minecraft:mangrove_wall_hanging_sign`
 - **Mangrove Wall Sign** — article needed; `minecraft:mangrove_wall_sign`
 - **Mangrove Wood** — article needed; `minecraft:mangrove_wood`
@@ -681,14 +681,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Monster Spawner** — [Monster Spawner](MonsterSpawner.md) (related guide); `minecraft:spawner`
 - **Moss Block** — article needed; `minecraft:moss_block`
 - **Moss Carpet** — article needed; `minecraft:moss_carpet`
-- **Mossy Cobblestone** — article needed; `minecraft:mossy_cobblestone`
-- **Mossy Cobblestone Slab** — article needed; `minecraft:mossy_cobblestone_slab`
-- **Mossy Cobblestone Stairs** — article needed; `minecraft:mossy_cobblestone_stairs`
-- **Mossy Cobblestone Wall** — article needed; `minecraft:mossy_cobblestone_wall`
-- **Mossy Stone Brick Slab** — article needed; `minecraft:mossy_stone_brick_slab`
-- **Mossy Stone Brick Stairs** — article needed; `minecraft:mossy_stone_brick_stairs`
-- **Mossy Stone Brick Wall** — article needed; `minecraft:mossy_stone_brick_wall`
-- **Mossy Stone Bricks** — article needed; `minecraft:mossy_stone_bricks`
+- **Mossy Cobblestone** — [Stone](Stone.md#mossy-variants) (related guide); `minecraft:mossy_cobblestone`
+- **Mossy Cobblestone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_cobblestone_slab`
+- **Mossy Cobblestone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_cobblestone_stairs`
+- **Mossy Cobblestone Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_cobblestone_wall`
+- **Mossy Stone Brick Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_stone_brick_slab`
+- **Mossy Stone Brick Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_stone_brick_stairs`
+- **Mossy Stone Brick Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_stone_brick_wall`
+- **Mossy Stone Bricks** — [Stone](Stone.md#mossy-variants) (related guide); `minecraft:mossy_stone_bricks`
 - **Moving Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:moving_piston`
 - **Mud** — article needed; `minecraft:mud`
 - **Mud Brick Slab** — article needed; `minecraft:mud_brick_slab`
@@ -718,20 +718,20 @@ Names use English localization where available. A † marks one of 25 readable r
 ### O
 
 - **Oak Button** — [Buttons](Buttons.md) (related guide); `minecraft:oak_button`
-- **Oak Door** — article needed; `minecraft:oak_door`
-- **Oak Fence** — article needed; `minecraft:oak_fence`
-- **Oak Fence Gate** — article needed; `minecraft:oak_fence_gate`
+- **Oak Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:oak_door`
+- **Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:oak_fence`
+- **Oak Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:oak_fence_gate`
 - **Oak Hanging Sign** — article needed; `minecraft:oak_hanging_sign`
 - **Oak Leaves** — [Oak](Oak.md) (related guide); `minecraft:oak_leaves`
 - **Oak Log** — [Oak](Oak.md) (related guide); `minecraft:oak_log`
-- **Oak Planks** — [Oak](Oak.md) (related guide); `minecraft:oak_planks`
+- **Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:oak_planks`
 - **Oak Pressure Plate** — [Pressure plates](PressurePlates.md) (related guide); `minecraft:oak_pressure_plate`
 - **Oak Sapling** — [Oak](Oak.md) (related guide); `minecraft:oak_sapling`
 - **Oak Shelf** — article needed; `minecraft:oak_shelf`
 - **Oak Sign** — article needed; `minecraft:oak_sign`
-- **Oak Slab** — article needed; `minecraft:oak_slab`
-- **Oak Stairs** — article needed; `minecraft:oak_stairs`
-- **Oak Trapdoor** — article needed; `minecraft:oak_trapdoor`
+- **Oak Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:oak_slab`
+- **Oak Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:oak_stairs`
+- **Oak Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:oak_trapdoor`
 - **Oak Wall Hanging Sign** — article needed; `minecraft:oak_wall_hanging_sign`
 - **Oak Wall Sign** — article needed; `minecraft:oak_wall_sign`
 - **Oak Wood** — [Oak](Oak.md) (related guide); `minecraft:oak_wood`
@@ -775,20 +775,20 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pale Moss Block** — article needed; `minecraft:pale_moss_block`
 - **Pale Moss Carpet** — article needed; `minecraft:pale_moss_carpet`
 - **Pale Oak Button** — article needed; `minecraft:pale_oak_button`
-- **Pale Oak Door** — article needed; `minecraft:pale_oak_door`
-- **Pale Oak Fence** — article needed; `minecraft:pale_oak_fence`
-- **Pale Oak Fence Gate** — article needed; `minecraft:pale_oak_fence_gate`
+- **Pale Oak Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:pale_oak_door`
+- **Pale Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:pale_oak_fence`
+- **Pale Oak Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:pale_oak_fence_gate`
 - **Pale Oak Hanging Sign** — article needed; `minecraft:pale_oak_hanging_sign`
 - **Pale Oak Leaves** — article needed; `minecraft:pale_oak_leaves`
 - **Pale Oak Log** — article needed; `minecraft:pale_oak_log`
-- **Pale Oak Planks** — article needed; `minecraft:pale_oak_planks`
+- **Pale Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:pale_oak_planks`
 - **Pale Oak Pressure Plate** — article needed; `minecraft:pale_oak_pressure_plate`
 - **Pale Oak Sapling** — article needed; `minecraft:pale_oak_sapling`
 - **Pale Oak Shelf** — article needed; `minecraft:pale_oak_shelf`
 - **Pale Oak Sign** — article needed; `minecraft:pale_oak_sign`
-- **Pale Oak Slab** — article needed; `minecraft:pale_oak_slab`
-- **Pale Oak Stairs** — article needed; `minecraft:pale_oak_stairs`
-- **Pale Oak Trapdoor** — article needed; `minecraft:pale_oak_trapdoor`
+- **Pale Oak Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:pale_oak_slab`
+- **Pale Oak Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:pale_oak_stairs`
+- **Pale Oak Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:pale_oak_trapdoor`
 - **Pale Oak Wall Hanging Sign** — article needed; `minecraft:pale_oak_wall_hanging_sign`
 - **Pale Oak Wall Sign** — article needed; `minecraft:pale_oak_wall_sign`
 - **Pale Oak Wood** — article needed; `minecraft:pale_oak_wood`
@@ -853,10 +853,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Polished Blackstone Slab** — article needed; `minecraft:polished_blackstone_slab`
 - **Polished Blackstone Stairs** — article needed; `minecraft:polished_blackstone_stairs`
 - **Polished Blackstone Wall** — article needed; `minecraft:polished_blackstone_wall`
-- **Polished Deepslate** — article needed; `minecraft:polished_deepslate`
-- **Polished Deepslate Slab** — article needed; `minecraft:polished_deepslate_slab`
-- **Polished Deepslate Stairs** — article needed; `minecraft:polished_deepslate_stairs`
-- **Polished Deepslate Wall** — article needed; `minecraft:polished_deepslate_wall`
+- **Polished Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:polished_deepslate`
+- **Polished Deepslate Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:polished_deepslate_slab`
+- **Polished Deepslate Stairs** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:polished_deepslate_stairs`
+- **Polished Deepslate Wall** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:polished_deepslate_wall`
 - **Polished Diorite** — article needed; `minecraft:polished_diorite`
 - **Polished Diorite Slab** — article needed; `minecraft:polished_diorite_slab`
 - **Polished Diorite Stairs** — article needed; `minecraft:polished_diorite_stairs`
@@ -984,7 +984,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Redstone Torch** — [Redstone Torch](RedstoneTorch.md) (related guide); `minecraft:redstone_torch`
 - **Redstone Wall Torch** — [Redstone Torch](RedstoneTorch.md) (related guide); `minecraft:redstone_wall_torch`
 - **Redstone Wire** — [Redstone Dust and wire](RedstoneDust.md) (related guide); `minecraft:redstone_wire`
-- **Reinforced Deepslate** — article needed; `minecraft:reinforced_deepslate`
+- **Reinforced Deepslate** — [Deepslate](Deepslate.md#reinforced-deepslate) (related guide); `minecraft:reinforced_deepslate`
 - **Relicheirus Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:relicheirus_egg`
 - **Repeating Command Block** — article needed; `minecraft:repeating_command_block`
 - **Resin Brick Slab** — article needed; `minecraft:resin_brick_slab`
@@ -1038,8 +1038,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Smooth Sandstone** — article needed; `minecraft:smooth_sandstone`
 - **Smooth Sandstone Slab** — article needed; `minecraft:smooth_sandstone_slab`
 - **Smooth Sandstone Stairs** — article needed; `minecraft:smooth_sandstone_stairs`
-- **Smooth Stone** — article needed; `minecraft:smooth_stone`
-- **Smooth Stone Slab** — article needed; `minecraft:smooth_stone_slab`
+- **Smooth Stone** — [Stone](Stone.md#smooth-stone) (related guide); `minecraft:smooth_stone`
+- **Smooth Stone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:smooth_stone_slab`
 - **Sniffer Egg** — article needed; `minecraft:sniffer_egg`
 - **Snow** — article needed; `minecraft:snow`
 - **Snow Block** — article needed; `minecraft:snow_block`
@@ -1053,33 +1053,33 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Sponge** — article needed; `minecraft:sponge`
 - **Spore Blossom** — article needed; `minecraft:spore_blossom`
 - **Spruce Button** — article needed; `minecraft:spruce_button`
-- **Spruce Door** — article needed; `minecraft:spruce_door`
-- **Spruce Fence** — article needed; `minecraft:spruce_fence`
-- **Spruce Fence Gate** — article needed; `minecraft:spruce_fence_gate`
+- **Spruce Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:spruce_door`
+- **Spruce Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:spruce_fence`
+- **Spruce Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:spruce_fence_gate`
 - **Spruce Hanging Sign** — article needed; `minecraft:spruce_hanging_sign`
 - **Spruce Leaves** — article needed; `minecraft:spruce_leaves`
 - **Spruce Log** — article needed; `minecraft:spruce_log`
-- **Spruce Planks** — article needed; `minecraft:spruce_planks`
+- **Spruce Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:spruce_planks`
 - **Spruce Pressure Plate** — article needed; `minecraft:spruce_pressure_plate`
 - **Spruce Sapling** — article needed; `minecraft:spruce_sapling`
 - **Spruce Shelf** — article needed; `minecraft:spruce_shelf`
 - **Spruce Sign** — article needed; `minecraft:spruce_sign`
-- **Spruce Slab** — article needed; `minecraft:spruce_slab`
-- **Spruce Stairs** — article needed; `minecraft:spruce_stairs`
-- **Spruce Trapdoor** — article needed; `minecraft:spruce_trapdoor`
+- **Spruce Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:spruce_slab`
+- **Spruce Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:spruce_stairs`
+- **Spruce Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:spruce_trapdoor`
 - **Spruce Wall Hanging Sign** — article needed; `minecraft:spruce_wall_hanging_sign`
 - **Spruce Wall Sign** — article needed; `minecraft:spruce_wall_sign`
 - **Spruce Wood** — article needed; `minecraft:spruce_wood`
 - **Sticky Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:sticky_piston`
-- **Stone** — [Stone](Stone.md) (related guide); `minecraft:stone`
-- **Stone Brick Slab** — article needed; `minecraft:stone_brick_slab`
-- **Stone Brick Stairs** — article needed; `minecraft:stone_brick_stairs`
-- **Stone Brick Wall** — article needed; `minecraft:stone_brick_wall`
-- **Stone Bricks** — article needed; `minecraft:stone_bricks`
+- **Stone** — [Stone](Stone.md#stone-and-cobblestone) (related guide); `minecraft:stone`
+- **Stone Brick Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_brick_slab`
+- **Stone Brick Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_brick_stairs`
+- **Stone Brick Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_brick_wall`
+- **Stone Bricks** — [Stone](Stone.md#stone-bricks) (related guide); `minecraft:stone_bricks`
 - **Stone Button** — [Buttons](Buttons.md) (related guide); `minecraft:stone_button`
 - **Stone Pressure Plate** — [Pressure plates](PressurePlates.md) (related guide); `minecraft:stone_pressure_plate`
-- **Stone Slab** — article needed; `minecraft:stone_slab`
-- **Stone Stairs** — article needed; `minecraft:stone_stairs`
+- **Stone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_slab`
+- **Stone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_stairs`
 - **Stonecutter** — [Stonecutter](Stonecutter.md) (related guide); `minecraft:stonecutter`
 - **Stripped Acacia Log** — article needed; `minecraft:stripped_acacia_log`
 - **Stripped Acacia Wood** — article needed; `minecraft:stripped_acacia_wood`
@@ -1167,22 +1167,22 @@ Names use English localization where available. A † marks one of 25 readable r
 
 - **Wall Torch** — [Torch](Torch.md) (related guide); `minecraft:wall_torch`
 - **Warped Button** — article needed; `minecraft:warped_button`
-- **Warped Door** — article needed; `minecraft:warped_door`
-- **Warped Fence** — article needed; `minecraft:warped_fence`
-- **Warped Fence Gate** — article needed; `minecraft:warped_fence_gate`
+- **Warped Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:warped_door`
+- **Warped Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:warped_fence`
+- **Warped Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:warped_fence_gate`
 - **Warped Fungus** — article needed; `minecraft:warped_fungus`
 - **Warped Hanging Sign** — article needed; `minecraft:warped_hanging_sign`
 - **Warped Hyphae** — article needed; `minecraft:warped_hyphae`
 - **Warped Nylium** — article needed; `minecraft:warped_nylium`
-- **Warped Planks** — article needed; `minecraft:warped_planks`
+- **Warped Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:warped_planks`
 - **Warped Pressure Plate** — article needed; `minecraft:warped_pressure_plate`
 - **Warped Roots** — article needed; `minecraft:warped_roots`
 - **Warped Shelf** — article needed; `minecraft:warped_shelf`
 - **Warped Sign** — article needed; `minecraft:warped_sign`
-- **Warped Slab** — article needed; `minecraft:warped_slab`
-- **Warped Stairs** — article needed; `minecraft:warped_stairs`
+- **Warped Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:warped_slab`
+- **Warped Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:warped_stairs`
 - **Warped Stem** — article needed; `minecraft:warped_stem`
-- **Warped Trapdoor** — article needed; `minecraft:warped_trapdoor`
+- **Warped Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:warped_trapdoor`
 - **Warped Wall Hanging Sign** — article needed; `minecraft:warped_wall_hanging_sign`
 - **Warped Wall Sign** — article needed; `minecraft:warped_wall_sign`
 - **Warped Wart Block** — article needed; `minecraft:warped_wart_block`
@@ -1327,6 +1327,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Crafter](Crafter.md)
 - [Crafting Table](CraftingTable.md)
 - [Dead Bush](DeadBush.md)
+- [Deepslate](Deepslate.md)
 - [Dinosaur Chop](DinosaurChop.md)
 - [Dispenser and Dropper](DispenserAndDropper.md)
 - [Dragon Egg](DragonEgg.md)
@@ -1374,6 +1375,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Torch](Torch.md)
 - [Tripwire and Tripwire Hooks](Tripwire.md)
 - [Wheat crop](Wheat.md)
+- [Wood construction](WoodConstruction.md)
 - [Wool and Carpet](WoolAndCarpet.md)
 
 ## Inventory and related pages
