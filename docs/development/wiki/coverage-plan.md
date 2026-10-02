@@ -1321,3 +1321,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - These are source-only findings, not runtime reproductions. Ordinary dispenser item ejection is distinct from supported fluid-container release; no unsupported dispenser-emptying path is claimed.
 - Reinforced exact loader-path resource counting after a prepublication research-manifest label correction. The six batch 158 player drafts were unchanged by that evidence repair. Full alphabetical block inventory still distinguishes 1,235 source IDs from complete variant-behavior coverage.
 - Continue the isolated jungle-animal draft and remaining mob/item families after this bounded review. Final documentation check, strict build, links/anchors and rendered citations are required before promotion; broad catch-up remains incomplete.
+
+## Batch 160: Jungle animal care
+
+- Expanded Panda, Parrot and Toucan owners with actual acquisition, food/breeding or taming, care, variants and loot limits, plus four discovery links in three existing owners.
+- Preserved fork-specific Panda one-stalk Bamboo breeding checks, Parrot Cookie/shoulder/imitation controls, and Toucan breeding-versus-planting inputs and current missing natural population route. A single Apple interaction can reach both inherited feeding and a separate planting gift when conditions permit.
+- Independent review corrected Parrot release attempts to distinguish ignored early triggers from queued release, qualified Cookie consumption for ordinary Survival, and cited the active TamableAnimal Lead override. Source/render checks and final strict documentation build are required before promotion; no live feeding, breeding, shoulder, planting, sound or loot test is claimed.

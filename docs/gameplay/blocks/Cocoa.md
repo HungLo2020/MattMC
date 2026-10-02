@@ -40,6 +40,7 @@ The checked table has no Fortune or Silk Touch branch. Explosion decay can reduc
 The placed pod is `minecraft:cocoa`; its planting and harvested item is `minecraft:cocoa_beans`. [Block registration][cocoa-registration] · [Item registration][cocoa-item]
 
 - [Cocoa Beans](../items/CocoaBeans.md)
+- [Parrot care and Cookie safety](../mobs/Parrot.md#cookies-sounds-and-music)
 - [Tree logs and roots](TreeLogsAndRoots.md#jungle-timber)
 - [Blocks](Blocks.md)
 

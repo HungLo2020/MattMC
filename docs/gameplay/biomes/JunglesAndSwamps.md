@@ -8,9 +8,9 @@ All IDs below use the `minecraft:` namespace. The comparison highlights selected
 
 | Biome | Vegetation and material route | Distinctive listed candidates or exclusions |
 | --- | --- | --- |
-| [Jungle](#jungle) | Mixed jungle trees, light Bamboo, Melons, Vines | Parrot and Panda; Ocelot in the monster list |
+| [Jungle](#jungle) | Mixed jungle trees, light Bamboo, Melons, Vines | [Parrot](../mobs/Parrot.md) and [Panda](../mobs/Panda.md); Ocelot in the monster list |
 | [Sparse Jungle](#sparse_jungle) | Sparse jungle-tree placement, sparse Melon placement, Vines | Wolf; no Parrot, Panda or Ocelot entry |
-| [Bamboo Jungle](#bamboo_jungle) | Dedicated Bamboo, mixed vegetation and Melons | Parrot, stronger Panda list weight; Ocelot in the monster list |
+| [Bamboo Jungle](#bamboo_jungle) | Dedicated Bamboo, mixed vegetation and Melons | [Parrot](../mobs/Parrot.md), stronger [Panda](../mobs/Panda.md) list weight; Ocelot in the monster list |
 | [Swamp](#swamp) | Swamp Oak, Water Lilies, Blue Orchid feature, Clay disks | Farm animals and Frog; Slime and Bogged in monster lists |
 | [Mangrove Swamp](#mangrove_swamp) | Mud surface, Mangrove trees/roots, Water Lilies, Clay disks | Frog and Tropical Fish; no farm-animal entries |
 
