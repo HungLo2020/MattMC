@@ -1340,3 +1340,10 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Expanded Bat, Phantom, Silverfish and Endermite with actual creation/spawn callers, care and combat limits, persistence and loot, plus seven discovery links. Phantom Membrane receives a conditional acquisition crosslink, not a completed item-owner claim.
 - Documented default-off insomnia, conditional Phantom scheduling/rest checks and the size-zero damage-initialization caveat; Bat seasonal/local-ground conditions; Silverfish infestation, effect and configured spawner routes; and Endermite Pearl-position/lifetime/Enderman-target distinctions.
 - Independent caller review and final unchanged-source/check/build/render validation are required before promotion. Spawn predicates are checked with their inherited and caller gates; no live spawn, combat, light-control, timing or loot test is claimed.
+
+## Batch 163: Bundle inventory storage and colored routes
+
+- Replaced the generic Bundle owner with source-grounded capacity, click/scroll controls, nesting restrictions, world unloading, component preservation and item-destruction limits. Added exact dye routes to the 16 existing color pages while retaining their old anchors and linking shared mechanics.
+- Verified the String-over-Leather recipe, all 16 transmute recipes, eight village chest tables and their template references, and ordinary browser availability in Survival and Creative. Color recipes preserve contents and reject an unchanged same-color result.
+- Reviewed exact base loader paths: 1,501 recipe resources and 1,410 loot-table resources. Advancement, plural recipe-directory and nested optional-pack resources were inventoried separately. Source reviewed at `1d7e3e91f2a2694339f78b8673993e98d496ca5f`.
+- The configured strict MkDocs build, rendered links, original anchors, immutable source bounds and full/shortcut reference checks pass. No game or browser test is claimed.
