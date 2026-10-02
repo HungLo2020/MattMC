@@ -269,7 +269,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cobblestone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_slab`
 - **Cobblestone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_stairs`
 - **Cobblestone Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_wall`
-- **Cobweb** — article needed; `minecraft:cobweb`
+- **Cobweb** — [Cobweb](Cobweb.md) (related guide); `minecraft:cobweb`
 - **Cocoa** — [Cocoa](Cocoa.md) (related guide); `minecraft:cocoa`
 - **Command Block** — [Command Blocks](CommandBlocks.md#impulse-command-block) (related guide); `minecraft:command_block`
 - **Composter** — [Composter](Composter.md#composter) (related guide); `minecraft:composter`
@@ -415,7 +415,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dragon Egg** — [Dragon Egg](DragonEgg.md) (related guide); `minecraft:dragon_egg`
 - **Dragon Head** — [Heads and Skulls](HeadsAndSkulls.md#dragon-heads) (related guide); `minecraft:dragon_head`
 - **Dragon Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#dragon-heads) (related guide); `minecraft:dragon_wall_head`
-- **Dried Ghast** — article needed; `minecraft:dried_ghast`
+- **Dried Ghast** — [Dried Ghast](DriedGhast.md) (related guide); `minecraft:dried_ghast`
 - **Dried Kelp Block** — [Kelp](Kelp.md) (related guide); `minecraft:dried_kelp_block`
 - **Dripstone Block** — [Dripstone](Dripstone.md#dripstone-block) (related guide); `minecraft:dripstone_block`
 - **Dropper** — [Dispenser and Dropper](DispenserAndDropper.md) (related guide); `minecraft:dropper`
@@ -517,11 +517,11 @@ Names use English localization where available. A † marks one of 25 readable r
 ### H
 
 - **Hanging Roots** — [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md#hanging-roots) (related guide); `minecraft:hanging_roots`
-- **Hay Bale** — article needed; `minecraft:hay_block`
-- **Heavy Core** — article needed; `minecraft:heavy_core`
+- **Hay Bale** — [Hay Bale](HayBale.md) (related guide); `minecraft:hay_block`
+- **Heavy Core** — [Heavy Core](HeavyCore.md) (related guide); `minecraft:heavy_core`
 - **Heavy Weighted Pressure Plate** — [Pressure plates](PressurePlates.md#heavy-weighted-pressure-plate) (related guide); `minecraft:heavy_weighted_pressure_plate`
 - **Honey Block** — [Slime and Honey Blocks](SlimeAndHoneyBlocks.md#honey-block) (related guide); `minecraft:honey_block`
-- **Honeycomb Block** — article needed; `minecraft:honeycomb_block`
+- **Honeycomb Block** — [Honeycomb Block](HoneycombBlock.md) (related guide); `minecraft:honeycomb_block`
 - **Hopper** — [Hopper](Hopper.md) (related guide); `minecraft:hopper`
 - **Horn Coral** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:horn_coral`
 - **Horn Coral Block** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:horn_coral_block`
@@ -583,8 +583,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Lava** — [Water and Lava](WaterAndLava.md) (related guide); `minecraft:lava`
 - **Lava Cauldron** — [Cauldrons](Cauldrons.md#lava-cauldron) (related guide); `minecraft:lava_cauldron`
 - **Leaf Litter** — [Flowerbeds and Leaf Litter](FlowerbedsAndLeafLitter.md#leaf-litter) (related guide); `minecraft:leaf_litter`
-- **Leafcutter Ant Chamber** — article needed; `minecraft:leafcutter_ant_chamber`
-- **Leafcutter Anthill** — article needed; `minecraft:leafcutter_anthill`
+- **Leafcutter Ant Chamber** — [Leafcutter ant nests](LeafcutterNests.md#leafcutter-ant-chamber) (related guide); `minecraft:leafcutter_ant_chamber`
+- **Leafcutter Anthill** — [Leafcutter ant nests](LeafcutterNests.md#leafcutter-anthill) (related guide); `minecraft:leafcutter_anthill`
 - **Lectern** — [Lectern](Lectern.md#lectern) (related guide); `minecraft:lectern`
 - **Lever** — [Lever](Lever.md) (related guide); `minecraft:lever`
 - **Light** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#light) (related guide); `minecraft:light`
@@ -1018,7 +1018,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:shulker_box`
 - **Skeleton Skull** — [Heads and Skulls](HeadsAndSkulls.md#skeleton-skulls) (related guide); `minecraft:skeleton_skull`
 - **Skeleton Wall Skull** — [Heads and Skulls](HeadsAndSkulls.md#skeleton-skulls) (related guide); `minecraft:skeleton_wall_skull`
-- **Skunk Spray** — article needed; `minecraft:skunk_spray`
+- **Skunk Spray** — [Skunk Spray](SkunkSpray.md#skunk-spray) (related guide); `minecraft:skunk_spray`
 - **Slime Block** — [Slime and Honey Blocks](SlimeAndHoneyBlocks.md#slime-block) (related guide); `minecraft:slime_block`
 - **Small Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#small-bud) (related guide); `minecraft:small_amethyst_bud`
 - **Small Dripleaf** — [Dripleaves](Dripleaves.md#small-dripleaf) (related guide); `minecraft:small_dripleaf`
@@ -1341,6 +1341,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Chest](Chest.md)
 - [Chorus Plants and Flowers](Chorus.md)
 - [Clay and Bricks](ClayAndBricks.md)
+- [Cobweb](Cobweb.md)
 - [Cocoa](Cocoa.md)
 - [Command Blocks](CommandBlocks.md)
 - [Composter](Composter.md)
@@ -1362,6 +1363,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Dinosaur Chop](DinosaurChop.md)
 - [Dispenser and Dropper](DispenserAndDropper.md)
 - [Dragon Egg](DragonEgg.md)
+- [Dried Ghast](DriedGhast.md)
 - [Dripleaves](Dripleaves.md)
 - [Dripstone](Dripstone.md)
 - [Elevator](Elevator.md)
@@ -1386,7 +1388,10 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Grass and Ferns](GrassAndFerns.md)
 - [Grindstone](Grindstone.md)
 - [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md)
+- [Hay Bale](HayBale.md)
 - [Heads and Skulls](HeadsAndSkulls.md)
+- [Heavy Core](HeavyCore.md)
+- [Honeycomb Block](HoneycombBlock.md)
 - [Hopper](Hopper.md)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
 - [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md)
@@ -1395,6 +1400,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Kelp](Kelp.md)
 - [Ladder](Ladder.md)
 - [Lanterns and Soul Lanterns](Lanterns.md)
+- [Leafcutter ant nests](LeafcutterNests.md)
 - [Lectern](Lectern.md)
 - [Lever](Lever.md)
 - [Lightning Rods](LightningRods.md)
@@ -1451,6 +1457,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Shrubs and Dry Grass](ShrubsAndDryGrass.md)
 - [Shulker Box](ShulkerBox.md)
 - [Signs and Hanging Signs](Signs.md)
+- [Skunk Spray](SkunkSpray.md)
 - [Slime and Honey Blocks](SlimeAndHoneyBlocks.md)
 - [Small and tall flowers](Flowers.md)
 - [Smithing Table](SmithingTable.md)

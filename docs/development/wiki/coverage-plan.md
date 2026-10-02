@@ -1039,13 +1039,23 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,326 pages / 37 indexes. All 24 authored paths are documentation; 1,752 local links/anchors and 190 tracked reference uses resolve, with no rendered citation candidates. The directory keeps 1,211 alphabetical IDs, 1,203 related-guide routes and eight explicit article gaps. Technical IDs and family routes remain distinct from obtainable items and completed behavior coverage.
 
+## Batch 129: Remaining block-family entry points
+
+- Added seven canonical guides and corrected nine item pages for the final eight explicit directory gaps: Leafcutter nests, Skunk Spray, Hay Bale, Honeycomb Block, Heavy Core, Cobweb and Dried Ghast. Leafcutter Ant and Skunk receive narrow owner crosslinks.
+- Imported nature guidance distinguishes active Pupa spawning and spray bottling from absent colony storage, production, recipe/loot and item integrations. Storage/core guidance verifies exact recipes, recovery, Vault reward probability and the separate ordinary inventory-browser route.
+- Cobweb coverage follows actual harvest gates, slowing, entity exceptions, Water replacement, Weaving and brewing. Dried Ghast coverage verifies recipe ID, barter/fossil callers, waterlogging, random-to-scheduled hydration checks and Happy Ghast hatch identity without promising an exact wall-clock timer.
+- Source checkpoint: `d815d4429aac38e31ae553cbf42752e5248e24d7`; all 132 distinct pinned source pairs match current source. Independent rendering repaired nineteen missing draft definitions and five potential shortcut misbindings before integration. No game/runtime tests were run.
+- All 1,211 source-inventoried block IDs now have a related placed-block route. This closes the directory's explicit link gaps only: shared family aliases, technical forms, article depth and broader player-wiki content remain review work. It is not a claim of complete block behavior coverage or broad catch-up completion.
+
+- Validation: required checker and strict build passed on 2,333 pages / 37 indexes. All 25 authored paths are documentation; 1,993 local links/anchors and 398 tracked reference uses resolve, with zero actual rendered citation candidates. All 1,211 IDs remain alphabetical and occur once across the separate categories; 25 fallback labels remain disclosed. The full set now has related-guide routes, pending ongoing semantic review.
+
 ## Next batches, in priority order
 
-1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Finish remaining nature, storage/core, Cobweb/Dried Ghast and Warden reviews. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
-3. Fill remaining practical gaps such as fuel/storage utility blocks, sculk devices and imported nature/redstone blocks, following actual active behavior and acquisition routes.
-4. Cover remaining terrain/material, plant and technical families, including Fire/Soul Fire, Chorus, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
-5. Preserve the ready Swords and undead drafts for later source revalidation; replace remaining generic mob/item pages, including Warden and the missing Nautilus owners, and add stronger combat, health/death/experience, expedition, effect and enchantment coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.
+1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.
+2. Integrate the reviewed Warden encounter guide, then finish Nautilus/Zombie Nautilus, health/death/experience and combat drafts. Preserve current citation repairs and source-revalidate every incoming draft.
+3. Revalidate the held Swords and undead-family drafts, replace remaining generic mob/item pages in coherent gameplay loops, and deepen practical expedition, biome, effect and enchantment references.
+4. Continue checking acquisition through the actual inventory browser, recipe/loot, generation, permissions and active interaction callers separately. Keep incomplete imported systems explicit and link independently verified issues without claiming unmerged fixes.
+5. Broad catch-up remains incomplete. The prior audit's template candidates are a triage list, not a completion metric; use player decisions, registry ownership and source-grounded substance to assess progress.
 
 ## Coordinated source and issue review, 2026-10-02 02:45 UTC
 
