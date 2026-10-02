@@ -830,6 +830,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Published source checkpoint at batch start: `3c39e8cc456e3c76eac84ae45b12020c4b08a7a7`. All authored paths are documentation.
 - Validation: required check and strict build passed on 2,254 pages / 37 indexes; 1,679 local links/anchors, 337 citation uses, 131 pinned source references unchanged, all 1,211 alphabetical IDs and exact 2/4/3 block maps checked. Directory: 957 related-guide routes and 254 explicit article gaps, not a completion score. Source, recipe, loot, persistence and active dispatch audits are complete for this bounded batch; no gameplay tests.
 
+## Batch 107: Banners/Loom, flowers and book furniture
+
+- Added five canonical guides: Banners, Loom, small/tall Flowers, Bookshelves and Lectern. Corrected ten existing item pages. Exact maps cover thirty-three banner/Loom IDs, seventeen flowers and three book-furniture blocks.
+- Checked pattern components, preservation/duplication/washing/map behavior, all ten template items and the normal Loom interface limit; flower support, dyes/stew effects, propagation and biome examples; bookshelf storage/removal, enchanting contribution, Lectern reading/page signals and profession assignment.
+- Kept existing Shield, Cauldron, Flower Pot, Bee, Enchanting and trading ownership. The guides correct the Chiseled Bookshelf portable-content assumption and distinguish comparator slot/page readings from inventory fullness. No gameplay tests were run.
+- Published source checkpoint at batch start: `88d85ee594bc770fa362129690eadb127272dc20`. All authored paths are documentation.
+- Validation: required check and strict build passed on 2,259 pages / 37 indexes; 2,034 local links/anchors, 305 citation uses, 239 pinned source references unchanged, all 1,211 alphabetical IDs and exact 33/17/3 family maps checked. All selected recipes, loot, pattern/flower/book tags and active callbacks were audited. Directory: 1010 related-guide routes and 201 explicit article gaps, not a completion score.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and category catalogs as source changes; expand genuine article coverage from the now-visible gaps. The initial directory, twelve-terrain guide, Crafter correction, and Rabbit/Fox citation repair are recorded in batch 97.

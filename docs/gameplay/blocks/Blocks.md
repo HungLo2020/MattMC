@@ -31,7 +31,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Acacia Wood** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:acacia_wood`
 - **Activator Rail** — [Rails](Rails.md) (related guide); `minecraft:activator_rail`
 - **Air** — article needed; `minecraft:air`
-- **Allium** — article needed; `minecraft:allium`
+- **Allium** — [Small and tall flowers](Flowers.md#allium) (related guide); `minecraft:allium`
 - **Amber** — [Amber](Amber.md) (related guide); `minecraft:amber`
 - **Ambersol** — [Ambersol](Ambersol.md) (related guide); `minecraft:ambersol`
 - **Ambersol Light †** — [Ambersol](Ambersol.md) (related guide); `minecraft:ambersol_light`
@@ -50,7 +50,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Attached Pumpkin Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:attached_pumpkin_stem`
 - **Azalea** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#azalea) (related guide); `minecraft:azalea`
 - **Azalea Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#azalea-leaves) (related guide); `minecraft:azalea_leaves`
-- **Azure Bluet** — article needed; `minecraft:azure_bluet`
+- **Azure Bluet** — [Small and tall flowers](Flowers.md#azure-bluet) (related guide); `minecraft:azure_bluet`
 
 ### B
 
@@ -102,7 +102,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Birch Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:birch_wall_hanging_sign`
 - **Birch Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:birch_wall_sign`
 - **Birch Wood** — [Tree logs and roots](TreeLogsAndRoots.md#birch-timber) (related guide); `minecraft:birch_wood`
-- **Black Banner** — article needed; `minecraft:black_banner`
+- **Black Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:black_banner`
 - **Black Bed** — [Beds](Bed.md) (related guide); `minecraft:black_bed`
 - **Black Candle** — [Candles](Candles.md#black-candle) (related guide); `minecraft:black_candle`
 - **Black Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:black_carpet`
@@ -113,7 +113,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Black Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:black_stained_glass`
 - **Black Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:black_stained_glass_pane`
 - **Black Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:black_terracotta`
-- **Black Wall Banner †** — article needed; `minecraft:black_wall_banner`
+- **Black Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:black_wall_banner`
 - **Black Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:black_wool`
 - **Blackstone** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:blackstone`
 - **Blackstone Slab** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:blackstone_slab`
@@ -137,7 +137,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Block of Redstone** — article needed; `minecraft:redstone_block`
 - **Block of Resin** — article needed; `minecraft:resin_block`
 - **Block of Stripped Bamboo** — article needed; `minecraft:stripped_bamboo_block`
-- **Blue Banner** — article needed; `minecraft:blue_banner`
+- **Blue Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:blue_banner`
 - **Blue Bed** — [Beds](Bed.md) (related guide); `minecraft:blue_bed`
 - **Blue Candle** — [Candles](Candles.md#blue-candle) (related guide); `minecraft:blue_candle`
 - **Blue Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:blue_carpet`
@@ -145,15 +145,15 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Blue Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:blue_concrete_powder`
 - **Blue Glazed Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:blue_glazed_terracotta`
 - **Blue Ice** — [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md#registered-ice-blocks) (related guide); `minecraft:blue_ice`
-- **Blue Orchid** — article needed; `minecraft:blue_orchid`
+- **Blue Orchid** — [Small and tall flowers](Flowers.md#blue-orchid) (related guide); `minecraft:blue_orchid`
 - **Blue Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:blue_shulker_box`
 - **Blue Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:blue_stained_glass`
 - **Blue Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:blue_stained_glass_pane`
 - **Blue Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:blue_terracotta`
-- **Blue Wall Banner †** — article needed; `minecraft:blue_wall_banner`
+- **Blue Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:blue_wall_banner`
 - **Blue Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:blue_wool`
 - **Bone Block** — article needed; `minecraft:bone_block`
-- **Bookshelf** — article needed; `minecraft:bookshelf`
+- **Bookshelf** — [Bookshelves](Bookshelves.md#bookshelf) (related guide); `minecraft:bookshelf`
 - **Brain Coral** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral`
 - **Brain Coral Block** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral_block`
 - **Brain Coral Fan** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral_fan`
@@ -163,7 +163,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Brick Stairs** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:brick_stairs`
 - **Brick Wall** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:brick_wall`
 - **Bricks** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:bricks`
-- **Brown Banner** — article needed; `minecraft:brown_banner`
+- **Brown Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:brown_banner`
 - **Brown Bed** — [Beds](Bed.md) (related guide); `minecraft:brown_bed`
 - **Brown Candle** — [Candles](Candles.md#brown-candle) (related guide); `minecraft:brown_candle`
 - **Brown Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:brown_carpet`
@@ -176,7 +176,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Brown Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:brown_stained_glass`
 - **Brown Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:brown_stained_glass_pane`
 - **Brown Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:brown_terracotta`
-- **Brown Wall Banner †** — article needed; `minecraft:brown_wall_banner`
+- **Brown Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:brown_wall_banner`
 - **Brown Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:brown_wool`
 - **Bubble Column** — [Bubble Columns](BubbleColumns.md) (related guide); `minecraft:bubble_column`
 - **Bubble Coral** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral`
@@ -242,7 +242,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cherry Wood** — [Tree logs and roots](TreeLogsAndRoots.md#cherry-timber) (related guide); `minecraft:cherry_wood`
 - **Chest** — [Chest](Chest.md) (related guide); `minecraft:chest`
 - **Chipped Anvil** — [Anvil](Anvil.md) (related guide); `minecraft:chipped_anvil`
-- **Chiseled Bookshelf** — article needed; `minecraft:chiseled_bookshelf`
+- **Chiseled Bookshelf** — [Bookshelves](Bookshelves.md#chiseled-bookshelf) (related guide); `minecraft:chiseled_bookshelf`
 - **Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:chiseled_copper`
 - **Chiseled Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:chiseled_deepslate`
 - **Chiseled Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_chiseled`
@@ -284,7 +284,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Copper Torch** — [Copper lighting](CopperLighting.md#copper-torches) (related guide); `minecraft:copper_torch`
 - **Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:copper_trapdoor`
 - **Copper Wall Torch** — [Copper lighting](CopperLighting.md#copper-torches) (related guide); `minecraft:copper_wall_torch`
-- **Cornflower** — article needed; `minecraft:cornflower`
+- **Cornflower** — [Small and tall flowers](Flowers.md#cornflower) (related guide); `minecraft:cornflower`
 - **Cracked Deepslate Bricks** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cracked_deepslate_bricks`
 - **Cracked Deepslate Tiles** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cracked_deepslate_tiles`
 - **Cracked Nether Bricks** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:cracked_nether_bricks`
@@ -322,7 +322,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cut Red Sandstone Slab** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:cut_red_sandstone_slab`
 - **Cut Sandstone** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:cut_sandstone`
 - **Cut Sandstone Slab** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:cut_sandstone_slab`
-- **Cyan Banner** — article needed; `minecraft:cyan_banner`
+- **Cyan Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:cyan_banner`
 - **Cyan Bed** — [Beds](Bed.md) (related guide); `minecraft:cyan_bed`
 - **Cyan Candle** — [Candles](Candles.md#cyan-candle) (related guide); `minecraft:cyan_candle`
 - **Cyan Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:cyan_carpet`
@@ -333,14 +333,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cyan Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:cyan_stained_glass`
 - **Cyan Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:cyan_stained_glass_pane`
 - **Cyan Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:cyan_terracotta`
-- **Cyan Wall Banner †** — article needed; `minecraft:cyan_wall_banner`
+- **Cyan Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:cyan_wall_banner`
 - **Cyan Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:cyan_wool`
 - **Cycad** — [Primordial decorative plants](PrimordialPlants.md) (related guide); `minecraft:cycad`
 
 ### D
 
 - **Damaged Anvil** — [Anvil](Anvil.md) (related guide); `minecraft:damaged_anvil`
-- **Dandelion** — article needed; `minecraft:dandelion`
+- **Dandelion** — [Small and tall flowers](Flowers.md#dandelion) (related guide); `minecraft:dandelion`
 - **Dark Oak Button** — [Buttons](Buttons.md#dark-oak-button) (related guide); `minecraft:dark_oak_button`
 - **Dark Oak Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:dark_oak_door`
 - **Dark Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:dark_oak_fence`
@@ -485,7 +485,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Granite Wall** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:granite_wall`
 - **Grass Block** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#grass-block-and-mycelium) (related guide); `minecraft:grass_block`
 - **Gravel** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#gravel-and-flint) (related guide); `minecraft:gravel`
-- **Gray Banner** — article needed; `minecraft:gray_banner`
+- **Gray Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:gray_banner`
 - **Gray Bed** — [Beds](Bed.md) (related guide); `minecraft:gray_bed`
 - **Gray Candle** — [Candles](Candles.md#gray-candle) (related guide); `minecraft:gray_candle`
 - **Gray Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:gray_carpet`
@@ -496,9 +496,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Gray Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:gray_stained_glass`
 - **Gray Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:gray_stained_glass_pane`
 - **Gray Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:gray_terracotta`
-- **Gray Wall Banner †** — article needed; `minecraft:gray_wall_banner`
+- **Gray Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:gray_wall_banner`
 - **Gray Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:gray_wool`
-- **Green Banner** — article needed; `minecraft:green_banner`
+- **Green Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:green_banner`
 - **Green Bed** — [Beds](Bed.md) (related guide); `minecraft:green_bed`
 - **Green Candle** — [Candles](Candles.md#green-candle) (related guide); `minecraft:green_candle`
 - **Green Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:green_carpet`
@@ -509,7 +509,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Green Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:green_stained_glass`
 - **Green Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:green_stained_glass_pane`
 - **Green Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:green_terracotta`
-- **Green Wall Banner †** — article needed; `minecraft:green_wall_banner`
+- **Green Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:green_wall_banner`
 - **Green Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:green_wool`
 - **Grindstone** — [Grindstone](Grindstone.md) (related guide); `minecraft:grindstone`
 - **Grottoceratops Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:grottoceratops_egg`
@@ -585,10 +585,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Leaf Litter** — article needed; `minecraft:leaf_litter`
 - **Leafcutter Ant Chamber** — article needed; `minecraft:leafcutter_ant_chamber`
 - **Leafcutter Anthill** — article needed; `minecraft:leafcutter_anthill`
-- **Lectern** — article needed; `minecraft:lectern`
+- **Lectern** — [Lectern](Lectern.md#lectern) (related guide); `minecraft:lectern`
 - **Lever** — [Lever](Lever.md) (related guide); `minecraft:lever`
 - **Light** — article needed; `minecraft:light`
-- **Light Blue Banner** — article needed; `minecraft:light_blue_banner`
+- **Light Blue Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:light_blue_banner`
 - **Light Blue Bed** — [Beds](Bed.md) (related guide); `minecraft:light_blue_bed`
 - **Light Blue Candle** — [Candles](Candles.md#light-blue-candle) (related guide); `minecraft:light_blue_candle`
 - **Light Blue Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:light_blue_carpet`
@@ -599,9 +599,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Light Blue Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:light_blue_stained_glass`
 - **Light Blue Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:light_blue_stained_glass_pane`
 - **Light Blue Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:light_blue_terracotta`
-- **Light Blue Wall Banner †** — article needed; `minecraft:light_blue_wall_banner`
+- **Light Blue Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:light_blue_wall_banner`
 - **Light Blue Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:light_blue_wool`
-- **Light Gray Banner** — article needed; `minecraft:light_gray_banner`
+- **Light Gray Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:light_gray_banner`
 - **Light Gray Bed** — [Beds](Bed.md) (related guide); `minecraft:light_gray_bed`
 - **Light Gray Candle** — [Candles](Candles.md#light-gray-candle) (related guide); `minecraft:light_gray_candle`
 - **Light Gray Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:light_gray_carpet`
@@ -612,14 +612,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Light Gray Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:light_gray_stained_glass`
 - **Light Gray Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:light_gray_stained_glass_pane`
 - **Light Gray Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:light_gray_terracotta`
-- **Light Gray Wall Banner †** — article needed; `minecraft:light_gray_wall_banner`
+- **Light Gray Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:light_gray_wall_banner`
 - **Light Gray Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:light_gray_wool`
 - **Light Weighted Pressure Plate** — [Pressure plates](PressurePlates.md#light-weighted-pressure-plate) (related guide); `minecraft:light_weighted_pressure_plate`
 - **Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:lightning_rod`
-- **Lilac** — article needed; `minecraft:lilac`
-- **Lily of the Valley** — article needed; `minecraft:lily_of_the_valley`
+- **Lilac** — [Small and tall flowers](Flowers.md#lilac) (related guide); `minecraft:lilac`
+- **Lily of the Valley** — [Small and tall flowers](Flowers.md#lily-of-the-valley) (related guide); `minecraft:lily_of_the_valley`
 - **Lily Pad** — article needed; `minecraft:lily_pad`
-- **Lime Banner** — article needed; `minecraft:lime_banner`
+- **Lime Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:lime_banner`
 - **Lime Bed** — [Beds](Bed.md) (related guide); `minecraft:lime_bed`
 - **Lime Candle** — [Candles](Candles.md#lime-candle) (related guide); `minecraft:lime_candle`
 - **Lime Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:lime_carpet`
@@ -630,7 +630,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Lime Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:lime_stained_glass`
 - **Lime Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:lime_stained_glass_pane`
 - **Lime Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:lime_terracotta`
-- **Lime Wall Banner †** — article needed; `minecraft:lime_wall_banner`
+- **Lime Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:lime_wall_banner`
 - **Lime Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:lime_wool`
 - **Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone`
 - **Limestone Pillar** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_pillar`
@@ -638,11 +638,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Limestone Stairs** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_stairs`
 - **Limestone Wall** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_wall`
 - **Lodestone** — article needed; `minecraft:lodestone`
-- **Loom** — article needed; `minecraft:loom`
+- **Loom** — [Loom](Loom.md#crafting-and-placing) (related guide); `minecraft:loom`
 
 ### M
 
-- **Magenta Banner** — article needed; `minecraft:magenta_banner`
+- **Magenta Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:magenta_banner`
 - **Magenta Bed** — [Beds](Bed.md) (related guide); `minecraft:magenta_bed`
 - **Magenta Candle** — [Candles](Candles.md#magenta-candle) (related guide); `minecraft:magenta_candle`
 - **Magenta Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:magenta_carpet`
@@ -653,7 +653,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Magenta Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:magenta_stained_glass`
 - **Magenta Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:magenta_stained_glass_pane`
 - **Magenta Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:magenta_terracotta`
-- **Magenta Wall Banner †** — article needed; `minecraft:magenta_wall_banner`
+- **Magenta Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:magenta_wall_banner`
 - **Magenta Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:magenta_wool`
 - **Magma Block** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#magma-block) (related guide); `minecraft:magma_block`
 - **Mangrove Button** — [Buttons](Buttons.md#mangrove-button) (related guide); `minecraft:mangrove_button`
@@ -739,7 +739,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Obsidian** — [Obsidian and Crying Obsidian](Obsidian.md#obsidian) (related guide); `minecraft:obsidian`
 - **Ochre Froglight** — article needed; `minecraft:ochre_froglight`
 - **Open Eyeblossom** — article needed; `minecraft:open_eyeblossom`
-- **Orange Banner** — article needed; `minecraft:orange_banner`
+- **Orange Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:orange_banner`
 - **Orange Bed** — [Beds](Bed.md) (related guide); `minecraft:orange_bed`
 - **Orange Candle** — [Candles](Candles.md#orange-candle) (related guide); `minecraft:orange_candle`
 - **Orange Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:orange_carpet`
@@ -750,10 +750,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Orange Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:orange_stained_glass`
 - **Orange Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:orange_stained_glass_pane`
 - **Orange Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:orange_terracotta`
-- **Orange Tulip** — article needed; `minecraft:orange_tulip`
-- **Orange Wall Banner †** — article needed; `minecraft:orange_wall_banner`
+- **Orange Tulip** — [Small and tall flowers](Flowers.md#orange-tulip) (related guide); `minecraft:orange_tulip`
+- **Orange Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:orange_wall_banner`
 - **Orange Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:orange_wool`
-- **Oxeye Daisy** — article needed; `minecraft:oxeye_daisy`
+- **Oxeye Daisy** — [Small and tall flowers](Flowers.md#oxeye-daisy) (related guide); `minecraft:oxeye_daisy`
 - **Oxidized Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_chiseled_copper`
 - **Oxidized Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_copper`
 - **Oxidized Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:oxidized_copper_bulb`
@@ -793,7 +793,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pale Oak Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:pale_oak_wall_sign`
 - **Pale Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#pale_oak-timber) (related guide); `minecraft:pale_oak_wood`
 - **Pearlescent Froglight** — article needed; `minecraft:pearlescent_froglight`
-- **Peony** — article needed; `minecraft:peony`
+- **Peony** — [Small and tall flowers](Flowers.md#peony) (related guide); `minecraft:peony`
 - **Petrified Oak Slab** — article needed; `minecraft:petrified_oak_slab`
 - **Pewen Branch** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_branch`
 - **Pewen Button** — [Buttons](Buttons.md#pewen-button) (related guide); `minecraft:pewen_button`
@@ -815,7 +815,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pewen Wood** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_wood`
 - **Piglin Head** — article needed; `minecraft:piglin_head`
 - **Piglin Wall Head** — article needed; `minecraft:piglin_wall_head`
-- **Pink Banner** — article needed; `minecraft:pink_banner`
+- **Pink Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:pink_banner`
 - **Pink Bed** — [Beds](Bed.md) (related guide); `minecraft:pink_bed`
 - **Pink Candle** — [Candles](Candles.md#pink-candle) (related guide); `minecraft:pink_candle`
 - **Pink Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:pink_carpet`
@@ -827,8 +827,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pink Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:pink_stained_glass`
 - **Pink Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:pink_stained_glass_pane`
 - **Pink Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:pink_terracotta`
-- **Pink Tulip** — article needed; `minecraft:pink_tulip`
-- **Pink Wall Banner †** — article needed; `minecraft:pink_wall_banner`
+- **Pink Tulip** — [Small and tall flowers](Flowers.md#pink-tulip) (related guide); `minecraft:pink_tulip`
+- **Pink Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:pink_wall_banner`
 - **Pink Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:pink_wool`
 - **Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:piston`
 - **Piston Head** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:piston_head`
@@ -867,7 +867,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Polished Tuff Slab** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff_slab`
 - **Polished Tuff Stairs** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff_stairs`
 - **Polished Tuff Wall** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff_wall`
-- **Poppy** — article needed; `minecraft:poppy`
+- **Poppy** — [Small and tall flowers](Flowers.md#poppy) (related guide); `minecraft:poppy`
 - **Potatoes** — [Root crops](RootCrops.md) (related guide); `minecraft:potatoes`
 - **Potted Acacia Sapling** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:potted_acacia_sapling`
 - **Potted Allium** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:potted_allium`
@@ -923,7 +923,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Prismarine Wall** — article needed; `minecraft:prismarine_wall`
 - **Pumpkin** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:pumpkin`
 - **Pumpkin Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:pumpkin_stem`
-- **Purple Banner** — article needed; `minecraft:purple_banner`
+- **Purple Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:purple_banner`
 - **Purple Bed** — [Beds](Bed.md) (related guide); `minecraft:purple_bed`
 - **Purple Candle** — [Candles](Candles.md#purple-candle) (related guide); `minecraft:purple_candle`
 - **Purple Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:purple_carpet`
@@ -934,7 +934,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Purple Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:purple_stained_glass`
 - **Purple Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:purple_stained_glass_pane`
 - **Purple Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:purple_terracotta`
-- **Purple Wall Banner †** — article needed; `minecraft:purple_wall_banner`
+- **Purple Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:purple_wall_banner`
 - **Purple Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:purple_wool`
 - **Purpur Block** — [End Stone and Purpur](EndStoneAndPurpur.md#purpur-variants-and-recipes) (related guide); `minecraft:purpur_block`
 - **Purpur Pillar** — [End Stone and Purpur](EndStoneAndPurpur.md#placement-pillars-and-dragon-interactions) (related guide); `minecraft:purpur_pillar`
@@ -951,7 +951,7 @@ Names use English localization where available. A † marks one of 25 readable r
 ### R
 
 - **Rail** — [Rails](Rails.md) (related guide); `minecraft:rail`
-- **Red Banner** — article needed; `minecraft:red_banner`
+- **Red Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:red_banner`
 - **Red Bed** — [Beds](Bed.md) (related guide); `minecraft:red_bed`
 - **Red Candle** — [Candles](Candles.md#red-candle) (related guide); `minecraft:red_candle`
 - **Red Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:red_carpet`
@@ -973,8 +973,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Red Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:red_stained_glass`
 - **Red Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:red_stained_glass_pane`
 - **Red Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:red_terracotta`
-- **Red Tulip** — article needed; `minecraft:red_tulip`
-- **Red Wall Banner †** — article needed; `minecraft:red_wall_banner`
+- **Red Tulip** — [Small and tall flowers](Flowers.md#red-tulip) (related guide); `minecraft:red_tulip`
+- **Red Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:red_wall_banner`
 - **Red Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:red_wool`
 - **Redstone Comparator** — [Redstone Comparator](RedstoneComparator.md) (related guide); `minecraft:comparator`
 - **Redstone Lamp** — [Redstone Lamp](RedstoneLamp.md) (related guide); `minecraft:redstone_lamp`
@@ -994,7 +994,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Resin Clump** — article needed; `minecraft:resin_clump`
 - **Respawn Anchor** — [Respawn Anchor](RespawnAnchor.md#respawn-anchor) (related guide); `minecraft:respawn_anchor`
 - **Rooted Dirt** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#rooted-dirt-and-hanging-roots) (related guide); `minecraft:rooted_dirt`
-- **Rose Bush** — article needed; `minecraft:rose_bush`
+- **Rose Bush** — [Small and tall flowers](Flowers.md#rose-bush) (related guide); `minecraft:rose_bush`
 
 ### S
 
@@ -1109,7 +1109,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Structure Void** — article needed; `minecraft:structure_void`
 - **Subterranodon Egg** — [Subterranodon Egg](SubterranodonEgg.md) (related guide); `minecraft:subterranodon_egg`
 - **Sugar Cane** — [Sugar Cane](SugarCane.md) (related guide); `minecraft:sugar_cane`
-- **Sunflower** — article needed; `minecraft:sunflower`
+- **Sunflower** — [Small and tall flowers](Flowers.md#sunflower) (related guide); `minecraft:sunflower`
 - **Suspicious Gravel** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel) (related guide); `minecraft:suspicious_gravel`
 - **Suspicious Sand** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel) (related guide); `minecraft:suspicious_sand`
 - **Sweet Berry Bush** — article needed; `minecraft:sweet_berry_bush`
@@ -1252,7 +1252,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Weeping Vines Plant** — article needed; `minecraft:weeping_vines_plant`
 - **Wet Sponge** — article needed; `minecraft:wet_sponge`
 - **Wheat Crops** — [Wheat crop](Wheat.md) (related guide); `minecraft:wheat`
-- **White Banner** — article needed; `minecraft:white_banner`
+- **White Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:white_banner`
 - **White Bed** — [Beds](Bed.md) (related guide); `minecraft:white_bed`
 - **White Candle** — [Candles](Candles.md#white-candle) (related guide); `minecraft:white_candle`
 - **White Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:white_carpet`
@@ -1263,17 +1263,17 @@ Names use English localization where available. A † marks one of 25 readable r
 - **White Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:white_stained_glass`
 - **White Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:white_stained_glass_pane`
 - **White Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:white_terracotta`
-- **White Tulip** — article needed; `minecraft:white_tulip`
-- **White Wall Banner †** — article needed; `minecraft:white_wall_banner`
+- **White Tulip** — [Small and tall flowers](Flowers.md#white-tulip) (related guide); `minecraft:white_tulip`
+- **White Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:white_wall_banner`
 - **White Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:white_wool`
 - **Wildflowers** — article needed; `minecraft:wildflowers`
-- **Wither Rose** — article needed; `minecraft:wither_rose`
+- **Wither Rose** — [Small and tall flowers](Flowers.md#wither-rose) (related guide); `minecraft:wither_rose`
 - **Wither Skeleton Skull** — article needed; `minecraft:wither_skeleton_skull`
 - **Wither Skeleton Wall Skull** — article needed; `minecraft:wither_skeleton_wall_skull`
 
 ### Y
 
-- **Yellow Banner** — article needed; `minecraft:yellow_banner`
+- **Yellow Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:yellow_banner`
 - **Yellow Bed** — [Beds](Bed.md) (related guide); `minecraft:yellow_bed`
 - **Yellow Candle** — [Candles](Candles.md#yellow-candle) (related guide); `minecraft:yellow_candle`
 - **Yellow Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:yellow_carpet`
@@ -1284,7 +1284,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Yellow Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:yellow_stained_glass`
 - **Yellow Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:yellow_stained_glass_pane`
 - **Yellow Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:yellow_terracotta`
-- **Yellow Wall Banner †** — article needed; `minecraft:yellow_wall_banner`
+- **Yellow Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:yellow_wall_banner`
 - **Yellow Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:yellow_wool`
 
 ### Z
@@ -1317,11 +1317,13 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Ancient trees, Flytraps and Tree Stars](AncientPlants.md)
 - [Anvil](Anvil.md)
 - [Bamboo](Bamboo.md)
+- [Banners](Banners.md)
 - [Barrel](Barrel.md)
 - [Beacon](Beacon.md)
 - [Beds](Bed.md)
 - [Bee housing](BeeHousing.md)
 - [Blackstone and Basalt](BlackstoneAndBasalt.md)
+- [Bookshelves](Bookshelves.md)
 - [Brewing Stand](BrewingStand.md)
 - [Bubble Columns](BubbleColumns.md)
 - [Buttons](Buttons.md)
@@ -1361,9 +1363,11 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Hopper](Hopper.md)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
 - [Kelp](Kelp.md)
+- [Lectern](Lectern.md)
 - [Lever](Lever.md)
 - [Lightning Rods](LightningRods.md)
 - [Limestone family](Limestone.md)
+- [Loom](Loom.md)
 - [Monster Spawner](MonsterSpawner.md)
 - [Nether Bricks](NetherBricks.md)
 - [Nether Wart crop](NetherWart.md)
@@ -1395,6 +1399,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Seagrass](Seagrass.md)
 - [Shulker Box](ShulkerBox.md)
 - [Signs and Hanging Signs](Signs.md)
+- [Small and tall flowers](Flowers.md)
 - [Smithing Table](SmithingTable.md)
 - [Snow and Powder Snow](Snow.md)
 - [Soil, Sand, and Gravel](SoilSandAndGravel.md)

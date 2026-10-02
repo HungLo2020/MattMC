@@ -28,6 +28,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Farming, food, and animal care
 
+- [Small and tall flowers](blocks/Flowers.md): exact dye/stew variants, soils, Bone Meal routes, Bee choices and Wither Rose limits
+
 - [Saplings and Azaleas](blocks/SaplingsAndAzaleas.md) and [Crimson/Warped Fungi](blocks/NetherFungi.md): planting patterns, Bone Meal, growth space and recovery
 
 - [Rabbit](mobs/Rabbit.md) and [Fox](mobs/Fox.md): breeding/coats/trust, crop and berry interactions, carried items, and Rabbit food/material drops
@@ -90,6 +92,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
 
 ### Building, redstone, and travel
+
+- [Banners](blocks/Banners.md) and [Loom](blocks/Loom.md): colors, pattern layers/templates, duplication, washing, map markers and Shield decoration
+- [Bookshelves](blocks/Bookshelves.md) and [Lectern](blocks/Lectern.md): enchanting versus storage, book slots, reading, persistence and redstone outputs
 
 - [Barrel](blocks/Barrel.md) and [Ender Chest](blocks/EnderChest.md): shared versus personal storage, persistence, access, automation and recovery
 - [Cauldrons](blocks/Cauldrons.md): bucket/bottle exchanges, washing, precipitation, dripstone, contact effects and comparator levels
