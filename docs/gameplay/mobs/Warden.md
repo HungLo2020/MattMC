@@ -63,6 +63,8 @@ These tactics follow the detection, attack and timer rules above; they are not a
 
 ## Darkness, emerging and burrowing
 
+See [Vision effects](../effects/VisionEffects.md#darkness) for Darkness visibility, the Darkness Pulsing setting, and the HUD-icon distinction.
+
 While its server AI runs, the Warden checks every **120 ticks** to apply **260 ticks of Darkness** to eligible non-allied Survival/Adventure players **less than 20 blocks** away. The helper refreshes only when its effect-duration/amplifier conditions allow. Darkness does not require the Warden to be angry at that player. This aura is distinct from [a Shrieker's wider Darkness response](../blocks/SculkShrieker.md#warning-levels-and-summoning). [AI caller][ai-tick] · [Darkness effect][darkness] · [Player filtering][effect-players] · [Survival/Adventure predicate][survival]
 
 A triggered Warden begins **emerging**, with a configured **134-tick** emergence. Ordinary damage cannot hurt it while emerging or digging unless the damage type bypasses invulnerability; it also ignores explosions in those poses. This is not an opportunity for ordinary free hits. [Spawn initialization][spawn-init] · [Duration][durations] · [Emerging behavior][emerging] · [Damage gate][invulnerability] · [Explosion handling][explosions]

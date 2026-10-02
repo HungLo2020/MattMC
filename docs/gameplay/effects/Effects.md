@@ -5,13 +5,16 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 ## Reviewed effects
 
 - [Absorption](CombatEffects.md#absorption): temporary damage buffer and refill/expiry limits
+- [Blindness](VisionEffects.md#blindness): restricted fog, sprinting, and ordinary critical hits
 - [Breath of the Nautilus](WaterAndFireEffects.md#breath-of-the-nautilus): mount-applied status and its current air limitation
 - [Conduit Power](WaterAndFireEffects.md#conduit-power): air protection, mining assistance, and lighting inputs
+- [Darkness](VisionEffects.md#darkness): blended fog, pulsing light, and source refresh rules
 - [Dolphin's Grace](MovementEffects.md#dolphins-grace): horizontal water-momentum retention
 - [Fire Resistance](WaterAndFireEffects.md#fire-resistance): fire-tagged damage rejection and lava-fog behavior
 - [Health Boost](CombatEffects.md#health-boost): maximum ordinary health without immediate healing
 - [Jump Boost](MovementEffects.md#jump-boost): ground-jump power and safe-fall-distance contributions
 - [Levitation](MovementEffects.md#levitation): upward air movement and the Elytra restriction
+- [Night Vision](VisionEffects.md#night-vision): rendered brightness, sources, and near-expiry flicker
 - [Poison](Poison.md): periodic damage with a low-health cutoff
 - [Regeneration](Regeneration.md): periodic healing, separate from food-based healing
 - [Resistance](CombatEffects.md#resistance): eligible damage reduction and bypasses
@@ -28,6 +31,8 @@ The [movement effects reference](MovementEffects.md) compares acquisition, movem
 The [combat effects reference](CombatEffects.md) compares attack modifiers, damage reduction, and extra health.
 
 The [water and fire effects reference](WaterAndFireEffects.md) compares fire damage, breathing, Conduit benefits, and the Nautilus effect limitation.
+
+The [vision effects reference](VisionEffects.md) compares Night Vision, Blindness, Darkness, and their rendering and player-action limits.
 
 This is a growing reference, not a complete list of all registered effects. The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
 
