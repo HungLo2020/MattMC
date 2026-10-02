@@ -725,6 +725,13 @@ At `987ab0a72e971d40dbcdfc6d4ee5ae52c2a95564`, 513 gameplay paths differ from th
 - Latest integrated default source is `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; unchanged material/tool evidence remains pinned to its reviewed `4efea14485328238a3a4981162c8a7e8400914b4` snapshot. This completed batch follows standing promotion and deployment verification.
 - Validation: checker and strict build passed on 2,198 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, mining, repair, item-use, recycling, or fire gameplay test.
 
+## Ninety-fifth batch: Axes and Hoes
+
+- Added shared Axe/Hoe behavior and all fourteen material variants with exact recipes, combat values, mining eligibility, repairs/upgrades, axe conversions, hoe tilling, crop harvesting, and recycling.
+- Corrected shared crop/durability guidance for the retained broken-hoe area-harvest exception, while keeping tilling guarded; documented offhand blocking-item interception and Rooted Dirt's special click/cover rules.
+- Latest integrated default source remains `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; unchanged evidence is pinned to gameplay source `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. This completed batch follows standing promotion and deployment verification.
+- Validation: checker and strict build passed on 2,199 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, combat, conversions, tilling, crop harvesting, repairs, or recycling gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

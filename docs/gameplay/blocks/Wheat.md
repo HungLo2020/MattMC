@@ -15,7 +15,9 @@ Bone meal advances Wheat by a random **2–5 age stages**, capped at age 7. It d
 - **Empty-hand use on mature Wheat:** drops the mature crop loot and resets that crop to age 0.
 - **Use a hoe on mature Wheat:** harvests the clicked crop and mature Wheat in the surrounding **3 × 3 horizontal area**, resetting each to age 0.
 - Hoe area harvesting only selects the **same crop block type** at the same height. It does not harvest immature neighbors or a different adjacent crop.
-- The hoe loses durability equal to the number of crops harvested, before any normal durability-modifying behavior.
+- The hoe requests durability damage equal to the number of crops harvested, before any normal durability-modifying behavior.
+
+Retained broken hoes also reach the block-side area-harvest handler, while their wear processing skips further damage. See [the current hoe exception](../mechanics/AxesAndHoes.md#mattmc-crop-area-harvesting); ordinary tilling remains blocked for broken hoes.
 
 The empty-hand path passes an empty tool to loot calculation. The hoe path passes the actual hoe, so tool-dependent loot conditions can differ. Both paths keep the planted crop in place; neither explicitly spends a replacement seed in the checked implementation.
 

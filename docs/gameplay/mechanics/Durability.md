@@ -26,6 +26,8 @@ Full [Bee housing](../blocks/BeeHousing.md#fully-worn-shears) also has a block-s
 
 Soft blocks that do not require a correct tool are a separate case; a broken pickaxe is not a reliable way to collect tool-gated ores just because it can still break something.
 
+A retained broken hoe can still trigger ordinary [crop-area harvesting](AxesAndHoes.md#mattmc-crop-area-harvesting): the crop block checks the HoeItem class before the shared broken-item use guard, and wear processing skips an already-broken stack. This does not enable broken-hoe tilling. That specialized route was source-reviewed at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`; no gameplay test was run.
+
 ## Choose a repair method
 
 | Method | Main inputs | Level payment | Enchantments and other data |

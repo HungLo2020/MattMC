@@ -30,7 +30,9 @@ Fewer age stages do not mean Beetroots follow the same growth schedule as Carrot
 - **Use an empty hand on a mature crop:** drops that crop's mature loot and resets it to age 0.
 - **Use a hoe on a mature crop:** harvests the clicked crop and mature crops of the **same type** in the surrounding **3 × 3 horizontal area**, resetting each to age 0.
 - The hoe's area stays at the clicked crop's height. Immature plants and neighboring crop types are left alone. Clicking an immature crop does not start an area harvest.
-- The hoe receives durability damage equal to the number of crops harvested, before normal durability-modifying effects.
+- The hoe requests durability damage equal to the number of crops harvested, before normal durability-modifying effects.
+
+Retained broken hoes also reach this block-side harvest handler; their wear processing skips further damage. See [the current hoe exception](../mechanics/AxesAndHoes.md#mattmc-crop-area-harvesting), which is separate from guarded tilling.
 
 Both harvest controls leave the planted crop in place and do not explicitly spend a replacement planting item. Empty-hand harvesting supplies an empty tool for loot; hoe harvesting supplies the actual hoe, allowing its Fortune level to affect the relevant crop drops.
 

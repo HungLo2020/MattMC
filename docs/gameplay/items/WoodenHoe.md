@@ -1,18 +1,40 @@
-﻿# Wooden Hoe
+# Wooden Hoe
+
+**Wooden Hoe** (`minecraft:wooden_hoe`) has **59 durability** and a **2.0 matching-block mining-speed value** before player modifiers. Its unbroken main-hand defaults give a normal player **1 attack damage** and **1.0 attack speed**. See [Axes and Hoes](../mechanics/AxesAndHoes.md#material-and-combat-choices) for how these attributes differ from actual hit damage. [Registration][registration] · [Material and attributes][materials] · [Player damage base][player-base] · [Speed base][speed-base]
 
 ## Obtaining
 
-Wooden Hoe can be crafted from sticks and planks. It can also be obtained from the Creative Menu.
+Use **2 accepted planks** and **2 [Sticks](Stick.md)** at a [Crafting Table](../blocks/CraftingTable.md) to make **1 Wooden Hoe**. Place two head materials side by side in the top row and the two Sticks vertically beneath one end. The mirrored pattern also works. [Recipe][recipe] · [Accepted material][repair-wooden] · [Pattern matching][pattern]
 
-## Usage
+The checked plank tag contains Oak, Spruce, Birch, Jungle, Acacia, Dark Oak, Mangrove, Cherry, Pale Oak, Bamboo, Crimson, and Warped Planks. Accepted plank types can be mixed across the head slots; Pewen Planks are absent. [Plank tag][planks] · [Slot matching][pattern]
 
-Wooden Hoe is an early-game hoe used for harvesting, combat, or utility interactions depending on the tool type.
+## Uses and upkeep
 
-## Behavior
+Use it for [hoe-tagged mining](../mechanics/AxesAndHoes.md#mining-targets-and-drops), [soil conversion](../mechanics/AxesAndHoes.md#tilling-with-a-hoe), and [MattMC crop-area harvesting](../mechanics/AxesAndHoes.md#mattmc-crop-area-harvesting). Its material does not change the 3 × 3 harvest footprint. [Hoe callback][hoe] · [Crop callback][crop]
 
-It has wooden-tier durability and mining or attack behavior.
+For [Anvil material repair](../mechanics/Durability.md#choose-a-repair-method), use [accepted planks](../mechanics/AxesAndHoes.md#wear-repair-and-upgrading). Its current family targets have no material-tier exclusions, but block loot conditions still apply. See the [shared mining explanation](../mechanics/AxesAndHoes.md#mining-targets-and-drops) before substituting it for another tool family. [Repair material][repair-wooden] · [Assigned properties][materials] · [Repair lookup][repair-check]
 
-## Notes
+A fully damaged hoe is retained. It loses normal tool speed and cannot till, but the current block-side crop handler still accepts it for [ordinary area harvesting](../mechanics/AxesAndHoes.md#fully-damaged-hoes-still-reach-this-harvest-path). This verified exception does not make every broken-tool action work. [Use guard][use-guard] · [Retention and wear][broken] · [Crop condition][crop] · [Interaction order][server-use]
 
-* This item is registered as `minecraft:wooden_hoe`.
+It can be consumed as [furnace fuel](../mechanics/AxesAndHoes.md#recycling-and-fuel), including after wear-out.
 
+Related: [Axes and Hoes](../mechanics/AxesAndHoes.md) · [Mining](../mechanics/Mining.md) · [Durability and repair](../mechanics/Durability.md) · [Items](Items.md)
+
+## Sources and verification
+
+Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. No in-game crafting, combat, tool-use, harvesting, or repair test was run. The creation recipe and shared callbacks are source-checked; this page does not inventory trades, chest loot, or every acquisition route.
+
+[registration]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/Items.java#L1310
+[materials]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/ToolMaterial.java#L20-L59
+[player-base]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/player/Player.java#L220-L224
+[speed-base]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/ai/attributes/Attributes.java#L13-L17
+[recipe]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/recipe/crafting/wooden_hoe.json
+[repair-wooden]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/tags/item/wooden_tool_materials.json
+[pattern]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/crafting/ShapedRecipePattern.java#L158-L193
+[planks]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/tags/item/planks.json
+[hoe]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/HoeItem.java#L23-L88
+[crop]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/block/CropBlock.java#L208-L250
+[repair-check]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/ItemStack.java#L1106-L1108
+[use-guard]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/ItemStack.java#L354-L379
+[broken]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/ItemStack.java#L429-L485
+[server-use]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L358-L387
