@@ -2,6 +2,8 @@
 
 Commands can inspect or change a world, give items, create entities, and manage player modes. This page covers selected commands verified in MattMC's active registration code; it is not a complete reference to every command or integrated editing tool.
 
+For commands stored in placed blocks, see [Command Blocks](../blocks/CommandBlocks.md) for Game Master permissions, trigger modes and conditional chains.
+
 ## Start with help and permissions
 
 Use `/help` to request available command usage, or `/help give` for a specific command's syntax. The examples below are written for an in-game player source. A server console has no self-player for commands that require one.

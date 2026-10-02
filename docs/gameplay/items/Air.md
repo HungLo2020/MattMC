@@ -2,17 +2,20 @@
 
 ## Obtaining
 
-Air is registered as an item internally, but it is not normally obtainable as a player-facing item.
+An internal registry placeholder, not a collectible inventory supply. AirItem is not a BlockItem, and ItemStack treats Air as empty. [Item registry][items]
 
 ## Usage
 
-Air represents empty space in the block and item registries. It is used by the game engine rather than by players.
+Represents empty space; read the block guide for ordinary, Cave, and Void Air. Use [Air](../blocks/TechnicalBlocks.md#air) for the canonical placed-block instructions and their source evidence.
 
 ## Behavior
 
-Air has no collision, no drops, and no normal item interaction.
+No ordinary item placement or drops. Cave Air and Void Air have no separate registered item entries.
 
 ## Notes
 
-* This item is the item form of the `minecraft:air` block.
-* It is included here because it is registered in `Items.java`, even though it is not a normal Creative Menu item.
+- Registered ID: `minecraft:air`
+- Source-reviewed at `b823010659d7b5095ed021b1c99cf85627e2082a` on 2026-10-02; no in-game operation was performed
+- [Placed-block behavior and verification](../blocks/TechnicalBlocks.md#air)
+
+[items]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/item/Items.java

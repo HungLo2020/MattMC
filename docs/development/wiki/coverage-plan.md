@@ -1030,10 +1030,19 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Linked the existing Elevator travel/landing caveat to [#797](https://github.com/HungLo2020/MattMC/issues/797), and Terrapin egg laying, item-mapping and parent-data limitations to [#798](https://github.com/HungLo2020/MattMC/issues/798). Both are open source-reviewed bugs, not completed fixes or runtime reproductions.
 - Pewen signs [#795](https://github.com/HungLo2020/MattMC/issues/795) and Composter rollback [#796](https://github.com/HungLo2020/MattMC/issues/796) remain open. Held-item light [PR #791](https://github.com/HungLo2020/MattMC/pull/791) and Building Wand [PR #794](https://github.com/HungLo2020/MattMC/pull/794) remain unmerged at this review; their proposed behavior is not promoted into current master guides.
 
+## Batch 128: Operator, structural and empty-space blocks
+
+- Added five canonical guides and corrected twelve registered item pages for fourteen exact block IDs: Air forms, Barrier, Light, Structure Void, Bedrock, Command Blocks, Structure/Jigsaw and Test Blocks.
+- Verified actual inventory-category, placement, editor and removal gates rather than assuming all supplied items use Game Master restrictions. Bedrock's ordinary browser route remains separate from its absent mining recovery; AirItem remains an empty internal inventory form.
+- Command guidance uses MattMC's commandBlocksEnabled gamerule and active chain/condition semantics. Structure and test guidance distinguishes preview from potentially immediate replacement, omission from saved Air, memory capture from disk save, and shared test/region effects. No commands, world edits or test runs were executed.
+- Source checkpoint: `4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f`; all 56 distinct pinned source pairs match current source. Actual rendered-citation review repaired five missing draft definitions before integration, preserving prose and anchors.
+
+- Validation: required checker and strict build passed on 2,326 pages / 37 indexes. All 24 authored paths are documentation; 1,752 local links/anchors and 190 tracked reference uses resolve, with no rendered citation candidates. The directory keeps 1,211 alphabetical IDs, 1,203 related-guide routes and eight explicit article gaps. Technical IDs and family routes remain distinct from obtainable items and completed behavior coverage.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Integrate the reviewed operator-block drafts, then finish remaining nature, storage/core, Cobweb/Dried Ghast and Warden reviews. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+2. Finish remaining nature, storage/core, Cobweb/Dried Ghast and Warden reviews. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
 3. Fill remaining practical gaps such as fuel/storage utility blocks, sculk devices and imported nature/redstone blocks, following actual active behavior and acquisition routes.
 4. Cover remaining terrain/material, plant and technical families, including Fire/Soul Fire, Chorus, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
 5. Preserve the ready Swords and undead drafts for later source revalidation; replace remaining generic mob/item pages, including Warden and the missing Nautilus owners, and add stronger combat, health/death/experience, expedition, effect and enchantment coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.

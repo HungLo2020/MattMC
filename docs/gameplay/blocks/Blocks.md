@@ -30,7 +30,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Acacia Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:acacia_wall_sign`
 - **Acacia Wood** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:acacia_wood`
 - **Activator Rail** — [Rails](Rails.md) (related guide); `minecraft:activator_rail`
-- **Air** — article needed; `minecraft:air`
+- **Air** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#air) (related guide); `minecraft:air`
 - **Allium** — [Small and tall flowers](Flowers.md#allium) (related guide); `minecraft:allium`
 - **Amber** — [Amber](Amber.md) (related guide); `minecraft:amber`
 - **Ambersol** — [Ambersol](Ambersol.md) (related guide); `minecraft:ambersol`
@@ -74,10 +74,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Bamboo Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:bamboo_wall_hanging_sign`
 - **Bamboo Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:bamboo_wall_sign`
 - **Barrel** — [Barrel](Barrel.md#persistence-and-breaking-a-filled-barrel) (related guide); `minecraft:barrel`
-- **Barrier** — article needed; `minecraft:barrier`
+- **Barrier** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#barrier) (related guide); `minecraft:barrier`
 - **Basalt** — [Blackstone and Basalt](BlackstoneAndBasalt.md#basalt-variants-and-orientation) (related guide); `minecraft:basalt`
 - **Beacon** — [Beacon](Beacon.md#build-the-base) (related guide); `minecraft:beacon`
-- **Bedrock** — article needed; `minecraft:bedrock`
+- **Bedrock** — [Bedrock](Bedrock.md) (related guide); `minecraft:bedrock`
 - **Bee Nest** — [Bee housing](BeeHousing.md) (related guide); `minecraft:bee_nest`
 - **Beehive** — [Bee housing](BeeHousing.md) (related guide); `minecraft:beehive`
 - **Beetroots** — [Root crops](RootCrops.md) (related guide); `minecraft:beetroots`
@@ -218,10 +218,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cartography Table** — [Cartography Table](CartographyTable.md#cartography-table) (related guide); `minecraft:cartography_table`
 - **Carved Pumpkin** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:carved_pumpkin`
 - **Cauldron** — [Cauldrons](Cauldrons.md#empty-cauldron) (related guide); `minecraft:cauldron`
-- **Cave Air** — article needed; `minecraft:cave_air`
+- **Cave Air** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#cave-air) (related guide); `minecraft:cave_air`
 - **Cave Vines** — [Vines and Glow Berries](Vines.md#cave-vines) (related guide); `minecraft:cave_vines`
 - **Cave Vines Plant** — [Vines and Glow Berries](Vines.md#cave-vines-plant) (related guide); `minecraft:cave_vines_plant`
-- **Chain Command Block** — article needed; `minecraft:chain_command_block`
+- **Chain Command Block** — [Command Blocks](CommandBlocks.md#chain-command-block) (related guide); `minecraft:chain_command_block`
 - **Cherry Button** — [Buttons](Buttons.md#cherry-button) (related guide); `minecraft:cherry_button`
 - **Cherry Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:cherry_door`
 - **Cherry Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:cherry_fence`
@@ -271,7 +271,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cobblestone Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_wall`
 - **Cobweb** — article needed; `minecraft:cobweb`
 - **Cocoa** — [Cocoa](Cocoa.md) (related guide); `minecraft:cocoa`
-- **Command Block** — article needed; `minecraft:command_block`
+- **Command Block** — [Command Blocks](CommandBlocks.md#impulse-command-block) (related guide); `minecraft:command_block`
 - **Composter** — [Composter](Composter.md#composter) (related guide); `minecraft:composter`
 - **Conduit** — [Conduit](Conduit.md#build-a-valid-frame) (related guide); `minecraft:conduit`
 - **Cooked Dinosaur Chop** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:cooked_dinosaur_chop`
@@ -547,7 +547,7 @@ Names use English localization where available. A † marks one of 25 readable r
 ### J
 
 - **Jack o'Lantern** — [Jack o'Lantern](JackOLantern.md#placement-water-and-light) (related guide); `minecraft:jack_o_lantern`
-- **Jigsaw Block** — article needed; `minecraft:jigsaw`
+- **Jigsaw Block** — [Structure and Jigsaw Blocks](StructureAndJigsawBlocks.md#jigsaw-block) (related guide); `minecraft:jigsaw`
 - **Jukebox** — [Jukebox](Jukebox.md#inserting-and-ejecting-discs) (related guide); `minecraft:jukebox`
 - **Jungle Button** — [Buttons](Buttons.md#jungle-button) (related guide); `minecraft:jungle_button`
 - **Jungle Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:jungle_door`
@@ -587,7 +587,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Leafcutter Anthill** — article needed; `minecraft:leafcutter_anthill`
 - **Lectern** — [Lectern](Lectern.md#lectern) (related guide); `minecraft:lectern`
 - **Lever** — [Lever](Lever.md) (related guide); `minecraft:lever`
-- **Light** — article needed; `minecraft:light`
+- **Light** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#light) (related guide); `minecraft:light`
 - **Light Blue Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:light_blue_banner`
 - **Light Blue Bed** — [Beds](Bed.md) (related guide); `minecraft:light_blue_bed`
 - **Light Blue Candle** — [Candles](Candles.md#light-blue-candle) (related guide); `minecraft:light_blue_candle`
@@ -986,7 +986,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Redstone Wire** — [Redstone Dust and wire](RedstoneDust.md) (related guide); `minecraft:redstone_wire`
 - **Reinforced Deepslate** — [Deepslate](Deepslate.md#reinforced-deepslate) (related guide); `minecraft:reinforced_deepslate`
 - **Relicheirus Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:relicheirus_egg`
-- **Repeating Command Block** — article needed; `minecraft:repeating_command_block`
+- **Repeating Command Block** — [Command Blocks](CommandBlocks.md#repeating-command-block) (related guide); `minecraft:repeating_command_block`
 - **Resin Brick Slab** — [Resin](Resin.md#resin-brick-slab) (related guide); `minecraft:resin_brick_slab`
 - **Resin Brick Stairs** — [Resin](Resin.md#resin-brick-stairs) (related guide); `minecraft:resin_brick_stairs`
 - **Resin Brick Wall** — [Resin](Resin.md#resin-brick-wall) (related guide); `minecraft:resin_brick_wall`
@@ -1105,8 +1105,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Stripped Spruce Wood** — [Tree logs and roots](TreeLogsAndRoots.md#spruce-timber) (related guide); `minecraft:stripped_spruce_wood`
 - **Stripped Warped Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:stripped_warped_hyphae`
 - **Stripped Warped Stem** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:stripped_warped_stem`
-- **Structure Block** — article needed; `minecraft:structure_block`
-- **Structure Void** — article needed; `minecraft:structure_void`
+- **Structure Block** — [Structure and Jigsaw Blocks](StructureAndJigsawBlocks.md#structure-block) (related guide); `minecraft:structure_block`
+- **Structure Void** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#structure-void) (related guide); `minecraft:structure_void`
 - **Subterranodon Egg** — [Subterranodon Egg](SubterranodonEgg.md) (related guide); `minecraft:subterranodon_egg`
 - **Sugar Cane** — [Sugar Cane](SugarCane.md) (related guide); `minecraft:sugar_cane`
 - **Sunflower** — [Small and tall flowers](Flowers.md#sunflower) (related guide); `minecraft:sunflower`
@@ -1125,8 +1125,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Target** — [Target](Target.md#target) (related guide); `minecraft:target`
 - **Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:terracotta`
 - **Terrapin Egg** — [Placed animal eggs](AnimalEggs.md#terrapin-eggs) (related guide); `minecraft:terrapin_egg`
-- **Test Block** — article needed; `minecraft:test_block`
-- **Test Instance Block** — article needed; `minecraft:test_instance_block`
+- **Test Block** — [Test Blocks and Test Instance Blocks](TestBlocks.md#test-block) (related guide); `minecraft:test_block`
+- **Test Instance Block** — [Test Blocks and Test Instance Blocks](TestBlocks.md#test-instance-block) (related guide); `minecraft:test_instance_block`
 - **Thin Bone** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:thin_bone`
 - **Tinted Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:tinted_glass`
 - **TNT** — [TNT](TNT.md#tnt) (related guide); `minecraft:tnt`
@@ -1161,7 +1161,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Vault** — [Vault](Vault.md#normal-and-ominous-vaults) (related guide); `minecraft:vault`
 - **Verdant Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#ochre-verdant-and-pearlescent) (related guide); `minecraft:verdant_froglight`
 - **Vines** — [Vines and Glow Berries](Vines.md#vine) (related guide); `minecraft:vine`
-- **Void Air** — article needed; `minecraft:void_air`
+- **Void Air** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#void-air) (related guide); `minecraft:void_air`
 
 ### W
 
@@ -1311,6 +1311,7 @@ Names use English localization where available. A † marks one of 25 readable r
 
 Alphabetical list of existing guides; family pages can cover several registered forms.
 
+- [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md)
 - [Amber](Amber.md)
 - [Ambersol](Ambersol.md)
 - [Amethyst, buds and clusters](Amethyst.md)
@@ -1321,6 +1322,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Banners](Banners.md)
 - [Barrel](Barrel.md)
 - [Beacon](Beacon.md)
+- [Bedrock](Bedrock.md)
 - [Beds](Bed.md)
 - [Bee housing](BeeHousing.md)
 - [Bell](Bell.md)
@@ -1340,6 +1342,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Chorus Plants and Flowers](Chorus.md)
 - [Clay and Bricks](ClayAndBricks.md)
 - [Cocoa](Cocoa.md)
+- [Command Blocks](CommandBlocks.md)
 - [Composter](Composter.md)
 - [Concrete and Concrete Powder](Concrete.md)
 - [Conduit](Conduit.md)
@@ -1457,12 +1460,14 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Sponge and Wet Sponge](Sponge.md)
 - [Stone](Stone.md)
 - [Stonecutter](Stonecutter.md)
+- [Structure and Jigsaw Blocks](StructureAndJigsawBlocks.md)
 - [Subterranodon Egg](SubterranodonEgg.md)
 - [Sugar Cane](SugarCane.md)
 - [Sweet Berry Bush](SweetBerryBush.md)
 - [TaCZ Workbenches](TaCZWorkbenches.md)
 - [Target](Target.md)
 - [Terracotta and Glazed Terracotta](Terracotta.md)
+- [Test Blocks and Test Instance Blocks](TestBlocks.md)
 - [TNT](TNT.md)
 - [Torch](Torch.md)
 - [Torchflower and Torchflower Crop](Torchflower.md)

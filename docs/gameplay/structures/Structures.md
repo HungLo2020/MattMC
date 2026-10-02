@@ -2,6 +2,8 @@
 
 Structures give exploration a destination: a place to collect supplies, face a particular hazard, or unlock a route onward. Start with the guide for your goal, then prepare for the dimension around it.
 
+For mapmaking with saved templates and pool connectors, see [Structure and Jigsaw Blocks](../blocks/StructureAndJigsawBlocks.md). Their operator controls are separate from finding naturally generated structures.
+
 ## Choose an expedition
 
 | Guide | Where to search in the bundled normal world | Main reasons to visit |
