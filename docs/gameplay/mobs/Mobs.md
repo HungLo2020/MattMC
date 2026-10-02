@@ -7,7 +7,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 ## Featured routes
 
 - **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Axolotl](Axolotl.md), and [Dolphin](Dolphin.md)
-- **Hostile encounters and bosses:** [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Enderman](Enderman.md), [Blaze](Blaze.md), [Wither Skeleton](WitherSkeleton.md), [Slime](Slime.md), [Magma Cube](MagmaCube.md), and [Wither](Wither.md)
+- **Hostile encounters and bosses:** [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Enderman](Enderman.md), [Blaze](Blaze.md), [Wither Skeleton](WitherSkeleton.md), [Slime](Slime.md), [Magma Cube](MagmaCube.md), [Wither](Wither.md), and [Ender Dragon](EnderDragon.md)
 - **Bundled animals and caves:** use the [Alex's Mobs](../ContentGuide.md#alexs-mobs-additions) and [Alex's Caves](../ContentGuide.md#alexs-caves-additions) sections for reviewed feeding, ownership, resources, and availability limits
 
 ## Passive Mobs

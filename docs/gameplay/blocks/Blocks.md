@@ -62,6 +62,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Eggs
 
+- [Dragon Egg](DragonEgg.md): first-fight trophy, teleporting, falling, and piston collection
+
 - [Placed dinosaur eggs](DinosaurEggs.md): four species, Vallumraptor clusters, collection, and ownership differences
 
 - [Subterranodon Egg](SubterranodonEgg.md): Creative placement, hatching, ownership, and incomplete breeding source

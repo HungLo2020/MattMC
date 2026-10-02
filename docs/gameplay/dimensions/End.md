@@ -35,6 +35,9 @@ Set up your bed or anchor in a dimension that supports it, and check the surroun
 
 ## Related pages
 
+- [Ender Dragon](../mobs/EnderDragon.md): crystals, perching, breath, rewards, and respawning
+- [Dragon Egg](../blocks/DragonEgg.md): trophy collection, teleporting, and falling
+
 - [Dimensions](Dimensions.md)
 - [Nether and anchor respawns](Nether.md#respawning-safely)
 - [Beds](../blocks/Bed.md)

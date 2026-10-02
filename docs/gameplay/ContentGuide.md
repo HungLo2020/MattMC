@@ -50,6 +50,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Combat and mob resources
 
+- [Ender Dragon](mobs/EnderDragon.md), [End Crystals](items/EndCrystal.md), and [Dragon Egg](blocks/DragonEgg.md): healing, fight phases, rewards, respawning, and trophy collection
+
 - [Slime](mobs/Slime.md), [Magma Cube](mobs/MagmaCube.md), [Slimeball](items/Slimeball.md), and [Magma Cream](items/MagmaCream.md): spawning, splitting, frog rewards, and crafting/brewing resources
 
 - [Bow](items/Bow.md) and [Crossbow](items/Crossbow.md): draw/load controls, ammunition selection, Infinity, rockets, enchantments, and wear
