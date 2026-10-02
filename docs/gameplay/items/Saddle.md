@@ -22,6 +22,7 @@ Leash-removal interactions take priority, so shearing a leashed animal may remov
 
 ## Related pages
 
+- [Strider](../mobs/Strider.md) and [Warped Fungus on a Stick](WarpedFungusonaStick.md): adult Lava mounts and steering
 - [Pig](../mobs/Pig.md)
 - [Carrot on a Stick](CarrotOnAStick.md)
 - [Items](Items.md)

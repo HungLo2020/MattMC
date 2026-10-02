@@ -780,6 +780,7 @@ Find inventory objects here, including block items, food, equipment, and spawn e
 - [HAMR 3x Scope](HAMR3xScope.md)
 - [Hanging Roots](HangingRoots.md)
 - [Happy Ghast Spawn Egg](HappyGhastSpawnEgg.md)
+- [Harnesses](Harnesses.md): shared Happy Ghast equipment and all sixteen color recipes
 - [Hay Bale](HayBale.md)
 - [Heart of the Sea](HeartOfTheSea.md)
 - [Heart Pottery Sherd](HeartPotterySherd.md)

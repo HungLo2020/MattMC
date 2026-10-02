@@ -1131,6 +1131,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,346 pages / 37 indexes. All 15 authored paths are documentation; 907 local links/anchors and 191 tracked reference uses resolve, with zero rendered citation candidates and all existing replacement anchors retained. The two new owners and two mob expansions remain separate from the three narrow item corrections.
 
+## Batch 139: Lava and aerial mounts
+
+- Expanded Strider and Happy Ghast as separate source-grounded riding owners and added one Harnesses family guide covering all sixteen colors and thirty-two recipes. Existing color filenames now provide exact recipe and equipment routes; Warped Fungus on a Stick and both spawn eggs have corrected acquisition/use details.
+- Traced Strider Lava spawning, temperature, adult saddle eligibility, steering/boosting and dismount limits; Happy Ghast hatching/growth, food/healing separation, four-seat control, temporary platform behavior and harness recovery. MattMC's current Left Ctrl crouch and Shift sprint defaults are preserved.
+- Source checkpoint: `af6d2c60f3fe80c03eedd83996b9b6bd194d8775`; 92 immutable source files match current source. Independent actual rendering retained all existing anchors with no citation misbindings. No in-game flight, breeding, crafting, equipment, dismount or loot test was run.
+
+- Validation: required checker and strict build passed on 2,347 pages / 37 indexes. All 29 authored paths are documentation; 2,711 local links/anchors and 464 tracked reference uses resolve, with zero rendered citation candidates. One shared Harness family owner and two substantive mob expansions are counted separately from exact color and support-item corrections.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.

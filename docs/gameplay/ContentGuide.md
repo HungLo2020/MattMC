@@ -40,6 +40,7 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Llama](mobs/Llama.md), [Trader Llama](mobs/TraderLlama.md), and [Camel](mobs/Camel.md): cargo/caravans, merchant retention, two-player travel, feeding, breeding, and dash controls
 - [Cactus](blocks/Cactus.md) and [Bamboo](blocks/Bamboo.md): planting/growth, harvesting, Green Dye, fuel, and [Scaffolding](blocks/Scaffolding.md) construction
 - [Horse](mobs/Horse.md), [Donkey](mobs/Donkey.md), and [Mule](mobs/Mule.md): taming, feeding, riding/equipment, cargo, breeding, inheritance, and recovery
+- [Strider](mobs/Strider.md) and [Happy Ghast](mobs/HappyGhast.md): Lava travel, ghastling growth, flight controls, [steering tools](items/WarpedFungusonaStick.md), and [Harness colors and recovery](items/Harnesses.md)
 - [Frog](mobs/Frog.md), [Frogspawn](blocks/Frogspawn.md), and [Tadpole](mobs/Tadpole.md): shoreline breeding, hatching/growth, bucket transport, maturation variants, and Froglights
 - [Wheat farming](blocks/Wheat.md) and [Farmland](blocks/Farmland.md): hydration, growth, and MattMC's area-harvest controls
 - [Root crops](blocks/RootCrops.md): Carrot, Potato, and Beetroot growth, custom harvesting, food, and cooking
