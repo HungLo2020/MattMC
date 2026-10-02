@@ -82,6 +82,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Anvil](blocks/Anvil.md) and [anvil mechanics](mechanics/AnvilMechanics.md): repairs, enchantment combining, names, wear, and the 40-level payment cap
 - [Grindstone](blocks/Grindstone.md): free repair, enchantment removal, curse retention, and experience refunds
 - [Enchanting](enchanting/Enchanting.md): bookshelf setup, costs versus requirements, eligibility, and reroll behavior
+- [Protection enchantments](enchanting/ProtectionEnchantments.md): four armor choices, matching damage types, combined reduction, secondary attributes and broken gear
 - [Efficiency, Fortune and Silk Touch](enchanting/MiningEnchantments.md): supported tools, mining-speed bonuses, loot contexts and collection limits
 - [Bookshelf](items/Bookshelf.md), [Book](items/Book.md), [Enchanted Book](items/EnchantedBook.md), and [Lapis Lazuli](items/LapisLazuli.md): supporting materials
 - [Smithing](smithing/Smithing.md): equipment upgrades, trims, and component preservation
