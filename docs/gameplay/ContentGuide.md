@@ -19,6 +19,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Farming, food, and animal care
 
+- [Cactus](blocks/Cactus.md) and [Bamboo](blocks/Bamboo.md): planting/growth, harvesting, Green Dye, fuel, and [Scaffolding](blocks/Scaffolding.md) construction
 - [Horse](mobs/Horse.md), [Donkey](mobs/Donkey.md), and [Mule](mobs/Mule.md): taming, feeding, riding/equipment, cargo, breeding, inheritance, and recovery
 - [Frog](mobs/Frog.md), [Frogspawn](blocks/Frogspawn.md), and [Tadpole](mobs/Tadpole.md): shoreline breeding, hatching/growth, bucket transport, maturation variants, and Froglights
 - [Wheat farming](blocks/Wheat.md) and [Farmland](blocks/Farmland.md): hydration, growth, and MattMC's area-harvest controls

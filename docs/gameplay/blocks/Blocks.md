@@ -22,6 +22,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Stone and construction
 
+- [Scaffolding](Scaffolding.md): special placement controls, support limits, climbing/collision, and waterlogging
 - [Clay and Bricks](ClayAndBricks.md): collection, smelting, masonry recipes, and Mud conversion
 - [Flower Pot](FlowerPot.md): all supported plants, potting/recovery, support, and Eyeblossom changes
 - [Terracotta and Glazed Terracotta](Terracotta.md): all colors, smelting/dye rules, facing, mining, and piston interactions
@@ -72,6 +73,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Farming
 
+- [Cactus](Cactus.md): growth/flowers, harvesting, Green Dye, and contact hazards
+- [Bamboo](Bamboo.md): shoots/stalks, growth and Bone Meal, resource uses, and fuel
 - [Dead Bush](DeadBush.md): dry vegetation, Shears collection, placement, and Gelada breeding supply
 - [Frogspawn](Frogspawn.md): shoreline eggs, water support, hatching, and collection limits
 - [Sugar Cane](SugarCane.md): waterside planting, growth limits, harvesting, Sugar, and Paper
