@@ -69,6 +69,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Building, redstone, and travel
 
+- [Redstone Torch](blocks/RedstoneTorch.md) and [Lamp](blocks/RedstoneLamp.md): input inversion, output/light distinction, burnout, and switch-off timing
 - [Terracotta and Glazed Terracotta](blocks/Terracotta.md): all 33 forms with exact conversions, facing, harvesting, and push-only distinctions
 - [Rails](blocks/Rails.md): ordinary curves, Powered Rail relays, detector outputs, and Activator effects across cart types
 - [Pressure plates](blocks/PressurePlates.md) and [Tripwire](blocks/Tripwire.md): entity filtering/counts, support, line layout, timing, and disarming

@@ -627,6 +627,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Content Guide, simplified the growing Mobs route summary, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,184 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, warnings, combat, Poison, feeding, breeding, reward, or drop gameplay test.
 
+## Eighty-third batch: Redstone Torch and Lamp
+
+- Added canonical Torch/Lamp guides and expanded matching item pages with recipes, collection, standing/wall support, physical input/output direction, light values, and switching behavior.
+- Independently checked burnout off-transition counting, retained-history pruning, pending-tick deduplication, restart checks, and Lamp delayed-off behavior; examples remain explicitly untested.
+- Updated Blocks, Redstone, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,186 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, placement, circuit, pulse, burnout, or lighting gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

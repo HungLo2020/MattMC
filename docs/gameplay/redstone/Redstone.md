@@ -4,6 +4,7 @@ Redstone components carry signals and control blocks. Start with a source, a sup
 
 ## Core components
 
+- [Redstone Torch](../blocks/RedstoneTorch.md) inverts its support-side input; [Redstone Lamp](../blocks/RedstoneLamp.md) shows powered/unpowered states
 - [Rails](../blocks/Rails.md) provide propulsion, cart detection, and vehicle-specific activation
 - [Pressure plates](../blocks/PressurePlates.md) detect occupancy or entity counts
 - [Tripwire](../blocks/Tripwire.md) detects crossings between facing hooks

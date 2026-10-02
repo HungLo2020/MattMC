@@ -1,17 +1,17 @@
 # Redstone Torch
 
+**Redstone Torch** (`minecraft:redstone_torch`) is the item form of the redstone device described in the [placed-block guide](../blocks/RedstoneTorch.md). Use that page for the exact recipe, placement, power behavior, and timing. [Registration](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java)
+
 ## Obtaining
 
-Redstone Torch can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft it using the [canonical recipe](../blocks/RedstoneTorch.md#crafting-and-collection). Ordinary collection returns the matching item without requiring Silk Touch or a tool tier; explosion recovery remains conditional. [Recipe](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/recipe/crafting/redstone_torch.json) · [Loot](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/blocks/redstone_torch.json)
 
-## Usage
+## Using it
 
-Redstone Torch is a redstone component used for circuits, signals, logic, or power control.
+The Torch supplies power while its support-side input is off. Rapid switching can cause burnout; this is separate from ordinary light-emitting Torch behavior. The same item handles standing and wall placement.
 
-## Behavior
+## Sources and verification
 
-It follows its configured redstone behavior when placed or used in a circuit.
+Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. The shared block guide cites the active callbacks. No gameplay test was run; recipes and loot can change with data packs.
 
-## Notes
-
-* This item is the item form of the `minecraft:redstone_torch` block.
+Related: [Redstone Torch block](../blocks/RedstoneTorch.md) · [Redstone](../redstone/Redstone.md) · [Items](Items.md)

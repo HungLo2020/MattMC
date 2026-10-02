@@ -52,6 +52,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Redstone components
 
+- [Redstone Torch](RedstoneTorch.md): support-side inversion, output directions, delay, and burnout
+- [Redstone Lamp](RedstoneLamp.md): switchable full-strength light and delayed shutoff
 - [Rails](Rails.md): support, curves, Powered/Detector/Activator behavior, and minecart-specific effects
 - [Pressure plates](PressurePlates.md): Stone/Oak filters, weighted entity counts, support, and release checks
 - [Tripwire](Tripwire.md): facing hooks, String lines, crossing detection, and disarming
