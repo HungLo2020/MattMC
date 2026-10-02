@@ -476,6 +476,7 @@ Find inventory objects here, including block items, food, equipment, and spawn e
 - [Cut Red Sandstone](CutRedSandstone.md)
 - [Cut Red Sandstone Slab](CutRedSandstoneSlab.md)
 - [Cut Sandstone](CutSandstone.md)
+- [Cut Sandstone Slab](CutSandstoneSlab.md)
 - [Cut Standstone Slab](CutStandstoneSlab.md)
 - [Cyan Banner](CyanBanner.md)
 - [Cyan Bed](CyanBed.md)

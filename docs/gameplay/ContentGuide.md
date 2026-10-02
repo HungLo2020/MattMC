@@ -82,6 +82,10 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Building, redstone, and travel
 
+- [Copper lighting](blocks/CopperLighting.md), [Copper Chests](blocks/CopperChests.md), [Lightning Rods](blocks/LightningRods.md), [Golem Statues](blocks/CopperGolemStatues.md), and [Raw Copper storage](blocks/RawCopperStorage.md): device controls, sorting, variant changes and collection
+
+- [Sandstone](blocks/Sandstone.md), [Blackstone/Basalt](blocks/BlackstoneAndBasalt.md), and [Nether Bricks](blocks/NetherBricks.md): exact finishes, shape recipes, material yields, collection and Nether acquisition examples
+
 - [Copper construction](blocks/CopperConstruction.md): all structural oxidation/wax variants, efficient stonecutting, aging, scraping, lightning cleaning, doors and waterlogging
 - [Decorative stone](blocks/DecorativeStone.md) and [Tuff](blocks/Tuff.md): Granite/Diorite/Andesite/Calcite, exact polished/brick/chiseled variants and construction recipes
 

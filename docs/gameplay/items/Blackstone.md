@@ -1,17 +1,23 @@
 # Blackstone
 
-## Obtaining
+**Blackstone** (`minecraft:blackstone`) is a placeable dark building material and an ingredient for its polished masonry family. [Registration][items]
 
-Blackstone can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Obtaining and use
 
-## Usage
+Mine Blackstone with an **unbroken pickaxe**, including Wood; it drops itself without Silk Touch, and Fortune does not increase the count. The [placed guide](../blocks/BlackstoneAndBasalt.md#finding-blackstone-and-basalt) explains the checked Basalt Deltas and adult Piglin barter routes. [Loot][loot-blackstone] · [Mining tag][pickaxe] · [Barter loot][barter-loot]
 
-Blackstone is placed in the world as a block and used for building, decoration, utility, or environmental detail.
+Use the [family recipes](../blocks/BlackstoneAndBasalt.md#crafting-and-smelting) and [stonecutting choices](../blocks/BlackstoneAndBasalt.md#stonecutting) for polished, brick, chiseled and shaped products. Ordinary Blackstone also qualifies for the checked Furnace and Stone Pickaxe material tags; its polished and gilded variants do not. [Polishing][crafting-polished-blackstone] · [Material tags][materials] [tool-materials]
 
-## Behavior
+Related: [Gilded Blackstone](GildedBlackstone.md) · [Basalt](Basalt.md) · [Items](Items.md)
 
-When placed, it behaves as the corresponding block. Breaking the block returns drops according to the block's normal loot rules.
+## Sources and verification
 
-## Notes
+Source-reviewed on **2026-10-02** at `1879e5f54378351fd773b9a2c10839eb9259c504`; registration, relevant acquisition paths, recipes and loot checked. No in-game acquisition, crafting or placement test was run.
 
-* This item is the item form of the `minecraft:blackstone` block.
+[items]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/java/net/minecraft/world/item/Items.java
+[loot-blackstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/loot_table/blocks/blackstone.json
+[pickaxe]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[barter-loot]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/loot_table/gameplay/piglin_bartering.json
+[crafting-polished-blackstone]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/polished_blackstone.json
+[materials]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/tags/item/stone_crafting_materials.json
+[tool-materials]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/tags/item/stone_tool_materials.json

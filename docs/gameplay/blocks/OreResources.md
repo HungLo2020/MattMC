@@ -43,6 +43,10 @@ Most ore resource branches use the ore-drop Fortune formula: at Fortune level L 
 
 These ranges are not uniform probability distributions or explosion yields. Most ordinary resource branches include explosion decay; Ancient Debris has a different direct-item loot table. See [Mining](../mechanics/Mining.md) for shared block/tool conditions. [Loot definitions](#registered-forms-and-loot)
 
+### Gold ores and Piglins
+
+Mining Gold Ore, Deepslate Gold Ore or Nether Gold Ore can anger nearby idle Piglins. These three ores belong to the guarded-block group, and the player-breaking callback is independent of the chosen Silk Touch or resource loot branch. [Gold ore tag](https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/tags/block/gold_ores.json) · [Guarded blocks](https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/tags/block/guarded_by_piglins.json) · [Breaking callback](https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/java/net/minecraft/world/level/block/Block.java#L480-L487) · [Anger routine](https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/java/net/minecraft/world/entity/monster/piglin/PiglinAi.java#L524-L533)
+
 ## Processing raw metal
 
 Smelt or blast **one Raw Iron, Raw Copper or Raw Gold into one matching ingot**. Furnace recipes take **200 ticks**; Blast Furnace recipes take **100 ticks**, nominally 10 and 5 seconds at 20 ticks per second. Both require fuel and operating conditions. Recipe experience is **0.7** for Iron/Copper and **1.0** for Gold; collection and rounding are handled by the device. [Iron recipes][iron_ingot_from_smelting_raw_iron] [iron_ingot_from_blasting_raw_iron] · [Copper recipes][copper_ingot_from_smelting_raw_copper] [copper_ingot_from_blasting_raw_copper] · [Gold recipes][gold_ingot_from_smelting_raw_gold] [gold_ingot_from_blasting_raw_gold]
