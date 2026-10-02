@@ -16,6 +16,8 @@ At a Crafting Table, place these in one vertical column:
 
 The recipe consumes **two shells and one ordinary Chest** to make **one uncolored Shulker Box**. It needs three rows, so it does not fit the inventory's 2 × 2 crafting grid. A Trapped Chest or Ender Chest is not the Chest ingredient in this recipe. [Crafting recipe][recipe]
 
+For storage, collection, recoloring, and washing rules, see the [Shulker Box guide](../blocks/ShulkerBox.md).
+
 ## Sources and verification
 
 Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. No in-game shell collection, Looting, or crafting test was run. Custom loot tables and recipes can change these defaults.

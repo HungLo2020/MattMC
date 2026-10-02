@@ -54,6 +54,7 @@ The [Furnace](Furnace.md#hopper-automation) exposes its input from above, fuel f
 
 ## Related pages
 
+- [Shulker Box](ShulkerBox.md#nesting-and-automation): portable storage with sided transfer and nesting restrictions
 - [Hopper item](../items/Hopper.md)
 - [Chest](Chest.md)
 - [Furnace](Furnace.md)

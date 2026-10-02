@@ -1,17 +1,23 @@
 # Green Shulker Box
 
+The **Green Shulker Box** (`minecraft:green_shulker_box`) is the green variant of the [27-slot portable container](../blocks/ShulkerBox.md). Its item stacks to one; color does not add storage slots.
+
 ## Obtaining
 
-Green Shulker Box can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Combine **one Shulker Box of a different color, or an uncolored box, with one Green Dye** in two crafting slots. This returns **one Green Shulker Box** while preserving contents and other saved components. Combining a Green Shulker Box with Green Dye produces no result. [Exact recipe][recipe]
 
-## Usage
+To make your first box, use the [basic Shulker Shell recipe](ShulkerShell.md#crafting-a-shulker-box). To remove this color, follow the [Water Cauldron washing instructions](../blocks/ShulkerBox.md#washing-off-a-color).
 
-Green Shulker Box is portable container storage.
+## Using and collecting
 
-## Behavior
+Place it on a block face to access its inventory. Normal collection returns this same color and copies its stored contents. Use the shared [block guide](../blocks/ShulkerBox.md) for lid clearance, Creative differences, nested-box restrictions, hoppers, and item-loss hazards. [Block loot][loot]
 
-It keeps its inventory when broken and can be placed again later with the contents intact.
+## Sources and verification
 
-## Notes
+Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`; no in-game coloring, washing, storage, or collection test was run. [Item registration][registration] · [Color recipe][recipe] · [Block loot][loot]. Recipe matching and component-preservation sources are on the [shared guide](../blocks/ShulkerBox.md#obtaining-and-colors).
 
-* This item is the item form of the `minecraft:green_shulker_box` block.
+Related: [Uncolored Shulker Box](ShulkerBox.md) · [Items](Items.md)
+
+[registration]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java#L814-L816
+[recipe]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/recipe/crafting/green_shulker_box.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/blocks/green_shulker_box.json
