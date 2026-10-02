@@ -46,11 +46,11 @@ The rule is the dimension type's **`respawn_anchor_works`** setting, not merely 
 
 Charging is possible even where anchors cannot set spawn. Using a **charged** anchor there through its spawn interaction removes the anchor and requests a **power-5, fire-producing block explosion**. Placing it or adding a charge is not that detonation interaction. Actual block damage and fire depend on the explosion rules and surroundings. Its high normal blast resistance does not prevent this deliberate self-removal. [Interaction and explosion][anchor] · [Explosion processing][explosion]
 
-Do not rely on an untested water-containment design: the reviewed wet-anchor explosion path has a position-comparison anomaly, so this guide makes no claim that water makes its explosion safe. The [Nether guide](../dimensions/Nether.md#respawning-safely) covers dimension preparation; [Beds](Bed.md) remain the canonical guide to sleeping and bed-specific restrictions.
+The [Nether guide](../dimensions/Nether.md#respawning-safely) covers dimension preparation; [Beds](Bed.md) remain the canonical guide to sleeping and bed-specific restrictions.
 
 ## Sources and verification
 
-Source-reviewed on **2026-10-02** at `60699a119c4728a7bcaf15196f3c839cfcfd69dc`, including the active server interaction and death/End-return respawn paths, standing-position search, fuel transaction, loot, recipe, comparator/light calculation and all bundled dimension-type flags. No in-game crafting, charging, mining, respawn, comparator or explosion test was run. The source anomaly noted above was not reproduced in gameplay. [Anchor explosion source][anchor]
+Source-reviewed on **2026-10-02** at `60699a119c4728a7bcaf15196f3c839cfcfd69dc`, including the active server interaction and death/End-return respawn paths, standing-position search, fuel transaction, loot, recipe, comparator/light calculation and all bundled dimension-type flags. No in-game crafting, charging, mining, respawn, comparator or explosion test was run. [Anchor explosion source][anchor]
 
 Related: [Anchor item](../items/RespawnAnchor.md) · [Crying Obsidian](Obsidian.md#crying-obsidian) · [Glowstone](../items/Glowstone.md) · [Nether](../dimensions/Nether.md) · [End](../dimensions/End.md) · [Workstations and utilities](catalog/workstations.md) · [Blocks](Blocks.md)
 
