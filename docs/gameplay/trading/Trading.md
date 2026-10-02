@@ -60,6 +60,7 @@ The checked experimental replacements cover **Librarians and Armorers** and incl
 
 ## Related pages
 
+- [Wandering Trader](../mobs/WanderingTrader.md): visits, buying offers, limited stock, and timed despawning
 - [Raids and Hero of the Village](../mechanics/Raid.md#victory-defeat-and-stopping)
 
 - [Villager: professions and job sites](../mobs/Villager.md)
