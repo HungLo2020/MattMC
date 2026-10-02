@@ -855,13 +855,22 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: documentation check and strict build passed on 2,263 pages and 37 directory indexes; all 1,961 local links/anchors and 150 citation uses in this 17-path batch resolve. The alphabetical directory retains all 1,211 exact registered IDs, with 1,025 related-guide routes and 186 explicit article gaps. These route counts are navigation coverage, not completed article counts. All 132 unique pinned source references were compared unchanged with the current source.
 
+## Batch 110: Nether ground and steady lighting
+
+- Added three source-reviewed placed-block guides covering seven Nylium/root/sprout/cap IDs and nine full-light/Lantern IDs. Corrected seven related inventory articles. Preserved canonical fungus, crop, vine, Frog and brewing ownership.
+- Nylium coverage distinguishes correct-tool Silk Touch recovery, cover conversion, targeted Netherrack renewal, weighted Bone Meal vegetation and active natural-surface routes. Wart Blocks are not reversible brewing-crop storage.
+- Lighting coverage distinguishes Glowstone/Sea Lantern Fortune caps, three verified Frog outputs, Carmine Survival acquisition still unverified, and MattMC Lantern hand recovery versus pickaxe speed. No gameplay test or new acquisition route is inferred.
+- Source checkpoint: published `1d7b3bbf88ccad2196a6de69317d934e7c3aeced`; all authored paths are documentation.
+
+- Validation: required checker and strict build passed on 2,266 pages / 37 indexes. The 17 authored documentation paths resolve 2,106 local links/anchors and 158 citation uses. All 118 distinct pinned source references remain unchanged. The 1,211-ID alphabetical directory now has 1,041 related-guide routes and 170 article gaps; these are navigation counts, not completeness.
+
 ## Next batches, in priority order
 
-1. Maintain the complete alphabetical Blocks directory and category catalogs as source changes; expand genuine article coverage from the now-visible gaps. The initial directory, twelve-terrain guide, Crafter correction, and Rabbit/Fox citation repair are recorded in batch 97.
-2. Expand stone/cobblestone, deepslate, tuff, sandstone, Nether/End masonry and broad mineral/ore families with meaningful placed behavior and variant routes.
-3. Expand non-Oak/Pewen woods and their actual doors, trapdoors, fences, signs, shelves, and other building behavior; do not assume every imported wood has vanilla recipe/tool wiring.
-4. Cover Copper oxidation/waxing and its many building/functional variants, then Beacon/Conduit, Trial Spawner/Vault and remaining functional families.
-5. Preserve ready Swords and undead drafts for later; finish them after the immediate Blocks correction. Continue remaining mobs, biomes, effects, structures and gameplay systems without claiming broad catch-up is complete.
+1. Maintain the complete alphabetical Blocks directory and separate category catalogs as source changes; use explicit article gaps to choose new work. A related family link is not proof that every detail of a variant is reviewed.
+2. Finish the current bounded Stonecutter/Composter, wooden Shelf and ordinary Mushroom reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
+3. Expand remaining functional blocks: Trial Spawner/Vault, Bell, Cartography/Fletching Tables, Decorated Pot, Target/Daylight Detector, Campfires, TNT, Sculk and other registry-backed gaps. Keep shared mechanics in canonical family guides and link exact variants.
+4. Fill remaining terrain/resource, flora, technical and imported-block gaps, including refined resource blocks, Resin, Dripleaves, dry vegetation, heads and custom workbenches. Reassess current source rather than extrapolating from upstream implementations.
+5. Preserve ready Swords and undead drafts for later; continue remaining mobs, biomes, effects, structures and gameplay systems after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw page or route counts.
 
 ## Coordinated source and issue review, 2026-10-02 02:45 UTC
 

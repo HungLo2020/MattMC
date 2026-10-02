@@ -213,7 +213,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Calibrated Sculk Sensor** — article needed; `minecraft:calibrated_sculk_sensor`
 - **Campfire** — article needed; `minecraft:campfire`
 - **Candle** — [Candles](Candles.md#candle) (related guide); `minecraft:candle`
-- **Carmine Froglight** — article needed; `minecraft:carmine_froglight`
+- **Carmine Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#carmine-froglight) (related guide); `minecraft:carmine_froglight`
 - **Carrots** — [Root crops](RootCrops.md) (related guide); `minecraft:carrots`
 - **Cartography Table** — [Cartography Table](CartographyTable.md) (related guide); `minecraft:cartography_table`
 - **Carved Pumpkin** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:carved_pumpkin`
@@ -302,10 +302,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Crimson Fungus** — [Crimson and Warped Fungi](NetherFungi.md#crimson-fungus) (related guide); `minecraft:crimson_fungus`
 - **Crimson Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:crimson_hanging_sign`
 - **Crimson Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#crimson-timber) (related guide); `minecraft:crimson_hyphae`
-- **Crimson Nylium** — article needed; `minecraft:crimson_nylium`
+- **Crimson Nylium** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#crimson-nylium) (related guide); `minecraft:crimson_nylium`
 - **Crimson Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:crimson_planks`
 - **Crimson Pressure Plate** — [Pressure plates](PressurePlates.md#crimson-pressure-plate) (related guide); `minecraft:crimson_pressure_plate`
-- **Crimson Roots** — article needed; `minecraft:crimson_roots`
+- **Crimson Roots** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#crimson-roots) (related guide); `minecraft:crimson_roots`
 - **Crimson Shelf** — article needed; `minecraft:crimson_shelf`
 - **Crimson Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:crimson_sign`
 - **Crimson Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:crimson_slab`
@@ -477,7 +477,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:glass`
 - **Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:glass_pane`
 - **Glow Lichen** — [Glow Lichen](GlowLichen.md#placement-and-support) (related guide); `minecraft:glow_lichen`
-- **Glowstone** — article needed; `minecraft:glowstone`
+- **Glowstone** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#glowstone) (related guide); `minecraft:glowstone`
 - **Gold Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:gold_ore`
 - **Granite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#finding-granite-diorite-and-andesite) (related guide); `minecraft:granite`
 - **Granite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:granite_slab`
@@ -576,7 +576,7 @@ Names use English localization where available. A † marks one of 25 readable r
 ### L
 
 - **Ladder** — article needed; `minecraft:ladder`
-- **Lantern** — article needed; `minecraft:lantern`
+- **Lantern** — [Lanterns and Soul Lanterns](Lanterns.md#crafting-and-obtaining) (related guide); `minecraft:lantern`
 - **Lapis Lazuli Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:lapis_ore`
 - **Large Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#large-bud) (related guide); `minecraft:large_amethyst_bud`
 - **Large Fern** — article needed; `minecraft:large_fern`
@@ -709,9 +709,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Nether Gold Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:nether_gold_ore`
 - **Nether Portal** — article needed; `minecraft:nether_portal`
 - **Nether Quartz Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:nether_quartz_ore`
-- **Nether Sprouts** — article needed; `minecraft:nether_sprouts`
+- **Nether Sprouts** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#nether-sprouts) (related guide); `minecraft:nether_sprouts`
 - **Nether Wart** — [Nether Wart crop](NetherWart.md) (related guide); `minecraft:nether_wart`
-- **Nether Wart Block** — article needed; `minecraft:nether_wart_block`
+- **Nether Wart Block** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#nether-wart-block) (related guide); `minecraft:nether_wart_block`
 - **Netherrack** — article needed; `minecraft:netherrack`
 - **Note Block** — article needed; `minecraft:note_block`
 
@@ -737,7 +737,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#oak-timber) (related guide); `minecraft:oak_wood`
 - **Observer** — [Observer](Observer.md) (related guide); `minecraft:observer`
 - **Obsidian** — [Obsidian and Crying Obsidian](Obsidian.md#obsidian) (related guide); `minecraft:obsidian`
-- **Ochre Froglight** — article needed; `minecraft:ochre_froglight`
+- **Ochre Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#ochre-verdant-and-pearlescent) (related guide); `minecraft:ochre_froglight`
 - **Open Eyeblossom** — article needed; `minecraft:open_eyeblossom`
 - **Orange Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:orange_banner`
 - **Orange Bed** — [Beds](Bed.md) (related guide); `minecraft:orange_bed`
@@ -792,7 +792,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pale Oak Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:pale_oak_wall_hanging_sign`
 - **Pale Oak Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:pale_oak_wall_sign`
 - **Pale Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#pale_oak-timber) (related guide); `minecraft:pale_oak_wood`
-- **Pearlescent Froglight** — article needed; `minecraft:pearlescent_froglight`
+- **Pearlescent Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#ochre-verdant-and-pearlescent) (related guide); `minecraft:pearlescent_froglight`
 - **Peony** — [Small and tall flowers](Flowers.md#peony) (related guide); `minecraft:peony`
 - **Petrified Oak Slab** — article needed; `minecraft:petrified_oak_slab`
 - **Pewen Branch** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_branch`
@@ -1009,12 +1009,12 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Sculk Sensor** — article needed; `minecraft:sculk_sensor`
 - **Sculk Shrieker** — article needed; `minecraft:sculk_shrieker`
 - **Sculk Vein** — article needed; `minecraft:sculk_vein`
-- **Sea Lantern** — article needed; `minecraft:sea_lantern`
+- **Sea Lantern** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#sea-lantern) (related guide); `minecraft:sea_lantern`
 - **Sea Pickle** — [Sea Pickle](SeaPickle.md) (related guide); `minecraft:sea_pickle`
 - **Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:seagrass`
 - **Short Dry Grass** — article needed; `minecraft:short_dry_grass`
 - **Short Grass** — article needed; `minecraft:short_grass`
-- **Shroomlight** — article needed; `minecraft:shroomlight`
+- **Shroomlight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#shroomlight) (related guide); `minecraft:shroomlight`
 - **Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:shulker_box`
 - **Skeleton Skull** — article needed; `minecraft:skeleton_skull`
 - **Skeleton Wall Skull** — article needed; `minecraft:skeleton_wall_skull`
@@ -1045,7 +1045,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Snow Block** — [Snow and Powder Snow](Snow.md#collecting-and-crafting-snow) (related guide); `minecraft:snow_block`
 - **Soul Campfire** — article needed; `minecraft:soul_campfire`
 - **Soul Fire** — article needed; `minecraft:soul_fire`
-- **Soul Lantern** — article needed; `minecraft:soul_lantern`
+- **Soul Lantern** — [Lanterns and Soul Lanterns](Lanterns.md#crafting-and-obtaining) (related guide); `minecraft:soul_lantern`
 - **Soul Sand** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-sand) (related guide); `minecraft:soul_sand`
 - **Soul Soil** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-soil) (related guide); `minecraft:soul_soil`
 - **Soul Torch** — article needed; `minecraft:soul_torch`
@@ -1159,7 +1159,7 @@ Names use English localization where available. A † marks one of 25 readable r
 
 - **Vallumraptor Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:vallumraptor_egg`
 - **Vault** — article needed; `minecraft:vault`
-- **Verdant Froglight** — article needed; `minecraft:verdant_froglight`
+- **Verdant Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#ochre-verdant-and-pearlescent) (related guide); `minecraft:verdant_froglight`
 - **Vines** — [Vines and Glow Berries](Vines.md#vine) (related guide); `minecraft:vine`
 - **Void Air** — article needed; `minecraft:void_air`
 
@@ -1173,10 +1173,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Warped Fungus** — [Crimson and Warped Fungi](NetherFungi.md#warped-fungus) (related guide); `minecraft:warped_fungus`
 - **Warped Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:warped_hanging_sign`
 - **Warped Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:warped_hyphae`
-- **Warped Nylium** — article needed; `minecraft:warped_nylium`
+- **Warped Nylium** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#warped-nylium) (related guide); `minecraft:warped_nylium`
 - **Warped Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:warped_planks`
 - **Warped Pressure Plate** — [Pressure plates](PressurePlates.md#warped-pressure-plate) (related guide); `minecraft:warped_pressure_plate`
-- **Warped Roots** — article needed; `minecraft:warped_roots`
+- **Warped Roots** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#warped-roots) (related guide); `minecraft:warped_roots`
 - **Warped Shelf** — article needed; `minecraft:warped_shelf`
 - **Warped Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:warped_sign`
 - **Warped Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:warped_slab`
@@ -1185,7 +1185,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Warped Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:warped_trapdoor`
 - **Warped Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:warped_wall_hanging_sign`
 - **Warped Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:warped_wall_sign`
-- **Warped Wart Block** — article needed; `minecraft:warped_wart_block`
+- **Warped Wart Block** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#warped-wart-block) (related guide); `minecraft:warped_wart_block`
 - **Water** — [Water and Lava](WaterAndLava.md) (related guide); `minecraft:water`
 - **Water Cauldron** — [Cauldrons](Cauldrons.md#water-cauldron) (related guide); `minecraft:water_cauldron`
 - **Waxed Block of Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_copper_block`
@@ -1359,12 +1359,14 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Furnace, Blast Furnace and Smoker](Furnace.md)
 - [Glass and Glass Panes](GlassAndPanes.md)
 - [Glow Lichen](GlowLichen.md)
+- [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md)
 - [Granite, Diorite, Andesite and Calcite](DecorativeStone.md)
 - [Grindstone](Grindstone.md)
 - [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md)
 - [Hopper](Hopper.md)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
 - [Kelp](Kelp.md)
+- [Lanterns and Soul Lanterns](Lanterns.md)
 - [Lectern](Lectern.md)
 - [Lever](Lever.md)
 - [Lightning Rods](LightningRods.md)
@@ -1374,6 +1376,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Moss and Pale Moss](MossAndPaleMoss.md)
 - [Nether Bricks](NetherBricks.md)
 - [Nether Wart crop](NetherWart.md)
+- [Nylium and Nether vegetation](NetherGroundAndVegetation.md)
 - [Oak](Oak.md)
 - [Observer](Observer.md)
 - [Obsidian and Crying Obsidian](Obsidian.md)

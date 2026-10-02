@@ -215,6 +215,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 - [Atlatitan](mobs/Atlatitan.md) and [Serene Salad](items/SereneSalad.md): the active temporary mounting route and remaining breeding/control limits
 
+- [Nylium and Nether vegetation](blocks/NetherGroundAndVegetation.md): renewable ground, roots, sprouts and fungus-cap blocks
+- [Glowstone, Sea Lanterns, Shroomlights and Froglights](blocks/LuminousBlocks.md) and [Lanterns](blocks/Lanterns.md): acquisition, light, recovery tools and placement
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)
