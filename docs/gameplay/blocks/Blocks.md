@@ -21,6 +21,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Stone and construction
 
+- [Clay and Bricks](ClayAndBricks.md): collection, smelting, masonry recipes, and Mud conversion
+- [Flower Pot](FlowerPot.md): all supported plants, potting/recovery, support, and Eyeblossom changes
 - [Terracotta and Glazed Terracotta](Terracotta.md): all colors, smelting/dye rules, facing, mining, and piston interactions
 - [Concrete and Concrete Powder](Concrete.md): all colors, water hardening, falling, and tool/drop requirements
 - [Glass and Glass Panes](GlassAndPanes.md): ordinary, all stained colors, and Tinted Glass; collection, connections, waterlogging, light, and beacon filters

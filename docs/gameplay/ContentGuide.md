@@ -69,6 +69,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Building, redstone, and travel
 
+- [Clay and Bricks](blocks/ClayAndBricks.md) and [Flower Pots](blocks/FlowerPot.md): material conversion, dripstone Clay, masonry, and all supported potted plants
 - [Redstone Torch](blocks/RedstoneTorch.md) and [Lamp](blocks/RedstoneLamp.md): input inversion, output/light distinction, burnout, and switch-off timing
 - [Terracotta and Glazed Terracotta](blocks/Terracotta.md): all 33 forms with exact conversions, facing, harvesting, and push-only distinctions
 - [Rails](blocks/Rails.md): ordinary curves, Powered Rail relays, detector outputs, and Activator effects across cart types

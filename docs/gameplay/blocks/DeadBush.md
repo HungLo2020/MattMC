@@ -19,7 +19,7 @@ There is no Silk Touch alternative or Fortune multiplier in this loot table. Use
 
 Place the item on a block in the dry-vegetation support tag: the bundled **sand**, **terracotta**, or **dirt** groups, or **Farmland**. These groups include ordinary Sand, Red Sand, Dirt, Grass Blocks, Coarse Dirt, and more. The bush has no collision and needs valid support underneath; it does not require nearby water. [Support check][dry] · [Support tag][support] · [Sand group][sand] · [Dirt group][dirt] · [Survival check][vegetation]
 
-A Dead Bush can also be placed in an empty **Flower Pot**. Use the filled pot with an empty hand to recover the bush while leaving the pot in place. The potted form is not in the Gelada clearing tag. [Potted registration][potted] · [Pot interaction][pot] · [Clearing tag][plants]
+A Dead Bush can also be placed in an empty **[Flower Pot](FlowerPot.md)**. Use the filled pot with an empty hand to recover the bush while leaving the pot in place. The potted form is not in the Gelada clearing tag. [Potted registration][potted] · [Pot interaction][pot] · [Clearing tag][plants]
 
 Bone Meal does not grow or duplicate this block: its registered class has no bonemeal target implementation. It is a decorative plant, not a crop with a growth cycle. [Plant class][dry] · [Bone Meal dispatch][bonemeal]
 

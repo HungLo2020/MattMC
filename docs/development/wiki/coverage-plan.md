@@ -634,6 +634,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Redstone, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,186 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, placement, circuit, pulse, burnout, or lighting gameplay test.
 
+## Eighty-fourth batch: Clay, Bricks, and Flower Pots
+
+- Added Clay/Bricks and Flower Pot guides plus five material/item rewrites with actual Clay drops, smelting/fuel, masonry recipes, Mud conversion, pot interactions, and all 40 registered filled forms.
+- Verified the separate support block in the dripstone layout, pot support behavior, integrated plant/tag differences, variant loot exceptions, and potted Eyeblossom time changes; preserved Terracotta and Dead Bush recipe ownership.
+- Updated Blocks, Dead Bush cross-link, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,188 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No mining, smelting, dripstone, potting, lighting, or growth gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
