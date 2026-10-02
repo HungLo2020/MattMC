@@ -52,6 +52,8 @@ Closing and reopening the menu, removing and reinserting the same unchanged item
 
 ## Related pages
 
+- [Sharpness, Smite and Bane](MeleeDamageEnchantments.md): damage bonuses, exact targets, slowing, support and exclusions
+
 - [Unbreaking and Mending](DurabilityEnchantments.md): wear chances, supported equipment, XP-repair selection, broken stacks and acquisition
 
 - [Protection enchantments](ProtectionEnchantments.md): four armor choices, damage tags, combined cap, secondary attributes and retained broken gear
