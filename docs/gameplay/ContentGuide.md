@@ -19,6 +19,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Farming, food, and animal care
 
+- [Frog](mobs/Frog.md), [Frogspawn](blocks/Frogspawn.md), and [Tadpole](mobs/Tadpole.md): shoreline breeding, hatching/growth, bucket transport, maturation variants, and Froglights
 - [Wheat farming](blocks/Wheat.md) and [Farmland](blocks/Farmland.md): hydration, growth, and MattMC's area-harvest controls
 - [Root crops](blocks/RootCrops.md): Carrot, Potato, and Beetroot growth, custom harvesting, food, and cooking
 - [Sugar Cane](blocks/SugarCane.md) and [Pumpkin and Melon farming](blocks/PumpkinAndMelon.md): planting, growth, harvesting, and crop resources

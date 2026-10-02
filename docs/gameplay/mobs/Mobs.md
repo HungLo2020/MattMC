@@ -8,7 +8,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 - **Crocodile integration:** [Crocodile](Crocodile.md) and [Crocodile Scute](../items/CrocodileScute.md) distinguish active fish/egg behavior from imported placeholders
 
-- **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Axolotl](Axolotl.md), and [Dolphin](Dolphin.md)
+- **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Axolotl](Axolotl.md), [Dolphin](Dolphin.md), [Frog](Frog.md), and [Tadpole](Tadpole.md)
 - **Hostile encounters and bosses:** [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Enderman](Enderman.md), [Blaze](Blaze.md), [Wither Skeleton](WitherSkeleton.md), [Slime](Slime.md), [Magma Cube](MagmaCube.md), [Wither](Wither.md), [Ender Dragon](EnderDragon.md), and [Shulker](Shulker.md)
 - **Bundled animals and caves:** [Orca](Orca.md) and [Hammerhead Shark](HammerheadShark.md) cover conditional ocean encounters; use the [Alex's Mobs](../ContentGuide.md#alexs-mobs-additions) and [Alex's Caves](../ContentGuide.md#alexs-caves-additions) sections for reviewed feeding, ownership, resources, and availability limits
 

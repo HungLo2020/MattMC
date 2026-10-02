@@ -63,6 +63,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Farming
 
+- [Frogspawn](Frogspawn.md): shoreline eggs, water support, hatching, and collection limits
 - [Sugar Cane](SugarCane.md): waterside planting, growth limits, harvesting, Sugar, and Paper
 - [Pumpkin and Melon farming](PumpkinAndMelon.md): stem layout, Bone Meal, fruit drops, carving, and repeat harvests
 
