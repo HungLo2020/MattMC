@@ -122,13 +122,27 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
         if (this.hasCustomName()) {
             bucket.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, this.getCustomName());
         }
-        bucket.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, data -> data.update(tag -> {
+        bucket.update(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY, data -> data.update(tag -> {
             tag.putBoolean("Fedora", this.hasFedora());
             tag.putBoolean("Sensing", this.isSensing());
             tag.putBoolean("FromBucket", this.fromBucket());
             tag.putBoolean("HasEgg", this.hasEgg());
             tag.putBoolean("SuperCharged", this.superCharged);
         }));
+    }
+
+    @Override
+    public void loadFromBucketItem(@Nonnull ItemStack bucket) {
+        CompoundTag data = bucket.getOrDefault(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY).copyTag();
+        CompoundTag legacy = bucket.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        // Older Platypus buckets stored only these flags in CUSTOM_DATA. Never
+        // import unrelated keys or override a present bucket-component value.
+        for (String key : new String[]{"Fedora", "Sensing", "FromBucket", "HasEgg", "SuperCharged"}) {
+            if (!data.contains(key)) {
+                legacy.getBoolean(key).ifPresent(value -> data.putBoolean(key, value));
+            }
+        }
+        this.loadFromBucketTag(data);
     }
 
     @Override

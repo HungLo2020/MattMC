@@ -18,7 +18,7 @@ Creative includes the [Platypus Spawn Egg](../items/PlatypusSpawnEgg.md), [Bucke
 
 **Natural spawning is not established in this snapshot.** A helper checks for a dirt-tag block below the mob and a position below sea level plus four, but no active spawn-placement caller or biome spawn entry was found. That helper alone does not establish a river or swamp population. [Spawn helper][spawn] · [Spawn placements][placements] · [Biome data][biomes]
 
-Use a **Water Bucket**, not an empty Bucket, on a living Platypus to capture it. The filled bucket releases it through the normal mob-bucket flow. Released animals are marked as coming from a bucket, which suppresses their distance-despawning route. Read [Bucket of Platypus](../items/BucketOfPlatypus.md) before transporting a baby or an animal carrying an egg: age and special-state preservation are incomplete. The special-state component mismatch is tracked in [issue #782](https://github.com/HungLo2020/MattMC/issues/782); the separate age omission remains a limitation too. [Capture][capture] · [Release][release] · [Persistence][persistence]
+Use a **Water Bucket**, not an empty Bucket, on a living Platypus to capture it. The filled bucket releases it through the normal mob-bucket flow. Released animals are marked as coming from a bucket, which suppresses their distance-despawning route. Sensing, egg-carrying, supercharged, and fedora flags are preserved, including supported older bucket data. **Age is still not saved:** read [Bucket of Platypus](../items/BucketOfPlatypus.md) before transporting a baby and for the compatibility rule. [Capture][capture] · [Release][release] · [Persistence][persistence]
 
 Platypuses are not tameable through these interactions. Feeding, naming, or bucketing one does not give owner commands, a riding seat, or an inventory. [Entity and food behavior][food] · [Interactions][interactions]
 
@@ -62,6 +62,8 @@ No dedicated Platypus death-loot table was found. The wearable-fedora interactio
 
 Source-reviewed at MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. Registration, active attributes, actual food tags, bucket transfer, breeding goals, egg blocks, digging data, spawning, and loot were checked separately, including uppercase constants and lowercase IDs. No in-game spawning, breeding, hatching, digging, poison, or bucket round-trip test was run.
 
+The bucket-transfer description includes the correction for [issue #782](https://github.com/HungLo2020/MattMC/issues/782) on `fix/issue-782-platypus-bucket`; its focused automated tests do not replace live placement or dedicated-server checks. Other behavior remains from the baseline audit.
+
 [attributes]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L88-L90
 [active-attributes]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/ai/attributes/DefaultAttributes.java#L212
 [registration]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/EntityType.java#L1059-L1065
@@ -73,7 +75,7 @@ Source-reviewed at MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2` on 2
 [placements]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/SpawnPlacements.java
 [biomes]: https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/worldgen/biome
 [capture]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/animal/Bucketable.java#L71-L88
-[release]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/MobBucketItem.java#L43-L54
+[release]: https://github.com/HungLo2020/MattMC/blob/fix/issue-782-platypus-bucket/src/main/java/net/minecraft/world/item/MobBucketItem.java
 [persistence]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L359-L367
 [food]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L57-L94
 [fish]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/item/fishes.json

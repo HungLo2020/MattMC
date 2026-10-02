@@ -1,6 +1,6 @@
 # Bucket of Platypus
 
-A **Bucket of Platypus** carries and releases one [Platypus](../mobs/Platypus.md). Capture and release are wired into MattMC's mob-bucket system, but the current bucket data does **not preserve every part of the animal's state**. Avoid using it as a way to safely preserve breeding progress or a baby's age. [Registration][registration] · [Platypus bucket data][platypus-data]
+A **Bucket of Platypus** carries and releases one [Platypus](../mobs/Platypus.md). The bucket preserves its sensing and egg-carrying state, along with the other saved flags below. It still **does not preserve age**, so do not use it to keep a baby at the same age. [Registration][registration] · [Platypus bucket data][platypus-data]
 
 ## Obtaining
 
@@ -16,14 +16,13 @@ The released animal is marked **from a bucket**, which its distance-despawning c
 
 ## What the bucket preserves
 
-The shared bucket helper writes **health**, a custom name, and basic flags such as No AI, silence, glowing, invulnerability, and no gravity. The release path reads that shared bucket data back. A custom name is also carried on the item. These are source-defined transfers, not results of a tested capture/release cycle. [Shared data][shared-data] · [Platypus name][name] · [Release][release]
+The shared bucket helper writes **health**, a custom name, and basic flags such as No AI, silence, glowing, invulnerability, and no gravity. The release path reads that shared bucket data back. A custom name is also carried on the item. A live capture/release round trip still needs verification; the focused automated coverage is described below. [Shared data][shared-data] · [Platypus name][name] · [Release][release]
 
-Two limitations matter when moving a particular animal:
+The Platypus also saves its **sensing, egg-carrying, supercharged, fedora, and previous from-bucket flags** in the same bucket component. Release restores those fields, then marks the animal as from a bucket. This preserves an existing state; it does not add working treasure rewards, egg laying, or a Fedora item. [Bucket save/load][platypus-data] · [Release][release]
 
-- **Age is not saved** by the Platypus's bucket method or the shared helper. Capturing a baby therefore does not establish a same-age baby on release
-- **Special state uses mismatched data fields.** The Platypus writes sensing, egg-carrying, supercharged, fedora, and previous bucket-state flags into `CUSTOM_DATA`; the generic release code instead passes `BUCKET_ENTITY_DATA` to its loader. The special flags can consequently reset to their defaults on release. The release flow separately sets the new animal's from-bucket flag to true. The component mismatch is tracked in [issue #782](https://github.com/HungLo2020/MattMC/issues/782); this is a documented limitation, not a completed fix
+Older buckets are supported: the loader reads only those five known flags from legacy custom data when the corresponding field is absent from the current bucket data. Current data takes precedence, including an explicit false value. Unrelated custom data is left untouched.
 
-Ordinary world saving uses a different path and does save those Platypus flags; that does not repair the bucket transfer. If an animal is already sensing or carrying an egg, keep it in its enclosure instead of relying on the bucket to preserve that progress. [Bucket save/load][platypus-data] · [Generic release data][release] · [World save/load][world-data]
+**Age is still not saved.** A captured baby is not restored as the same-age baby. Temporary digging/visual animation state also starts fresh; sensing itself is preserved. Ordinary world saving follows its separate existing path. [World save/load][world-data]
 
 ## Related pages
 
@@ -37,14 +36,16 @@ Ordinary world saving uses a different path and does save those Platypus flags; 
 
 Source-reviewed at MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. Item registration, Creative availability, capture, placement, and data-transfer paths were inspected. No in-game capture/release, name, health, age, or special-state preservation test was run.
 
+The transfer section includes the correction for [issue #782](https://github.com/HungLo2020/MattMC/issues/782) on `fix/issue-782-platypus-bucket`. Focused automated item-codec and bucket-dispatch tests are provided. A live placement and dedicated-server synchronization check is still needed.
+
 [registration]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/Items.java#L1523-L1527
-[platypus-data]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L119-L142
+[platypus-data]: https://github.com/HungLo2020/MattMC/blob/fix/issue-782-platypus-bucket/src/main/java/net/alexsmobs/entity/EntityPlatypus.java
 [interaction]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L144-L166
 [capture]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/animal/Bucketable.java#L71-L88
 [creative]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1454
 [use]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/BucketItem.java#L72-L93
-[release]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/MobBucketItem.java#L43-L54
+[release]: https://github.com/HungLo2020/MattMC/blob/fix/issue-782-platypus-bucket/src/main/java/net/minecraft/world/item/MobBucketItem.java
 [persistence]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L359-L367
-[shared-data]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/animal/Bucketable.java#L33-L69
+[shared-data]: https://github.com/HungLo2020/MattMC/blob/fix/issue-782-platypus-bucket/src/main/java/net/minecraft/world/entity/animal/Bucketable.java
 [name]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L109-L124
 [world-data]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityPlatypus.java#L325-L341

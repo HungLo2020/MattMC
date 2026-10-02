@@ -1,7 +1,6 @@
 package net.minecraft.world.item;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
@@ -10,7 +9,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.Bucketable;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.gameevent.GameEvent;
@@ -43,8 +41,7 @@ public class MobBucketItem extends BucketItem {
 	private void spawn(ServerLevel serverLevel, ItemStack itemStack, BlockPos blockPos) {
 		Mob mob = this.type.create(serverLevel, EntityType.createDefaultStackConfig(serverLevel, itemStack, null), blockPos, EntitySpawnReason.BUCKET, true, false);
 		if (mob instanceof Bucketable bucketable) {
-			CustomData customData = itemStack.getOrDefault(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY);
-			bucketable.loadFromBucketTag(customData.copyTag());
+			bucketable.loadFromBucketItem(itemStack);
 			bucketable.setFromBucket(true);
 		}
 
