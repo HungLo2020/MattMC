@@ -60,6 +60,8 @@ The checked experimental replacements cover **Librarians and Armorers** and incl
 
 ## Related pages
 
+- [Raids and Hero of the Village](../mechanics/Raid.md#victory-defeat-and-stopping)
+
 - [Villager: professions and job sites](../mobs/Villager.md)
 - [Emerald](../items/Emerald.md)
 - [Gameplay](../Gameplay.md)

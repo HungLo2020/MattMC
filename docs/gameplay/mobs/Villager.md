@@ -44,6 +44,8 @@ The entity ID is `minecraft:villager`. For Creative testing and mapmaking, use t
 
 ## Related pages
 
+- [Raid preparation and village recognition](../mechanics/Raid.md#starting-or-avoiding-a-raid)
+
 - [Trading](../trading/Trading.md)
 - [Emerald](../items/Emerald.md)
 - [Mobs](Mobs.md)

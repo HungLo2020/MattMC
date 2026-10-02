@@ -1122,6 +1122,15 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,344 pages / 37 indexes. All ten authored paths are documentation; local links/anchors and actual rendered citations resolve. The correction follows fresh and saved-world caller inputs, not only the bake helper, and makes no runtime or old-terrain-change claim.
 
+## Batch 138: Raids, outposts and raider behavior
+
+- Added canonical Raid and Pillager Outpost guides, expanded Pillager/Ravager, and corrected Ominous Bottle and two egg pages. Trading/Villager and Trial Spawner/Vault retain their separate mechanics and gain narrow links.
+- Traced drinking versus carrying, Bad Omen conversion, stored-position Raid Omen cancellation, occupied village points, wave composition versus additions/riders, active-raid persistence and victory/loss/stop outcomes. Captain bottle eligibility is stated at loot-evaluation time, not inferred solely from where a captain originated.
+- Outpost review follows actual structure-set/jigsaw/NBT resident and chest paths, candidate placement controls and the continuing full-bounding-box Pillager override. Ravager guidance covers active blocking response, stun/roar timing, obstacles and separate Saddle/XP conditions.
+- Source checkpoint: `384aa3dfa1473af7753759569de95012d5bdc46f`; 74 distinct pinned source pairs match current source. The direct-biome-spawn absence check covers 68 biome definitions, separately from biome-tag resources. No generation, captain-loot, raid, combat, cancellation or victory gameplay test was run.
+
+- Validation: required checker and strict build passed on 2,346 pages / 37 indexes. All 15 authored paths are documentation; 907 local links/anchors and 191 tracked reference uses resolve, with zero rendered citation candidates and all existing replacement anchors retained. The two new owners and two mob expansions remain separate from the three narrow item corrections.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.

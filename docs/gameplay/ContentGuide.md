@@ -154,6 +154,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Exploration, archaeology, and trade
 
+- [Pillager Outpost](structures/PillagerOutpost.md), [Pillager](mobs/Pillager.md), [Ravager](mobs/Ravager.md), and [Raids](mechanics/Raid.md): tower expeditions, captain bottles, omen preparation, waves and victory
+
 - [Nether biomes](biomes/NetherBiomes.md) and [End biomes](biomes/EndBiomes.md): choose natural exploration routes by materials, structures and feature limits
 
 - [Bastion Remnant](structures/BastionRemnant.md), [Piglin](mobs/Piglin.md), and [Piglin Brute](mobs/PiglinBrute.md): Nether residents, chest rewards, gold rules and bartering

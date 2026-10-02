@@ -8,6 +8,7 @@ Understand the systems behind everyday gameplay. Guides here explain current Mat
 - [Death and respawn](DeathAndRespawn.md): inventory/experience loss, recovery and saved-point fallback
 - [Experience points, levels, and Mending](Experience.md): level costs, orb collection, equipment repairs and spending
 - [Combat](Combat.md): attack charge, criticals, sweeps, Shields and projectile differences
+- [Raids](Raid.md): omen conversion, village recognition, waves, outcomes and stopping
 - [Swords](Swords.md): material values, sweeping, fixed mining rules, enchantments and repair
 - [Axes and Hoes](AxesAndHoes.md): all seven materials, combat values, wood/copper conversions, tilling, and crop harvesting
 - [Pickaxes and Shovels](PickaxesAndShovels.md): all seven materials, exact recipes, tool actions, upkeep, and recycling

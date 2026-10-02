@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Raid encounters:** [Pillager](Pillager.md), [Ravager](Ravager.md), [Outposts](../structures/PillagerOutpost.md), and [Raids](../mechanics/Raid.md): natural selection, omen gates and event behavior
+
 - **Airborne bundled creatures:** [Spectre](Spectre.md), [Cosmaw](Cosmaw.md), and [Cosmic Cod](CosmicCod.md): lure, hunting, bucket and companion-integration limits
 
 - **Imported arthropods:** [Cave Centipede](CaveCentipede.md) and [Tarantula Hawk](TarantulaHawk.md): actual encounters, sting/loot behavior and resource limitations
