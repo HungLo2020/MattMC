@@ -1,6 +1,6 @@
 # Copper Golem Statues
 
-Copper Golem Statues are placed decorations with four selectable poses and a Comparator output. Their eight oxidation/wax variants can also lead back to a living Copper Golem, but revival requires a specific **unwaxed, Unaffected statue** and a normal axe interaction. [Registration][statue-reg] · [Pose behavior][statue] · [Revival handler][statue-aging]
+Copper Golem Statues are placed decorations with four selectable poses and a Comparator output. Their eight oxidation/wax variants can also lead back to a living [Copper Golem](../mobs/CopperGolem.md), but revival requires a specific **unwaxed, Unaffected statue** and a normal axe interaction. [Registration][statue-reg] · [Pose behavior][statue] · [Revival handler][statue-aging]
 
 ## Obtaining a statue
 

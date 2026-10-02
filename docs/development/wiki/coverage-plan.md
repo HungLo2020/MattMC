@@ -1300,3 +1300,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Replaced 22 generic standard Sign/Hanging Sign inventory entries with exact item IDs, standing/wall bindings, per-material recipe references, ordinary browser availability, blank-drop distinctions and scoped placement/editing owner links. No new article files were added.
 - Existing authored Oak/Pewen entries and their different integration limits are preserved; already-substantive Wool/Glass pages were excluded from the candidate list. The current Signs owner remains the source-reviewed authority for shared behavior.
 - Independent review and final source/check/build/render validation are required before promotion; all 110 existing page anchors are preserved. This is a bounded inventory-routing improvement, not 22 newly exhaustive block-behavior articles or a completed item backlog. No in-game placement, editing or harvesting test is claimed.
+
+## Batch 157: Constructed protectors and ancient animal care
+
+- Expanded Copper Golem, Creaking and Sniffer owners, preserving existing chest/statue, Heart, egg and ancient-plant behavior owners and adding two Copper backlinks.
+- Traced construction/revival and sorting interactions, living-golem wax/lightning controls, Heart-bound versus unbound Creaking gaze/damage/removal, and Sniffer food, 48,000-tick hatchling growth, egg breeding and variable digging cycles.
+- Independent source/render review and final documentation check/build/local-anchor verification are required before promotion. No live sorting, gaze, damage, revival, hatching, breeding or digging test is claimed; biome registration alone is not treated as a natural spawn route.

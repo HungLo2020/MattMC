@@ -1,6 +1,6 @@
 # Copper Chests
 
-Copper Chests provide ordinary persistent storage and act as **pickup containers for Copper Golem item sorting**. All eight oxidation/wax variants can be opened and used for storage. Their connection rules can change a double chest's finish, so join the pair before choosing its final wax/oxidation treatment. [Copper Chest behavior][copper-chest] · [Storage block entity][chest-be-reg] · [Sorting source predicate][golem-ai]
+Copper Chests provide ordinary persistent storage and act as **pickup containers for [Copper Golem](../mobs/CopperGolem.md) item sorting**. All eight oxidation/wax variants can be opened and used for storage. Their connection rules can change a double chest's finish, so join the pair before choosing its final wax/oxidation treatment. [Copper Chest behavior][copper-chest] · [Storage block entity][chest-be-reg] · [Sorting source predicate][golem-ai]
 
 ## Obtaining
 
