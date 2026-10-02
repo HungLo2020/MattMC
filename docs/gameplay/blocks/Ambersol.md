@@ -4,7 +4,7 @@ Ambersol is a light-emitting block integrated from Alex's Caves. Place it above 
 
 ## Obtaining
 
-Ambersol is listed in the Creative inventory. Its block loot table specifies one Ambersol item, but the block also requires a correct tool for drops. The checked mining-tool tags do not include Ambersol, so a reliable Survival harvesting tool has **not been verified**. Do not assume that the loot table alone guarantees a drop.
+Ambersol is listed in the Creative inventory. To collect its **one Ambersol item** drop in Survival, use a **stone, copper, iron, diamond, or netherite pickaxe**. Wooden and golden pickaxes, other tools, and bare hands do not meet its harvesting requirement. A broken pickaxe cannot collect the drop. Silk Touch is not required.
 
 A natural-generation location and a crafting recipe have not been established from MattMC's active implementation. Upstream Alex's Caves locations should not be treated as confirmed MattMC acquisition methods.
 
@@ -33,11 +33,12 @@ For a hanging light, keep the vertical space below the Ambersol clear. A light-b
 
 ## Sources and verification
 
-Source-reviewed at [snapshot fffe4a073f0b](https://github.com/HungLo2020/MattMC/commit/fffe4a073f0b8d867902b067a6dd022cda31926f) on 2026-10-01; not an in-game test.
+Harvesting configuration source-reviewed on 2026-10-02. The bundled tags require a stone-tier-or-better pickaxe, and the loot table specifies one Ambersol. In-game Survival breaking and rendered light-column cleanup still need verification.
 
-- [Block registration](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/minecraft/world/level/block/Blocks.java)
-- [Column creation](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexscaves/server/block/AmbersolBlock.java)
-- [Invisible light behavior](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexscaves/server/block/AmbersolLightBlock.java)
-- [Block drops](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/resources/data/minecraft/loot_table/blocks/ambersol.json)
-- [Creative inventory](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
-- [Mining tool tags](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json)
+- [Block registration](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/java/net/minecraft/world/level/block/Blocks.java)
+- [Column creation](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/java/net/alexscaves/server/block/AmbersolBlock.java)
+- [Invisible light behavior](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/java/net/alexscaves/server/block/AmbersolLightBlock.java)
+- [Block drops](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/resources/data/minecraft/loot_table/blocks/ambersol.json)
+- [Creative inventory](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
+- [Mining tool tags](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json)
+- [Required tool tier](https://github.com/HungLo2020/MattMC/blob/fix/issue-779-ambersol-tool/src/main/resources/data/minecraft/tags/block/needs_stone_tool.json)
