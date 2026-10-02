@@ -64,9 +64,10 @@ def audit(out):
     body = body.replace('this.forAllBoxes(', 'forAllBoxes(source, ')
     if (ROOT / 'src/test/java/net/minecraft/world/phys/shapes/JavaVoxelBoxList.java').read_text().count(body) != 1:
         raise RuntimeError('Original complete public box caller differs from Git')
+    from VerifyRustVoxelRotation import strip_rotation
     for name in ['VoxelShape.java','DiscreteVoxelShape.java','Shapes.java','ArrayVoxelShape.java','CubeVoxelShape.java',
                  'SubShape.java','NativeVoxelJoin.java','NonOverlappingMerger.java']:
-        if (strip_box_list((ROOT / (folder + name)).read_text()) if name == 'VoxelShape.java' else (ROOT / (folder + name)).read_text()) != original(name):
+        if (strip_box_list((ROOT / (folder + name)).read_text()) if name == 'VoxelShape.java' else strip_rotation((ROOT/(folder+name)).read_text()) if name=='DiscreteVoxelShape.java' else (ROOT / (folder + name)).read_text()) != original(name):
             raise RuntimeError('Unchanged coordinates/ownership/joins changed: ' + name)
     (out / 'OriginalBitSetDiscreteVoxelShape.java').write_text(source)
     (out / 'OriginalVoxelShape.java').write_text(outer)

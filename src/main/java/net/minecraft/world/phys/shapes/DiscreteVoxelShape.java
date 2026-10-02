@@ -24,6 +24,10 @@ public abstract class DiscreteVoxelShape {
 		if (octahedralGroup == OctahedralGroup.IDENTITY) {
 			return this;
 		} else {
+			if ((long)this.xSize * this.ySize * this.zSize >= NativeVoxelRotation.MIN_CELLS) {
+				var nativeRotation = NativeVoxelRotation.rotate(this, octahedralGroup);
+				if (nativeRotation != null) return nativeRotation;
+			}
 			Direction.Axis axis = octahedralGroup.permute(Direction.Axis.X);
 			Direction.Axis axis2 = octahedralGroup.permute(Direction.Axis.Y);
 			Direction.Axis axis3 = octahedralGroup.permute(Direction.Axis.Z);

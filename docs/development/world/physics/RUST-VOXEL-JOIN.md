@@ -54,6 +54,8 @@ the same real bitset shape class and allocation. Shape/merger implementations
 remain pinned except the specific native dispatch, field visibility and pure
 nonoverlap compatibility predicate, plus the separately pinned
 [merged-box and box-list dispatches](RUST-VOXEL-BOXES.md) and strip-helper visibility.
+The original discrete-grid source audit also removes only the separately pinned
+[rotation dispatch](RUST-VOXEL-ROTATION.md).
 No reflection is timed. Use `--cpu N` for
 an available logical CPU. Focused tests require no graphics context.
 

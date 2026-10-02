@@ -41,7 +41,8 @@ src/main/rust/
     ├── phys/
     │   └── shapes/
     │       ├── boolean_join/
-    │       └── box_extract/
+    │       ├── box_extract/
+    │       └── rotation/
     └── level/
         ├── biome/
         │   └── climate/
@@ -90,6 +91,9 @@ under `world/phys/shapes/boolean_join/`. Java keeps coordinate merging and
 shape ownership while Rust evaluates packed occupancy.
 Ordered [merged voxel boxes](world/physics/RUST-VOXEL-BOXES.md) use
 `world/phys/shapes/box_extract/`; Java retains the original snapshot and callbacks.
+[Voxel rotation](world/physics/RUST-VOXEL-ROTATION.md) uses
+`world/phys/shapes/rotation/` for packed axis transforms while Java retains
+floating coordinates and shape ownership.
 
 ### `gameplay/`
 

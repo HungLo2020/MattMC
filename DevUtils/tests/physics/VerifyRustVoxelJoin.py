@@ -51,6 +51,7 @@ def main():
     at=expected.index('\n',at)+1
     expected=expected[:at]+JOIN_DISPATCH+expected[at:]
     from VerifyRustVoxelBoxes import strip_boxes, strip_box_list
+    from VerifyRustVoxelRotation import strip_rotation
     if strip_boxes(source.read_text())!=expected:raise RuntimeError('Grid differs beyond exact native dispatch/internal field visibility')
     a=original.index('\tstatic BitSetDiscreteVoxelShape join(');b=original.index('\n\tprotected static void forAllBoxes',a)
     if (ROOT/'src/test/java/net/minecraft/world/phys/shapes/JavaVoxelJoin.java').read_text().count(original[a:b])!=1:
@@ -61,7 +62,7 @@ def main():
         raise RuntimeError('Original public caller differs from Git')
     for name in ['Shapes.java','BooleanOp.java','DiscreteVoxelShape.java','VoxelShape.java','ArrayVoxelShape.java',
                  'CubeVoxelShape.java','IndexMerger.java','IdenticalMerger.java','IndirectMerger.java','DiscreteCubeMerger.java','CubePointRange.java']:
-        if (strip_box_list((ROOT/(folder+name)).read_text()) if name == 'VoxelShape.java' else (ROOT/(folder+name)).read_text())!=original_file(name):raise RuntimeError('Original shape/coordinate semantics changed: '+name)
+        if (strip_box_list((ROOT/(folder+name)).read_text()) if name == 'VoxelShape.java' else strip_rotation((ROOT/(folder+name)).read_text()) if name=='DiscreteVoxelShape.java' else (ROOT/(folder+name)).read_text())!=original_file(name):raise RuntimeError('Original shape/coordinate semantics changed: '+name)
     non=original_file('NonOverlappingMerger.java')
     expected=non.replace('\t@Override\n\tpublic int size()',NONOVERLAP+'\t@Override\n\tpublic int size()',1)
     if (ROOT/(folder+'NonOverlappingMerger.java')).read_text()!=expected:raise RuntimeError('Nonoverlap changed beyond exact compatibility predicate')

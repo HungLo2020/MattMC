@@ -6,3 +6,5 @@ Collision geometry and block physics are independent of renderer backends.
   exact bounds/coordinate compatibility and focused acceptance checks.
 - [Rust merged voxel boxes](RUST-VOXEL-BOXES.md): ordered collision-box extraction,
   callback compatibility and complete caller verification.
+- [Rust voxel rotation](RUST-VOXEL-ROTATION.md): packed rotations/reflections,
+  original coordinates and complete public caller checks.

@@ -73,6 +73,8 @@ The Linux driver builds release Rust and pins the original extraction loop,
 helpers and complete public `VoxelShape.toAabbs()` caller to Git `3e85592c4`.
 Only the exact native dispatches and helper visibility are permitted by the
 source audit.
+The discrete-grid source audit also allows only the separately pinned
+[rotation dispatch](RUST-VOXEL-ROTATION.md).
 The test oracle uses the same real snapshot class and strip helpers; only the
 kernel call is redirected. No reflection is timed. Use `--cpu N` to select an
 available logical CPU. These focused tests need no graphics context.
