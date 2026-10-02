@@ -52,6 +52,8 @@ Closing and reopening the menu, removing and reinserting the same unchanged item
 
 ## Related pages
 
+- [Efficiency, Fortune and Silk Touch](MiningEnchantments.md): tool eligibility, speed bonuses, loot choices and collection limits
+
 - [Experience points, levels, and Mending](../mechanics/Experience.md)
 
 - [Enchanting Table block](../blocks/EnchantingTable.md)

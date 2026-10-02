@@ -39,6 +39,8 @@ Examples of the requirement tags include Iron/Copper/Lapis Ores at Stone tier; D
 
 ## Loot and enchantments
 
+Use [Efficiency, Fortune and Silk Touch](../enchanting/MiningEnchantments.md) for supported tools, the active mining-speed bonus and source-specific loot choices.
+
 [Stone](../blocks/Stone.md) illustrates Silk Touch selecting Stone instead of Cobblestone. [Coal](../items/Coal.md) illustrates Silk Touch selecting ore and Fortune modifying the ordinary coal branch. Do not generalize those exact drop counts or enchantment rules to every block.
 
 When a drop surprises you, check tool family, material restriction, correct-tool requirement, loot conditions, and current data-pack changes separately. A missing integration tag is a documentation caveat until the gameplay code/data is actually repaired.

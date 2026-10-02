@@ -1418,3 +1418,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Added one shared practical owner for Speed, Slowness, Jump Boost, Slow Falling, Levitation and Dolphin's Grace, with exact effect anchors. Expanded the Effects index to nine reviewed effects alphabetically and linked Brewing; the prior three effect owners are preserved.
 - Traced active attribute/motion/gravity/fall consumers, actual potion and mob/food/Beacon routes, duration scaling, refresh/hidden-effect rules, clearing and recipient limits. Attribute contributions are not represented as measured travel speeds or guaranteed jump heights.
 - Moved the already-recorded native palette/world-generation source entry into the monthly landed-code section, without duplicating it or changing its factual scope. Final independent source/render review, required index routes, documentation check and strict build apply. No gameplay movement, brewing, command, timing or fall tests were run.
+
+## Batch 175: Mining enchantments
+
+- Added one practical owner for Efficiency, Fortune and Silk Touch, with required Enchanting-index and Mining/ContentGuide links. Preserved newer ContentGuide additions by applying only the exact scoped insertion, and kept existing tool/block owners intact.
+- Traced supported and exclusive tags, the Shears Anvil-versus-table distinction, active main-hand speed and loot/XP consumers, correct-tool/drop gates and player/crop/explosion tool contexts. Broken-stack behavior is qualified by the actual caller rather than a global enchantment-disable assumption.
+- Exact recipe/definition/source bounds and configured rendering accompany final independent review, actual overlaid hierarchy check and strict build. No timed mining, enchantment-roll, drop-rate, crop-harvest or explosion gameplay tests were run.
