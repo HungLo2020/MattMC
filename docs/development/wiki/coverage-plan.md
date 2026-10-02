@@ -599,6 +599,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: independent source review, checker and strict build passed on 2,182 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, lighting, mining, egg configuration, redstone, or farm gameplay test.
 
+## Seventy-ninth batch: Gorilla, Gelada, and Dead Bush
+
+- Expanded Gorilla/Gelada behavior and spawn eggs; added canonical Dead Bush and expanded its item with traced biome/loot supply, Shears collection, support, pots, and Gelada breeding use.
+- Separated absent Gorilla food/foraging tags from active Gelada breeding/clearing; documented source-only combat-state, old-callback, and mob-griefing limits without claiming fixes.
+- Updated Blocks, Mobs, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,183 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No feeding, breeding, clearing, grooming, combat, generation, or harvesting gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

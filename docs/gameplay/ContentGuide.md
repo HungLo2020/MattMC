@@ -98,6 +98,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Alex's Mobs additions
 
+- [Gorilla](mobs/Gorilla.md) and [Gelada Monkey](mobs/GeladaMonkey.md): group behavior, active Dead Bush breeding/Wheat clearing, and food/combat integration limits
 - [Orca](mobs/Orca.md) and [Hammerhead Shark](mobs/HammerheadShark.md): swimming benefits, conditional predation, spawn-egg access, and current natural-spawn/breeding limits
 - [Crocodile](mobs/Crocodile.md) and [Crocodile Scute](items/CrocodileScute.md): fish feeding, Turtle Egg/Scute placeholders, owner-state limits, and active combat dispatch
 
