@@ -151,6 +151,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Exploration, archaeology, and trade
 
+- [Bastion Remnant](structures/BastionRemnant.md), [Piglin](mobs/Piglin.md), and [Piglin Brute](mobs/PiglinBrute.md): Nether residents, chest rewards, gold rules and bartering
+- [Ocean Monument](structures/OceanMonument.md), [Guardian](mobs/Guardian.md), and [Elder Guardian](mobs/ElderGuardian.md): deep-ocean search, beam/spike combat, fatigue and rewards
+
 - [Ocean biomes](biomes/Oceans.md): nine ordinary/deep/temperature variants, resource and aquatic lists, structure eligibility, and integrated-content distinctions
 - [End City](structures/EndCity.md), [Shulker](mobs/Shulker.md), [Elytra](items/Elytra.md), and [Shulker Shell](items/ShulkerShell.md): outer-island rewards, Levitation, gliding, repairs, and boxes
 

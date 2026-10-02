@@ -28,6 +28,8 @@ Use the plant guides for [Kelp](../blocks/Kelp.md), [Seagrass](../blocks/Seagras
 
 ## Structures and exploration
 
+The [Ocean Monument expedition](../structures/OceanMonument.md) covers deep-ocean search, preparation, its three structure-placed Elders and continuing ordinary Guardian encounters.
+
 The bundled structure-biome tags connect these routes:
 
 | Structure route | Eligible ocean families in the checked data |

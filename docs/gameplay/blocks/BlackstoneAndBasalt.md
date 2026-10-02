@@ -83,7 +83,7 @@ For a small, **untested** collection setup, put Soul Soil under the intended con
 
 ## Gilded blackstone
 
-`minecraft:gilded_blackstone` is a separate decorative block with a Gold Nugget drop branch. The checked **Bastion Remnant** route can produce it: a registered Bastion start template contains Blackstone, and its active degradation processor can convert Blackstone to Gilded Blackstone. Bastion placement is limited by its biome tag and is not a guarantee in every Nether area. [Structure set][nether-structures] · [Bastion configuration and biomes][bastion] [bastion-biomes] · [Start pool][bastion-starts] · [Template][bastion-template] · [Processor][bastion-processor] · [Jigsaw/template/processor dispatch][jigsaw] [single-pool][] [template][] [rule-processor]
+`minecraft:gilded_blackstone` is a separate decorative block with a Gold Nugget drop branch. The checked [Bastion Remnant](../structures/BastionRemnant.md) route can produce it: a registered Bastion start template contains Blackstone, and its active degradation processor can convert Blackstone to Gilded Blackstone. Bastion placement is limited by its biome tag and is not a guarantee in every Nether area. [Structure set][nether-structures] · [Bastion configuration and biomes][bastion] [bastion-biomes] · [Start pool][bastion-starts] · [Template][bastion-template] · [Processor][bastion-processor] · [Jigsaw/template/processor dispatch][jigsaw] [single-pool][] [template][] [rule-processor]
 
 With a correct pickaxe, the normal mining outcomes are:
 

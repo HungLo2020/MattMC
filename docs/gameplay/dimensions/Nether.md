@@ -42,6 +42,8 @@ These rules follow the bundled Nether dimension type. The anchor recipe and inte
 ## Related pages
 
 - [Dimensions](Dimensions.md)
+- [Bastion Remnant](../structures/BastionRemnant.md)
+- [Piglin](../mobs/Piglin.md) and [Piglin Brute](../mobs/PiglinBrute.md)
 - [Beds](../blocks/Bed.md)
 - [End](End.md)
 

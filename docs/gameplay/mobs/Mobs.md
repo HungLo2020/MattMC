@@ -6,6 +6,9 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Bastion residents:** [Piglin](Piglin.md), [Piglin Brute](PiglinBrute.md), and [Bastion Remnant](../structures/BastionRemnant.md): gold, barter and looting limits
+- **Monument expeditions:** [Guardian](Guardian.md), [Elder Guardian](ElderGuardian.md), and [Ocean Monument](../structures/OceanMonument.md): spawning, attacks, fatigue and rewards
+
 - **Animal transport:** [Horse](Horse.md), [Donkey](Donkey.md), [Mule](Mule.md), [Llama](Llama.md), [Trader Llama](TraderLlama.md), and [Camel](Camel.md)
 - **Built defenders:** [Iron Golem](IronGolem.md) and [Snow Golem](SnowGolem.md), including creation, repair, targeting, and environmental limits
 - **Crocodile integration:** [Crocodile](Crocodile.md) and [Crocodile Scute](../items/CrocodileScute.md) distinguish active fish/egg behavior from imported placeholders

@@ -1086,6 +1086,15 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,340 pages / 37 indexes. All 17 authored paths are documentation; 752 local links/anchors and 403 tracked reference uses resolve, with zero rendered citation candidates. One new family guide, ten substantive item corrections and existing-owner crosslinks are recorded separately.
 
+## Batch 134: Bastion and Monument expeditions
+
+- Added two substantive structure guides and expanded four resident mob guides: Bastion Remnant/Piglin/Brute and Ocean Monument/Guardian/Elder Guardian. Existing source-reviewed material, breathing, brewing, map and trading owners remain linked.
+- Bastion review traces Normal-preset eligibility, structure selection, actual connected templates and resident/chest dispatch, gold protection/theft/retaliation, the complete bundled barter table, conversion and equipment drops. No fixed layout or resident count is inferred from pool weights.
+- Monument review traces loaded structure/spawn data, eligible deep-ocean selection, Cartographer map offer lookup, generation/room/resident callers, renewable Guardians, beam/spike attacks, Mining Fatigue eligibility and separate loot conditions. Looting, player credit and the three Elder template chances are kept distinct.
+- Source checkpoint: `79f20bccc697135bd56a472c64f59981dce47fe0`; 115 distinct pinned source pairs match current source. Binary-template decoding and source checks are not in-game generation, combat or reward trials. Independent citation/anchor review passed all six incoming pages before integration.
+
+- Validation: required checker and strict build passed on 2,342 pages / 37 indexes. All 17 authored paths are documentation; 964 local links/anchors and 508 tracked reference uses resolve, with zero rendered citation candidates. Two expedition owners and four substantive mob replacements are recorded separately from the narrow discovery links.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.

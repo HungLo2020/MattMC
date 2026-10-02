@@ -9,10 +9,12 @@ For mapmaking with saved templates and pool connectors, see [Structure and Jigsa
 | Guide | Where to search in the bundled normal world | Main reasons to visit |
 | --- | --- | --- |
 | [Nether Fortress](NetherFortress.md) | Nether biomes | Blazes, Nether Wart where a stalk room generates, and corridor-chest loot |
+| [Bastion Remnant](BastionRemnant.md) | Nether Wastes, Crimson Forest, Soul Sand Valley and Warped Forest | Piglin/Brute encounters and chest loot, including table-specific Netherite Upgrade Template chances |
 | [Stronghold](Stronghold.md) | Overworld | An End portal room, with possible libraries and other loot rooms |
 | [End City](EndCity.md) | End Highlands and End Midlands on outer islands | Shulker Shells, equipment chests, and Elytra when a ship generates |
 | [Shipwreck](Shipwreck.md) | Overworld oceans, Beach, and Snowy Beach | Supply/treasure chests and possible treasure maps |
 | [Ocean Ruins](OceanRuins.md) | Eligible warm or cold Overworld oceans | Chest rewards, archaeology, and possible treasure maps |
+| [Ocean Monument](OceanMonument.md) | Deep Ocean, Deep Cold Ocean, Deep Lukewarm Ocean, and Deep Frozen Ocean | Guardian/Elder encounters, Prismarine, Wet Sponges, gold, and a Tide template chance |
 | [Buried Treasure](BuriedTreasure.md) | Beach and Snowy Beach | Heart of the Sea and other buried-chest loot |
 
 These are the structures reviewed in this section so far, not a list of every structure in MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
