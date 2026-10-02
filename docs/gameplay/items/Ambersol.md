@@ -4,7 +4,7 @@ Ambersol is the placeable item for the [Ambersol block](../blocks/Ambersol.md), 
 
 ## Obtaining and use
 
-The item is included in the Creative inventory and is registered as `minecraft:ambersol`. Place it overhead to produce the block's downward lighting effect. See the block page for light level, placement behavior, and the unresolved Survival harvesting and generation details.
+The item is included in the Creative inventory and is registered as `minecraft:ambersol`. Place it overhead to produce the block's downward lighting effect. See the block page for the required pickaxe, light level, placement behavior, and the unresolved natural-generation details.
 
 The item uses the block's standard registered item form; no separate item-only ability is established here.
 
