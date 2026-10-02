@@ -485,7 +485,6 @@ The 24 Copper Bars, Chain and Lantern variants have exact entries below and a sh
 - [Cut Red Sandstone Slab](CutRedSandstoneSlab.md)
 - [Cut Sandstone](CutSandstone.md)
 - [Cut Sandstone Slab](CutSandstoneSlab.md)
-- [Cut Standstone Slab](CutStandstoneSlab.md)
 - [Cyan Banner](CyanBanner.md)
 - [Cyan Bed](CyanBed.md)
 - [Cyan Bundle](CyanBundle.md)
@@ -1934,3 +1933,7 @@ The 24 Copper Bars, Chain and Lantern variants have exact entries below and a sh
 - [Zombie Spawn Egg](ZombieSpawnEgg.md)
 - [Zombie Villager Spawn Egg](ZombieVillagerSpawnEgg.md)
 - [Zombified Piglin Spawn Egg](ZombifiedPiglinSpawnEgg.md)
+
+## Compatibility page names
+
+- [Cut Sandstone Slab: old misspelled address](CutStandstoneSlab.md)
