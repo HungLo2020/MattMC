@@ -1449,3 +1449,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Corrected thirteen existing ordinary BlockItem routes with exact raw/polished/brick/chiseled recipes and useful family-section links. Preserved the authored base Tuff item and substantive block owners; these are route improvements, not thirteen new articles.
 - Reviewed all 38 family recipes (13 crafting and 25 Stonecutter), complete per-form loot, correct-tool gates and slab/stair/wall placement. Chiseled Tuff and Chiseled Tuff Bricks use different slab ingredients and different cutting inputs; ordinary Wood pickaxes qualify, and double slabs recover two matching slabs.
 - Exact baseline/proposal hashes, 65 original anchors, source/render review, required hierarchy check and strict build apply. Catalog IDs, display ordering and existing shared owners remain preserved. No gameplay crafting, mining, placement or water tests were run.
+
+## Batch 180: Candle-color inventory routes
+
+- Corrected fifteen existing color routes with exact uncolored-Candle-plus-Dye recipes and links to each placed-candle and candle-cake variant. Preserved the authored Candle and White Candle items, shared block owners and catalog files; these are inventory-route improvements, not fifteen new articles.
+- Reviewed all fifteen recipes, thirty complete standalone/cake loot tables and active grouping, lighting, water, support, Cake insertion and recovery callbacks. Already dyed candles are not recipe substitutes; same-color groups hold up to four, while a Cake holds one.
+- Exact baseline/proposal hashes, 75 original anchors (including the old Yellow Candle heading), source/render review, hierarchy check and strict build apply. No gameplay crafting, lighting, mining, water, support-removal or eating tests were run.
