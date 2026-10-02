@@ -53,6 +53,8 @@ Keep `docs/gameplay/blocks/Blocks.md` alphabetical by displayed block name, with
 
 For ported methods, verify the current base-class signature and actual call path before describing a method body as active behavior. An old overload with a similar name can compile without overriding the current callback. Trace helper calls through their actual state changes too; a method name such as a break/conversion helper does not establish that the returned item changes in the current implementation. Treat source presence, active dispatch, data registration, and runtime tests as separate evidence.
 
+When reporting resource counts, enumerate the exact active loader paths. Keep singular `recipe/` and `loot_table/` resources separate from advancement/tag files, legacy plural paths and nested optional data packs. A broad negative search may inspect those additional scopes, but its total must not be labeled as the active base registry. Record source-path counts separately from runtime-loaded counts.
+
 Run the required documentation checker and strict build locally. Record what passed, failed, or could not run; source review is not gameplay verification. Recheck the exact published SHA and any workflow runs. A wiki-branch push alone is not a live deployment; verify the subsequent master promotion and its deployment run.
 
 Update the checkpoint with the source SHA, pages changed, evidence gaps, tests, and next priority. Summarize every mutation in the requesting conversation, including source merges, all created/updated page paths, commits, and verification results. Scheduled and continuous continuation should use one writer, complete each coherent batch, and apply the standing promotion procedure.

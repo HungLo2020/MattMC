@@ -64,6 +64,8 @@ The separate [Raw Catfish](../items/RawCatfish.md) and [Cooked Catfish](../items
 
 ## Notes
 
+The shared bucket-release limitation is tracked in [#801](https://github.com/HungLo2020/MattMC/issues/801).
+
 The mob is registered as `MobCategory.WATER_AMBIENT` with `EntityCatfish` from bundled Alex's Mobs content. Its three size renderers are active. Buckets, fascination tags and absent loot tables are current integration limits, not assurances that another mod version's behavior works here. [Registration][c-id] · [Renderer registration][render-register]
 
 Related: [Catfish Spawn Egg](../items/CatfishSpawnEgg.md) · [Sea Pickle](../items/SeaPickle.md) · [Mobs](Mobs.md)

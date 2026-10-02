@@ -51,6 +51,8 @@ A qualifying player-credited kill can still award **1–3 base XP** with `doMobL
 
 ## Notes
 
+The bucket-color restoration limitation is tracked in [#802](https://github.com/HungLo2020/MattMC/issues/802).
+
 The entity is registered in `MobCategory.WATER_AMBIENT` and uses the integrated `net.minecraft.world.entity.animal.EntityLobster` class. The class's package does not make its behavior interchangeable with an upstream Lobster guide. Air-supply and bucket-color limitations above are source-only findings, not runtime test results.
 
 Related: [Lobster Spawn Egg](../items/LobsterSpawnEgg.md) · [Bucket of Lobster](../items/BucketOfLobster.md) · [Lobster Tail](../items/LobsterTail.md) · [Cooked Lobster Tail](../items/CookedLobsterTail.md) · [Mobs](Mobs.md)

@@ -22,6 +22,8 @@ Use the [Catfish guide](../mobs/Catfish.md#behavior) for item collection, swallo
 
 ## Notes
 
+The shared Catfish and Comb Jelly release limitation is tracked in [#801](https://github.com/HungLo2020/MattMC/issues/801).
+
 - The item stacks to **one** and uses the Water fluid with the custom `ItemModFishBucket` class. [Registration][c-buckets]
 - The missing release call is a source-only integration finding. No capture, loss or release test was performed.
 - Source-reviewed at `a24aecea45ed1b91bc5c3f8cf9fb89de728fffa1` on 2026-10-02.

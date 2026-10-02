@@ -22,6 +22,8 @@ The released creature receives the bucket-origin flag, which protects it from or
 
 ## Notes
 
+The bucket-color restoration limitation is tracked in [#802](https://github.com/HungLo2020/MattMC/issues/802).
+
 - The filled item stacks to one and uses the standard MobBucketItem Water release class. [Registration][l-bucket]
 - Normal world saving preserves a Lobster's color; the limitation above concerns the bucket transition. [World save][l-save]
 - Source-reviewed at `a24aecea45ed1b91bc5c3f8cf9fb89de728fffa1` on 2026-10-02. No in-game color-retention, bucket or air test was run.
