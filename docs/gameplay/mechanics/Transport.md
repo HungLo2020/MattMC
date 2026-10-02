@@ -64,6 +64,7 @@ If a ride fails, first check the simple causes: rail support, a missed track con
 
 ## Related pages
 
+- [Rails](../blocks/Rails.md): placed-track support, special rails, and vehicle-specific activation
 - [Oak Boat](../items/OakBoat.md)
 - [Minecart](../items/Minecart.md)
 - [Rail](../items/Rail.md)

@@ -4,6 +4,7 @@ Redstone components carry signals and control blocks. Start with a source, a sup
 
 ## Core components
 
+- [Rails](../blocks/Rails.md) provide propulsion, cart detection, and vehicle-specific activation
 - [Pressure plates](../blocks/PressurePlates.md) detect occupancy or entity counts
 - [Tripwire](../blocks/Tripwire.md) detects crossings between facing hooks
 - [Pistons](../blocks/Pistons.md) move blocks within load and pushability limits

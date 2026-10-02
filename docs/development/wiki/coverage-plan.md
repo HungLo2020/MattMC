@@ -578,6 +578,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Mobs, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; these are wiki-branch additions after the authorized master cutoff.
 - Validation: checker and strict build passed on 2,179 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, swimming, breeding, combat, enclosure, or drop gameplay test.
 
+## Seventy-sixth batch: placed rails and cart activation
+
+- Added Rails and expanded its four item forms while preserving Transport/Minecart's established recipe and route guidance.
+- Covered support, curves/slopes, same-type power relays, detector digital/analog differences, per-cart Activator effects, and default/experimental movement distinctions without untested speed or spacing claims.
+- Updated Blocks, Redstone, Transport, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is wiki-branch work after the authorized master cutoff.
+- Validation: checker and strict build passed on 2,180 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No track, junction, vehicle, timing, speed, or stopping-distance gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

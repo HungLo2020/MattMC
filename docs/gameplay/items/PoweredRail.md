@@ -1,17 +1,22 @@
 # Powered Rail
 
-## Obtaining
+The Powered Rail item places `minecraft:powered_rail`, which boosts a cart when powered and brakes it when unpowered.
 
-Powered Rail can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Obtaining and use
 
-## Usage
+Craft **six Powered Rails** from six Gold Ingots, one Stick, and one Redstone Dust using the [Transport recipe layout](../mechanics/Transport.md#building-a-basic-rail-route). The placed rail returns its item in ordinary Survival mining without a correct-tool requirement.
 
-Powered Rail is placed in the world as a block and used for building, decoration, utility, or environmental detail.
+Connect it to redstone power and supported track. Power relays only through compatible connected rails of the same type within the search limit; an isolated stationary cart may still need a launch direction. See [Rails](../blocks/Rails.md#powered-rail-and-power-propagation) for connections and [Transport](../mechanics/Transport.md#starting-and-stopping-a-cart) for the existing terminal layout and braking cautions.
 
-## Behavior
+## Related pages
 
-When placed, it behaves as the corresponding block. Breaking the block returns drops according to the block's normal loot rules.
+- [Rails](../blocks/Rails.md)
+- [Rail](Rail.md) and [Minecart](Minecart.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:powered_rail` block.
+Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. No gameplay test was run. The canonical Rails guide and existing Transport guide provide the recipe, drop, placement, and vehicle-behavior evidence.
+
+- [Rail item registrations](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java)
+- [Creative listings](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)

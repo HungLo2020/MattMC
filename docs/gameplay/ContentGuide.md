@@ -66,6 +66,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Building, redstone, and travel
 
+- [Rails](blocks/Rails.md): ordinary curves, Powered Rail relays, detector outputs, and Activator effects across cart types
 - [Pressure plates](blocks/PressurePlates.md) and [Tripwire](blocks/Tripwire.md): entity filtering/counts, support, line layout, timing, and disarming
 - [Concrete and Concrete Powder](blocks/Concrete.md): all 16 colors with exact recipes, water conversion, falling, and mining rules
 - [Pistons](blocks/Pistons.md) and [Dispenser/Dropper](blocks/DispenserAndDropper.md): movement limits, power response, item actions, and controlled transfer

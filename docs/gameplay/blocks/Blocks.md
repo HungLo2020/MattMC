@@ -48,6 +48,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Redstone components
 
+- [Rails](Rails.md): support, curves, Powered/Detector/Activator behavior, and minecart-specific effects
 - [Pressure plates](PressurePlates.md): Stone/Oak filters, weighted entity counts, support, and release checks
 - [Tripwire](Tripwire.md): facing hooks, String lines, crossing detection, and disarming
 - [Pistons](Pistons.md): block movement, sticky retraction, load limits, and power/update rules

@@ -1,18 +1,22 @@
 # Activator Rail
 
-## Obtaining
+The Activator Rail item places `minecraft:activator_rail`, a track component that invokes a passing cart's activation behavior.
 
-Activator Rails are crafted from Iron Ingots, Sticks, and a Redstone Torch. They can also be obtained from the Creative Menu.
+## Obtaining and use
 
-## Usage
+Craft **six Activator Rails** from six Iron Ingots, two Sticks, and one Redstone Torch using the [shared rail recipe](../blocks/Rails.md#crafting-and-collecting). Ordinary Survival mining returns the rail without a correct-tool requirement.
 
-Activator Rails are used in minecart systems to trigger special minecart behavior.
+Powered Activator Rails eject riders from plain Minecarts, disable a Hopper Minecart's own collection, and can prime TNT Minecarts. An unpowered Activator Rail re-enables Hopper cart collection. These effects are not the Powered Rail's boost/brake behavior. See the [Rails block guide](../blocks/Rails.md#activator-rail-effects) for exact cart distinctions, power propagation, and movement-model limits.
 
-## Behavior
+## Related pages
 
-When powered, an Activator Rail can affect minecarts passing over it, such as ejecting riders or activating compatible minecart contents.
+- [Rails](../blocks/Rails.md)
+- [Powered Rail](PoweredRail.md) and [Minecart](Minecart.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:activator_rail` block.
-* It appears in the Redstone Blocks creative tab.
+Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. No gameplay test was run. The canonical Rails guide and existing Transport guide provide the recipe, drop, placement, and vehicle-behavior evidence.
+
+- [Rail item registrations](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java)
+- [Creative listings](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)
