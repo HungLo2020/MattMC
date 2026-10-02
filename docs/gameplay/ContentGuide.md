@@ -45,10 +45,11 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Materials, equipment, and enchanting
 
+- [Ores and Ancient Debris](blocks/OreResources.md): all nineteen ore/debris blocks, exact tool gates, drops/Fortune/XP, processing and checked generation examples
+
 - [Axes and Hoes](mechanics/AxesAndHoes.md): all seven materials, combat attributes, stripping/copper restoration, tilling, and MattMC crop-area harvesting
 - [Pickaxes and Shovels](mechanics/PickaxesAndShovels.md): all seven materials with exact recipes, mining/drop rules, path/campfire use, upkeep, and recycling
 - [Mining tools](mechanics/Mining.md): material stats and correct-drop rules, including Copper
-- [Ore resources](blocks/OreResources.md): Iron/Copper raw-metal processing, Diamond collection, and selected material recipes
 - [Armor](mechanics/Armor.md): current material values including Copper, toughness, repairs, and Chestplate progression
 - [Durability and repair](mechanics/Durability.md): retained broken gear, guarded actions, and differences in repair data preservation
 - [Anvil](blocks/Anvil.md) and [anvil mechanics](mechanics/AnvilMechanics.md): repairs, enchantment combining, names, wear, and the 40-level payment cap
@@ -80,6 +81,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
 
 ### Building, redstone, and travel
+
+- [Copper construction](blocks/CopperConstruction.md): all structural oxidation/wax variants, efficient stonecutting, aging, scraping, lightning cleaning, doors and waterlogging
+- [Decorative stone](blocks/DecorativeStone.md) and [Tuff](blocks/Tuff.md): Granite/Diorite/Andesite/Calcite, exact polished/brick/chiseled variants and construction recipes
 
 - [Wood construction](blocks/WoodConstruction.md): twelve materials, Bamboo Mosaic, exact shape recipes, placement/connections, waterlogging, power, and fire/fuel differences
 

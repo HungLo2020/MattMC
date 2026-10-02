@@ -36,13 +36,13 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Ambersol** — [Ambersol](Ambersol.md) (related guide); `minecraft:ambersol`
 - **Ambersol Light †** — [Ambersol](Ambersol.md) (related guide); `minecraft:ambersol_light`
 - **Amethyst Cluster** — article needed; `minecraft:amethyst_cluster`
-- **Ancient Debris** — article needed; `minecraft:ancient_debris`
+- **Ancient Debris** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:ancient_debris`
 - **Ancient Leaves** — article needed; `minecraft:ancient_leaves`
 - **Ancient Sapling** — article needed; `minecraft:ancient_sapling`
-- **Andesite** — article needed; `minecraft:andesite`
-- **Andesite Slab** — article needed; `minecraft:andesite_slab`
-- **Andesite Stairs** — article needed; `minecraft:andesite_stairs`
-- **Andesite Wall** — article needed; `minecraft:andesite_wall`
+- **Andesite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#finding-granite-diorite-and-andesite) (related guide); `minecraft:andesite`
+- **Andesite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:andesite_slab`
+- **Andesite Stairs** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:andesite_stairs`
+- **Andesite Wall** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:andesite_wall`
 - **Anvil** — [Anvil](Anvil.md) (related guide); `minecraft:anvil`
 - **Archaic Vine** — [Primordial decorative plants](PrimordialPlants.md) (related guide); `minecraft:archaic_vine`
 - **Archaic Vine Plant †** — [Primordial decorative plants](PrimordialPlants.md) (related guide); `minecraft:archaic_vine_plant`
@@ -123,7 +123,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Block of Amethyst** — article needed; `minecraft:amethyst_block`
 - **Block of Bamboo** — article needed; `minecraft:bamboo_block`
 - **Block of Coal** — article needed; `minecraft:coal_block`
-- **Block of Copper** — article needed; `minecraft:copper_block`
+- **Block of Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:copper_block`
 - **Block of Diamond** — article needed; `minecraft:diamond_block`
 - **Block of Emerald** — article needed; `minecraft:emerald_block`
 - **Block of Gold** — article needed; `minecraft:gold_block`
@@ -209,7 +209,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cake with Red Candle** — article needed; `minecraft:red_candle_cake`
 - **Cake with White Candle** — article needed; `minecraft:white_candle_cake`
 - **Cake with Yellow Candle** — article needed; `minecraft:yellow_candle_cake`
-- **Calcite** — article needed; `minecraft:calcite`
+- **Calcite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#calcite) (related guide); `minecraft:calcite`
 - **Calibrated Sculk Sensor** — article needed; `minecraft:calibrated_sculk_sensor`
 - **Campfire** — article needed; `minecraft:campfire`
 - **Candle** — article needed; `minecraft:candle`
@@ -243,7 +243,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Chest** — [Chest](Chest.md) (related guide); `minecraft:chest`
 - **Chipped Anvil** — [Anvil](Anvil.md) (related guide); `minecraft:chipped_anvil`
 - **Chiseled Bookshelf** — article needed; `minecraft:chiseled_bookshelf`
-- **Chiseled Copper** — article needed; `minecraft:chiseled_copper`
+- **Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:chiseled_copper`
 - **Chiseled Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:chiseled_deepslate`
 - **Chiseled Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_chiseled`
 - **Chiseled Nether Bricks** — article needed; `minecraft:chiseled_nether_bricks`
@@ -253,13 +253,13 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Chiseled Resin Bricks** — article needed; `minecraft:chiseled_resin_bricks`
 - **Chiseled Sandstone** — article needed; `minecraft:chiseled_sandstone`
 - **Chiseled Stone Bricks** — [Stone](Stone.md#stone-bricks) (related guide); `minecraft:chiseled_stone_bricks`
-- **Chiseled Tuff** — article needed; `minecraft:chiseled_tuff`
-- **Chiseled Tuff Bricks** — article needed; `minecraft:chiseled_tuff_bricks`
+- **Chiseled Tuff** — [Tuff](Tuff.md#variants) (related guide); `minecraft:chiseled_tuff`
+- **Chiseled Tuff Bricks** — [Tuff](Tuff.md#variants) (related guide); `minecraft:chiseled_tuff_bricks`
 - **Chorus Flower** — article needed; `minecraft:chorus_flower`
 - **Chorus Plant** — article needed; `minecraft:chorus_plant`
 - **Clay** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:clay`
 - **Closed Eyeblossom** — article needed; `minecraft:closed_eyeblossom`
-- **Coal Ore** — article needed; `minecraft:coal_ore`
+- **Coal Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:coal_ore`
 - **Coarse Dirt** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#coarse-dirt-recipe) (related guide); `minecraft:coarse_dirt`
 - **Cobbled Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cobbled_deepslate`
 - **Cobbled Deepslate Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cobbled_deepslate_slab`
@@ -277,12 +277,12 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cooked Dinosaur Chop** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:cooked_dinosaur_chop`
 - **Copper Bulb** — article needed; `minecraft:copper_bulb`
 - **Copper Chest** — article needed; `minecraft:copper_chest`
-- **Copper Door** — article needed; `minecraft:copper_door`
+- **Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:copper_door`
 - **Copper Golem Statue** — article needed; `minecraft:copper_golem_statue`
-- **Copper Grate** — article needed; `minecraft:copper_grate`
-- **Copper Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:copper_ore`
+- **Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:copper_grate`
+- **Copper Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:copper_ore`
 - **Copper Torch** — article needed; `minecraft:copper_torch`
-- **Copper Trapdoor** — article needed; `minecraft:copper_trapdoor`
+- **Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:copper_trapdoor`
 - **Copper Wall Torch** — article needed; `minecraft:copper_wall_torch`
 - **Cornflower** — article needed; `minecraft:cornflower`
 - **Cracked Deepslate Bricks** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cracked_deepslate_bricks`
@@ -315,9 +315,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Crimson Wall Hanging Sign** — article needed; `minecraft:crimson_wall_hanging_sign`
 - **Crimson Wall Sign** — article needed; `minecraft:crimson_wall_sign`
 - **Crying Obsidian** — article needed; `minecraft:crying_obsidian`
-- **Cut Copper** — article needed; `minecraft:cut_copper`
-- **Cut Copper Slab** — article needed; `minecraft:cut_copper_slab`
-- **Cut Copper Stairs** — article needed; `minecraft:cut_copper_stairs`
+- **Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:cut_copper`
+- **Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:cut_copper_slab`
+- **Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:cut_copper_stairs`
 - **Cut Red Sandstone** — article needed; `minecraft:cut_red_sandstone`
 - **Cut Red Sandstone Slab** — article needed; `minecraft:cut_red_sandstone_slab`
 - **Cut Sandstone** — article needed; `minecraft:cut_sandstone`
@@ -390,25 +390,25 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Deepslate Brick Stairs** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_stairs`
 - **Deepslate Brick Wall** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_wall`
 - **Deepslate Bricks** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_bricks`
-- **Deepslate Coal Ore** — article needed; `minecraft:deepslate_coal_ore`
-- **Deepslate Copper Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:deepslate_copper_ore`
-- **Deepslate Diamond Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:deepslate_diamond_ore`
-- **Deepslate Emerald Ore** — article needed; `minecraft:deepslate_emerald_ore`
-- **Deepslate Gold Ore** — article needed; `minecraft:deepslate_gold_ore`
-- **Deepslate Iron Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:deepslate_iron_ore`
-- **Deepslate Lapis Lazuli Ore** — article needed; `minecraft:deepslate_lapis_ore`
-- **Deepslate Redstone Ore** — article needed; `minecraft:deepslate_redstone_ore`
+- **Deepslate Coal Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:deepslate_coal_ore`
+- **Deepslate Copper Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:deepslate_copper_ore`
+- **Deepslate Diamond Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:deepslate_diamond_ore`
+- **Deepslate Emerald Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:deepslate_emerald_ore`
+- **Deepslate Gold Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:deepslate_gold_ore`
+- **Deepslate Iron Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:deepslate_iron_ore`
+- **Deepslate Lapis Lazuli Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:deepslate_lapis_ore`
+- **Deepslate Redstone Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:deepslate_redstone_ore`
 - **Deepslate Tile Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_tile_slab`
 - **Deepslate Tile Stairs** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_tile_stairs`
 - **Deepslate Tile Wall** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_tile_wall`
 - **Deepslate Tiles** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_tiles`
 - **Detector Rail** — [Rails](Rails.md) (related guide); `minecraft:detector_rail`
-- **Diamond Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:diamond_ore`
+- **Diamond Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:diamond_ore`
 - **Dinosaur Chop** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:dinosaur_chop`
-- **Diorite** — article needed; `minecraft:diorite`
-- **Diorite Slab** — article needed; `minecraft:diorite_slab`
-- **Diorite Stairs** — article needed; `minecraft:diorite_stairs`
-- **Diorite Wall** — article needed; `minecraft:diorite_wall`
+- **Diorite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#finding-granite-diorite-and-andesite) (related guide); `minecraft:diorite`
+- **Diorite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:diorite_slab`
+- **Diorite Stairs** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:diorite_stairs`
+- **Diorite Wall** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:diorite_wall`
 - **Dirt** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#crafting-and-converting-soils) (related guide); `minecraft:dirt`
 - **Dirt Path** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#dirt-path-placement-and-cover) (related guide); `minecraft:dirt_path`
 - **Dispenser** — [Dispenser and Dropper](DispenserAndDropper.md) (related guide); `minecraft:dispenser`
@@ -423,7 +423,7 @@ Names use English localization where available. A † marks one of 25 readable r
 ### E
 
 - **Elevator** — article needed; `minecraft:elevator`
-- **Emerald Ore** — article needed; `minecraft:emerald_ore`
+- **Emerald Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:emerald_ore`
 - **Enchanting Table** — [Enchanting Table](EnchantingTable.md) (related guide); `minecraft:enchanting_table`
 - **End Gateway** — article needed; `minecraft:end_gateway`
 - **End Portal** — article needed; `minecraft:end_portal`
@@ -435,17 +435,17 @@ Names use English localization where available. A † marks one of 25 readable r
 - **End Stone Brick Wall** — article needed; `minecraft:end_stone_brick_wall`
 - **End Stone Bricks** — article needed; `minecraft:end_stone_bricks`
 - **Ender Chest** — article needed; `minecraft:ender_chest`
-- **Exposed Chiseled Copper** — article needed; `minecraft:exposed_chiseled_copper`
-- **Exposed Copper** — article needed; `minecraft:exposed_copper`
+- **Exposed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_chiseled_copper`
+- **Exposed Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_copper`
 - **Exposed Copper Bulb** — article needed; `minecraft:exposed_copper_bulb`
 - **Exposed Copper Chest** — article needed; `minecraft:exposed_copper_chest`
-- **Exposed Copper Door** — article needed; `minecraft:exposed_copper_door`
+- **Exposed Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:exposed_copper_door`
 - **Exposed Copper Golem Statue** — article needed; `minecraft:exposed_copper_golem_statue`
-- **Exposed Copper Grate** — article needed; `minecraft:exposed_copper_grate`
-- **Exposed Copper Trapdoor** — article needed; `minecraft:exposed_copper_trapdoor`
-- **Exposed Cut Copper** — article needed; `minecraft:exposed_cut_copper`
-- **Exposed Cut Copper Slab** — article needed; `minecraft:exposed_cut_copper_slab`
-- **Exposed Cut Copper Stairs** — article needed; `minecraft:exposed_cut_copper_stairs`
+- **Exposed Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:exposed_copper_grate`
+- **Exposed Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:exposed_copper_trapdoor`
+- **Exposed Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_cut_copper`
+- **Exposed Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:exposed_cut_copper_slab`
+- **Exposed Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:exposed_cut_copper_stairs`
 - **Exposed Lightning Rod** — article needed; `minecraft:exposed_lightning_rod`
 
 ### F
@@ -478,11 +478,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:glass_pane`
 - **Glow Lichen** — article needed; `minecraft:glow_lichen`
 - **Glowstone** — article needed; `minecraft:glowstone`
-- **Gold Ore** — article needed; `minecraft:gold_ore`
-- **Granite** — article needed; `minecraft:granite`
-- **Granite Slab** — article needed; `minecraft:granite_slab`
-- **Granite Stairs** — article needed; `minecraft:granite_stairs`
-- **Granite Wall** — article needed; `minecraft:granite_wall`
+- **Gold Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:gold_ore`
+- **Granite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#finding-granite-diorite-and-andesite) (related guide); `minecraft:granite`
+- **Granite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:granite_slab`
+- **Granite Stairs** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:granite_stairs`
+- **Granite Wall** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:granite_wall`
 - **Grass Block** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#grass-block-and-mycelium) (related guide); `minecraft:grass_block`
 - **Gravel** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#gravel-and-flint) (related guide); `minecraft:gravel`
 - **Gray Banner** — article needed; `minecraft:gray_banner`
@@ -541,7 +541,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Iron Bars** — article needed; `minecraft:iron_bars`
 - **Iron Chain** — article needed; `minecraft:iron_chain`
 - **Iron Door** — article needed; `minecraft:iron_door`
-- **Iron Ore** — [Iron, Copper, and Diamond ores](OreResources.md) (related guide); `minecraft:iron_ore`
+- **Iron Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:iron_ore`
 - **Iron Trapdoor** — article needed; `minecraft:iron_trapdoor`
 
 ### J
@@ -577,7 +577,7 @@ Names use English localization where available. A † marks one of 25 readable r
 
 - **Ladder** — article needed; `minecraft:ladder`
 - **Lantern** — article needed; `minecraft:lantern`
-- **Lapis Lazuli Ore** — article needed; `minecraft:lapis_ore`
+- **Lapis Lazuli Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:lapis_ore`
 - **Large Amethyst Bud** — article needed; `minecraft:large_amethyst_bud`
 - **Large Fern** — article needed; `minecraft:large_fern`
 - **Lava** — article needed; `minecraft:lava`
@@ -706,9 +706,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Nether Brick Stairs** — article needed; `minecraft:nether_brick_stairs`
 - **Nether Brick Wall** — article needed; `minecraft:nether_brick_wall`
 - **Nether Bricks** — article needed; `minecraft:nether_bricks`
-- **Nether Gold Ore** — article needed; `minecraft:nether_gold_ore`
+- **Nether Gold Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:nether_gold_ore`
 - **Nether Portal** — article needed; `minecraft:nether_portal`
-- **Nether Quartz Ore** — article needed; `minecraft:nether_quartz_ore`
+- **Nether Quartz Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:nether_quartz_ore`
 - **Nether Sprouts** — article needed; `minecraft:nether_sprouts`
 - **Nether Wart** — [Nether Wart crop](NetherWart.md) (related guide); `minecraft:nether_wart`
 - **Nether Wart Block** — article needed; `minecraft:nether_wart_block`
@@ -754,17 +754,17 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Orange Wall Banner †** — article needed; `minecraft:orange_wall_banner`
 - **Orange Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:orange_wool`
 - **Oxeye Daisy** — article needed; `minecraft:oxeye_daisy`
-- **Oxidized Chiseled Copper** — article needed; `minecraft:oxidized_chiseled_copper`
-- **Oxidized Copper** — article needed; `minecraft:oxidized_copper`
+- **Oxidized Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_chiseled_copper`
+- **Oxidized Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_copper`
 - **Oxidized Copper Bulb** — article needed; `minecraft:oxidized_copper_bulb`
 - **Oxidized Copper Chest** — article needed; `minecraft:oxidized_copper_chest`
-- **Oxidized Copper Door** — article needed; `minecraft:oxidized_copper_door`
+- **Oxidized Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:oxidized_copper_door`
 - **Oxidized Copper Golem Statue** — article needed; `minecraft:oxidized_copper_golem_statue`
-- **Oxidized Copper Grate** — article needed; `minecraft:oxidized_copper_grate`
-- **Oxidized Copper Trapdoor** — article needed; `minecraft:oxidized_copper_trapdoor`
-- **Oxidized Cut Copper** — article needed; `minecraft:oxidized_cut_copper`
-- **Oxidized Cut Copper Slab** — article needed; `minecraft:oxidized_cut_copper_slab`
-- **Oxidized Cut Copper Stairs** — article needed; `minecraft:oxidized_cut_copper_stairs`
+- **Oxidized Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:oxidized_copper_grate`
+- **Oxidized Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:oxidized_copper_trapdoor`
+- **Oxidized Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_cut_copper`
+- **Oxidized Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:oxidized_cut_copper_slab`
+- **Oxidized Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:oxidized_cut_copper_stairs`
 - **Oxidized Lightning Rod** — article needed; `minecraft:oxidized_lightning_rod`
 
 ### P
@@ -839,9 +839,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Player Wall Head** — article needed; `minecraft:player_wall_head`
 - **Podzol** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#podzol-and-mushroom-support) (related guide); `minecraft:podzol`
 - **Pointed Dripstone** — article needed; `minecraft:pointed_dripstone`
-- **Polished Andesite** — article needed; `minecraft:polished_andesite`
-- **Polished Andesite Slab** — article needed; `minecraft:polished_andesite_slab`
-- **Polished Andesite Stairs** — article needed; `minecraft:polished_andesite_stairs`
+- **Polished Andesite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite`
+- **Polished Andesite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite_slab`
+- **Polished Andesite Stairs** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite_stairs`
 - **Polished Basalt** — article needed; `minecraft:polished_basalt`
 - **Polished Blackstone** — article needed; `minecraft:polished_blackstone`
 - **Polished Blackstone Brick Slab** — article needed; `minecraft:polished_blackstone_brick_slab`
@@ -857,16 +857,16 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Polished Deepslate Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:polished_deepslate_slab`
 - **Polished Deepslate Stairs** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:polished_deepslate_stairs`
 - **Polished Deepslate Wall** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:polished_deepslate_wall`
-- **Polished Diorite** — article needed; `minecraft:polished_diorite`
-- **Polished Diorite Slab** — article needed; `minecraft:polished_diorite_slab`
-- **Polished Diorite Stairs** — article needed; `minecraft:polished_diorite_stairs`
-- **Polished Granite** — article needed; `minecraft:polished_granite`
-- **Polished Granite Slab** — article needed; `minecraft:polished_granite_slab`
-- **Polished Granite Stairs** — article needed; `minecraft:polished_granite_stairs`
-- **Polished Tuff** — article needed; `minecraft:polished_tuff`
-- **Polished Tuff Slab** — article needed; `minecraft:polished_tuff_slab`
-- **Polished Tuff Stairs** — article needed; `minecraft:polished_tuff_stairs`
-- **Polished Tuff Wall** — article needed; `minecraft:polished_tuff_wall`
+- **Polished Diorite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_diorite`
+- **Polished Diorite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_diorite_slab`
+- **Polished Diorite Stairs** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_diorite_stairs`
+- **Polished Granite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_granite`
+- **Polished Granite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_granite_slab`
+- **Polished Granite Stairs** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_granite_stairs`
+- **Polished Tuff** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff`
+- **Polished Tuff Slab** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff_slab`
+- **Polished Tuff Stairs** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff_stairs`
+- **Polished Tuff Wall** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff_wall`
 - **Poppy** — article needed; `minecraft:poppy`
 - **Potatoes** — [Root crops](RootCrops.md) (related guide); `minecraft:potatoes`
 - **Potted Acacia Sapling** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:potted_acacia_sapling`
@@ -978,7 +978,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Red Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:red_wool`
 - **Redstone Comparator** — [Redstone Comparator](RedstoneComparator.md) (related guide); `minecraft:comparator`
 - **Redstone Lamp** — [Redstone Lamp](RedstoneLamp.md) (related guide); `minecraft:redstone_lamp`
-- **Redstone Ore** — article needed; `minecraft:redstone_ore`
+- **Redstone Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:redstone_ore`
 - **Redstone Randomizer** — article needed; `minecraft:redstone_randomizer`
 - **Redstone Repeater** — [Redstone Repeater](RedstoneRepeater.md) (related guide); `minecraft:repeater`
 - **Redstone Torch** — [Redstone Torch](RedstoneTorch.md) (related guide); `minecraft:redstone_torch`
@@ -1143,14 +1143,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Tube Coral Block** — article needed; `minecraft:tube_coral_block`
 - **Tube Coral Fan** — article needed; `minecraft:tube_coral_fan`
 - **Tube Coral Wall Fan** — article needed; `minecraft:tube_coral_wall_fan`
-- **Tuff** — article needed; `minecraft:tuff`
-- **Tuff Brick Slab** — article needed; `minecraft:tuff_brick_slab`
-- **Tuff Brick Stairs** — article needed; `minecraft:tuff_brick_stairs`
-- **Tuff Brick Wall** — article needed; `minecraft:tuff_brick_wall`
-- **Tuff Bricks** — article needed; `minecraft:tuff_bricks`
-- **Tuff Slab** — article needed; `minecraft:tuff_slab`
-- **Tuff Stairs** — article needed; `minecraft:tuff_stairs`
-- **Tuff Wall** — article needed; `minecraft:tuff_wall`
+- **Tuff** — [Tuff](Tuff.md#obtaining-and-mining) (related guide); `minecraft:tuff`
+- **Tuff Brick Slab** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_brick_slab`
+- **Tuff Brick Stairs** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_brick_stairs`
+- **Tuff Brick Wall** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_brick_wall`
+- **Tuff Bricks** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_bricks`
+- **Tuff Slab** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_slab`
+- **Tuff Stairs** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_stairs`
+- **Tuff Wall** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_wall`
 - **Turtle Egg** — article needed; `minecraft:turtle_egg`
 - **Twisting Vines** — article needed; `minecraft:twisting_vines`
 - **Twisting Vines Plant** — article needed; `minecraft:twisting_vines_plant`
@@ -1188,65 +1188,65 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Warped Wart Block** — article needed; `minecraft:warped_wart_block`
 - **Water** — article needed; `minecraft:water`
 - **Water Cauldron** — article needed; `minecraft:water_cauldron`
-- **Waxed Block of Copper** — article needed; `minecraft:waxed_copper_block`
-- **Waxed Chiseled Copper** — article needed; `minecraft:waxed_chiseled_copper`
+- **Waxed Block of Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_copper_block`
+- **Waxed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_chiseled_copper`
 - **Waxed Copper Bulb** — article needed; `minecraft:waxed_copper_bulb`
 - **Waxed Copper Chest** — article needed; `minecraft:waxed_copper_chest`
-- **Waxed Copper Door** — article needed; `minecraft:waxed_copper_door`
+- **Waxed Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_copper_door`
 - **Waxed Copper Golem Statue** — article needed; `minecraft:waxed_copper_golem_statue`
-- **Waxed Copper Grate** — article needed; `minecraft:waxed_copper_grate`
-- **Waxed Copper Trapdoor** — article needed; `minecraft:waxed_copper_trapdoor`
-- **Waxed Cut Copper** — article needed; `minecraft:waxed_cut_copper`
-- **Waxed Cut Copper Slab** — article needed; `minecraft:waxed_cut_copper_slab`
-- **Waxed Cut Copper Stairs** — article needed; `minecraft:waxed_cut_copper_stairs`
-- **Waxed Exposed Chiseled Copper** — article needed; `minecraft:waxed_exposed_chiseled_copper`
-- **Waxed Exposed Copper** — article needed; `minecraft:waxed_exposed_copper`
+- **Waxed Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_copper_grate`
+- **Waxed Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_copper_trapdoor`
+- **Waxed Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_cut_copper`
+- **Waxed Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_cut_copper_slab`
+- **Waxed Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_cut_copper_stairs`
+- **Waxed Exposed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_exposed_chiseled_copper`
+- **Waxed Exposed Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_exposed_copper`
 - **Waxed Exposed Copper Bulb** — article needed; `minecraft:waxed_exposed_copper_bulb`
 - **Waxed Exposed Copper Chest** — article needed; `minecraft:waxed_exposed_copper_chest`
-- **Waxed Exposed Copper Door** — article needed; `minecraft:waxed_exposed_copper_door`
+- **Waxed Exposed Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_exposed_copper_door`
 - **Waxed Exposed Copper Golem Statue** — article needed; `minecraft:waxed_exposed_copper_golem_statue`
-- **Waxed Exposed Copper Grate** — article needed; `minecraft:waxed_exposed_copper_grate`
-- **Waxed Exposed Copper Trapdoor** — article needed; `minecraft:waxed_exposed_copper_trapdoor`
-- **Waxed Exposed Cut Copper** — article needed; `minecraft:waxed_exposed_cut_copper`
-- **Waxed Exposed Cut Copper Slab** — article needed; `minecraft:waxed_exposed_cut_copper_slab`
-- **Waxed Exposed Cut Copper Stairs** — article needed; `minecraft:waxed_exposed_cut_copper_stairs`
+- **Waxed Exposed Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_exposed_copper_grate`
+- **Waxed Exposed Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_exposed_copper_trapdoor`
+- **Waxed Exposed Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_exposed_cut_copper`
+- **Waxed Exposed Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_exposed_cut_copper_slab`
+- **Waxed Exposed Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_exposed_cut_copper_stairs`
 - **Waxed Exposed Lightning Rod** — article needed; `minecraft:waxed_exposed_lightning_rod`
 - **Waxed Lightning Rod** — article needed; `minecraft:waxed_lightning_rod`
-- **Waxed Oxidized Chiseled Copper** — article needed; `minecraft:waxed_oxidized_chiseled_copper`
-- **Waxed Oxidized Copper** — article needed; `minecraft:waxed_oxidized_copper`
+- **Waxed Oxidized Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_oxidized_chiseled_copper`
+- **Waxed Oxidized Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_oxidized_copper`
 - **Waxed Oxidized Copper Bulb** — article needed; `minecraft:waxed_oxidized_copper_bulb`
 - **Waxed Oxidized Copper Chest** — article needed; `minecraft:waxed_oxidized_copper_chest`
-- **Waxed Oxidized Copper Door** — article needed; `minecraft:waxed_oxidized_copper_door`
+- **Waxed Oxidized Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_oxidized_copper_door`
 - **Waxed Oxidized Copper Golem Statue** — article needed; `minecraft:waxed_oxidized_copper_golem_statue`
-- **Waxed Oxidized Copper Grate** — article needed; `minecraft:waxed_oxidized_copper_grate`
-- **Waxed Oxidized Copper Trapdoor** — article needed; `minecraft:waxed_oxidized_copper_trapdoor`
-- **Waxed Oxidized Cut Copper** — article needed; `minecraft:waxed_oxidized_cut_copper`
-- **Waxed Oxidized Cut Copper Slab** — article needed; `minecraft:waxed_oxidized_cut_copper_slab`
-- **Waxed Oxidized Cut Copper Stairs** — article needed; `minecraft:waxed_oxidized_cut_copper_stairs`
+- **Waxed Oxidized Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_oxidized_copper_grate`
+- **Waxed Oxidized Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_oxidized_copper_trapdoor`
+- **Waxed Oxidized Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_oxidized_cut_copper`
+- **Waxed Oxidized Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_oxidized_cut_copper_slab`
+- **Waxed Oxidized Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_oxidized_cut_copper_stairs`
 - **Waxed Oxidized Lightning Rod** — article needed; `minecraft:waxed_oxidized_lightning_rod`
-- **Waxed Weathered Chiseled Copper** — article needed; `minecraft:waxed_weathered_chiseled_copper`
-- **Waxed Weathered Copper** — article needed; `minecraft:waxed_weathered_copper`
+- **Waxed Weathered Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_weathered_chiseled_copper`
+- **Waxed Weathered Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_weathered_copper`
 - **Waxed Weathered Copper Bulb** — article needed; `minecraft:waxed_weathered_copper_bulb`
 - **Waxed Weathered Copper Chest** — article needed; `minecraft:waxed_weathered_copper_chest`
-- **Waxed Weathered Copper Door** — article needed; `minecraft:waxed_weathered_copper_door`
+- **Waxed Weathered Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_weathered_copper_door`
 - **Waxed Weathered Copper Golem Statue** — article needed; `minecraft:waxed_weathered_copper_golem_statue`
-- **Waxed Weathered Copper Grate** — article needed; `minecraft:waxed_weathered_copper_grate`
-- **Waxed Weathered Copper Trapdoor** — article needed; `minecraft:waxed_weathered_copper_trapdoor`
-- **Waxed Weathered Cut Copper** — article needed; `minecraft:waxed_weathered_cut_copper`
-- **Waxed Weathered Cut Copper Slab** — article needed; `minecraft:waxed_weathered_cut_copper_slab`
-- **Waxed Weathered Cut Copper Stairs** — article needed; `minecraft:waxed_weathered_cut_copper_stairs`
+- **Waxed Weathered Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_weathered_copper_grate`
+- **Waxed Weathered Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_weathered_copper_trapdoor`
+- **Waxed Weathered Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_weathered_cut_copper`
+- **Waxed Weathered Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_weathered_cut_copper_slab`
+- **Waxed Weathered Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_weathered_cut_copper_stairs`
 - **Waxed Weathered Lightning Rod** — article needed; `minecraft:waxed_weathered_lightning_rod`
-- **Weathered Chiseled Copper** — article needed; `minecraft:weathered_chiseled_copper`
-- **Weathered Copper** — article needed; `minecraft:weathered_copper`
+- **Weathered Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:weathered_chiseled_copper`
+- **Weathered Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:weathered_copper`
 - **Weathered Copper Bulb** — article needed; `minecraft:weathered_copper_bulb`
 - **Weathered Copper Chest** — article needed; `minecraft:weathered_copper_chest`
-- **Weathered Copper Door** — article needed; `minecraft:weathered_copper_door`
+- **Weathered Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:weathered_copper_door`
 - **Weathered Copper Golem Statue** — article needed; `minecraft:weathered_copper_golem_statue`
-- **Weathered Copper Grate** — article needed; `minecraft:weathered_copper_grate`
-- **Weathered Copper Trapdoor** — article needed; `minecraft:weathered_copper_trapdoor`
-- **Weathered Cut Copper** — article needed; `minecraft:weathered_cut_copper`
-- **Weathered Cut Copper Slab** — article needed; `minecraft:weathered_cut_copper_slab`
-- **Weathered Cut Copper Stairs** — article needed; `minecraft:weathered_cut_copper_stairs`
+- **Weathered Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:weathered_copper_grate`
+- **Weathered Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:weathered_copper_trapdoor`
+- **Weathered Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:weathered_cut_copper`
+- **Weathered Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:weathered_cut_copper_slab`
+- **Weathered Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:weathered_cut_copper_stairs`
 - **Weathered Lightning Rod** — article needed; `minecraft:weathered_lightning_rod`
 - **Weeping Vines** — article needed; `minecraft:weeping_vines`
 - **Weeping Vines Plant** — article needed; `minecraft:weeping_vines_plant`
@@ -1298,7 +1298,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - [Stone and masonry](catalog/stone.md): Stone, deepslate, tuff, sandstone, brick, Nether and End building families, including shaped variants.
 - [Ores, minerals and resource blocks](catalog/ores.md): Overworld and Nether ores, raw-resource blocks, refined storage blocks, amethyst and obsidian.
 - [Wood and tree families](catalog/wood.md): Logs, wood, stripped forms, planks, stems, roots, saplings, foliage and wooden building forms.
-- [Copper and oxidation variants](catalog/copper.md): Copper ores and resource blocks, building forms, doors, trapdoors, grates, bulbs, chests, bars, chains, decorations and lightning rods.
+- [Copper and oxidation variants](catalog/copper.md): Copper ores and resource blocks, building forms, doors, trapdoors, grates, bulbs, chests, statues, torches and lightning rods.
 - [Colored building and decoration](catalog/colored.md): Wool, carpets, glass, concrete, terracotta, beds, banners and Shulker Boxes, with every registered color.
 - [Plants, crops and coral](catalog/plants.md): Flowers, grasses, crops, vines, mushrooms, underwater vegetation, coral and decorative plants.
 - [Flower pots and potted plants](catalog/pots.md): The empty Flower Pot and every separately registered planted form.
@@ -1324,6 +1324,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Chest](Chest.md)
 - [Clay and Bricks](ClayAndBricks.md)
 - [Concrete and Concrete Powder](Concrete.md)
+- [Copper construction](CopperConstruction.md)
 - [Crafter](Crafter.md)
 - [Crafting Table](CraftingTable.md)
 - [Dead Bush](DeadBush.md)
@@ -1337,9 +1338,9 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Frogspawn](Frogspawn.md)
 - [Furnace](Furnace.md)
 - [Glass and Glass Panes](GlassAndPanes.md)
+- [Granite, Diorite, Andesite and Calcite](DecorativeStone.md)
 - [Grindstone](Grindstone.md)
 - [Hopper](Hopper.md)
-- [Iron, Copper, and Diamond ores](OreResources.md)
 - [Kelp](Kelp.md)
 - [Lever](Lever.md)
 - [Limestone family](Limestone.md)
@@ -1347,6 +1348,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Nether Wart crop](NetherWart.md)
 - [Oak](Oak.md)
 - [Observer](Observer.md)
+- [Ores and Ancient Debris](OreResources.md)
 - [Pewen family](Pewen.md)
 - [Piston and Sticky Piston](Pistons.md)
 - [Placed dinosaur eggs](DinosaurEggs.md)
@@ -1374,6 +1376,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Terracotta and Glazed Terracotta](Terracotta.md)
 - [Torch](Torch.md)
 - [Tripwire and Tripwire Hooks](Tripwire.md)
+- [Tuff](Tuff.md)
 - [Wheat crop](Wheat.md)
 - [Wood construction](WoodConstruction.md)
 - [Wool and Carpet](WoolAndCarpet.md)

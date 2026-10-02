@@ -1,17 +1,25 @@
 # Diorite
 
-## Obtaining
+**Diorite** (`minecraft:diorite`) is a placeable decorative stone with polished, stair, slab and wall forms. Its polished finish has stairs and slabs, but no wall. [Registrations][blocks] [items]
 
-Diorite can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Obtaining and use
 
-## Usage
+Mine its natural deposits with an **unbroken pickaxe**, including Wood. A placed Diorite block drops itself without Silk Touch; Fortune does not multiply that drop. See the [decorative-stone guide](../blocks/DecorativeStone.md#finding-granite-diorite-and-andesite) for the checked generation route. [Loot][loot-diorite] · [Mining tag][pickaxe]
 
-Diorite is a building, resource, or decorative block used in construction, crafting, or world interaction.
+The [canonical recipes](../blocks/DecorativeStone.md#crafting-the-base-and-polished-blocks) cover making the base block and polishing it. The [shaped variants and stonecutting table](../blocks/DecorativeStone.md#polished-and-shaped-variants) give exact yields. [Base recipe][crafting-diorite] · [Polishing recipe][crafting-polished-diorite]
 
-## Behavior
+Place the full block directly for construction, or use the matching shape item. The [placed guide](../blocks/DecorativeStone.md#placement-and-properties) owns placement and mining properties. Diorite appears in both the Building Blocks and Natural Blocks Creative tabs. [Creative entries][creative]
 
-It behaves as a block and follows its normal mining, tool, placement, and interaction rules.
+Related: [Stone](../blocks/Stone.md) · [Tuff](../blocks/Tuff.md) · [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:diorite` block.
+Source-reviewed on **2026-10-02** at `2f6c6d4689df9796912eea87cf9def80fc320ee1`; registration, recipes, loot and generation connections checked. No in-game acquisition, crafting or placement test was run.
+
+[blocks]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/java/net/minecraft/world/level/block/Blocks.java
+[items]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/java/net/minecraft/world/item/Items.java
+[loot-diorite]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/resources/data/minecraft/loot_table/blocks/diorite.json
+[pickaxe]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[crafting-diorite]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/resources/data/minecraft/recipe/crafting/diorite.json
+[crafting-polished-diorite]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/resources/data/minecraft/recipe/crafting/polished_diorite.json
+[creative]: https://github.com/HungLo2020/MattMC/blob/2f6c6d4689df9796912eea87cf9def80fc320ee1/src/main/java/net/minecraft/world/item/CreativeModeTabs.java

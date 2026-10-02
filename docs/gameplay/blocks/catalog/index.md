@@ -10,7 +10,7 @@ A **related guide** can cover a whole family or only a shared behavior. Its pres
 | [Stone and masonry](stone.md) | 199 | Stone, deepslate, tuff, sandstone, brick, Nether and End building families, including shaped variants. |
 | [Ores, minerals and resource blocks](ores.md) | 35 | Overworld and Nether ores, raw-resource blocks, refined storage blocks, amethyst and obsidian. |
 | [Wood and tree families](wood.md) | 269 | Logs, wood, stripped forms, planks, stems, roots, saplings, foliage and wooden building forms. |
-| [Copper and oxidation variants](copper.md) | 101 | Copper ores and resource blocks, building forms, doors, trapdoors, grates, bulbs, chests, bars, chains, decorations and lightning rods. |
+| [Copper and oxidation variants](copper.md) | 101 | Copper ores and resource blocks, building forms, doors, trapdoors, grates, bulbs, chests, statues, torches and lightning rods. |
 | [Colored building and decoration](colored.md) | 199 | Wool, carpets, glass, concrete, terracotta, beds, banners and Shulker Boxes, with every registered color. |
 | [Plants, crops and coral](plants.md) | 134 | Flowers, grasses, crops, vines, mushrooms, underwater vegetation, coral and decorative plants. |
 | [Flower pots and potted plants](pots.md) | 41 | The empty Flower Pot and every separately registered planted form. |
