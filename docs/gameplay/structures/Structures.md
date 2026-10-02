@@ -8,6 +8,7 @@ Structures give exploration a destination: a place to collect supplies, face a p
 | --- | --- | --- |
 | [Nether Fortress](NetherFortress.md) | Nether biomes | Blazes, Nether Wart where a stalk room generates, and corridor-chest loot |
 | [Stronghold](Stronghold.md) | Overworld | An End portal room, with possible libraries and other loot rooms |
+| [End City](EndCity.md) | End Highlands and End Midlands on outer islands | Shulker Shells, equipment chests, and Elytra when a ship generates |
 | [Shipwreck](Shipwreck.md) | Overworld oceans, Beach, and Snowy Beach | Supply/treasure chests and possible treasure maps |
 | [Ocean Ruins](OceanRuins.md) | Eligible warm or cold Overworld oceans | Chest rewards, archaeology, and possible treasure maps |
 | [Buried Treasure](BuriedTreasure.md) | Beach and Snowy Beach | Heart of the Sea and other buried-chest loot |

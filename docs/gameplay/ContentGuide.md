@@ -74,6 +74,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Exploration, archaeology, and trade
 
+- [End City](structures/EndCity.md), [Shulker](mobs/Shulker.md), [Elytra](items/Elytra.md), and [Shulker Shell](items/ShulkerShell.md): outer-island rewards, Levitation, gliding, repairs, and boxes
+
 - [Maps](items/Map.md), [Empty Maps](items/EmptyMap.md), [Compass](items/Compass.md), and [Cartography Table](blocks/CartographyTable.md): surveys, scales, shared copies, locks, and Lodestone navigation
 
 - [Shipwreck](structures/Shipwreck.md), [Ocean Ruins](structures/OceanRuins.md), and [Buried Treasure](structures/BuriedTreasure.md): chest layouts, archaeology, treasure maps, and safe search limits
