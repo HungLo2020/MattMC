@@ -23,7 +23,7 @@
 
 ## Block inventory method correction
 
-The current inspected built-in path has **1,235 unique registered block IDs: 1,211 direct static Block fields plus 24 WeatheringCopperBlocks helper forms**. Earlier 1,211-ID directory/validation counts below describe the direct-field subset, not the full effective source inventory. Copper Bars, Copper Chain and Copper Lantern each have eight registered oxidation/wax forms that already existed in the original `c87803e7` snapshot. Batch 147 supersedes the earlier completeness claim; it does not add game content. Existing 1,211 related-guide routes are preserved, while the newly exposed 24 forms remain **Article needed** until dedicated scope is verified. See [the registration method and source chain](../../gameplay/blocks/catalog/index.md#registration-method-correction).
+The current inspected built-in path has **1,235 unique registered block IDs: 1,211 direct static Block fields plus 24 WeatheringCopperBlocks helper forms**. Earlier 1,211-ID directory/validation counts below describe the direct-field subset, not the full effective source inventory. Copper Bars, Copper Chain and Copper Lantern each have eight registered oxidation/wax forms that already existed in the original `c87803e7` snapshot. Batch 147 supersedes the earlier completeness claim; it does not add game content. Existing 1,211 related-guide routes are preserved. Batch 148 adds source-reviewed Copper Bars, Chains and Lanterns family routes for the newly exposed 24 forms; route coverage is not complete variant-behavior certification. See [the registration method and source chain](../../gameplay/blocks/catalog/index.md#registration-method-correction).
 
 ## Initial coverage inventory
 
@@ -1244,3 +1244,10 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 ## Mutation ledger policy
 
 Every batch must record its source sync, exact changed paths, published commit, test outcomes, and remaining gaps in the requesting conversation. The commit diff is the authoritative file ledger. Update this checkpoint within the same batch; record the resulting commit link in the conversation (it cannot reference its own future hash here).
+
+## Batch 148: Copper helper families
+
+- Added two substantive placed-block/inventory owners for all 24 Copper Bars, Chain and Lantern forms, with exact anchors and alphabetical item aliases. The 1,235-ID catalog now routes those forms to their reviewed family guide.
+- Verified 15 crafting recipes, 24 self-drop tables, tool/drop distinctions, support, waterlogging, light, oxidation, waxing, axe scraping and lightning state preservation against unchanged source. Copper Lanterns can drop without a correct-tool gate; Bars and Chain require an intact pickaxe.
+- Removed obsolete recipe-book advice from the new draft: recipe awards are disabled, so mismatched reward IDs are an inactive data observation, not a manual-crafting defect. Axe wear is qualified for enchantments and infinite-material handling.
+- Documentation check, strict build, local links, exact variant anchors and rendered citations are required before promotion. No game launch or crafting/mining/weathering runtime test is claimed; broad wiki catch-up remains incomplete.

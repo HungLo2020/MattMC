@@ -2,7 +2,7 @@
 
 Find the **1,235 source-inventoried built-in IDs** by name below, including MattMC additions, separately registered variants and helper-created Copper forms. Browse [block categories](catalog/index.md) for material or purpose.
 
-**Article coverage is incomplete.** A **related guide** can describe shared family behavior without covering every variant detail. **Article needed** marks a missing dedicated owner; the 24 Copper Bars/Chain/Lantern forms are currently in that group. See the [correction of the earlier direct-field-only count](catalog/index.md#registration-method-correction).
+**Article coverage is incomplete.** A **related guide** can describe shared family behavior without covering every variant detail. **Article needed** marks a missing dedicated owner. The Copper Bars/Chain/Lantern forms now have their own reviewed family guide. See the [correction of the earlier direct-field-only count](catalog/index.md#registration-method-correction).
 
 Names use English localization where available. A † marks one of 25 readable registry-name labels without a separate English entry; the exact ID distinguishes those forms.
 
@@ -275,14 +275,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Composter** — [Composter](Composter.md#composter) (related guide); `minecraft:composter`
 - **Conduit** — [Conduit](Conduit.md#build-a-valid-frame) (related guide); `minecraft:conduit`
 - **Cooked Dinosaur Chop** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:cooked_dinosaur_chop`
-- **Copper Bars** — article needed; `minecraft:copper_bars`
+- **Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#copper-bars) (related guide); `minecraft:copper_bars`
 - **Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:copper_bulb`
-- **Copper Chain** — article needed; `minecraft:copper_chain`
+- **Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#copper-chain) (related guide); `minecraft:copper_chain`
 - **Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:copper_chest`
 - **Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:copper_door`
 - **Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:copper_golem_statue`
 - **Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:copper_grate`
-- **Copper Lantern** — article needed; `minecraft:copper_lantern`
+- **Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#copper-lantern) (related guide); `minecraft:copper_lantern`
 - **Copper Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:copper_ore`
 - **Copper Torch** — [Copper lighting](CopperLighting.md#copper-torches) (related guide); `minecraft:copper_torch`
 - **Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:copper_trapdoor`
@@ -440,14 +440,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Ender Chest** — [Ender Chest](EnderChest.md#player-ownership-and-persistence) (related guide); `minecraft:ender_chest`
 - **Exposed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_chiseled_copper`
 - **Exposed Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_copper`
-- **Exposed Copper Bars** — article needed; `minecraft:exposed_copper_bars`
+- **Exposed Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#exposed-copper-bars) (related guide); `minecraft:exposed_copper_bars`
 - **Exposed Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:exposed_copper_bulb`
-- **Exposed Copper Chain** — article needed; `minecraft:exposed_copper_chain`
+- **Exposed Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#exposed-copper-chain) (related guide); `minecraft:exposed_copper_chain`
 - **Exposed Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:exposed_copper_chest`
 - **Exposed Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:exposed_copper_door`
 - **Exposed Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:exposed_copper_golem_statue`
 - **Exposed Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:exposed_copper_grate`
-- **Exposed Copper Lantern** — article needed; `minecraft:exposed_copper_lantern`
+- **Exposed Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#exposed-copper-lantern) (related guide); `minecraft:exposed_copper_lantern`
 - **Exposed Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:exposed_copper_trapdoor`
 - **Exposed Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_cut_copper`
 - **Exposed Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:exposed_cut_copper_slab`
@@ -762,14 +762,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Oxeye Daisy** — [Small and tall flowers](Flowers.md#oxeye-daisy) (related guide); `minecraft:oxeye_daisy`
 - **Oxidized Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_chiseled_copper`
 - **Oxidized Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_copper`
-- **Oxidized Copper Bars** — article needed; `minecraft:oxidized_copper_bars`
+- **Oxidized Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#oxidized-copper-bars) (related guide); `minecraft:oxidized_copper_bars`
 - **Oxidized Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:oxidized_copper_bulb`
-- **Oxidized Copper Chain** — article needed; `minecraft:oxidized_copper_chain`
+- **Oxidized Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#oxidized-copper-chain) (related guide); `minecraft:oxidized_copper_chain`
 - **Oxidized Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:oxidized_copper_chest`
 - **Oxidized Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:oxidized_copper_door`
 - **Oxidized Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:oxidized_copper_golem_statue`
 - **Oxidized Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:oxidized_copper_grate`
-- **Oxidized Copper Lantern** — article needed; `minecraft:oxidized_copper_lantern`
+- **Oxidized Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#oxidized-copper-lantern) (related guide); `minecraft:oxidized_copper_lantern`
 - **Oxidized Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:oxidized_copper_trapdoor`
 - **Oxidized Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_cut_copper`
 - **Oxidized Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:oxidized_cut_copper_slab`
@@ -1199,28 +1199,28 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Water Cauldron** — [Cauldrons](Cauldrons.md#water-cauldron) (related guide); `minecraft:water_cauldron`
 - **Waxed Block of Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_copper_block`
 - **Waxed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_chiseled_copper`
-- **Waxed Copper Bars** — article needed; `minecraft:waxed_copper_bars`
+- **Waxed Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-copper-bars) (related guide); `minecraft:waxed_copper_bars`
 - **Waxed Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:waxed_copper_bulb`
-- **Waxed Copper Chain** — article needed; `minecraft:waxed_copper_chain`
+- **Waxed Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-copper-chain) (related guide); `minecraft:waxed_copper_chain`
 - **Waxed Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:waxed_copper_chest`
 - **Waxed Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_copper_door`
 - **Waxed Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:waxed_copper_golem_statue`
 - **Waxed Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_copper_grate`
-- **Waxed Copper Lantern** — article needed; `minecraft:waxed_copper_lantern`
+- **Waxed Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-copper-lantern) (related guide); `minecraft:waxed_copper_lantern`
 - **Waxed Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_copper_trapdoor`
 - **Waxed Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_cut_copper`
 - **Waxed Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_cut_copper_slab`
 - **Waxed Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_cut_copper_stairs`
 - **Waxed Exposed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_exposed_chiseled_copper`
 - **Waxed Exposed Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_exposed_copper`
-- **Waxed Exposed Copper Bars** — article needed; `minecraft:waxed_exposed_copper_bars`
+- **Waxed Exposed Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-exposed-copper-bars) (related guide); `minecraft:waxed_exposed_copper_bars`
 - **Waxed Exposed Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:waxed_exposed_copper_bulb`
-- **Waxed Exposed Copper Chain** — article needed; `minecraft:waxed_exposed_copper_chain`
+- **Waxed Exposed Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-exposed-copper-chain) (related guide); `minecraft:waxed_exposed_copper_chain`
 - **Waxed Exposed Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:waxed_exposed_copper_chest`
 - **Waxed Exposed Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_exposed_copper_door`
 - **Waxed Exposed Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:waxed_exposed_copper_golem_statue`
 - **Waxed Exposed Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_exposed_copper_grate`
-- **Waxed Exposed Copper Lantern** — article needed; `minecraft:waxed_exposed_copper_lantern`
+- **Waxed Exposed Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-exposed-copper-lantern) (related guide); `minecraft:waxed_exposed_copper_lantern`
 - **Waxed Exposed Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_exposed_copper_trapdoor`
 - **Waxed Exposed Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_exposed_cut_copper`
 - **Waxed Exposed Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_exposed_cut_copper_slab`
@@ -1229,14 +1229,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Waxed Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:waxed_lightning_rod`
 - **Waxed Oxidized Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_oxidized_chiseled_copper`
 - **Waxed Oxidized Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_oxidized_copper`
-- **Waxed Oxidized Copper Bars** — article needed; `minecraft:waxed_oxidized_copper_bars`
+- **Waxed Oxidized Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-oxidized-copper-bars) (related guide); `minecraft:waxed_oxidized_copper_bars`
 - **Waxed Oxidized Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:waxed_oxidized_copper_bulb`
-- **Waxed Oxidized Copper Chain** — article needed; `minecraft:waxed_oxidized_copper_chain`
+- **Waxed Oxidized Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-oxidized-copper-chain) (related guide); `minecraft:waxed_oxidized_copper_chain`
 - **Waxed Oxidized Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:waxed_oxidized_copper_chest`
 - **Waxed Oxidized Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_oxidized_copper_door`
 - **Waxed Oxidized Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:waxed_oxidized_copper_golem_statue`
 - **Waxed Oxidized Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_oxidized_copper_grate`
-- **Waxed Oxidized Copper Lantern** — article needed; `minecraft:waxed_oxidized_copper_lantern`
+- **Waxed Oxidized Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-oxidized-copper-lantern) (related guide); `minecraft:waxed_oxidized_copper_lantern`
 - **Waxed Oxidized Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_oxidized_copper_trapdoor`
 - **Waxed Oxidized Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_oxidized_cut_copper`
 - **Waxed Oxidized Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_oxidized_cut_copper_slab`
@@ -1244,14 +1244,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Waxed Oxidized Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:waxed_oxidized_lightning_rod`
 - **Waxed Weathered Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_weathered_chiseled_copper`
 - **Waxed Weathered Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_weathered_copper`
-- **Waxed Weathered Copper Bars** — article needed; `minecraft:waxed_weathered_copper_bars`
+- **Waxed Weathered Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-weathered-copper-bars) (related guide); `minecraft:waxed_weathered_copper_bars`
 - **Waxed Weathered Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:waxed_weathered_copper_bulb`
-- **Waxed Weathered Copper Chain** — article needed; `minecraft:waxed_weathered_copper_chain`
+- **Waxed Weathered Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-weathered-copper-chain) (related guide); `minecraft:waxed_weathered_copper_chain`
 - **Waxed Weathered Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:waxed_weathered_copper_chest`
 - **Waxed Weathered Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_weathered_copper_door`
 - **Waxed Weathered Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:waxed_weathered_copper_golem_statue`
 - **Waxed Weathered Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_weathered_copper_grate`
-- **Waxed Weathered Copper Lantern** — article needed; `minecraft:waxed_weathered_copper_lantern`
+- **Waxed Weathered Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-weathered-copper-lantern) (related guide); `minecraft:waxed_weathered_copper_lantern`
 - **Waxed Weathered Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_weathered_copper_trapdoor`
 - **Waxed Weathered Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_weathered_cut_copper`
 - **Waxed Weathered Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_weathered_cut_copper_slab`
@@ -1259,14 +1259,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Waxed Weathered Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:waxed_weathered_lightning_rod`
 - **Weathered Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:weathered_chiseled_copper`
 - **Weathered Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:weathered_copper`
-- **Weathered Copper Bars** — article needed; `minecraft:weathered_copper_bars`
+- **Weathered Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#weathered-copper-bars) (related guide); `minecraft:weathered_copper_bars`
 - **Weathered Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:weathered_copper_bulb`
-- **Weathered Copper Chain** — article needed; `minecraft:weathered_copper_chain`
+- **Weathered Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#weathered-copper-chain) (related guide); `minecraft:weathered_copper_chain`
 - **Weathered Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:weathered_copper_chest`
 - **Weathered Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:weathered_copper_door`
 - **Weathered Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:weathered_copper_golem_statue`
 - **Weathered Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:weathered_copper_grate`
-- **Weathered Copper Lantern** — article needed; `minecraft:weathered_copper_lantern`
+- **Weathered Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#weathered-copper-lantern) (related guide); `minecraft:weathered_copper_lantern`
 - **Weathered Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:weathered_copper_trapdoor`
 - **Weathered Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:weathered_cut_copper`
 - **Weathered Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:weathered_cut_copper_slab`
@@ -1371,6 +1371,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Composter](Composter.md)
 - [Concrete and Concrete Powder](Concrete.md)
 - [Conduit](Conduit.md)
+- [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md)
 - [Copper Chests](CopperChests.md)
 - [Copper construction](CopperConstruction.md)
 - [Copper Golem Statues](CopperGolemStatues.md)

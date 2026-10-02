@@ -131,6 +131,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 - [Sandstone](blocks/Sandstone.md), [Blackstone/Basalt](blocks/BlackstoneAndBasalt.md), and [Nether Bricks](blocks/NetherBricks.md): exact finishes, shape recipes, material yields, collection and Nether acquisition examples
 
+- [Copper Bars, Chains and Lanterns](blocks/CopperBarsChainsAndLanterns.md): 24 oxidation/wax forms, recipes, tool gates, support, waterlogging and light; [inventory variants](items/CopperFixtures.md)
 - [Copper construction](blocks/CopperConstruction.md): all structural oxidation/wax variants, efficient stonecutting, aging, scraping, lightning cleaning, doors and waterlogging
 - [Decorative stone](blocks/DecorativeStone.md) and [Tuff](blocks/Tuff.md): Granite/Diorite/Andesite/Calcite, exact polished/brick/chiseled variants and construction recipes
 
