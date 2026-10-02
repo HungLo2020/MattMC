@@ -689,7 +689,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Mossy Stone Brick Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_stone_brick_stairs`
 - **Mossy Stone Brick Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_stone_brick_wall`
 - **Mossy Stone Bricks** — [Stone](Stone.md#mossy-variants) (related guide); `minecraft:mossy_stone_bricks`
-- **Moving Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:moving_piston`
+- **Moving Piston** — [Piston and Sticky Piston](Pistons.md#piston-head-and-moving-piston) (related guide); `minecraft:moving_piston`
 - **Mud** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud) (related guide); `minecraft:mud`
 - **Mud Brick Slab** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-brick-slab) (related guide); `minecraft:mud_brick_slab`
 - **Mud Brick Stairs** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-brick-stairs) (related guide); `minecraft:mud_brick_stairs`
@@ -798,7 +798,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pewen Branch** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_branch`
 - **Pewen Button** — [Buttons](Buttons.md#pewen-button) (related guide); `minecraft:pewen_button`
 - **Pewen Door** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_door`
-- **Pewen Fence** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_fence`
+- **Pewen Fence** — [Pewen family](Pewen.md#fence-connections) (related guide); `minecraft:pewen_fence`
 - **Pewen Fence Gate** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_fence_gate`
 - **Pewen Hanging Sign** — [Signs and Hanging Signs](Signs.md#pewen-signs-incomplete-integration) (related guide); `minecraft:pewen_hanging_sign`
 - **Pewen Log** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_log`
@@ -831,7 +831,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pink Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:pink_wall_banner`
 - **Pink Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:pink_wool`
 - **Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:piston`
-- **Piston Head** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:piston_head`
+- **Piston Head** — [Piston and Sticky Piston](Pistons.md#piston-head-and-moving-piston) (related guide); `minecraft:piston_head`
 - **Pitcher Crop** — [Pitcher Plant and Pitcher Crop](PitcherPlant.md) (related guide); `minecraft:pitcher_crop`
 - **Pitcher Plant** — [Pitcher Plant and Pitcher Crop](PitcherPlant.md) (related guide); `minecraft:pitcher_plant`
 - **Platypus Egg** — [Placed animal eggs](AnimalEggs.md#platypus-eggs) (related guide); `minecraft:platypus_egg`
@@ -1127,7 +1127,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Terrapin Egg** — [Placed animal eggs](AnimalEggs.md#terrapin-eggs) (related guide); `minecraft:terrapin_egg`
 - **Test Block** — [Test Blocks and Test Instance Blocks](TestBlocks.md#test-block) (related guide); `minecraft:test_block`
 - **Test Instance Block** — [Test Blocks and Test Instance Blocks](TestBlocks.md#test-instance-block) (related guide); `minecraft:test_instance_block`
-- **Thin Bone** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:thin_bone`
+- **Thin Bone** — [Dinosaur Chop](DinosaurChop.md#the-leftover-thin-bone) (related guide); `minecraft:thin_bone`
 - **Tinted Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:tinted_glass`
 - **TNT** — [TNT](TNT.md#tnt) (related guide); `minecraft:tnt`
 - **Torch** — [Torch](Torch.md) (related guide); `minecraft:torch`

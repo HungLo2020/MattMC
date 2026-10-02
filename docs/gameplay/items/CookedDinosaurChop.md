@@ -1,10 +1,10 @@
 # Cooked Dinosaur Chop
 
-Cooked Dinosaur Chop (`minecraft:cooked_dinosaur_chop`) is a **non-stackable, placeable food block item**, not a directly consumable inventory food. It is explicitly listed in Creative and can be made by cooking an existing [Dinosaur Chop](DinosaurChop.md).
+Cooked Dinosaur Chop (`minecraft:cooked_dinosaur_chop`) is a **non-stackable, placeable food block item**, not a directly consumable inventory food. Its ordinary category entry supports the [inventory-browser](../mechanics/InventoryBrowser.md) route in Survival and Creative, and it can be made by cooking an existing [Dinosaur Chop](DinosaurChop.md).
 
 ## Cooking and eating
 
-One raw chop becomes one cooked chop in a furnace (**200 ticks**), smoker (**100 ticks**), or campfire (**600 ticks**). These correspond to 10, 5, and 30 seconds at 20 TPS. The recipes specify 0.15 experience; campfire completion does not award that recipe XP. These recipes do not establish a Survival source for the first raw chop.
+One raw chop becomes one cooked chop in a furnace (**200 ticks**), smoker (**100 ticks**), or campfire (**600 ticks**). These correspond to 10, 5, and 30 seconds at 20 TPS. The recipes specify 0.15 experience; campfire completion does not award that recipe XP. These recipes do not establish a natural-loot source for the first raw chop; the separate browser route is documented in the [block guide](../blocks/DinosaurChop.md#obtaining-and-keeping-a-chop).
 
 Place the cooked chop, then interact with an empty hand while hungry. A fresh block has **four servings**, each restoring **7 hunger points and 4.9 saturation**, subject to the normal caps. The final serving leaves a Thin Bone block. The empty block loot table means breaking it does not recover the food, even with Silk Touch.
 

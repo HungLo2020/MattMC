@@ -18,6 +18,14 @@ To craft one Sticky Piston, put one [Slimeball](../items/Slimeball.md) directly 
 
 A pickaxe is the tagged mining tool for both Pistons, but neither sets a correct-tool requirement for its own ordinary Survival drop. Each returns its matching item. Retract the mechanism and let it settle before collecting the base; the extended head and moving-block stage have separate removal behavior.
 
+## Piston Head and Moving Piston
+
+`minecraft:piston_head` is the attached end of an extended Piston, not a separate inventory item. **Breaking the head also removes its matching extended base.** In ordinary Survival, the base follows its normal drop path; the head itself has no loot. Creative breaking removes that matching base without drops. A head supported by a stationary base must match its direction and ordinary/sticky type; a same-facing Moving Piston can also support the head during movement. Picking the head selects the corresponding Piston or Sticky Piston item. [Head registration][parts-head-registration] · [Matching, removal, support, and pick-block][parts-head] · [Active player-break path][parts-break] · [Removal callback dispatch][parts-removal] · [Base drop dispatch][parts-drops]
+
+`minecraft:moving_piston` is the temporary stage carrying a block during movement. It has no separate inventory item, cannot be mined normally in Survival, and returns no pick-block item. Its special player-destruction callback can remove an extended piston base behind it without dropping that base; this is not a safe way to collect a mechanism. Its loot callback uses the carried block's loot only while the required moving-block data is present, and otherwise returns nothing. **Let movement finish, retract the Piston, then collect its base.** [Moving registration][parts-moving-registration] · [Moving-stage destruction, loot, and pick-block][parts-moving] · [Active player-break path][parts-break]
+
+These part-specific rules were source-reviewed at `d815d4429aac38e31ae553cbf42752e5248e24d7` on 2026-10-02. No in-game head removal, motion-stage destruction, or collection test was run.
+
 ## Facing and power
 
 The head can point in any of the six directions. Placement points it **opposite your nearest look direction**, usually toward you for a horizontal placement. Check the head before placing the load.
@@ -84,3 +92,11 @@ Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. Reg
 - [Moving-stage ticker and removal behavior](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/piston/MovingPistonBlock.java)
 - [Motion, settling, waterlogging, and saved state](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/piston/PistonMovingBlockEntity.java)
 - [Active block-entity tick dispatch](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/chunk/LevelChunk.java)
+
+[parts-head-registration]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/Blocks.java#L808-L810
+[parts-head]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/piston/PistonHeadBlock.java#L64-L125
+[parts-break]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L273-L292
+[parts-removal]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/chunk/LevelChunk.java#L325-L327
+[parts-drops]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/Level.java#L256-L284
+[parts-moving-registration]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/Blocks.java#L890-L904
+[parts-moving]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/piston/MovingPistonBlock.java#L68-L118

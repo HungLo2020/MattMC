@@ -4,9 +4,9 @@ Dinosaur Chop and Cooked Dinosaur Chop are **placeable, four-serving food blocks
 
 ## Obtaining and keeping a chop
 
-Both [Dinosaur Chop](../items/DinosaurChop.md), `minecraft:dinosaur_chop`, and [Cooked Dinosaur Chop](../items/CookedDinosaurChop.md), `minecraft:cooked_dinosaur_chop`, are explicitly listed in Creative. They can also be given by ID with command permission.
+Both [Dinosaur Chop](../items/DinosaurChop.md), `minecraft:dinosaur_chop`, and [Cooked Dinosaur Chop](../items/CookedDinosaurChop.md), `minecraft:cooked_dinosaur_chop`, are ordinary listed food-category entries. MattMC's [inventory browser](../mechanics/InventoryBrowser.md) can supply them in Survival as well as Creative, separately from recipes and natural loot. They can also be given by ID with command permission. [Category entries](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1739-L1740)
 
-**A Survival source for the initial raw chop is not established.** No raw-chop crafting recipe, natural generation source, or entity-loot entry was found in the reviewed source and data. The registered dinosaur mobs should not be assumed to drop it. Cooking an existing raw chop is a confirmed recipe path, not a source for the first one.
+**A bundled crafting or natural-loot source for the initial raw chop is not established.** No raw-chop crafting recipe, natural generation source, or entity-loot entry was found in the reviewed source and data. The registered dinosaur mobs should not be assumed to drop it. Cooking an existing raw chop is a confirmed recipe path, not a source for the first one.
 
 **Breaking either placed chop loses the food.** Both bundled block loot tables have no entries, including no Silk Touch exception. Place it where you intend to use it rather than assuming it can be picked up again.
 
@@ -22,6 +22,14 @@ In Survival, wait until you are hungry and interact with the placed chop using a
 Hunger and saturation still obey their normal caps; unused nutrition is not stored for later. See [Hunger and healing](../mechanics/Hunger.md).
 
 The chop starts at `bites=0`, progresses through 1, 2, and 3, and is replaced after the fourth serving by `minecraft:thin_bone`. The remaining bone's axis follows the chop's facing axis. Finishing it does not restore a raw or cooked chop item.
+
+## The leftover Thin Bone
+
+After the fourth serving, the chop becomes **Thin Bone** (`minecraft:thin_bone`) with the same facing axis. That is a placed remnant, not an awarded inventory item. Thin Bone is registered as an ordinary rotated pillar: its item placement follows the clicked face's axis, and its inherited collision is a full block despite the name. Hardness is **0.4**, not a mining-time guarantee. [Chop remainder](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/alexscaves/server/block/DinosaurChopBlock.java#L160-L175) · [Registration](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/level/block/Blocks.java#L4354-L4363) · [Axis placement](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/level/block/RotatedPillarBlock.java#L47-L55) · [Default shape](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/level/block/state/BlockBehaviour.java#L321-L327)
+
+**Do not mine the remnant expecting an ordinary tool to recover it.** The block requires a correct tool for drops, but no bundled block tag assigns Thin Bone to a standard mining-tool rule. Its one-item loot entry does not bypass the player's tool check. A stronger pickaxe, Silk Touch or Fortune does not supply the missing correct-tool assignment. This is a source-reviewed standard-tool limitation, not a tested harvesting result; custom item rules or data packs may change it. [Loot](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/resources/data/minecraft/loot_table/blocks/thin_bone.json) · [Bundled block tags](https://github.com/HungLo2020/MattMC/tree/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/resources/data/minecraft/tags/block) · [Tool-rule result](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/component/Tool.java#L49-L56) · [Player harvest gate](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L283-L292)
+
+There is a real [Thin Bone item](../items/ThinBone.md), listed in ordinary Natural Blocks; the [inventory browser](../mechanics/InventoryBrowser.md) can supply it in Survival and Creative. No bundled recipe produces or consumes Thin Bone. That browser route is separate from collecting an eaten chop's remnant. [Item registration](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/Items.java#L770) · [Category entry](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L805)
 
 ## Cooking
 

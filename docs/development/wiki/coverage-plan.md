@@ -1058,6 +1058,16 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,337 pages / 37 indexes. All 15 authored paths are documentation; 862 local links/anchors and 202 tracked reference uses resolve, with zero rendered citation candidates. Existing owner headings remain available. No raw page count is used to claim broad coverage completion.
 
+## Batch 131: Semantic family-route corrections
+
+- Expanded Pewen, Pistons and Dinosaur Chop where related-family links previously omitted player decisions. Four existing item pages now give actual acquisition, connection or recovery instructions instead of generic or overly broad availability claims.
+- Pewen Fence explains missing bundled fence-tag membership, the resulting source-derived connection exceptions, and suitable sturdy-face/gate alternatives without promising tested pen containment. The family also links the already tracked Pewen sign limitation.
+- Piston Head and Moving Piston now have explicit removal/collection guidance and precise directory anchors, including matching-base and moving-support conditions.
+- Thin Bone now has an anchored remnant/placement/tool-gate section: its loot entry does not bypass the missing standard-tool assignment. Its ordinary inventory-browser route remains available. Dinosaur Chop availability wording likewise separates browser insertion from absent bundled raw crafting/natural loot.
+- Source checkpoint: `b153e7232bbb43920a8694afbdb0053c2e219d77`; 23 newly cited pinned source pairs were checked unchanged. This was a bounded semantic audit, not a blanket certification of all family aliases or a gameplay test. No source defect was fixed or tracker issue created by this batch.
+
+- Validation: required checker and strict build passed on 2,337 pages / 37 indexes. All 13 authored paths are documentation; 2,163 local links/anchors and 16 tracked shortcut uses resolve, with zero rendered citation candidates. Four registry aliases now reach precise subsections; the 1,211-ID alphabetical/category inventory remains unchanged.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.

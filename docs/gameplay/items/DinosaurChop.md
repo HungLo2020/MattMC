@@ -4,7 +4,7 @@ Dinosaur Chop (`minecraft:dinosaur_chop`) is a **non-stackable, placeable food b
 
 ## Obtaining and using
 
-The item is explicitly listed in Creative, and can be given with command permission. A Survival source for the initial raw chop was not established: do not assume that registered dinosaurs drop one.
+The ordinary category-listed item can be supplied by the [inventory browser](../mechanics/InventoryBrowser.md) in Survival and Creative, or by a command with permission. A bundled crafting or natural-loot source for the initial raw chop was not established: do not assume that registered dinosaurs drop one. See the [acquisition evidence](../blocks/DinosaurChop.md#obtaining-and-keeping-a-chop).
 
 The placed chop supplies **four servings**, each restoring **3 hunger points and 1.2 saturation** before normal caps. The last serving leaves a Thin Bone block. Breaking the placed chop does not return the food, because its bundled block loot table is empty.
 
