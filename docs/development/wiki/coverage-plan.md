@@ -557,6 +557,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Redstone, Hopper, Content Guide, this checkpoint, and October log. Source remains integrated master `3e85592c4c78ebb420302360667a6c230dc0318d`.
 - Validation: checker and strict build passed on 2,176 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No motion, dispensing, transfer, timing, or save/reload gameplay test.
 
+## Seventy-third batch: Concrete and Powder colors
+
+- Added canonical Concrete/Powder behavior and expanded all 32 color/form item pages with exact nine-ingredient recipes, matching conversion targets, falling and water-contact rules, and mining/drop requirements.
+- Distinguished ordinary Sand from excluded Red Sand, adjacent water from water below, and hand-collectible powder from correct-tool Concrete drops.
+- Updated Blocks, Content Guide, this checkpoint, and October log. Master and wiki share the authorized promotion cutoff `239a8cb570ae75443f9d7865d3caaa1b239a4300`; gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`. This batch remains wiki-branch-only.
+- Validation: checker and strict build passed on 2,177 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, water conversion, falling, mining, or farm gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

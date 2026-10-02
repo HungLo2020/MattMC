@@ -1,17 +1,28 @@
 # Pink Concrete
 
+**Pink Concrete** (`minecraft:pink_concrete`) is the hardened pink building block made from [Pink Concrete Powder](PinkConcretePowder.md). The shared [Concrete guide](../blocks/Concrete.md) covers water conversion, support, and mining. [Block registration][block] · [Item registration][item]
+
 ## Obtaining
 
-Pink Concrete can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft [Pink Concrete Powder](PinkConcretePowder.md#crafting), then expose the placed or falling powder to qualifying water contact. It hardens into **the same color**, pink concrete. Use the [water-hardening guide](../blocks/Concrete.md#hardening-powder-with-water) for placement, flowing water, and contact limits. [Matching conversion target][powder-block] · [Hardening callbacks][hardening]
 
-## Usage
+## Collection and building
 
-Pink Concrete is a solid colored building block.
+Mine it with an **unbroken pickaxe** to collect **one pink concrete**. A Wooden Pickaxe is sufficient under the bundled tool tags; a hand or shovel does not satisfy Concrete's collection requirement. See [mining and drops](../blocks/Concrete.md#mining-and-drops) for the active tool rules. [Correct-tool requirement][block] · [Pickaxe tag][pickaxe] · [Block loot][loot]
 
-## Behavior
+The loot has no Silk Touch requirement or Fortune count bonus, and includes an explosion-survival condition. It returns concrete, not powder. [Block loot][loot]
 
-Concrete is a clean, full-block construction material and does not fall like concrete powder.
+Once hardened, this is an ordinary full building block and does not need continuing support underneath. For the falling behavior of its powder form, use the [family guide](../blocks/Concrete.md#falling-and-support).
 
-## Notes
+Related: [Pink Concrete Powder](PinkConcretePowder.md) · [All concrete colors](../blocks/Concrete.md#colors-and-item-ids) · [Items](Items.md)
 
-* This item is the item form of the `minecraft:pink_concrete` block.
+## Sources and verification
+
+Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. These are the checked crafting, hardening, and collection routes. No gameplay test was run. Data packs can change recipes, tags, and loot.
+
+[block]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L4590-L4647
+[item]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java#L839-L854
+[powder-block]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L4648-L4727
+[hardening]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/ConcretePowderBlock.java#L38-L94
+[pickaxe]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/blocks/pink_concrete.json
