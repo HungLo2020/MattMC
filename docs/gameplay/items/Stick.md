@@ -19,7 +19,7 @@ Sticks are verified ingredients for:
 - [Bows](Bow.md) and [Fishing Rods](FishingRod.md), together with String
 - [Ladders](Ladder.md), using seven sticks in an H-shaped 3 × 3 pattern to make three ladders
 
-The linked item/block guides and recipe book hold the other layouts. [Torch recipe][torch] · [Pickaxe recipe][pickaxe] · [Bow recipe][bow] · [Fishing Rod recipe][rod] · [Ladder recipe][ladder]
+The linked item/block guides hold the other layouts. [Torch recipe][torch] · [Pickaxe recipe][pickaxe] · [Bow recipe][bow] · [Fishing Rod recipe][rod] · [Ladder recipe][ladder]
 
 ## Fuel
 

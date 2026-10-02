@@ -1257,3 +1257,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Expanded Mooshroom, Goat and Polar Bear behavior and acquisition limits, plus Mushroom Stew and Goat Horn use, with three discovery/care crosslinks.
 - Source review covers Mooshroom flower servings and shearing, Goat ramming/horn instruments and breeding variants, and Polar Bear cub protection and absent breeding food. Loot follows current MattMC data, including Goat Mutton; upstream assumptions are not substituted.
 - All five owner drafts were independently reviewed, with 74 immutable source-file pairs checked against the integrated source. Final documentation check/build, rendered citations and local anchors are required before promotion. No live animal, item-use or breeding test is claimed.
+
+## Batch 150: Recipe-book documentation correction
+
+- Corrected the Knowledge Book owner against current item registration, category/browser construction, command permissions, client/server dispatch and consumption, loaded-recipe validation, inactive server recipe awards, and Chiseled Bookshelf storage. Empty or invalid recipe data can consume a book in Survival before failure; valid data does not unlock recipes in this implementation.
+- Removed only the obsolete recipe-book-layout phrases from Stick, String and Oak Planks, preserving their existing authored recipes, source citations and anchors. The current crafting-table screen has no recipe-book interface.
+- Source-reviewed at `13ff4feddc5b7b0ce0cdbfd912a9486d817400fd`. Preserved all old anchors; require the package's exact-diff, local-link, source-bound, reference-binding and actual MkDocs-render checks before promotion. No gameplay or multiplayer test is claimed, and this correction does not certify every other guide's recipe-book wording.

@@ -14,7 +14,7 @@ These are confirmed examples rather than every possible source:
 
 ## Selected crafting recipes
 
-The quantities below are the bundled recipes, not an exhaustive list. These are shaped recipes: ingredient placement matters, so use the recipe book or the linked recipe when arranging a grid.
+The quantities below are the bundled recipes, not an exhaustive list. These are shaped recipes: ingredient placement matters, so use the linked recipe when arranging a grid.
 
 | Result | Ingredients | Recipe |
 | --- | --- | --- |
