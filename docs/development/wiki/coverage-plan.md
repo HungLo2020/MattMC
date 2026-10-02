@@ -1517,3 +1517,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Replaced the generic existing item owner with the exact recipe, linked Compass ingredients, reachable Ancient City Barracks chest-table acquisition and separate inventory-browser route. Loot selections are not guaranteed chest yields.
 - Traced player-owned death saving, ordinary respawn copying, login/respawn synchronization and normal inventory model selection. The compass reads the viewer’s applicable player record, not a stored item target; dimension/no-record and horizontal-direction limits are explicit, and dropped-item survival remains with Death and Respawn.
 - Verified the active selected-model geometry/atlas transport into the Rust GUI draw route rather than assuming asset definitions establish displayed behavior. Exact canonical/baseline guards, five preserved heading IDs, independent source/render review, hierarchy check and strict build apply. No gameplay crafting, chest search, death, rejoin, dimension, needle or item-recovery tests were run.
+
+## Batch 191: 23:45 coordinated review
+
+- Linked the existing Skelewag rendering warning to [#803](https://github.com/HungLo2020/MattMC/issues/803), the verified shared Citadel geometry transport/admission issue. The visible ordinary-body, readable-texture and valid-transform scope is explicit; no runtime failure, universal imported-mob defect or gameplay fix is claimed. The separate breathing lead remains outside that ticket.
+- Source remains `8b9173b399a629578a7bf0168e4d3ea32b10e8a6` at the batch-190 article cutoff. The review adds one tracked limitation; it does not close issues or represent new gameplay implementation. Existing monthly entries and their links are preserved.
+- Documentation hierarchy, changed local links, rendered citations and strict build are checked. No gameplay or optional browser validation is claimed. Broader player-wiki catch-up remains incomplete.
