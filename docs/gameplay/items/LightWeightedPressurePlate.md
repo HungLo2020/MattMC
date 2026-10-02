@@ -1,17 +1,22 @@
 # Light Weighted Pressure Plate
 
-## Obtaining
+The Light Weighted Pressure Plate item places `minecraft:light_weighted_pressure_plate`, the gold plate that gives one signal level per eligible entity, capped at 15.
 
-Light Weighted Pressure Plate can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Obtaining and use
 
-## Usage
+Craft one from two Gold Ingots placed side by side, as shown in the [pressure-plate recipe table](../blocks/PressurePlates.md#crafting-and-collecting). A pickaxe is its tagged tool, but a correct tool is not required for its ordinary block-item drop in this registration.
 
-Light Weighted Pressure Plate is a utility, redstone, navigation, lighting, or workstation block.
+It counts entity objects, not the number of items inside dropped stacks. While powered, it rechecks the count every 10 game ticks. The [Pressure plates guide](../blocks/PressurePlates.md) covers placement, entity filtering, low-strength output, and timing.
 
-## Behavior
+## Related pages
 
-It provides its configured block interaction when placed in the world.
+- [Pressure plates](../blocks/PressurePlates.md)
+- [Heavy Weighted Pressure Plate](HeavyWeightedPressurePlate.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:light_weighted_pressure_plate` block.
+Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. No gameplay test was run. The canonical block guide contains the recipe, loot, tool, and placed-behavior evidence.
+
+- [Block-item registrations](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java)
+- [Redstone Creative entries](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)

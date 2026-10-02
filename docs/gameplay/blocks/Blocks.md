@@ -48,6 +48,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Redstone components
 
+- [Pressure plates](PressurePlates.md): Stone/Oak filters, weighted entity counts, support, and release checks
+- [Tripwire](Tripwire.md): facing hooks, String lines, crossing detection, and disarming
 - [Pistons](Pistons.md): block movement, sticky retraction, load limits, and power/update rules
 - [Dispenser and Dropper](DispenserAndDropper.md): item actions, transfer, random slot selection, and trigger timing
 - [Repeater](RedstoneRepeater.md): directional strength restoration, delay, and locking

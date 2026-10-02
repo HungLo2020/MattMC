@@ -29,7 +29,7 @@ The quantities below are the bundled recipes, not an exhaustive list. These are 
 
 ## Tripwire use
 
-Using string for placement creates **tripwire**, which works with [Tripwire Hooks](TripwireHook.md). Breaking an armed line can activate its connected hooks; using shears to break a segment marks it disarmed. Take care when collecting string from an existing trap. The [Redstone guide](../redstone/Redstone.md) covers basic circuit principles. [String registration][item] · [Placement and disarming][tripwire] · [Hook state handling][hook]
+Using string for placement creates **tripwire**, which works with [Tripwire Hooks](TripwireHook.md). Breaking an armed line can activate its connected hooks; using shears to break a segment marks it disarmed. Take care when collecting string from an existing trap. The [Tripwire block guide](../blocks/Tripwire.md) covers complete-line placement, entity detection, output, and disarming. The [Redstone guide](../redstone/Redstone.md) covers basic circuit principles. [String registration][item] · [Placement and disarming][tripwire] · [Hook state handling][hook]
 
 ## Trading
 

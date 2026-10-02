@@ -4,6 +4,8 @@ Redstone components carry signals and control blocks. Start with a source, a sup
 
 ## Core components
 
+- [Pressure plates](../blocks/PressurePlates.md) detect occupancy or entity counts
+- [Tripwire](../blocks/Tripwire.md) detects crossings between facing hooks
 - [Pistons](../blocks/Pistons.md) move blocks within load and pushability limits
 - [Dispenser and Dropper](../blocks/DispenserAndDropper.md) perform item actions or transfer/eject selected items
 - [Repeater](../blocks/RedstoneRepeater.md): directional strength restoration, adjustable delay, and locking

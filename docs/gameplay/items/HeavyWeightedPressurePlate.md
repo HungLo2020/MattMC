@@ -1,17 +1,22 @@
 # Heavy Weighted Pressure Plate
 
-## Obtaining
+The Heavy Weighted Pressure Plate item places `minecraft:heavy_weighted_pressure_plate`, the iron plate whose signal rises by one level for each ten eligible entities, rounded up and capped at 15.
 
-Heavy Weighted Pressure Plate can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Obtaining and use
 
-## Usage
+Craft one from two Iron Ingots placed side by side using the [pressure-plate recipe table](../blocks/PressurePlates.md#crafting-and-collecting). A pickaxe is its tagged tool, but the registration does not require a correct tool for its ordinary block-item drop.
 
-Heavy Weighted Pressure Plate is a redstone input block triggered by entities standing on it.
+One to ten eligible entities produce strength 1; 141 or more reach 15. A dropped stack counts as one entity. While powered, the count is rechecked every 10 game ticks. See the [Pressure plates guide](../blocks/PressurePlates.md) for exact filtering, support, and release behavior.
 
-## Behavior
+## Related pages
 
-Weighted pressure plates emit a redstone signal strength based on the number of entities pressing them.
+- [Pressure plates](../blocks/PressurePlates.md)
+- [Light Weighted Pressure Plate](LightWeightedPressurePlate.md)
+- [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is the item form of the `minecraft:heavy_weighted_pressure_plate` block.
+Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. No gameplay test was run. The canonical block guide contains the recipe, loot, tool, and placed-behavior evidence.
+
+- [Block-item registrations](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java)
+- [Redstone Creative entries](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/CreativeModeTabs.java)

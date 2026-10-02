@@ -564,6 +564,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Content Guide, this checkpoint, and October log. Master and wiki share the authorized promotion cutoff `239a8cb570ae75443f9d7865d3caaa1b239a4300`; gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`. This batch remains wiki-branch-only.
 - Validation: checker and strict build passed on 2,177 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, water conversion, falling, mining, or farm gameplay test.
 
+## Seventy-fourth batch: occupancy and crossing sensors
+
+- Added Pressure Plates and Tripwire guides, expanded five sensor item pages, and added one guide link while preserving String's existing source-grounded content.
+- Covered living/all-entity filters, count-based weighted signals, recheck intervals, support, hook spacing, line attachment, and usable-Shears disarming through active callbacks.
+- Updated Blocks, Redstone, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this batch is subsequent wiki-branch work after the authorized master cutoff.
+- Validation: checker and strict build passed on 2,179 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No entity-detection, count, circuit, attachment, disarming, or timing gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
