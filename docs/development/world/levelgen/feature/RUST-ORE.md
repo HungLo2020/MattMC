@@ -32,6 +32,28 @@ buffers until callbacks and section cleanup finish. Nested calls lease another b
 - Codec sizes are 0–64; larger programmatically constructed configurations use
   dynamically sized native storage. Empty veins do not cross the boundary.
 
+## Configured target tags
+
+The custom `ore/...` configurations used by Dry Midlands and Primordial Ocean
+reference `stone_ore_replaceables` and `deepslate_ore_replaceables`. Keep these
+IDs aligned with the bundled block tags: native geometry only supplies candidate
+coordinates, and Java still rejects any block that does not match the target.
+An unresolved tag can therefore yield no ore even when the geometry is correct.
+Do not widen the host sets to unrelated custom terrain while repairing an ID.
+
+Run the registry/resource regression separately from geometry parity:
+
+```sh
+./gradlew test --tests net.minecraft.world.level.levelgen.feature.CustomOreTargetTagsTest
+```
+
+It follows biome → placed feature → configured feature references and exercises
+native placement in deterministic, fresh in-memory chunk sections. The actual
+configured heights, counts, biome filters, air-exposure rules and palette writes
+run, but the fixture supplies solid host terrain; it does not run a server's
+complete noise/carver/decoration pipeline. Geodes and other target families are
+separate routes. Resource changes do not retrofit existing generated chunks.
+
 ## Verify this subsystem
 
 ```sh
