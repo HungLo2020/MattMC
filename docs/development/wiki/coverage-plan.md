@@ -528,6 +528,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Structures, Mobs, Content Guide, End, this checkpoint, and October log. Source remains integrated master `3e85592c4c78ebb420302360667a6c230dc0318d`.
 - Validation: checker and strict build passed on 2,169 pages / 36 indexes; source targets, local links/anchors and whitespace checked. No city generation, combat, loot, duplication, gliding, repair, or boost gameplay test.
 
+## Sixty-ninth batch: repeaters, comparators, and observers
+
+- Added three canonical device guides and expanded matching item pages with verified recipes, support/mining, placement direction, direct versus side inputs, ordinary/initial timing, locking, compare/subtract math, and Observer update/pulse limits.
+- Explained actual container stack-size fullness and blocked-Chest reads; small circuits are explicitly source-derived and untested. Connected Hopper and Dust guidance to the new pages.
+- Updated Blocks, Redstone, Content Guide, this checkpoint, and October log. Source remains integrated master `3e85592c4c78ebb420302360667a6c230dc0318d`.
+- Validation: checker and strict build passed on 2,172 pages / 36 indexes; source targets, local links/anchors and whitespace checked. No circuit, timing, locking, container, observer, or crafting gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

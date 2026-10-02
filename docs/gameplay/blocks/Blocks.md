@@ -45,6 +45,10 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Redstone components
 
+- [Repeater](RedstoneRepeater.md): directional strength restoration, delay, and locking
+- [Comparator](RedstoneComparator.md): compare/subtract modes and container fullness
+- [Observer](Observer.md): watched-side updates and short output pulses
+
 - [Lever](Lever.md): sustained on/off input
 - [Buttons](Buttons.md): Stone/Oak timing and arrow activation
 - [Redstone Dust and wire](RedstoneDust.md): support, connections, and signal loss

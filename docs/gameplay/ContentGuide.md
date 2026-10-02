@@ -66,6 +66,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Building, redstone, and travel
 
+- [Repeater](blocks/RedstoneRepeater.md), [Comparator](blocks/RedstoneComparator.md), and [Observer](blocks/Observer.md): directional signals, timing, locking, container readings, and block updates
+
 - [Wool and Carpet](blocks/WoolAndCarpet.md): complete 16-color families with exact dye/craft/drop rules and quiet-building distinctions
 
 - [Redstone basics](redstone/Redstone.md): lever/button inputs, wire connections, and troubleshooting

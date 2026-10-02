@@ -26,6 +26,8 @@ See [Redstone Dust](../items/RedstoneDust.md) for ore drops and block packing. A
 
 ## Related pages
 
+- [Repeater](RedstoneRepeater.md): restore a still-positive signal to strength 15 before a dust line fades out
+
 - [Redstone basics](../redstone/Redstone.md)
 - [Lever](Lever.md)
 - [Buttons](Buttons.md)

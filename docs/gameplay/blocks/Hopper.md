@@ -46,7 +46,7 @@ Neighbor redstone power sets `enabled` to false and prevents this Hopper's own p
 
 **Locking one Hopper is not an access lock on its inventory.** Other enabled Hoppers can still insert into or extract from that container through their own transfer paths. Players can also open it. Design the surrounding line, rather than assuming a powered Hopper seals every direction.
 
-The Hopper exposes an analog fullness signal for a Comparator, ranging from 0 for empty to 15 for full. Stack limits affect fullness; a non-stackable item fills its slot differently from one item in a 64-stack.
+The Hopper exposes an analog fullness signal for a [Comparator](RedstoneComparator.md), ranging from 0 for empty to 15 for full. Stack limits affect fullness; a non-stackable item fills its slot differently from one item in a 64-stack.
 
 ## Furnace connections
 

@@ -4,6 +4,10 @@ Redstone components carry signals and control blocks. Start with a source, a sup
 
 ## Core components
 
+- [Repeater](../blocks/RedstoneRepeater.md): directional strength restoration, adjustable delay, and locking
+- [Comparator](../blocks/RedstoneComparator.md): compare/subtract modes and analog container readings
+- [Observer](../blocks/Observer.md): watched-side updates and short pulses
+
 - [Lever](../blocks/Lever.md): toggled, sustained signal
 - [Buttons](../blocks/Buttons.md): timed Stone/Oak pulses and arrow differences
 - [Redstone Dust and wire](../blocks/RedstoneDust.md): connections and signal loss
@@ -14,7 +18,7 @@ Redstone components carry signals and control blocks. Start with a source, a sup
 
 A Lever and a pressed Button both supply signal 15, but the lever holds its state while the button schedules release. Ordinary wire loses strength as it carries a signal farther. A pulse's duration and a wire's strength are distinct properties.
 
-The button guides use **game ticks**: at normal speed, 20 game ticks equal one second. Do not silently read those numbers as redstone ticks or as elapsed time during lag.
+The button guides use **game ticks**: at normal speed, 20 game ticks equal one second. One conventional redstone tick equals two game ticks. Do not read either as fixed elapsed time during lag; the component pages distinguish ordinary delays from placement and interaction exceptions.
 
 ## First troubleshooting steps
 
