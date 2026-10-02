@@ -930,13 +930,22 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Pewen sign issue #795 remains open; held-light PR #791 and Building Wand PR #794 remain unmerged drafts at the review checkpoint. No new runtime commits, migration completion or issue closures were recorded. Dinosaur/Footprint pattern and acquisition limitations remain documented, with separate integration triage deferred; no tested visual defect or fix is claimed.
 - Batch116 publication was delayed by a stalled tree-object request. Read-only reconciliation confirmed both refs still at the prior head and no116 commit/ref request had been sent. The citation repair and this bounded review are validated together before promotion.
 
+## Batch 117: Prismarine, heads, sponges and navigation markers
+
+- Added four canonical guides and ten item corrections, with exact routes for ten Prismarine forms, fourteen head/skull forms and three Sponge/Lodestone blocks. Existing Conduit, Guardian, End City, Wither, Compass and fluid owners remain linked.
+- Prismarine review checks all ten registrations/loot tables, full crafting/stonecutting conversions, actual ingredient distinctions, water/shape/piston behavior and active Monument supplies. Heads review distinguishes seven inventory items from fourteen placed forms, real charged-Creeper and structure routes, retained profile/sound data, animation and the current wall-head Note Block playback limitation.
+- Sponge review counts the traversal origin separately from its maximum 64 admitted water positions, traces supported removal paths and tool-free plant loot, and distinguishes Furnace/bucket recovery from ultrawarm drying. Lodestone review verifies the Iron recipe, assigned chest-loot routes, tool gate and stored Compass coordinates/point-of-interest checks.
+- Source checkpoint: `cf1c134b3f9ff634490e448fe26c335b90f82227`; all authored changes are documentation. These are source-derived mechanics, with no gameplay, listening or generated-world testing claimed.
+
+- Validation: required checker and strict build passed on 2,286 pages / 37 indexes. All 21 authored paths are documentation; 2,164 local links/anchors and 453 tracked reference uses resolve. Rendered-prose/reference checks found no ambiguity or unresolved bracket candidates on the changed pages. All 171 distinct pinned article-source references match the integrated source. The alphabetical directory retains 1,211 IDs, with 1,114 related-guide routes and 97 explicit article gaps, not a completion score.
+
 ## Next batches, in priority order
 
-1. Maintain the complete alphabetical Blocks directory and separate category catalogs as source changes; use explicit article gaps to choose new work. A related family link is not proof that every detail of a variant is reviewed.
-2. Finish the current bounded Prismarine and remaining utility/material reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
-3. Expand remaining functional blocks: Trial Spawner/Vault, Bell, Cartography/Fletching Tables, Decorated Pot, Target/Daylight Detector, Campfires, TNT, Sculk and other registry-backed gaps. Keep shared mechanics in canonical family guides and link exact variants.
-4. Fill remaining terrain/resource, flora, technical and imported-block gaps, including refined resource blocks, Resin, Dripleaves, dry vegetation, heads and custom workbenches. Reassess current source rather than extrapolating from upstream implementations.
-5. Preserve ready Swords and undead drafts for later; continue remaining mobs, biomes, effects, structures and gameplay systems after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw page or route counts.
+1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
+2. Integrate the ready Mud/Dripstone reviews and finish the bounded Note Block, Resin/Creaking Heart and remaining light-block drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+3. Fill remaining practical gaps such as TNT, Trapped Chest, ladders/bars/chains, fuel/storage utility blocks, and the imported weapon workbenches, following actual active behavior and acquisition routes.
+4. Cover remaining terrain/material, plant and technical families, including Netherrack/Bone Block, Bamboo full blocks, Fire/Soul Fire, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
+5. Preserve the ready Swords and undead drafts for later source revalidation; continue broader item, mob, biome, effect, structure and gameplay-system coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.
 
 ## Coordinated source and issue review, 2026-10-02 02:45 UTC
 

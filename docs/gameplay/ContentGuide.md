@@ -235,6 +235,10 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Decorated Pot](blocks/DecoratedPot.md): face ingredients, storage, water and intact versus shattered recovery
 - [Bell](blocks/Bell.md) and [Jukebox](blocks/Jukebox.md): ringing, Raider outlines, disc playback and redstone
 
+- [Prismarine construction](blocks/Prismarine.md): ten full-block and shaped variants, exact recipes and Conduit-frame distinctions
+- [Heads and Skulls](blocks/HeadsAndSkulls.md): seven collectibles/fourteen placed forms, real acquisition and retained data
+- [Sponge](blocks/Sponge.md) and [Lodestone](blocks/Lodestone.md): water removal/drying and persistent Compass markers
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)

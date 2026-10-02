@@ -48,14 +48,14 @@ Names use English localization where available. A † marks a readable registry-
 | Ladder | [`minecraft:ladder`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1411) | Article needed |
 | Lava Cauldron | [`minecraft:lava_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2536) | [Cauldrons](../Cauldrons.md#lava-cauldron) |
 | Lectern | [`minecraft:lectern`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5355) | [Lectern](../Lectern.md#lectern) |
-| Lodestone | [`minecraft:lodestone`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5806) | Article needed |
+| Lodestone | [`minecraft:lodestone`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5806) | [Lodestone](../Lodestone.md) |
 | Loom | [`minecraft:loom`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5306) | [Loom](../Loom.md#crafting-and-placing) |
 | Powder Snow Cauldron | [`minecraft:powder_snow_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2539) | [Cauldrons](../Cauldrons.md#powder-snow-cauldron) |
 | Respawn Anchor | [`minecraft:respawn_anchor`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5784) | [Respawn Anchor](../RespawnAnchor.md#respawn-anchor) |
 | Scaffolding | [`minecraft:scaffolding`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5294) | [Scaffolding](../Scaffolding.md) |
 | Smithing Table | [`minecraft:smithing_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5370) | [Smithing Table](../SmithingTable.md) |
 | Smoker | [`minecraft:smoker`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5316) | [Furnace, Blast Furnace and Smoker](../Furnace.md#smoker) |
-| Sponge | [`minecraft:sponge`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L614) | Article needed |
+| Sponge | [`minecraft:sponge`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L614) | [Sponge and Wet Sponge](../Sponge.md#dry-sponge) |
 | Stonecutter | [`minecraft:stonecutter`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5375) | [Stonecutter](../Stonecutter.md#stonecutter) |
 | TaCZ Ammo Assembly Table | [`minecraft:ammo_workbench`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6815) | Article needed |
 | TaCZ Attachment Table | [`minecraft:attachment_workbench`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6820) | Article needed |
@@ -63,7 +63,7 @@ Names use English localization where available. A † marks a readable registry-
 | Trapped Chest | [`minecraft:trapped_chest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2834) | Article needed |
 | Vault | [`minecraft:vault`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6787) | [Vault](../Vault.md#normal-and-ominous-vaults) |
 | Water Cauldron | [`minecraft:water_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2531) | [Cauldrons](../Cauldrons.md#water-cauldron) |
-| Wet Sponge | [`minecraft:wet_sponge`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L617) | Article needed |
+| Wet Sponge | [`minecraft:wet_sponge`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L617) | [Sponge and Wet Sponge](../Sponge.md#wet-sponge) |
 
 ## Inventory source
 

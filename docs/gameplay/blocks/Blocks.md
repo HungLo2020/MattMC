@@ -293,8 +293,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Crafter** — [Crafter](Crafter.md) (related guide); `minecraft:crafter`
 - **Crafting Table** — [Crafting Table](CraftingTable.md) (related guide); `minecraft:crafting_table`
 - **Creaking Heart** — article needed; `minecraft:creaking_heart`
-- **Creeper Head** — article needed; `minecraft:creeper_head`
-- **Creeper Wall Head** — article needed; `minecraft:creeper_wall_head`
+- **Creeper Head** — [Heads and Skulls](HeadsAndSkulls.md#creeper-heads) (related guide); `minecraft:creeper_head`
+- **Creeper Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#creeper-heads) (related guide); `minecraft:creeper_wall_head`
 - **Crimson Button** — [Buttons](Buttons.md#crimson-button) (related guide); `minecraft:crimson_button`
 - **Crimson Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:crimson_door`
 - **Crimson Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:crimson_fence`
@@ -359,9 +359,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dark Oak Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:dark_oak_wall_hanging_sign`
 - **Dark Oak Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:dark_oak_wall_sign`
 - **Dark Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#dark_oak-timber) (related guide); `minecraft:dark_oak_wood`
-- **Dark Prismarine** — article needed; `minecraft:dark_prismarine`
-- **Dark Prismarine Slab** — article needed; `minecraft:dark_prismarine_slab`
-- **Dark Prismarine Stairs** — article needed; `minecraft:dark_prismarine_stairs`
+- **Dark Prismarine** — [Prismarine construction](Prismarine.md#dark-prismarine-forms) (related guide); `minecraft:dark_prismarine`
+- **Dark Prismarine Slab** — [Prismarine construction](Prismarine.md#dark-prismarine-forms) (related guide); `minecraft:dark_prismarine_slab`
+- **Dark Prismarine Stairs** — [Prismarine construction](Prismarine.md#dark-prismarine-forms) (related guide); `minecraft:dark_prismarine_stairs`
 - **Daylight Detector** — [Daylight Detector](DaylightDetector.md#daylight-detector) (related guide); `minecraft:daylight_detector`
 - **Dead Brain Coral** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral`
 - **Dead Brain Coral Block** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral_block`
@@ -413,8 +413,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dirt Path** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#dirt-path-placement-and-cover) (related guide); `minecraft:dirt_path`
 - **Dispenser** — [Dispenser and Dropper](DispenserAndDropper.md) (related guide); `minecraft:dispenser`
 - **Dragon Egg** — [Dragon Egg](DragonEgg.md) (related guide); `minecraft:dragon_egg`
-- **Dragon Head** — article needed; `minecraft:dragon_head`
-- **Dragon Wall Head** — article needed; `minecraft:dragon_wall_head`
+- **Dragon Head** — [Heads and Skulls](HeadsAndSkulls.md#dragon-heads) (related guide); `minecraft:dragon_head`
+- **Dragon Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#dragon-heads) (related guide); `minecraft:dragon_wall_head`
 - **Dried Ghast** — article needed; `minecraft:dried_ghast`
 - **Dried Kelp Block** — [Kelp](Kelp.md) (related guide); `minecraft:dried_kelp_block`
 - **Dripstone Block** — article needed; `minecraft:dripstone_block`
@@ -637,7 +637,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Limestone Slab** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_slab`
 - **Limestone Stairs** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_stairs`
 - **Limestone Wall** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_wall`
-- **Lodestone** — article needed; `minecraft:lodestone`
+- **Lodestone** — [Lodestone](Lodestone.md) (related guide); `minecraft:lodestone`
 - **Loom** — [Loom](Loom.md#crafting-and-placing) (related guide); `minecraft:loom`
 
 ### M
@@ -813,8 +813,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pewen Wall Hanging Sign †** — [Signs and Hanging Signs](Signs.md#pewen-signs-incomplete-integration) (related guide); `minecraft:pewen_wall_hanging_sign`
 - **Pewen Wall Sign †** — [Signs and Hanging Signs](Signs.md#pewen-signs-incomplete-integration) (related guide); `minecraft:pewen_wall_sign`
 - **Pewen Wood** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_wood`
-- **Piglin Head** — article needed; `minecraft:piglin_head`
-- **Piglin Wall Head** — article needed; `minecraft:piglin_wall_head`
+- **Piglin Head** — [Heads and Skulls](HeadsAndSkulls.md#piglin-heads) (related guide); `minecraft:piglin_head`
+- **Piglin Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#piglin-heads) (related guide); `minecraft:piglin_wall_head`
 - **Pink Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:pink_banner`
 - **Pink Bed** — [Beds](Bed.md) (related guide); `minecraft:pink_bed`
 - **Pink Candle** — [Candles](Candles.md#pink-candle) (related guide); `minecraft:pink_candle`
@@ -835,8 +835,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pitcher Crop** — article needed; `minecraft:pitcher_crop`
 - **Pitcher Plant** — article needed; `minecraft:pitcher_plant`
 - **Platypus Egg** — article needed; `minecraft:platypus_egg`
-- **Player Head** — article needed; `minecraft:player_head`
-- **Player Wall Head** — article needed; `minecraft:player_wall_head`
+- **Player Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_head`
+- **Player Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_wall_head`
 - **Podzol** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#podzol-and-mushroom-support) (related guide); `minecraft:podzol`
 - **Pointed Dripstone** — article needed; `minecraft:pointed_dripstone`
 - **Polished Andesite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite`
@@ -914,13 +914,13 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Powered Rail** — [Rails](Rails.md) (related guide); `minecraft:powered_rail`
 - **Primal Magma** — [Primal Magma and Fissure Primal Magma](PrimalMagma.md) (related guide); `minecraft:primal_magma`
 - **Primordial Caves Portal †** — article needed; `minecraft:primordial_caves_portal`
-- **Prismarine** — article needed; `minecraft:prismarine`
-- **Prismarine Brick Slab** — article needed; `minecraft:prismarine_brick_slab`
-- **Prismarine Brick Stairs** — article needed; `minecraft:prismarine_brick_stairs`
-- **Prismarine Bricks** — article needed; `minecraft:prismarine_bricks`
-- **Prismarine Slab** — article needed; `minecraft:prismarine_slab`
-- **Prismarine Stairs** — article needed; `minecraft:prismarine_stairs`
-- **Prismarine Wall** — article needed; `minecraft:prismarine_wall`
+- **Prismarine** — [Prismarine construction](Prismarine.md#prismarine-forms) (related guide); `minecraft:prismarine`
+- **Prismarine Brick Slab** — [Prismarine construction](Prismarine.md#prismarine-brick-forms) (related guide); `minecraft:prismarine_brick_slab`
+- **Prismarine Brick Stairs** — [Prismarine construction](Prismarine.md#prismarine-brick-forms) (related guide); `minecraft:prismarine_brick_stairs`
+- **Prismarine Bricks** — [Prismarine construction](Prismarine.md#prismarine-brick-forms) (related guide); `minecraft:prismarine_bricks`
+- **Prismarine Slab** — [Prismarine construction](Prismarine.md#prismarine-forms) (related guide); `minecraft:prismarine_slab`
+- **Prismarine Stairs** — [Prismarine construction](Prismarine.md#prismarine-forms) (related guide); `minecraft:prismarine_stairs`
+- **Prismarine Wall** — [Prismarine construction](Prismarine.md#prismarine-forms) (related guide); `minecraft:prismarine_wall`
 - **Pumpkin** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:pumpkin`
 - **Pumpkin Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:pumpkin_stem`
 - **Purple Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:purple_banner`
@@ -1016,8 +1016,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Short Grass** — article needed; `minecraft:short_grass`
 - **Shroomlight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#shroomlight) (related guide); `minecraft:shroomlight`
 - **Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:shulker_box`
-- **Skeleton Skull** — article needed; `minecraft:skeleton_skull`
-- **Skeleton Wall Skull** — article needed; `minecraft:skeleton_wall_skull`
+- **Skeleton Skull** — [Heads and Skulls](HeadsAndSkulls.md#skeleton-skulls) (related guide); `minecraft:skeleton_skull`
+- **Skeleton Wall Skull** — [Heads and Skulls](HeadsAndSkulls.md#skeleton-skulls) (related guide); `minecraft:skeleton_wall_skull`
 - **Skunk Spray** — article needed; `minecraft:skunk_spray`
 - **Slime Block** — article needed; `minecraft:slime_block`
 - **Small Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#small-bud) (related guide); `minecraft:small_amethyst_bud`
@@ -1050,7 +1050,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Soul Soil** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-soil) (related guide); `minecraft:soul_soil`
 - **Soul Torch** — article needed; `minecraft:soul_torch`
 - **Soul Wall Torch** — article needed; `minecraft:soul_wall_torch`
-- **Sponge** — article needed; `minecraft:sponge`
+- **Sponge** — [Sponge and Wet Sponge](Sponge.md#dry-sponge) (related guide); `minecraft:sponge`
 - **Spore Blossom** — [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md#spore-blossom) (related guide); `minecraft:spore_blossom`
 - **Spruce Button** — [Buttons](Buttons.md#spruce-button) (related guide); `minecraft:spruce_button`
 - **Spruce Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:spruce_door`
@@ -1250,7 +1250,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Weathered Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:weathered_lightning_rod`
 - **Weeping Vines** — [Vines and Glow Berries](Vines.md#weeping-vines) (related guide); `minecraft:weeping_vines`
 - **Weeping Vines Plant** — [Vines and Glow Berries](Vines.md#weeping-vines-plant) (related guide); `minecraft:weeping_vines_plant`
-- **Wet Sponge** — article needed; `minecraft:wet_sponge`
+- **Wet Sponge** — [Sponge and Wet Sponge](Sponge.md#wet-sponge) (related guide); `minecraft:wet_sponge`
 - **Wheat Crops** — [Wheat crop](Wheat.md) (related guide); `minecraft:wheat`
 - **White Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:white_banner`
 - **White Bed** — [Beds](Bed.md) (related guide); `minecraft:white_bed`
@@ -1268,8 +1268,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **White Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:white_wool`
 - **Wildflowers** — article needed; `minecraft:wildflowers`
 - **Wither Rose** — [Small and tall flowers](Flowers.md#wither-rose) (related guide); `minecraft:wither_rose`
-- **Wither Skeleton Skull** — article needed; `minecraft:wither_skeleton_skull`
-- **Wither Skeleton Wall Skull** — article needed; `minecraft:wither_skeleton_wall_skull`
+- **Wither Skeleton Skull** — [Heads and Skulls](HeadsAndSkulls.md#wither-skeleton-skulls) (related guide); `minecraft:wither_skeleton_skull`
+- **Wither Skeleton Wall Skull** — [Heads and Skulls](HeadsAndSkulls.md#wither-skeleton-skulls) (related guide); `minecraft:wither_skeleton_wall_skull`
 
 ### Y
 
@@ -1289,8 +1289,8 @@ Names use English localization where available. A † marks one of 25 readable r
 
 ### Z
 
-- **Zombie Head** — article needed; `minecraft:zombie_head`
-- **Zombie Wall Head** — article needed; `minecraft:zombie_wall_head`
+- **Zombie Head** — [Heads and Skulls](HeadsAndSkulls.md#zombie-heads) (related guide); `minecraft:zombie_head`
+- **Zombie Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#zombie-heads) (related guide); `minecraft:zombie_wall_head`
 
 ## Block categories
 
@@ -1370,6 +1370,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Granite, Diorite, Andesite and Calcite](DecorativeStone.md)
 - [Grindstone](Grindstone.md)
 - [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md)
+- [Heads and Skulls](HeadsAndSkulls.md)
 - [Hopper](Hopper.md)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
 - [Jukebox](Jukebox.md)
@@ -1380,6 +1381,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Lightning Rods](LightningRods.md)
 - [Lily Pad](LilyPad.md)
 - [Limestone family](Limestone.md)
+- [Lodestone](Lodestone.md)
 - [Loom](Loom.md)
 - [Monster Spawner](MonsterSpawner.md)
 - [Moss and Pale Moss](MossAndPaleMoss.md)
@@ -1397,6 +1399,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Pressure plates](PressurePlates.md)
 - [Primal Magma and Fissure Primal Magma](PrimalMagma.md)
 - [Primordial decorative plants](PrimordialPlants.md)
+- [Prismarine construction](Prismarine.md)
 - [Pumpkin and Melon farming](PumpkinAndMelon.md)
 - [Quartz construction](Quartz.md)
 - [Rails](Rails.md)
@@ -1422,6 +1425,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Snow and Powder Snow](Snow.md)
 - [Soil, Sand, and Gravel](SoilSandAndGravel.md)
 - [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md)
+- [Sponge and Wet Sponge](Sponge.md)
 - [Stone](Stone.md)
 - [Stonecutter](Stonecutter.md)
 - [Subterranodon Egg](SubterranodonEgg.md)
