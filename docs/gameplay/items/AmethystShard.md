@@ -8,7 +8,7 @@ Harvest a fully grown Amethyst Cluster without Silk Touch: a listed pickaxe give
 
 ## Use
 
-Craft decorative Amethyst Blocks, Tinted Glass, a Spyglass or a Calibrated Sculk Sensor; Shards also provide an armor-trim material and are used by the eligible dancing-Allay duplication interaction.
+Craft decorative Amethyst Blocks, Tinted Glass, a Spyglass or a Calibrated Sculk Sensor; Shards also provide an armor-trim material and are used by the eligible [dancing-Allay duplication interaction](../mobs/Allay.md#duplication).
 
 The [Amethyst guide](../blocks/Amethyst.md#shard-recipes-and-other-uses) gives the exact growth, tool, Fortune, recipe and placement rules.
 

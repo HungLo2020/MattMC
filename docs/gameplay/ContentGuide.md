@@ -28,6 +28,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Farming, food, and animal care
 
+- [Allay](mobs/Allay.md): finding helpers, sample filters, item delivery, music and Amethyst duplication
+
 - [Vines and Glow Berries](blocks/Vines.md), [Glow Lichen](blocks/GlowLichen.md), [Moss](blocks/MossAndPaleMoss.md), and [ceiling plants](blocks/HangingRootsAndSporeBlossom.md): support, water, growth, harvesting, light and verified starter routes
 
 - [Small and tall flowers](blocks/Flowers.md): exact dye/stew variants, soils, Bone Meal routes, Bee choices and Wither Rose limits
@@ -155,6 +157,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Transport](mechanics/Transport.md): boats, chest storage, minecart controls, track construction, and stopping safely
 
 ### Exploration, archaeology, and trade
+
+- [Woodland Mansion](structures/WoodlandMansion.md), [Evoker](mobs/Evoker.md), [Vindicator](mobs/Vindicator.md), and [Vex](mobs/Vex.md): forest expeditions, room rewards, spell/axe encounters and summon limits
 
 - [Pillager Outpost](structures/PillagerOutpost.md), [Pillager](mobs/Pillager.md), [Ravager](mobs/Ravager.md), and [Raids](mechanics/Raid.md): tower expeditions, captain bottles, omen preparation, waves and victory
 

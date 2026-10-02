@@ -6,6 +6,10 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Allay collection:** [Allay](Allay.md): loose-item matching, player/Note Block deliveries, Jukebox dancing and duplication
+
+- **Mansion illagers:** [Evoker](Evoker.md), [Vindicator](Vindicator.md), [Vex](Vex.md), and [Woodland Mansion](../structures/WoodlandMansion.md): generated residents, spells, door hazards and loot
+
 - **Turtles and Terrapins:** [Turtle](Turtle.md) and [Terrapin](Terrapin.md): home beaches, egg lifecycles, Scutes, air and bucket limitations
 
 - **Fish and squid care:** [Cod](Cod.md), [Salmon](Salmon.md), [Tropical Fish](TropicalFish.md), [Pufferfish](Pufferfish.md), [Squid](Squid.md), and [Glow Squid](GlowSquid.md): water conditions, capture/retention, variants, sting and ink routes

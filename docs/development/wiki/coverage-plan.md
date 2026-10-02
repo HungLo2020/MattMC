@@ -1180,6 +1180,15 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,357 pages / 37 indexes. All eight authored paths are documentation; 842 local links/anchors and 155 tracked reference uses resolve, with zero rendered citation candidates and all prior replacement anchors preserved. Two substantive mob replacements are counted separately from two resource/equipment corrections.
 
+## Batch 145: Mansion residents and Allay helpers
+
+- Added Woodland Mansion as a structure owner and expanded Evoker, Vindicator, Vex and Allay, with three narrow illager egg corrections. Mansion review follows Dark Forest/Pale Garden eligibility, Cartographer map availability, actual room/NBT resident paths, loot-table versus fixed/empty chests and conditional Vex-template rewards.
+- Traced illager targeting, fangs/summons, raid-gated door actions, persistent Johnny state and Vex lifetime damage. Allay owns sample/cargo filters, player versus Note Block delivery, Jukebox duplication, retention and recovery limitations. Existing Raid, Totem, Amethyst and shared transport owners retain their separate mechanics.
+- Source checkpoint: `780a7733d1804088e86c248a1c8ec6957def4915`; 86 immutable source pairs match current source. All 73 mansion templates were decoded during research. Independent rendering caught five missing shortcut definitions in isolated Allay; all five were restored and the actual patched file passed before integration, with no prose or anchor rewrite.
+- No in-game mansion search, loot sampling, spell combat, item collection, duplication or recovery test was run. Source-observed limitations are not implemented fixes or broad runtime parity claims.
+
+- Validation: required checker and strict build passed on 2,358 pages / 37 indexes. All 15 authored paths are documentation; 931 local links/anchors and 273 tracked reference uses resolve, with zero rendered citation candidates and prior replacement anchors preserved. One new structure owner and four substantive mob replacements are distinct from three spawn-egg corrections and narrow discovery links.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.

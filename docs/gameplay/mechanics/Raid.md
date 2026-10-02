@@ -60,6 +60,8 @@ Milk removes the player's omen effects; it does not call the active raid's stop 
 
 ## Related pages
 
+- [Evoker](../mobs/Evoker.md) · [Vindicator](../mobs/Vindicator.md) · [Vex](../mobs/Vex.md) · [Woodland Mansion](../structures/WoodlandMansion.md)
+
 - [Pillager Outpost](../structures/PillagerOutpost.md)
 - [Pillager](../mobs/Pillager.md) · [Ravager](../mobs/Ravager.md)
 - [Villager jobs](../mobs/Villager.md) · [Trading](../trading/Trading.md)

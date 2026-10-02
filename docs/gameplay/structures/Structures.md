@@ -11,6 +11,7 @@ For mapmaking with saved templates and pool connectors, see [Structure and Jigsa
 | [Nether Fortress](NetherFortress.md) | Nether biomes | Blazes, Nether Wart where a stalk room generates, and corridor-chest loot |
 | [Bastion Remnant](BastionRemnant.md) | Nether Wastes, Crimson Forest, Soul Sand Valley and Warped Forest | Piglin/Brute encounters and chest loot, including table-specific Netherite Upgrade Template chances |
 | [Pillager Outpost](PillagerOutpost.md) | Eligible normal-Overworld plains, desert, savanna, taiga, snowy and mountain biomes | Pillager/captain encounters, upper-chest rewards and optional captive residents |
+| [Woodland Mansion](WoodlandMansion.md) | Dark Forest and Pale Garden in the normal Overworld | Evokers, Vindicators, possible Allays, varied room chests and a Vex template chance |
 | [Stronghold](Stronghold.md) | Overworld | An End portal room, with possible libraries and other loot rooms |
 | [End City](EndCity.md) | End Highlands and End Midlands on outer islands | Shulker Shells, equipment chests, and Elytra when a ship generates |
 | [Shipwreck](Shipwreck.md) | Overworld oceans, Beach, and Snowy Beach | Supply/treasure chests and possible treasure maps |
