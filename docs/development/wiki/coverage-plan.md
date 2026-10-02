@@ -1155,6 +1155,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,357 pages / 37 indexes. All 15 authored paths are documentation; 884 local links/anchors and 791 tracked reference uses resolve, with zero rendered citation candidates. The alphabetical biome directory has exactly 68 unique source IDs, 65 translated names and three disclosed fallback labels; every new family section is reachable.
 
+## Batch 142: Ordinary fish, squid and aquatic resources
+
+- Expanded six aquatic mob owners, four live-fish buckets, two ink resources and the loose Pufferfish/Tropical Fish items. Existing Oceans, Fishing, Signs, Nautilus and ordinary Cod/Salmon food owners remain linked for their distinct workflows.
+- Traced actual biome candidates and water/height checks, schooling versus breeding, Salmon size weights, Tropical Fish appearance selection, Pufferfish inflation/sting, Squid baby/drying behavior, bucket state/retention/ultra-warm release and death-loot gates. Primordial Cod/Squid notes retain the corrected loaded-dimension precedence without measured encounter claims.
+- Source checkpoint: `881a3ef4335dce000555e8584df9772b043887b6`; 84 immutable source pairs match current source. Independent rendered-reference and retained-anchor checks passed. No in-game spawning, aquarium, capture, damage, appearance or loot test was run.
+
+- Validation: required checker and strict build passed on 2,357 pages / 37 indexes. All 18 authored paths are documentation; 925 local links/anchors and 377 tracked reference uses resolve, with zero rendered citation candidates and all prior replacement anchors retained. Six substantial mob replacements are counted separately from eight support-item corrections.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.
