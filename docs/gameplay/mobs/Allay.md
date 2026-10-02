@@ -19,7 +19,7 @@ Neither structure promises that cage room in every generated example. Clear near
 
 Use a collection item, such as Cobblestone, on an empty-handed Allay. It takes **one** into its main hand and remembers the player who gave it. The usual item-consumption rule exempts players with Creative's infinite-materials ability. Special interactions such as naming and using spawn eggs can take priority over sample handoff. [Sample interaction][interact] · [Interaction order][interact-call] · [Consumption][sample-consume] [consume] · [Creative exemption][creative]
 
-Use an **empty main hand** on an Allay holding a sample to take it back. This clears its remembered player and throws its collected cargo onto the ground. **Leave inventory space for the sample first:** the checked return path attempts to add it to your inventory without a fallback ground drop if it cannot fit. If the Allay is leashed to you, an interaction first detaches that leash. [Return interaction][interact] · [Inventory-add call][player-add] · [Capacity failure][inventory-add] · [Leash interaction][lead]
+Use an **empty main hand** on an Allay holding a sample to take it back. This clears its remembered player and throws its collected cargo onto the ground. For an ordinarily assigned **one-item sample**, the required empty hand also leaves a free selected inventory slot for its return. Cargo is thrown as dropped items with a pickup delay; it is not inserted into that slot first. If the Allay is leashed to you, an interaction first detaches that leash. [Return interaction][interact] · [Selected-slot mapping][return-slot] · [Free-slot lookup][return-space] · [Inventory-add call][player-add] · [Inventory insertion][inventory-add] · [Cargo throw][throw] · [Leash interaction][lead]
 
 This is not exclusive ownership: the sample-return branch does not require the player to be the one who assigned it. A player can take the sample and then give a new one. An existing Note Block preference is not erased by that return interaction. [Player-memory and item changes][interact]
 
@@ -146,3 +146,6 @@ No rescue, pickup, sorting, return, music, duplication, cooldown, damage or rete
 [jukebox-listener]: https://github.com/HungLo2020/MattMC/blob/cf8cd5371bd1de61411ae5e7e144aabe3edb1e54/src/main/java/net/minecraft/world/entity/animal/allay/Allay.java#L529-L559
 [dance-stop]: https://github.com/HungLo2020/MattMC/blob/cf8cd5371bd1de61411ae5e7e144aabe3edb1e54/src/main/java/net/minecraft/world/entity/animal/allay/Allay.java#L391-L405
 [brain-load]: https://github.com/HungLo2020/MattMC/blob/cf8cd5371bd1de61411ae5e7e144aabe3edb1e54/src/main/java/net/minecraft/world/entity/LivingEntity.java#L808-L817
+
+[return-slot]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/entity/player/PlayerEquipment.java#L14-L21
+[return-space]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/entity/player/Inventory.java#L102-L109
