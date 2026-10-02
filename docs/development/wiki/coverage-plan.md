@@ -1282,3 +1282,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Checked 68 biome definitions, 34 structure definitions and 1,202 templates separately from standalone predicates; no natural population route for these three species was found. Actual browser/egg routes, breeding, moss/dispenser harvest, cargo and swallowed-creature controls, persistence and food/device recipes are documented.
 - Kept source-confirmed incomplete Catfish entity addition, Lobster bucket-color component mismatch and Snapping Turtle breathing limits explicit. These are implementation findings, not live reproduction or completed fixes. Common bucket health/name components and dispenser durability handling are precisely qualified.
 - Independent rendering/source review and final documentation check/build/local-anchor validation are required before promotion. No creature release, storage-loss, drowning, breeding, farming or loot runtime test is claimed.
+
+## Batch 154: Nether encounters and Ghast rewards
+
+- Expanded Ghast, Hoglin, Zoglin and Zombified Piglin owners plus Ghast Tear and Tears music-disc items, linking biome/structure routes and relevant food/portal owners.
+- Checked fireball ownership and exact disc-loot conditions, Hoglin feeding/repellents/conversion and retained Peaceful flag, monster-versus-animal baby loot gates, and Zombified Piglin anger/equipment handling. Hoglin pacification wording preserves the successful-hit and living-attacker guards.
+- Independent review checked active source, 207 citation definitions, 268 rendered references, retained anchors, proposed crosslinks and decoded Bastion templates. Final documentation check/build and unchanged-source checks are required before promotion. No in-game encounter, reflection, breeding, conversion or drop test is claimed.

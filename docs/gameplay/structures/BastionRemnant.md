@@ -1,6 +1,6 @@
 # Bastion Remnant
 
-A Bastion Remnant (`minecraft:bastion_remnant`) is a ruined Blackstone complex in the [Nether](../dimensions/Nether.md), with chest rewards and resident [Piglins](../mobs/Piglin.md), [Piglin Brutes](../mobs/PiglinBrute.md), and possible Hoglins. Visit for loot such as Netherite Upgrade Smithing Templates, but prepare a retreat before entering: **gold armor does not pacify Brutes or excuse stealing from Piglins**. [Structure][bastion] · [Residents][piglin-pool] · [Hoglin template][hoglin-template]
+A Bastion Remnant (`minecraft:bastion_remnant`) is a ruined Blackstone complex in the [Nether](../dimensions/Nether.md), with chest rewards and resident [Piglins](../mobs/Piglin.md), [Piglin Brutes](../mobs/PiglinBrute.md), and possible [Hoglins](../mobs/Hoglin.md). Visit for loot such as Netherite Upgrade Smithing Templates, but prepare a retreat before entering: **gold armor does not pacify Brutes or excuse stealing from Piglins**. [Structure][bastion] · [Residents][piglin-pool] · [Hoglin template][hoglin-template]
 
 ## Where to look
 

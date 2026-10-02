@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Nether encounters:** [Ghast](Ghast.md), [Hoglin](Hoglin.md), [Zoglin](Zoglin.md), and [Zombified Piglin](ZombifiedPiglin.md): fireball returns, breeding/repellents, conversion and group anger
+
 - **Imported water creatures:** [Alligator Snapping Turtle](AlligatorSnappingTurtle.md), [Catfish](Catfish.md), and [Lobster](Lobster.md): care, collection, bucket limitations and actual acquisition
 
 - **Fungal and mountain animals:** [Mooshroom](Mooshroom.md), [Goat](Goat.md), and [Polar Bear](PolarBear.md): food/variant care, horns, and cub-protection limits

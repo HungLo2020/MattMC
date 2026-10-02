@@ -6,6 +6,8 @@ Raw Porkchop (`minecraft:porkchop`) is food. Eating one restores **3 hunger poin
 
 Adult [Pigs](../mobs/Pig.md) have a base drop of 1–3 Raw Porkchops, with a Looting count increase. Their bundled loot converts the meat to cooked form when the burning or Fire Aspect smelting condition applies. Babies do not pass the ordinary loot gate, and the mob-loot game rule must allow the drops.
 
+[Hoglins](../mobs/Hoglin.md#drops) provide another source, with their own drop counts and adult-only ordinary item-loot gate.
+
 ## Cooking
 
 One Raw Porkchop becomes one Cooked Porkchop using any of these bundled recipes:

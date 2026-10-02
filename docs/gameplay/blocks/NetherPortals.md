@@ -14,7 +14,7 @@ For initial activation, place fire inside the frame, for example with [Flint and
 
 The normal portal rechecks its complete frame and filled interior on relevant neighbor-shape updates. Removing a required frame block or interrupting its active interior can therefore collapse the portal. Repair the frame and clear the interior before lighting it again. Outside corners are not required supports. [Support updates][nether-support] · [Complete-shape check][complete]
 
-The ordinary portal's random-tick routine can also create a Zombified Piglin in a dimension marked natural, when monster spawning, difficulty, a nearby player, and a valid spawning surface permit it. This is a conditional random spawn, not a guaranteed result of using a portal. The Primordial Caves portal does not inherit this routine. [Nether portal random tick][portal-spawn] · [Separate Primordial implementation][primordial-all]
+The ordinary portal's random-tick routine can also create a [Zombified Piglin](../mobs/ZombifiedPiglin.md) in a dimension marked natural, when monster spawning, difficulty, a nearby player, and a valid spawning surface permit it. This is a conditional random spawn, not a guaranteed result of using a portal. The Primordial Caves portal does not inherit this routine. [Nether portal random tick][portal-spawn] · [Separate Primordial implementation][primordial-all]
 
 ### Destination and linking
 

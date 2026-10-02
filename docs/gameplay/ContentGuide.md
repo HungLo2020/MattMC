@@ -87,6 +87,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Combat and mob resources
 
+- [Ghast](mobs/Ghast.md), [Hoglin](mobs/Hoglin.md), [Zoglin](mobs/Zoglin.md), and [Zombified Piglin](mobs/ZombifiedPiglin.md): Nether encounter routes, fireball rewards, food/breeding, zombification and group anger
+
 - [Cave Centipede](mobs/CaveCentipede.md), [Centipede Legs](items/CentipedeLeg.md), and [Leggings](items/CentipedeLeggings.md): head loot, food risk, crafting and armor-tag limits
 - [Tarantula Hawk](mobs/TarantulaHawk.md) and its [Elytra](items/TarantulaHawkElytra.md): sting/prey behavior and the current feeding, wing-production and flight integration gaps
 

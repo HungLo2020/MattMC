@@ -10,11 +10,11 @@ Surface materials below are outputs of conditional surface rules, not a uniform 
 
 | Biome and exact ID | What to look for | Biome monster candidates |
 | --- | --- | --- |
-| [Nether Wastes](#nether-wastes) — `minecraft:nether_wastes` | Netherrack, conditional Soul Sand/Gravel patches, ordinary mushrooms | Ghast, Zombified Piglin, Magma Cube, Enderman, Piglin |
-| [Soul Sand Valley](#soul-sand-valley) — `minecraft:soul_sand_valley` | Soul Sand/Soul Soil surfaces, Basalt pillars, eligible Nether fossils | Skeleton, Ghast, Enderman |
-| [Crimson Forest](#crimson-forest) — `minecraft:crimson_forest` | Crimson Nylium, huge Crimson Fungi, Weeping Vines | Zombified Piglin, Hoglin, Piglin |
+| [Nether Wastes](#nether-wastes) — `minecraft:nether_wastes` | Netherrack, conditional Soul Sand/Gravel patches, ordinary mushrooms | [Ghast](../mobs/Ghast.md), [Zombified Piglin](../mobs/ZombifiedPiglin.md), Magma Cube, Enderman, Piglin |
+| [Soul Sand Valley](#soul-sand-valley) — `minecraft:soul_sand_valley` | Soul Sand/Soul Soil surfaces, Basalt pillars, eligible Nether fossils | Skeleton, [Ghast](../mobs/Ghast.md), Enderman |
+| [Crimson Forest](#crimson-forest) — `minecraft:crimson_forest` | Crimson Nylium, huge Crimson Fungi, Weeping Vines | [Zombified Piglin](../mobs/ZombifiedPiglin.md), [Hoglin](../mobs/Hoglin.md), Piglin |
 | [Warped Forest](#warped-forest) — `minecraft:warped_forest` | Warped Nylium, huge Warped Fungi, Nether Sprouts, Twisting Vines | Enderman |
-| [Basalt Deltas](#basalt-deltas) — `minecraft:basalt_deltas` | Basalt/Blackstone surfaces, Basalt columns, Lava/Magma delta features | Ghast, Magma Cube |
+| [Basalt Deltas](#basalt-deltas) — `minecraft:basalt_deltas` | Basalt/Blackstone surfaces, Basalt columns, Lava/Magma delta features | [Ghast](../mobs/Ghast.md), Magma Cube |
 
 All five also list **Striders** in the creature category. These are the complete biome monster lists, not every entity that can occur there: structures, spawners, arriving mobs, and players provide other routes. Each entry still needs its placement, difficulty, population, and other spawn checks. [Wastes data][nether_wastes] · [Valley data][soul_sand_valley] · [Crimson data][crimson_forest] · [Warped data][warped_forest] · [Deltas data][basalt_deltas] · [Natural-spawn checks][spawn-checks]
 
