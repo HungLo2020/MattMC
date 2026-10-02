@@ -34,7 +34,7 @@ The [Dried Kelp item](../items/DriedKelp.md#drying-kelp) owns the Furnace, Smoke
 
 Placed **Dried Kelp Blocks** (`minecraft:dried_kelp_block`) are ordinary full building blocks with **0.5 hardness** and **2.5 blast resistance**. They need no continuing support and do not fall. Any ordinary mining tool or bare hand can collect one block; hoes get their tagged mining speed. Silk Touch is unnecessary and Fortune does not change the self-drop. Explosion recovery is conditional. [Properties][pack-block] · [Full-block shape and support][shape] · [Hoe tag][hoe] · [Tool rules][tools] · [Loot][pack-loot]
 
-Related: [Kelp item](../items/Kelp.md) · [Dried Kelp](../items/DriedKelp.md) · [Dried Kelp Block](../items/DriedKelpBlock.md) · [Seagrass](Seagrass.md) · [Sea Pickle](SeaPickle.md) · [Blocks](Blocks.md)
+Related: [Ocean biomes](../biomes/Oceans.md) · [Kelp item](../items/Kelp.md) · [Dried Kelp](../items/DriedKelp.md) · [Dried Kelp Block](../items/DriedKelpBlock.md) · [Seagrass](Seagrass.md) · [Sea Pickle](SeaPickle.md) · [Blocks](Blocks.md)
 
 ## Sources and verification
 

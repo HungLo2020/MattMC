@@ -29,7 +29,7 @@ You can also use Bone Meal on a **sturdy block face next to full-strength Water*
 
 A source-derived multiplication loop is to plant short Seagrass with Water above, apply Bone Meal, then harvest the tall plant with Shears for two items. Replant one to repeat. This uses the direct tall-growth and loot rules; no automated farm was tested. [Tall conversion][grass] · [Tall harvest][tall-loot]
 
-Related: [Seagrass item](../items/Seagrass.md) · [Shears](../items/Shears.md) · [Kelp](Kelp.md) · [Sea Pickle](SeaPickle.md) · [Blocks](Blocks.md)
+Related: [Ocean biomes](../biomes/Oceans.md) · [Seagrass item](../items/Seagrass.md) · [Shears](../items/Shears.md) · [Kelp](Kelp.md) · [Sea Pickle](SeaPickle.md) · [Blocks](Blocks.md)
 
 ## Sources and verification
 

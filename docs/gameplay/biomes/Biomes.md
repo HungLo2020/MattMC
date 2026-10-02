@@ -2,6 +2,10 @@
 
 Biomes choose local terrain materials, decorations, and possible mob spawns. In MattMC, a biome's name does not guarantee that it contains all the creatures or resources associated with an upstream mod.
 
+## Overworld ocean families
+
+- [Ocean biomes](Oceans.md): all nine ordinary, deep, cold, lukewarm, warm, and frozen selections, with checked vegetation, aquatic candidates, and structure eligibility
+
 ## Primordial Caves biomes
 
 The bundled **Normal** world preset selects these two biomes inside [Primordial Caves](../dimensions/PrimordialCaves.md):
@@ -17,7 +21,7 @@ The server's missing-dimension fallback uses a Primordial Plains-only biome pres
 
 A **feature entry** tells the generator what to attempt. Height, supporting blocks, space, and placement filters can prevent that attempt from placing anything. A **spawn entry** is likewise a candidate, not a promise that a mob appears: light, ground, difficulty, mob limits, and each creature's own checks still apply.
 
-The individual pages distinguish those data entries from verified constraints. No in-game generation or spawn-rate test was run for this source review. This index currently covers the two source-reviewed custom biomes above, rather than every biome in the game.
+The individual pages distinguish those data entries from verified constraints. No in-game generation or spawn-rate test was run for this source review. This index covers the ocean families and two custom biomes above; other biome families remain to be expanded.
 
 ## Related pages
 
@@ -27,7 +31,7 @@ The individual pages distinguish those data entries from verified constraints. N
 
 ## Sources and verification
 
-Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01, using active `src/main` files.
+Index updated on 2026-10-02 after integrating master `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. The [ocean guide](Oceans.md) records its own verified sources; the unchanged custom-dimension evidence below remains pinned to its 2026-10-01 review at `9bd57e1d0057903f6a9196e592d5e2a087c9248a`.
 
 - [Normal world preset](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/worldgen/world_preset/normal.json)
 - [Server dimension fallback](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/server/MinecraftServer.java#L406-L563) and [fallback biome preset](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/biome/MultiNoiseBiomeSourceParameterList.java#L81-L93)

@@ -33,7 +33,7 @@ A successful Bone Meal use fills the targeted cluster to **four pickles** and at
 
 An already-full qualifying cluster can still accept Bone Meal and attempt to spread. Dry pickles or pickles on ordinary stone cannot use this multiplication route. A flat bed of the five tagged Coral Blocks under water is a source-derived starting layout; new-cluster yield remains random. [Target and full-cluster behavior][pickle-bone]
 
-Related: [Sea Pickle item and dye recipe](../items/SeaPickle.md) · [Seagrass](Seagrass.md) · [Kelp](Kelp.md) · [Water Bucket](../items/WaterBucket.md) · [Blocks](Blocks.md)
+Related: [Ocean biomes](../biomes/Oceans.md) · [Sea Pickle item and dye recipe](../items/SeaPickle.md) · [Seagrass](Seagrass.md) · [Kelp](Kelp.md) · [Water Bucket](../items/WaterBucket.md) · [Blocks](Blocks.md)
 
 ## Sources and verification
 
