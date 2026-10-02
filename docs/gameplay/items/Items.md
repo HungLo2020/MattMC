@@ -1575,6 +1575,7 @@ Find inventory objects here, including block items, food, equipment, and spawn e
 - [Soul Soil](SoulSoil.md)
 - [Soul Torch](SoulTorch.md)
 - [SPAS-12 Multi-purpose Shotgun](SPAS12MultipurposeShotgun.md)
+- [Spawn eggs](SpawnEggs.md): shared acquisition, placement, spawner and supported-baby rules
 - [Spectral Arrow](SpectralArrow.md)
 - [Spectre Spawn Egg](SpectreSpawnEgg.md)
 - [Spider Eye](SpiderEye.md)

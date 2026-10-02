@@ -1189,6 +1189,15 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,358 pages / 37 indexes. All 15 authored paths are documentation; 931 local links/anchors and 273 tracked reference uses resolve, with zero rendered citation candidates and prior replacement anchors preserved. One new structure owner and four substantive mob replacements are distinct from three spawn-egg corrections and narrow discovery links.
 
+## Batch 146: Spawn-egg family and acquisition corrections
+
+- Added one shared Spawn Eggs owner grounded in all 158 registrations and 156 ordinary category listings. Ender Dragon/Wither eggs are explicitly unlisted and use the separately permission-gated command route; Cave Centipede binds to its head entity. Common hand/fluid/spawner/dispenser and existing-mob interactions retain their different gates and species exceptions.
+- Corrected 117 generic egg pages with narrow acquisition/behavior paragraphs, exact registration/category evidence and verified species-guide links. Separately corrected the misleading Survival exclusions in Giant Squid and Mule without replacing their authored mechanics. The three newly expanded illager egg pages were preserved after exact baseline-drift checks; all other protected pages retain their substance.
+- These are 119 targeted existing-page corrections plus one substantive shared owner, not 119 newly complete species articles. Natural spawning, food breeding, variants and care remain species-owned. Missing recipe/loot claims are kept distinct from the verified ordinary inventory-browser route.
+- Source checkpoint: `ac333e7655e092e93f2423a5ab47b50b2b2a9d9a`; 34 cited source pairs used by the family and corrections match current source. Independent inventory, rendered-reference, species-link and old-anchor checks passed; the actual server slot-insertion range supplements its handler gates. No inventory request, spawn-egg use, spawner change, dispenser or gameplay test was run.
+
+- Validation: required checker and strict build passed on 2,359 pages / 37 indexes. All 124 authored paths are documentation; 2,956 local links/anchors and 74 tracked reference uses resolve, with zero rendered citation candidates. The 119 section-level corrections retain existing headings and authored species notes; the three newer illager egg pages remain untouched.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.

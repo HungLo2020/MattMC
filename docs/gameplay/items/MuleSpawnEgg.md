@@ -6,7 +6,7 @@ The **Mule Spawn Egg** (`minecraft:mule_spawn_egg`) is a Creative tool for placi
 
 Use the egg on an ordinary block to spawn its mob at the clicked position or adjacent face, depending on the block's collision shape. Leave suitable room for the animal. A successful ordinary spawn consumes one egg in Survival; Creative use preserves the held supply. [Placement and consumption][egg] · [Consumption helper][stack]
 
-A matching egg used directly on a Mule can create a baby through the egg interaction even though Mules cannot mate. This is a Creative placement tool, not a way to breed Mules in ordinary Survival. [Egg offspring interaction][egg] · [Live mob interaction dispatch][mob]
+A matching egg used directly on a Mule can create a baby through the egg interaction even though Mules cannot mate. This egg-created baby route is available in **Survival as well as Creative** through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md); ordinary Mule mating remains disabled. [Registration](https://github.com/HungLo2020/MattMC/blob/aaeea0b263d995334061e562cd5b71a853540f7f/src/main/java/net/minecraft/world/item/Items.java#L1916) · [Category entry](https://github.com/HungLo2020/MattMC/blob/aaeea0b263d995334061e562cd5b71a853540f7f/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L2050) [Egg offspring interaction][egg] · [Live mob interaction dispatch][mob]
 
 A spawned animal is not automatically tamed or saddled by the ordinary egg. Follow the [Mule guide](../mobs/Mule.md) for obtaining, feeding, taming, riding, equipment, and drops. Modified egg components can change the entity data. [Default tame state][shared] · [Egg components][egg]
 

@@ -273,6 +273,7 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Torchflower](blocks/Torchflower.md) and [Pitcher Plant](blocks/PitcherPlant.md): actual Sniffer acquisition, crop-to-flower lifecycles and separate harvest rules
 - [Note Block](blocks/NoteBlock.md): tuning, all instrument types, head sounds and timed redstone examples
 - [Inventory item browser](mechanics/InventoryBrowser.md): current Survival/Creative insertion, search/capacity controls and operator-category limits
+- [Spawn eggs](items/SpawnEggs.md): ordinary browser access, two unlisted boss exceptions, placement/spawner controls and conditional offspring interactions
 - [Placed animal eggs](blocks/AnimalEggs.md): species-specific hatching, collection, trampling and current acquisition gaps
 - [Elevator](blocks/Elevator.md) and [Redstone Randomizer](blocks/RedstoneRandomizer.md): actual controls, search/output behavior, collection and limits
 - [Sculk and Catalysts](blocks/Sculk.md), [Sensors/calibration](blocks/SculkSensors.md) and [Shriekers](blocks/SculkShrieker.md): collection, XP-driven growth, vibration circuits and actual warning/summoning gates
