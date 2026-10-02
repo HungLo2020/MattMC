@@ -72,7 +72,7 @@ Armadillos differ from ordinary farm animals here: their support tag includes th
 
 | Search target | Eligible IDs in this guide | Active definition and placement set |
 | --- | --- | --- |
-| Desert Pyramid | `desert` | [Definition][structure-desert_pyramid] · [Set][set-desert_pyramids] · [Biome tag][tag-desert_pyramid] |
+| [Desert Pyramid](../structures/DesertPyramid.md) | `desert` | [Definition][structure-desert_pyramid] · [Set][set-desert_pyramids] · [Biome tag][tag-desert_pyramid] |
 | Desert Village | `desert` | [Definition][structure-village_desert] · [Village set][set-villages] · [Biome tag][tag-village_desert] |
 | Savanna Village | `savanna` | [Definition][structure-village_savanna] · [Village set][set-villages] · [Biome tag][tag-village_savanna] |
 | Mesa-type Mineshaft | `badlands`, `wooded_badlands`, `eroded_badlands` | [Definition][structure-mineshaft_mesa] · [Mineshaft set][set-mineshafts] · [Eligibility][tag-mineshaft_mesa] · [Expanded Badlands tag][badlands-tag] |

@@ -18,6 +18,9 @@ For mapmaking with saved templates and pool connectors, see [Structure and Jigsa
 | [Ocean Ruins](OceanRuins.md) | Eligible warm or cold Overworld oceans | Chest rewards, archaeology, and possible treasure maps |
 | [Ocean Monument](OceanMonument.md) | Deep Ocean, Deep Cold Ocean, Deep Lukewarm Ocean, and Deep Frozen Ocean | Guardian/Elder encounters, Prismarine, Wet Sponges, gold, and a Tide template chance |
 | [Buried Treasure](BuriedTreasure.md) | Beach and Snowy Beach | Heart of the Sea and other buried-chest loot |
+| [Desert Pyramid](DesertPyramid.md) | Desert | Four trap-room chests, Dune templates and a separate archaeology cellar |
+| [Jungle Temple](JungleTemple.md) | Jungle and Bamboo Jungle | Two chests, arrow traps, a piston puzzle and Wild templates |
+| [Swamp Hut](SwampHut.md) | Swamp | Witch/Cat residents and separate piece-bound spawning routes |
 
 These are the structures reviewed in this section so far, not a list of every structure in MattMC. Room layouts and chest contents vary. Finding the right structure does not guarantee a particular optional room or random reward.
 

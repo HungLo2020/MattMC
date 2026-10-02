@@ -161,6 +161,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Exploration, archaeology, and trade
 
+- [Desert Pyramid](structures/DesertPyramid.md), [Jungle Temple](structures/JungleTemple.md) and [Swamp Hut](structures/SwampHut.md): traps, chest and archaeology rewards, and Witch/Cat encounters
+
 - [Woodland Mansion](structures/WoodlandMansion.md), [Evoker](mobs/Evoker.md), [Vindicator](mobs/Vindicator.md), and [Vex](mobs/Vex.md): forest expeditions, room rewards, spell/axe encounters and summon limits
 
 - [Pillager Outpost](structures/PillagerOutpost.md), [Pillager](mobs/Pillager.md), [Ravager](mobs/Ravager.md), and [Raids](mechanics/Raid.md): tower expeditions, captain bottles, omen preparation, waves and victory

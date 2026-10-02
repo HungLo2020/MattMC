@@ -64,9 +64,9 @@ The tables above are deliberately selective. Ordinary hostile entries remain pre
 
 | Search target | Eligible IDs among these five | Active definition and placement set |
 | --- | --- | --- |
-| Jungle Temple | `jungle`, `bamboo_jungle` | [Definition][structure-jungle_pyramid] · [Set][set-jungle_temples] · [Biome tag][tag-jungle_temple] |
+| [Jungle Temple](../structures/JungleTemple.md) | `jungle`, `bamboo_jungle` | [Definition][structure-jungle_pyramid] · [Set][set-jungle_temples] · [Biome tag][tag-jungle_temple] |
 | Trail Ruins | `jungle` | [Definition][structure-trail_ruins] · [Set][set-trail_ruins] · [Biome tag][tag-trail_ruins] |
-| Swamp Hut | `swamp` | [Definition][structure-swamp_hut] · [Set][set-swamp_huts] · [Biome tag][tag-swamp_hut] |
+| [Swamp Hut](../structures/SwampHut.md) | `swamp` | [Definition][structure-swamp_hut] · [Set][set-swamp_huts] · [Biome tag][tag-swamp_hut] |
 
 These are selected routes, not a complete structure list. Structure-set placement, the definition's biome restriction and the structure's generation point all participate in the active generation path. A matching biome is search eligibility, not a guaranteed structure or loot result. For Trail Ruins materials and archaeology, use [Mud's natural supplies](../blocks/MudAndMudBricks.md#natural-supplies) and [Suspicious Sand and Gravel](../blocks/SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel). [Placement caller][structure-call] · [Biome gate][structure-biome] · [Generation-point filter][generation-point]
 

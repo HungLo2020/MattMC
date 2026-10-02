@@ -83,6 +83,8 @@ With normal mob loot enabled, an adult's base death loot is **0–2 String**. Th
 
 ## Related pages
 
+- [Swamp Hut](../structures/SwampHut.md)
+
 - [Ocelot](Ocelot.md)
 - [Cat Spawn Egg](../items/CatSpawnEgg.md)
 - [Raw Cod](../items/RawCod.md)

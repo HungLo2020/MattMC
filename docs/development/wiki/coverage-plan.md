@@ -1263,3 +1263,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Corrected the Knowledge Book owner against current item registration, category/browser construction, command permissions, client/server dispatch and consumption, loaded-recipe validation, inactive server recipe awards, and Chiseled Bookshelf storage. Empty or invalid recipe data can consume a book in Survival before failure; valid data does not unlock recipes in this implementation.
 - Removed only the obsolete recipe-book-layout phrases from Stick, String and Oak Planks, preserving their existing authored recipes, source citations and anchors. The current crafting-table screen has no recipe-book interface.
 - Source-reviewed at `13ff4feddc5b7b0ce0cdbfd912a9486d817400fd`. Preserved all old anchors; require the package's exact-diff, local-link, source-bound, reference-binding and actual MkDocs-render checks before promotion. No gameplay or multiplayer test is claimed, and this correction does not certify every other guide's recipe-book wording.
+
+## Batch 151: Desert, jungle and swamp structures
+
+- Added Desert Pyramid, Jungle Temple and Swamp Hut expedition owners, with biome, structure-index, Cat and content-guide routes.
+- Reviewed actual trap layouts, finite Dispenser ammunition, chest and archaeology loot, intended suspicious-block counts, and the distinct generated-resident/natural/replenishment paths in huts. Generation source and pool weights are not runtime frequency guarantees.
+- Independent review checked 175 references and 68 immutable source files; final check/build, local anchors and rendered citations are required before promotion. No live trap disarming, puzzle sequence, terrain-generation or loot survey is claimed.
