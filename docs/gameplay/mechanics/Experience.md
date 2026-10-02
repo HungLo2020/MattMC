@@ -27,6 +27,8 @@ Those are source-reviewed examples, not an exhaustive farming guide. Use each or
 
 ## Why Mending can leave the bar unchanged
 
+For equipment eligibility, acquisition, targeted repair and the odd-durability remainder, see [Unbreaking and Mending](../enchanting/DurabilityEnchantments.md).
+
 Orb collection attempts **Mending repairs before adding leftover points to your experience bar**. The checked selection considers damaged eligible items in equipment slots, including the selected main-hand item and offhand, and chooses among matching candidates. A damaged Mending tool stored in another ordinary inventory slot is not a candidate until equipped. [Repair-before-XP path][pickup] · [Equipment selection][mending-selection] · [Selected main-hand mapping][player-equipment]
 
 The bundled Mending effect supplies **two durability points of repair per experience point** before the remaining-damage cap and integer remainder calculation. For a simple example, a **5-point orb** can repair **10 damage** on the only eligible equipped item and leave **zero points** for your bar. If repair leaves points, the routine can try another eligible item before paying the final remainder to the player. Existing levels are not drained to do this. [Repair calculation][pickup] · [Bundled Mending effect][mending] · [Effect application][repair-effect]

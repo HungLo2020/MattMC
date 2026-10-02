@@ -52,6 +52,8 @@ Closing and reopening the menu, removing and reinserting the same unchanged item
 
 ## Related pages
 
+- [Unbreaking and Mending](DurabilityEnchantments.md): wear chances, supported equipment, XP-repair selection, broken stacks and acquisition
+
 - [Protection enchantments](ProtectionEnchantments.md): four armor choices, damage tags, combined cap, secondary attributes and retained broken gear
 
 - [Efficiency, Fortune and Silk Touch](MiningEnchantments.md): tool eligibility, speed bonuses, loot choices and collection limits

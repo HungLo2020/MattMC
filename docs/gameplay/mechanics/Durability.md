@@ -58,6 +58,8 @@ Similarly, a break sound or animation does not prove that the inventory item was
 
 ## Related pages
 
+- [Unbreaking and Mending](../enchanting/DurabilityEnchantments.md): ordinary wear probabilities, XP-repair eligibility and enchantment acquisition
+
 - [Pickaxes and Shovels](PickaxesAndShovels.md): exact item materials, last-use drop order, and broken-tool recycling
 - [Anvil operations](AnvilMechanics.md)
 - [Grindstone](../blocks/Grindstone.md)
