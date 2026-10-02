@@ -1104,6 +1104,15 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,342 pages / 37 indexes. All 14 authored paths are documentation; 853 local links/anchors and 196 tracked reference uses resolve, with zero rendered citation candidates and all replacement headings retained. The two mob and six item expansions do not certify other imported integrations.
 
+## Batch 136: Nether/End biome choices and airborne imports
+
+- Added two substantive biome-family owners with exact sections for all ten Nether/End IDs, preserving dimension travel/respawn and structure/material ownership. Updated the biome index's scope without claiming coverage of the remaining Overworld families.
+- Replaced three imported mob stubs and corrected four related items for Spectre, Cosmaw and Cosmic Cod. Soul Heart remains the existing lure owner. Loaded natural-spawn absence, failed required Cosmaw food-item dependency, conditional companion behavior, water-sensitive bucket release and source-level leash limits are explicit.
+- Biome guidance separates selected climate/noise categories, conditional surfaces, placed-feature attempts, spawn candidates and structure eligibility. Doubled Delta ore attempts are not described as doubled yield; End Midlands city eligibility is distinct from its empty feature list.
+- Source checkpoint: `cfed1bb2ac5db4457ec7654a9418120f59bcf69d`; 113 distinct pinned source pairs match current source. Independent reference/anchor rendering passed all nine incoming pages. No generation, spawn-rate, feeding, transport, capture/release or resource-yield gameplay test was run.
+
+- Validation: required checker and strict build passed on 2,344 pages / 37 indexes. All 16 authored paths are documentation; 909 local links/anchors and 266 tracked reference uses resolve, with zero rendered citation candidates and old replacement anchors retained. Ten biome IDs have precise family sections; this does not imply all Overworld biomes or imported systems are complete.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.

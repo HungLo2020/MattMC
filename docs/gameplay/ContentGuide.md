@@ -154,6 +154,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Exploration, archaeology, and trade
 
+- [Nether biomes](biomes/NetherBiomes.md) and [End biomes](biomes/EndBiomes.md): choose natural exploration routes by materials, structures and feature limits
+
 - [Bastion Remnant](structures/BastionRemnant.md), [Piglin](mobs/Piglin.md), and [Piglin Brute](mobs/PiglinBrute.md): Nether residents, chest rewards, gold rules and bartering
 - [Ocean Monument](structures/OceanMonument.md), [Guardian](mobs/Guardian.md), and [Elder Guardian](mobs/ElderGuardian.md): deep-ocean search, beam/spike combat, fatigue and rewards
 
@@ -171,6 +173,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Trading](trading/Trading.md), [Villagers](mobs/Villager.md), and [Emeralds](items/Emerald.md): professions, stock, prices, and optional trade-rebalance rules
 
 ## Alex's Mobs additions
+
+- **Airborne encounters:** [Spectre](mobs/Spectre.md), [Cosmaw](mobs/Cosmaw.md), and [Cosmic Cod](mobs/CosmicCod.md): Soul Heart attraction, hunting, bucket handling and current feeding/transport limits
 
 - [Hummingbird](mobs/Hummingbird.md): active flight/variants and egg offspring, with missing food/pollination/feeder integrations clearly separated
 - [Cachalot Whale](mobs/CachalotWhale.md) and [Giant Squid](mobs/GiantSquid.md): breathing/care, whale rescue rewards and building hazards, combat, and current capture/multipart limits

@@ -41,6 +41,8 @@ These rules follow the bundled Nether dimension type. The anchor recipe and inte
 
 ## Related pages
 
+- [Nether biomes](../biomes/NetherBiomes.md): compare all five exploration routes and their resources, candidates and structures
+
 - [Dimensions](Dimensions.md)
 - [Bastion Remnant](../structures/BastionRemnant.md)
 - [Piglin](../mobs/Piglin.md) and [Piglin Brute](../mobs/PiglinBrute.md)

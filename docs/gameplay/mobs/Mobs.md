@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Airborne bundled creatures:** [Spectre](Spectre.md), [Cosmaw](Cosmaw.md), and [Cosmic Cod](CosmicCod.md): lure, hunting, bucket and companion-integration limits
+
 - **Imported arthropods:** [Cave Centipede](CaveCentipede.md) and [Tarantula Hawk](TarantulaHawk.md): actual encounters, sting/loot behavior and resource limitations
 
 - **Bastion residents:** [Piglin](Piglin.md), [Piglin Brute](PiglinBrute.md), and [Bastion Remnant](../structures/BastionRemnant.md): gold, barter and looting limits

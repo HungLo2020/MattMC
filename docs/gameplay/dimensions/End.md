@@ -37,6 +37,8 @@ Set up your bed or anchor in a dimension that supports it, and check the surroun
 
 ## Related pages
 
+- [End biomes](../biomes/EndBiomes.md): compare central terrain, Chorus-bearing Highlands, city-eligible Midlands, Barrens and Small End Islands
+
 - [End City](../structures/EndCity.md) and [Elytra](../items/Elytra.md): outer-island exploration, ships, and safe flight limits
 
 - [Ender Dragon](../mobs/EnderDragon.md): crystals, perching, breath, rewards, and respawning
