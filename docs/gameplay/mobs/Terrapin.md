@@ -18,3 +18,7 @@ Terrapin is classified as passive here: it does not normally start fights with p
 * Its entity class is `EntityTerrapin`.
 * Its registered size is `0.6, 0.4` blocks.
 * This mob comes from bundled Alex's Mobs content integrated into MattMC.
+
+## Related pages
+
+- [Placed Terrapin Eggs: acquisition, hatching and protection](../blocks/AnimalEggs.md#terrapin-eggs)

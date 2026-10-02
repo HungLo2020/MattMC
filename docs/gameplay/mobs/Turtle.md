@@ -18,3 +18,7 @@ Turtle is classified as passive here: it does not normally start fights with pla
 * Its entity class is `Turtle`.
 * Its registered size is `1.2, 0.4` blocks.
 * This mob comes from the base MattMC/Minecraft entity set.
+
+## Related pages
+
+- [Placed Turtle Eggs: acquisition, hatching and protection](../blocks/AnimalEggs.md#turtle-eggs)

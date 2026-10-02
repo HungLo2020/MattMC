@@ -51,6 +51,8 @@ Untamed adults target the bundled list of small prey, including Chickens, Rabbit
 
 ## Related pages
 
+- [Placed Caiman Eggs: acquisition, hatching and protection](../blocks/AnimalEggs.md#caiman-eggs)
+
 - [Caiman Egg](../items/CaimanEgg.md)
 - [Caiman Spawn Egg](../items/CaimanSpawnEgg.md)
 - [Platypus](Platypus.md)

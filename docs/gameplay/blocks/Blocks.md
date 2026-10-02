@@ -190,7 +190,7 @@ Names use English localization where available. A † marks one of 25 readable r
 
 - **Cactus** — [Cactus](Cactus.md) (related guide); `minecraft:cactus`
 - **Cactus Flower** — [Cactus](Cactus.md) (related guide); `minecraft:cactus_flower`
-- **Caiman Egg** — article needed; `minecraft:caiman_egg`
+- **Caiman Egg** — [Placed animal eggs](AnimalEggs.md#caiman-eggs) (related guide); `minecraft:caiman_egg`
 - **Cake** — [Cake](Cake.md#placement-and-collection) (related guide); `minecraft:cake`
 - **Cake with Black Candle** — [Cake](Cake.md#black-candle-cake) (related guide); `minecraft:black_candle_cake`
 - **Cake with Blue Candle** — [Cake](Cake.md#blue-candle-cake) (related guide); `minecraft:blue_candle_cake`
@@ -422,7 +422,7 @@ Names use English localization where available. A † marks one of 25 readable r
 
 ### E
 
-- **Elevator** — article needed; `minecraft:elevator`
+- **Elevator** — [Elevator](Elevator.md#elevator) (related guide); `minecraft:elevator`
 - **Emerald Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:emerald_ore`
 - **Enchanting Table** — [Enchanting Table](EnchantingTable.md) (related guide); `minecraft:enchanting_table`
 - **End Gateway** — article needed; `minecraft:end_gateway`
@@ -834,7 +834,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Piston Head** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:piston_head`
 - **Pitcher Crop** — [Pitcher Plant and Pitcher Crop](PitcherPlant.md) (related guide); `minecraft:pitcher_crop`
 - **Pitcher Plant** — [Pitcher Plant and Pitcher Crop](PitcherPlant.md) (related guide); `minecraft:pitcher_plant`
-- **Platypus Egg** — article needed; `minecraft:platypus_egg`
+- **Platypus Egg** — [Placed animal eggs](AnimalEggs.md#platypus-eggs) (related guide); `minecraft:platypus_egg`
 - **Player Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_head`
 - **Player Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_wall_head`
 - **Podzol** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#podzol-and-mushroom-support) (related guide); `minecraft:podzol`
@@ -979,7 +979,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Redstone Comparator** — [Redstone Comparator](RedstoneComparator.md) (related guide); `minecraft:comparator`
 - **Redstone Lamp** — [Redstone Lamp](RedstoneLamp.md) (related guide); `minecraft:redstone_lamp`
 - **Redstone Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:redstone_ore`
-- **Redstone Randomizer** — article needed; `minecraft:redstone_randomizer`
+- **Redstone Randomizer** — [Redstone Randomizer](RedstoneRandomizer.md#redstone-randomizer) (related guide); `minecraft:redstone_randomizer`
 - **Redstone Repeater** — [Redstone Repeater](RedstoneRepeater.md) (related guide); `minecraft:repeater`
 - **Redstone Torch** — [Redstone Torch](RedstoneTorch.md) (related guide); `minecraft:redstone_torch`
 - **Redstone Wall Torch** — [Redstone Torch](RedstoneTorch.md) (related guide); `minecraft:redstone_wall_torch`
@@ -1040,7 +1040,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Smooth Sandstone Stairs** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:smooth_sandstone_stairs`
 - **Smooth Stone** — [Stone](Stone.md#smooth-stone) (related guide); `minecraft:smooth_stone`
 - **Smooth Stone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:smooth_stone_slab`
-- **Sniffer Egg** — article needed; `minecraft:sniffer_egg`
+- **Sniffer Egg** — [Placed animal eggs](AnimalEggs.md#sniffer-eggs) (related guide); `minecraft:sniffer_egg`
 - **Snow** — [Snow and Powder Snow](Snow.md#placing-layers-and-keeping-their-support) (related guide); `minecraft:snow`
 - **Snow Block** — [Snow and Powder Snow](Snow.md#collecting-and-crafting-snow) (related guide); `minecraft:snow_block`
 - **Soul Campfire** — [Campfires](Campfires.md#variants-and-crafting) (related guide); `minecraft:soul_campfire`
@@ -1124,7 +1124,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Tall Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:tall_seagrass`
 - **Target** — [Target](Target.md#target) (related guide); `minecraft:target`
 - **Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:terracotta`
-- **Terrapin Egg** — article needed; `minecraft:terrapin_egg`
+- **Terrapin Egg** — [Placed animal eggs](AnimalEggs.md#terrapin-eggs) (related guide); `minecraft:terrapin_egg`
 - **Test Block** — article needed; `minecraft:test_block`
 - **Test Instance Block** — article needed; `minecraft:test_instance_block`
 - **Thin Bone** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:thin_bone`
@@ -1151,7 +1151,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Tuff Slab** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_slab`
 - **Tuff Stairs** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_stairs`
 - **Tuff Wall** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_wall`
-- **Turtle Egg** — article needed; `minecraft:turtle_egg`
+- **Turtle Egg** — [Placed animal eggs](AnimalEggs.md#turtle-eggs) (related guide); `minecraft:turtle_egg`
 - **Twisting Vines** — [Vines and Glow Berries](Vines.md#twisting-vines) (related guide); `minecraft:twisting_vines`
 - **Twisting Vines Plant** — [Vines and Glow Berries](Vines.md#twisting-vines-plant) (related guide); `minecraft:twisting_vines_plant`
 
@@ -1360,6 +1360,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Dragon Egg](DragonEgg.md)
 - [Dripleaves](Dripleaves.md)
 - [Dripstone](Dripstone.md)
+- [Elevator](Elevator.md)
 - [Enchanting Table](EnchantingTable.md)
 - [End Rod](EndRod.md)
 - [End Stone and Purpur](EndStoneAndPurpur.md)
@@ -1412,6 +1413,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Pewen family](Pewen.md)
 - [Piston and Sticky Piston](Pistons.md)
 - [Pitcher Plant and Pitcher Crop](PitcherPlant.md)
+- [Placed animal eggs](AnimalEggs.md)
 - [Placed dinosaur eggs](DinosaurEggs.md)
 - [Pressure plates](PressurePlates.md)
 - [Primal Magma and Fissure Primal Magma](PrimalMagma.md)
@@ -1424,6 +1426,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Redstone Comparator](RedstoneComparator.md)
 - [Redstone Dust and wire](RedstoneDust.md)
 - [Redstone Lamp](RedstoneLamp.md)
+- [Redstone Randomizer](RedstoneRandomizer.md)
 - [Redstone Repeater](RedstoneRepeater.md)
 - [Redstone Torch](RedstoneTorch.md)
 - [Resin](Resin.md)

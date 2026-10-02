@@ -1006,10 +1006,19 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,314 pages / 37 indexes. All 21 authored paths are documentation; 2,034 local links/anchors and 217 tracked reference uses resolve, with zero rendered citation ambiguity or unresolved-bracket candidates. The inventory/browser source chain and all new correction citation bounds were checked independently. The alphabetical directory preserves 1,211 IDs, with 1,173 related-guide routes and 38 explicit article gaps; neither this nor the page count implies broad completion.
 
+## Batch 125: Animal eggs and custom redstone
+
+- Added three canonical block guides and corrected six item pages, covering seven exact IDs. Five existing mob guides gain narrow egg-owner crosslinks without rewriting their behavior or merged fixes.
+- Egg review separates Caiman/Platypus/Terrapin/Turtle random-tick rules from Sniffer scheduled stages, actual baby types/ages, placement/stacking, Silk/drop and trample differences. Terrapin’s unregistered laying goal, absent item mapping and unestablished parent-trait transfer remain explicit; no fictional Terrapin Egg inventory page was created. Existing breeding/loot gaps remain qualified, with ordinary listed egg acquisition linked to the verified inventory browser.
+- Elevator review distinguishes the two active upward input/search paths, basic server acceptance, ordinary listing and absent recipe/loot/tool data. Player prose focuses on controls and practical landing limits; separate server-validation analysis remains outside the wiki article. Randomizer review verifies directional signal mapping, sampled delay/pulse behavior, default states and model limitations without claiming measured randomness or circuit timing.
+- Source checkpoint: `306bdd428eff0c9b05475b43735b798f71f130aa`; all 61 distinct pinned draft-source pairs match the integrated source. No hatch, breeding, collection, teleport, multiplayer or circuit runtime test is claimed.
+
+- Validation: required checker and strict build passed on 2,317 pages / 37 indexes. All 20 authored paths are documentation; 2,056 local links/anchors and 334 tracked references resolve, with zero rendered citation ambiguity or unresolved-bracket candidates. The directory keeps all 1,211 IDs alphabetical, with 1,180 related-guide routes and 31 explicit article gaps. Five mob edits are crosslinks only, not newly completed species guides.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Finish the isolated animal-egg and custom redstone drafts, then Fire/Chorus, portal and operator-block reviews. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+2. Integrate the reviewed Fire/Chorus, portal and operator-block drafts, then finish remaining nature, storage/core, Cobweb/Dried Ghast and Warden reviews. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
 3. Fill remaining practical gaps such as fuel/storage utility blocks, sculk devices and imported nature/redstone blocks, following actual active behavior and acquisition routes.
 4. Cover remaining terrain/material, plant and technical families, including Fire/Soul Fire, Chorus, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
 5. Preserve the ready Swords and undead drafts for later source revalidation; replace remaining generic mob/item pages, including Warden and the missing Nautilus owners, and add stronger combat, health/death/experience, expedition, effect and enchantment coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.

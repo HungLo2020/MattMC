@@ -52,6 +52,8 @@ No dedicated Platypus death-loot table was found. The wearable-fedora interactio
 
 ## Related pages
 
+- [Placed Platypus Eggs: acquisition, hatching and protection](../blocks/AnimalEggs.md#platypus-eggs)
+
 - [Bucket of Platypus](../items/BucketOfPlatypus.md)
 - [Platypus Egg](../items/PlatypusEgg.md)
 - [Platypus Spawn Egg](../items/PlatypusSpawnEgg.md)

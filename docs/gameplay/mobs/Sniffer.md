@@ -18,3 +18,7 @@ Sniffer is classified as passive here: it does not normally start fights with pl
 * Its entity class is `Sniffer`.
 * Its registered size is `1.9, 1.75` blocks.
 * This mob comes from the base MattMC/Minecraft entity set.
+
+## Related pages
+
+- [Placed Sniffer Eggs: acquisition, hatching and protection](../blocks/AnimalEggs.md#sniffer-eggs)
