@@ -28,6 +28,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Farming, food, and animal care
 
+- [Mooshroom](mobs/Mooshroom.md), [Goat](mobs/Goat.md), and [Polar Bear](mobs/PolarBear.md): stew/milk routes, horn collection, breeding differences and cub safety
+
 - [Allay](mobs/Allay.md): finding helpers, sample filters, item delivery, music and Amethyst duplication
 
 - [Vines and Glow Berries](blocks/Vines.md), [Glow Lichen](blocks/GlowLichen.md), [Moss](blocks/MossAndPaleMoss.md), and [ceiling plants](blocks/HangingRootsAndSporeBlossom.md): support, water, growth, harvesting, light and verified starter routes

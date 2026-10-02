@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Fungal and mountain animals:** [Mooshroom](Mooshroom.md), [Goat](Goat.md), and [Polar Bear](PolarBear.md): food/variant care, horns, and cub-protection limits
+
 - **Allay collection:** [Allay](Allay.md): loose-item matching, player/Note Block deliveries, Jukebox dancing and duplication
 
 - **Mansion illagers:** [Evoker](Evoker.md), [Vindicator](Vindicator.md), [Vex](Vex.md), and [Woodland Mansion](../structures/WoodlandMansion.md): generated residents, spells, door hazards and loot

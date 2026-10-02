@@ -1251,3 +1251,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Verified 15 crafting recipes, 24 self-drop tables, tool/drop distinctions, support, waterlogging, light, oxidation, waxing, axe scraping and lightning state preservation against unchanged source. Copper Lanterns can drop without a correct-tool gate; Bars and Chain require an intact pickaxe.
 - Removed obsolete recipe-book advice from the new draft: recipe awards are disabled, so mismatched reward IDs are an inactive data observation, not a manual-crafting defect. Axe wear is qualified for enchantments and infinite-material handling.
 - Documentation check, strict build, local links, exact variant anchors and rendered citations are required before promotion. No game launch or crafting/mining/weathering runtime test is claimed; broad wiki catch-up remains incomplete.
+
+## Batch 149: Fungal and mountain animal care
+
+- Expanded Mooshroom, Goat and Polar Bear behavior and acquisition limits, plus Mushroom Stew and Goat Horn use, with three discovery/care crosslinks.
+- Source review covers Mooshroom flower servings and shearing, Goat ramming/horn instruments and breeding variants, and Polar Bear cub protection and absent breeding food. Loot follows current MattMC data, including Goat Mutton; upstream assumptions are not substituted.
+- All five owner drafts were independently reviewed, with 74 immutable source-file pairs checked against the integrated source. Final documentation check/build, rendered citations and local anchors are required before promotion. No live animal, item-use or breeding test is claimed.
