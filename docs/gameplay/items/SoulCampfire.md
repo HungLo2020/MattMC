@@ -4,7 +4,7 @@ The **Soul Campfire** item places `minecraft:soul_campfire`. It cooks up to four
 
 ## Obtaining
 
-Craft **one Soul Campfire** in a Crafting Table with three Sticks, three tagged logs, and **one Soul Sand or Soul Soil**. Use the [canonical recipe layout and log choices](../blocks/Campfires.md#variants-and-crafting); the recipe accepts mixed tagged logs, including the Nether stem families. [Recipe][recipe-soul_campfire] · [Log choices][logs] [burnlogs] [crimson] [warped]
+Craft **one Soul Campfire** in a Crafting Table with three Sticks, three tagged logs, and **one Soul Sand or Soul Soil**. Use the [canonical recipe layout and log choices](../blocks/Campfires.md#variants-and-crafting); the recipe accepts mixed tagged logs, including the Nether stem families. [Recipe][recipe-soul_campfire] · [Log choices][logs] [burnlogs][] [crimson][] [warped]
 
 Mine the placed block with **Silk Touch** to recover this item. Ordinary harvesting instead gives **one Soul Soil**; an axe is faster but does not substitute for Silk Touch. Fortune does not increase that drop. [Loot][loot-soul_campfire] · [Registration][blocks] · [Axe tag][axe]
 

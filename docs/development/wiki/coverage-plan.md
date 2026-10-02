@@ -915,6 +915,21 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,282 pages / 37 indexes. All 23 authored paths are documentation; 2,045 local links/anchors and 720 citation uses resolve. Integrated citation QA caught and corrected two undefined Pot shorthand references before publication. All 176 distinct pinned source references in the fourteen article files match the integrated source. The 1,211-ID alphabetical directory has 1,087 related-guide routes and 124 article gaps, not a completion score.
 
+## Batch 116: source-citation rendering repair
+
+- Repaired 205 context-reviewed citation collisions across 123 lines in 45 gameplay pages. Whitespace-separated shortcut citations were being interpreted as a single full reference, showing the first source label but linking the second source.
+- The repair only appends 410 empty reference brackets, restoring 205 intended anchors while preserving prose, URL definitions, whitespace and legitimate full references. Each citation-only page transformation was compared byte-for-byte with the expected edit and its complete rendered HTML matched the independently audited result. The later coordinated-review update adds the separately verified #796 link to Composter.
+- The source audit covered all 2,223 gameplay Markdown files at `a3c8229f0d3eff7b98dcb5af3aaa0803ea303dcd`, including 545 files with reference definitions. No undefined full/collapsed/shortcut citations were found at that snapshot; this repair addresses wrong/missing rendered targets rather than missing definitions.
+- Continuing authoring rule: use explicit full or collapsed source references, or separate independent shortcuts clearly. Validate all three reference forms and actual rendered labels/targets; a strict MkDocs build alone does not detect every reference-syntax problem. This is documentation-only maintenance, with no gameplay changes or tests.
+
+- Validation: all 45 citation-only transformations exactly match the independently verified rendered HTML; all 410 inserted collapsed references resolve to their own definitions, restoring exactly 205 anchors. Required checker, strict build and diff checks passed on 2,282 pages / 37 indexes; 930 local links/anchors were checked across the 47 authored documentation paths. Registry inventory, article routes and gameplay descriptions are unchanged.
+
+## Coordinated source and issue review, 2026-10-02 08:45 UTC
+
+- Source remains unchanged at the published documentation head `a3c8229f0d3eff7b98dcb5af3aaa0803ea303dcd`. The review added [Composter issue #796](https://github.com/HungLo2020/MattMC/issues/796) after independent source verification of failed-Hopper-transfer rollback; the existing player warning now links it. This is an open, source-predicted defect, not a runtime reproduction or implemented fix.
+- Pewen sign issue #795 remains open; held-light PR #791 and Building Wand PR #794 remain unmerged drafts at the review checkpoint. No new runtime commits, migration completion or issue closures were recorded. Dinosaur/Footprint pattern and acquisition limitations remain documented, with separate integration triage deferred; no tested visual defect or fix is claimed.
+- Batch116 publication was delayed by a stalled tree-object request. Read-only reconciliation confirmed both refs still at the prior head and no116 commit/ref request had been sent. The citation repair and this bounded review are validated together before promotion.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and separate category catalogs as source changes; use explicit article gaps to choose new work. A related family link is not proof that every detail of a variant is reviewed.

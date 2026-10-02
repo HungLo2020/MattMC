@@ -10,9 +10,9 @@ The active normal world preset uses the End noise generator settings, whose base
 
 ### Mining and recovery
 
-Use an **unbroken pickaxe**, including Wood, for all nine End Stone/Purpur forms on this page. They require a correct tool, are in the pickaxe tag and have no higher material-tier restriction. Hand breaking does not collect them. [Registry][blocks] · [Tool tags][pickaxe] [wood-denials] [stone-tier] [iron-tier] [diamond-tier] · [Tool/break dispatch][tool-material] [player-tool] [broken-tool] [break-dispatch]
+Use an **unbroken pickaxe**, including Wood, for all nine End Stone/Purpur forms on this page. They require a correct tool, are in the pickaxe tag and have no higher material-tier restriction. Hand breaking does not collect them. [Registry][blocks] · [Tool tags][pickaxe] [wood-denials][] [stone-tier][] [iron-tier][] [diamond-tier][] · [Tool/break dispatch][tool-material] [player-tool][] [broken-tool][] [break-dispatch]
 
-Full blocks, pillars, stairs and walls drop **one matching item**. Single slabs give **one slab**, and double slabs give **two matching slabs**. Silk Touch is unnecessary and Fortune does not multiply these drops. Mining End Stone Bricks preserves the bricks, and mining Purpur does not return Popped Chorus Fruit. Explosions have separate survival/decay conditions. [End Stone family loot][loot-end-stone] [loot-end-stone-bricks] [loot-end-stone-brick-stairs] [loot-end-stone-brick-wall] [loot-end-stone-brick-slab] · [Purpur loot][loot-purpur-block] [loot-purpur-pillar] [loot-purpur-stairs] [loot-purpur-slab]
+Full blocks, pillars, stairs and walls drop **one matching item**. Single slabs give **one slab**, and double slabs give **two matching slabs**. Silk Touch is unnecessary and Fortune does not multiply these drops. Mining End Stone Bricks preserves the bricks, and mining Purpur does not return Popped Chorus Fruit. Explosions have separate survival/decay conditions. [End Stone family loot][loot-end-stone] [loot-end-stone-bricks][] [loot-end-stone-brick-stairs][] [loot-end-stone-brick-wall][] [loot-end-stone-brick-slab][] · [Purpur loot][loot-purpur-block] [loot-purpur-pillar][] [loot-purpur-stairs][] [loot-purpur-slab]
 
 ## End stone variants and recipes
 
@@ -24,13 +24,13 @@ Full blocks, pillars, stairs and walls drop **one matching item**. Single slabs 
 | [End Stone Brick Slab](../items/EndStoneBrickSlab.md) | `minecraft:end_stone_brick_slab` |
 | [End Stone Brick Wall](../items/EndStoneBrickWall.md) | `minecraft:end_stone_brick_wall` |
 
-Craft **4 End Stone in a 2 × 2 square → 4 End Stone Bricks**. For the brick shapes, use the [shared patterns](Stone.md#crafting-yields): **6 End Stone Bricks → 4 stairs**, **3 → 6 slabs**, or **6 → 6 walls**. Crafting these shapes uses the bricks, while stonecutting can accept raw End Stone directly. [Brick recipe][crafting-end-stone-bricks] · [Shape recipes][crafting-end-stone-brick-stairs] [crafting-end-stone-brick-slab] [crafting-end-stone-brick-wall]
+Craft **4 End Stone in a 2 × 2 square → 4 End Stone Bricks**. For the brick shapes, use the [shared patterns](Stone.md#crafting-yields): **6 End Stone Bricks → 4 stairs**, **3 → 6 slabs**, or **6 → 6 walls**. Crafting these shapes uses the bricks, while stonecutting can accept raw End Stone directly. [Brick recipe][crafting-end-stone-bricks] · [Shape recipes][crafting-end-stone-brick-stairs] [crafting-end-stone-brick-slab][] [crafting-end-stone-brick-wall][]
 
 There are no registered raw End Stone stairs/slabs/walls, cracked or chiseled End Stone Bricks, or End Stone pillars. The raw block is also not made by a bundled crafting or smelting recipe. [Registry][blocks] · [Recipe loading][recipes]
 
 ## Chorus fruit to purpur
 
-**Chorus Plant stems** provide the raw fruit for this route. The active End biome source includes End Highlands, whose feature list points to the placed Chorus Plant feature. That feature chooses surface positions and generates a plant only with empty space above **End Stone**. Breaking a stem has a bundled drop of **0–1 Chorus Fruit**; it does not directly produce Popped Chorus Fruit. [Biome source and feature wiring][end-biomes] [end-highlands] [chorus-placement] [chorus-config] · [Registered feature and generation][features] [chorus-feature] [chorus-flower] · [Stem loot][chorus-loot]
+**Chorus Plant stems** provide the raw fruit for this route. The active End biome source includes End Highlands, whose feature list points to the placed Chorus Plant feature. That feature chooses surface positions and generates a plant only with empty space above **End Stone**. Breaking a stem has a bundled drop of **0–1 Chorus Fruit**; it does not directly produce Popped Chorus Fruit. [Biome source and feature wiring][end-biomes] [end-highlands][] [chorus-placement][] [chorus-config] · [Registered feature and generation][features] [chorus-feature][] [chorus-flower][] · [Stem loot][chorus-loot]
 
 1. Smelt **1 Chorus Fruit → 1 Popped Chorus Fruit** in a [Furnace](Furnace.md)
 2. Arrange **4 Popped Chorus Fruit in a 2 × 2 square → 4 Purpur Blocks**
@@ -47,7 +47,7 @@ Cooking takes **200 game ticks**, nominally **10 seconds at 20 ticks per second*
 | [Purpur Stairs](../items/PurpurStairs.md) | `minecraft:purpur_stairs` | 6 accepted blocks in the stair pattern → 4 stairs |
 | [Purpur Slab](../items/PurpurSlab.md) | `minecraft:purpur_slab` | 3 accepted blocks in one row → 6 slabs |
 
-For Purpur Stairs and Slabs, each occupied recipe slot accepts **Purpur Block or Purpur Pillar**, so the two may be mixed. There is no registered Purpur Wall, separate Purpur Bricks block, or smooth/chiseled/cracked Purpur family. [Recipes][crafting-purpur-block] [crafting-purpur-pillar] [crafting-purpur-stairs] [crafting-purpur-slab] · [Ingredient matching][ingredient] [pattern] · [Registry][blocks]
+For Purpur Stairs and Slabs, each occupied recipe slot accepts **Purpur Block or Purpur Pillar**, so the two may be mixed. There is no registered Purpur Wall, separate Purpur Bricks block, or smooth/chiseled/cracked Purpur family. [Recipes][crafting-purpur-block] [crafting-purpur-pillar][] [crafting-purpur-stairs][] [crafting-purpur-slab] · [Ingredient matching][ingredient] [pattern] · [Registry][blocks]
 
 ## Stonecutting
 
@@ -63,7 +63,7 @@ The [Stonecutter](Stonecutter.md) uses one input per operation. It produces one 
 
 ## Placement, pillars and dragon interactions
 
-**Purpur Pillar** uses the clicked face's axis: top/bottom faces make a vertical pillar; east/west sides give an east–west axis; north/south sides give a north–south axis. Ordinary Purpur, End Stone and End Stone Bricks have no such orientation property. Their stairs, slabs and walls use the [shared shape and waterlogging rules](Stone.md#placing-shaped-blocks). All these masonry blocks remain placed when support beneath is removed. [Classes][blocks] · [Pillar placement][pillar] · [Base and shape behavior][properties] [stairs] [slabs] [walls]
+**Purpur Pillar** uses the clicked face's axis: top/bottom faces make a vertical pillar; east/west sides give an east–west axis; north/south sides give a north–south axis. Ordinary Purpur, End Stone and End Stone Bricks have no such orientation property. Their stairs, slabs and walls use the [shared shape and waterlogging rules](Stone.md#placing-shaped-blocks). All these masonry blocks remain placed when support beneath is removed. [Classes][blocks] · [Pillar placement][pillar] · [Base and shape behavior][properties] [stairs][] [slabs][] [walls]
 
 Raw End Stone is specifically accepted beneath a **Chorus Flower**; End Stone Bricks is not a substitute for that directly-underneath support check. This is a substrate distinction, not a complete Chorus-growing guide. [Flower survival check][chorus-flower]
 

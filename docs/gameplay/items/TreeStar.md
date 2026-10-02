@@ -1,6 +1,6 @@
 # Tree Star
 
-**Tree Star** (`minecraft:tree_star`) is a placeable surface decoration, explicitly available in Natural Blocks Creative. A natural starter route, crafting recipe or Bone Meal duplication path was not established. [Registration][blocks] [items] [creative] · [Implemented behavior][star]
+**Tree Star** (`minecraft:tree_star`) is a placeable surface decoration, explicitly available in Natural Blocks Creative. A natural starter route, crafting recipe or Bone Meal duplication path was not established. [Registration][blocks] [items][] [creative][] · [Implemented behavior][star]
 
 ## Obtaining
 

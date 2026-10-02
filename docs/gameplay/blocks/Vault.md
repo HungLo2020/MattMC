@@ -4,13 +4,13 @@ A **Vault** exchanges a matching Trial Key for a batch of loose rewards. Its eli
 
 ## Finding Vaults
 
-Find placed Vaults in **Trial Chambers**, underground structures available through the normal Overworld generation route when structure generation is enabled. The active structure set, biome eligibility, start pool, and jigsaw templates connect to both reward forms. This is a verified template route, not a claim that every chamber layout contains the same number or arrangement of Vaults. [Normal preset][normal-preset] · [Structure and set][structure] [structure-set] · [Eligible biomes][biome-tag] · [Active selection and placement][structure-filter] [biomes] [jigsaw] [placement]
+Find placed Vaults in **Trial Chambers**, underground structures available through the normal Overworld generation route when structure generation is enabled. The active structure set, biome eligibility, start pool, and jigsaw templates connect to both reward forms. This is a verified template route, not a claim that every chamber layout contains the same number or arrangement of Vaults. [Normal preset][normal-preset] · [Structure and set][structure] [structure-set] · [Eligible biomes][biome-tag] · [Active selection and placement][structure-filter] [biomes][] [jigsaw][] [placement]
 
 The start pool selects corridor-end templates. In the bundled data, `end_1` connects directly to the ominous reward pool and `end_2` to the normal reward pool; those pools select the actual configured Vault templates. The Vault's reward configuration is therefore present in reachable structure data, rather than inferred from an unused loot table. [Start pool][start-pool] · [End templates][end-one] [end-two] · [Reward pools][normal-pool] [ominous-pool] · [Vault templates][normal-template] [ominous-template]
 
 ## Normal and ominous Vaults
 
-There is **one registered block and inventory item**, `minecraft:vault`. Its block states are horizontal `facing`, Boolean `ominous`, and `vault_state` with `inactive`, `active`, `unlocking`, or `ejecting`. Both appearances use the same valid Vault block-entity type. [Registration][blocks] [items] [type] · [State definition][vault] [state]
+There is **one registered block and inventory item**, `minecraft:vault`. Its block states are horizontal `facing`, Boolean `ominous`, and `vault_state` with `inactive`, `active`, `unlocking`, or `ejecting`. Both appearances use the same valid Vault block-entity type. [Registration][blocks] [items][] [type][] · [State definition][vault] [state]
 
 ### Normal Vaults
 
@@ -56,7 +56,7 @@ An active display can be present because **another eligible player** is nearby. 
 
 These light levels apply to both normal and ominous appearances. Key use is routed only while the block is `active`; it cannot accept another player's key midway through the same ejection sequence. [Light registration][blocks] · [States][state] · [Use-state gate][vault]
 
-After acceptance, the Vault waits **14 game ticks** before entering `ejecting`, then another **20 game ticks** before the first stack. The first output is therefore about **1.7 seconds** after acceptance at 20 ticks per second, while actively ticking. Further stacks are ejected **20 ticks apart**. After the final stack it waits another **20 ticks**, then returns to active or inactive according to nearby eligible players. This short sequence does **not** reset the player reward history. [Unlocking delay][roll] · [Ejection timing and return state][state] · [Tick scheduling][tick] [level-tick] [chunk-tick]
+After acceptance, the Vault waits **14 game ticks** before entering `ejecting`, then another **20 game ticks** before the first stack. The first output is therefore about **1.7 seconds** after acceptance at 20 ticks per second, while actively ticking. Further stacks are ejected **20 ticks apart**. After the final stack it waits another **20 ticks**, then returns to active or inactive according to nearby eligible players. This short sequence does **not** reset the player reward history. [Unlocking delay][roll] · [Ejection timing and return state][state] · [Tick scheduling][tick] [level-tick][] [chunk-tick][]
 
 The Vault ejects **item stacks into the world**, not directly into the key user's inventory. Its spawn routine does not assign a pickup owner, so other players can collect them too. Stay nearby with inventory space and give the block clear space above for collection. Your reward eligibility was already recorded at acceptance, not at pickup. [Upward ejection][state] [eject] · [Pickup rules][pickup] · [History update][use-key]
 
@@ -66,7 +66,7 @@ While active, the display cycles every **20 game ticks** by making a separate ra
 
 ## Normal versus ominous rewards
 
-Both bundled reward tables perform **one initial weighted choice** between their rare and common tables, at weights **8:2**, followed by **one to three additional common-table rolls**. Each also has one possible unique-table roll: **25%** for normal, **75%** for ominous. Those percentages describe the optional unique roll, not the chance of every named unique item. [Normal table][normal-loot] · [Ominous table][ominous-loot] · [Roll/weight handling][loot-rolls] [loot-weights] [loot-chance]
+Both bundled reward tables perform **one initial weighted choice** between their rare and common tables, at weights **8:2**, followed by **one to three additional common-table rolls**. Each also has one possible unique-table roll: **25%** for normal, **75%** for ominous. Those percentages describe the optional unique roll, not the chance of every named unique item. [Normal table][normal-loot] · [Ominous table][ominous-loot] · [Roll/weight handling][loot-rolls] [loot-weights][] [loot-chance][]
 
 | Reward group | Normal examples | Ominous examples |
 | --- | --- | --- |
@@ -76,7 +76,7 @@ Both bundled reward tables perform **one initial weighted choice** between their
 
 [Normal common][common] · [Normal rare][rare] · [Normal unique][unique] · [Ominous common][ominous-common] · [Ominous rare][ominous-rare] · [Ominous unique][ominous-unique] · [Book enchantment application][book]
 
-For a useful example of the actual weighting, the ominous unique table gives **Heavy Core weight 1 out of a total 10**. Combined with the 75% unique-roll condition, that is a **7.5% Heavy Core chance per successful ominous Vault opening** under these bundled tables. Heavy Core is absent from the normal reward tables. This calculation comes from the checked resource weights; it is not a guarantee after a fixed number of keys. [Ominous parent table][ominous-loot] · [Unique weights][ominous-unique] · [Normal tables][normal-loot] [common] [rare] [unique]
+For a useful example of the actual weighting, the ominous unique table gives **Heavy Core weight 1 out of a total 10**. Combined with the 75% unique-roll condition, that is a **7.5% Heavy Core chance per successful ominous Vault opening** under these bundled tables. Heavy Core is absent from the normal reward tables. This calculation comes from the checked resource weights; it is not a guarantee after a fixed number of keys. [Ominous parent table][ominous-loot] · [Unique weights][ominous-unique] · [Normal tables][normal-loot] [common][] [rare][] [unique]
 
 Use existing item pages for the rewards themselves, including [Heavy Core](../items/HeavyCore.md), [Trident](../items/Trident.md), and [Golden Apple](../items/GoldenApple.md). [Banners](Banners.md) owns the Guster/Flow pattern uses. The Vault guide does not replace those item or crafting mechanics.
 
@@ -90,7 +90,7 @@ There is one precise limit: the history retains **up to 128 rewarded UUIDs**. Wh
 
 The [Vault item](../items/Vault.md) is registered and available in Creative. There is no Survival crafting recipe or ordinary block-item drop. Vaults have **hardness 50**, so they are slow to break but are not registered as unbreakable. The bundled block loot table has **no reward pools**, including no Silk Touch branch: mining with Silk Touch or Fortune does not recover a Vault. Breaking it is not another way to open its reward table. [Registration][blocks] · [Creative entry][creative-vault] · [Mining rules][defaults] [mining] · [Empty block loot][vault-loot]
 
-The registration has no correct-tool drop requirement, and the ordinary pickaxe/axe/shovel/hoe mining tags do not assign Vault an efficient tool. That does not create a drop where the block loot is empty. Leave a useful generated Vault in place. [Registration][blocks] · [Mining tags][pickaxe] [axe] [shovel] [hoe] · [Tool gate][gate] · [Loot][vault-loot]
+The registration has no correct-tool drop requirement, and the ordinary pickaxe/axe/shovel/hoe mining tags do not assign Vault an efficient tool. That does not create a drop where the block loot is empty. Leave a useful generated Vault in place. [Registration][blocks] · [Mining tags][pickaxe] [axe][] [shovel][] [hoe] · [Tool gate][gate] · [Loot][vault-loot]
 
 A placed item faces toward its placer and starts inactive with `ominous=false`. The block has full-cube collision, no attachment-support requirement, and no waterlogged state. Pistons reject it because it has a block entity. It provides neither a normal inventory for Hoppers nor a redstone-powered opening handler; using the key is the active player interaction. [Placement and states][vault] · [Inherited shape/support][defaults] · [Piston rule][piston] · [Block-entity interface][entity] · [Hopper lookup][hopper]
 

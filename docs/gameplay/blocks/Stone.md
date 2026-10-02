@@ -6,7 +6,7 @@ Stone (`minecraft:stone`), Cobblestone (`minecraft:cobblestone`) and their brick
 
 The normal Overworld uses Stone as its base terrain block; caves, ores, surface materials and the deep Deepslate layer interrupt it. Mine exposed Stone or reach it beneath the surface. This is the ordinary terrain route, not a promise about every custom world preset. [Normal preset][presets] · [Terrain settings][overworld] · [Generator][terrain]
 
-Use an **unbroken pickaxe**, including a Wooden Pickaxe, to collect the ordinary construction blocks covered here. They require a correct tool for drops, are in the pickaxe mining tag, and have no Stone-, Iron- or Diamond-tier restriction. Breaking one by hand does not collect it. See [Mining](../mechanics/Mining.md) for the shared tool rules. [Registration][blocks] · [Pickaxe tag][pickaxe] · [Tier tags][stone-tier] [iron-tier] [diamond-tier] · [Wood rules][wood-denials] · [Tool checks][tool-material] [player-tool] [broken-tool] · [Server mining dispatch][break-dispatch]
+Use an **unbroken pickaxe**, including a Wooden Pickaxe, to collect the ordinary construction blocks covered here. They require a correct tool for drops, are in the pickaxe mining tag, and have no Stone-, Iron- or Diamond-tier restriction. Breaking one by hand does not collect it. See [Mining](../mechanics/Mining.md) for the shared tool rules. [Registration][blocks] · [Pickaxe tag][pickaxe] · [Tier tags][stone-tier] [iron-tier][] [diamond-tier][] · [Wood rules][wood-denials] · [Tool checks][tool-material] [player-tool][] [broken-tool][] · [Server mining dispatch][break-dispatch]
 
 ### Mining and drops
 
@@ -18,7 +18,7 @@ Use an **unbroken pickaxe**, including a Wooden Pickaxe, to collect the ordinary
 | A listed stair or wall | 1 matching stair or wall | Same result |
 | A listed single slab / double slab | 1 / 2 matching slabs | Same result |
 
-Fortune does not add a multiplier to these building-block drops. A double slab returns slab items, not a full-block ingredient. Explosion drops have separate survival/decay conditions. **Infested lookalikes follow different rules**, described [below](#infested-stone-variants). [Stone loot][loot-stone] · [Cobblestone][loot-cobblestone] · [Mossy Cobblestone][loot-mossy-cobblestone] · [Smooth Stone][loot-smooth-stone] · [Brick loot][loot-stone-bricks] [loot-mossy-stone-bricks] [loot-cracked-stone-bricks] [loot-chiseled-stone-bricks] · [Stair example][loot-stone-stairs] · [Wall example][loot-cobblestone-wall] · [Slab example][loot-stone-slab]
+Fortune does not add a multiplier to these building-block drops. A double slab returns slab items, not a full-block ingredient. Explosion drops have separate survival/decay conditions. **Infested lookalikes follow different rules**, described [below](#infested-stone-variants). [Stone loot][loot-stone] · [Cobblestone][loot-cobblestone] · [Mossy Cobblestone][loot-mossy-cobblestone] · [Smooth Stone][loot-smooth-stone] · [Brick loot][loot-stone-bricks] [loot-mossy-stone-bricks][] [loot-cracked-stone-bricks][] [loot-chiseled-stone-bricks] · [Stair example][loot-stone-stairs] · [Wall example][loot-cobblestone-wall] · [Slab example][loot-stone-slab]
 
 ### Water and lava
 
@@ -48,7 +48,7 @@ The regular Stone Bricks recipe above is the starting point for brick shapes. Sm
 
 Combine **1 Cobblestone with 1 Vine or 1 Moss Block**, shapeless, for **1 Mossy Cobblestone**. The equivalent recipe with **1 Stone Bricks** makes **1 Mossy Stone Bricks**. Moss Carpet is not the named Moss Block ingredient. Make the mossy full block first, then shape it. [Cobblestone recipes][crafting-mossy-cobblestone-from-vine] [crafting-mossy-cobblestone-from-moss-block] · [Brick recipes][crafting-mossy-stone-bricks-from-vine] [crafting-mossy-stone-bricks-from-moss-block]
 
-All three smelting conversions above take **200 game ticks per item**, nominally **10 seconds at 20 ticks per second**, and specify **0.1 recipe experience**. They are Furnace smelting recipes; experience collection and fuel belong to the [Furnace guide](Furnace.md). [Smelting recipes][smelting-stone] [smelting-smooth-stone] [smelting-cracked-stone-bricks] · [Active Furnace recipe type and ticking][furnace] [furnace-tick]
+All three smelting conversions above take **200 game ticks per item**, nominally **10 seconds at 20 ticks per second**, and specify **0.1 recipe experience**. They are Furnace smelting recipes; experience collection and fuel belong to the [Furnace guide](Furnace.md). [Smelting recipes][smelting-stone] [smelting-smooth-stone][] [smelting-cracked-stone-bricks][] · [Active Furnace recipe type and ticking][furnace] [furnace-tick]
 
 ## Stairs, slabs and walls
 
@@ -95,7 +95,7 @@ A Stonecutter consumes **one input block** per operation. Stairs cost one block 
 - **Stairs:** the stair faces the player's horizontal direction, with its higher end ahead for ordinary bottom stairs. The clicked face and height choose upright or upside-down placement. Suitable neighboring stairs automatically form inner or outer corners, including stairs made from another material when their half and facing fit. Stairs can be waterlogged. [Placement and corner rules][stairs]
 - **Walls:** neighboring walls, sturdy block faces, Iron Bars and suitably aligned Fence Gates determine connections; blocks above can change wall/post shape. Their collision extends **1.5 blocks high**. Walls can be waterlogged. [Connections, shape and water][walls]
 
-These placed forms do not fall or require a supporting block beneath them. Shape and water states affect the placed block; mining returns the corresponding ordinary item, so choose the orientation again on placement. [Block classes][blocks] · [Base survival rules][properties] · [Shape callbacks][slabs] [stairs] [walls]
+These placed forms do not fall or require a supporting block beneath them. Shape and water states affect the placed block; mining returns the corresponding ordinary item, so choose the orientation again on placement. [Block classes][blocks] · [Base survival rules][properties] · [Shape callbacks][slabs] [stairs][] [walls][]
 
 ## Infested stone variants
 
@@ -110,7 +110,7 @@ An infested block can resemble ordinary masonry but release a **Silverfish** whe
 | `minecraft:infested_cracked_stone_bricks` | 1 ordinary Cracked Stone Bricks |
 | `minecraft:infested_chiseled_stone_bricks` | 1 ordinary Chiseled Stone Bricks |
 
-Without Silk Touch these loot tables give **no block item**, and the active break callback spawns a Silverfish when `doTileDrops` is enabled. **Silk Touch suppresses the Silverfish and gives the ordinary host block**, never the infested item. The spawn suppression uses an enchantment tag containing Silk Touch in the bundled data. Ordinary destructive explosions also reach that break callback with no enchanted tool. [Infested behavior][infested] · [Suppression tag][prevent-infestation] · [Exact loot][loot-infested-stone] [loot-infested-cobblestone] [loot-infested-stone-bricks] [loot-infested-mossy-stone-bricks] [loot-infested-cracked-stone-bricks] [loot-infested-chiseled-stone-bricks] · [Mining dispatch][break-dispatch] [block-destroy] [block-drops] · [Explosion callback][properties]
+Without Silk Touch these loot tables give **no block item**, and the active break callback spawns a Silverfish when `doTileDrops` is enabled. **Silk Touch suppresses the Silverfish and gives the ordinary host block**, never the infested item. The spawn suppression uses an enchantment tag containing Silk Touch in the bundled data. Ordinary destructive explosions also reach that break callback with no enchanted tool. [Infested behavior][infested] · [Suppression tag][prevent-infestation] · [Exact loot][loot-infested-stone] [loot-infested-cobblestone][] [loot-infested-stone-bricks][] [loot-infested-mossy-stone-bricks][] [loot-infested-cracked-stone-bricks][] [loot-infested-chiseled-stone-bricks] · [Mining dispatch][break-dispatch] [block-destroy][] [block-drops][] · [Explosion callback][properties]
 
 These infested registrations **do not require a correct tool for drops**, so breaking them by hand is not a way to avoid the Silverfish. Their hardness is half the ordinary host block's hardness and their blast resistance is **0.75**. Creative breaking takes a separate no-drops path. [Registrations][blocks] · [Infested properties][infested] · [Player tool check][player-tool] · [Creative/mining path][break-dispatch]
 

@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Living Tube Coral becomes this form after a qualifying dry death check. To recover the placed dead plant, use an **unbroken pickaxe with Silk Touch**. The correct-tool gate and Silk Touch loot condition are both required; an unenchanted pickaxe or Shears alone does not collect it. [Death][living-plant] · [Loot][loot-dead-tube-coral] · [Tool gate][blocks] [pickaxe] [player-tool] [broken-tool]
+Living Tube Coral becomes this form after a qualifying dry death check. To recover the placed dead plant, use an **unbroken pickaxe with Silk Touch**. The correct-tool gate and Silk Touch loot condition are both required; an unenchanted pickaxe or Shears alone does not collect it. [Death][living-plant] · [Loot][loot-dead-tube-coral] · [Tool gate][blocks] [pickaxe][] [player-tool][] [broken-tool]
 
 ## Usage
 

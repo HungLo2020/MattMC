@@ -1,6 +1,6 @@
 # Ancient Leaves
 
-**Ancient Leaves** (`minecraft:ancient_leaves`) are a placeable canopy block, explicitly listed in Natural Blocks Creative and used by the active Ancient Tree feature. [Registration][blocks] [items] [creative] · [Tree feature][tree]
+**Ancient Leaves** (`minecraft:ancient_leaves`) are a placeable canopy block, explicitly listed in Natural Blocks Creative and used by the active Ancient Tree feature. [Registration][blocks] [items][] [creative][] · [Tree feature][tree]
 
 ## Obtaining
 

@@ -4,13 +4,13 @@ Granite (`minecraft:granite`), Diorite (`minecraft:diorite`) and Andesite (`mine
 
 ## Mining and drops
 
-Use an **unbroken pickaxe**, including a Wooden Pickaxe, for every ordinary block and shape covered on this page. All require a correct tool for drops, appear in the pickaxe mining tag and have no higher material-tier restriction. Hand breaking does not collect them. [Registration][blocks] · [Tool tags][pickaxe] [wood-denials] [stone-tier] [iron-tier] [diamond-tier] · [Tool checks][tool-material] [player-tool] [broken-tool] · [Server break path][break-dispatch]
+Use an **unbroken pickaxe**, including a Wooden Pickaxe, for every ordinary block and shape covered on this page. All require a correct tool for drops, appear in the pickaxe mining tag and have no higher material-tier restriction. Hand breaking does not collect them. [Registration][blocks] · [Tool tags][pickaxe] [wood-denials][] [stone-tier][] [iron-tier][] [diamond-tier][] · [Tool checks][tool-material] [player-tool][] [broken-tool][] · [Server break path][break-dispatch]
 
-Full blocks, stairs and walls drop **one matching item**; single slabs drop **one slab**, and double slabs drop **two matching slabs**. Silk Touch is unnecessary and does not change the finish. Fortune does not increase these building-block drops. Explosion survival/decay conditions remain separate. [Full-block loot][loot-granite] [loot-polished-granite] [loot-diorite] [loot-polished-diorite] [loot-andesite] [loot-polished-andesite] [loot-calcite] · [Shape examples][loot-granite-stairs] [loot-diorite-wall] · [Slab tables][loot-granite-slab] [loot-polished-granite-slab] [loot-diorite-slab] [loot-polished-diorite-slab] [loot-andesite-slab] [loot-polished-andesite-slab]
+Full blocks, stairs and walls drop **one matching item**; single slabs drop **one slab**, and double slabs drop **two matching slabs**. Silk Touch is unnecessary and does not change the finish. Fortune does not increase these building-block drops. Explosion survival/decay conditions remain separate. [Full-block loot][loot-granite] [loot-polished-granite][] [loot-diorite][] [loot-polished-diorite][] [loot-andesite][] [loot-polished-andesite][] [loot-calcite][] · [Shape examples][loot-granite-stairs] [loot-diorite-wall] · [Slab tables][loot-granite-slab] [loot-polished-granite-slab][] [loot-diorite-slab][] [loot-polished-diorite-slab][] [loot-andesite-slab][] [loot-polished-andesite-slab]
 
 ## Finding granite, diorite and andesite
 
-Search stone terrain in the normal Overworld. As a checked example, the **Plains** biome includes both upper and lower deposit features for all three materials. Their configured features replace eligible blocks in the base-stone tag with the corresponding material. These are natural deposits, not a promise that every chunk contains each stone. [Normal preset][presets] · [Plains feature list][plains] · [Deposit definitions][deposit-granite] [deposit-diorite] [deposit-andesite] · [Replacement tag][base-stone] · [Feature registration and placement][features] [ore-feature] [placed-feature] [biome-generation]
+Search stone terrain in the normal Overworld. As a checked example, the **Plains** biome includes both upper and lower deposit features for all three materials. Their configured features replace eligible blocks in the base-stone tag with the corresponding material. These are natural deposits, not a promise that every chunk contains each stone. [Normal preset][presets] · [Plains feature list][plains] · [Deposit definitions][deposit-granite] [deposit-diorite][] [deposit-andesite][] · [Replacement tag][base-stone] · [Feature registration and placement][features] [ore-feature][] [placed-feature][] [biome-generation]
 
 The checked lower placements choose origins from **Y=0 through Y=60**; the upper placements choose origins from **Y=64 through Y=128**. Those are candidate origin ranges, not exact limits of every generated clump or a best mining-height chart. [Granite placements][placement-granite-lower] [placement-granite-upper] · [Diorite placements][placement-diorite-lower] [placement-diorite-upper] · [Andesite placements][placement-andesite-lower] [placement-andesite-upper]
 
@@ -27,9 +27,9 @@ These recipes provide another route when the right ingredients are available. Th
 | 4 Diorite in a 2 × 2 square | 4 Polished Diorite |
 | 4 Andesite in a 2 × 2 square | 4 Polished Andesite |
 
-[Diorite][crafting-diorite] · [Granite][crafting-granite] · [Andesite][crafting-andesite] · [Polishing][crafting-polished-granite] [crafting-polished-diorite] [crafting-polished-andesite]
+[Diorite][crafting-diorite] · [Granite][crafting-granite] · [Andesite][crafting-andesite] · [Polishing][crafting-polished-granite] [crafting-polished-diorite][] [crafting-polished-andesite][]
 
-Polishing is a crafting or stonecutting operation. No smelting recipe targets these decorative-stone forms in the checked bundled recipe set. Mining a polished block gives that polished block, rather than undoing the recipe. [Recipe loading][recipes] · [Polished loot][loot-polished-granite] [loot-polished-diorite] [loot-polished-andesite]
+Polishing is a crafting or stonecutting operation. No smelting recipe targets these decorative-stone forms in the checked bundled recipe set. Mining a polished block gives that polished block, rather than undoing the recipe. [Recipe loading][recipes] · [Polished loot][loot-polished-granite] [loot-polished-diorite][] [loot-polished-andesite][]
 
 ## Polished and shaped variants
 
@@ -77,11 +77,11 @@ Calcite is a **full block only** in this registry. There is no registered Polish
 Two checked natural routes are useful:
 
 - **Amethyst geodes:** Calcite is the middle shell material around the amethyst-bearing interior. The Plains biome includes the placed Amethyst Geode feature, which points to this configuration, and the registered GeodeFeature uses its middle-layer provider when placing the shell. [Biome entry][plains] · [Placement][geode-placement] · [Shell configuration][geode-config] · [Active feature][features] [geode-feature]
-- **Stony Peaks:** the normal Overworld surface rules select Calcite for a noise-dependent part of this biome's stone surface. This produces another collection route without requiring a geode; it does not mean every white or rocky mountain block is Calcite. [Surface configuration][overworld] · [Preset][presets] · [Surface execution][terrain] [surface] [native-surface]
+- **Stony Peaks:** the normal Overworld surface rules select Calcite for a noise-dependent part of this biome's stone surface. This produces another collection route without requiring a geode; it does not mean every white or rocky mountain block is Calcite. [Surface configuration][overworld] · [Preset][presets] · [Surface execution][terrain] [surface][] [native-surface][]
 
 ## Placement and properties
 
-All full blocks covered here use ordinary Block placement: they have **no player-selected axis or facing**, including polished blocks and Calcite. They stay placed when the block beneath is removed. Their stairs, slabs and walls use the [shared shape, corner and waterlogging rules](Stone.md#placing-shaped-blocks); those shape states are chosen again when an item is placed. [Registered classes][blocks] · [Base behavior][properties] · [Shape implementations][slabs] [stairs] [walls]
+All full blocks covered here use ordinary Block placement: they have **no player-selected axis or facing**, including polished blocks and Calcite. They stay placed when the block beneath is removed. Their stairs, slabs and walls use the [shared shape, corner and waterlogging rules](Stone.md#placing-shaped-blocks); those shape states are chosen again when an item is placed. [Registered classes][blocks] · [Base behavior][properties] · [Shape implementations][slabs] [stairs][] [walls][]
 
 | Material | Hardness | Blast resistance |
 | --- | ---: | ---: |

@@ -10,7 +10,7 @@ Only this ordinary form belongs to the bundled **enchantment-power-provider** ta
 
 ### Crafting and buying
 
-Craft **6 planks + 3 Books → 1 Bookshelf**: fill the top and bottom rows with planks and put the three Books across the middle. Each plank slot accepts a member of the bundled `minecraft:planks` item tag; matching wood colors are not required. [Recipe][bookshelf-recipe] · [Planks tag and ingredient matching][planks] [ingredient] [pattern]
+Craft **6 planks + 3 Books → 1 Bookshelf**: fill the top and bottom rows with planks and put the three Books across the middle. Each plank slot accepts a member of the bundled `minecraft:planks` item tag; matching wood colors are not required. [Recipe][bookshelf-recipe] · [Planks tag and ingredient matching][planks] [ingredient][] [pattern][]
 
 A novice Librarian can also offer **one Bookshelf for a base price of 9 Emeralds**. The offer is one choice in its level-1 trade pool, so it is not guaranteed for every Librarian; demand and other price adjustments can change the displayed cost. The offer exists in both the normal and optional rebalance pools. Follow [Trading](../trading/Trading.md) for offer selection and pricing. [Trade pools][trades] · [Active pool selection][villager]
 
@@ -53,11 +53,11 @@ A comparator reads **the last slot changed by insertion or removal**, using the 
 
 A placed Chiseled Bookshelf saves its six item stacks and last-interacted slot. Written text and enchantments travel with the stored book item. This persistence while placed is different from harvesting the shelf. [Save/load and item storage][shelf-entity]
 
-**Breaking the shelf spills its stored books separately, including when using Silk Touch.** Silk Touch decides whether the shelf block itself drops; it does not pack the books into that drop. An ordinary harvested shelf item has empty storage when placed again. Remove valuable books first if loose drops would be difficult to collect. [Active block-entity removal][chunk-removal] [base-entity] [containers] · [Shelf loot][chiseled-loot] · [Default item contents and placement][items] [block-item]
+**Breaking the shelf spills its stored books separately, including when using Silk Touch.** Silk Touch decides whether the shelf block itself drops; it does not pack the books into that drop. An ordinary harvested shelf item has empty storage when placed again. Remove valuable books first if loose drops would be difficult to collect. [Active block-entity removal][chunk-removal] [base-entity][] [containers][] · [Shelf loot][chiseled-loot] · [Default item contents and placement][items] [block-item]
 
 ## Mining and block properties
 
-An **unbroken axe**, including Wood, mines both shelf forms faster than an empty hand. Neither requires a particular tool or material tier to run its ordinary harvest loot; **Silk Touch is the separate condition for recovering a shelf block**. [Registry][blocks] · [Axe mining and tool speed][axe] [tool] [stack] · [Harvest gate][player-tool] [harvest]
+An **unbroken axe**, including Wood, mines both shelf forms faster than an empty hand. Neither requires a particular tool or material tier to run its ordinary harvest loot; **Silk Touch is the separate condition for recovering a shelf block**. [Registry][blocks] · [Axe mining and tool speed][axe] [tool][] [stack][] · [Harvest gate][player-tool] [harvest]
 
 | Block | With Silk Touch | Without Silk Touch | Hardness | Blast resistance |
 | --- | --- | --- | ---: | ---: |

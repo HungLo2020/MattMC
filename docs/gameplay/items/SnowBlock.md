@@ -4,7 +4,7 @@ A **Snow Block** (`minecraft:snow_block`) is the full solid snow-building block.
 
 ## Crafting and collecting
 
-See [Snow collecting and crafting](../blocks/Snow.md#collecting-and-crafting-snow) for the four-Snowball recipe and layer recipe. Use an unbroken shovel to collect a placed Snow Block: without Silk Touch it gives **four Snowballs**, while a correct Silk Touch shovel gives **one Snow Block**. Breaking by hand does not collect it. [Loot][loot-snow-block] · [Tool requirement][blocks] [shovel] [player-tool] [broken-tool]
+See [Snow collecting and crafting](../blocks/Snow.md#collecting-and-crafting-snow) for the four-Snowball recipe and layer recipe. Use an unbroken shovel to collect a placed Snow Block: without Silk Touch it gives **four Snowballs**, while a correct Silk Touch shovel gives **one Snow Block**. Breaking by hand does not collect it. [Loot][loot-snow-block] · [Tool requirement][blocks] [shovel][] [player-tool][] [broken-tool]
 
 ## Use
 

@@ -4,13 +4,13 @@
 
 ## Mining and ordinary drops
 
-Use an **unbroken pickaxe**, including Wood, to collect the blocks and shapes covered here. All require the correct tool, are pickaxe-tagged and have no higher material-tier restriction. Hand breaking does not collect them. [Registry][blocks] · [Tags][pickaxe] [wood-denials] [stone-tier] [iron-tier] [diamond-tier] · [Tool and break checks][tool-material] [player-tool] [broken-tool] [break-dispatch]
+Use an **unbroken pickaxe**, including Wood, to collect the blocks and shapes covered here. All require the correct tool, are pickaxe-tagged and have no higher material-tier restriction. Hand breaking does not collect them. [Registry][blocks] · [Tags][pickaxe] [wood-denials][] [stone-tier][] [iron-tier][] [diamond-tier][] · [Tool and break checks][tool-material] [player-tool][] [broken-tool][] [break-dispatch]
 
-Except for [Gilded Blackstone](#gilded-blackstone), ordinary full blocks, stairs and walls drop **one matching item**. Single slabs give **one slab**; double slabs give **two matching slabs**. Silk Touch is unnecessary, Fortune adds no multiplier, and mining a polished or brick block preserves its finish. Explosions have separate survival/decay rules. [Ordinary full-block loot][loot-blackstone] [loot-polished-blackstone] [loot-polished-blackstone-bricks] [loot-cracked-polished-blackstone-bricks] [loot-chiseled-polished-blackstone] [loot-basalt] [loot-polished-basalt] [loot-smooth-basalt] · [Shape examples][loot-blackstone-stairs] [loot-polished-blackstone-brick-wall] · [Slab tables][loot-blackstone-slab] [loot-polished-blackstone-slab] [loot-polished-blackstone-brick-slab]
+Except for [Gilded Blackstone](#gilded-blackstone), ordinary full blocks, stairs and walls drop **one matching item**. Single slabs give **one slab**; double slabs give **two matching slabs**. Silk Touch is unnecessary, Fortune adds no multiplier, and mining a polished or brick block preserves its finish. Explosions have separate survival/decay rules. [Ordinary full-block loot][loot-blackstone] [loot-polished-blackstone][] [loot-polished-blackstone-bricks][] [loot-cracked-polished-blackstone-bricks][] [loot-chiseled-polished-blackstone][] [loot-basalt][] [loot-polished-basalt][] [loot-smooth-basalt] · [Shape examples][loot-blackstone-stairs] [loot-polished-blackstone-brick-wall] · [Slab tables][loot-blackstone-slab] [loot-polished-blackstone-slab][] [loot-polished-blackstone-brick-slab][]
 
 ## Finding blackstone and basalt
 
-**Basalt Deltas** are a checked natural route for both materials: the normal Nether's surface settings select Basalt and Blackstone in this biome. This is a source-backed terrain example, not a best-height or per-chunk abundance claim. [Nether preset][nether-preset] · [Surface settings][nether-settings] · [Surface execution][terrain] [surface] [native-surface]
+**Basalt Deltas** are a checked natural route for both materials: the normal Nether's surface settings select Basalt and Blackstone in this biome. This is a source-backed terrain example, not a best-height or per-chunk abundance claim. [Nether preset][nether-preset] · [Surface settings][nether-settings] · [Surface execution][terrain] [surface][] [native-surface][]
 
 **Adult Piglin bartering** can also yield **8–16 Blackstone** when that entry is selected. Interacting with an eligible adult Piglin using a Gold Ingot starts its admiration/barter flow; the returned item is random, so an ingot does not guarantee Blackstone. [Barter loot][barter-loot] · [Active Piglin interaction and brain][piglin] [piglin-ai] · [Completion behavior][barter-completion]
 
@@ -71,9 +71,9 @@ The checked recipes provide no reverse cutting route from bricks to polished or 
 
 [Registry][blocks] · [Polishing][crafting-polished-basalt] · [Stonecutting][stonecutting-polished-basalt-from-basalt-stonecutting] · [Smoothing][smelting-smooth-basalt] · [Axis placement][pillar]
 
-For Basalt and Polished Basalt, clicking a **top/bottom face** sets a vertical axis; an **east/west side** sets an east–west axis; a **north/south side** sets a north–south axis. The item does not preserve its former orientation when mined. Smooth Basalt is registered as a plain Block despite sharing the base material properties. No Basalt stairs, slabs or walls are registered in these three finishes. [Placement][pillar] · [Block classes][blocks] · [Loot][loot-basalt] [loot-polished-basalt] [loot-smooth-basalt]
+For Basalt and Polished Basalt, clicking a **top/bottom face** sets a vertical axis; an **east/west side** sets an east–west axis; a **north/south side** sets a north–south axis. The item does not preserve its former orientation when mined. Smooth Basalt is registered as a plain Block despite sharing the base material properties. No Basalt stairs, slabs or walls are registered in these three finishes. [Placement][pillar] · [Block classes][blocks] · [Loot][loot-basalt] [loot-polished-basalt][] [loot-smooth-basalt][]
 
-Smoothing Basalt takes **200 game ticks**, nominally **10 seconds**, and specifies **0.1 recipe experience**. The input is ordinary Basalt, not Polished Basalt. Smooth Basalt also forms the **outer shell of Amethyst Geodes**: the checked Plains biome includes the placed geode feature, whose active generator uses that outer-layer provider. [Smelting][smelting-smooth-basalt] · [Biome and feature wiring][plains] [geode-placement] [geode-config] · [Active geode placement][features] [geode-feature]
+Smoothing Basalt takes **200 game ticks**, nominally **10 seconds**, and specifies **0.1 recipe experience**. The input is ordinary Basalt, not Polished Basalt. Smooth Basalt also forms the **outer shell of Amethyst Geodes**: the checked Plains biome includes the placed geode feature, whose active generator uses that outer-layer provider. [Smelting][smelting-smooth-basalt] · [Biome and feature wiring][plains] [geode-placement][] [geode-config][] · [Active geode placement][features] [geode-feature]
 
 ### Making basalt with lava
 
@@ -83,7 +83,7 @@ For a small, **untested** collection setup, put Soul Soil under the intended con
 
 ## Gilded blackstone
 
-`minecraft:gilded_blackstone` is a separate decorative block with a Gold Nugget drop branch. The checked **Bastion Remnant** route can produce it: a registered Bastion start template contains Blackstone, and its active degradation processor can convert Blackstone to Gilded Blackstone. Bastion placement is limited by its biome tag and is not a guarantee in every Nether area. [Structure set][nether-structures] · [Bastion configuration and biomes][bastion] [bastion-biomes] · [Start pool][bastion-starts] · [Template][bastion-template] · [Processor][bastion-processor] · [Jigsaw/template/processor dispatch][jigsaw] [single-pool] [template] [rule-processor]
+`minecraft:gilded_blackstone` is a separate decorative block with a Gold Nugget drop branch. The checked **Bastion Remnant** route can produce it: a registered Bastion start template contains Blackstone, and its active degradation processor can convert Blackstone to Gilded Blackstone. Bastion placement is limited by its biome tag and is not a guarantee in every Nether area. [Structure set][nether-structures] · [Bastion configuration and biomes][bastion] [bastion-biomes] · [Start pool][bastion-starts] · [Template][bastion-template] · [Processor][bastion-processor] · [Jigsaw/template/processor dispatch][jigsaw] [single-pool][] [template][] [rule-processor]
 
 With a correct pickaxe, the normal mining outcomes are:
 
@@ -101,7 +101,7 @@ Fortune changes the chance of the nugget branch, not its **2–5** count. Silk T
 
 ## Placement and properties
 
-Blackstone full blocks have no axis or facing control. Their stairs, slabs and walls use the [shared shape, corner and waterlogging rules](Stone.md#placing-shaped-blocks). All these construction blocks remain placed when the support beneath them is removed. [Classes][blocks] · [Base behavior][properties] · [Shapes][stairs] [slabs] [walls]
+Blackstone full blocks have no axis or facing control. Their stairs, slabs and walls use the [shared shape, corner and waterlogging rules](Stone.md#placing-shaped-blocks). All these construction blocks remain placed when the support beneath them is removed. [Classes][blocks] · [Base behavior][properties] · [Shapes][stairs] [slabs][] [walls][]
 
 | Full-block material | Hardness | Blast resistance |
 | --- | ---: | ---: |

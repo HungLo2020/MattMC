@@ -21,13 +21,13 @@ Every row uses the same quantities: **nine of the named resource fill a 3 × 3 c
 | <span id="raw-gold-block"></span>[Block of Raw Gold](../items/BlockOfRawGold.md) · `minecraft:raw_gold_block` | [Raw Gold](../items/RawGold.md) · `minecraft:raw_gold` | [9 → 1][pack-raw_gold_block] / [1 → 9][unpack-raw_gold_block] | [1 matching block][loot-raw_gold_block] |
 | <span id="redstone-block"></span>[Block of Redstone](../items/BlockOfRedstone.md) · `minecraft:redstone_block` | [Redstone Dust](../items/RedstoneDust.md) · `minecraft:redstone` | [9 → 1][pack-redstone_block] / [1 → 9][unpack-redstone_block] | [1 matching block][loot-redstone_block] |
 
-These are resource conversions, not containers with a menu or saved inventory. The item registrations share their blocks' IDs. [Block items][items] [lapis-item] [emerald-item] [redstone-item] · [Default interaction][shape-support]
+These are resource conversions, not containers with a menu or saved inventory. The item registrations share their blocks' IDs. [Block items][items] [lapis-item][] [emerald-item][] [redstone-item] · [Default interaction][shape-support]
 
 **Unpack Raw Iron or Raw Gold before smelting or blasting.** The bundled recipes process individual raw pieces; they do not process an entire storage block into nine ingots. Follow [raw-metal processing](OreResources.md#processing-raw-metal) for device times and XP. [Raw Iron unpacking][unpack-raw_iron_block] · [Raw Gold unpacking][unpack-raw_gold_block]
 
 ## Recovering a placed block
 
-Use an **unbroken pickaxe** from the matching row. Hand breaking and other ordinary tools do not recover these blocks. Every complete loot table above returns one matching block with no Fortune multiplier or Silk Touch branch: **Silk Touch is unnecessary and cannot bypass the tool requirement**. These plain block classes provide no ordinary mining XP. [Pickaxe group][pickaxe] · [Tool dispatch][pickaxe-property] [tool-material] [tool-rule] · [Player check][player-tool] [harvest] · [Broken guard][broken] · [No block XP callback][no-xp]
+Use an **unbroken pickaxe** from the matching row. Hand breaking and other ordinary tools do not recover these blocks. Every complete loot table above returns one matching block with no Fortune multiplier or Silk Touch branch: **Silk Touch is unnecessary and cannot bypass the tool requirement**. These plain block classes provide no ordinary mining XP. [Pickaxe group][pickaxe] · [Tool dispatch][pickaxe-property] [tool-material][] [tool-rule][] · [Player check][player-tool] [harvest] · [Broken guard][broken] · [No block XP callback][no-xp]
 
 | Placed block | Suitable pickaxe materials | Hardness | Blast resistance |
 | --- | --- | ---: | ---: |
@@ -42,7 +42,7 @@ Use an **unbroken pickaxe** from the matching row. Hand breaking and other ordin
 | [Block of Raw Gold](#raw-gold-block) | Iron, Diamond, Netherite | 5 | 6 |
 | [Block of Redstone](#redstone-block) | Wood, Stone, Copper, Iron, Gold, Diamond, Netherite | 5 | 6 |
 
-The material requirements come from the bundled tier and exclusion tags, not the tool's name or mining speed. In particular, **Wooden and Golden Pickaxes recover Redstone Blocks but not Redstone Ore**. A Golden Pickaxe cannot recover Gold Blocks. Copper has the same access as Stone for this family. [Tier tags][stone-tier] [iron-tier] [diamond-tier] · [Wood/Gold exclusions][incorrect-wooden] [incorrect-gold] · [Stone/Copper exclusions][incorrect-stone] [incorrect-copper] · [Iron/Diamond/Netherite exclusions][incorrect-iron] [incorrect-diamond] [incorrect-netherite]
+The material requirements come from the bundled tier and exclusion tags, not the tool's name or mining speed. In particular, **Wooden and Golden Pickaxes recover Redstone Blocks but not Redstone Ore**. A Golden Pickaxe cannot recover Gold Blocks. Copper has the same access as Stone for this family. [Tier tags][stone-tier] [iron-tier][] [diamond-tier][] · [Wood/Gold exclusions][incorrect-wooden] [incorrect-gold] · [Stone/Copper exclusions][incorrect-stone] [incorrect-copper] · [Iron/Diamond/Netherite exclusions][incorrect-iron] [incorrect-diamond][] [incorrect-netherite][]
 
 Hardness is not a time in seconds. The values above are registered block properties; tool speed and conditions still affect mining. Follow [Mining](../mechanics/Mining.md), [Pickaxes and Shovels](../mechanics/PickaxesAndShovels.md) and [Durability](../mechanics/Durability.md) for the shared rules. [Properties][blocks]
 

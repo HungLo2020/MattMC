@@ -4,7 +4,7 @@ The **Campfire** item places `minecraft:campfire`. It cooks up to four individua
 
 ## Obtaining
 
-Craft **one Campfire** in a Crafting Table with three Sticks, three tagged logs, and **one Coal or Charcoal**. Use the [canonical recipe layout and log choices](../blocks/Campfires.md#variants-and-crafting); the recipe accepts mixed tagged logs, including the Nether stem families. [Recipe][recipe-campfire] · [Log choices][logs] [burnlogs] [crimson] [warped]
+Craft **one Campfire** in a Crafting Table with three Sticks, three tagged logs, and **one Coal or Charcoal**. Use the [canonical recipe layout and log choices](../blocks/Campfires.md#variants-and-crafting); the recipe accepts mixed tagged logs, including the Nether stem families. [Recipe][recipe-campfire] · [Log choices][logs] [burnlogs][] [crimson][] [warped]
 
 Mine the placed block with **Silk Touch** to recover this item. Ordinary harvesting instead gives **two Charcoal**; an axe is faster but does not substitute for Silk Touch. Fortune does not increase that drop. [Loot][loot-campfire] · [Registration][blocks] · [Axe tag][axe]
 

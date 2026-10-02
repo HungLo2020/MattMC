@@ -4,7 +4,7 @@ A **Bell** (`minecraft:bell`) can be rung by using it, striking an appropriate s
 
 ## Obtaining and collecting
 
-Find Bells in village meeting areas. A verified example is the Bell in the Taiga meeting-point-1 template, selected by the Taiga town-center pool. The village structure set and normal Overworld preset make this an active generation route when structures are enabled. [Actual Bell template][town-template] · [Pool and village][town-pool] [taiga-village] · [Structure set and biome][villages] [village-biome] · [Normal preset and active selection][normal] [biomes] [taiga] [structure-filter]
+Find Bells in village meeting areas. A verified example is the Bell in the Taiga meeting-point-1 template, selected by the Taiga town-center pool. The village structure set and normal Overworld preset make this an active generation route when structures are enabled. [Actual Bell template][town-template] · [Pool and village][town-pool] [taiga-village] · [Structure set and biome][villages] [village-biome] · [Normal preset and active selection][normal] [biomes][] [taiga][] [structure-filter]
 
 Bells have **no bundled crafting recipe**. At base prices, these trades can supply one Bell for **36 Emeralds**:
 
@@ -63,7 +63,7 @@ During an existing Raid, the separate raid/pre-raid activities control their res
 
 ## Revealing nearby Raiders
 
-For an uninterrupted ring, the server starts resonance once the ringing counter reaches **5 ticks**, provided the cached list contains a living **Raider-tagged entity within 32 blocks**. After the resonance counter has advanced for **40 ticks**, the server applies **Glowing for 60 ticks**, or three seconds, to qualifying cached Raiders within **48 blocks**. This normally places the outline at roughly **45 game ticks after the processed ring event**, about 2.25 seconds, while the block is actively ticking. [Resonance timing and server action][ring-ticks] · [32-block trigger][hearing] · [48-block target and 60-tick effect][outline] · [Active ticking][bell] [level-tick] [chunk-tick]
+For an uninterrupted ring, the server starts resonance once the ringing counter reaches **5 ticks**, provided the cached list contains a living **Raider-tagged entity within 32 blocks**. After the resonance counter has advanced for **40 ticks**, the server applies **Glowing for 60 ticks**, or three seconds, to qualifying cached Raiders within **48 blocks**. This normally places the outline at roughly **45 game ticks after the processed ring event**, about 2.25 seconds, while the block is actively ticking. [Resonance timing and server action][ring-ticks] · [32-block trigger][hearing] · [48-block target and 60-tick effect][outline] · [Active ticking][bell] [level-tick][] [chunk-tick][]
 
 The current Raider tag includes **Evokers, Pillagers, Ravagers, Vindicators, Illusioners, and Witches**. The check uses entity type and distance, not membership in an active Raid, and does not raycast for a clear view. Thus the outline can help locate a qualifying mob behind a wall, subject to the cached-list and range limits. A Raider between 32 and 48 blocks does not by itself start resonance, though it can be outlined when a closer Raider starts it. [Raider tag][raiders] · [Trigger and target predicates][hearing] [outline]
 

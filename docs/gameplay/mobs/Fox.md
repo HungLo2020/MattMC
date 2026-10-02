@@ -4,7 +4,7 @@ A **Fox** is an animal that carries items, gathers berries, and can produce offs
 
 ## Finding Foxes
 
-Natural spawn tables include **Taiga, Snowy Taiga, Old Growth Pine Taiga, Old Growth Spruce Taiga, and Grove**, with configured groups of **2–4**. The spawn predicate requires **raw brightness above 8** and **Grass Block, a Snow layer, Snow Block, Podzol, or Coarse Dirt below**, alongside natural-spawn population and obstruction checks. [Biome tables][taiga] [snowy_taiga] [old_growth_pine_taiga] [old_growth_spruce_taiga] [grove] · [Registered spawn predicate][placements] · [Ground tag][fox-ground] · [Brightness helper][animal] · [Spawn dispatch][natural]
+Natural spawn tables include **Taiga, Snowy Taiga, Old Growth Pine Taiga, Old Growth Spruce Taiga, and Grove**, with configured groups of **2–4**. The spawn predicate requires **raw brightness above 8** and **Grass Block, a Snow layer, Snow Block, Podzol, or Coarse Dirt below**, alongside natural-spawn population and obstruction checks. [Biome tables][taiga] [snowy_taiga][] [old_growth_pine_taiga][] [old_growth_spruce_taiga][] [grove][] · [Registered spawn predicate][placements] · [Ground tag][fox-ground] · [Brightness helper][animal] · [Spawn dispatch][natural]
 
 Foxes are **Snow** variants in Snowy Taiga and Grove, and **Red** variants in the other listed biomes. The variant selector uses a biome tag that also includes snowy biomes without Fox spawn entries; a tag membership alone does not add natural Fox spawning there. A group shares its variant, with the third and later members initialized as babies. [Variant and group initialization][fox] · [Snow-Fox tag][snow-fox] · [Shared group counting][age]
 

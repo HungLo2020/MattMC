@@ -4,7 +4,7 @@
 
 ## Obsidian
 
-**ID:** `minecraft:obsidian`. Ordinary Obsidian has no light emission. Use it for a [Nether portal frame](../dimensions/Nether.md#building-and-using-a-portal), or as an ingredient for an [Enchanting Table](EnchantingTable.md), [Beacon](Beacon.md), or [Ender Chest](../items/EnderChest.md). The bundled recipes require ordinary Obsidian specifically; Crying Obsidian cannot fill those slots. [Registry][blocks] · [Recipes][enchanting-recipe] [beacon-recipe] [chest-recipe]
+**ID:** `minecraft:obsidian`. Ordinary Obsidian has no light emission. Use it for a [Nether portal frame](../dimensions/Nether.md#building-and-using-a-portal), or as an ingredient for an [Enchanting Table](EnchantingTable.md), [Beacon](Beacon.md), or [Ender Chest](../items/EnderChest.md). The bundled recipes require ordinary Obsidian specifically; Crying Obsidian cannot fill those slots. [Registry][blocks] · [Recipes][enchanting-recipe] [beacon-recipe][] [chest-recipe][]
 
 ### Making ordinary obsidian
 
@@ -18,7 +18,7 @@ The normal Nether's Water Bucket placement evaporates the water, so plan this ro
 
 **Crying Obsidian is not a valid Nether portal frame block.** The active frame check accepts ordinary Obsidian only, so replace crying pieces on a required edge when repairing a ruined portal. Follow the existing [Nether guide](../dimensions/Nether.md#building-and-using-a-portal) for frame dimensions, lighting and travel. [Frame predicate and checks][portal]
 
-Neither form has a bundled crafting, smelting or stonecutting recipe producing it, and there is no recipe converting one into the other. The checked recipes use ordinary Obsidian for the three items above and Crying Obsidian for the anchor. [Recipe loading][recipes] · [Recipes][enchanting-recipe] [beacon-recipe] [chest-recipe] [anchor-recipe]
+Neither form has a bundled crafting, smelting or stonecutting recipe producing it, and there is no recipe converting one into the other. The checked recipes use ordinary Obsidian for the three items above and Crying Obsidian for the anchor. [Recipe loading][recipes] · [Recipes][enchanting-recipe] [beacon-recipe][] [chest-recipe][] [anchor-recipe]
 
 ## Finding both forms
 
@@ -32,11 +32,11 @@ Ruined portals provide placed Obsidian, and their generation processor can repla
 
 The templates also wire their chest to the ruined-portal loot table, where **1–2 ordinary Obsidian per selected entry** is possible. This is a random chest result, not a guaranteed chest total. Use the mining rules below to recover the frame itself. [Template][ruins-template] · [Chest loot][ruins-loot] · [Template placement][template] · [Container loot loading][container] [container-loot]
 
-Ordinary Obsidian also forms the End's central-island spikes and arrival platform. The active End biome includes the spike feature, and entering the End rebuilds the platform. See the [End guide](../dimensions/End.md) for travel and arrival hazards; this page does not validate an Obsidian farm. [Normal preset and End biome source][normal] [end-biome-source] · [End biome and spike wiring][end-biome] [spike-placement] [spike-config] [spike] · [Entry and platform][end-portal] [end-platform]
+Ordinary Obsidian also forms the End's central-island spikes and arrival platform. The active End biome includes the spike feature, and entering the End rebuilds the platform. See the [End guide](../dimensions/End.md) for travel and arrival hazards; this page does not validate an Obsidian farm. [Normal preset and End biome source][normal] [end-biome-source] · [End biome and spike wiring][end-biome] [spike-placement][] [spike-config][] [spike] · [Entry and platform][end-portal] [end-platform]
 
 ## Mining and block properties
 
-Use an **unbroken Diamond or Netherite Pickaxe** to collect either form in ordinary Survival mining. Both blocks require a correct tool, are pickaxe-mineable, and are in the diamond-tier requirement tag. A hand, Iron Pickaxe or lower-tier ordinary pickaxe does not produce the block drop. [Block properties][blocks] · [Tool tags and material rules][pickaxe] [diamond-tier] [iron-denials] [diamond-denials] [netherite-denials] [tool-material] · [Unbroken-tool and harvesting checks][stack] [player-tool] [break-dispatch]
+Use an **unbroken Diamond or Netherite Pickaxe** to collect either form in ordinary Survival mining. Both blocks require a correct tool, are pickaxe-mineable, and are in the diamond-tier requirement tag. A hand, Iron Pickaxe or lower-tier ordinary pickaxe does not produce the block drop. [Block properties][blocks] · [Tool tags and material rules][pickaxe] [diamond-tier][] [iron-denials][] [diamond-denials][] [netherite-denials][] [tool-material] · [Unbroken-tool and harvesting checks][stack] [player-tool][] [break-dispatch][]
 
 Each drops **one matching block**. Silk Touch is unnecessary and Fortune does not increase the result. The explosion-survival condition is separate from the correct-tool check. [Ordinary loot][obsidian-loot] · [Crying loot][crying-loot]
 

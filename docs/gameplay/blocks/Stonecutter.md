@@ -6,7 +6,7 @@ The **Stonecutter** (`minecraft:stonecutter`) turns one accepted ingredient into
 
 Put **3 ordinary Stone in a row**, with **1 Iron Ingot directly above the middle Stone**, to craft **1 Stonecutter**. This is a two-row pattern on the Crafting Table; Cobblestone and Smooth Stone cannot replace the named Stone ingredient. [Recipe][recipe]
 
-Use an **unbroken pickaxe**, including Wood, to collect a placed Stonecutter. It requires a correct tool and is in the pickaxe tag, with no higher tool-tier requirement. Ordinary mining drops **one Stonecutter**; Silk Touch is unnecessary and Fortune adds nothing. Its loot has an explosion-survival condition. Registered hardness and blast resistance are both **3.5**, not measured breaking times. [Registry and properties][blocks] [properties] · [Mining tags and tool rules][pickaxe] [wood-denials] [stone-tier] [iron-tier] [diamond-tier] [tool] [stack] · [Harvest dispatch][player-tool] [harvest] · [Loot][loot]
+Use an **unbroken pickaxe**, including Wood, to collect a placed Stonecutter. It requires a correct tool and is in the pickaxe tag, with no higher tool-tier requirement. Ordinary mining drops **one Stonecutter**; Silk Touch is unnecessary and Fortune adds nothing. Its loot has an explosion-survival condition. Registered hardness and blast resistance are both **3.5**, not measured breaking times. [Registry and properties][blocks] [properties] · [Mining tags and tool rules][pickaxe] [wood-denials][] [stone-tier][] [iron-tier][] [diamond-tier][] [tool][] [stack][] · [Harvest dispatch][player-tool] [harvest] · [Loot][loot]
 
 ## Using the menu
 
@@ -52,7 +52,7 @@ These links are not a complete list of all accepted ingredients. The checked sou
 
 The front faces the player when placed. The block's shape is a full-width base **9/16 block high**; the blade artwork has no special damaging contact callback in the active block class. [Shape and placement][block]
 
-An unemployed adult Villager can claim an available, reachable Stonecutter as a **Mason** job site. All its facing states belong to that job-site type, with room for **one claimant**; it needs no input item, fuel or completed cutting recipe. Babies and nitwits do not take this job through the normal acquisition path. [POI and profession registration][poi] [profession] · [Active Villager brain and job acquisition][villager] [goals] [acquire] [assign]
+An unemployed adult Villager can claim an available, reachable Stonecutter as a **Mason** job site. All its facing states belong to that job-site type, with room for **one claimant**; it needs no input item, fuel or completed cutting recipe. Babies and nitwits do not take this job through the normal acquisition path. [POI and profession registration][poi] [profession] · [Active Villager brain and job acquisition][villager] [goals][] [acquire][] [assign]
 
 Placing or moving the block does not guarantee a particular Villager changes profession or offers a particular trade. Follow [Villager employment](../mobs/Villager.md#employment-and-changing-jobs) and [Trading](../trading/Trading.md) for job changes, experience locks, restocking and selected offers.
 

@@ -4,9 +4,9 @@ A **Lectern** (`minecraft:lectern`) holds one readable book, lets players turn i
 
 ## Crafting, placement and collection
 
-Craft **4 wooden slabs + 1 ordinary Bookshelf → 1 Lectern**. Put three slabs across the top row, the Bookshelf in the center, and the fourth slab in the bottom-center slot. Each slab must be in `minecraft:wooden_slabs`; accepted wood types can be mixed. A Chiseled Bookshelf is not a substitute. [Recipe][recipe] · [Slab tag and matching][slabs] [ingredient] [pattern]
+Craft **4 wooden slabs + 1 ordinary Bookshelf → 1 Lectern**. Put three slabs across the top row, the Bookshelf in the center, and the fourth slab in the bottom-center slot. Each slab must be in `minecraft:wooden_slabs`; accepted wood types can be mixed. A Chiseled Bookshelf is not a substitute. [Recipe][recipe] · [Slab tag and matching][slabs] [ingredient][] [pattern][]
 
-The Lectern faces the player when placed. A normal crafted or harvested item places an **empty, unpowered** Lectern. Its hardness and blast resistance are both **2.5**. Use an unbroken axe for faster mining; a bare hand can still recover **one Lectern**, because the block has no correct-tool requirement. Silk Touch is unnecessary, Fortune adds nothing, and the block loot has an explosion-survival condition. [Placement and initial state][lectern] · [Properties][blocks] [properties] · [Axe/tool rules][axe] [tool] [stack] [player-tool] [harvest] · [Loot][loot]
+The Lectern faces the player when placed. A normal crafted or harvested item places an **empty, unpowered** Lectern. Its hardness and blast resistance are both **2.5**. Use an unbroken axe for faster mining; a bare hand can still recover **one Lectern**, because the block has no correct-tool requirement. Silk Touch is unnecessary, Fortune adds nothing, and the block loot has an explosion-survival condition. [Placement and initial state][lectern] · [Properties][blocks] [properties] · [Axe/tool rules][axe] [tool][] [stack][] [player-tool][] [harvest][] · [Loot][loot]
 
 ## Placing, reading and taking a book
 
@@ -37,7 +37,7 @@ The Lectern's redstone output does not turn its own pages. The checked page chan
 
 ## Librarian job site
 
-An available, reachable Lectern can be claimed by an unemployed adult Villager to become a **Librarian**. It has room for **one claimant**, and **does not need a book**: all of the Lectern's facing, powered and book-present states are registered as the same Librarian job-site type. Nitwits and babies do not become Librarians through this normal job-acquisition path. [All-state POI registration][poi] · [Profession mapping][profession] · [Active brain, acquisition and assignment][villager] [goals] [acquire] [assign]
+An available, reachable Lectern can be claimed by an unemployed adult Villager to become a **Librarian**. It has room for **one claimant**, and **does not need a book**: all of the Lectern's facing, powered and book-present states are registered as the same Librarian job-site type. Nitwits and babies do not become Librarians through this normal job-acquisition path. [All-state POI registration][poi] · [Profession mapping][profession] · [Active brain, acquisition and assignment][villager] [goals][] [acquire][] [assign]
 
 Placing a Lectern near a Villager does not guarantee that Villager claims it or offers a particular enchanted book. Removing the workstation only permits the ordinary profession reset when the Villager has **zero villager experience and is still level 1**; trading can prevent that reset. Preserve the full [Villager employment guidance](../mobs/Villager.md#employment-and-changing-jobs) and [Trading guide](../trading/Trading.md) when planning a Librarian setup. [Reset conditions][reset] · [Trade selection][villager]
 

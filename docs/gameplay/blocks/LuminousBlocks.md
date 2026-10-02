@@ -16,13 +16,13 @@ Each listed ID has a matching inventory item. The light value is constant in its
 | `minecraft:pearlescent_froglight` | 15 | 0.3 | 1 Pearlescent Froglight |
 | `minecraft:carmine_froglight` | 15 | 0.3 | 1 Carmine Froglight; starting Survival supply is unverified |
 
-The two resource-drop counts above are without Fortune. These blocks have **full-block collision**, no gravity or ongoing attachment requirement, and no waterlogged state. They can form solid lighting blocks beside water, without storing Water in the same block. None burns down with time. [Block defaults][default] · [Registrations][reg-glow] [reg-sea] [reg-shroom] [reg-frogs]
+The two resource-drop counts above are without Fortune. These blocks have **full-block collision**, no gravity or ongoing attachment requirement, and no waterlogged state. They can form solid lighting blocks beside water, without storing Water in the same block. None burns down with time. [Block defaults][default] · [Registrations][reg-glow] [reg-sea][] [reg-shroom][] [reg-frogs]
 
 The four Froglights use `RotatedPillarBlock`: clicking a top/bottom face places the texture axis vertically; clicking an east/west or north/south face sets that horizontal axis. Orientation does not change the registered light level. Glowstone, Sea Lantern, and Shroomlight have no placement-axis property. [Pillar placement][pillar] · [Froglight registration][reg-frogs]
 
 ## Tools, Silk Touch, and Fortune
 
-**None of these seven registrations has a required-tool drop gate.** Hand mining can produce the ordinary result. A hoe is the tagged efficient tool for Shroomlight; the other six have no matching entry in the bundled ordinary axe, pickaxe, shovel, or hoe mining tags. Silk Touch's loot conditions on Glowstone and Sea Lantern check the enchantment, not a particular pickaxe material. [Registrations][reg-glow] [reg-sea] [reg-shroom] [reg-frogs] · [Player harvest gate][gate] · [Active mining dispatch][harvest] · [Mining tags][hoe] [axe] [pickaxe] [shovel] · [Loot details below](#glowstone)
+**None of these seven registrations has a required-tool drop gate.** Hand mining can produce the ordinary result. A hoe is the tagged efficient tool for Shroomlight; the other six have no matching entry in the bundled ordinary axe, pickaxe, shovel, or hoe mining tags. Silk Touch's loot conditions on Glowstone and Sea Lantern check the enchantment, not a particular pickaxe material. [Registrations][reg-glow] [reg-sea][] [reg-shroom][] [reg-frogs] · [Player harvest gate][gate] · [Active mining dispatch][harvest] · [Mining tags][hoe] [axe][] [pickaxe][] [shovel] · [Loot details below](#glowstone)
 
 Normal item spawning follows `doTileDrops`. The listed mining counts are not explosion guarantees: dust/crystal branches apply explosion decay, and ordinary self-drop tables use their own conditions. Carmine's bundled self-drop table is notably simpler and has no explosion-survival condition; that does not create a starting acquisition route. [Drop dispatch and game rule][drops] · [Carmine loot][loot-carmine_froglight]
 

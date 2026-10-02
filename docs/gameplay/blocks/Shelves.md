@@ -33,7 +33,7 @@ The block has `facing`, `powered`, `side_chain_part`, and `waterlogged` states. 
 
 ## Three slots and normal use
 
-The Shelf has **one row of three slots**, read left to right while looking at its front. Each slot stores a stack with its normal item stack limit: for example, three ordinary 64-count stacks fit, while unstackable tools occupy one slot each. The underlying container also caps a slot at 99, so a custom higher item maximum would not bypass that cap. It does not restrict storage to books or to a particular item family. [Slot layout][shelf] [slots] · [Inventory and stack limits][entity] [list] [container] · [Default item stack size][components]
+The Shelf has **one row of three slots**, read left to right while looking at its front. Each slot stores a stack with its normal item stack limit: for example, three ordinary 64-count stacks fit, while unstackable tools occupy one slot each. The underlying container also caps a slot at 99, so a custom higher item maximum would not bypass that cap. It does not restrict storage to books or to a particular item family. [Slot layout][shelf] [slots] · [Inventory and stack limits][entity] [list][] [container][] · [Default item stack size][components]
 
 Use the **front face**, aiming at its left, middle, or right third, with your main hand:
 
@@ -96,7 +96,7 @@ While placed, the Shelf saves and reloads its three item stacks, and synchronize
 
 ### Fuel and fire distinctions
 
-The ten Overworld/Bamboo Shelf items are default furnace fuel for **300 burn ticks each**. Crimson and Warped Shelves are excluded by the non-flammable-wood item tag. Their ordinary FireBlock spread/burn entries are also absent, while the other ten have entries. However, **all twelve block registrations carry the lava-ignition flag**, which the lava ignition code checks for nearby fire creation. The item fuel exclusion is not a blanket statement that every fire/lava interaction ignores the Nether Shelf variants. [Fuel construction and exclusion][fuel] [shelf-item-tag] [nonflammable] · [Active server fuel initialization][fuel-init] · [Fire entries][fire] · [Block flags][registration] · [Lava ignition path][lava]
+The ten Overworld/Bamboo Shelf items are default furnace fuel for **300 burn ticks each**. Crimson and Warped Shelves are excluded by the non-flammable-wood item tag. Their ordinary FireBlock spread/burn entries are also absent, while the other ten have entries. However, **all twelve block registrations carry the lava-ignition flag**, which the lava ignition code checks for nearby fire creation. The item fuel exclusion is not a blanket statement that every fire/lava interaction ignores the Nether Shelf variants. [Fuel construction and exclusion][fuel] [shelf-item-tag][] [nonflammable][] · [Active server fuel initialization][fuel-init] · [Fire entries][fire] · [Block flags][registration] · [Lava ignition path][lava]
 
 ## Small storage setup
 

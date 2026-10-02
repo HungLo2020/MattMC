@@ -6,9 +6,9 @@
 
 Craft **4 Nether Quartz in a 2 × 2 square → 1 Block of Quartz**. Follow [Ore Resources](OreResources.md#bring-a-suitable-pickaxe) for Nether Quartz Ore mining and its tool, Silk Touch and Fortune rules; this guide covers the resulting building materials. [Construction recipe][crafting-quartz-block]
 
-Use an **unbroken pickaxe**, including Wood, to recover all nine placed quartz forms below. They require a correct tool, are pickaxe-tagged and have no higher material-tier restriction. Hand breaking does not collect them. [Registrations][blocks] · [Mining tags][pickaxe] [wood-denials] [stone-tier] [iron-tier] [diamond-tier] · [Tool and server checks][tool-material] [player-tool] [broken-tool] [break-dispatch]
+Use an **unbroken pickaxe**, including Wood, to recover all nine placed quartz forms below. They require a correct tool, are pickaxe-tagged and have no higher material-tier restriction. Hand breaking does not collect them. [Registrations][blocks] · [Mining tags][pickaxe] [wood-denials][] [stone-tier][] [iron-tier][] [diamond-tier][] · [Tool and server checks][tool-material] [player-tool][] [broken-tool][] [break-dispatch]
 
-Full blocks and stairs give **one matching item**. A single slab gives **one slab**; a double slab gives **two matching slabs**. Silk Touch is unnecessary and Fortune does not multiply these building-block drops. Explosions apply separate survival/decay conditions. [Full-block loot][loot-quartz-block] [loot-chiseled-quartz-block] [loot-quartz-pillar] [loot-quartz-bricks] [loot-smooth-quartz] · [Stair loot][loot-quartz-stairs] [loot-smooth-quartz-stairs] · [Slab loot][loot-quartz-slab] [loot-smooth-quartz-slab]
+Full blocks and stairs give **one matching item**. A single slab gives **one slab**; a double slab gives **two matching slabs**. Silk Touch is unnecessary and Fortune does not multiply these building-block drops. Explosions apply separate survival/decay conditions. [Full-block loot][loot-quartz-block] [loot-chiseled-quartz-block][] [loot-quartz-pillar][] [loot-quartz-bricks][] [loot-smooth-quartz][] · [Stair loot][loot-quartz-stairs] [loot-smooth-quartz-stairs] · [Slab loot][loot-quartz-slab] [loot-smooth-quartz-slab]
 
 ## Registered variants
 
@@ -51,7 +51,7 @@ Use the [shared stair/slab patterns](Stone.md#crafting-yields): six blocks in a 
 | Smooth Quartz Stairs | Smooth Quartz Block only | 6 blocks → 4 stairs |
 | Smooth Quartz Slab | Smooth Quartz Block only | 3 blocks → 6 slabs |
 
-The three accepted ordinary quartz forms may be **mixed within one crafting recipe** because each occupied slot independently accepts any listed form. Quartz Bricks and Smooth Quartz are excluded from that ordinary ingredient list. [Exact recipes][crafting-quartz-stairs] [crafting-quartz-slab] [crafting-smooth-quartz-stairs] [crafting-smooth-quartz-slab] · [Ingredient and pattern matching][ingredient] [pattern]
+The three accepted ordinary quartz forms may be **mixed within one crafting recipe** because each occupied slot independently accepts any listed form. Quartz Bricks and Smooth Quartz are excluded from that ordinary ingredient list. [Exact recipes][crafting-quartz-stairs] [crafting-quartz-slab][] [crafting-smooth-quartz-stairs][] [crafting-smooth-quartz-slab] · [Ingredient and pattern matching][ingredient] [pattern]
 
 ## Stonecutting
 

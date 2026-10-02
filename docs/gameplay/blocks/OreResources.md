@@ -4,7 +4,7 @@ Ores supply fuel, metals, gems and redstone. **Use a suitable pickaxe before bre
 
 ## Bring a suitable pickaxe
 
-All 19 blocks require the correct tool and belong to the pickaxe mining group. The table lists the ordinary unbroken pickaxe materials accepted by the bundled tags. [Harvest gate][player] · [Mining dispatch][mining] · [Pickaxe group][pickaxe] · [Tier groups][stone-tier] [iron-tier] [diamond-tier]
+All 19 blocks require the correct tool and belong to the pickaxe mining group. The table lists the ordinary unbroken pickaxe materials accepted by the bundled tags. [Harvest gate][player] · [Mining dispatch][mining] · [Pickaxe group][pickaxe] · [Tier groups][stone-tier] [iron-tier][] [diamond-tier][]
 
 | Ore family, including its Deepslate form where present | Suitable pickaxes | Base ordinary drop | Base mining XP |
 | --- | --- | --- | ---: |

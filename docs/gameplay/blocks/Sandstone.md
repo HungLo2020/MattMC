@@ -6,7 +6,7 @@ Sandstone turns loose Sand into stable building material. The ordinary pale fami
 
 Craft **4 Sand in a 2 × 2 square into 1 Sandstone**, or use **4 Red Sand for 1 Red Sandstone**. The recipes name the exact sand item, so do not mix their colors. This fits the inventory crafting grid. See [Sand and Red Sand](SoilSandAndGravel.md#sand-red-sand-and-gravel-falling) for collecting the loose inputs. [Sandstone recipe][r-sandstone] · [Red Sandstone recipe][r-red_sandstone]
 
-Use an **unbroken pickaxe of any ordinary material, including Wood**, to collect all 20 forms covered here. All require a correct tool and are pickaxe-tagged, without a higher material-tier restriction. Breaking one by hand does not collect its normal block drop. [Registrations][blocks] · [Pickaxe tag][pickaxe] · [Wood tier exclusions][wood-tier] · [Tool checks][tool] [player] [broken] · [Harvest dispatch][mining]
+Use an **unbroken pickaxe of any ordinary material, including Wood**, to collect all 20 forms covered here. All require a correct tool and are pickaxe-tagged, without a higher material-tier restriction. Breaking one by hand does not collect its normal block drop. [Registrations][blocks] · [Pickaxe tag][pickaxe] · [Wood tier exclusions][wood-tier] · [Tool checks][tool] [player][] [broken][] · [Harvest dispatch][mining]
 
 Ordinary correct-tool mining gives **one matching full block, stair or wall**, **one slab from a single slab**, or **two slabs from a double slab**. Silk Touch is not needed and Fortune adds no multiplier. Finished blocks retain their finish: mining Chiseled Sandstone does not turn it back into ordinary Sandstone or Sand. Explosions use separate survival/quantity conditions. [All exact loot tables](#registered-forms-and-loot)
 

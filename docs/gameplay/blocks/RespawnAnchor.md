@@ -1,12 +1,12 @@
 # Respawn Anchor
 
-A **Respawn Anchor** (`minecraft:respawn_anchor`) stores up to four Glowstone charges and lets you select a respawn point in dimensions that allow anchors. In the bundled dimensions, that means the **Nether**. Trying to use a charged anchor for respawning elsewhere causes an explosion. [Registration][blocks] · [Anchor behavior][anchor] · [Dimension settings][nether-type] [overworld-type] [end-type] [primordial-type]
+A **Respawn Anchor** (`minecraft:respawn_anchor`) stores up to four Glowstone charges and lets you select a respawn point in dimensions that allow anchors. In the bundled dimensions, that means the **Nether**. Trying to use a charged anchor for respawning elsewhere causes an explosion. [Registration][blocks] · [Anchor behavior][anchor] · [Dimension settings][nether-type] [overworld-type][] [end-type][] [primordial-type]
 
 ## Crafting and recovering an anchor
 
 Craft **6 Crying Obsidian + 3 Glowstone blocks → 1 Respawn Anchor**. Fill the top and bottom crafting rows with Crying Obsidian and the middle row with Glowstone. Ordinary Obsidian and Glowstone Dust are not substitutes. See [Obsidian and Crying Obsidian](Obsidian.md#finding-both-forms) for a checked supply route. [Exact recipe][recipe] · [Recipe loading][recipes]
 
-Mine a placed anchor with an **unbroken Diamond or Netherite Pickaxe** to recover **one anchor**. It requires a correct tool and the diamond-tier pickaxe requirement. Silk Touch is unnecessary; Fortune adds nothing. Its loot does not preserve the charge or return the spent Glowstone, so a recovered anchor placed again starts at **0 charges**. [Registry and tool rules][blocks] [pickaxe] [diamond-tier] [iron-denials] [diamond-denials] [netherite-denials] [tool-material] · [Harvest dispatch][stack] [player-tool] [break-dispatch] · [Loot][loot] · [Default placement][block] [block-item] [anchor]
+Mine a placed anchor with an **unbroken Diamond or Netherite Pickaxe** to recover **one anchor**. It requires a correct tool and the diamond-tier pickaxe requirement. Silk Touch is unnecessary; Fortune adds nothing. Its loot does not preserve the charge or return the spent Glowstone, so a recovered anchor placed again starts at **0 charges**. [Registry and tool rules][blocks] [pickaxe][] [diamond-tier][] [iron-denials][] [diamond-denials][] [netherite-denials][] [tool-material][] · [Harvest dispatch][stack] [player-tool][] [break-dispatch][] · [Loot][loot] · [Default placement][block] [block-item][] [anchor][]
 
 ## Charging and selecting your respawn point
 
@@ -42,7 +42,7 @@ If a saved ordinary point is empty, missing, in a disallowed dimension, or has n
 
 ## Dimension restrictions and explosions
 
-The rule is the dimension type's **`respawn_anchor_works`** setting, not merely its name. The bundled Nether type enables it; Overworld, Overworld Caves, End and Primordial Caves types disable it. The normal world preset uses the Nether, Overworld, End and Primordial Caves types. Custom data can change these settings. [Dimension predicate][anchor] · [Bundled types][nether-type] [overworld-type] [overworld-caves-type] [end-type] [primordial-type] · [Normal preset][normal]
+The rule is the dimension type's **`respawn_anchor_works`** setting, not merely its name. The bundled Nether type enables it; Overworld, Overworld Caves, End and Primordial Caves types disable it. The normal world preset uses the Nether, Overworld, End and Primordial Caves types. Custom data can change these settings. [Dimension predicate][anchor] · [Bundled types][nether-type] [overworld-type][] [overworld-caves-type][] [end-type][] [primordial-type][] · [Normal preset][normal]
 
 Charging is possible even where anchors cannot set spawn. Using a **charged** anchor there through its spawn interaction removes the anchor and requests a **power-5, fire-producing block explosion**. Placing it or adding a charge is not that detonation interaction. Actual block damage and fire depend on the explosion rules and surroundings. Its high normal blast resistance does not prevent this deliberate self-removal. [Interaction and explosion][anchor] · [Explosion processing][explosion]
 

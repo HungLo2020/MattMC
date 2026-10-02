@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Use an **unbroken pickaxe with Silk Touch** to recover it alive. A correct pickaxe without Silk Touch gives one Dead Tube Coral Block; the wrong tool gives nothing. The guide covers [Warm Ocean reefs and Wandering Trader offers](../blocks/Coral.md#finding-coral-and-obtaining-more). There is no bundled crafting recipe or Bone Meal full-block growth route. [Loot][loot-tube-coral-block] · [Tool gate][blocks] [pickaxe] [player-tool]
+Use an **unbroken pickaxe with Silk Touch** to recover it alive. A correct pickaxe without Silk Touch gives one Dead Tube Coral Block; the wrong tool gives nothing. The guide covers [Warm Ocean reefs and Wandering Trader offers](../blocks/Coral.md#finding-coral-and-obtaining-more). There is no bundled crafting recipe or Bone Meal full-block growth route. [Loot][loot-tube-coral-block] · [Tool gate][blocks] [pickaxe][] [player-tool][]
 
 ## Usage
 

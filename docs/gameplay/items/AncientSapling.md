@@ -1,6 +1,6 @@
 # Ancient Sapling
 
-**Ancient Sapling** (`minecraft:ancient_sapling`) grows through an active tree feature into Jungle Logs and Ancient Leaves. It appears in the Natural Blocks Creative tab. [Registration][blocks] [items] [creative] · [Grower and tree][grower] [tree]
+**Ancient Sapling** (`minecraft:ancient_sapling`) grows through an active tree feature into Jungle Logs and Ancient Leaves. It appears in the Natural Blocks Creative tab. [Registration][blocks] [items][] [creative][] · [Grower and tree][grower] [tree]
 
 ## Obtaining
 
