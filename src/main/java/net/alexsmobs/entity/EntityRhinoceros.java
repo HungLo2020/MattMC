@@ -40,6 +40,7 @@ import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.raid.Raider;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemUtils;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.item.alchemy.PotionContents;
@@ -422,13 +423,12 @@ public class EntityRhinoceros extends Animal implements IAnimatedEntity {
         if(!isBaby() && (itemstack.getItem() == Items.POTION || itemstack.getItem() == Items.SPLASH_POTION || itemstack.getItem() == Items.LINGERING_POTION)){
             PotionContents potionContents = itemstack.get(DataComponents.POTION_CONTENTS);
             Potion contained = potionContents != null && potionContents.potion().isPresent() ? potionContents.potion().get().value() : null;
-            if(applyPotion(contained)){
-                this.gameEvent(GameEvent.ENTITY_INTERACT);
-                this.playSound(SoundEvents.DYE_USE);
-                this.usePlayerItem(player, hand, itemstack);
-                ItemStack bottle = new ItemStack(Items.GLASS_BOTTLE);
-                if(!player.addItem(bottle)){
-                    player.drop(bottle, false);
+            boolean clientSide = this.level().isClientSide();
+            if(applyPotion(contained, clientSide)){
+                if (!clientSide) {
+                    this.gameEvent(GameEvent.ENTITY_INTERACT);
+                    this.playSound(SoundEvents.DYE_USE);
+                    player.setItemInHand(hand, ItemUtils.createFilledResult(itemstack, player, new ItemStack(Items.GLASS_BOTTLE)));
                 }
                 return InteractionResult.SUCCESS;
             }
@@ -442,19 +442,29 @@ public class EntityRhinoceros extends Animal implements IAnimatedEntity {
         return type;
     }
 
-    public boolean applyPotion(Potion potion){
-        if(potion == null || potion == Potions.WATER){
-            resetPotion();
+    public boolean applyPotion(@Nullable Potion potion){
+        return applyPotion(potion, false);
+    }
+
+    private boolean applyPotion(@Nullable Potion potion, boolean simulate){
+        // Preserve the existing reset behavior for bottles with no base potion.
+        // Client prediction validates the same inputs without changing the coating.
+        if(potion == null || potion == Potions.WATER.value()){
+            if (!simulate) {
+                resetPotion();
+            }
             return true;
         }else{
             if(potion.getEffects().size() >= 1){
                 MobEffectInstance first = potion.getEffects().get(0);
                 ResourceLocation loc = BuiltInRegistries.MOB_EFFECT.getKey(first.getEffect().value());
                 if(loc != null){
-                    this.setAppliedPotionId(loc.toString());
-                    this.setPotionLevel(first.getAmplifier());
-                    this.setPotionDuration(first.getDuration());
-                    this.setInflictedCount(0);
+                    if (!simulate) {
+                        this.setAppliedPotionId(loc.toString());
+                        this.setPotionLevel(first.getAmplifier());
+                        this.setPotionDuration(first.getDuration());
+                        this.setInflictedCount(0);
+                    }
                     return true;
                 }
             }
