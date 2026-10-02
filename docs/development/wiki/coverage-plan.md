@@ -1294,3 +1294,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Expanded Witch, Bogged, Stray and Breeze owners with actual spawning/Trial configuration routes, combat controls, effects, shearing, immunities and conditional drops. Added four discovery/related-owner crosslinks.
 - Independent review traced connected Trial templates, active potion and arrow handling, projectile collision/deflection, loot gates and damage exceptions. Bogged Shears wear is qualified before modifiers; Breeze burst mechanism triggers need mobGriefing, while an eligible direct Bell hit can still ring through its separate callback.
 - Final unchanged-source, documentation check/build, local-anchor and actual rendered-citation checks are required before promotion. No runtime chamber, combat, potion-duration, shearing or mechanism-trigger test is claimed.
+
+## Batch 156: Standard Sign inventory routes
+
+- Replaced 22 generic standard Sign/Hanging Sign inventory entries with exact item IDs, standing/wall bindings, per-material recipe references, ordinary browser availability, blank-drop distinctions and scoped placement/editing owner links. No new article files were added.
+- Existing authored Oak/Pewen entries and their different integration limits are preserved; already-substantive Wool/Glass pages were excluded from the candidate list. The current Signs owner remains the source-reviewed authority for shared behavior.
+- Independent review and final source/check/build/render validation are required before promotion; all 110 existing page anchors are preserved. This is a bounded inventory-routing improvement, not 22 newly exhaustive block-behavior articles or a completed item backlog. No in-game placement, editing or harvesting test is claimed.

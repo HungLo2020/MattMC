@@ -1,18 +1,26 @@
 # Acacia Hanging Sign
 
+`minecraft:acacia_hanging_sign` is the inventory item for both ceiling and wall-hanging Acacia signs. It stacks to 16. [Item binding][item]
+
 ## Obtaining
 
-Acacia Hanging Signs are crafted from stripped acacia wood materials and chains. They can also be obtained from the Creative Menu.
+Use Stripped Acacia Log and Iron Chain in [this variant’s hanging-sign recipe](../blocks/Signs.md#hanging-sign-variants); the guide gives the exact layout and yield. [Recipe][recipe]
+
+It is also an ordinary [inventory-browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) entry, available in Survival as well as Creative. [Category listing][listing]
 
 ## Usage
 
-The Acacia Hanging Sign is used to display editable text while hanging from blocks or from the side of blocks.
+Follow the [ceiling placement](../blocks/Signs.md#ceiling-hanging-signs) or [wall-hanging support rules](../blocks/Signs.md#wall-hanging-signs), including the current support-removal difference, then use the guide for [editing both faces](../blocks/Signs.md#writing-and-editing-both-faces).
 
 ## Behavior
 
-The sign keeps its written text after placement. It can be edited, waxed to lock text, and decorated with dye.
+Ordinary mining returns one matching **blank item**. Text, dye, glow, and wax are not copied into that drop. See [mining and saved text](../blocks/Signs.md#mining-drops-and-saved-text) for collection conditions. [Exact loot][loot]
 
 ## Notes
 
-* This item is the item form of the `minecraft:acacia_hanging_sign` block.
-* It appears in the Functional Blocks creative tab.
+Checked item binding, recipe, listing, and loot at `25319cecd6bee492767c5b15ee53b9213d1ec1ee` on 2026-10-02; no gameplay test. Shared placement and editing details remain in the [Signs guide](../blocks/Signs.md).
+
+[item]: https://github.com/HungLo2020/MattMC/blob/25319cecd6bee492767c5b15ee53b9213d1ec1ee/src/main/java/net/minecraft/world/item/Items.java#L1471-L1475
+[recipe]: https://github.com/HungLo2020/MattMC/blob/25319cecd6bee492767c5b15ee53b9213d1ec1ee/src/main/resources/data/minecraft/recipe/crafting/acacia_hanging_sign.json
+[listing]: https://github.com/HungLo2020/MattMC/blob/25319cecd6bee492767c5b15ee53b9213d1ec1ee/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1155
+[loot]: https://github.com/HungLo2020/MattMC/blob/25319cecd6bee492767c5b15ee53b9213d1ec1ee/src/main/resources/data/minecraft/loot_table/blocks/acacia_hanging_sign.json

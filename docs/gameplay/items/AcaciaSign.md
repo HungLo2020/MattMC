@@ -1,18 +1,26 @@
 # Acacia Sign
 
+`minecraft:acacia_sign` is the inventory item for both standing and wall Acacia signs. It stacks to 16. [Item binding][item]
+
 ## Obtaining
 
-Acacia Signs are crafted from Acacia Planks and a Stick. They can also be obtained from the Creative Menu.
+Use Acacia Planks and a Stick in [this variant’s sign recipe](../blocks/Signs.md#ordinary-sign-variants); the guide gives the exact layout and yield. [Recipe][recipe]
+
+It is also an ordinary [inventory-browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) entry, available in Survival as well as Creative. [Category listing][listing]
 
 ## Usage
 
-The Acacia Sign is used to display editable text on the ground or on walls.
+Follow the [standing and wall placement rules](../blocks/Signs.md#standing-and-wall-signs), then use the guide for [editing both faces](../blocks/Signs.md#writing-and-editing-both-faces).
 
 ## Behavior
 
-The sign keeps its text after placement. It can be edited, dyed, and waxed to prevent further edits.
+Ordinary mining returns one matching **blank item**. Text, dye, glow, and wax are not copied into that drop. See [mining and saved text](../blocks/Signs.md#mining-drops-and-saved-text) for collection conditions. [Exact loot][loot]
 
 ## Notes
 
-* This item is the item form for the standing and wall acacia sign blocks.
-* It appears in the Functional Blocks creative tab.
+Checked item binding, recipe, listing, and loot at `25319cecd6bee492767c5b15ee53b9213d1ec1ee` on 2026-10-02; no gameplay test. Shared placement and editing details remain in the [Signs guide](../blocks/Signs.md).
+
+[item]: https://github.com/HungLo2020/MattMC/blob/25319cecd6bee492767c5b15ee53b9213d1ec1ee/src/main/java/net/minecraft/world/item/Items.java#L1431-L1433
+[recipe]: https://github.com/HungLo2020/MattMC/blob/25319cecd6bee492767c5b15ee53b9213d1ec1ee/src/main/resources/data/minecraft/recipe/crafting/acacia_sign.json
+[listing]: https://github.com/HungLo2020/MattMC/blob/25319cecd6bee492767c5b15ee53b9213d1ec1ee/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1154
+[loot]: https://github.com/HungLo2020/MattMC/blob/25319cecd6bee492767c5b15ee53b9213d1ec1ee/src/main/resources/data/minecraft/loot_table/blocks/acacia_sign.json
