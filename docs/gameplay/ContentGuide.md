@@ -72,6 +72,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Exploration, archaeology, and trade
 
+- [Maps](items/Map.md), [Empty Maps](items/EmptyMap.md), [Compass](items/Compass.md), and [Cartography Table](blocks/CartographyTable.md): surveys, scales, shared copies, locks, and Lodestone navigation
+
 - [Shipwreck](structures/Shipwreck.md), [Ocean Ruins](structures/OceanRuins.md), and [Buried Treasure](structures/BuriedTreasure.md): chest layouts, archaeology, treasure maps, and safe search limits
 
 - [Structures](structures/Structures.md): prepare for [Nether Fortresses](structures/NetherFortress.md) and [Strongholds](structures/Stronghold.md), including optional rooms and portal hazards

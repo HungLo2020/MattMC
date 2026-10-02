@@ -4,6 +4,8 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Workstations and storage
 
+- [Cartography Table](CartographyTable.md): map enlargement, shared copies, locking, and crafting-route differences
+
 - [Crafting Table](CraftingTable.md): 3 × 3 crafting, recipe tags, and grid cleanup
 - [Furnace](Furnace.md): crafting, fuels, processing, and troubleshooting
 - [Grindstone](Grindstone.md): repair, disenchantment, curses, and experience
