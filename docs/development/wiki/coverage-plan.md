@@ -676,6 +676,17 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Mobs, Transport, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,192 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No taming, feeding, breeding, caravan, merchant retention, dash, or travel gameplay test.
 
+## Ninetieth batch: Hummingbird integration guide
+
+- Expanded Hummingbird and its spawn egg with active flight/variant/offspring paths, persistence, and source-confirmed access and resource limits.
+- Independently checked absent bundled food/pollination tags, absent feeder registration and POI stub, all 68 actual biome definitions, and default loot fallback. No upstream crop-farm or feeder claims were imported.
+- Updated Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,192 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, flight, feeding, breeding, pollination, or drop gameplay test.
+
+### Coverage measurement at the preceding published cutoff
+
+At `987ab0a72e971d40dbcdfc6d4ee5ae52c2a95564`, 513 gameplay paths differ from the underlying gameplay source snapshot. Of those, 467 non-index articles contain pinned/source links and at least 150 whitespace-separated words: 316 items, 66 mobs, 59 blocks, 8 mechanics, 6 structures, 4 game modes, 3 dimensions, 3 effects, and 2 biomes. This is a rough substantial-article proxy, not a claim that every article is complete or runtime-tested. Variant families share canonical behavior guides; remaining untouched stubs and sparse biome/effect/structure coverage remain work.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
