@@ -62,6 +62,7 @@ Netherite equipment follows the matching Diamond-item Smithing upgrade with a Ne
 - [Centipede Leggings](../items/CentipedeLeggings.md): chainmail-based attributes with separate recipe, repair ingredient and enchantment-tag limits
 
 - [Combat and defensive stages](Combat.md#layer-defenses-without-adding-their-percentages)
+- [Combat effects](../effects/CombatEffects.md): Resistance, Absorption, Health Boost, and attack modifiers
 
 - [Copper Chestplate](../items/CopperChestplate.md)
 - [Iron Chestplate](../items/IronChestplate.md)

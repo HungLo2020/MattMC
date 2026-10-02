@@ -4,17 +4,24 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 
 ## Reviewed effects
 
+- [Absorption](CombatEffects.md#absorption): temporary damage buffer and refill/expiry limits
 - [Dolphin's Grace](MovementEffects.md#dolphins-grace): horizontal water-momentum retention
+- [Health Boost](CombatEffects.md#health-boost): maximum ordinary health without immediate healing
 - [Jump Boost](MovementEffects.md#jump-boost): ground-jump power and safe-fall-distance contributions
 - [Levitation](MovementEffects.md#levitation): upward air movement and the Elytra restriction
 - [Poison](Poison.md): periodic damage with a low-health cutoff
 - [Regeneration](Regeneration.md): periodic healing, separate from food-based healing
+- [Resistance](CombatEffects.md#resistance): eligible damage reduction and bypasses
 - [Slow Falling](MovementEffects.md#slow-falling): descending gravity and fall-distance handling
 - [Slowness](MovementEffects.md#slowness): reduced movement-speed attribute
 - [Speed](MovementEffects.md#speed): increased movement-speed attribute
+- [Strength](CombatEffects.md#strength): added attack-damage attribute and hit limitations
+- [Weakness](CombatEffects.md#weakness): reduced attack-damage attribute, curing, and other sources
 - [Wither](Wither.md): periodic damage without Poison's low-health cutoff
 
 The [movement effects reference](MovementEffects.md) compares acquisition, movement rules, and effect interactions.
+
+The [combat effects reference](CombatEffects.md) compares attack modifiers, damage reduction, and extra health.
 
 This is a growing reference, not a complete list of all registered effects. The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
 
