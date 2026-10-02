@@ -646,7 +646,7 @@ public class EntityGrizzlyBear extends TamableAnimal implements NeutralMob, IAni
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel world, AgeableMob p_241840_2_) {
-        return EntityType.POLAR_BEAR.create(world, EntitySpawnReason.BREEDING);
+        return EntityType.GRIZZLY_BEAR.create(world, EntitySpawnReason.BREEDING);
     }
 
     @Override

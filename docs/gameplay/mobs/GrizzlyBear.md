@@ -31,13 +31,13 @@ Keep bears away from working beehives and bee nests. Adults seek hives containin
 
 ## Breeding and drops
 
-- Fish can put **tamed** bears into breeding mode. However, the current offspring method creates a **polar bear**, not a grizzly cub. Do not plan a grizzly breeding farm around this implementation. [Food condition][food] · [Offspring][offspring]
+- Fish can put **tamed** bears into breeding mode. Breeding produces a baby **grizzly bear**. The cub starts untamed and without an owner; tame it separately. [Food condition][food] · [Offspring][offspring]
 - A living, adult, tamed bear periodically drops one [Rabbit Hide](../items/RabbitHide.md). The timer is 24,000–47,999 ticking game ticks, approximately 20–40 minutes at normal tick speed; unloaded time does not advance it. [Hide timer][hide]
 - No dedicated grizzly death-loot table was found in the bundled entity loot data. The periodic rabbit-hide drop above is the verified resource-producing behavior. [Entity loot data][loot]
 
 ## Verification scope
 
-Checked against MattMC source and bundled data at commit `fffe4a073f0b8d867902b067a6dd022cda31926f`. These are source-defined behaviors, not a completed in-game taming, combat, or spawning test.
+The baseline source audit used commit `fffe4a073f0b8d867902b067a6dd022cda31926f`. The breeding description includes the offspring-factory correction on `fix/issue-778-grizzly-offspring`. Other behavior remains from the baseline audit. This is not a completed in-game taming, combat, spawning, or breeding test.
 
 [attributes]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L87-L103
 [registration]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/minecraft/world/entity/EntityType.java#L714-L720
@@ -53,6 +53,6 @@ Checked against MattMC source and bundled data at commit `fffe4a073f0b8d867902b0
 [goals]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L185-L209
 [hives]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/ai/GrizzlyBearAIBeehive.java#L85-L129
 [food]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L236-L239
-[offspring]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L646-L650
+[offspring]: https://github.com/HungLo2020/MattMC/blob/fix/issue-778-grizzly-offspring/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L646-L650
 [hide]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L525-L528
 [loot]: https://github.com/HungLo2020/MattMC/tree/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/resources/data/minecraft/loot_table/entities
