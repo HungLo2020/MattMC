@@ -60,6 +60,7 @@ The same potion-content recipes also accept the splash and lingering containers.
 - [Brewing Stand](../blocks/BrewingStand.md)
 - [Potion](../items/Potion.md), [Splash Potion](../items/SplashPotion.md), and [Lingering Potion](../items/LingeringPotion.md)
 - [Effects](../effects/Effects.md)
+- [Instant effects](../effects/InstantEffects.md): Healing, Harming, recipient inversion, and delivery differences
 - [Movement effects](../effects/MovementEffects.md): Speed, Slowness, Jump Boost, Slow Falling, Levitation, and Dolphin’s Grace
 - [Gameplay](../Gameplay.md)
 

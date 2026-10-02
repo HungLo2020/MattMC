@@ -12,6 +12,8 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Dolphin's Grace](MovementEffects.md#dolphins-grace): horizontal water-momentum retention
 - [Fire Resistance](WaterAndFireEffects.md#fire-resistance): fire-tagged damage rejection and lava-fog behavior
 - [Health Boost](CombatEffects.md#health-boost): maximum ordinary health without immediate healing
+- [Instant Damage](InstantEffects.md#instant-damage): instant magic damage, inverted healing, and delivery limits
+- [Instant Health](InstantEffects.md#instant-health): immediate healing, inverted damage, and delivery limits
 - [Jump Boost](MovementEffects.md#jump-boost): ground-jump power and safe-fall-distance contributions
 - [Levitation](MovementEffects.md#levitation): upward air movement and the Elytra restriction
 - [Night Vision](VisionEffects.md#night-vision): rendered brightness, sources, and near-expiry flicker
@@ -33,6 +35,8 @@ The [combat effects reference](CombatEffects.md) compares attack modifiers, dama
 The [water and fire effects reference](WaterAndFireEffects.md) compares fire damage, breathing, Conduit benefits, and the Nautilus effect limitation.
 
 The [vision effects reference](VisionEffects.md) compares Night Vision, Blindness, Darkness, and their rendering and player-action limits.
+
+The [instant effects reference](InstantEffects.md) compares Healing and Harming, recipient inversion, and drinking, splash, cloud, and arrow delivery.
 
 This is a growing reference, not a complete list of all registered effects. The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
 
