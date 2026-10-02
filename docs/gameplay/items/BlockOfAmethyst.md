@@ -1,17 +1,22 @@
 # Block of Amethyst
 
+**Block of Amethyst** (`minecraft:amethyst_block`) belongs to the Amethyst resource family.
+
 ## Obtaining
 
-Block of Amethyst can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft four Amethyst Shards in a 2 × 2 square, or recover a placed block with an unbroken pickaxe, including Wood.
 
-## Usage
+## Use
 
-Block of Amethyst is placed in the world as a block and used for building, decoration, utility, or environmental detail.
+Use it as a full building block, a projectile-chime surface or a tagged Sculk vibration resonator. It does not grow buds and has no reverse crafting recipe back into Shards.
 
-## Behavior
+The [Amethyst guide](../blocks/Amethyst.md#amethyst-block) gives the exact growth, tool, Fortune, recipe and placement rules.
 
-When placed, it behaves as the corresponding block. Breaking the block returns drops according to the block's normal loot rules.
+## Related pages
 
-## Notes
+- [Amethyst family](../blocks/Amethyst.md)
+- [Items](Items.md)
 
-* This item is the item form of the `minecraft:amethyst_block` block.
+## Sources and verification
+
+Source-reviewed at `beaa5747b36af51b001a13ce8b6648319ba6faf5` on 2026-10-02; no gameplay test. See the [canonical source record](../blocks/Amethyst.md#sources-and-verification) for the checked registration, loot, recipes and active callbacks.

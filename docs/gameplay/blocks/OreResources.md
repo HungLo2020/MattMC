@@ -91,7 +91,7 @@ In the normal preset, the bundled **Forest** feature list includes Coal, Iron, C
 
 **Nether Wastes** includes placed Nether Gold, Nether Quartz and two Ancient Debris features. The Debris features use the Nether base-stone target group and discard exposed candidates; the presence of a feature is not a guarantee of finding a vein in every chunk. [Nether biome][nether] · [Nether Gold placement][placed-ore_gold_nether] [configured-ore_gold_nether] · [Quartz placement][placed-ore_quartz_nether] [configured-ore_quartz_nether] · [Large Debris][placed-ore_ancient_debris_large] [configured-ore_ancient_debris_large] · [Small Debris][placed-ore_debris_small] [configured-ore_debris_small] · [Scattered-ore implementation][scattered]
 
-Custom dimensions/presets need their own generation verification. In particular, [Dry Midlands](../biomes/DryMidlands.md) has an ore-target-tag limitation tracked in [#781](https://github.com/HungLo2020/MattMC/issues/781). A registered ore or familiar block appearance does not establish working ore generation there.
+Custom dimensions/presets need their own generation verification. The [Dry Midlands](../biomes/DryMidlands.md) stone/deepslate target IDs were corrected by [#781 / PR #792](https://github.com/HungLo2020/MattMC/pull/792), with deterministic registry and native-placement tests. Its separate magma/gravel target limitation remains; the correction is not a complete natural-terrain yield survey or a retrofit of existing chunks. A registered ore or familiar block appearance does not establish working ore generation there.
 
 ## Registered forms and loot
 

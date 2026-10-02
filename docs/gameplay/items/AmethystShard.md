@@ -1,18 +1,22 @@
 # Amethyst Shard
 
+**Amethyst Shard** (`minecraft:amethyst_shard`) belongs to the Amethyst resource family.
+
 ## Obtaining
 
-Amethyst Shards are dropped from Amethyst Clusters and can also be obtained from the Creative Menu.
+Harvest a fully grown Amethyst Cluster without Silk Touch: a listed pickaxe gives four Shards before Fortune; other tools give two. Immature buds do not drop Shards.
 
-## Usage
+## Use
 
-Amethyst Shards are crafting ingredients for amethyst-related recipes.
+Craft decorative Amethyst Blocks, Tinted Glass, a Spyglass or a Calibrated Sculk Sensor; Shards also provide an armor-trim material and are used by the eligible dancing-Allay duplication interaction.
 
-## Behavior
+The [Amethyst guide](../blocks/Amethyst.md#shard-recipes-and-other-uses) gives the exact growth, tool, Fortune, recipe and placement rules.
 
-The item is a stackable ingredient. It is also registered as an amethyst trim material for smithing systems.
+## Related pages
 
-## Notes
+- [Amethyst family](../blocks/Amethyst.md)
+- [Items](Items.md)
 
-* This item is registered as `minecraft:amethyst_shard`.
-* It appears in the Ingredients creative tab.
+## Sources and verification
+
+Source-reviewed at `beaa5747b36af51b001a13ce8b6648319ba6faf5` on 2026-10-02; no gameplay test. See the [canonical source record](../blocks/Amethyst.md#sources-and-verification) for the checked registration, loot, recipes and active callbacks.

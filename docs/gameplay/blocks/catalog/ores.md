@@ -10,9 +10,9 @@ Names use English localization where available. A † marks a readable registry-
 
 | Block | Registry ID / source | Related placed-block guide |
 | --- | --- | --- |
-| Amethyst Cluster | [`minecraft:amethyst_cluster`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5974) | Article needed |
+| Amethyst Cluster | [`minecraft:amethyst_cluster`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5974) | [Amethyst, buds and clusters](../Amethyst.md#cluster) |
 | Ancient Debris | [`minecraft:ancient_debris`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5770) | [Ores and Ancient Debris](../OreResources.md#registered-forms-and-loot) |
-| Block of Amethyst | [`minecraft:amethyst_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5952) | Article needed |
+| Block of Amethyst | [`minecraft:amethyst_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5952) | [Amethyst, buds and clusters](../Amethyst.md#amethyst-block) |
 | Block of Coal | [`minecraft:coal_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L3278) | Article needed |
 | Block of Diamond | [`minecraft:diamond_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1262) | Article needed |
 | Block of Emerald | [`minecraft:emerald_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2623) | Article needed |
@@ -22,7 +22,7 @@ Names use English localization where available. A † marks a readable registry-
 | Block of Netherite | [`minecraft:netherite_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5766) | Article needed |
 | Block of Raw Gold | [`minecraft:raw_gold_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6726) | Article needed |
 | Block of Raw Iron | [`minecraft:raw_iron_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6718) | Article needed |
-| Budding Amethyst | [`minecraft:budding_amethyst`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5963) | Article needed |
+| Budding Amethyst | [`minecraft:budding_amethyst`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5963) | [Amethyst, buds and clusters](../Amethyst.md#budding-amethyst) |
 | Coal Ore | [`minecraft:coal_ore`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L368) | [Ores and Ancient Debris](../OreResources.md#registered-forms-and-loot) |
 | Crying Obsidian | [`minecraft:crying_obsidian`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5774) | Article needed |
 | Deepslate Coal Ore | [`minecraft:deepslate_coal_ore`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L373) | [Ores and Ancient Debris](../OreResources.md#registered-forms-and-loot) |
@@ -38,13 +38,13 @@ Names use English localization where available. A † marks a readable registry-
 | Heavy Core | [`minecraft:heavy_core`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6799) | Article needed |
 | Iron Ore | [`minecraft:iron_ore`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L358) | [Ores and Ancient Debris](../OreResources.md#registered-forms-and-loot) |
 | Lapis Lazuli Ore | [`minecraft:lapis_ore`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L633) | [Ores and Ancient Debris](../OreResources.md#registered-forms-and-loot) |
-| Large Amethyst Bud | [`minecraft:large_amethyst_bud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5986) | Article needed |
-| Medium Amethyst Bud | [`minecraft:medium_amethyst_bud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5991) | Article needed |
+| Large Amethyst Bud | [`minecraft:large_amethyst_bud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5986) | [Amethyst, buds and clusters](../Amethyst.md#large-bud) |
+| Medium Amethyst Bud | [`minecraft:medium_amethyst_bud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5991) | [Amethyst, buds and clusters](../Amethyst.md#medium-bud) |
 | Nether Gold Ore | [`minecraft:nether_gold_ore`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L378) | [Ores and Ancient Debris](../OreResources.md#registered-forms-and-loot) |
 | Nether Quartz Ore | [`minecraft:nether_quartz_ore`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2870) | [Ores and Ancient Debris](../OreResources.md#registered-forms-and-loot) |
 | Obsidian | [`minecraft:obsidian`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1189) | Article needed |
 | Redstone Ore | [`minecraft:redstone_ore`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1889) | [Ores and Ancient Debris](../OreResources.md#registered-forms-and-loot) |
-| Small Amethyst Bud | [`minecraft:small_amethyst_bud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5996) | Article needed |
+| Small Amethyst Bud | [`minecraft:small_amethyst_bud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5996) | [Amethyst, buds and clusters](../Amethyst.md#small-bud) |
 
 ## Inventory source
 

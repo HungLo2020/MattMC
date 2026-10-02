@@ -1,17 +1,29 @@
 # Pewen Button
 
+The item places `minecraft:pewen_button`. It emits signal **15** when pressed, with a normal **30-game-tick** click pulse. Its Cherry-type behavior also checks for qualifying arrows and thrown tridents overlapping the button.
+
 ## Obtaining
 
-Pewen Button can be obtained from the Creative Menu and from its normal survival sources when those sources are available.
+The bundled crafting definition still has the incompatible legacy ingredient format documented in [Pewen](../blocks/Pewen.md#construction-and-recipes). Do not rely on it as a working one-plank crafting route. An already placed button normally drops one matching item when mined, including by hand. [Recipe definition][recipe] · [Loot table][loot]
 
-## Usage
+<span id="usage"></span><span id="behavior"></span>
 
-Pewen Button is a redstone input block. Place it on a surface and press it to emit a short redstone pulse.
+## Placement and use
 
-## Behavior
+Place it on a supported floor, wall, or ceiling face and interact to press it. Reusing a powered button does not restart the pulse. Incoming water can wash it away; it does not waterlog. Its normal piston reaction and missing furnace-fuel tag differ from the ordinary wooden buttons. The [complete button guide](../blocks/Buttons.md) explains the detection, timing, support, mining, water, and material exceptions. [Registration][registration]
 
-Buttons release automatically after a brief delay. Wooden buttons can also be triggered by projectiles.
+<span id="notes"></span>
 
-## Notes
+## Related pages
 
-* This item is registered as `minecraft:pewen_button`.
+- [All buttons](../blocks/Buttons.md)
+- [Redstone basics](../redstone/Redstone.md)
+- [Items](Items.md)
+
+## Sources and verification
+
+Source-reviewed at `be4ac3081f175ffb862938ab118b20e6457110d8` on 2026-10-02. The linked canonical block guide contains the complete behavior, tool, tag, and timing evidence. No gameplay or circuit timing test was run.
+
+[recipe]: https://github.com/HungLo2020/MattMC/blob/be4ac3081f175ffb862938ab118b20e6457110d8/src/main/resources/data/minecraft/recipe/pewen_button.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/be4ac3081f175ffb862938ab118b20e6457110d8/src/main/resources/data/minecraft/loot_table/blocks/pewen_button.json
+[registration]: https://github.com/HungLo2020/MattMC/blob/be4ac3081f175ffb862938ab118b20e6457110d8/src/main/java/net/minecraft/world/level/block/Blocks.java#L7048-L7056

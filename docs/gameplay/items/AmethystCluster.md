@@ -1,18 +1,22 @@
 # Amethyst Cluster
 
+**Amethyst Cluster** (`minecraft:amethyst_cluster`) belongs to the Amethyst resource family.
+
 ## Obtaining
 
-Amethyst Clusters can be collected from geodes with the correct tool. They can also be obtained from the Creative Menu.
+Use Silk Touch on a mature cluster to collect the cluster item. Without Silk Touch, it drops Shards: four before Fortune with a listed pickaxe, or two through the fallback.
 
-## Usage
+## Use
 
-Amethyst Clusters are decorative crystal blocks and a source of Amethyst Shards.
+Place it on a sturdy face in any of six directions for a light-level-5 crystal. It can be waterlogged and needs its support. A decorative placed cluster is already mature and does not turn its support into Budding Amethyst.
 
-## Behavior
+The [Amethyst guide](../blocks/Amethyst.md#cluster) gives the exact growth, tool, Fortune, recipe and placement rules.
 
-Clusters can be placed on block faces and emit a small amount of light. Breaking a mature cluster can drop Amethyst Shards.
+## Related pages
 
-## Notes
+- [Amethyst family](../blocks/Amethyst.md)
+- [Items](Items.md)
 
-* This item is the item form of the `minecraft:amethyst_cluster` block.
-* It appears in the Natural Blocks creative tab.
+## Sources and verification
+
+Source-reviewed at `beaa5747b36af51b001a13ce8b6648319ba6faf5` on 2026-10-02; no gameplay test. See the [canonical source record](../blocks/Amethyst.md#sources-and-verification) for the checked registration, loot, recipes and active callbacks.

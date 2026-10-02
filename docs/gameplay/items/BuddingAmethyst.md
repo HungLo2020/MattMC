@@ -1,17 +1,22 @@
 # Budding Amethyst
 
+**Budding Amethyst** (`minecraft:budding_amethyst`) belongs to the Amethyst resource family.
+
 ## Obtaining
 
-Budding Amethyst can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+This block has a registered Creative inventory form, but its Survival loot is empty even with Silk Touch. No producing recipe was found. Preserve naturally generated blocks where they are.
 
-## Usage
+## Use
 
-Budding Amethyst is placed in the world as a block and used for building, decoration, utility, or environmental detail.
+The placed block grows Small → Medium → Large Buds → Clusters on eligible faces through random ticks. Ordinary decorative Amethyst Blocks cannot replace it. Pistons destroy it rather than relocating it intact.
 
-## Behavior
+The [Amethyst guide](../blocks/Amethyst.md#budding-amethyst) gives the exact growth, tool, Fortune, recipe and placement rules.
 
-When placed, it behaves as the corresponding block. Breaking the block returns drops according to the block's normal loot rules.
+## Related pages
 
-## Notes
+- [Amethyst family](../blocks/Amethyst.md)
+- [Items](Items.md)
 
-* This item is the item form of the `minecraft:budding_amethyst` block.
+## Sources and verification
+
+Source-reviewed at `beaa5747b36af51b001a13ce8b6648319ba6faf5` on 2026-10-02; no gameplay test. See the [canonical source record](../blocks/Amethyst.md#sources-and-verification) for the checked registration, loot, recipes and active callbacks.

@@ -1,17 +1,29 @@
 # Polished Blackstone Button
 
+The item places `minecraft:polished_blackstone_button`. It emits signal **15** when pressed, with a normal **20-game-tick** click pulse. It uses Stone button behavior and does not activate from the arrow-contact check.
+
 ## Obtaining
 
-Polished Blackstone Button can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft one from one Polished Blackstone in a shapeless recipe; see the [canonical recipe table](../blocks/Buttons.md#polished-blackstone-button). Ordinary mining returns one matching item even by hand. A pickaxe is the tagged mining tool. [Recipe definition][recipe] · [Loot table][loot]
 
-## Usage
+<span id="usage"></span><span id="behavior"></span>
 
-Polished Blackstone Button is a redstone input block. Place it on a surface and press it to emit a short redstone pulse.
+## Placement and use
 
-## Behavior
+Place it on a supported floor, wall, or ceiling face and interact to press it. Reusing a powered button does not restart the pulse. Incoming water can wash it away; it does not waterlog. A Wind Charge can still press it through the separate explosion callback. The [complete button guide](../blocks/Buttons.md) explains the detection, timing, support, mining, water, and material exceptions. [Registration][registration]
 
-Buttons release automatically after a brief delay. Wooden buttons can also be triggered by projectiles.
+<span id="notes"></span>
 
-## Notes
+## Related pages
 
-* This item is the item form of the `minecraft:polished_blackstone_button` block.
+- [All buttons](../blocks/Buttons.md)
+- [Redstone basics](../redstone/Redstone.md)
+- [Items](Items.md)
+
+## Sources and verification
+
+Source-reviewed at `be4ac3081f175ffb862938ab118b20e6457110d8` on 2026-10-02. The linked canonical block guide contains the complete behavior, tool, tag, and timing evidence. No gameplay or circuit timing test was run.
+
+[recipe]: https://github.com/HungLo2020/MattMC/blob/be4ac3081f175ffb862938ab118b20e6457110d8/src/main/resources/data/minecraft/recipe/crafting/polished_blackstone_button.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/be4ac3081f175ffb862938ab118b20e6457110d8/src/main/resources/data/minecraft/loot_table/blocks/polished_blackstone_button.json
+[registration]: https://github.com/HungLo2020/MattMC/blob/be4ac3081f175ffb862938ab118b20e6457110d8/src/main/java/net/minecraft/world/level/block/Blocks.java#L5859-L5861

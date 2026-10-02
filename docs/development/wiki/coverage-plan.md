@@ -4,8 +4,9 @@
 
 - Working branch: `docs/wiki-expansion`
 - Source default branch: `master`
-- Latest non-wiki default-branch snapshot integrated: `7af3a1594956f41ed57c3bf67d11ce006e61530f`; older gameplay citations remain pinned to their reviewed snapshots where the relevant behavior is unchanged.
-- Latest source sync: fast-forwarded again from `b6b5f733b316cef6852866924e2f11f12b0c4f5c` to `7af3a1594956f41ed57c3bf67d11ce006e61530f` after the publication guard detected a concurrent packed-voxel rotation migration. All 23 pending docs and all 20 incoming paths were preserved; instructions and workflows were unchanged.
+- Latest non-wiki default-branch snapshot integrated: `cf8cd5371bd1de61411ae5e7e144aabe3edb1e54`; older gameplay citations remain pinned to their reviewed snapshots where the relevant behavior is unchanged.
+- Latest source sync: fast-forwarded from `beaa5747b36af51b001a13ce8b6648319ba6faf5` to `cf8cd5371bd1de61411ae5e7e144aabe3edb1e54`, preserving all eighteen pending docs and all 23 incoming ore-target/Enderman fix paths. User-merged PRs #792 and #793 are integrated; PR #791 remained unmerged at this checkpoint. Instructions and workflows were unchanged.
+- Previous source sync: fast-forwarded again from `b6b5f733b316cef6852866924e2f11f12b0c4f5c` to `7af3a1594956f41ed57c3bf67d11ce006e61530f` after the publication guard detected a concurrent packed-voxel rotation migration. All 23 pending docs and all 20 incoming paths were preserved; instructions and workflows were unchanged.
 - Previous source sync: fast-forwarded from promoted cutoff `e87cde38c872d30ae86139bbee181937603af769` to master `b6b5f733b316cef6852866924e2f11f12b0c4f5c`, preserving all 23 pending wiki paths byte-for-byte and all twelve incoming Crow, Kangaroo and Platypus fix paths in the Git index. Incoming tests remain outside this checkout’s sparse working tree. README, AGENTS and workflows were unchanged.
 - Previous source sync: fast-forward from promoted cutoff `c87803e75d339e5d643ca812efc70a6def06a401` to master `fb7d6979fb8d9773cfe05f084c6085f35feb885c`, preserving all 39 pending documentation paths byte-for-byte and all twelve incoming merged-fix paths. PRs #787, #786 and #785 landed Rhinoceros, Ambersol and Grizzly corrections plus tests and guides; README, AGENTS and workflows were unchanged.
 - Previous source sync: fast-forward from promoted cutoff `84e9628b0fbd2fe8ea1769278feaa4ce82259fd2` to master `2d4b7646eac8561a23f41f873e261d86f0cff5a2`, preserving the two incoming prompt-document reorganizations and all eight pending Cat/Ocelot documents in place. No source code or workflows changed in that incoming commit.
@@ -805,6 +806,13 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Kept existing Nether Star crafting, glass beam-color, Bubble Column, Nether Wart, Wither and Basalt article ownership. All forty Coral IDs route to actual species anchors; wall fans retain their shared item/loot distinction.
 - No source advance was needed from published `be4ac3081f175ffb862938ab118b20e6457110d8` at batch start. The authored diff is documentation only; no gameplay tests were run.
 - Validation: required checker and strict build passed on 2,245 pages / 37 indexes. Checked 1,789 local links/anchors, 307 citation uses, 164 pinned source paths unchanged against the integrated head, all 1,211 alphabetical IDs, and exact 2/40/3 block-family maps. The directory has 833 related-guide routes and 378 explicit article gaps, not a completion score.
+
+## Batch 104: all buttons/plates and Amethyst
+
+- Expanded the existing Buttons and Pressure Plates guides to all fifteen buttons and seventeen plates, preserving prior anchors. Checked exact recipes/loot, occupancy and arrow/Wind Charge paths, strength/recheck timing, weighted entity counts, water/piston/fuel differences and Pewen integration limits.
+- Added the canonical six-block Amethyst guide with growth, nonrecoverable budding blocks, exact Silk Touch/Fortune yields, support/water states, piston destruction, geode generation, recipes, vibration and active Shard uses. Corrected eight existing item pages across both families.
+- Reconciled 151 pinned source references against published head `beaa5747b36af51b001a13ce8b6648319ba6faf5`. Master advanced during publication to `cf8cd5371bd1de61411ae5e7e144aabe3edb1e54`; preserved incoming #781/#767 fixes and guides, then updated the related Biomes/Ore Resources caveats and monthly log. Final validation was repeated after sync. All authored edits are documentation; no gameplay tests were run.
+- Validation: required check and strict build passed on 2,246 pages / 37 indexes; 1,796 local links/anchors, 391 citations, all 1,211 alphabetical IDs, all thirty-two control recipe/loot mappings and six Amethyst loot tables were checked. Existing control anchors are retained. The directory has 863 related-guide routes and 348 explicit article gaps, not a completion score.
 
 ## Next batches, in priority order
 

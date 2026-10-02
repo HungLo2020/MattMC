@@ -11,7 +11,7 @@ Biomes choose local terrain materials, decorations, and possible mob spawns. In 
 The bundled **Normal** world preset selects these two biomes inside [Primordial Caves](../dimensions/PrimordialCaves.md):
 
 - [Primordial Plains](PrimordialPlains.md): grass-and-dirt surface rules, ordinary plains vegetation and ore feature lists, and farm-animal spawn entries. Bring wood and food; the dimension's ceiling and darkness affect placement and spawning.
-- [Dry Midlands](DryMidlands.md): sand and sandstone surface rules, cactus and dry-grass patches, and ore-bearing geode features. Its separate vein-generation data has missing target tags, and its rabbit, camel, and husk entries have important spawn restrictions.
+- [Dry Midlands](DryMidlands.md): sand and sandstone surface rules, cactus and dry-grass patches, and ore-bearing geode features. Its ordinary stone/deepslate ore targets were corrected in [#781](https://github.com/HungLo2020/MattMC/issues/781); separate magma/gravel target and rabbit/camel/husk spawn restrictions remain.
 
 Use the dimension guide for portal access, return travel, and respawn rules. Both biomes share its ceiling and lack of skylight; they are not ordinary open-air Overworld plains or desert.
 
