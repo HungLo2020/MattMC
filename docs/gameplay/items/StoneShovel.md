@@ -1,17 +1,29 @@
 # Stone Shovel
 
+**Stone Shovel** (`minecraft:stone_shovel`) has **131 durability** and a **4.0 matching-block mining-speed value** before player modifiers. See [Pickaxes and Shovels](../mechanics/PickaxesAndShovels.md) for its shared actions, wear, and collection rules. [Registration][registration] · [Material properties][materials]
+
 ## Obtaining
 
-Stone Shovel can be obtained from the Creative Menu and from its normal survival sources when those sources are available.
+At a [Crafting Table](../blocks/CraftingTable.md), put **1 Cobblestone, Blackstone, or Cobbled Deepslate** above **2 [Sticks](Stick.md)** in one vertical three-slot column. This makes **1 Stone Shovel**. The three-row layout does not fit the inventory crafting grid. [Recipe][recipe] · [Accepted material][repair-stone]
 
-## Usage
+## Mining and upkeep
 
-Stone Shovel is a tool or weapon used for its matching action.
+It uses the same current shovel targets and path/campfire actions as the other six materials. For conditions and exceptions, see [mining and collecting](../mechanics/PickaxesAndShovels.md#mining-and-collecting), [path creation](../mechanics/PickaxesAndShovels.md#making-paths-with-a-shovel), and [campfire extinguishing](../mechanics/PickaxesAndShovels.md#extinguishing-campfires). [Shovel registration][registration] · [Shovel callback][shovel]
 
-## Behavior
+For [Anvil material repair](../mechanics/Durability.md#choose-a-repair-method), use [Cobblestone](Cobblestone.md), [Blackstone](Blackstone.md), or [Cobbled Deepslate](CobbledDeepslate.md). Ordinary wear retains a fully damaged stack; repair it before relying on its mining speed or shovel-use actions. [Repair material][repair-stone] · [Assigned repair component][materials] · [Repair lookup][repair-check] · [Broken-stack rules][broken] · [Use and speed guards][use-guard] · [Drop guard][hit-mine]
 
-It has durability and follows normal tool or weapon behavior for mining, combat, or block interaction.
+Related: [Pickaxes and Shovels](../mechanics/PickaxesAndShovels.md) · [Durability and repair](../mechanics/Durability.md) · [Items](Items.md)
 
-## Notes
+## Sources and verification
 
-* This item is registered as `minecraft:stone_shovel`.
+Source-reviewed on **2026-10-02** at `4efea14485328238a3a4981162c8a7e8400914b4`. No in-game crafting, mining, repair, or item-use test was run. The documented creation route is verified; this page does not inventory trades, chest loot, or every other acquisition route.
+
+[registration]: https://github.com/HungLo2020/MattMC/blob/4efea14485328238a3a4981162c8a7e8400914b4/src/main/java/net/minecraft/world/item/Items.java#L1317
+[materials]: https://github.com/HungLo2020/MattMC/blob/4efea14485328238a3a4981162c8a7e8400914b4/src/main/java/net/minecraft/world/item/ToolMaterial.java#L20-L48
+[recipe]: https://github.com/HungLo2020/MattMC/blob/4efea14485328238a3a4981162c8a7e8400914b4/src/main/resources/data/minecraft/recipe/crafting/stone_shovel.json
+[repair-stone]: https://github.com/HungLo2020/MattMC/blob/4efea14485328238a3a4981162c8a7e8400914b4/src/main/resources/data/minecraft/tags/item/stone_tool_materials.json
+[shovel]: https://github.com/HungLo2020/MattMC/blob/4efea14485328238a3a4981162c8a7e8400914b4/src/main/java/net/minecraft/world/item/ShovelItem.java#L20-L73
+[repair-check]: https://github.com/HungLo2020/MattMC/blob/4efea14485328238a3a4981162c8a7e8400914b4/src/main/java/net/minecraft/world/item/ItemStack.java#L1106-L1108
+[broken]: https://github.com/HungLo2020/MattMC/blob/4efea14485328238a3a4981162c8a7e8400914b4/src/main/java/net/minecraft/world/item/ItemStack.java#L429-L485
+[use-guard]: https://github.com/HungLo2020/MattMC/blob/4efea14485328238a3a4981162c8a7e8400914b4/src/main/java/net/minecraft/world/item/ItemStack.java#L354-L379
+[hit-mine]: https://github.com/HungLo2020/MattMC/blob/4efea14485328238a3a4981162c8a7e8400914b4/src/main/java/net/minecraft/world/item/ItemStack.java#L564-L588

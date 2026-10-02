@@ -2,6 +2,8 @@
 
 Breaking a block, breaking it quickly, and receiving its expected drop are separate questions. MattMC uses block mining tags, tool-material restrictions, loot tables, and enchantment conditions together.
 
+Use [Pickaxes and Shovels](PickaxesAndShovels.md) for exact per-item recipes, material repair, path/campfire actions, and recycling.
+
 ## Choose the tool family first
 
 Tools have rules for their intended block groups, such as pickaxe-mineable stone or axe-mineable wood. A block that requires a correct tool can fail its drop check even when its loot table names an item. If no matching correct-for-drops rule is found, the tool rule returns false.

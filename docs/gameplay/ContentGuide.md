@@ -40,6 +40,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Materials, equipment, and enchanting
 
+- [Pickaxes and Shovels](mechanics/PickaxesAndShovels.md): all seven materials with exact recipes, mining/drop rules, path/campfire use, upkeep, and recycling
 - [Mining tools](mechanics/Mining.md): material stats and correct-drop rules, including Copper
 - [Ore resources](blocks/OreResources.md): Iron/Copper raw-metal processing, Diamond collection, and selected material recipes
 - [Armor](mechanics/Armor.md): current material values including Copper, toughness, repairs, and Chestplate progression

@@ -718,6 +718,13 @@ At `987ab0a72e971d40dbcdfc6d4ee5ae52c2a95564`, 513 gameplay paths differ from th
 - Latest integrated default tip is `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; gameplay source remains `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`; unchanged evidence stays pinned to its reviewed snapshot. This completed batch follows standing promotion and deployment verification.
 - Validation: checker and strict build passed on 2,197 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, taming, trust, breeding, teleport, gift, or predator gameplay test.
 
+## Ninety-fourth batch: Pickaxes and Shovels
+
+- Added a shared tool guide and expanded all seven Pickaxe/seven Shovel variants, including Copper, with exact recipes, material values/repair, upgrades, tool eligibility, path/campfire actions, wear, and recycling.
+- Preserved Mining, Durability, and Smithing ownership; documented retained broken tools, last-use loot ordering, identity-based recycling/fuel, and Netherite item fire resistance without universal-loss immunity claims.
+- Latest integrated default source is `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; unchanged material/tool evidence remains pinned to its reviewed `4efea14485328238a3a4981162c8a7e8400914b4` snapshot. This completed batch follows standing promotion and deployment verification.
+- Validation: checker and strict build passed on 2,198 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, mining, repair, item-use, recycling, or fire gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
