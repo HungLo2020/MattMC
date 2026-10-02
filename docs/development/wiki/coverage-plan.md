@@ -977,12 +977,22 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,301 pages / 37 indexes. All 16 authored paths are documentation; 2,027 local links/anchors and 287 tracked reference uses resolve, with zero rendered citation ambiguity or unresolved-bracket candidates. The alphabetical directory retains 1,211 IDs, with 1,148 related-guide routes and 63 explicit article gaps. Broad article coverage remains incomplete.
 
+## Batch 122: Workbenches, sticky blocks and remaining building materials
+
+- Added six canonical block guides and corrected ten item pages, covering ten registered IDs. Bamboo and Pistons link the new detailed material owners; central alphabetical/category navigation retains honest incomplete-coverage language.
+- TaCZ review traces all three registered workbenches through menus, screens, definition/recipe loading and server crafting; static data resolves 63 firearm, 29 ammunition and 99 attachment recipes. The guide documents direct player-inventory inputs, groups/output examples, no workbench storage/fuel, Creative ingredient requirements/overflow behavior and source-identified missing labels without claiming a live UI test.
+- Slime/Honey review checks reversible recipes and bottle remainders, landing/crouch/slide callbacks, collision and movement factors, sticky-group exclusions/limits and moving-entity/projectile distinctions. The source-only ordinary on-foot Slime crouch path is qualified; no tested launcher or universal imported-entity behavior is claimed.
+- Material review verifies Bamboo packing/stripping/fuel, Bone Meal storage and wired fossil routes, Netherrack terrain/processing/vegetation/fire uses, and Petrified Oak Slab’s separate mining/material rules. No ordinary fresh-Survival Petrified acquisition route was found in the checked recipes, loot, active references or 1,202 structure templates; legacy conversion remains distinct.
+- Source checkpoint: `099b1184d1a7115915d880b436c8f58c1ed5a422`; all 135 distinct pinned draft-source paths match the integrated source. These are documentation/source checks, not runtime generation, crafting, UI, physics or native-player synchronization tests.
+
+- Validation: required checker and strict build passed on 2,307 pages / 37 indexes. All 26 authored paths are documentation; 2,543 local links/anchors and 352 tracked references resolve, with zero rendered ambiguity/unresolved-bracket candidates. The full alphabetical directory retains 1,211 IDs, with 1,158 related-guide routes and 53 explicit article gaps. The route counts do not establish finished variant or broad wiki coverage.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Finish the isolated TaCZ workbench, remaining material and Slime/Honey block drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
-3. Fill remaining practical gaps such as fuel/storage utility blocks and the imported weapon workbenches, following actual active behavior and acquisition routes. The isolated material review also covers Bamboo full blocks, Bone Block, Netherrack and Petrified Oak Slab.
-4. Cover remaining terrain/material, plant and technical families, including Netherrack/Bone Block, Bamboo full blocks, Fire/Soul Fire, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
+2. Finish the isolated grasses/ferns, flowerbed/leaf-litter and Eyeblossom drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+3. Fill remaining practical gaps such as fuel/storage utility blocks, sculk devices and imported nature/redstone blocks, following actual active behavior and acquisition routes.
+4. Cover remaining terrain/material, plant and technical families, including Fire/Soul Fire, Chorus, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
 5. Preserve the ready Swords and undead drafts for later source revalidation; continue broader item, mob, biome, effect, structure and gameplay-system coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.
 
 ## Coordinated source and issue review, 2026-10-02 02:45 UTC

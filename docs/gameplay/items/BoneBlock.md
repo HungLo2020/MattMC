@@ -1,17 +1,21 @@
 # Bone Block
 
+**Bone Block** is the item form of `minecraft:bone_block`. The [block guide](../blocks/BoneBlock.md#bone-block) owns its placed behavior. [Item registration][item]
+
 ## Obtaining
 
-Bone Block can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Use the [Bone Meal packing recipe](../blocks/BoneBlock.md#packing-and-unpacking-bone-meal), or collect [fossil blocks](../blocks/BoneBlock.md#finding-fossils) with an unbroken pickaxe.
 
 ## Usage
 
-Bone Block is placed in the world as a block and used for building, decoration, utility, or environmental detail.
+Place an axis-oriented building block or [unpack it into Bone Meal](../blocks/BoneBlock.md#packing-and-unpacking-bone-meal) before fertilizing plants.
 
 ## Behavior
 
-When placed, it behaves as the corresponding block. Breaking the block returns drops according to the block's normal loot rules.
+Successful ordinary mining gives one Bone Block. Hand breaking loses the block; Silk Touch is unnecessary. The [block guide](../blocks/BoneBlock.md#mining-and-drops) owns the tool, placement, note, fire, and fuel details.
 
 ## Notes
 
-* This item is the item form of the `minecraft:bone_block` block.
+The linked block guide records the detailed source review at `beb4335362d5983b867ef84d66a74ce668b6ef7d` on **2026-10-02**. No in-game verification was performed for this item-page update.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/beb4335362d5983b867ef84d66a74ce668b6ef7d/src/main/java/net/minecraft/world/item/Items.java#L769

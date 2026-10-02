@@ -40,7 +40,7 @@ Pistons queue **block events** and recheck power when those events run. They do 
 
 World borders and vertical build limits also restrict movement. Do not use the list as a complete catalog of every integrated block's behavior.
 
-**Slime and Honey Blocks** can attach eligible neighboring blocks to the moving group. Slime and Honey do not stick to each other. A neighboring support or wall may add an unwanted load, and all attached moved blocks count toward the same 12-block limit.
+**[Slime and Honey Blocks](SlimeAndHoneyBlocks.md#pistons-and-neighboring-blocks)** can attach eligible neighboring blocks to the moving group. Slime and Honey do not stick to each other. A neighboring support or wall may add an unwanted load, and all attached moved blocks count toward the same 12-block limit.
 
 ## Small example: a retractable block
 
