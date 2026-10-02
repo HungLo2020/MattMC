@@ -4,8 +4,9 @@
 
 - Working branch: `docs/wiki-expansion`
 - Source default branch: `master`
-- Latest default-branch snapshot integrated: `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`; older gameplay citations remain pinned to their reviewed snapshots where the relevant behavior is unchanged.
-- Latest source sync: fast-forward from promoted cutoff `959ad4e7ec6e1347ee00ef5799ae99cf4a478db8` to master `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`, preserving all 23 incoming voxel-box/skill paths and all eight pending Oceans documents in place. The new repository sync-and-push skill was read; README, AGENTS, and workflows were unchanged.
+- Latest default-branch snapshot integrated: `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; older gameplay citations remain pinned to their reviewed snapshots where the relevant behavior is unchanged.
+- Latest source sync: fast-forward from promoted cutoff `84e9628b0fbd2fe8ea1769278feaa4ce82259fd2` to master `2d4b7646eac8561a23f41f873e261d86f0cff5a2`, preserving the two incoming prompt-document reorganizations and all eight pending Cat/Ocelot documents in place. No source code or workflows changed in that incoming commit.
+- Previous source sync: fast-forward from promoted cutoff `959ad4e7ec6e1347ee00ef5799ae99cf4a478db8` to master `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`, preserving all 23 incoming voxel-box/skill paths and all eight pending Oceans documents in place. The new repository sync-and-push skill was read; README, AGENTS, and workflows were unchanged.
 - Previous source sync: real two-parent merge `9fc7874be6328503aabf794c757584c4c0d11514`, integrating all 93 incoming rendering/shader-control paths exactly from master without conflicts. Incoming README, AGENTS, and workflows were unchanged.
 - Previous source sync: real two-parent merge `226ad2d5499924128d0e21c0390c69820320d8f2`, preserving published wiki history and integrating palette resize/unpacking and voxel-join migrations without conflicts. Incoming workflow definitions were unchanged.
 - Previous source sync: real two-parent merge `0b73e6fe0303fcdf2b86ce5c58ebf1436ba4d71a` integrated renderer cleanup/documentation; Java gameplay and bundled game data were unchanged then.
@@ -709,6 +710,13 @@ At `987ab0a72e971d40dbcdfc6d4ee5ae52c2a95564`, 513 gameplay paths differ from th
 - Connected the biome index, underwater plant guides, and Content Guide while separating generation entries from guaranteed finds and fish categories from structure monster overrides.
 - Integrated source is now `6fe3f1e877707e45ee3159929bb9cd8769d6bda7` after preserving the newer voxel-box and repository-skill work; unchanged evidence stays pinned to its reviewed `3e85592c4c78ebb420302360667a6c230dc0318d` snapshot. This completed batch follows the standing promotion procedure.
 - Validation: independent source review, checker and strict build passed on 2,197 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No generation survey, spawn-rate, resource, structure-search, or diving gameplay test.
+
+## Ninety-third batch: Cats and Ocelots
+
+- Expanded two companion guides and both spawn eggs with actual village/hut and biome routes, coat selectors, taming versus trust, feeding/breeding, owner controls, safe teleport checks, gifts, predators, and persistence.
+- Documented current Cat replenishment variant-ordering and Ocelot monster-list dependencies without claiming they were fixed; preserved Raw Cod and other existing food guidance.
+- Latest integrated default tip is `2d4b7646eac8561a23f41f873e261d86f0cff5a2`; gameplay source remains `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`; unchanged evidence stays pinned to its reviewed snapshot. This completed batch follows standing promotion and deployment verification.
+- Validation: checker and strict build passed on 2,197 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, taming, trust, breeding, teleport, gift, or predator gameplay test.
 
 ## Next batches, in priority order
 

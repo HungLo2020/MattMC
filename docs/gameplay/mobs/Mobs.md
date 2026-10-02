@@ -10,7 +10,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 - **Built defenders:** [Iron Golem](IronGolem.md) and [Snow Golem](SnowGolem.md), including creation, repair, targeting, and environmental limits
 - **Crocodile integration:** [Crocodile](Crocodile.md) and [Crocodile Scute](../items/CrocodileScute.md) distinguish active fish/egg behavior from imported placeholders
 
-- **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Axolotl](Axolotl.md), [Dolphin](Dolphin.md), [Frog](Frog.md), and [Tadpole](Tadpole.md)
+- **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Cat](Cat.md), [Ocelot](Ocelot.md), [Axolotl](Axolotl.md), [Dolphin](Dolphin.md), [Frog](Frog.md), and [Tadpole](Tadpole.md)
 - **Hostile encounters and bosses:** [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Enderman](Enderman.md), [Blaze](Blaze.md), [Wither Skeleton](WitherSkeleton.md), [Slime](Slime.md), [Magma Cube](MagmaCube.md), [Wither](Wither.md), [Ender Dragon](EnderDragon.md), and [Shulker](Shulker.md)
 - **Bundled animals and caves:** use the [Alex's Mobs](../ContentGuide.md#alexs-mobs-additions) and [Alex's Caves](../ContentGuide.md#alexs-caves-additions) sections for reviewed feeding, ownership, resources, and availability limits
 
