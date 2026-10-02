@@ -1443,3 +1443,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Added one shared owner for Protection, Fire Protection, Blast Protection and Projectile Protection, with exact I–IV contributions, damage-tag matching, the shared 20-point cap, the 29 supported armor items and table/Anvil/browser routes. Other enchantment definitions are not marked reviewed by this batch.
 - Separated damage protection from armor/toughness and from Fire burning-time/Blast knockback attributes. Retained broken armor's passive contribution follows the active caller; the broader policy tracked in [#800](https://github.com/HungLo2020/MattMC/issues/800) remains unresolved, with no code change or blanket disable rule claimed.
 - Added guarded Enchanting, Armor and ContentGuide discovery links and a link to the now-published Combat Effects owner, preserving newer prose. Final independent source/render equality review, actual documentation hierarchy check and strict build apply. No in-game combat, equipping, enchanting, inventory or repair tests were run.
+
+## Batch 179: Tuff inventory routes
+
+- Corrected thirteen existing ordinary BlockItem routes with exact raw/polished/brick/chiseled recipes and useful family-section links. Preserved the authored base Tuff item and substantive block owners; these are route improvements, not thirteen new articles.
+- Reviewed all 38 family recipes (13 crafting and 25 Stonecutter), complete per-form loot, correct-tool gates and slab/stair/wall placement. Chiseled Tuff and Chiseled Tuff Bricks use different slab ingredients and different cutting inputs; ordinary Wood pickaxes qualify, and double slabs recover two matching slabs.
+- Exact baseline/proposal hashes, 65 original anchors, source/render review, required hierarchy check and strict build apply. Catalog IDs, display ordering and existing shared owners remain preserved. No gameplay crafting, mining, placement or water tests were run.
