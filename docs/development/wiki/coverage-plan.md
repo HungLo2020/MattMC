@@ -571,6 +571,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Redstone, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this batch is subsequent wiki-branch work after the authorized master cutoff.
 - Validation: checker and strict build passed on 2,179 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No entity-detection, count, circuit, attachment, disarming, or timing gameplay test.
 
+## Seventy-fifth batch: Orcas and Hammerhead Sharks
+
+- Expanded two custom predator guides and both spawn-egg pages with verified current access, health/combat, player interaction, air/water care, and loot limits.
+- Distinguished registered mobs from absent bundled natural-spawn wiring; documented Orca swimming benefits and missing mating AI/legacy melee selection, plus Hammerhead injured-target acquisition versus continuation.
+- Updated Mobs, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; these are wiki-branch additions after the authorized master cutoff.
+- Validation: checker and strict build passed on 2,179 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, swimming, breeding, combat, enclosure, or drop gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
