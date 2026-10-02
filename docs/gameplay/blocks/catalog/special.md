@@ -12,7 +12,7 @@ Names use English localization where available. A † marks a readable registry-
 | --- | --- | --- |
 | Air | [`minecraft:air`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L72) | Article needed |
 | Barrier | [`minecraft:barrier`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L3121) | Article needed |
-| Bubble Column | [`minecraft:bubble_column`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5224) | Article needed |
+| Bubble Column | [`minecraft:bubble_column`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5224) | [Bubble Columns](../BubbleColumns.md) |
 | Caiman Egg | [`minecraft:caiman_egg`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L4776) | Article needed |
 | Cave Air | [`minecraft:cave_air`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5223) | Article needed |
 | Chain Command Block | [`minecraft:chain_command_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L4302) | Article needed |

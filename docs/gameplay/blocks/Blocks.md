@@ -16,8 +16,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Acacia Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:acacia_fence`
 - **Acacia Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:acacia_fence_gate`
 - **Acacia Hanging Sign** — article needed; `minecraft:acacia_hanging_sign`
-- **Acacia Leaves** — article needed; `minecraft:acacia_leaves`
-- **Acacia Log** — article needed; `minecraft:acacia_log`
+- **Acacia Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#acacia-leaves) (related guide); `minecraft:acacia_leaves`
+- **Acacia Log** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:acacia_log`
 - **Acacia Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:acacia_planks`
 - **Acacia Pressure Plate** — article needed; `minecraft:acacia_pressure_plate`
 - **Acacia Sapling** — article needed; `minecraft:acacia_sapling`
@@ -28,7 +28,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Acacia Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:acacia_trapdoor`
 - **Acacia Wall Hanging Sign** — article needed; `minecraft:acacia_wall_hanging_sign`
 - **Acacia Wall Sign** — article needed; `minecraft:acacia_wall_sign`
-- **Acacia Wood** — article needed; `minecraft:acacia_wood`
+- **Acacia Wood** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:acacia_wood`
 - **Activator Rail** — [Rails](Rails.md) (related guide); `minecraft:activator_rail`
 - **Air** — article needed; `minecraft:air`
 - **Allium** — article needed; `minecraft:allium`
@@ -49,7 +49,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Attached Melon Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:attached_melon_stem`
 - **Attached Pumpkin Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:attached_pumpkin_stem`
 - **Azalea** — article needed; `minecraft:azalea`
-- **Azalea Leaves** — article needed; `minecraft:azalea_leaves`
+- **Azalea Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#azalea-leaves) (related guide); `minecraft:azalea_leaves`
 - **Azure Bluet** — article needed; `minecraft:azure_bluet`
 
 ### B
@@ -89,8 +89,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Birch Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:birch_fence`
 - **Birch Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:birch_fence_gate`
 - **Birch Hanging Sign** — article needed; `minecraft:birch_hanging_sign`
-- **Birch Leaves** — article needed; `minecraft:birch_leaves`
-- **Birch Log** — article needed; `minecraft:birch_log`
+- **Birch Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#birch-leaves) (related guide); `minecraft:birch_leaves`
+- **Birch Log** — [Tree logs and roots](TreeLogsAndRoots.md#birch-timber) (related guide); `minecraft:birch_log`
 - **Birch Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:birch_planks`
 - **Birch Pressure Plate** — article needed; `minecraft:birch_pressure_plate`
 - **Birch Sapling** — article needed; `minecraft:birch_sapling`
@@ -101,7 +101,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Birch Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:birch_trapdoor`
 - **Birch Wall Hanging Sign** — article needed; `minecraft:birch_wall_hanging_sign`
 - **Birch Wall Sign** — article needed; `minecraft:birch_wall_sign`
-- **Birch Wood** — article needed; `minecraft:birch_wood`
+- **Birch Wood** — [Tree logs and roots](TreeLogsAndRoots.md#birch-timber) (related guide); `minecraft:birch_wood`
 - **Black Banner** — article needed; `minecraft:black_banner`
 - **Black Bed** — [Beds](Bed.md) (related guide); `minecraft:black_bed`
 - **Black Candle** — article needed; `minecraft:black_candle`
@@ -130,7 +130,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Block of Iron** — article needed; `minecraft:iron_block`
 - **Block of Lapis Lazuli** — article needed; `minecraft:lapis_block`
 - **Block of Netherite** — article needed; `minecraft:netherite_block`
-- **Block of Quartz** — article needed; `minecraft:quartz_block`
+- **Block of Quartz** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:quartz_block`
 - **Block of Raw Copper** — [Raw Copper storage](RawCopperStorage.md#collecting-and-processing) (related guide); `minecraft:raw_copper_block`
 - **Block of Raw Gold** — article needed; `minecraft:raw_gold_block`
 - **Block of Raw Iron** — article needed; `minecraft:raw_iron_block`
@@ -178,7 +178,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Brown Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:brown_terracotta`
 - **Brown Wall Banner †** — article needed; `minecraft:brown_wall_banner`
 - **Brown Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:brown_wool`
-- **Bubble Column** — article needed; `minecraft:bubble_column`
+- **Bubble Column** — [Bubble Columns](BubbleColumns.md) (related guide); `minecraft:bubble_column`
 - **Bubble Coral** — article needed; `minecraft:bubble_coral`
 - **Bubble Coral Block** — article needed; `minecraft:bubble_coral_block`
 - **Bubble Coral Fan** — article needed; `minecraft:bubble_coral_fan`
@@ -227,8 +227,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cherry Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:cherry_fence`
 - **Cherry Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:cherry_fence_gate`
 - **Cherry Hanging Sign** — article needed; `minecraft:cherry_hanging_sign`
-- **Cherry Leaves** — article needed; `minecraft:cherry_leaves`
-- **Cherry Log** — article needed; `minecraft:cherry_log`
+- **Cherry Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#cherry-leaves) (related guide); `minecraft:cherry_leaves`
+- **Cherry Log** — [Tree logs and roots](TreeLogsAndRoots.md#cherry-timber) (related guide); `minecraft:cherry_log`
 - **Cherry Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:cherry_planks`
 - **Cherry Pressure Plate** — article needed; `minecraft:cherry_pressure_plate`
 - **Cherry Sapling** — article needed; `minecraft:cherry_sapling`
@@ -239,7 +239,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cherry Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:cherry_trapdoor`
 - **Cherry Wall Hanging Sign** — article needed; `minecraft:cherry_wall_hanging_sign`
 - **Cherry Wall Sign** — article needed; `minecraft:cherry_wall_sign`
-- **Cherry Wood** — article needed; `minecraft:cherry_wood`
+- **Cherry Wood** — [Tree logs and roots](TreeLogsAndRoots.md#cherry-timber) (related guide); `minecraft:cherry_wood`
 - **Chest** — [Chest](Chest.md) (related guide); `minecraft:chest`
 - **Chipped Anvil** — [Anvil](Anvil.md) (related guide); `minecraft:chipped_anvil`
 - **Chiseled Bookshelf** — article needed; `minecraft:chiseled_bookshelf`
@@ -248,7 +248,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Chiseled Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_chiseled`
 - **Chiseled Nether Bricks** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:chiseled_nether_bricks`
 - **Chiseled Polished Blackstone** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:chiseled_polished_blackstone`
-- **Chiseled Quartz Block** — article needed; `minecraft:chiseled_quartz_block`
+- **Chiseled Quartz Block** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:chiseled_quartz_block`
 - **Chiseled Red Sandstone** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:chiseled_red_sandstone`
 - **Chiseled Resin Bricks** — article needed; `minecraft:chiseled_resin_bricks`
 - **Chiseled Sandstone** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:chiseled_sandstone`
@@ -301,7 +301,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Crimson Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:crimson_fence_gate`
 - **Crimson Fungus** — article needed; `minecraft:crimson_fungus`
 - **Crimson Hanging Sign** — article needed; `minecraft:crimson_hanging_sign`
-- **Crimson Hyphae** — article needed; `minecraft:crimson_hyphae`
+- **Crimson Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#crimson-timber) (related guide); `minecraft:crimson_hyphae`
 - **Crimson Nylium** — article needed; `minecraft:crimson_nylium`
 - **Crimson Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:crimson_planks`
 - **Crimson Pressure Plate** — article needed; `minecraft:crimson_pressure_plate`
@@ -310,7 +310,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Crimson Sign** — article needed; `minecraft:crimson_sign`
 - **Crimson Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:crimson_slab`
 - **Crimson Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:crimson_stairs`
-- **Crimson Stem** — article needed; `minecraft:crimson_stem`
+- **Crimson Stem** — [Tree logs and roots](TreeLogsAndRoots.md#crimson-timber) (related guide); `minecraft:crimson_stem`
 - **Crimson Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:crimson_trapdoor`
 - **Crimson Wall Hanging Sign** — article needed; `minecraft:crimson_wall_hanging_sign`
 - **Crimson Wall Sign** — article needed; `minecraft:crimson_wall_sign`
@@ -346,8 +346,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dark Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:dark_oak_fence`
 - **Dark Oak Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:dark_oak_fence_gate`
 - **Dark Oak Hanging Sign** — article needed; `minecraft:dark_oak_hanging_sign`
-- **Dark Oak Leaves** — article needed; `minecraft:dark_oak_leaves`
-- **Dark Oak Log** — article needed; `minecraft:dark_oak_log`
+- **Dark Oak Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#dark-oak-leaves) (related guide); `minecraft:dark_oak_leaves`
+- **Dark Oak Log** — [Tree logs and roots](TreeLogsAndRoots.md#dark_oak-timber) (related guide); `minecraft:dark_oak_log`
 - **Dark Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:dark_oak_planks`
 - **Dark Oak Pressure Plate** — article needed; `minecraft:dark_oak_pressure_plate`
 - **Dark Oak Sapling** — article needed; `minecraft:dark_oak_sapling`
@@ -358,7 +358,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dark Oak Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:dark_oak_trapdoor`
 - **Dark Oak Wall Hanging Sign** — article needed; `minecraft:dark_oak_wall_hanging_sign`
 - **Dark Oak Wall Sign** — article needed; `minecraft:dark_oak_wall_sign`
-- **Dark Oak Wood** — article needed; `minecraft:dark_oak_wood`
+- **Dark Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#dark_oak-timber) (related guide); `minecraft:dark_oak_wood`
 - **Dark Prismarine** — article needed; `minecraft:dark_prismarine`
 - **Dark Prismarine Slab** — article needed; `minecraft:dark_prismarine_slab`
 - **Dark Prismarine Stairs** — article needed; `minecraft:dark_prismarine_stairs`
@@ -429,11 +429,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **End Portal** — article needed; `minecraft:end_portal`
 - **End Portal Frame** — article needed; `minecraft:end_portal_frame`
 - **End Rod** — article needed; `minecraft:end_rod`
-- **End Stone** — article needed; `minecraft:end_stone`
-- **End Stone Brick Slab** — article needed; `minecraft:end_stone_brick_slab`
-- **End Stone Brick Stairs** — article needed; `minecraft:end_stone_brick_stairs`
-- **End Stone Brick Wall** — article needed; `minecraft:end_stone_brick_wall`
-- **End Stone Bricks** — article needed; `minecraft:end_stone_bricks`
+- **End Stone** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone`
+- **End Stone Brick Slab** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_slab`
+- **End Stone Brick Stairs** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_stairs`
+- **End Stone Brick Wall** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_wall`
+- **End Stone Bricks** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_bricks`
 - **Ender Chest** — article needed; `minecraft:ender_chest`
 - **Exposed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_chiseled_copper`
 - **Exposed Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_copper`
@@ -465,7 +465,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Flood Basalt** — article needed; `minecraft:flood_basalt`
 - **Flower Pot** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:flower_pot`
 - **Flowering Azalea** — article needed; `minecraft:flowering_azalea`
-- **Flowering Azalea Leaves** — article needed; `minecraft:flowering_azalea_leaves`
+- **Flowering Azalea Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#flowering-azalea-leaves) (related guide); `minecraft:flowering_azalea_leaves`
 - **Flytrap** — article needed; `minecraft:flytrap`
 - **Frogspawn** — [Frogspawn](Frogspawn.md) (related guide); `minecraft:frogspawn`
 - **Frosted Ice** — article needed; `minecraft:frosted_ice`
@@ -554,8 +554,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Jungle Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:jungle_fence`
 - **Jungle Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:jungle_fence_gate`
 - **Jungle Hanging Sign** — article needed; `minecraft:jungle_hanging_sign`
-- **Jungle Leaves** — article needed; `minecraft:jungle_leaves`
-- **Jungle Log** — article needed; `minecraft:jungle_log`
+- **Jungle Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#jungle-leaves) (related guide); `minecraft:jungle_leaves`
+- **Jungle Log** — [Tree logs and roots](TreeLogsAndRoots.md#jungle-timber) (related guide); `minecraft:jungle_log`
 - **Jungle Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:jungle_planks`
 - **Jungle Pressure Plate** — article needed; `minecraft:jungle_pressure_plate`
 - **Jungle Sapling** — article needed; `minecraft:jungle_sapling`
@@ -566,7 +566,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Jungle Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:jungle_trapdoor`
 - **Jungle Wall Hanging Sign** — article needed; `minecraft:jungle_wall_hanging_sign`
 - **Jungle Wall Sign** — article needed; `minecraft:jungle_wall_sign`
-- **Jungle Wood** — article needed; `minecraft:jungle_wood`
+- **Jungle Wood** — [Tree logs and roots](TreeLogsAndRoots.md#jungle-timber) (related guide); `minecraft:jungle_wood`
 
 ### K
 
@@ -580,7 +580,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Lapis Lazuli Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:lapis_ore`
 - **Large Amethyst Bud** — article needed; `minecraft:large_amethyst_bud`
 - **Large Fern** — article needed; `minecraft:large_fern`
-- **Lava** — article needed; `minecraft:lava`
+- **Lava** — [Water and Lava](WaterAndLava.md) (related guide); `minecraft:lava`
 - **Lava Cauldron** — article needed; `minecraft:lava_cauldron`
 - **Leaf Litter** — article needed; `minecraft:leaf_litter`
 - **Leafcutter Ant Chamber** — article needed; `minecraft:leafcutter_ant_chamber`
@@ -661,12 +661,12 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Mangrove Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:mangrove_fence`
 - **Mangrove Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:mangrove_fence_gate`
 - **Mangrove Hanging Sign** — article needed; `minecraft:mangrove_hanging_sign`
-- **Mangrove Leaves** — article needed; `minecraft:mangrove_leaves`
-- **Mangrove Log** — article needed; `minecraft:mangrove_log`
+- **Mangrove Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#mangrove-leaves) (related guide); `minecraft:mangrove_leaves`
+- **Mangrove Log** — [Tree logs and roots](TreeLogsAndRoots.md#mangrove-timber) (related guide); `minecraft:mangrove_log`
 - **Mangrove Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:mangrove_planks`
 - **Mangrove Pressure Plate** — article needed; `minecraft:mangrove_pressure_plate`
-- **Mangrove Propagule** — article needed; `minecraft:mangrove_propagule`
-- **Mangrove Roots** — article needed; `minecraft:mangrove_roots`
+- **Mangrove Propagule** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#mangrove-propagules) (related guide); `minecraft:mangrove_propagule`
+- **Mangrove Roots** — [Tree logs and roots](TreeLogsAndRoots.md#mangrove-roots) (related guide); `minecraft:mangrove_roots`
 - **Mangrove Shelf** — article needed; `minecraft:mangrove_shelf`
 - **Mangrove Sign** — article needed; `minecraft:mangrove_sign`
 - **Mangrove Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:mangrove_slab`
@@ -674,7 +674,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Mangrove Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:mangrove_trapdoor`
 - **Mangrove Wall Hanging Sign** — article needed; `minecraft:mangrove_wall_hanging_sign`
 - **Mangrove Wall Sign** — article needed; `minecraft:mangrove_wall_sign`
-- **Mangrove Wood** — article needed; `minecraft:mangrove_wood`
+- **Mangrove Wood** — [Tree logs and roots](TreeLogsAndRoots.md#mangrove-timber) (related guide); `minecraft:mangrove_wood`
 - **Medium Amethyst Bud** — article needed; `minecraft:medium_amethyst_bud`
 - **Melon** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:melon`
 - **Melon Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:melon_stem`
@@ -695,7 +695,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Mud Brick Stairs** — article needed; `minecraft:mud_brick_stairs`
 - **Mud Brick Wall** — article needed; `minecraft:mud_brick_wall`
 - **Mud Bricks** — article needed; `minecraft:mud_bricks`
-- **Muddy Mangrove Roots** — article needed; `minecraft:muddy_mangrove_roots`
+- **Muddy Mangrove Roots** — [Tree logs and roots](TreeLogsAndRoots.md#muddy-mangrove-roots) (related guide); `minecraft:muddy_mangrove_roots`
 - **Mushroom Stem** — article needed; `minecraft:mushroom_stem`
 - **Mycelium** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#grass-block-and-mycelium) (related guide); `minecraft:mycelium`
 
@@ -722,8 +722,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:oak_fence`
 - **Oak Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:oak_fence_gate`
 - **Oak Hanging Sign** — article needed; `minecraft:oak_hanging_sign`
-- **Oak Leaves** — [Oak](Oak.md) (related guide); `minecraft:oak_leaves`
-- **Oak Log** — [Oak](Oak.md) (related guide); `minecraft:oak_log`
+- **Oak Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#oak-leaves) (related guide); `minecraft:oak_leaves`
+- **Oak Log** — [Tree logs and roots](TreeLogsAndRoots.md#oak-timber) (related guide); `minecraft:oak_log`
 - **Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:oak_planks`
 - **Oak Pressure Plate** — [Pressure plates](PressurePlates.md) (related guide); `minecraft:oak_pressure_plate`
 - **Oak Sapling** — [Oak](Oak.md) (related guide); `minecraft:oak_sapling`
@@ -734,7 +734,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Oak Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:oak_trapdoor`
 - **Oak Wall Hanging Sign** — article needed; `minecraft:oak_wall_hanging_sign`
 - **Oak Wall Sign** — article needed; `minecraft:oak_wall_sign`
-- **Oak Wood** — [Oak](Oak.md) (related guide); `minecraft:oak_wood`
+- **Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#oak-timber) (related guide); `minecraft:oak_wood`
 - **Observer** — [Observer](Observer.md) (related guide); `minecraft:observer`
 - **Obsidian** — article needed; `minecraft:obsidian`
 - **Ochre Froglight** — article needed; `minecraft:ochre_froglight`
@@ -779,8 +779,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pale Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:pale_oak_fence`
 - **Pale Oak Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:pale_oak_fence_gate`
 - **Pale Oak Hanging Sign** — article needed; `minecraft:pale_oak_hanging_sign`
-- **Pale Oak Leaves** — article needed; `minecraft:pale_oak_leaves`
-- **Pale Oak Log** — article needed; `minecraft:pale_oak_log`
+- **Pale Oak Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#pale-oak-leaves) (related guide); `minecraft:pale_oak_leaves`
+- **Pale Oak Log** — [Tree logs and roots](TreeLogsAndRoots.md#pale_oak-timber) (related guide); `minecraft:pale_oak_log`
 - **Pale Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:pale_oak_planks`
 - **Pale Oak Pressure Plate** — article needed; `minecraft:pale_oak_pressure_plate`
 - **Pale Oak Sapling** — article needed; `minecraft:pale_oak_sapling`
@@ -791,7 +791,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Pale Oak Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:pale_oak_trapdoor`
 - **Pale Oak Wall Hanging Sign** — article needed; `minecraft:pale_oak_wall_hanging_sign`
 - **Pale Oak Wall Sign** — article needed; `minecraft:pale_oak_wall_sign`
-- **Pale Oak Wood** — article needed; `minecraft:pale_oak_wood`
+- **Pale Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#pale_oak-timber) (related guide); `minecraft:pale_oak_wood`
 - **Pearlescent Froglight** — article needed; `minecraft:pearlescent_froglight`
 - **Peony** — article needed; `minecraft:peony`
 - **Petrified Oak Slab** — article needed; `minecraft:petrified_oak_slab`
@@ -936,17 +936,17 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Purple Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:purple_terracotta`
 - **Purple Wall Banner †** — article needed; `minecraft:purple_wall_banner`
 - **Purple Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:purple_wool`
-- **Purpur Block** — article needed; `minecraft:purpur_block`
-- **Purpur Pillar** — article needed; `minecraft:purpur_pillar`
-- **Purpur Slab** — article needed; `minecraft:purpur_slab`
-- **Purpur Stairs** — article needed; `minecraft:purpur_stairs`
+- **Purpur Block** — [End Stone and Purpur](EndStoneAndPurpur.md#purpur-variants-and-recipes) (related guide); `minecraft:purpur_block`
+- **Purpur Pillar** — [End Stone and Purpur](EndStoneAndPurpur.md#placement-pillars-and-dragon-interactions) (related guide); `minecraft:purpur_pillar`
+- **Purpur Slab** — [End Stone and Purpur](EndStoneAndPurpur.md#purpur-variants-and-recipes) (related guide); `minecraft:purpur_slab`
+- **Purpur Stairs** — [End Stone and Purpur](EndStoneAndPurpur.md#purpur-variants-and-recipes) (related guide); `minecraft:purpur_stairs`
 
 ### Q
 
-- **Quartz Bricks** — article needed; `minecraft:quartz_bricks`
-- **Quartz Pillar** — article needed; `minecraft:quartz_pillar`
-- **Quartz Slab** — article needed; `minecraft:quartz_slab`
-- **Quartz Stairs** — article needed; `minecraft:quartz_stairs`
+- **Quartz Bricks** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:quartz_bricks`
+- **Quartz Pillar** — [Quartz construction](Quartz.md#pillar-orientation-and-placement) (related guide); `minecraft:quartz_pillar`
+- **Quartz Slab** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:quartz_slab`
+- **Quartz Stairs** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:quartz_stairs`
 
 ### R
 
@@ -1029,9 +1029,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Smooth Limestone Slab** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone_slab`
 - **Smooth Limestone Stairs** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone_stairs`
 - **Smooth Limestone Wall** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone_wall`
-- **Smooth Quartz Block** — article needed; `minecraft:smooth_quartz`
-- **Smooth Quartz Slab** — article needed; `minecraft:smooth_quartz_slab`
-- **Smooth Quartz Stairs** — article needed; `minecraft:smooth_quartz_stairs`
+- **Smooth Quartz Block** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:smooth_quartz`
+- **Smooth Quartz Slab** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:smooth_quartz_slab`
+- **Smooth Quartz Stairs** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:smooth_quartz_stairs`
 - **Smooth Red Sandstone** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:smooth_red_sandstone`
 - **Smooth Red Sandstone Slab** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:smooth_red_sandstone_slab`
 - **Smooth Red Sandstone Stairs** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:smooth_red_sandstone_stairs`
@@ -1057,8 +1057,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Spruce Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:spruce_fence`
 - **Spruce Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:spruce_fence_gate`
 - **Spruce Hanging Sign** — article needed; `minecraft:spruce_hanging_sign`
-- **Spruce Leaves** — article needed; `minecraft:spruce_leaves`
-- **Spruce Log** — article needed; `minecraft:spruce_log`
+- **Spruce Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#spruce-leaves) (related guide); `minecraft:spruce_leaves`
+- **Spruce Log** — [Tree logs and roots](TreeLogsAndRoots.md#spruce-timber) (related guide); `minecraft:spruce_log`
 - **Spruce Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:spruce_planks`
 - **Spruce Pressure Plate** — article needed; `minecraft:spruce_pressure_plate`
 - **Spruce Sapling** — article needed; `minecraft:spruce_sapling`
@@ -1069,7 +1069,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Spruce Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:spruce_trapdoor`
 - **Spruce Wall Hanging Sign** — article needed; `minecraft:spruce_wall_hanging_sign`
 - **Spruce Wall Sign** — article needed; `minecraft:spruce_wall_sign`
-- **Spruce Wood** — article needed; `minecraft:spruce_wood`
+- **Spruce Wood** — [Tree logs and roots](TreeLogsAndRoots.md#spruce-timber) (related guide); `minecraft:spruce_wood`
 - **Sticky Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:sticky_piston`
 - **Stone** — [Stone](Stone.md#stone-and-cobblestone) (related guide); `minecraft:stone`
 - **Stone Brick Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_brick_slab`
@@ -1081,30 +1081,30 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Stone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_slab`
 - **Stone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_stairs`
 - **Stonecutter** — [Stonecutter](Stonecutter.md) (related guide); `minecraft:stonecutter`
-- **Stripped Acacia Log** — article needed; `minecraft:stripped_acacia_log`
-- **Stripped Acacia Wood** — article needed; `minecraft:stripped_acacia_wood`
-- **Stripped Birch Log** — article needed; `minecraft:stripped_birch_log`
-- **Stripped Birch Wood** — article needed; `minecraft:stripped_birch_wood`
-- **Stripped Cherry Log** — article needed; `minecraft:stripped_cherry_log`
-- **Stripped Cherry Wood** — article needed; `minecraft:stripped_cherry_wood`
-- **Stripped Crimson Hyphae** — article needed; `minecraft:stripped_crimson_hyphae`
-- **Stripped Crimson Stem** — article needed; `minecraft:stripped_crimson_stem`
-- **Stripped Dark Oak Log** — article needed; `minecraft:stripped_dark_oak_log`
-- **Stripped Dark Oak Wood** — article needed; `minecraft:stripped_dark_oak_wood`
-- **Stripped Jungle Log** — article needed; `minecraft:stripped_jungle_log`
-- **Stripped Jungle Wood** — article needed; `minecraft:stripped_jungle_wood`
-- **Stripped Mangrove Log** — article needed; `minecraft:stripped_mangrove_log`
-- **Stripped Mangrove Wood** — article needed; `minecraft:stripped_mangrove_wood`
-- **Stripped Oak Log** — [Oak](Oak.md) (related guide); `minecraft:stripped_oak_log`
-- **Stripped Oak Wood** — [Oak](Oak.md) (related guide); `minecraft:stripped_oak_wood`
-- **Stripped Pale Oak Log** — article needed; `minecraft:stripped_pale_oak_log`
-- **Stripped Pale Oak Wood** — article needed; `minecraft:stripped_pale_oak_wood`
+- **Stripped Acacia Log** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:stripped_acacia_log`
+- **Stripped Acacia Wood** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:stripped_acacia_wood`
+- **Stripped Birch Log** — [Tree logs and roots](TreeLogsAndRoots.md#birch-timber) (related guide); `minecraft:stripped_birch_log`
+- **Stripped Birch Wood** — [Tree logs and roots](TreeLogsAndRoots.md#birch-timber) (related guide); `minecraft:stripped_birch_wood`
+- **Stripped Cherry Log** — [Tree logs and roots](TreeLogsAndRoots.md#cherry-timber) (related guide); `minecraft:stripped_cherry_log`
+- **Stripped Cherry Wood** — [Tree logs and roots](TreeLogsAndRoots.md#cherry-timber) (related guide); `minecraft:stripped_cherry_wood`
+- **Stripped Crimson Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#crimson-timber) (related guide); `minecraft:stripped_crimson_hyphae`
+- **Stripped Crimson Stem** — [Tree logs and roots](TreeLogsAndRoots.md#crimson-timber) (related guide); `minecraft:stripped_crimson_stem`
+- **Stripped Dark Oak Log** — [Tree logs and roots](TreeLogsAndRoots.md#dark_oak-timber) (related guide); `minecraft:stripped_dark_oak_log`
+- **Stripped Dark Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#dark_oak-timber) (related guide); `minecraft:stripped_dark_oak_wood`
+- **Stripped Jungle Log** — [Tree logs and roots](TreeLogsAndRoots.md#jungle-timber) (related guide); `minecraft:stripped_jungle_log`
+- **Stripped Jungle Wood** — [Tree logs and roots](TreeLogsAndRoots.md#jungle-timber) (related guide); `minecraft:stripped_jungle_wood`
+- **Stripped Mangrove Log** — [Tree logs and roots](TreeLogsAndRoots.md#mangrove-timber) (related guide); `minecraft:stripped_mangrove_log`
+- **Stripped Mangrove Wood** — [Tree logs and roots](TreeLogsAndRoots.md#mangrove-timber) (related guide); `minecraft:stripped_mangrove_wood`
+- **Stripped Oak Log** — [Tree logs and roots](TreeLogsAndRoots.md#oak-timber) (related guide); `minecraft:stripped_oak_log`
+- **Stripped Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#oak-timber) (related guide); `minecraft:stripped_oak_wood`
+- **Stripped Pale Oak Log** — [Tree logs and roots](TreeLogsAndRoots.md#pale_oak-timber) (related guide); `minecraft:stripped_pale_oak_log`
+- **Stripped Pale Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#pale_oak-timber) (related guide); `minecraft:stripped_pale_oak_wood`
 - **Stripped Pewen Log** — [Pewen family](Pewen.md) (related guide); `minecraft:stripped_pewen_log`
 - **Stripped Pewen Wood** — [Pewen family](Pewen.md) (related guide); `minecraft:stripped_pewen_wood`
-- **Stripped Spruce Log** — article needed; `minecraft:stripped_spruce_log`
-- **Stripped Spruce Wood** — article needed; `minecraft:stripped_spruce_wood`
-- **Stripped Warped Hyphae** — article needed; `minecraft:stripped_warped_hyphae`
-- **Stripped Warped Stem** — article needed; `minecraft:stripped_warped_stem`
+- **Stripped Spruce Log** — [Tree logs and roots](TreeLogsAndRoots.md#spruce-timber) (related guide); `minecraft:stripped_spruce_log`
+- **Stripped Spruce Wood** — [Tree logs and roots](TreeLogsAndRoots.md#spruce-timber) (related guide); `minecraft:stripped_spruce_wood`
+- **Stripped Warped Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:stripped_warped_hyphae`
+- **Stripped Warped Stem** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:stripped_warped_stem`
 - **Structure Block** — article needed; `minecraft:structure_block`
 - **Structure Void** — article needed; `minecraft:structure_void`
 - **Subterranodon Egg** — [Subterranodon Egg](SubterranodonEgg.md) (related guide); `minecraft:subterranodon_egg`
@@ -1172,7 +1172,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Warped Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:warped_fence_gate`
 - **Warped Fungus** — article needed; `minecraft:warped_fungus`
 - **Warped Hanging Sign** — article needed; `minecraft:warped_hanging_sign`
-- **Warped Hyphae** — article needed; `minecraft:warped_hyphae`
+- **Warped Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:warped_hyphae`
 - **Warped Nylium** — article needed; `minecraft:warped_nylium`
 - **Warped Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:warped_planks`
 - **Warped Pressure Plate** — article needed; `minecraft:warped_pressure_plate`
@@ -1181,12 +1181,12 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Warped Sign** — article needed; `minecraft:warped_sign`
 - **Warped Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:warped_slab`
 - **Warped Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:warped_stairs`
-- **Warped Stem** — article needed; `minecraft:warped_stem`
+- **Warped Stem** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:warped_stem`
 - **Warped Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:warped_trapdoor`
 - **Warped Wall Hanging Sign** — article needed; `minecraft:warped_wall_hanging_sign`
 - **Warped Wall Sign** — article needed; `minecraft:warped_wall_sign`
 - **Warped Wart Block** — article needed; `minecraft:warped_wart_block`
-- **Water** — article needed; `minecraft:water`
+- **Water** — [Water and Lava](WaterAndLava.md) (related guide); `minecraft:water`
 - **Water Cauldron** — article needed; `minecraft:water_cauldron`
 - **Waxed Block of Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_copper_block`
 - **Waxed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_chiseled_copper`
@@ -1319,6 +1319,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Bee housing](BeeHousing.md)
 - [Blackstone and Basalt](BlackstoneAndBasalt.md)
 - [Brewing Stand](BrewingStand.md)
+- [Bubble Columns](BubbleColumns.md)
 - [Buttons](Buttons.md)
 - [Cactus](Cactus.md)
 - [Cartography Table](CartographyTable.md)
@@ -1337,6 +1338,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Dispenser and Dropper](DispenserAndDropper.md)
 - [Dragon Egg](DragonEgg.md)
 - [Enchanting Table](EnchantingTable.md)
+- [End Stone and Purpur](EndStoneAndPurpur.md)
 - [Farmland](Farmland.md)
 - [Flower Pot](FlowerPot.md)
 - [Frogspawn](Frogspawn.md)
@@ -1362,6 +1364,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Primal Magma and Fissure Primal Magma](PrimalMagma.md)
 - [Primordial decorative plants](PrimordialPlants.md)
 - [Pumpkin and Melon farming](PumpkinAndMelon.md)
+- [Quartz construction](Quartz.md)
 - [Rails](Rails.md)
 - [Raw Copper storage](RawCopperStorage.md)
 - [Redstone Comparator](RedstoneComparator.md)
@@ -1383,8 +1386,11 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Sugar Cane](SugarCane.md)
 - [Terracotta and Glazed Terracotta](Terracotta.md)
 - [Torch](Torch.md)
+- [Tree leaves and Mangrove Propagules](TreeLeaves.md)
+- [Tree logs and roots](TreeLogsAndRoots.md)
 - [Tripwire and Tripwire Hooks](Tripwire.md)
 - [Tuff](Tuff.md)
+- [Water and Lava](WaterAndLava.md)
 - [Wheat crop](Wheat.md)
 - [Wood construction](WoodConstruction.md)
 - [Wool and Carpet](WoolAndCarpet.md)

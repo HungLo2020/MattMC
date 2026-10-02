@@ -8,6 +8,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Getting started and survival
 
+- [Tree logs and roots](blocks/TreeLogsAndRoots.md) and [Leaves/Propagules](blocks/TreeLeaves.md): exact timber variants, stripping, leaf drops/decay and mangrove materials
+- [Water and Lava](blocks/WaterAndLava.md) and [Bubble Columns](blocks/BubbleColumns.md): fluid sources/flow, bucket rules, reusable pools and vertical transport
+
 - [Soil, Sand, and Gravel](blocks/SoilSandAndGravel.md): collection, Grass/Mycelium spread, tool conversions, falling terrain, Flint, and suspicious-block care
 
 - [Game modes](gamemodes/Gamemodes.md): all four modes and permission-aware switching
@@ -81,6 +84,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
 
 ### Building, redstone, and travel
+
+- [Quartz](blocks/Quartz.md) and [End Stone/Purpur](blocks/EndStoneAndPurpur.md): exact finishes, mixed crafting inputs, stonecutting, pillars and Dragon interactions
 
 - [Copper lighting](blocks/CopperLighting.md), [Copper Chests](blocks/CopperChests.md), [Lightning Rods](blocks/LightningRods.md), [Golem Statues](blocks/CopperGolemStatues.md), and [Raw Copper storage](blocks/RawCopperStorage.md): device controls, sorting, variant changes and collection
 

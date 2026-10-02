@@ -21,9 +21,9 @@ Names use English localization where available. A † marks a readable registry-
 | Grass Block | [`minecraft:grass_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L127) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#grass-block-and-mycelium) |
 | Gravel | [`minecraft:gravel`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L333) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#gravel-and-flint) |
 | Ice | [`minecraft:ice`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1930) | Article needed |
-| Lava | [`minecraft:lava`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L298) | Article needed |
+| Lava | [`minecraft:lava`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L298) | [Water and Lava](../WaterAndLava.md) |
 | Mud | [`minecraft:mud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6652) | Article needed |
-| Muddy Mangrove Roots | [`minecraft:muddy_mangrove_roots`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L417) | Article needed |
+| Muddy Mangrove Roots | [`minecraft:muddy_mangrove_roots`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L417) | [Tree logs and roots](../TreeLogsAndRoots.md#muddy-mangrove-roots) |
 | Mycelium | [`minecraft:mycelium`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2440) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#grass-block-and-mycelium) |
 | Packed Ice | [`minecraft:packed_ice`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L3282) | Article needed |
 | Packed Mud | [`minecraft:packed_mud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2264) | Article needed |
@@ -38,7 +38,7 @@ Names use English localization where available. A † marks a readable registry-
 | Soul Soil | [`minecraft:soul_soil`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2010) | Article needed |
 | Suspicious Gravel | [`minecraft:suspicious_gravel`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L338) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel) |
 | Suspicious Sand | [`minecraft:suspicious_sand`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L318) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel) |
-| Water | [`minecraft:water`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L285) | Article needed |
+| Water | [`minecraft:water`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L285) | [Water and Lava](../WaterAndLava.md) |
 
 ## Inventory source
 
