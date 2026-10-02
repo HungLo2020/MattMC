@@ -77,6 +77,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Combat and mob resources
 
+- [Combat](mechanics/Combat.md), [Health](mechanics/Health.md), [Death and respawn](mechanics/DeathAndRespawn.md), and [Experience](mechanics/Experience.md): attack timing, defenses, recovery and progression
+- [Warden](mobs/Warden.md): detection, anger, melee versus sonic defense, escape limits and burrowing
+
 - [Iron Golem](mobs/IronGolem.md) and [Snow Golem](mobs/SnowGolem.md): construction, conditional village/outpost routes, defense, repair, environmental care, and drops
 - [Monster Spawner](blocks/MonsterSpawner.md): preserving found cages, activation and attempt rules, nearby limits, and spawn-egg configuration
 - [Ender Dragon](mobs/EnderDragon.md), [End Crystals](items/EndCrystal.md), and [Dragon Egg](blocks/DragonEgg.md): healing, fight phases, rewards, respawning, and trophy collection

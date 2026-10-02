@@ -4,7 +4,7 @@ Food manages two related resources: visible hunger and an additional saturation 
 
 ## Food values
 
-Hunger is capped at **20 points** (ten hunger icons). Saturation is capped at the current hunger level. When a food uses a saturation modifier, its contribution is `nutrition × modifier × 2` before those caps.
+Hunger is capped at **20 points** (ten hunger icons). When food adds saturation, the result is capped at the current hunger level. When a food uses a saturation modifier, its contribution is `nutrition × modifier × 2` before those caps.
 
 Examples from MattMC's food registrations:
 
@@ -25,6 +25,8 @@ Actions can add exhaustion. When exhaustion exceeds 4, the food tick subtracts 4
 
 The ordinary local-player sprint food check requires **more than 6 hunger points**. Passenger and flight-ability paths are exceptions; that threshold is not a promise that food is the only condition governing sprinting.
 
+Peaceful recovery uses a separate saturation setter; see [Health](Health.md#recovering-safely). [Food-add cap](https://github.com/HungLo2020/MattMC/blob/4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f/src/main/java/net/minecraft/world/food/FoodData.java#L19-L30) · [Peaceful recovery](https://github.com/HungLo2020/MattMC/blob/4532f95d76649fa60ddfcc5e7b9f7fea6f91ab7f/src/main/java/net/minecraft/server/level/ServerPlayer.java#L740-L758)
+
 ## Natural healing
 
 With the natural-regeneration game rule enabled:
@@ -41,6 +43,8 @@ At zero hunger, the starvation check runs every 80 ticks. Its difficulty conditi
 Carry food before exploring or fighting rather than waiting until you can no longer sprint. [Cooking](../smelting/Smelting.md) often improves the value of an existing food supply.
 
 ## Related pages
+
+- [Health, damage, and recovery](Health.md)
 
 - [Survival](../gamemodes/Survival.md)
 - [Smelting and cooking](../smelting/Smelting.md)

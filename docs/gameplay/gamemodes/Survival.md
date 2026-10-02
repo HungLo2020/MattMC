@@ -21,6 +21,8 @@ Creative availability also is not proof of Survival availability. Several integr
 
 ## Related pages
 
+- [Death and respawn](../mechanics/DeathAndRespawn.md)
+
 - [All game modes](Gamemodes.md)
 - [Crafting](../crafting/Crafting.md)
 - [Hunger and food](../mechanics/Hunger.md)

@@ -1049,10 +1049,19 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,333 pages / 37 indexes. All 25 authored paths are documentation; 1,993 local links/anchors and 398 tracked reference uses resolve, with zero actual rendered citation candidates. All 1,211 IDs remain alphabetical and occur once across the separate categories; 25 fallback labels remain disclosed. The full set now has related-guide routes, pending ongoing semantic review.
 
+## Batch 130: Combat, recovery and the Warden encounter
+
+- Added four shared mechanics owners for Combat, Health, Death/Respawn and Experience, and replaced the generic Warden page with a source-reviewed encounter guide. Existing equipment, food, Bed/Anchor and enchanting owners remain linked; their specialized formulas and setup are not replaced.
+- Covers active charge/critical/sweep and defense stages; health/absorption and selective difficulty scaling; inventory/XP consequences, saved-point fallback and recovery; point-to-level costs, orb/Mending allocation and level spending. Hunger's saturation-cap sentence is now scoped to food additions, with Peaceful's separate setter linked.
+- Warden coverage traces triggered/egg spawning, vibration/smell/contact, anger, melee versus sonic defenses, Darkness, persistence/burrowing and actual loot. Mobs navigation now lists it with aggressive encounters rather than claiming an implemented boss system.
+- Source checkpoint: `c1adfb58c73bd6918cde87943be31afef6a2ccf4`; 78 distinct pinned source pairs match current source. No gameplay combat, death, healing, XP, spawn or escape test is claimed.
+
+- Validation: required checker and strict build passed on 2,337 pages / 37 indexes. All 15 authored paths are documentation; 862 local links/anchors and 202 tracked reference uses resolve, with zero rendered citation candidates. Existing owner headings remain available. No raw page count is used to claim broad coverage completion.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.
-2. Integrate the reviewed Warden encounter guide, then finish Nautilus/Zombie Nautilus, health/death/experience and combat drafts. Preserve current citation repairs and source-revalidate every incoming draft.
+2. Finish Nautilus/Zombie Nautilus and the semantic block-family audit. Preserve current citation repairs and source-revalidate every incoming draft.
 3. Revalidate the held Swords and undead-family drafts, replace remaining generic mob/item pages in coherent gameplay loops, and deepen practical expedition, biome, effect and enchantment references.
 4. Continue checking acquisition through the actual inventory browser, recipe/loot, generation, permissions and active interaction callers separately. Keep incomplete imported systems explicit and link independently verified issues without claiming unmerged fixes.
 5. Broad catch-up remains incomplete. The prior audit's template candidates are a triage list, not a completion metric; use player decisions, registry ownership and source-grounded substance to assess progress.

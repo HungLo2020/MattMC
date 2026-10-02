@@ -12,6 +12,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 - **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Cat](Cat.md), [Ocelot](Ocelot.md), [Axolotl](Axolotl.md), [Dolphin](Dolphin.md), [Frog](Frog.md), and [Tadpole](Tadpole.md)
 - **Hostile encounters and bosses:** [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Enderman](Enderman.md), [Blaze](Blaze.md), [Wither Skeleton](WitherSkeleton.md), [Slime](Slime.md), [Magma Cube](MagmaCube.md), [Wither](Wither.md), [Ender Dragon](EnderDragon.md), and [Shulker](Shulker.md)
+- **Sculk encounter:** [Warden](Warden.md), including vibration/smell detection, anger, sonic attacks and retreat limits
 - **Bundled animals and caves:** use the [Alex's Mobs](../ContentGuide.md#alexs-mobs-additions) and [Alex's Caves](../ContentGuide.md#alexs-caves-additions) sections for reviewed feeding, ownership, resources, and availability limits
 
 ## Passive Mobs
@@ -169,6 +170,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 - [Vallumraptor](Vallumraptor.md)
 - [Vex](Vex.md)
 - [Vindicator](Vindicator.md)
+- [Warden](Warden.md)
 - [Witch](Witch.md)
 - [Wither Skeleton](WitherSkeleton.md)
 - [Zoglin](Zoglin.md)
@@ -180,5 +182,4 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 - [Elder Guardian](ElderGuardian.md)
 - [Ender Dragon](EnderDragon.md)
 - [Ravager](Ravager.md)
-- [Warden](Warden.md)
 - [Wither](Wither.md)

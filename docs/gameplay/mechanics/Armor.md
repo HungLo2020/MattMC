@@ -57,6 +57,8 @@ Netherite equipment follows the matching Diamond-item Smithing upgrade with a Ne
 
 ## Related pages
 
+- [Combat and defensive stages](Combat.md#layer-defenses-without-adding-their-percentages)
+
 - [Copper Chestplate](../items/CopperChestplate.md)
 - [Iron Chestplate](../items/IronChestplate.md)
 - [Diamond Chestplate](../items/DiamondChestplate.md)

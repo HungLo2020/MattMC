@@ -52,6 +52,8 @@ Closing and reopening the menu, removing and reinserting the same unchanged item
 
 ## Related pages
 
+- [Experience points, levels, and Mending](../mechanics/Experience.md)
+
 - [Enchanting Table block](../blocks/EnchantingTable.md)
 - [Enchanting Table item](../items/EnchantingTable.md)
 - [Enchanted Book](../items/EnchantedBook.md)
