@@ -655,6 +655,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,189 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, rescue, combat, block damage, breathing, or loot gameplay test.
 
+## Eighty-seventh batch: Horses, Donkeys, and Mules
+
+- Expanded three equine guides and three spawn eggs with actual biome/offspring routes, taming/temper, feeding versus lures, current equipment, riding, cargo, breeding/inheritance, and persistence/drop recovery.
+- Preserved Saddle, Transport, and Armor ownership while documenting current Carrot food, 15-slot chested transport, bred-Donkey variation, and Mule infertility despite possible love particles.
+- Updated Content Guide, Transport links, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,189 pages / 36 indexes; independent source review, source paths, local links/anchors, and whitespace checked. No spawning, taming, feeding, breeding, cargo, equipment, or travel gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

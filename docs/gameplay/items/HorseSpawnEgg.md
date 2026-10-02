@@ -1,17 +1,24 @@
 # Horse Spawn Egg
 
-## Obtaining
+The **Horse Spawn Egg** (`minecraft:horse_spawn_egg`) is a Creative tool for placing a [Horse](../mobs/Horse.md). It is registered with that entity type and appears in the Creative spawn-egg selection. [Item registration][items] · [Creative entry][creative]
 
-The Horse Spawn Egg is available from the Creative Menu.
+## Use
 
-## Usage
+Use the egg on an ordinary block to spawn its mob at the clicked position or adjacent face, depending on the block's collision shape. Leave suitable room for the animal. A successful ordinary spawn consumes one egg in Survival; Creative use preserves the held supply. [Placement and consumption][egg] · [Consumption helper][stack]
 
-Use the Horse Spawn Egg on a block to spawn a Horse.
+A matching egg used directly on a Horse can create a baby Horse through the spawn-egg interaction. This does not require the ordinary two-parent breeding procedure. [Egg offspring interaction][egg] · [Live mob interaction dispatch][mob]
 
-## Behavior
+A spawned animal is not automatically tamed or saddled by the ordinary egg. Follow the [Horse guide](../mobs/Horse.md) for obtaining, feeding, taming, riding, equipment, and drops. Modified egg components can change the entity data. [Default tame state][shared] · [Egg components][egg]
 
-Spawn eggs are creative utility items. They do not have durability and are primarily used for testing, mapmaking, creative building, and quickly placing mobs into the world.
+Using an egg on a compatible Spawner configures its entity instead of placing an animal; see [Monster Spawner](../blocks/MonsterSpawner.md) for the current settings and restrictions. [Spawner interaction][egg]
 
-## Notes
+## Sources and verification
 
-* This item is registered as `minecraft:horse_spawn_egg`.
+Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. Item registration, Creative entry, block use, and matching-mob offspring dispatch were inspected. No in-game egg, Spawner, or baby-spawn test was run.
+
+[items]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java
+[creative]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/CreativeModeTabs.java
+[egg]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/SpawnEggItem.java
+[stack]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/ItemStack.java
+[mob]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/entity/Mob.java
+[shared]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/entity/animal/horse/AbstractHorse.java
