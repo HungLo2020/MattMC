@@ -4,9 +4,17 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 
 ## Reviewed effects
 
+- [Dolphin's Grace](MovementEffects.md#dolphins-grace): horizontal water-momentum retention
+- [Jump Boost](MovementEffects.md#jump-boost): ground-jump power and safe-fall-distance contributions
+- [Levitation](MovementEffects.md#levitation): upward air movement and the Elytra restriction
 - [Poison](Poison.md): periodic damage with a low-health cutoff
-- [Wither](Wither.md): periodic damage without Poison's low-health cutoff
 - [Regeneration](Regeneration.md): periodic healing, separate from food-based healing
+- [Slow Falling](MovementEffects.md#slow-falling): descending gravity and fall-distance handling
+- [Slowness](MovementEffects.md#slowness): reduced movement-speed attribute
+- [Speed](MovementEffects.md#speed): increased movement-speed attribute
+- [Wither](Wither.md): periodic damage without Poison's low-health cutoff
+
+The [movement effects reference](MovementEffects.md) compares acquisition, movement rules, and effect interactions.
 
 This is a growing reference, not a complete list of all registered effects. The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
 
