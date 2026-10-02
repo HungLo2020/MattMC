@@ -1068,11 +1068,20 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,337 pages / 37 indexes. All 13 authored paths are documentation; 2,163 local links/anchors and 16 tracked shortcut uses resolve, with zero rendered citation candidates. Four registry aliases now reach precise subsections; the 1,211-ID alphabetical/category inventory remains unchanged.
 
+## Batch 132: Nautilus care and undead encounters
+
+- Added two missing mob owners for Nautilus and Zombie Nautilus, expanded Husk/Drowned/Zombie Villager, and corrected nine related item pages. Existing published anchors are preserved, including compatibility anchors for the older undead drafts.
+- Nautilus coverage verifies loaded-biome spawn omissions, ordinary listed eggs, taming/feeding/breeding, dispenser armor, riding and persistence. The named mount effect remains explicitly insufficient as current air protection; Zombie Nautilus restrictions and conditional rider creation are distinct.
+- Undead coverage follows active spawn data, water-conversion callers, equipment versus table loot, curing inputs/timers, saved trades and persistence. Shell acquisition connects fishing/trading/Drowned equipment with qualified Nautilus loot and the separate browser route; Golden Apple links exact food/cure behavior.
+- Source checkpoint: `a8cfed894fbc4de04fbf938986736c539fe9549e`; 139 distinct pinned source pairs were rechecked unchanged. Ten hidden citation misbindings in held drafts were repaired before integration, and spawn-egg prose now includes the verified Survival browser route. No gameplay spawning, breeding, riding, oxygen, curing, loot or persistence test was run.
+
+- Validation: required checker and strict build passed on 2,339 pages / 37 indexes. All 18 authored paths are documentation; 888 local links/anchors and 349 tracked reference uses resolve, with zero rendered citation candidates. Two new mob owners and three substantive replacements are distinct from the nine item corrections; broader mob coverage remains incomplete.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.
-2. Finish Nautilus/Zombie Nautilus and the semantic block-family audit. Preserve current citation repairs and source-revalidate every incoming draft.
-3. Revalidate the held Swords and undead-family drafts, replace remaining generic mob/item pages in coherent gameplay loops, and deepen practical expedition, biome, effect and enchantment references.
+2. Continue the remaining generic mob/item families and source-reviewed expedition drafts. Preserve current citation repairs and source-revalidate every incoming draft.
+3. Revalidate the held Swords draft, replace remaining generic mob/item pages in coherent gameplay loops, and deepen practical expedition, biome, effect and enchantment references.
 4. Continue checking acquisition through the actual inventory browser, recipe/loot, generation, permissions and active interaction callers separately. Keep incomplete imported systems explicit and link independently verified issues without claiming unmerged fixes.
 5. Broad catch-up remains incomplete. The prior audit's template candidates are a triage list, not a completion metric; use player decisions, registry ownership and source-grounded substance to assess progress.
 

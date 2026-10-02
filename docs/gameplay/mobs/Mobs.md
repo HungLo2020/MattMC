@@ -13,6 +13,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 - **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Cat](Cat.md), [Ocelot](Ocelot.md), [Axolotl](Axolotl.md), [Dolphin](Dolphin.md), [Frog](Frog.md), and [Tadpole](Tadpole.md)
 - **Hostile encounters and bosses:** [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Enderman](Enderman.md), [Blaze](Blaze.md), [Wither Skeleton](WitherSkeleton.md), [Slime](Slime.md), [Magma Cube](MagmaCube.md), [Wither](Wither.md), [Ender Dragon](EnderDragon.md), and [Shulker](Shulker.md)
 - **Sculk encounter:** [Warden](Warden.md), including vibration/smell detection, anger, sonic attacks and retreat limits
+- **Nautilus care and encounters:** [Nautilus](Nautilus.md) and [Zombie Nautilus](ZombieNautilus.md): listed eggs, taming, equipment and breathing limits
+- **Undead variants:** [Husk](Husk.md), [Drowned](Drowned.md), and [Zombie Villager](ZombieVillager.md): conversions, equipment drops and curing
 - **Bundled animals and caves:** use the [Alex's Mobs](../ContentGuide.md#alexs-mobs-additions) and [Alex's Caves](../ContentGuide.md#alexs-caves-additions) sections for reviewed feeding, ownership, resources, and availability limits
 
 ## Passive Mobs
@@ -109,6 +111,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 - [Mimic Octopus](MimicOctopus.md)
 - [Moose](Moose.md)
 - [Mudskipper](Mudskipper.md)
+- [Nautilus](Nautilus.md)
 - [Orca](Orca.md)
 - [Panda](Panda.md)
 - [Piglin](Piglin.md)
@@ -175,6 +178,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 - [Wither Skeleton](WitherSkeleton.md)
 - [Zoglin](Zoglin.md)
 - [Zombie](Zombie.md)
+- [Zombie Nautilus](ZombieNautilus.md)
 - [Zombie Villager](ZombieVillager.md)
 
 ## Bosses & Mini-Bosses

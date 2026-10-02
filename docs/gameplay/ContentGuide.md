@@ -77,6 +77,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Combat and mob resources
 
+- [Husk](mobs/Husk.md), [Drowned](mobs/Drowned.md), and [Zombie Villager](mobs/ZombieVillager.md): water conversions, underwater equipment and [curing](mobs/ZombieVillager.md#curing-step-by-step)
+- [Nautilus](mobs/Nautilus.md) and [Zombie Nautilus](mobs/ZombieNautilus.md): egg access, ownership, dispenser armor, rider hazards and incomplete natural-spawn/breathing integration
+
 - [Combat](mechanics/Combat.md), [Health](mechanics/Health.md), [Death and respawn](mechanics/DeathAndRespawn.md), and [Experience](mechanics/Experience.md): attack timing, defenses, recovery and progression
 - [Warden](mobs/Warden.md): detection, anger, melee versus sonic defense, escape limits and burrowing
 
