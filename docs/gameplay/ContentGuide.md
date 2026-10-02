@@ -182,6 +182,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 - [Woodland Mansion](structures/WoodlandMansion.md), [Evoker](mobs/Evoker.md), [Vindicator](mobs/Vindicator.md), and [Vex](mobs/Vex.md): forest expeditions, room rewards, spell/axe encounters and summon limits
 
+- [Illusioner](mobs/Illusioner.md): deliberate spawning, bow attacks, Invisibility/Blindness, persistence and equipment drops
+
 - [Pillager Outpost](structures/PillagerOutpost.md), [Pillager](mobs/Pillager.md), [Ravager](mobs/Ravager.md), and [Raids](mechanics/Raid.md): tower expeditions, captain bottles, omen preparation, waves and victory
 
 - [All biome families](biomes/Biomes.md#alphabetical-biome-directory): exact alphabetical IDs and reviewed land, cave, shore, Nether, End and special-world choices
