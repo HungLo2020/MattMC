@@ -592,6 +592,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Mobs, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,181 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No breeding, hatch, growth, bucket, variant, or farm gameplay test.
 
+## Seventy-eighth batch: ordinary Monster Spawners
+
+- Added canonical ordinary-spawner behavior and replaced the generic item stub with actual Creative access, empty loot, configuration, and no-default-Pig guidance.
+- Traced current player activation, spawn attempts/collision/mob rules, exact-class local counts, conditional delay resets, mining XP gates, and Creative egg-count restoration; Trial Spawners remain a separate system.
+- Updated Blocks, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: independent source review, checker and strict build passed on 2,182 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No spawning, lighting, mining, egg configuration, redstone, or farm gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

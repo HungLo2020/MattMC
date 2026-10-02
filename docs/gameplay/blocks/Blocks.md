@@ -33,8 +33,11 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 - [Oak family](Oak.md): harvesting, leaf drops, saplings, Bone Meal, stripping, and wood conversions
 - [Pewen family](Pewen.md): tree growth, shaped recipes, and wood integration caveats
 
-## Lighting and integrated content
+## Spawning blocks
 
+- [Monster Spawner](MonsterSpawner.md): nearby-player activation, spawn attempts, local limits, configuration, and collection restrictions
+
+## Lighting and integrated content
 - [Torch](Torch.md): crafting, support requirements, and light values
 
 - [Amber](Amber.md): transparent construction and harvesting caveats
