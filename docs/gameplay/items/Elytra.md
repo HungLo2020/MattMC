@@ -43,6 +43,8 @@ For travel, craft **one Paper plus one, two, or three Gunpowder**, with each Gun
 
 Stars add explosion effects. When a boosting rocket with such effects explodes, it can damage the attached flyer and nearby entities. Rockets crafted without stars have no explosion-damage payload. This removes that particular damage source, not the risk of flying into a wall or exhausting your Elytra. [Explosion damage][rocket]
 
+The separately named [Tarantula Hawk Elytra](TarantulaHawkElytra.md) lacks the current default glider/equipment wiring; its name does not grant the ordinary flight behavior described here.
+
 ## Sources and verification
 
 Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. Reviewed item registration, template reward creation, equipment and flight callers, wear/repair paths, enchantment data, and active rocket recipes. No in-game frame collection, glide, crash, wear-out, repair, enchantment, or boost test was run. Custom components, enchantments, and server data can change these defaults.

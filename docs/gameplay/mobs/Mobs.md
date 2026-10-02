@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Imported arthropods:** [Cave Centipede](CaveCentipede.md) and [Tarantula Hawk](TarantulaHawk.md): actual encounters, sting/loot behavior and resource limitations
+
 - **Bastion residents:** [Piglin](Piglin.md), [Piglin Brute](PiglinBrute.md), and [Bastion Remnant](../structures/BastionRemnant.md): gold, barter and looting limits
 - **Monument expeditions:** [Guardian](Guardian.md), [Elder Guardian](ElderGuardian.md), and [Ocean Monument](../structures/OceanMonument.md): spawning, attacks, fatigue and rewards
 

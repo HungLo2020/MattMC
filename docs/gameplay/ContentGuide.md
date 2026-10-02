@@ -77,6 +77,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Combat and mob resources
 
+- [Cave Centipede](mobs/CaveCentipede.md), [Centipede Legs](items/CentipedeLeg.md), and [Leggings](items/CentipedeLeggings.md): head loot, food risk, crafting and armor-tag limits
+- [Tarantula Hawk](mobs/TarantulaHawk.md) and its [Elytra](items/TarantulaHawkElytra.md): sting/prey behavior and the current feeding, wing-production and flight integration gaps
+
 - [Swords](mechanics/Swords.md), [Mace](items/Mace.md), [Trident](items/Trident.md), and [Wind Charge](items/WindCharge.md): material choice, attack-specific rules, acquisition, movement and upkeep
 
 - [Husk](mobs/Husk.md), [Drowned](mobs/Drowned.md), and [Zombie Villager](mobs/ZombieVillager.md): water conversions, underwater equipment and [curing](mobs/ZombieVillager.md#curing-step-by-step)

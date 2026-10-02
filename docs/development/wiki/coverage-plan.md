@@ -1095,6 +1095,15 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,342 pages / 37 indexes. All 17 authored paths are documentation; 964 local links/anchors and 508 tracked reference uses resolve, with zero rendered citation candidates. Two expedition owners and four substantive mob replacements are recorded separately from the narrow discovery links.
 
+## Batch 135: Imported arthropod encounters and equipment
+
+- Replaced two generic mob guides and six distinctive item pages for Cave Centipede and Tarantula Hawk. Existing Armor, Elytra and Durability owners remain canonical and gain narrow links to the imported exceptions.
+- Centipede guidance traces active head/segment behavior, Poison, head-only leg loot, raw-chicken-style Hunger risk, seven-leg crafting and chainmail-based leggings. Missing normal armor/durability enchantment tag membership is distinct from repair material and armor attributes.
+- Hawk guidance separates active sting/prey behavior from absent bundled feeding tags, unestablished offspring/wing production, and missing default Elytra equipment/glider/fragment-repair components. Neither imported animal is assumed to receive the default arthropod enchantment behavior solely from appearance.
+- Source checkpoint: `bb9a8a060da02b64f23508b77794fb0f79307de4`; 47 distinct pinned source pairs match current source. Independent actual rendering verified all old anchors and references before integration. No gameplay encounter, taming, breeding, drop, crafting, flight or repair test was run, and no missing integration was claimed fixed.
+
+- Validation: required checker and strict build passed on 2,342 pages / 37 indexes. All 14 authored paths are documentation; 853 local links/anchors and 196 tracked reference uses resolve, with zero rendered citation candidates and all replacement headings retained. The two mob and six item expansions do not certify other imported integrations.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.
