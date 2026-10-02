@@ -68,6 +68,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Materials, equipment, and enchanting
 
+- [Dyes](items/Dyes.md): exact color recipes, ingredient choices, Sheep and collars, sign text, Banner patterns, equipment blends and storage colors
+
 - [Amethyst](blocks/Amethyst.md): protect budding blocks, grow and harvest crystals, use Shards and distinguish decoration from renewable growth
 
 - [Ores and Ancient Debris](blocks/OreResources.md): all nineteen ore/debris blocks, exact tool gates, drops/Fortune/XP, processing and checked generation examples
