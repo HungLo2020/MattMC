@@ -2,9 +2,9 @@
 
 Wool, carpets, glass, concrete, terracotta, beds, banners and Shulker Boxes, with every registered color.
 
-This catalog contains **199 registered forms**. Names and IDs identify blocks; the links in the last column lead to related placed-block guides where available. Read each guide’s scope and limitations before applying it to a variant.
+This catalog contains **199 registered forms**. Names and IDs identify blocks; the last column links related placed-block guides where available. Read each guide’s scope before applying it to a variant.
 
-Names use English localization where available. A † marks a readable registry-name label where no separate English entry exists; the exact ID is authoritative.
+Names use English localization where available. A † marks a readable registry-name label without a separate English entry; the exact ID is authoritative.
 
 [All block categories](index.md) · [Blocks and practical guides](../Blocks.md)
 
@@ -212,4 +212,4 @@ Names use English localization where available. A † marks a readable registry-
 
 ## Inventory source
 
-Registration inventory checked on **2026-10-02**, pinned to [`c87803e7`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java). This is a source inventory, not an in-game availability or Survival acquisition test. Block states such as facing, age, waterlogging, or power are not additional registry IDs.
+Registration inventory checked on **2026-10-02**, using source snapshot [`f9e4a4c9`](https://github.com/HungLo2020/MattMC/blob/f9e4a4c96fcf7fb744bce869c085cdfab189810e/src/main/java/net/minecraft/world/level/block/Blocks.java). Direct declarations and helper registrations are counted; see the [inventory-method correction](index.md#registration-method-correction). This is a source inventory, not an in-game availability or Survival acquisition test. Block states are not separate registry IDs.

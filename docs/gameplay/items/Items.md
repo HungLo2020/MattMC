@@ -2,6 +2,8 @@
 
 Find inventory objects here, including block items, food, equipment, and spawn eggs. For reviewed examples, start with the [content guide](../ContentGuide.md). Placed-block behavior is documented under [Blocks](../blocks/Blocks.md). Existing short entries are still being checked against MattMC source; an entry alone does not establish Survival availability.
 
+The [Copper block catalog](../blocks/catalog/copper.md) also exposes 24 helper-registered Bars, Chain and Lantern forms whose dedicated item/behavior guides are still pending. Their absence from the individual item-page list is a documentation gap, not proof that the items are unregistered.
+
 ## List of Items
 #### #
 - [.22 Modle 943 Revolver](22Modle943Revolver.md)

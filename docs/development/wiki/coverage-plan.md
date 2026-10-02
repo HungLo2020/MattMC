@@ -21,6 +21,10 @@
 - Standing publication instruction issued on 2026-10-02 UTC supersedes the earlier branch-only restriction: after each completed validated wiki batch, including three-hour reviews, promote the preserved documentation history to master and verify the expected Wiki Pages deployment. Author on the wiki branch, preserve concurrent source changes, use no force-push, and coordinate one deployment at a time.
 - Continue using [safe synchronization](continuation.md) before each batch
 
+## Block inventory method correction
+
+The current inspected built-in path has **1,235 unique registered block IDs: 1,211 direct static Block fields plus 24 WeatheringCopperBlocks helper forms**. Earlier 1,211-ID directory/validation counts below describe the direct-field subset, not the full effective source inventory. Copper Bars, Copper Chain and Copper Lantern each have eight registered oxidation/wax forms that already existed in the original `c87803e7` snapshot. Batch 147 supersedes the earlier completeness claim; it does not add game content. Existing 1,211 related-guide routes are preserved, while the newly exposed 24 forms remain **Article needed** until dedicated scope is verified. See [the registration method and source chain](../../gameplay/blocks/catalog/index.md#registration-method-correction).
+
 ## Initial coverage inventory
 
 At the source snapshot, `docs/` contains **2,090 Markdown pages** and **32 directory indexes**. These are file counts, not a completeness score.
@@ -745,8 +749,8 @@ At `987ab0a72e971d40dbcdfc6d4ee5ae52c2a95564`, 513 gameplay paths differ from th
 
 ## Ninety-seventh batch: alphabetical Blocks and missing core behavior
 
-- Replaced the incomplete Blocks main list with all 1,211 active built-in registrations in displayed-name alphabetical order, retaining exact IDs and related-guide scope labels. Added twelve separate material/use category lists and one category index; every ID appears exactly once in each inventory view.
-- The registry inventory is complete at `c87803e75d339e5d643ca812efc70a6def06a401`; placed-block behavior coverage remains substantially incomplete. No item stubs are used as substitutes, no empty variant articles were generated, and no word/file-count completeness score is claimed.
+- Replaced the incomplete Blocks main list with the then-inventoried 1,211 direct-field registrations in displayed-name alphabetical order, retaining exact IDs and related-guide scope labels. Added twelve separate material/use category lists and one category index; every ID appears exactly once in each inventory view.
+- The original registry-completeness claim at `c87803e75d339e5d643ca812efc70a6def06a401` is superseded by batch 147: the direct-field scan missed 24 helper registrations already present there. Placed-block behavior coverage remains substantially incomplete. No item stubs are used as substitutes, no empty variant articles were generated, and no word/file-count completeness score is claimed.
 - Added source-grounded core block guidance and corrected the Crafter item's false boat template. Repaired missing source-reference definitions in six Rabbit/Fox articles without changing their behavior claims.
 - Updated continuation rules and priority order for the requested alphabetical main directory, separate categories, and registry-based article expansion. Linked the coordinated source/issue review while keeping draft fixes explicitly unmerged.
 - Source advanced during validation: fast-forwarded from `c87803e7` to `fb7d6979fb8d9773cfe05f084c6085f35feb885c`, preserving the user-merged Grizzly, Rhino and Ambersol fixes. Updated current checkpoints and remaining Grizzly egg/mining caveats; historical citations remain pinned where unchanged. Final validation and publication follow the standing procedure.
@@ -787,7 +791,7 @@ At `987ab0a72e971d40dbcdfc6d4ee5ae52c2a95564`, 513 gameplay paths differ from th
 
 ## Current block coverage audit and priority
 
-The 2026-10-02 audit at `c87803e75d339e5d643ca812efc70a6def06a401` found **1,211 built-in block registrations**, resolving six pumpkin/melon ResourceKey names. The registry has one active write site and is bootstrapped through `Blocks.AIR`; this is a source inventory, not an in-game registry dump. The earlier 62 placed-block guides provide candidate related-guide routes for 344 IDs, leaving 867 without an identified placed-block guide. Those figures describe navigation scope, **not completed behavior coverage**. Family edge cases and partially covered articles still need review.
+The 2026-10-02 audit at `c87803e75d339e5d643ca812efc70a6def06a401` found **1,211 direct-field block registrations**, resolving six pumpkin/melon ResourceKey names; it missed 24 helper-created IDs, as corrected in batch 147. The registry has one active write site and is bootstrapped through `Blocks.AIR`; this is a source inventory, not an in-game registry dump. The earlier 62 placed-block guides provide candidate related-guide routes for 344 IDs, leaving 867 without an identified placed-block guide. Those figures describe navigation scope, **not completed behavior coverage**. Family edge cases and partially covered articles still need review.
 
 The user requested an alphabetical Blocks main page like Items, with separate category pages. Keep this as the default layout. Do not use word counts or article-file totals as a completion measure. Each block family needs practical obtaining/mining, placement/use, variants, recipes/loot, and important MattMC caveats before calling its player guidance complete.
 
@@ -1045,9 +1049,9 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Imported nature guidance distinguishes active Pupa spawning and spray bottling from absent colony storage, production, recipe/loot and item integrations. Storage/core guidance verifies exact recipes, recovery, Vault reward probability and the separate ordinary inventory-browser route.
 - Cobweb coverage follows actual harvest gates, slowing, entity exceptions, Water replacement, Weaving and brewing. Dried Ghast coverage verifies recipe ID, barter/fossil callers, waterlogging, random-to-scheduled hydration checks and Happy Ghast hatch identity without promising an exact wall-clock timer.
 - Source checkpoint: `d815d4429aac38e31ae553cbf42752e5248e24d7`; all 132 distinct pinned source pairs match current source. Independent rendering repaired nineteen missing draft definitions and five potential shortcut misbindings before integration. No game/runtime tests were run.
-- All 1,211 source-inventoried block IDs now have a related placed-block route. This closes the directory's explicit link gaps only: shared family aliases, technical forms, article depth and broader player-wiki content remain review work. It is not a claim of complete block behavior coverage or broad catch-up completion.
+- All 1,211 IDs in the then-used direct-field inventory acquired a related placed-block route; the 24 omitted helper forms were exposed later in batch 147. This closes the directory's explicit link gaps only: shared family aliases, technical forms, article depth and broader player-wiki content remain review work. It is not a claim of complete block behavior coverage or broad catch-up completion.
 
-- Validation: required checker and strict build passed on 2,333 pages / 37 indexes. All 25 authored paths are documentation; 1,993 local links/anchors and 398 tracked reference uses resolve, with zero actual rendered citation candidates. All 1,211 IDs remain alphabetical and occur once across the separate categories; 25 fallback labels remain disclosed. The full set now has related-guide routes, pending ongoing semantic review.
+- Validation: required checker and strict build passed on 2,333 pages / 37 indexes. All 25 authored paths are documentation; 1,993 local links/anchors and 398 tracked reference uses resolve, with zero actual rendered citation candidates. All 1,211 IDs remain alphabetical and occur once across the separate categories; 25 fallback labels remain disclosed. That direct-field subset has related-guide routes, pending ongoing semantic review; it was not the full registration set.
 
 ## Batch 130: Combat, recovery and the Warden encounter
 
@@ -1197,6 +1201,15 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Source checkpoint: `ac333e7655e092e93f2423a5ab47b50b2b2a9d9a`; 34 cited source pairs used by the family and corrections match current source. Independent inventory, rendered-reference, species-link and old-anchor checks passed; the actual server slot-insertion range supplements its handler gates. No inventory request, spawn-egg use, spawner change, dispenser or gameplay test was run.
 
 - Validation: required checker and strict build passed on 2,359 pages / 37 indexes. All 124 authored paths are documentation; 2,956 local links/anchors and 74 tracked reference uses resolve, with zero rendered citation candidates. The 119 section-level corrections retain existing headings and authored species notes; the three newer illager egg pages remain untouched.
+
+## Batch 147: Correcting helper-created block inventory
+
+- Reconciled the built-in declaration types and actual helper calls: 1,211 direct Block fields plus three WeatheringCopperBlocks families with eight explicit registration invocations each, deduplicated to 1,235 IDs. All three pass Blocks::register; their matching item helpers register eight inventory forms per family.
+- Added the 24 Copper Bars/Chain/Lantern forms to the displayed-name alphabetical Blocks list and Copper category, with exact English labels and per-row helper evidence. All 1,211 existing guide routes and category memberships are retained. The 24 new inventory rows explicitly say Article needed; Iron recipes/loot or ordinary Lantern behavior are not asserted as full Copper coverage.
+- Corrected the historical completeness wording, monthly entry and continuation method. This is an inventory-method correction: Blocks.java, Items.java and both helper sources are unchanged from the original `c87803e7` snapshot. The validated but unpushed animal-care batch is preserved separately for later integration.
+- Source checkpoint: `f9e4a4c96fcf7fb744bce869c085cdfab189810e`. This is a source registration inventory, not a runtime dump or a claim about external mods, natural availability, item completeness or all variant behavior. The 25 existing localization fallback labels remain disclosed; all 24 helper names have exact English entries.
+
+- Validation: required checker and strict build passed on 2,359 pages / 37 indexes. All 19 authored paths are documentation; 5,138 local links/anchors resolve and actual rendering has no unresolved citation candidates. Exact inventory checks cover 1,235 unique displayed-name-sorted IDs, one category membership each, all 1,211 preserved guide routes, precisely 24 Article needed rows and 25 disclosed fallback labels.
 
 ## Next batches, in priority order
 

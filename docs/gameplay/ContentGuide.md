@@ -2,7 +2,7 @@
 
 MattMC combines vanilla-derived Minecraft content with integrated additions. Use the pages below to find current recipes, interactions, and limitations. A familiar name from a mod does not guarantee that all of its original systems are available in MattMC.
 
-Browse all registered blocks in the [alphabetical Blocks directory](blocks/Blocks.md), or by [material and purpose](blocks/catalog/index.md). These inventories expose missing articles explicitly; they do not imply that detailed block coverage is finished.
+Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directory](blocks/Blocks.md), or by [material and purpose](blocks/catalog/index.md). These inventories expose missing articles explicitly; they do not imply that detailed block coverage is finished.
 
 ## Vanilla-derived gameplay
 
