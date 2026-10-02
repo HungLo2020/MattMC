@@ -1347,3 +1347,10 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Verified the String-over-Leather recipe, all 16 transmute recipes, eight village chest tables and their template references, and ordinary browser availability in Survival and Creative. Color recipes preserve contents and reject an unchanged same-color result.
 - Reviewed exact base loader paths: 1,501 recipe resources and 1,410 loot-table resources. Advancement, plural recipe-directory and nested optional-pack resources were inventoried separately. Source reviewed at `1d7e3e91f2a2694339f78b8673993e98d496ca5f`.
 - The configured strict MkDocs build, rendered links, original anchors, immutable source bounds and full/shortcut reference checks pass. No game or browser test is claimed.
+
+## Batch 164: Six item classification corrections
+
+- Corrected Copper Nugget, Glowstone Dust and Pumpkin Pie from false placed-block descriptions to actual ingredient/food behavior with exact selected recipes, harvesting/brewing or nutrition and ordinary browser routes.
+- Corrected Copper, Oxidized Copper and Pewen Trapdoors from two-block-door descriptions to single-block panels, retaining actual hand/power/oxidation controls, Copper tool-tier requirements and Pewen recipe/tag limits. Other authored trapdoor variants and shared owners are preserved.
+- These are six existing-page corrections with all 30 old anchors retained. Exact registration, recipe/loot, tool and food callers, source/render checks and final strict documentation build are required before promotion; no gameplay placement, mining, crafting, eating or brewing test is claimed.
+- Before publication, fast-forwarded from batch 163 to concurrent master `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, preserving all eight draft files and incoming source/development documentation. This source change adds native palette/world-generation work; its code tests were not rerun by the wiki pass. The six item-page source dependencies remain independently checked.
