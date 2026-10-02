@@ -1,17 +1,30 @@
 # Red Stained Glass Pane
 
-## Obtaining
+**Red Stained Glass Pane** (`minecraft:red_stained_glass_pane`) is a thin red window block. It shares pane connections, waterlogging, light, and beacon rules with the [Glass and Glass Panes family](../blocks/GlassAndPanes.md). [Block registration][blocks] · [Item registration][items]
 
-Red Stained Glass Pane can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Crafting
 
-## Usage
+Use a [Crafting Table](../blocks/CraftingTable.md) for either checked recipe:
 
-Red Stained Glass Pane is a thin transparent decorative block for windows and details.
+- **From colored blocks:** arrange **six [Red Stained Glass](RedStainedGlass.md)** in two full rows to make **16 red stained-glass panes**. All six inputs must be this color. [Recipe][from-blocks]
+- **From ordinary panes:** surround **one [Red Dye](RedDye.md)** with **eight ordinary [Glass Panes](GlassPane.md)** to make **eight red stained-glass panes**. Place the dye in the center of the 3 × 3 grid. [Recipe][from-panes]
 
-## Behavior
+Neither recipe accepts panes already stained another color. See [color choices](../blocks/GlassAndPanes.md#obtaining-and-color-choices) before converting a large batch.
 
-Panes connect to nearby compatible blocks and let light pass through.
+## Collecting and placing
 
-## Notes
+A **Silk Touch** tool recovers **one red stained-glass pane** from the placed block. Without Silk Touch, its block loot produces no item. It does not turn back into a full glass block. [Block loot][loot]
 
-* This item is the item form of the `minecraft:red_stained_glass_pane` block.
+Use the family guide for [connections and support](../blocks/GlassAndPanes.md#placement-and-pane-connections), [waterlogging](../blocks/GlassAndPanes.md#waterlogging), and [beacon colors](../blocks/GlassAndPanes.md#beacon-beam-colors).
+
+Related: [Red Stained Glass](RedStainedGlass.md) · [All glass colors](../blocks/GlassAndPanes.md#forms-and-colors) · [Items](Items.md)
+
+## Sources and verification
+
+Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. These are selected crafting and collection routes; no gameplay test was run. Data packs can change recipes and loot.
+
+[blocks]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L3031-L3110
+[items]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java#L734-L749
+[from-blocks]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/recipe/crafting/red_stained_glass_pane.json
+[from-panes]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/recipe/crafting/red_stained_glass_pane_from_glass_pane.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/blocks/red_stained_glass_pane.json

@@ -535,6 +535,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Redstone, Content Guide, this checkpoint, and October log. Source remains integrated master `3e85592c4c78ebb420302360667a6c230dc0318d`.
 - Validation: checker and strict build passed on 2,172 pages / 36 indexes; source targets, local links/anchors and whitespace checked. No circuit, timing, locking, container, observer, or crafting gameplay test.
 
+## Seventieth batch: ordinary, stained, and tinted glass
+
+- Added one shared Glass and Glass Panes guide and expanded all 35 ordinary, stained-color, pane, and tinted item pages with audited recipes and collection rules.
+- Covered pane connections/support, waterlogging, light blocking, beacon coloring, and Tinted Glass differences; checked every color rather than assuming Wool recoloring applies.
+- Updated Blocks, Content Guide, this checkpoint, and October log. Source remains integrated master `3e85592c4c78ebb420302360667a6c230dc0318d`.
+- Validation: checker and strict build passed on 2,173 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, mining, lighting, waterlogging, renderer, or beacon gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

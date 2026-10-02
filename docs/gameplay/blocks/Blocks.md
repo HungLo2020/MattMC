@@ -20,6 +20,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Stone and construction
 
+- [Glass and Glass Panes](GlassAndPanes.md): ordinary, all stained colors, and Tinted Glass; collection, connections, waterlogging, light, and beacon filters
 - [Wool and Carpet](WoolAndCarpet.md): all 16 colors, dye recipes, support, harvesting, fuel, and vibration distinctions
 
 - [Iron, Copper, and Diamond ores](OreResources.md): tool requirements, drops, Fortune/Silk Touch, and processing
