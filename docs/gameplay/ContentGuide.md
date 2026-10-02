@@ -224,6 +224,10 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Mushrooms](blocks/Mushrooms.md): light and support, spreading, huge growth, cap/stem recovery and building faces
 - [Cartography Table](blocks/CartographyTable.md) and [Fletching Table](blocks/FletchingTable.md): implemented map operations, job sites and workstation limits
 
+- [Dripleaves](blocks/Dripleaves.md) and [Lily Pads](blocks/LilyPad.md): water, support, growth, recovery and tilting platforms
+- [Campfires](blocks/Campfires.md): four-slot cooking, damage, extinguishing and smoke
+- [Target](blocks/Target.md) and [Daylight Detector](blocks/DaylightDetector.md): projectile pulses, skylight signals and source-derived circuits
+
 ## Browse by topic
 
 - [Blocks](blocks/Blocks.md)

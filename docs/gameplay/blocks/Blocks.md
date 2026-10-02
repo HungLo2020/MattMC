@@ -82,8 +82,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Beehive** — [Bee housing](BeeHousing.md) (related guide); `minecraft:beehive`
 - **Beetroots** — [Root crops](RootCrops.md) (related guide); `minecraft:beetroots`
 - **Bell** — article needed; `minecraft:bell`
-- **Big Dripleaf** — article needed; `minecraft:big_dripleaf`
-- **Big Dripleaf Stem** — article needed; `minecraft:big_dripleaf_stem`
+- **Big Dripleaf** — [Dripleaves](Dripleaves.md#big-dripleaf) (related guide); `minecraft:big_dripleaf`
+- **Big Dripleaf Stem** — [Dripleaves](Dripleaves.md#big-dripleaf-stem) (related guide); `minecraft:big_dripleaf_stem`
 - **Birch Button** — [Buttons](Buttons.md#birch-button) (related guide); `minecraft:birch_button`
 - **Birch Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:birch_door`
 - **Birch Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:birch_fence`
@@ -211,7 +211,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cake with Yellow Candle** — [Cake](Cake.md#yellow-candle-cake) (related guide); `minecraft:yellow_candle_cake`
 - **Calcite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#calcite) (related guide); `minecraft:calcite`
 - **Calibrated Sculk Sensor** — article needed; `minecraft:calibrated_sculk_sensor`
-- **Campfire** — article needed; `minecraft:campfire`
+- **Campfire** — [Campfires](Campfires.md#variants-and-crafting) (related guide); `minecraft:campfire`
 - **Candle** — [Candles](Candles.md#candle) (related guide); `minecraft:candle`
 - **Carmine Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#carmine-froglight) (related guide); `minecraft:carmine_froglight`
 - **Carrots** — [Root crops](RootCrops.md) (related guide); `minecraft:carrots`
@@ -362,7 +362,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dark Prismarine** — article needed; `minecraft:dark_prismarine`
 - **Dark Prismarine Slab** — article needed; `minecraft:dark_prismarine_slab`
 - **Dark Prismarine Stairs** — article needed; `minecraft:dark_prismarine_stairs`
-- **Daylight Detector** — article needed; `minecraft:daylight_detector`
+- **Daylight Detector** — [Daylight Detector](DaylightDetector.md#daylight-detector) (related guide); `minecraft:daylight_detector`
 - **Dead Brain Coral** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral`
 - **Dead Brain Coral Block** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral_block`
 - **Dead Brain Coral Fan** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral_fan`
@@ -618,7 +618,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:lightning_rod`
 - **Lilac** — [Small and tall flowers](Flowers.md#lilac) (related guide); `minecraft:lilac`
 - **Lily of the Valley** — [Small and tall flowers](Flowers.md#lily-of-the-valley) (related guide); `minecraft:lily_of_the_valley`
-- **Lily Pad** — article needed; `minecraft:lily_pad`
+- **Lily Pad** — [Lily Pad](LilyPad.md#placement-and-support) (related guide); `minecraft:lily_pad`
 - **Lime Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:lime_banner`
 - **Lime Bed** — [Beds](Bed.md) (related guide); `minecraft:lime_bed`
 - **Lime Candle** — [Candles](Candles.md#lime-candle) (related guide); `minecraft:lime_candle`
@@ -1021,7 +1021,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Skunk Spray** — article needed; `minecraft:skunk_spray`
 - **Slime Block** — article needed; `minecraft:slime_block`
 - **Small Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#small-bud) (related guide); `minecraft:small_amethyst_bud`
-- **Small Dripleaf** — article needed; `minecraft:small_dripleaf`
+- **Small Dripleaf** — [Dripleaves](Dripleaves.md#small-dripleaf) (related guide); `minecraft:small_dripleaf`
 - **Smithing Table** — [Smithing Table](SmithingTable.md) (related guide); `minecraft:smithing_table`
 - **Smoker** — [Furnace, Blast Furnace and Smoker](Furnace.md#smoker) (related guide); `minecraft:smoker`
 - **Smooth Basalt** — [Blackstone and Basalt](BlackstoneAndBasalt.md#basalt-variants-and-orientation) (related guide); `minecraft:smooth_basalt`
@@ -1043,7 +1043,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Sniffer Egg** — article needed; `minecraft:sniffer_egg`
 - **Snow** — [Snow and Powder Snow](Snow.md#placing-layers-and-keeping-their-support) (related guide); `minecraft:snow`
 - **Snow Block** — [Snow and Powder Snow](Snow.md#collecting-and-crafting-snow) (related guide); `minecraft:snow_block`
-- **Soul Campfire** — article needed; `minecraft:soul_campfire`
+- **Soul Campfire** — [Campfires](Campfires.md#variants-and-crafting) (related guide); `minecraft:soul_campfire`
 - **Soul Fire** — article needed; `minecraft:soul_fire`
 - **Soul Lantern** — [Lanterns and Soul Lanterns](Lanterns.md#crafting-and-obtaining) (related guide); `minecraft:soul_lantern`
 - **Soul Sand** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-sand) (related guide); `minecraft:soul_sand`
@@ -1122,7 +1122,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Tall Dry Grass** — article needed; `minecraft:tall_dry_grass`
 - **Tall Grass** — article needed; `minecraft:tall_grass`
 - **Tall Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:tall_seagrass`
-- **Target** — article needed; `minecraft:target`
+- **Target** — [Target](Target.md#target) (related guide); `minecraft:target`
 - **Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:terracotta`
 - **Terrapin Egg** — article needed; `minecraft:terrapin_egg`
 - **Test Block** — article needed; `minecraft:test_block`
@@ -1329,6 +1329,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Buttons](Buttons.md)
 - [Cactus](Cactus.md)
 - [Cake](Cake.md)
+- [Campfires](Campfires.md)
 - [Candles](Candles.md)
 - [Cartography Table](CartographyTable.md)
 - [Cauldrons](Cauldrons.md)
@@ -1345,11 +1346,13 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Crafter](Crafter.md)
 - [Crafting Table](CraftingTable.md)
 - [Crimson and Warped Fungi](NetherFungi.md)
+- [Daylight Detector](DaylightDetector.md)
 - [Dead Bush](DeadBush.md)
 - [Deepslate](Deepslate.md)
 - [Dinosaur Chop](DinosaurChop.md)
 - [Dispenser and Dropper](DispenserAndDropper.md)
 - [Dragon Egg](DragonEgg.md)
+- [Dripleaves](Dripleaves.md)
 - [Enchanting Table](EnchantingTable.md)
 - [End Stone and Purpur](EndStoneAndPurpur.md)
 - [Ender Chest](EnderChest.md)
@@ -1372,6 +1375,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Lectern](Lectern.md)
 - [Lever](Lever.md)
 - [Lightning Rods](LightningRods.md)
+- [Lily Pad](LilyPad.md)
 - [Limestone family](Limestone.md)
 - [Loom](Loom.md)
 - [Monster Spawner](MonsterSpawner.md)
@@ -1417,6 +1421,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Stonecutter](Stonecutter.md)
 - [Subterranodon Egg](SubterranodonEgg.md)
 - [Sugar Cane](SugarCane.md)
+- [Target](Target.md)
 - [Terracotta and Glazed Terracotta](Terracotta.md)
 - [Torch](Torch.md)
 - [Tree leaves and Mangrove Propagules](TreeLeaves.md)

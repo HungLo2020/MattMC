@@ -885,10 +885,20 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,270 pages / 37 indexes. All 14 authored paths are documentation; 1,875 local links/anchors and 92 citation uses resolve. The eight article files have 100 pinned source references checked unchanged. The full 1,211-ID alphabetical directory has 1,060 related-guide routes and 151 explicit article gaps; these counts do not establish article completeness.
 
+## Batch 113: platforms, Campfires and signal inputs
+
+- Added five placed guides covering Dripleaves/Lily Pad, Campfires, Target and Daylight Detector, with seven inventory corrections and exact routes for eight registered IDs. Preserved Kelp/Seagrass, Bee housing, food, redstone-component and dimension ownership.
+- Plant review distinguishes paired-half recovery, source-water/ground rules, the Pale Moss conversion pitfall, growth and collapse, fresh versus pending tilt timers, and projectile/power exceptions. Lily Pad covers boat breakage and verified starting supplies.
+- Campfire review checks all twelve type-selected cooking recipes, four parallel slots and cooling, ordinary versus Silk Touch loot, smoke reach, damage and active lighting/water handlers. Recipe folder names are not treated as recipe types.
+- Target review distinguishes live pulse strength from credited later hits. Daylight review traces local skylight, inversion, time/weather and actual dimension types, including the End skylight definition and manual updates without an automatic ticker. Numeric and circuit examples are source-derived, not gameplay measurements.
+- Source checkpoint: `053cd852a8609f4002234ce0d445d3a345b551ae`; all authored changes are documentation and no gameplay tests were run.
+
+- Validation: required checker and strict build passed on 2,275 pages / 37 indexes. All 19 authored paths are documentation; 1,940 local links/anchors and 261 citation uses resolve. All 153 distinct pinned source references in the twelve articles were checked unchanged. The 1,211-ID alphabetical directory now offers 1,068 related-guide routes and retains 143 explicit article gaps; family links are not completed-article claims.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and separate category catalogs as source changes; use explicit article gaps to choose new work. A related family link is not proof that every detail of a variant is reviewed.
-2. Finish the current bounded Dripleaf, Campfire and Target/Daylight Detector reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
+2. Finish the current bounded Trial Spawner, Vault and low-shrub reviews, preserving existing recipes, source pins and article ownership. Check newly observed behavior before adding tracker claims.
 3. Expand remaining functional blocks: Trial Spawner/Vault, Bell, Cartography/Fletching Tables, Decorated Pot, Target/Daylight Detector, Campfires, TNT, Sculk and other registry-backed gaps. Keep shared mechanics in canonical family guides and link exact variants.
 4. Fill remaining terrain/resource, flora, technical and imported-block gaps, including refined resource blocks, Resin, Dripleaves, dry vegetation, heads and custom workbenches. Reassess current source rather than extrapolating from upstream implementations.
 5. Preserve ready Swords and undead drafts for later; continue remaining mobs, biomes, effects, structures and gameplay systems after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw page or route counts.

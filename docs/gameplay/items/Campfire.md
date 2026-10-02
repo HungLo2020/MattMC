@@ -1,17 +1,44 @@
 # Campfire
 
+The **Campfire** item places `minecraft:campfire`. It cooks up to four individual foods at once and provides light while lit. See [Campfires](../blocks/Campfires.md) for placement, the full cooking list, Water, smoke, Bees, and safe use. [Item registration][items] · [Shared block behavior][campfire]
+
 ## Obtaining
 
-Campfire can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Craft **one Campfire** in a Crafting Table with three Sticks, three tagged logs, and **one Coal or Charcoal**. Use the [canonical recipe layout and log choices](../blocks/Campfires.md#variants-and-crafting); the recipe accepts mixed tagged logs, including the Nether stem families. [Recipe][recipe-campfire] · [Log choices][logs] [burnlogs] [crimson] [warped]
+
+Mine the placed block with **Silk Touch** to recover this item. Ordinary harvesting instead gives **two Charcoal**; an axe is faster but does not substitute for Silk Touch. Fortune does not increase that drop. [Loot][loot-campfire] · [Registration][blocks] · [Axe tag][axe]
+
+An Apprentice Fisherman can offer one for a base price of two Emeralds. Taiga village buildings are another verified placed-block route; see [acquisition details](../blocks/Campfires.md#other-ways-to-obtain-them). [Trade pool][trade] · [Offer selection][trade-dispatch]
 
 ## Usage
 
-Campfire is a functional block used for storage, crafting, processing, signaling, or world interaction.
+Normal placement starts lit; source-Water placement starts waterlogged and unlit. Lit Campfires emit light level **15** and apply base contact damage of **one health point** through the living-entity fire-damage path. Follow the [damage and immunity rules](../blocks/Campfires.md#contact-damage-and-immunity) when building around them. [Registration][blocks] · [Placement and contact][campfire]
+
+Use the block with eligible food to insert one item per use. Both Campfire variants take **600 game ticks per item**, about 30 seconds at normal tick speed, and need no ongoing fuel. Extinguishing keeps food in place while its progress cools; finished food drops into the world. [Cooking details](../blocks/Campfires.md#cooking-four-items) · [Insertion][insert] · [Cook/cooldown loops][cooking]
 
 ## Behavior
 
-It provides its configured block interaction when placed in the world.
+Use Flint and Steel or a Fire Charge to relight a dry block, and a Shovel or Water to extinguish it. A Hay Bale directly underneath changes the smoke particles. Silk Touch recovers the block but **spills unfinished ingredients separately**, rather than storing them in its item. [Lighting][flint] [charge] · [Extinguishing][shovel] [campfire] · [Spill][spill] · [Loot][loot-campfire]
 
 ## Notes
 
-* This item is the item form of the `minecraft:campfire` block.
+Source-reviewed at `96e5604a6abaec697de2004b1ba9775e303bfba7` on 2026-10-02. No gameplay test was run. The canonical [Campfires guide](../blocks/Campfires.md) owns the shared placed-block mechanics.
+
+[items]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/item/Items.java#L2455-L2460
+[campfire]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/CampfireBlock.java
+[recipe-campfire]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/resources/data/minecraft/recipe/crafting/campfire.json
+[logs]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/resources/data/minecraft/tags/item/logs.json
+[burnlogs]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/resources/data/minecraft/tags/item/logs_that_burn.json
+[crimson]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/resources/data/minecraft/tags/item/crimson_stems.json
+[warped]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/resources/data/minecraft/tags/item/warped_stems.json
+[loot-campfire]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/resources/data/minecraft/loot_table/blocks/campfire.json
+[blocks]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/Blocks.java#L5423-L5447
+[axe]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/resources/data/minecraft/tags/block/mineable/axe.json
+[trade]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/entity/npc/VillagerTrades.java#L119-L137
+[trade-dispatch]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/entity/npc/Villager.java#L819-L842
+[insert]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/entity/CampfireBlockEntity.java#L168-L188
+[cooking]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/entity/CampfireBlockEntity.java#L41-L100
+[flint]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/item/FlintAndSteelItem.java
+[charge]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/item/FireChargeItem.java
+[shovel]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/item/ShovelItem.java
+[spill]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/entity/CampfireBlockEntity.java#L200-L217
