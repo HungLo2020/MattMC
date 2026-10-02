@@ -1269,3 +1269,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Added Desert Pyramid, Jungle Temple and Swamp Hut expedition owners, with biome, structure-index, Cat and content-guide routes.
 - Reviewed actual trap layouts, finite Dispenser ammunition, chest and archaeology loot, intended suspicious-block counts, and the distinct generated-resident/natural/replenishment paths in huts. Generation source and pool weights are not runtime frequency guarantees.
 - Independent review checked 175 references and 68 immutable source files; final check/build, local anchors and rendered citations are required before promotion. No live trap disarming, puzzle sequence, terrain-generation or loot survey is claimed.
+
+## Batch 152: Food comparison and staple preparation
+
+- Added a registered-food reference covering all 59 checked FOOD items, 19 MattMC additions, three separate nonfood drinks, and placed-food exclusions. Nutrition, saturation, use duration, stacking, remainder and effect distinctions follow actual registrations and active callers.
+- Expanded Bread, Baked Potato and Cooked Mutton with exact recipes, bounded loot examples and the ordinary inventory-browser route; added index, content-guide and hunger discovery links.
+- Independent review checked the complete registration inventory, nine recipes, four bounded loot claims, 218 citation uses and 36 source files. Final documentation check/build, local links, retained anchors and rendered citations are required before promotion. No eating, timing, production or loot runtime test is claimed.

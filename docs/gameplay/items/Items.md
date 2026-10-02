@@ -4,6 +4,8 @@ Find inventory objects here, including block items, food, equipment, and spawn e
 
 The 24 Copper Bars, Chain and Lantern variants have exact entries below and a shared [inventory guide](CopperFixtures.md), with recipes, acquisition and links to placed-block behavior.
 
+- [Food reference](FoodReference.md): compare all 59 registered handheld foods, special consumption behavior, and drinks without food values
+
 ## List of Items
 #### #
 - [.22 Modle 943 Revolver](22Modle943Revolver.md)

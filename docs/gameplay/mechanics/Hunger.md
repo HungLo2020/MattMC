@@ -4,6 +4,8 @@ Food manages two related resources: visible hunger and an additional saturation 
 
 ## Food values
 
+For the complete registered item comparison, see [Food reference](../items/FoodReference.md). This page owns the shared food caps, exhaustion and recovery rules.
+
 Hunger is capped at **20 points** (ten hunger icons). When food adds saturation, the result is capped at the current hunger level. When a food uses a saturation modifier, its contribution is `nutrition × modifier × 2` before those caps.
 
 Examples from MattMC's food registrations:

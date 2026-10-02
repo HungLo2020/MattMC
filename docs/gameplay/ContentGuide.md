@@ -28,6 +28,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ### Farming, food, and animal care
 
+- [Food reference](items/FoodReference.md): exact hunger/saturation values, consumption differences, and the distinction between handheld food, drinks, and placed food
+
 - [Mooshroom](mobs/Mooshroom.md), [Goat](mobs/Goat.md), and [Polar Bear](mobs/PolarBear.md): stew/milk routes, horn collection, breeding differences and cub safety
 
 - [Allay](mobs/Allay.md): finding helpers, sample filters, item delivery, music and Amethyst duplication
