@@ -238,6 +238,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Prismarine construction](blocks/Prismarine.md): ten full-block and shaped variants, exact recipes and Conduit-frame distinctions
 - [Heads and Skulls](blocks/HeadsAndSkulls.md): seven collectibles/fourteen placed forms, real acquisition and retained data
 - [Sponge](blocks/Sponge.md) and [Lodestone](blocks/Lodestone.md): water removal/drying and persistent Compass markers
+- [Mud, Packed Mud and Mud Bricks](blocks/MudAndMudBricks.md): soil conversion, renewable materials and six building forms
+- [Dripstone](blocks/Dripstone.md): spike placement, natural growth, falling hazards and distinct cauldron/Mud setups
 
 ## Browse by topic
 

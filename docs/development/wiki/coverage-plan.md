@@ -939,10 +939,19 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,286 pages / 37 indexes. All 21 authored paths are documentation; 2,164 local links/anchors and 453 tracked reference uses resolve. Rendered-prose/reference checks found no ambiguity or unresolved bracket candidates on the changed pages. All 171 distinct pinned article-source references match the integrated source. The alphabetical directory retains 1,211 IDs, with 1,114 related-guide routes and 97 explicit article gaps, not a completion score.
 
+## Batch 118: Mud masonry and Dripstone
+
+- Added two canonical block-family guides and corrected six item pages. Eight exact block IDs now route to reviewed family anchors; related navigation remains an inventory aid, not proof of complete variant coverage.
+- Mud review distinguishes low collision/full support, Packed Mud’s hand drops, correct-tool masonry drops, eight crafting/cutting recipes, bottle/dispenser conversion, actual Mangrove and Trail Ruins supply routes, and a source-derived renewable soil chain. Clay and Bricks retains ownership of detailed Mud drying.
+- Dripstone review separates placement support from growth and cauldron requirements, checks both damage paths and actual exclusive search limits, follows selected trades and generation/template routes, and distinguishes dry-tip cauldron behavior from the separate waterlogged-compatible Mud conversion path.
+- Source checkpoint: `3cc0d7d93500be7a135c5577511b5565406d42e6`; all 126 distinct pinned article-source paths match this integrated source. These are documentation/source checks, with no mining, placement, generation, growth, damage or farm runtime tests claimed.
+
+- Validation: required checker and strict build passed on 2,288 pages / 37 indexes; all 14 authored paths are documentation. The integrated tree resolves 2,051 local links/anchors and 313 tracked citation uses, with zero rendered citation ambiguity/unresolved-bracket candidates. The directory retains all 1,211 exact IDs, with 1,122 related-guide routes and 89 explicit article gaps; these counts do not measure article completeness.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Integrate the ready Mud/Dripstone reviews and finish the bounded Note Block, Resin/Creaking Heart and remaining light-block drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+2. Integrate the source-reviewed Note Block, Resin/Creaking Heart and remaining light-block drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
 3. Fill remaining practical gaps such as TNT, Trapped Chest, ladders/bars/chains, fuel/storage utility blocks, and the imported weapon workbenches, following actual active behavior and acquisition routes.
 4. Cover remaining terrain/material, plant and technical families, including Netherrack/Bone Block, Bamboo full blocks, Fire/Soul Fire, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
 5. Preserve the ready Swords and undead drafts for later source revalidation; continue broader item, mob, biome, effect, structure and gameplay-system coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.

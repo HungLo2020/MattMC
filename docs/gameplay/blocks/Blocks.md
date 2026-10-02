@@ -417,7 +417,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dragon Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#dragon-heads) (related guide); `minecraft:dragon_wall_head`
 - **Dried Ghast** — article needed; `minecraft:dried_ghast`
 - **Dried Kelp Block** — [Kelp](Kelp.md) (related guide); `minecraft:dried_kelp_block`
-- **Dripstone Block** — article needed; `minecraft:dripstone_block`
+- **Dripstone Block** — [Dripstone](Dripstone.md#dripstone-block) (related guide); `minecraft:dripstone_block`
 - **Dropper** — [Dispenser and Dropper](DispenserAndDropper.md) (related guide); `minecraft:dropper`
 
 ### E
@@ -690,11 +690,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Mossy Stone Brick Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_stone_brick_wall`
 - **Mossy Stone Bricks** — [Stone](Stone.md#mossy-variants) (related guide); `minecraft:mossy_stone_bricks`
 - **Moving Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:moving_piston`
-- **Mud** — article needed; `minecraft:mud`
-- **Mud Brick Slab** — article needed; `minecraft:mud_brick_slab`
-- **Mud Brick Stairs** — article needed; `minecraft:mud_brick_stairs`
-- **Mud Brick Wall** — article needed; `minecraft:mud_brick_wall`
-- **Mud Bricks** — article needed; `minecraft:mud_bricks`
+- **Mud** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud) (related guide); `minecraft:mud`
+- **Mud Brick Slab** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-brick-slab) (related guide); `minecraft:mud_brick_slab`
+- **Mud Brick Stairs** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-brick-stairs) (related guide); `minecraft:mud_brick_stairs`
+- **Mud Brick Wall** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-brick-wall) (related guide); `minecraft:mud_brick_wall`
+- **Mud Bricks** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-bricks) (related guide); `minecraft:mud_bricks`
 - **Muddy Mangrove Roots** — [Tree logs and roots](TreeLogsAndRoots.md#muddy-mangrove-roots) (related guide); `minecraft:muddy_mangrove_roots`
 - **Mushroom Stem** — [Mushrooms](Mushrooms.md#mushroom-stem) (related guide); `minecraft:mushroom_stem`
 - **Mycelium** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#grass-block-and-mycelium) (related guide); `minecraft:mycelium`
@@ -770,7 +770,7 @@ Names use English localization where available. A † marks one of 25 readable r
 ### P
 
 - **Packed Ice** — [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md#registered-ice-blocks) (related guide); `minecraft:packed_ice`
-- **Packed Mud** — article needed; `minecraft:packed_mud`
+- **Packed Mud** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#packed-mud) (related guide); `minecraft:packed_mud`
 - **Pale Hanging Moss** — [Moss and Pale Moss](MossAndPaleMoss.md#pale-hanging-moss) (related guide); `minecraft:pale_hanging_moss`
 - **Pale Moss Block** — [Moss and Pale Moss](MossAndPaleMoss.md#moss-blocks-and-spreading) (related guide); `minecraft:pale_moss_block`
 - **Pale Moss Carpet** — [Moss and Pale Moss](MossAndPaleMoss.md#pale-moss-carpet) (related guide); `minecraft:pale_moss_carpet`
@@ -838,7 +838,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Player Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_head`
 - **Player Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_wall_head`
 - **Podzol** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#podzol-and-mushroom-support) (related guide); `minecraft:podzol`
-- **Pointed Dripstone** — article needed; `minecraft:pointed_dripstone`
+- **Pointed Dripstone** — [Dripstone](Dripstone.md#pointed-dripstone) (related guide); `minecraft:pointed_dripstone`
 - **Polished Andesite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite`
 - **Polished Andesite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite_slab`
 - **Polished Andesite Stairs** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite_stairs`
@@ -1355,6 +1355,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Dispenser and Dropper](DispenserAndDropper.md)
 - [Dragon Egg](DragonEgg.md)
 - [Dripleaves](Dripleaves.md)
+- [Dripstone](Dripstone.md)
 - [Enchanting Table](EnchantingTable.md)
 - [End Stone and Purpur](EndStoneAndPurpur.md)
 - [Ender Chest](EnderChest.md)
@@ -1385,6 +1386,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Loom](Loom.md)
 - [Monster Spawner](MonsterSpawner.md)
 - [Moss and Pale Moss](MossAndPaleMoss.md)
+- [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md)
 - [Mushrooms](Mushrooms.md)
 - [Nether Bricks](NetherBricks.md)
 - [Nether Wart crop](NetherWart.md)
