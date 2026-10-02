@@ -84,6 +84,8 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ## Alex's Mobs additions
 
+- [Crocodile](mobs/Crocodile.md) and [Crocodile Scute](items/CrocodileScute.md): fish feeding, Turtle Egg/Scute placeholders, owner-state limits, and active combat dispatch
+
 - [Tiger](mobs/Tiger.md) and [Tasmanian Devil](mobs/TasmanianDevil.md): dropped-food blessing, howling, Bone Meal conversion, and active versus legacy behavior
 
 - [Blue Jay](mobs/BlueJay.md) and [Crow](mobs/Crow.md): seed companionship, monster-highlighting song, taming, crop protection, and marked-container gathering

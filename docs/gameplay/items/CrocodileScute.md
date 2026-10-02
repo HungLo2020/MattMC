@@ -1,17 +1,24 @@
 # Crocodile Scute
 
-## Obtaining
+**Crocodile Scute** (`minecraft:crocodile_scute`) is a registered **plain item**, not a placeable block. Its default registration has no food, equipment, special-use, or block-placement behavior. The Ingredients Creative category explicitly lists it. [Registration][item] · [Creative entry][creative]
 
-Crocodile Scute can be obtained from the Creative Menu and from its normal survival sources when those sources are available.
+## Availability
 
-## Usage
+Creative access and command-given items are confirmed. No crafting recipe, entity-loot entry, or other ordinary Survival award for this item was found in the reviewed bundled source and data.
 
-Crocodile Scute is a building or resource block used in construction, decoration, or crafting.
+The [Crocodile](../mobs/Crocodile.md) currently drops **Turtle Scute** when an existing baby matures with mob loot enabled. That active placeholder does not award Crocodile Scute despite the nearby source comment naming the intended item. Do not breed or raise Crocodiles expecting this separate resource. [Growth callback][croc] · [Age-boundary dispatch][age]
 
-## Behavior
+## Uses
 
-It behaves as a solid block and follows its normal mining, tool, and blast-resistance rules.
+No active crafting, brewing, equipment-repair, or special interaction use for Crocodile Scute was established in the checked recipes and Java references. Registration and a Creative entry alone do not prove an armor recipe or a substitute for another scute type. In particular, [Wolf Armor](WolfArmor.md) uses its own Armadillo Scute repair tag and recipe.
 
-## Notes
+## Sources and verification
 
-* This item is registered as `minecraft:crocodile_scute`.
+Source-reviewed on 2026-10-02 at `3e85592c4c78ebb420302360667a6c230dc0318d`. No gameplay test of acquisition or use was run. Data packs can add recipes or rewards, so these limits describe bundled data.
+
+Related: [Crocodile](../mobs/Crocodile.md) · [Turtle Scute](TurtleScute.md) · [Armadillo Scute](ArmadilloScute.md) · [Items](Items.md)
+
+[item]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java#L1284
+[creative]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1835
+[croc]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/alexsmobs/entity/EntityCrocodile.java#L123-L130
+[age]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/entity/AgeableMob.java#L97-L104
