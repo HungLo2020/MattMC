@@ -245,7 +245,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Chiseled Bookshelf** — [Bookshelves](Bookshelves.md#chiseled-bookshelf) (related guide); `minecraft:chiseled_bookshelf`
 - **Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:chiseled_copper`
 - **Chiseled Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:chiseled_deepslate`
-- **Chiseled Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_chiseled`
+- **Chiseled Limestone** — [Limestone family](Limestone.md#limestone-chiseled) (related guide); `minecraft:limestone_chiseled`
 - **Chiseled Nether Bricks** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:chiseled_nether_bricks`
 - **Chiseled Polished Blackstone** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:chiseled_polished_blackstone`
 - **Chiseled Quartz Block** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:chiseled_quartz_block`
@@ -638,11 +638,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Lime Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:lime_terracotta`
 - **Lime Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:lime_wall_banner`
 - **Lime Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:lime_wool`
-- **Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone`
-- **Limestone Pillar** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_pillar`
-- **Limestone Slab** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_slab`
-- **Limestone Stairs** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_stairs`
-- **Limestone Wall** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_wall`
+- **Limestone** — [Limestone family](Limestone.md#limestone) (related guide); `minecraft:limestone`
+- **Limestone Pillar** — [Limestone family](Limestone.md#limestone-pillar) (related guide); `minecraft:limestone_pillar`
+- **Limestone Slab** — [Limestone family](Limestone.md#limestone-slab) (related guide); `minecraft:limestone_slab`
+- **Limestone Stairs** — [Limestone family](Limestone.md#limestone-stairs) (related guide); `minecraft:limestone_stairs`
+- **Limestone Wall** — [Limestone family](Limestone.md#limestone-wall) (related guide); `minecraft:limestone_wall`
 - **Lodestone** — [Lodestone](Lodestone.md) (related guide); `minecraft:lodestone`
 - **Loom** — [Loom](Loom.md#crafting-and-placing) (related guide); `minecraft:loom`
 
@@ -1034,10 +1034,10 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Smithing Table** — [Smithing Table](SmithingTable.md) (related guide); `minecraft:smithing_table`
 - **Smoker** — [Furnace, Blast Furnace and Smoker](Furnace.md#smoker) (related guide); `minecraft:smoker`
 - **Smooth Basalt** — [Blackstone and Basalt](BlackstoneAndBasalt.md#basalt-variants-and-orientation) (related guide); `minecraft:smooth_basalt`
-- **Smooth Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone`
-- **Smooth Limestone Slab** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone_slab`
-- **Smooth Limestone Stairs** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone_stairs`
-- **Smooth Limestone Wall** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone_wall`
+- **Smooth Limestone** — [Limestone family](Limestone.md#smooth-limestone) (related guide); `minecraft:smooth_limestone`
+- **Smooth Limestone Slab** — [Limestone family](Limestone.md#smooth-limestone-slab) (related guide); `minecraft:smooth_limestone_slab`
+- **Smooth Limestone Stairs** — [Limestone family](Limestone.md#smooth-limestone-stairs) (related guide); `minecraft:smooth_limestone_stairs`
+- **Smooth Limestone Wall** — [Limestone family](Limestone.md#smooth-limestone-wall) (related guide); `minecraft:smooth_limestone_wall`
 - **Smooth Quartz Block** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:smooth_quartz`
 - **Smooth Quartz Slab** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:smooth_quartz_slab`
 - **Smooth Quartz Stairs** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:smooth_quartz_stairs`

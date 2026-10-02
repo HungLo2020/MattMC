@@ -1374,3 +1374,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Traced diet tags, shared-first breeding/growth, later taming/healing and the adult last-fish owner-control fallthrough. Documented Mantis Shrimp moisture, prey, block-changing controls, kill reward and current save/attack signature limits; documented Mudskipper breathing, defense, display and incomplete bucket-state transfer.
 - Source-reviewed at `eaeeffdeb9220de7d839af7c84a047693249c2f7`, using exact base recipe/loot/biome scopes and separate advancement/plural/nested-pack inventories. Configured render, old-anchor, link and immutable citation checks apply; no game or browser test is claimed.
 - Independent review distinguished the tagged-prey goal's start gate from continuation: Sit/Break Blocks do not clear an existing Mantis Shrimp target. Corrected this care warning and added the active continuation citation before publication.
+
+## Batch 168: Limestone variant behavior
+
+- Deepened the existing Limestone owner across its ten registered forms, adding exact variant anchors and 20 corresponding links in the alphabetical Blocks directory and stone category. Registry IDs, names, ordering and the 1,235-ID inventory are unchanged; these are reviewed routes, not ten new articles.
+- Distinguished ordinary inventory-browser supply from absent checked recipe/natural routes, standard-tool failure from conditional explosion loot, and one-item double-slab loot from normal two-slab placement. Explained stair corners, orientation, support and Water behavior.
+- Traced missing walls-tag membership through actual connection/support-shape callbacks; absent or asymmetric joins are source-predicted, not a runtime appearance or containment test. Final independent source/render review, original anchors, documentation check and strict build are required before promotion. No game mining, explosion, placement, waterlogging or generation tests were run.
