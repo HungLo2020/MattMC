@@ -7,7 +7,9 @@ Project skills have one source of truth in `.agents/skills/`. Claude Code's
 .agents/skills/
 ├── say-hello/
 │   └── SKILL.md
-└── sync-and-resume/
+├── sync-and-resume/
+│   └── SKILL.md
+└── sync-and-push/
     └── SKILL.md
 .claude/skills -> ../.agents/skills
 ```
@@ -73,6 +75,29 @@ versions require incompatible behavior, or integration cannot satisfy the
 user's Git constraints, it preserves the work and asks a focused question.
 The workflow reduces the risk of losing work; it cannot guarantee that an
 arbitrary combined implementation is correct without appropriate verification.
+
+## Sync and Push
+
+Use `sync-and-push` to integrate upstream changes and publish the current local
+work as **one new commit on top**, including when the worktree is dirty and the
+branch is behind changes made on another system.
+
+- Codex: `$sync-and-push`
+- Claude Code: `/sync-and-push`
+- Natural request: "Pull upstream, preserve both sides and resolve conflicts,
+  then commit and push our local changes as one commit."
+
+Invoking this skill authorizes syncing, one new commit, and a normal push.
+Creating or discussing the skill does not invoke it. Unlike `sync-and-resume`,
+the successful result is published work rather than restored pending edits.
+
+It uses the configured upstream, preserves local changes with a temporary stash
+or change-only recovery material when needed, resolves compatible conflicts,
+and reviews the combined changes before staging explicit paths. It never copies
+the whole repository, creates WIP or merge commits, or force-pushes. Existing
+divergent history, incompatible requirements, or a rejected push may require a
+specific decision; the skill preserves the work and reports the obstacle.
+Relevant verification follows the active task and repository instructions.
 
 ## Adding skills
 

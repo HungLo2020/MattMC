@@ -161,6 +161,8 @@ public final class BitSetDiscreteVoxelShape extends DiscreteVoxelShape {
 
 	protected static void forAllBoxes(DiscreteVoxelShape discreteVoxelShape, DiscreteVoxelShape.IntLineConsumer intLineConsumer, boolean bl) {
 		BitSetDiscreteVoxelShape bitSetDiscreteVoxelShape = new BitSetDiscreteVoxelShape(discreteVoxelShape);
+		if (bl && (long)bitSetDiscreteVoxelShape.xSize * bitSetDiscreteVoxelShape.ySize * bitSetDiscreteVoxelShape.zSize >= NativeVoxelBoxes.MIN_CELLS
+			&& NativeVoxelBoxes.emit(bitSetDiscreteVoxelShape, intLineConsumer)) return;
 
 		for (int i = 0; i < bitSetDiscreteVoxelShape.ySize; i++) {
 			for (int j = 0; j < bitSetDiscreteVoxelShape.xSize; j++) {
@@ -201,11 +203,11 @@ public final class BitSetDiscreteVoxelShape extends DiscreteVoxelShape {
 		}
 	}
 
-	private boolean isZStripFull(int i, int j, int k, int l) {
+	boolean isZStripFull(int i, int j, int k, int l) {
 		return k < this.xSize && l < this.ySize ? this.storage.nextClearBit(this.getIndex(k, l, i)) >= this.getIndex(k, l, j) : false;
 	}
 
-	private boolean isXZRectangleFull(int i, int j, int k, int l, int m) {
+	boolean isXZRectangleFull(int i, int j, int k, int l, int m) {
 		for (int n = i; n < j; n++) {
 			if (!this.isZStripFull(k, l, n, m)) {
 				return false;
@@ -215,7 +217,7 @@ public final class BitSetDiscreteVoxelShape extends DiscreteVoxelShape {
 		return true;
 	}
 
-	private void clearZStrip(int i, int j, int k, int l) {
+	void clearZStrip(int i, int j, int k, int l) {
 		this.storage.clear(this.getIndex(k, l, i), this.getIndex(k, l, j));
 	}
 

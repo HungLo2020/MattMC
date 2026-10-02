@@ -40,7 +40,8 @@ src/main/rust/
 └── world/
     ├── phys/
     │   └── shapes/
-    │       └── boolean_join/
+    │       ├── boolean_join/
+    │       └── box_extract/
     └── level/
         ├── biome/
         │   └── climate/
@@ -87,6 +88,8 @@ under `world/level/chunk/palette/resize/` for bulk remapping during block palett
 World collision geometry also uses [voxel Boolean joins](world/physics/RUST-VOXEL-JOIN.md)
 under `world/phys/shapes/boolean_join/`. Java keeps coordinate merging and
 shape ownership while Rust evaluates packed occupancy.
+Ordered [merged voxel boxes](world/physics/RUST-VOXEL-BOXES.md) use
+`world/phys/shapes/box_extract/`; Java retains the original snapshot and callbacks.
 
 ### `gameplay/`
 

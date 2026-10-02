@@ -127,6 +127,10 @@ public abstract class VoxelShape {
 	}
 
 	public List<AABB> toAabbs() {
+		if (this.shape != null && (long)this.shape.xSize * this.shape.ySize * this.shape.zSize >= NativeVoxelBoxes.MIN_CELLS) {
+			var nativeBoxes = NativeVoxelBoxes.toAabbs(this);
+			if (nativeBoxes != null) return nativeBoxes;
+		}
 		List<AABB> list = Lists.<AABB>newArrayList();
 		this.forAllBoxes((d, e, f, g, h, i) -> list.add(new AABB(d, e, f, g, h, i)));
 		return list;

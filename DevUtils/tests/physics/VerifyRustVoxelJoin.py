@@ -50,7 +50,8 @@ def main():
     at=expected.index('\t\tBitSetDiscreteVoxelShape bitSetDiscreteVoxelShape = new BitSetDiscreteVoxelShape(indexMerger.size() - 1')
     at=expected.index('\n',at)+1
     expected=expected[:at]+JOIN_DISPATCH+expected[at:]
-    if source.read_text()!=expected:raise RuntimeError('Grid differs beyond exact native dispatch/internal field visibility')
+    from VerifyRustVoxelBoxes import strip_boxes, strip_box_list
+    if strip_boxes(source.read_text())!=expected:raise RuntimeError('Grid differs beyond exact native dispatch/internal field visibility')
     a=original.index('\tstatic BitSetDiscreteVoxelShape join(');b=original.index('\n\tprotected static void forAllBoxes',a)
     if (ROOT/'src/test/java/net/minecraft/world/phys/shapes/JavaVoxelJoin.java').read_text().count(original[a:b])!=1:
         raise RuntimeError('Original complete grid join differs from Git')
@@ -60,7 +61,7 @@ def main():
         raise RuntimeError('Original public caller differs from Git')
     for name in ['Shapes.java','BooleanOp.java','DiscreteVoxelShape.java','VoxelShape.java','ArrayVoxelShape.java',
                  'CubeVoxelShape.java','IndexMerger.java','IdenticalMerger.java','IndirectMerger.java','DiscreteCubeMerger.java','CubePointRange.java']:
-        if (ROOT/(folder+name)).read_text()!=original_file(name):raise RuntimeError('Original shape/coordinate semantics changed: '+name)
+        if (strip_box_list((ROOT/(folder+name)).read_text()) if name == 'VoxelShape.java' else (ROOT/(folder+name)).read_text())!=original_file(name):raise RuntimeError('Original shape/coordinate semantics changed: '+name)
     non=original_file('NonOverlappingMerger.java')
     expected=non.replace('\t@Override\n\tpublic int size()',NONOVERLAP+'\t@Override\n\tpublic int size()',1)
     if (ROOT/(folder+'NonOverlappingMerger.java')).read_text()!=expected:raise RuntimeError('Nonoverlap changed beyond exact compatibility predicate')
@@ -78,7 +79,7 @@ def main():
     (out / 'parity.xml').write_bytes(xml.read_bytes())
     if 'failures="0"' not in xml.read_text() or 'errors="0"' not in xml.read_text():
         raise RuntimeError('Parity failed')
-    run(['rustc', '--edition=2021', '--test', 'src/test/rust/worldgen.rs', '-o', str(out / 'worldgen-tests')], out / 'rust-build.log')
+    run(['rustc', '--edition=2021', '--test', 'src/test/rust/physics.rs', '-o', str(out / 'worldgen-tests')], out / 'rust-build.log')
     run([str(out / 'worldgen-tests'), 'phys::shapes'], out / 'rust-tests.log')
     native = ROOT / 'build/rust/native'
     jvm = ['-Xbatch', '-Xms512m', '-Xmx3g', '-XX:+UseZGC', '-XX:+UseCompactObjectHeaders', '--enable-native-access=ALL-UNNAMED']
@@ -86,7 +87,7 @@ def main():
     files=list((ROOT/'src/main/rust/world/phys').rglob('*.rs'))
     files += list((ROOT/'src/main/java/net/minecraft/world/phys/shapes').glob('*.java'))
     files += list((ROOT/'src/test/java/net/minecraft/world/phys/shapes').glob('*.java'))
-    files += [ROOT/'src/main/rust/world/mod.rs', ROOT/'src/test/rust/worldgen.rs',
+    files += [ROOT/'src/main/rust/world/mod.rs', ROOT/'src/test/rust/physics.rs',
               ROOT/'src/main/java/net/minecraft/util/NativeLibraryLoader.java',Path(__file__).resolve()]
     report = {'reference': subprocess.check_output(['git','rev-parse',REFERENCE],cwd=ROOT,text=True).strip(),
               'scope': 'Complete Shapes.joinUnoptimized public caller: BooleanOp checks, empty/reference shortcuts, original Java coordinate/epsilon merges and allocations, native eligibility, two BitSet.toLongArray snapshots and copies, numeric merger materialization/copy, one ordinary FFM call, output/bounds copies, original-capacity BitSet/result shape construction and consuming every occupied word/coordinate bit/bounds. No cache; initial fixture/library/thread scratch setup excluded. Small/custom/unsupported joins remain original and are not credited as speedup.',

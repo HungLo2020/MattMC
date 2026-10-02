@@ -52,7 +52,9 @@ join and public `Shapes.joinUnoptimized()` caller to Git `b81c01943`. The public
 oracle redirects only the kernel call to the literal original Java body; it uses
 the same real bitset shape class and allocation. Shape/merger implementations
 remain pinned except the specific native dispatch, field visibility and pure
-nonoverlap compatibility predicate. No reflection is timed. Use `--cpu N` for
+nonoverlap compatibility predicate, plus the separately pinned
+[merged-box and box-list dispatches](RUST-VOXEL-BOXES.md) and strip-helper visibility.
+No reflection is timed. Use `--cpu N` for
 an available logical CPU. Focused tests require no graphics context.
 
 Tests compare every cell, raw words/capacity, all bounds and floating-coordinate
