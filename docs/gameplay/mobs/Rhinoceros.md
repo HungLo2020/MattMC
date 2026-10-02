@@ -48,9 +48,11 @@ An adult that is neither in love nor trusting anyone has a nearby-player acquisi
 
 Animated attacks fling or slash the main target and can hit nearby **untrusted, non-animal living entities** as collateral damage. The animated main-target damage uses 8 points normally and 10 against Raiders. Do not treat these numbers as a complete damage-per-attack total: the active ordinary melee goal and the animation-tick damage path both exist.
 
-An adult accepts a regular, splash, or lingering potion through its interaction method when the base potion has an effect. It stores **only that base potion's first effect**, including its amplifier and duration, for later animated hits. It consumes the potion and returns a Glass Bottle. This is not a promise that every custom potion effect behaves correctly.
+An adult accepts a regular, splash, or lingering potion through its interaction method when the base potion has an effect. It stores **only that base potion's first effect**, including its amplifier and duration, for later animated hits. Added custom effects are not used for the coating. This is not a promise that every custom potion effect behaves correctly.
 
-The stored coating counts newly applied effects and eventually wears off; its saved duration is the duration inflicted on a target, not a countdown for the coating itself. **Do not rely on an ordinary Water Bottle to clear it:** the current water comparison uses incompatible object forms and does not match the registered water potion as intended. This specific clearing failure is tracked in [issue #783](https://github.com/HungLo2020/MattMC/issues/783).
+The stored coating counts newly applied effects and eventually wears off; its saved duration is the duration inflicted on a target, not a countdown for the coating itself. Use an ordinary **Water Bottle** to remove the coating and reset its effect, strength, duration, and hit count. Splash and lingering water potions also clear it. Awkward, Mundane, and Thick Potions do nothing. A command-created potion with no base potion, including one with only custom effects, retains the existing clearing behavior.
+
+Successful coating or clearing works from either hand. In Survival, it consumes one potion and returns one Glass Bottle to that hand when the potion runs out; if a command-created stack has more potions, the bottle goes into inventory or drops when full. In Creative, the potion remains; a bottle is added when inventory has room and contains none. The server applies these changes; client prediction does not separately consume items or alter the coating. Babies do not accept potion coating.
 
 ## Drops and integration notes
 
@@ -67,7 +69,10 @@ The class's older one-argument melee method is not the method invoked by the cur
 
 Source-reviewed at `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. No in-game spawning, trust, breeding, potion, combat, or drop test was run.
 
-- [Stats, trust, food, potion interactions, and active animation damage](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityRhinoceros.java)
+The potion interaction section was updated with the source correction for [issue #783](https://github.com/HungLo2020/MattMC/issues/783) on 2026-10-02. Focused automated interaction tests were added; a live gameplay round trip is still needed before treating that issue's acceptance checks as complete.
+
+- [Corrected potion interaction](https://github.com/HungLo2020/MattMC/blob/fix/issue-783-rhino-water/src/main/java/net/alexsmobs/entity/EntityRhinoceros.java#L420-L475)
+- [Baseline stats, trust, food, and active animation damage](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityRhinoceros.java)
 - [Trust-food tag](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/item/rhinoceros_foodstuffs.json)
 - [Breeding-food tag](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/item/rhinoceros_breedables.json)
 - [Ordinary animal feeding and breeding](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/animal/Animal.java)
