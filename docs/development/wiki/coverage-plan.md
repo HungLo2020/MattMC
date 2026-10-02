@@ -1366,3 +1366,11 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Replaced generic Shroomlight, Ochre Froglight, Verdant Froglight and Pearlescent Froglight item entries with exact acquisition, ordinary recovery and shared placed-block links. These four inventory routes supplement the existing substantive Luminous Blocks owner; no new block article or exhaustive completion is claimed.
 - Preserved all 20 original anchors and the already-authored Glowstone, Sea Lantern, Carmine Froglight and Luminous Blocks pages. Independent review corrected three mob-loot citations to the active inherited LivingEntity gate before publication; visible behavior claims were unchanged.
 - Checked active huge-fungus growth and Frog prey/loot callers, exact ordinary and TaCZ recipe-loader scopes, tool/drop rules and configured rendering. Final documentation check and strict build are required before promotion. No live growth, mining, Frog, lighting or farm-rate test is claimed.
+
+## Batch 167: Mantis Shrimp and Mudskipper care
+
+- Expanded the two existing mob guides and the registered Bucket of Mudskipper item guide, preserving old anchors and linking the existing Bucket, Water Bucket, Inventory Browser and Shulker Shell owners.
+- Verified species/egg/bucket registrations and bounded natural-spawn/loot absence; removed the unsupported Mudskipper Bucket Creative/browser claim and documented actual manual capture, release and Dispenser fallback.
+- Traced diet tags, shared-first breeding/growth, later taming/healing and the adult last-fish owner-control fallthrough. Documented Mantis Shrimp moisture, prey, block-changing controls, kill reward and current save/attack signature limits; documented Mudskipper breathing, defense, display and incomplete bucket-state transfer.
+- Source-reviewed at `eaeeffdeb9220de7d839af7c84a047693249c2f7`, using exact base recipe/loot/biome scopes and separate advancement/plural/nested-pack inventories. Configured render, old-anchor, link and immutable citation checks apply; no game or browser test is claimed.
+- Independent review distinguished the tagged-prey goal's start gate from continuation: Sit/Break Blocks do not clear an existing Mantis Shrimp target. Corrected this care warning and added the active continuation citation before publication.
