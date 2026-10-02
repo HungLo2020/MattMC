@@ -822,6 +822,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Source checkpoint remains published `60699a119c4728a7bcaf15196f3c839cfcfd69dc` at batch start. All authored paths are documentation; no gameplay tests were run.
 - Validation: required check and strict build passed on 2,249 pages / 37 indexes; 1,917 local links/anchors, 447 citation uses, all 1,211 alphabetical IDs and exact 52/35/3 family maps checked. Reconciled 220 newly introduced pinned source references; audited all 113 cooking recipes and the sign/candle recipe/loot matrices. Directory: 948 related-guide routes and 263 explicit article gaps, not a completeness score.
 
+## Batch 106: storage, Cauldrons and Obsidian/respawn utilities
+
+- Added five canonical guides for Barrel, Ender Chest, Cauldrons, Obsidian/Crying Obsidian and Respawn Anchor; corrected six existing item pages. Exact maps cover two storage IDs, four cauldron contents IDs and three Obsidian/anchor IDs.
+- Traced shared versus personal inventory ownership, death/dimension persistence, opening/automation/loot, cauldron transactions and dripstone, Obsidian acquisition and the active anchor selection/charge/respawn/fallback/explosion paths. Wet-anchor resistance has an explicit source-qualified anomaly; no water-containment guarantee is made.
+- Preserved existing Eye of Ender recipe, Nether/End/Bed, Snow/Water/Bucket and Shulker ownership. Thirteen ruined-portal templates were decoded to verify acquisition evidence; no runtime generation or gameplay test was run.
+- Published source checkpoint at batch start: `3c39e8cc456e3c76eac84ae45b12020c4b08a7a7`. All authored paths are documentation.
+- Validation: required check and strict build passed on 2,254 pages / 37 indexes; 1,679 local links/anchors, 337 citation uses, 131 pinned source references unchanged, all 1,211 alphabetical IDs and exact 2/4/3 block maps checked. Directory: 957 related-guide routes and 254 explicit article gaps, not a completion score. Source, recipe, loot, persistence and active dispatch audits are complete for this bounded batch; no gameplay tests.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and category catalogs as source changes; expand genuine article coverage from the now-visible gaps. The initial directory, twelve-terrain guide, Crafter correction, and Rabbit/Fox citation repair are recorded in batch 97.

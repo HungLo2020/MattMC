@@ -73,7 +73,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Bamboo Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:bamboo_trapdoor`
 - **Bamboo Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:bamboo_wall_hanging_sign`
 - **Bamboo Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:bamboo_wall_sign`
-- **Barrel** — article needed; `minecraft:barrel`
+- **Barrel** — [Barrel](Barrel.md#persistence-and-breaking-a-filled-barrel) (related guide); `minecraft:barrel`
 - **Barrier** — article needed; `minecraft:barrier`
 - **Basalt** — [Blackstone and Basalt](BlackstoneAndBasalt.md#basalt-variants-and-orientation) (related guide); `minecraft:basalt`
 - **Beacon** — [Beacon](Beacon.md#build-the-base) (related guide); `minecraft:beacon`
@@ -217,7 +217,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Carrots** — [Root crops](RootCrops.md) (related guide); `minecraft:carrots`
 - **Cartography Table** — [Cartography Table](CartographyTable.md) (related guide); `minecraft:cartography_table`
 - **Carved Pumpkin** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:carved_pumpkin`
-- **Cauldron** — article needed; `minecraft:cauldron`
+- **Cauldron** — [Cauldrons](Cauldrons.md#empty-cauldron) (related guide); `minecraft:cauldron`
 - **Cave Air** — article needed; `minecraft:cave_air`
 - **Cave Vines** — article needed; `minecraft:cave_vines`
 - **Cave Vines Plant** — article needed; `minecraft:cave_vines_plant`
@@ -314,7 +314,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Crimson Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:crimson_trapdoor`
 - **Crimson Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:crimson_wall_hanging_sign`
 - **Crimson Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:crimson_wall_sign`
-- **Crying Obsidian** — article needed; `minecraft:crying_obsidian`
+- **Crying Obsidian** — [Obsidian and Crying Obsidian](Obsidian.md#crying-obsidian) (related guide); `minecraft:crying_obsidian`
 - **Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:cut_copper`
 - **Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:cut_copper_slab`
 - **Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:cut_copper_stairs`
@@ -434,7 +434,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **End Stone Brick Stairs** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_stairs`
 - **End Stone Brick Wall** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_wall`
 - **End Stone Bricks** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_bricks`
-- **Ender Chest** — article needed; `minecraft:ender_chest`
+- **Ender Chest** — [Ender Chest](EnderChest.md#player-ownership-and-persistence) (related guide); `minecraft:ender_chest`
 - **Exposed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_chiseled_copper`
 - **Exposed Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_copper`
 - **Exposed Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:exposed_copper_bulb`
@@ -581,7 +581,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Large Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#large-bud) (related guide); `minecraft:large_amethyst_bud`
 - **Large Fern** — article needed; `minecraft:large_fern`
 - **Lava** — [Water and Lava](WaterAndLava.md) (related guide); `minecraft:lava`
-- **Lava Cauldron** — article needed; `minecraft:lava_cauldron`
+- **Lava Cauldron** — [Cauldrons](Cauldrons.md#lava-cauldron) (related guide); `minecraft:lava_cauldron`
 - **Leaf Litter** — article needed; `minecraft:leaf_litter`
 - **Leafcutter Ant Chamber** — article needed; `minecraft:leafcutter_ant_chamber`
 - **Leafcutter Anthill** — article needed; `minecraft:leafcutter_anthill`
@@ -736,7 +736,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Oak Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:oak_wall_sign`
 - **Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#oak-timber) (related guide); `minecraft:oak_wood`
 - **Observer** — [Observer](Observer.md) (related guide); `minecraft:observer`
-- **Obsidian** — article needed; `minecraft:obsidian`
+- **Obsidian** — [Obsidian and Crying Obsidian](Obsidian.md#obsidian) (related guide); `minecraft:obsidian`
 - **Ochre Froglight** — article needed; `minecraft:ochre_froglight`
 - **Open Eyeblossom** — article needed; `minecraft:open_eyeblossom`
 - **Orange Banner** — article needed; `minecraft:orange_banner`
@@ -910,7 +910,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Potted White Tulip** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:potted_white_tulip`
 - **Potted Wither Rose** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:potted_wither_rose`
 - **Powder Snow** — [Snow and Powder Snow](Snow.md#powder-snow-buckets-and-collision) (related guide); `minecraft:powder_snow`
-- **Powder Snow Cauldron** — article needed; `minecraft:powder_snow_cauldron`
+- **Powder Snow Cauldron** — [Cauldrons](Cauldrons.md#powder-snow-cauldron) (related guide); `minecraft:powder_snow_cauldron`
 - **Powered Rail** — [Rails](Rails.md) (related guide); `minecraft:powered_rail`
 - **Primal Magma** — [Primal Magma and Fissure Primal Magma](PrimalMagma.md) (related guide); `minecraft:primal_magma`
 - **Primordial Caves Portal †** — article needed; `minecraft:primordial_caves_portal`
@@ -992,7 +992,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Resin Brick Wall** — article needed; `minecraft:resin_brick_wall`
 - **Resin Bricks** — article needed; `minecraft:resin_bricks`
 - **Resin Clump** — article needed; `minecraft:resin_clump`
-- **Respawn Anchor** — article needed; `minecraft:respawn_anchor`
+- **Respawn Anchor** — [Respawn Anchor](RespawnAnchor.md#respawn-anchor) (related guide); `minecraft:respawn_anchor`
 - **Rooted Dirt** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#rooted-dirt-and-hanging-roots) (related guide); `minecraft:rooted_dirt`
 - **Rose Bush** — article needed; `minecraft:rose_bush`
 
@@ -1187,7 +1187,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Warped Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:warped_wall_sign`
 - **Warped Wart Block** — article needed; `minecraft:warped_wart_block`
 - **Water** — [Water and Lava](WaterAndLava.md) (related guide); `minecraft:water`
-- **Water Cauldron** — article needed; `minecraft:water_cauldron`
+- **Water Cauldron** — [Cauldrons](Cauldrons.md#water-cauldron) (related guide); `minecraft:water_cauldron`
 - **Waxed Block of Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_copper_block`
 - **Waxed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_chiseled_copper`
 - **Waxed Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:waxed_copper_bulb`
@@ -1317,6 +1317,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Ancient trees, Flytraps and Tree Stars](AncientPlants.md)
 - [Anvil](Anvil.md)
 - [Bamboo](Bamboo.md)
+- [Barrel](Barrel.md)
 - [Beacon](Beacon.md)
 - [Beds](Bed.md)
 - [Bee housing](BeeHousing.md)
@@ -1328,6 +1329,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Cake](Cake.md)
 - [Candles](Candles.md)
 - [Cartography Table](CartographyTable.md)
+- [Cauldrons](Cauldrons.md)
 - [Chest](Chest.md)
 - [Clay and Bricks](ClayAndBricks.md)
 - [Concrete and Concrete Powder](Concrete.md)
@@ -1347,6 +1349,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Dragon Egg](DragonEgg.md)
 - [Enchanting Table](EnchantingTable.md)
 - [End Stone and Purpur](EndStoneAndPurpur.md)
+- [Ender Chest](EnderChest.md)
 - [Farmland](Farmland.md)
 - [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md)
 - [Flower Pot](FlowerPot.md)
@@ -1366,6 +1369,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Nether Wart crop](NetherWart.md)
 - [Oak](Oak.md)
 - [Observer](Observer.md)
+- [Obsidian and Crying Obsidian](Obsidian.md)
 - [Ores and Ancient Debris](OreResources.md)
 - [Pewen family](Pewen.md)
 - [Piston and Sticky Piston](Pistons.md)
@@ -1382,6 +1386,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Redstone Lamp](RedstoneLamp.md)
 - [Redstone Repeater](RedstoneRepeater.md)
 - [Redstone Torch](RedstoneTorch.md)
+- [Respawn Anchor](RespawnAnchor.md)
 - [Root crops](RootCrops.md)
 - [Sandstone and Red Sandstone](Sandstone.md)
 - [Saplings and Azalea growth](SaplingsAndAzaleas.md)

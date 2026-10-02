@@ -12,7 +12,7 @@ Names use English localization where available. A † marks a readable registry-
 | --- | --- | --- |
 | Amber | [`minecraft:amber`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5959) | [Amber](../Amber.md) |
 | Anvil | [`minecraft:anvil`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2804) | [Anvil](../Anvil.md) |
-| Barrel | [`minecraft:barrel`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5311) | Article needed |
+| Barrel | [`minecraft:barrel`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5311) | [Barrel](../Barrel.md#persistence-and-breaking-a-filled-barrel) |
 | Beacon | [`minecraft:beacon`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2640) | [Beacon](../Beacon.md#build-the-base) |
 | Bee Nest | [`minecraft:bee_nest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5748) | [Bee housing](../BeeHousing.md) |
 | Beehive | [`minecraft:beehive`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5753) | [Bee housing](../BeeHousing.md) |
@@ -22,7 +22,7 @@ Names use English localization where available. A † marks a readable registry-
 | Brewing Stand | [`minecraft:brewing_stand`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2525) | [Brewing Stand](../BrewingStand.md) |
 | Cake | [`minecraft:cake`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2106) | [Cake](../Cake.md#placement-and-collection) |
 | Cartography Table | [`minecraft:cartography_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5336) | [Cartography Table](../CartographyTable.md) |
-| Cauldron | [`minecraft:cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2528) | Article needed |
+| Cauldron | [`minecraft:cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2528) | [Cauldrons](../Cauldrons.md#empty-cauldron) |
 | Chest | [`minecraft:chest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1244) | [Chest](../Chest.md) |
 | Chipped Anvil | [`minecraft:chipped_anvil`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2814) | [Anvil](../Anvil.md) |
 | Chiseled Bookshelf | [`minecraft:chiseled_bookshelf`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1115) | Article needed |
@@ -36,7 +36,7 @@ Names use English localization where available. A † marks a readable registry-
 | Dinosaur Chop | [`minecraft:dinosaur_chop`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2109) | [Dinosaur Chop](../DinosaurChop.md) |
 | Dried Kelp Block | [`minecraft:dried_kelp_block`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L4749) | [Kelp](../Kelp.md) |
 | Enchanting Table | [`minecraft:enchanting_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2515) | [Enchanting Table](../EnchantingTable.md) |
-| Ender Chest | [`minecraft:ender_chest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2612) | Article needed |
+| Ender Chest | [`minecraft:ender_chest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2612) | [Ender Chest](../EnderChest.md#player-ownership-and-persistence) |
 | Fletching Table | [`minecraft:fletching_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5341) | Article needed |
 | Furnace | [`minecraft:furnace`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1292) | [Furnace, Blast Furnace and Smoker](../Furnace.md) |
 | Grindstone | [`minecraft:grindstone`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5345) | [Grindstone](../Grindstone.md) |
@@ -46,12 +46,12 @@ Names use English localization where available. A † marks a readable registry-
 | Iron Chain | [`minecraft:iron_chain`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2317) | Article needed |
 | Jukebox | [`minecraft:jukebox`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1970) | Article needed |
 | Ladder | [`minecraft:ladder`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1411) | Article needed |
-| Lava Cauldron | [`minecraft:lava_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2536) | Article needed |
+| Lava Cauldron | [`minecraft:lava_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2536) | [Cauldrons](../Cauldrons.md#lava-cauldron) |
 | Lectern | [`minecraft:lectern`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5355) | Article needed |
 | Lodestone | [`minecraft:lodestone`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5806) | Article needed |
 | Loom | [`minecraft:loom`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5306) | Article needed |
-| Powder Snow Cauldron | [`minecraft:powder_snow_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2539) | Article needed |
-| Respawn Anchor | [`minecraft:respawn_anchor`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5784) | Article needed |
+| Powder Snow Cauldron | [`minecraft:powder_snow_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2539) | [Cauldrons](../Cauldrons.md#powder-snow-cauldron) |
+| Respawn Anchor | [`minecraft:respawn_anchor`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5784) | [Respawn Anchor](../RespawnAnchor.md#respawn-anchor) |
 | Scaffolding | [`minecraft:scaffolding`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5294) | [Scaffolding](../Scaffolding.md) |
 | Smithing Table | [`minecraft:smithing_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5370) | [Smithing Table](../SmithingTable.md) |
 | Smoker | [`minecraft:smoker`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5316) | [Furnace, Blast Furnace and Smoker](../Furnace.md#smoker) |
@@ -62,7 +62,7 @@ Names use English localization where available. A † marks a readable registry-
 | TaCZ Gun Smith Table | [`minecraft:gun_smith_table`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6810) | Article needed |
 | Trapped Chest | [`minecraft:trapped_chest`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2834) | Article needed |
 | Vault | [`minecraft:vault`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6787) | Article needed |
-| Water Cauldron | [`minecraft:water_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2531) | Article needed |
+| Water Cauldron | [`minecraft:water_cauldron`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2531) | [Cauldrons](../Cauldrons.md#water-cauldron) |
 | Wet Sponge | [`minecraft:wet_sponge`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L617) | Article needed |
 
 ## Inventory source

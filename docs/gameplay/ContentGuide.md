@@ -91,6 +91,10 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Building, redstone, and travel
 
+- [Barrel](blocks/Barrel.md) and [Ender Chest](blocks/EnderChest.md): shared versus personal storage, persistence, access, automation and recovery
+- [Cauldrons](blocks/Cauldrons.md): bucket/bottle exchanges, washing, precipitation, dripstone, contact effects and comparator levels
+- [Obsidian](blocks/Obsidian.md) and [Respawn Anchors](blocks/RespawnAnchor.md): acquisition, exact tool tiers, charges, valid respawns and dimension restrictions
+
 - [Signs and Hanging Signs](blocks/Signs.md): all material forms, placement, two-sided writing, dye/glow/wax and Pewen integration gaps
 - [Candles](blocks/Candles.md) and [Cake](blocks/Cake.md): colors, stacked light, water/ignition, slices, candle recovery and comparator output
 
