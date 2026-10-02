@@ -56,6 +56,7 @@ Work from a stable opening with an exit, especially where the search column reac
 - [Ocean Ruins](OceanRuins.md)
 - [Dolphin](../mobs/Dolphin.md)
 - [Map](../items/Map.md)
+- [Seagull](../mobs/Seagull.md#offerings-and-treasure-maps): current limits of map offerings
 - [Structures](Structures.md)
 
 ## Sources and verification

@@ -55,6 +55,7 @@ Breaking a plant removes it; the two use controls above reset a mature plant ins
 - [Carrot](../items/Carrot.md)
 - [Potato](../items/Potato.md)
 - [Beetroot](../items/Beetroot.md)
+- [Potoo](../mobs/Potoo.md#luring-and-care): Beetroot Seed luring and current breeding limits
 - [Wheat crop](Wheat.md)
 - [Blocks](Blocks.md)
 

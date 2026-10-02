@@ -1400,3 +1400,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Independently verified all 43 dye-producing ordinary recipe resources: 41 shapeless and 2 smelting, with no tag ingredients. The rewritten entries cover 42; the existing substantive Green Dye owner covers the Cactus recipe and remains unchanged.
 - Kept Flowers, Wool and Carpet, Signs, Sheep, Cat, Wolf, Loom, Bundle, Shulker Box, Cauldrons and Inventory Browser as existing subject owners. Added direct ContentGuide and Items-index discovery entries plus scoped links from all 15 color entries; the alphabetical item list is unchanged.
 - Source-reviewed at `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, with 1,501 base recipe resources and 1,410 base loot tables counted separately from advancements, plural-path recipes and bundled-pack resources. Configured strict render, original-anchor, local-link, immutable-citation and reference-binding checks apply. No game or browser test is claimed.
+
+## Batch 172: Seagull and Potoo care
+
+- Replaced two generic mob owners with active egg/browser acquisition, absent natural-route limits, feeding and movement behavior, persistence and loot. Added Root Crops and Buried Treasure discovery links, retaining all eight old mob anchors.
+- Distinguished Seagull raw-fish breeding from luring/offerings, carried-food healing from player consumable effects, hotbar theft from dropped-item pickup, and working retrieval from incomplete map-destination assignment.
+- Separated Potoo's working Beetroot Seed lure from missing breeding/perch tags and inactive hunting commands. Exact active resource scopes, registered callers and configured-render/source checks are required alongside final independent review and strict documentation build. No game spawning, feeding, theft, treasure search, perching, flight or drop tests were run.
