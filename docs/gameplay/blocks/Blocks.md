@@ -219,8 +219,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Carved Pumpkin** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:carved_pumpkin`
 - **Cauldron** — [Cauldrons](Cauldrons.md#empty-cauldron) (related guide); `minecraft:cauldron`
 - **Cave Air** — article needed; `minecraft:cave_air`
-- **Cave Vines** — article needed; `minecraft:cave_vines`
-- **Cave Vines Plant** — article needed; `minecraft:cave_vines_plant`
+- **Cave Vines** — [Vines and Glow Berries](Vines.md#cave-vines) (related guide); `minecraft:cave_vines`
+- **Cave Vines Plant** — [Vines and Glow Berries](Vines.md#cave-vines-plant) (related guide); `minecraft:cave_vines_plant`
 - **Chain Command Block** — article needed; `minecraft:chain_command_block`
 - **Cherry Button** — [Buttons](Buttons.md#cherry-button) (related guide); `minecraft:cherry_button`
 - **Cherry Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:cherry_door`
@@ -476,7 +476,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Gilded Blackstone** — [Blackstone and Basalt](BlackstoneAndBasalt.md#gilded-blackstone) (related guide); `minecraft:gilded_blackstone`
 - **Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:glass`
 - **Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:glass_pane`
-- **Glow Lichen** — article needed; `minecraft:glow_lichen`
+- **Glow Lichen** — [Glow Lichen](GlowLichen.md#placement-and-support) (related guide); `minecraft:glow_lichen`
 - **Glowstone** — article needed; `minecraft:glowstone`
 - **Gold Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:gold_ore`
 - **Granite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#finding-granite-diorite-and-andesite) (related guide); `minecraft:granite`
@@ -516,7 +516,7 @@ Names use English localization where available. A † marks one of 25 readable r
 
 ### H
 
-- **Hanging Roots** — article needed; `minecraft:hanging_roots`
+- **Hanging Roots** — [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md#hanging-roots) (related guide); `minecraft:hanging_roots`
 - **Hay Bale** — article needed; `minecraft:hay_block`
 - **Heavy Core** — article needed; `minecraft:heavy_core`
 - **Heavy Weighted Pressure Plate** — [Pressure plates](PressurePlates.md#heavy-weighted-pressure-plate) (related guide); `minecraft:heavy_weighted_pressure_plate`
@@ -679,8 +679,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Melon** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:melon`
 - **Melon Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:melon_stem`
 - **Monster Spawner** — [Monster Spawner](MonsterSpawner.md) (related guide); `minecraft:spawner`
-- **Moss Block** — article needed; `minecraft:moss_block`
-- **Moss Carpet** — article needed; `minecraft:moss_carpet`
+- **Moss Block** — [Moss and Pale Moss](MossAndPaleMoss.md#moss-blocks-and-spreading) (related guide); `minecraft:moss_block`
+- **Moss Carpet** — [Moss and Pale Moss](MossAndPaleMoss.md#moss-carpet) (related guide); `minecraft:moss_carpet`
 - **Mossy Cobblestone** — [Stone](Stone.md#mossy-variants) (related guide); `minecraft:mossy_cobblestone`
 - **Mossy Cobblestone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_cobblestone_slab`
 - **Mossy Cobblestone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_cobblestone_stairs`
@@ -771,9 +771,9 @@ Names use English localization where available. A † marks one of 25 readable r
 
 - **Packed Ice** — [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md#registered-ice-blocks) (related guide); `minecraft:packed_ice`
 - **Packed Mud** — article needed; `minecraft:packed_mud`
-- **Pale Hanging Moss** — article needed; `minecraft:pale_hanging_moss`
-- **Pale Moss Block** — article needed; `minecraft:pale_moss_block`
-- **Pale Moss Carpet** — article needed; `minecraft:pale_moss_carpet`
+- **Pale Hanging Moss** — [Moss and Pale Moss](MossAndPaleMoss.md#pale-hanging-moss) (related guide); `minecraft:pale_hanging_moss`
+- **Pale Moss Block** — [Moss and Pale Moss](MossAndPaleMoss.md#moss-blocks-and-spreading) (related guide); `minecraft:pale_moss_block`
+- **Pale Moss Carpet** — [Moss and Pale Moss](MossAndPaleMoss.md#pale-moss-carpet) (related guide); `minecraft:pale_moss_carpet`
 - **Pale Oak Button** — [Buttons](Buttons.md#pale-oak-button) (related guide); `minecraft:pale_oak_button`
 - **Pale Oak Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:pale_oak_door`
 - **Pale Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:pale_oak_fence`
@@ -1051,7 +1051,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Soul Torch** — article needed; `minecraft:soul_torch`
 - **Soul Wall Torch** — article needed; `minecraft:soul_wall_torch`
 - **Sponge** — article needed; `minecraft:sponge`
-- **Spore Blossom** — article needed; `minecraft:spore_blossom`
+- **Spore Blossom** — [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md#spore-blossom) (related guide); `minecraft:spore_blossom`
 - **Spruce Button** — [Buttons](Buttons.md#spruce-button) (related guide); `minecraft:spruce_button`
 - **Spruce Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:spruce_door`
 - **Spruce Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:spruce_fence`
@@ -1152,15 +1152,15 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Tuff Stairs** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_stairs`
 - **Tuff Wall** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_wall`
 - **Turtle Egg** — article needed; `minecraft:turtle_egg`
-- **Twisting Vines** — article needed; `minecraft:twisting_vines`
-- **Twisting Vines Plant** — article needed; `minecraft:twisting_vines_plant`
+- **Twisting Vines** — [Vines and Glow Berries](Vines.md#twisting-vines) (related guide); `minecraft:twisting_vines`
+- **Twisting Vines Plant** — [Vines and Glow Berries](Vines.md#twisting-vines-plant) (related guide); `minecraft:twisting_vines_plant`
 
 ### V
 
 - **Vallumraptor Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:vallumraptor_egg`
 - **Vault** — article needed; `minecraft:vault`
 - **Verdant Froglight** — article needed; `minecraft:verdant_froglight`
-- **Vines** — article needed; `minecraft:vine`
+- **Vines** — [Vines and Glow Berries](Vines.md#vine) (related guide); `minecraft:vine`
 - **Void Air** — article needed; `minecraft:void_air`
 
 ### W
@@ -1248,8 +1248,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Weathered Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:weathered_cut_copper_slab`
 - **Weathered Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:weathered_cut_copper_stairs`
 - **Weathered Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:weathered_lightning_rod`
-- **Weeping Vines** — article needed; `minecraft:weeping_vines`
-- **Weeping Vines Plant** — article needed; `minecraft:weeping_vines_plant`
+- **Weeping Vines** — [Vines and Glow Berries](Vines.md#weeping-vines) (related guide); `minecraft:weeping_vines`
+- **Weeping Vines Plant** — [Vines and Glow Berries](Vines.md#weeping-vines-plant) (related guide); `minecraft:weeping_vines_plant`
 - **Wet Sponge** — article needed; `minecraft:wet_sponge`
 - **Wheat Crops** — [Wheat crop](Wheat.md) (related guide); `minecraft:wheat`
 - **White Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:white_banner`
@@ -1358,8 +1358,10 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Frogspawn](Frogspawn.md)
 - [Furnace, Blast Furnace and Smoker](Furnace.md)
 - [Glass and Glass Panes](GlassAndPanes.md)
+- [Glow Lichen](GlowLichen.md)
 - [Granite, Diorite, Andesite and Calcite](DecorativeStone.md)
 - [Grindstone](Grindstone.md)
+- [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md)
 - [Hopper](Hopper.md)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
 - [Kelp](Kelp.md)
@@ -1369,6 +1371,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Limestone family](Limestone.md)
 - [Loom](Loom.md)
 - [Monster Spawner](MonsterSpawner.md)
+- [Moss and Pale Moss](MossAndPaleMoss.md)
 - [Nether Bricks](NetherBricks.md)
 - [Nether Wart crop](NetherWart.md)
 - [Oak](Oak.md)
@@ -1414,6 +1417,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Tree logs and roots](TreeLogsAndRoots.md)
 - [Tripwire and Tripwire Hooks](Tripwire.md)
 - [Tuff](Tuff.md)
+- [Vines and Glow Berries](Vines.md)
 - [Water and Lava](WaterAndLava.md)
 - [Wheat crop](Wheat.md)
 - [Wood construction](WoodConstruction.md)

@@ -28,6 +28,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Farming, food, and animal care
 
+- [Vines and Glow Berries](blocks/Vines.md), [Glow Lichen](blocks/GlowLichen.md), [Moss](blocks/MossAndPaleMoss.md), and [ceiling plants](blocks/HangingRootsAndSporeBlossom.md): support, water, growth, harvesting, light and verified starter routes
+
 - [Small and tall flowers](blocks/Flowers.md): exact dye/stew variants, soils, Bone Meal routes, Bee choices and Wither Rose limits
 
 - [Saplings and Azaleas](blocks/SaplingsAndAzaleas.md) and [Crimson/Warped Fungi](blocks/NetherFungi.md): planting patterns, Bone Meal, growth space and recovery

@@ -847,6 +847,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 - Source checkpoint: `fa2e6ba3e894e8de0b3e432346185d36b5dd4fcc`; no source merge or gameplay test was needed. Broader vine/moss drafts remain separate from this bounded review.
 - Validation: required checker and strict build passed on 2,259 pages / 37 indexes; all four authored paths are documentation, with 184 local links/anchors and 199 citation uses checked. The full alphabetical registry inventory remains unchanged.
 
+## Batch 109: vines, lichen, moss and ceiling plants
+
+- Added four canonical guides: Vines/Glow Berries, Glow Lichen, Moss/Pale Moss, and Hanging Roots/Spore Blossom. Corrected seven existing item pages; exact maps cover eight vine/lichen IDs and seven moss/ceiling-plant IDs.
+- Checked tip/body and shared-item distinctions, growth/age/trimming, Bone Meal, tool-dependent drops and detached-segment losses, berry food/light, climbing, water, moss conversion limits and pale-carpet extensions. Source-backed starter examples distinguish natural features from player-grown tree configurations.
+- Preserved existing Stone recipe, Bee/Fox/Hunger, Rooted Dirt/Azalea and imported Archaic Vine ownership. The source checkpoint remains published `ae92d4575f1af7752d0f461bbf7bf0843c3cddf7` at batch start. All authored paths are documentation; no gameplay tests were run.
+
+- Validation: documentation check and strict build passed on 2,263 pages and 37 directory indexes; all 1,961 local links/anchors and 150 citation uses in this 17-path batch resolve. The alphabetical directory retains all 1,211 exact registered IDs, with 1,025 related-guide routes and 186 explicit article gaps. These route counts are navigation coverage, not completed article counts. All 132 unique pinned source references were compared unchanged with the current source.
+
 ## Next batches, in priority order
 
 1. Maintain the complete alphabetical Blocks directory and category catalogs as source changes; expand genuine article coverage from the now-visible gaps. The initial directory, twelve-terrain guide, Crafter correction, and Rabbit/Fox citation repair are recorded in batch 97.
