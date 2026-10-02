@@ -1,6 +1,6 @@
 # Dry Midlands
 
-Dry Midlands (`minecraft:dry_midlands`) is the sandy biome selected alongside [Primordial Plains](PrimordialPlains.md) in the bundled Normal preset's [Primordial Caves](../dimensions/PrimordialCaves.md). Its source includes cactus patches and ore-bearing geodes, but **some listed mining and mob routes are blocked by missing tags or spawn conditions**. Bring food, wood, and your own lighting.
+Dry Midlands (`minecraft:dry_midlands`) is a sandy biome candidate alongside [Primordial Plains](PrimordialPlains.md) and Primordial Ocean in the [effective bundled Primordial Caves source](../dimensions/PrimordialCaves.md#what-currently-generates). Its source includes cactus patches and ore-bearing geodes, but **some listed mining and mob routes are blocked by missing tags or spawn conditions**. Bring food, wood, and your own lighting.
 
 ## Terrain and decorations
 

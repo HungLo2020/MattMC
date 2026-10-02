@@ -49,7 +49,7 @@ Plan surface travel with the [Boat/transport guide](../mechanics/Transport.md), 
 
 ## Integrated ocean content is separate
 
-The registered **Primordial Ocean** definition is not one of these nine Overworld choices. The bundled Normal preset selects **Primordial Plains and Dry Midlands** for [Primordial Caves](../dimensions/PrimordialCaves.md), rather than that ocean definition. A standalone custom biome file does not establish an accessible generated destination. [Normal preset][normal] · [Primordial Ocean definition][primordial]
+The registered **Primordial Ocean** definition is not one of these nine Overworld choices. It is included in the loaded bundled [Primordial Caves dimension source](../dimensions/PrimordialCaves.md#what-currently-generates), which takes precedence over the literal Normal preset's two-biome definition. This establishes a source candidate, not a surveyed ocean location, guaranteed portal landing or completed generation test. [Primordial Ocean definition][primordial]
 
 Similarly, [Orca](../mobs/Orca.md), [Hammerhead Shark](../mobs/HammerheadShark.md), [Cachalot Whale](../mobs/CachalotWhale.md), and [Giant Squid](../mobs/GiantSquid.md) have separate integration limits. None is listed in these checked ocean biome spawn tables. Do not assume that choosing a warm or deep ocean completes their absent bundled spawning routes.
 
@@ -91,3 +91,5 @@ Related: [Biomes](Biomes.md) · [Structures](../structures/Structures.md) · [Tr
 [cold-definition]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/worldgen/structure/ocean_ruin_cold.json
 [spawn-override]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/chunk/ChunkGenerator.java#L426-L450
 [spawn-caller]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/NaturalSpawner.java#L315-L325
+
+Primordial-selection wording corrected on 2026-10-02 at `eafe6b61edf55cefa8036ec540a3029da1143637`: the [dimension guide](../dimensions/PrimordialCaves.md#what-currently-generates) traces loaded-registry precedence through fresh and saved-world callers. The earlier preset-only inference is superseded.

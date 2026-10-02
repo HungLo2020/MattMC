@@ -1113,6 +1113,15 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,344 pages / 37 indexes. All 16 authored paths are documentation; 909 local links/anchors and 266 tracked reference uses resolve, with zero rendered citation candidates and old replacement anchors retained. Ten biome IDs have precise family sections; this does not imply all Overworld biomes or imported systems are complete.
 
+## Batch 137: Correct effective Primordial biome selection
+
+- Corrected eight existing player owners after tracing dimension-resource loading and precedence through both fresh and saved client/server callers. Earlier preset-only wording that excluded Primordial Ocean from effective bundled selection was too broad and is superseded here.
+- The literal Normal definition has two custom biomes; the loaded dimension resource includes Primordial Plains, Dry Midlands and Primordial Ocean candidates and takes precedence during baking. The missing-dimension fallback remains a separate Plains-only path. Candidate inclusion is not a measured generation rate, guaranteed encounter/portal landing, or retroactive change to existing terrain.
+- Updated the dimension and biome owners plus Drowned, Dolphin and Coral wording, preserving their independent spawning and feature-placement gates. No gameplay code, resources, worlds or saved data changed.
+- Source checkpoint: `eafe6b61edf55cefa8036ec540a3029da1143637`. The previously validated raid/outpost draft is preserved outside this branch working tree for the following batch; it was not published or discarded.
+
+- Validation: required checker and strict build passed on 2,344 pages / 37 indexes. All ten authored paths are documentation; local links/anchors and actual rendered citations resolve. The correction follows fresh and saved-world caller inputs, not only the bake helper, and makes no runtime or old-terrain-change claim.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.

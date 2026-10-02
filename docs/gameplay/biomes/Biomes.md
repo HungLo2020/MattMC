@@ -16,20 +16,22 @@ Biomes choose local terrain materials, decorations, and possible mob spawns. In 
 
 ## Primordial Caves biomes
 
-The bundled **Normal** world preset selects these two biomes inside [Primordial Caves](../dimensions/PrimordialCaves.md):
+The loaded bundled dimension source includes these three biome candidates in [Primordial Caves](../dimensions/PrimordialCaves.md#what-currently-generates). Its registry entry takes precedence over the literal Normal preset's two-biome definition:
 
 - [Primordial Plains](PrimordialPlains.md): grass-and-dirt surface rules, ordinary plains vegetation and ore feature lists, and farm-animal spawn entries. Bring wood and food; the dimension's ceiling and darkness affect placement and spawning.
 - [Dry Midlands](DryMidlands.md): sand and sandstone surface rules, cactus and dry-grass patches, and ore-bearing geode features. Its ordinary stone/deepslate ore targets were corrected in [#781](https://github.com/HungLo2020/MattMC/issues/781); separate magma/gravel target and rabbit/camel/husk spawn restrictions remain.
 
-Use the dimension guide for portal access, return travel, and respawn rules. Both biomes share its ceiling and lack of skylight; they are not ordinary open-air Overworld plains or desert.
+- **Primordial Ocean** (`minecraft:primordial_ocean`): included by the loaded dimension resource; see [selection precedence and its limits](../dimensions/PrimordialCaves.md#what-currently-generates). It is separate from the nine Overworld ocean choices.
 
-The server's missing-dimension fallback uses a Primordial Plains-only biome preset instead. Existing worlds and data packs can differ from the Normal preset, so Dry Midlands is not guaranteed in every Primordial Caves world setup.
+Use the dimension guide for portal access, return travel, and respawn rules. These biomes share its ceiling and lack of skylight; their names do not imply ordinary Overworld environments.
+
+The server's missing-dimension fallback uses a Primordial Plains-only biome preset instead. That recovery path does not replace a successfully loaded bundled dimension. Existing terrain, data packs and resource loading can differ; no biome occurrence rate or portal landing is guaranteed.
 
 ## Reading these guides
 
 A **feature entry** tells the generator what to attempt. Height, supporting blocks, space, and placement filters can prevent that attempt from placing anything. A **spawn entry** is likewise a candidate, not a promise that a mob appears: light, ground, difficulty, mob limits, and each creature's own checks still apply.
 
-The individual pages distinguish those data entries from verified constraints. No in-game generation or spawn-rate test was run for this source review. This index covers the ocean, Nether and End families and the two custom biomes above; other Overworld biome families remain to be expanded.
+The individual pages distinguish those data entries from verified constraints. No in-game generation or spawn-rate test was run for this source review. This index covers the ocean, Nether and End families and the custom biome candidates above; other Overworld biome families remain to be expanded.
 
 ## Related pages
 

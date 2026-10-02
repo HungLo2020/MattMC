@@ -117,7 +117,7 @@ If still dry, it becomes the **same species and same shape's dead block**. Small
 
 The verified normal-world reef route is **Warm Ocean**. Its `warm_ocean_vegetation` feature uses the ocean-floor heightmap and chooses among registered coral-tree, coral-claw and coral-mushroom generators. The shared generator selects full blocks from all five living species and can decorate them with living plants/fans and wall fans. Water and local placement checks still control the resulting formations. See [Ocean biomes](../biomes/Oceans.md#vegetation-and-resources) for the broader ocean selection. [Normal preset and biome selection][normal-preset] [biome-parameters][] [overworld-biomes][] · [Warm Ocean feature chain][warm-ocean] [reef-placement][] [reef-config][] [features][] [reef-selector][] [reef-tree][] [reef-claw][] [reef-mushroom][] [reef-feature][] · [Block selections][coral-blocks-tag] [corals-tag][] [wall-corals-tag][] · [Generation dispatch][biome-generation] [placed-feature]
 
-The Normal preset does not select MattMC's bundled Primordial Ocean biome. Standalone coral feature resources also do not establish an additional generated destination. The [ocean integration notes](../biomes/Oceans.md#integrated-ocean-content-is-separate) explain that distinction.
+The loaded bundled [Primordial Caves dimension source](../dimensions/PrimordialCaves.md#what-currently-generates) includes Primordial Ocean despite its omission from the literal Normal preset. That corrects the selection inference; it does not by itself verify every coral feature's placement or a harvestable coral location. The [ocean integration notes](../biomes/Oceans.md#integrated-ocean-content-is-separate) keep the Overworld and custom routes distinct.
 
 ### Bone Meal for plants and fans
 
