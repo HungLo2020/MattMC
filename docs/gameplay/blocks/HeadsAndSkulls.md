@@ -1,6 +1,6 @@
 # Heads and Skulls
 
-Heads and skulls are collectible decorations that can stand on a surface or attach to a wall. Use standing mob heads above a [Note Block](../items/NoteBlock.md) for mob sounds, power Dragon or Piglin Heads for animation, or save Wither Skeleton Skulls for the [Wither](../mobs/Wither.md#summoning). Every kind also has a wearable inventory item. [Registered blocks][blocks] · [Items][items]
+Heads and skulls are collectible decorations that can stand on a surface or attach to a wall. Use standing mob heads above a [Note Block](NoteBlock.md) for mob sounds, power Dragon or Piglin Heads for animation, or save Wither Skeleton Skulls for the [Wither](../mobs/Wither.md#summoning). Every kind also has a wearable inventory item. [Registered blocks][blocks] · [Items][items]
 
 ## Registered forms and inventory items
 
@@ -78,7 +78,7 @@ Redstone power animates the **Dragon Head's jaw** and the **Piglin Head's ears**
 
 ## Note Block sounds
 
-Place a **standing head directly above** a [Note Block](../items/NoteBlock.md), then play or power the Note Block. The top-instrument item tag lets the head-placement interaction pass through when used on the Note Block's upper face. A newly powered Note Block plays once on its unpowered-to-powered transition; it does not continuously repeat while power stays on. [Placement interaction][note-use] · [Accepted items][note-tag] · [Selection and power][note-selection]
+Place a **standing head directly above** a [Note Block](NoteBlock.md), then play or power the Note Block. The top-instrument item tag lets the head-placement interaction pass through when used on the Note Block's upper face. A newly powered Note Block plays once on its unpowered-to-powered transition; it does not continuously repeat while power stays on. [Placement interaction][note-use] · [Accepted items][note-tag] · [Selection and power][note-selection]
 
 | Standing head above the Note Block | Selected sound |
 | --- | --- |

@@ -135,7 +135,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Block of Raw Gold** — [Resource Storage Blocks](ResourceStorageBlocks.md#raw-gold-block) (related guide); `minecraft:raw_gold_block`
 - **Block of Raw Iron** — [Resource Storage Blocks](ResourceStorageBlocks.md#raw-iron-block) (related guide); `minecraft:raw_iron_block`
 - **Block of Redstone** — [Resource Storage Blocks](ResourceStorageBlocks.md#redstone-block) (related guide); `minecraft:redstone_block`
-- **Block of Resin** — article needed; `minecraft:resin_block`
+- **Block of Resin** — [Resin](Resin.md#block-of-resin) (related guide); `minecraft:resin_block`
 - **Block of Stripped Bamboo** — article needed; `minecraft:stripped_bamboo_block`
 - **Blue Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:blue_banner`
 - **Blue Bed** — [Beds](Bed.md) (related guide); `minecraft:blue_bed`
@@ -250,7 +250,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Chiseled Polished Blackstone** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:chiseled_polished_blackstone`
 - **Chiseled Quartz Block** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:chiseled_quartz_block`
 - **Chiseled Red Sandstone** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:chiseled_red_sandstone`
-- **Chiseled Resin Bricks** — article needed; `minecraft:chiseled_resin_bricks`
+- **Chiseled Resin Bricks** — [Resin](Resin.md#chiseled-resin-bricks) (related guide); `minecraft:chiseled_resin_bricks`
 - **Chiseled Sandstone** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:chiseled_sandstone`
 - **Chiseled Stone Bricks** — [Stone](Stone.md#stone-bricks) (related guide); `minecraft:chiseled_stone_bricks`
 - **Chiseled Tuff** — [Tuff](Tuff.md#variants) (related guide); `minecraft:chiseled_tuff`
@@ -292,7 +292,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cracked Stone Bricks** — [Stone](Stone.md#stone-bricks) (related guide); `minecraft:cracked_stone_bricks`
 - **Crafter** — [Crafter](Crafter.md) (related guide); `minecraft:crafter`
 - **Crafting Table** — [Crafting Table](CraftingTable.md) (related guide); `minecraft:crafting_table`
-- **Creaking Heart** — article needed; `minecraft:creaking_heart`
+- **Creaking Heart** — [Creaking Heart](CreakingHeart.md#creaking-heart) (related guide); `minecraft:creaking_heart`
 - **Creeper Head** — [Heads and Skulls](HeadsAndSkulls.md#creeper-heads) (related guide); `minecraft:creeper_head`
 - **Creeper Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#creeper-heads) (related guide); `minecraft:creeper_wall_head`
 - **Crimson Button** — [Buttons](Buttons.md#crimson-button) (related guide); `minecraft:crimson_button`
@@ -428,7 +428,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **End Gateway** — article needed; `minecraft:end_gateway`
 - **End Portal** — article needed; `minecraft:end_portal`
 - **End Portal Frame** — article needed; `minecraft:end_portal_frame`
-- **End Rod** — article needed; `minecraft:end_rod`
+- **End Rod** — [End Rod](EndRod.md#facing-support-and-collision) (related guide); `minecraft:end_rod`
 - **End Stone** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone`
 - **End Stone Brick Slab** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_slab`
 - **End Stone Brick Stairs** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_stairs`
@@ -546,7 +546,7 @@ Names use English localization where available. A † marks one of 25 readable r
 
 ### J
 
-- **Jack o'Lantern** — article needed; `minecraft:jack_o_lantern`
+- **Jack o'Lantern** — [Jack o'Lantern](JackOLantern.md#placement-water-and-light) (related guide); `minecraft:jack_o_lantern`
 - **Jigsaw Block** — article needed; `minecraft:jigsaw`
 - **Jukebox** — [Jukebox](Jukebox.md#inserting-and-ejecting-discs) (related guide); `minecraft:jukebox`
 - **Jungle Button** — [Buttons](Buttons.md#jungle-button) (related guide); `minecraft:jungle_button`
@@ -713,7 +713,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Nether Wart** — [Nether Wart crop](NetherWart.md) (related guide); `minecraft:nether_wart`
 - **Nether Wart Block** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#nether-wart-block) (related guide); `minecraft:nether_wart_block`
 - **Netherrack** — article needed; `minecraft:netherrack`
-- **Note Block** — article needed; `minecraft:note_block`
+- **Note Block** — [Note Block](NoteBlock.md) (related guide); `minecraft:note_block`
 
 ### O
 
@@ -987,11 +987,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Reinforced Deepslate** — [Deepslate](Deepslate.md#reinforced-deepslate) (related guide); `minecraft:reinforced_deepslate`
 - **Relicheirus Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:relicheirus_egg`
 - **Repeating Command Block** — article needed; `minecraft:repeating_command_block`
-- **Resin Brick Slab** — article needed; `minecraft:resin_brick_slab`
-- **Resin Brick Stairs** — article needed; `minecraft:resin_brick_stairs`
-- **Resin Brick Wall** — article needed; `minecraft:resin_brick_wall`
-- **Resin Bricks** — article needed; `minecraft:resin_bricks`
-- **Resin Clump** — article needed; `minecraft:resin_clump`
+- **Resin Brick Slab** — [Resin](Resin.md#resin-brick-slab) (related guide); `minecraft:resin_brick_slab`
+- **Resin Brick Stairs** — [Resin](Resin.md#resin-brick-stairs) (related guide); `minecraft:resin_brick_stairs`
+- **Resin Brick Wall** — [Resin](Resin.md#resin-brick-wall) (related guide); `minecraft:resin_brick_wall`
+- **Resin Bricks** — [Resin](Resin.md#resin-bricks) (related guide); `minecraft:resin_bricks`
+- **Resin Clump** — [Resin](Resin.md#resin-clump) (related guide); `minecraft:resin_clump`
 - **Respawn Anchor** — [Respawn Anchor](RespawnAnchor.md#respawn-anchor) (related guide); `minecraft:respawn_anchor`
 - **Rooted Dirt** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#rooted-dirt-and-hanging-roots) (related guide); `minecraft:rooted_dirt`
 - **Rose Bush** — [Small and tall flowers](Flowers.md#rose-bush) (related guide); `minecraft:rose_bush`
@@ -1048,8 +1048,8 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Soul Lantern** — [Lanterns and Soul Lanterns](Lanterns.md#crafting-and-obtaining) (related guide); `minecraft:soul_lantern`
 - **Soul Sand** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-sand) (related guide); `minecraft:soul_sand`
 - **Soul Soil** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-soil) (related guide); `minecraft:soul_soil`
-- **Soul Torch** — article needed; `minecraft:soul_torch`
-- **Soul Wall Torch** — article needed; `minecraft:soul_wall_torch`
+- **Soul Torch** — [Torch](Torch.md#soul-torch) (related guide); `minecraft:soul_torch`
+- **Soul Wall Torch** — [Torch](Torch.md#soul-torch) (related guide); `minecraft:soul_wall_torch`
 - **Sponge** — [Sponge and Wet Sponge](Sponge.md#dry-sponge) (related guide); `minecraft:sponge`
 - **Spore Blossom** — [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md#spore-blossom) (related guide); `minecraft:spore_blossom`
 - **Spruce Button** — [Buttons](Buttons.md#spruce-button) (related guide); `minecraft:spruce_button`
@@ -1346,6 +1346,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Coral](Coral.md)
 - [Crafter](Crafter.md)
 - [Crafting Table](CraftingTable.md)
+- [Creaking Heart](CreakingHeart.md)
 - [Crimson and Warped Fungi](NetherFungi.md)
 - [Daylight Detector](DaylightDetector.md)
 - [Dead Bush](DeadBush.md)
@@ -1357,6 +1358,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Dripleaves](Dripleaves.md)
 - [Dripstone](Dripstone.md)
 - [Enchanting Table](EnchantingTable.md)
+- [End Rod](EndRod.md)
 - [End Stone and Purpur](EndStoneAndPurpur.md)
 - [Ender Chest](EnderChest.md)
 - [Farmland](Farmland.md)
@@ -1374,6 +1376,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Heads and Skulls](HeadsAndSkulls.md)
 - [Hopper](Hopper.md)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
+- [Jack o'Lantern](JackOLantern.md)
 - [Jukebox](Jukebox.md)
 - [Kelp](Kelp.md)
 - [Lanterns and Soul Lanterns](Lanterns.md)
@@ -1390,6 +1393,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Mushrooms](Mushrooms.md)
 - [Nether Bricks](NetherBricks.md)
 - [Nether Wart crop](NetherWart.md)
+- [Note Block](NoteBlock.md)
 - [Nylium and Nether vegetation](NetherGroundAndVegetation.md)
 - [Oak](Oak.md)
 - [Observer](Observer.md)
@@ -1411,6 +1415,7 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Redstone Lamp](RedstoneLamp.md)
 - [Redstone Repeater](RedstoneRepeater.md)
 - [Redstone Torch](RedstoneTorch.md)
+- [Resin](Resin.md)
 - [Resource Storage Blocks](ResourceStorageBlocks.md)
 - [Respawn Anchor](RespawnAnchor.md)
 - [Root crops](RootCrops.md)

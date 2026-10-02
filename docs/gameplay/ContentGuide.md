@@ -240,6 +240,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Sponge](blocks/Sponge.md) and [Lodestone](blocks/Lodestone.md): water removal/drying and persistent Compass markers
 - [Mud, Packed Mud and Mud Bricks](blocks/MudAndMudBricks.md): soil conversion, renewable materials and six building forms
 - [Dripstone](blocks/Dripstone.md): spike placement, natural growth, falling hazards and distinct cauldron/Mud setups
+- [Note Block](blocks/NoteBlock.md): tuning, all instrument types, head sounds and timed redstone examples
+- [Resin](blocks/Resin.md) and [Creaking Heart](blocks/CreakingHeart.md): renewable material production, masonry and exact operating conditions
+- [Soul Torches](blocks/Torch.md#soul-torch), [End Rods](blocks/EndRod.md) and [Jack o'Lanterns](blocks/JackOLantern.md): support, water, lighting and specific mob/construction interactions
 
 ## Browse by topic
 

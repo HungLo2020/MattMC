@@ -948,10 +948,20 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,288 pages / 37 indexes; all 14 authored paths are documentation. The integrated tree resolves 2,051 local links/anchors and 313 tracked citation uses, with zero rendered citation ambiguity/unresolved-bracket candidates. The directory retains all 1,211 exact IDs, with 1,122 related-guide routes and 89 explicit article gaps; these counts do not measure article completeness.
 
+## Batch 119: Note Block, Resin and remaining decorative lights
+
+- Added five canonical block guides (Note Block, Resin, Creaking Heart, End Rod, Jack o’Lantern), expanded Torch for Soul forms, and corrected eight item pages. Thirteen exact registered IDs gain reviewed owner routes; the head/skull guide now links the canonical Note Block guide.
+- Note Block review checks all 23 instruments and representative base materials, actual pitch/tuning/player and power callbacks, queue semantics, standing/wall head behavior and source-derived circuit examples. Audio and timing were not tested in game.
+- Resin/Heart review distinguishes seven building forms from the Heart and ingredient-only Resin Brick, verifies recipes, mining/loot, actual tree/chest sources, aligned-log activation, spawning and day/night gates, player attribution, placement attempts/cooldown, protector removal, natural-only XP and comparator behavior.
+- Lighting review preserves existing Torch anchors while checking Soul recipes/Piglin behavior, End Rod support and water replacement, Jack o’Lantern golem/dispenser distinctions, and wired structure/loot supply routes. None of these source checks establishes tested light radius, farm yield or runtime behavior.
+- Source checkpoint: `85428ea17c51c31ddb67b6c1060b78f4c3a13515`; 157 distinct pinned draft-source paths match the integrated source. All authored changes are documentation.
+
+- Validation: required checker and strict build passed on 2,293 pages / 37 indexes. All 23 authored paths are documentation; 2,491 local links/anchors and 512 tracked citation uses resolve, with zero rendered ambiguity or unresolved-bracket candidates. All 1,211 exact registered IDs remain alphabetical, with 1,135 related-guide routes and 76 explicit article gaps, not a completion score.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.
-2. Integrate the source-reviewed Note Block, Resin/Creaking Heart and remaining light-block drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
+2. Finish the isolated TNT, Trapped Chest and iron-fixture/Ladder drafts. Start changes from the current published pages so older draft copies cannot overwrite citation repairs.
 3. Fill remaining practical gaps such as TNT, Trapped Chest, ladders/bars/chains, fuel/storage utility blocks, and the imported weapon workbenches, following actual active behavior and acquisition routes.
 4. Cover remaining terrain/material, plant and technical families, including Netherrack/Bone Block, Bamboo full blocks, Fire/Soul Fire, special eggs, portals and operator/world-building blocks. Keep Creative/operator availability distinct from Survival acquisition and verify unresolved imported features.
 5. Preserve the ready Swords and undead drafts for later source revalidation; continue broader item, mob, biome, effect, structure and gameplay-system coverage after the immediate Blocks gaps. Broad catch-up remains incomplete and is not measured by raw file or route counts.
