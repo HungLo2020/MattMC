@@ -1212,6 +1212,9 @@ public class Options {
 			integer -> {}
 		);
 		this.syncWrites = Util.getPlatform() == OS.WINDOWS;
+		// Include registered controls before reading their saved key mappings.
+		this.keyMappings = ArrayUtils.addAll(this.keyMappings,
+			net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper.getRegisteredBindings().toArray(KeyMapping[]::new));
 		this.load();
 	}
 

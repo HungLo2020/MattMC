@@ -4378,6 +4378,8 @@ fn mesh_items_share_compositor_program_and_packed_uniform_stream() {
     assert_eq!(rasters[0].pipeline_layout, rasters[1].pipeline_layout);
     assert_ne!(rasters[0].resource_set, rasters[1].resource_set);
     assert_ne!(rasters[0].uniform_buffer, rasters[1].uniform_buffer);
+    assert_eq!(rasters[0].vertex_buffer, rasters[1].vertex_buffer);
+    assert_eq!(rasters[0].index_buffer, rasters[1].index_buffer);
     gal.submit(SubmissionBatch {
         label: "gui-mesh-reuse-target-test".to_string(),
         command_lists: vec![CommandList::from(CommandListDesc {

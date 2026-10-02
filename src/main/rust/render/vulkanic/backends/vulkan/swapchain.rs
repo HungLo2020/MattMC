@@ -455,6 +455,12 @@ impl VulkanSwapchain {
 
     fn recreate(&mut self, old_swapchain: vk::SwapchainKHR) -> GalResult<()> {
         let _zone = trace::Zone::new("vulkan.swapchain.recreate");
+        if old_swapchain != vk::SwapchainKHR::null() {
+            // Acquisition can request recreation independently of explicit resize.
+            // Both graphics and presentation must release the old image views.
+            unsafe { self.context.device.device_wait_idle() }
+                .map_err(|error| GalError::backend(format!("swapchain recreation wait failed: {error:?}")))?;
+        }
         if self.desc.extent.width == 0 || self.desc.extent.height == 0 {
             return Ok(());
         }

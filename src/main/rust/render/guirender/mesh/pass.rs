@@ -17,6 +17,7 @@ pub struct GuiMeshPassResources {
     pub pipeline_layout: Handle,
     pub pipeline: Handle,
     pub(super) owned_program: Option<GuiMeshSharedProgram>,
+    owns_geometry: bool,
 }
 
 impl GuiMeshPassResources {
@@ -58,8 +59,17 @@ impl GuiMeshPassResources {
         sampler: Handle,
         program: GuiMeshSharedProgram,
     ) -> GalResult<Self> {
+        Self::create_with_shared_streams(gal, label, texture_view, sampler, program, None)
+    }
+
+    /// Borrows frontend-owned geometry streams when supplied.
+    pub fn create_with_shared_streams(
+        gal: &mut VulkanicGal, label: &str, texture_view: Handle, sampler: Handle,
+        program: GuiMeshSharedProgram, streams: Option<(Handle, Handle)>,
+    ) -> GalResult<Self> {
         let mut created = Vec::new();
         let result = (|| -> GalResult<Self> {
+            let (vertex_buffer, index_buffer) = if let Some(streams) = streams { streams } else {
             let vertex_buffer = gal.create_buffer(BufferDesc {
                 label: format!("{label}.vertices"),
                 size: GUI_MESH_MAX_VERTEX_BYTES,
@@ -82,6 +92,8 @@ impl GuiMeshPassResources {
                 ],
             })?;
             created.push(index_buffer);
+            (vertex_buffer, index_buffer)
+            };
             let uniform_buffer = gal.create_buffer(BufferDesc {
                 label: format!("{label}.frame"),
                 size: GUI_MESH_FRAME_UNIFORM_BYTES as u64,
@@ -115,6 +127,7 @@ impl GuiMeshPassResources {
                 pipeline_layout: program.pipeline_layout,
                 pipeline: program.pipeline,
                 owned_program: None,
+                owns_geometry: streams.is_none(),
             })
         })();
         if result.is_err() {
@@ -243,6 +256,7 @@ impl GuiMeshPassResources {
             offset: 0,
             data: draw_frame_uniform_bytes(draw, draw.projection_extent),
         });
+        if write_geometry {
         operations.push(CommandOp::Barrier(buffer_barrier(
             self.vertex_buffer,
             TextureUsageState::TransferDst,
@@ -253,6 +267,7 @@ impl GuiMeshPassResources {
             TextureUsageState::TransferDst,
             TextureUsageState::IndexRead,
         )));
+        }
         operations.push(CommandOp::Barrier(buffer_barrier(
             self.uniform_buffer,
             TextureUsageState::TransferDst,
@@ -415,6 +430,7 @@ impl GuiMeshPassResources {
             offset: 0,
             data: draw_frame_uniform_bytes(draw, draw.render_extent.map(|axis| axis as f32)),
         });
+        if write_geometry {
         operations.push(CommandOp::Barrier(buffer_barrier(
             self.vertex_buffer,
             TextureUsageState::TransferDst,
@@ -425,6 +441,7 @@ impl GuiMeshPassResources {
             TextureUsageState::TransferDst,
             TextureUsageState::IndexRead,
         )));
+        }
         operations.push(CommandOp::Barrier(buffer_barrier(
             self.uniform_buffer,
             TextureUsageState::TransferDst,
@@ -479,14 +496,16 @@ impl GuiMeshPassResources {
         Ok(())
     }
 
+    /// Transfers stream ownership to the frontend, which releases all sets first.
+    pub fn transfer_geometry_ownership(&mut self) -> (Handle, Handle) {
+        self.owns_geometry = false;
+        (self.vertex_buffer, self.index_buffer)
+    }
+
     pub fn destroy_asset_resources(self, gal: &mut VulkanicGal) {
-        for handle in [
-            self.resource_set,
-            self.uniform_buffer,
-            self.index_buffer,
-            self.vertex_buffer,
-        ] {
-            let _ = gal.destroy(handle);
+        for handle in [self.resource_set, self.uniform_buffer] { let _ = gal.destroy(handle); }
+        if self.owns_geometry {
+            for handle in [self.index_buffer, self.vertex_buffer] { let _ = gal.destroy(handle); }
         }
     }
 

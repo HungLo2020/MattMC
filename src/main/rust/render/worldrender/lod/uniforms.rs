@@ -4,7 +4,7 @@ use crate::render::worldrender::lod::*;
 
 pub(super) fn packed_lod_uniforms_enabled() -> bool {
     !matches!(
-        std::env::var("MATTMC_RUST_DH_PACKED_UNIFORMS").as_deref(),
+        crate::core::environment::var("MATTMC_RUST_DH_PACKED_UNIFORMS").as_deref(),
         Ok("0") | Ok("false") | Ok("FALSE") | Ok("off") | Ok("OFF")
     )
 }

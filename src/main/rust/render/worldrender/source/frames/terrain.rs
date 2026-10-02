@@ -389,7 +389,7 @@ impl WorldPrimitiveFrontend {
         }
         self.source_terrain_batch_scope = Some(SourceTerrainBatchScope {
             frame_id,
-            scalar_uniform_receipts: std::env::var_os("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE")
+            scalar_uniform_receipts: crate::core::environment::var_os("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE")
                 .is_some(),
             validated_programs,
             pack_keys: Vec::new(),

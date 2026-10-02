@@ -16,7 +16,7 @@ impl WorldPrimitiveFrontend {
     ) {
         if !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -24,7 +24,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         if std::fs::create_dir_all(&dir).is_ok() {
@@ -64,19 +64,19 @@ impl WorldPrimitiveFrontend {
         color_attachment_count: usize,
     ) {
         if !matches!(
-            std::env::var("MATTMC_RUST_CLOUD_PIPELINE_RECEIPT")
+            crate::core::environment::var("MATTMC_RUST_CLOUD_PIPELINE_RECEIPT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) || !matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT")
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let mut states = BTreeMap::<(u32, u32, u32), usize>::new();
@@ -115,7 +115,7 @@ impl WorldPrimitiveFrontend {
     ) {
         if !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -123,7 +123,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let dir = Path::new(&dir);
@@ -195,7 +195,7 @@ impl WorldPrimitiveFrontend {
     ) {
         if stats.world_text_quad_count == 0
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -203,7 +203,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let dir = Path::new(&dir);
@@ -238,7 +238,7 @@ impl WorldPrimitiveFrontend {
         gui_stats: &GuiSubmitStats,
     ) {
         if !matches!(
-            std::env::var("MATTMC_GRAPHICS_AUDIT")
+            crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")
@@ -328,7 +328,7 @@ impl WorldPrimitiveFrontend {
                 )
             })
             .unwrap_or_else(|| "{\"status\":\"unavailable\"}".to_owned());
-        if let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") {
+        if let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") {
             let dir = Path::new(&dir);
             if std::fs::create_dir_all(dir).is_ok() {
                 let source_mesh_instance_semantics = source_mesh_instance_semantics_json(frame);
@@ -461,7 +461,7 @@ impl WorldPrimitiveFrontend {
                         source_shadow_semantics,
                         distant_horizons_opaque_program_ready,
                         distant_horizons_water_program_ready,
-                        std::env::var("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE")
+                        crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE")
                             .unwrap_or_else(|_| "lit".to_owned()),
                     ),
                 );
@@ -483,7 +483,7 @@ impl WorldPrimitiveFrontend {
     ) {
         if !self.source_execution_enabled()
             || !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -491,7 +491,7 @@ impl WorldPrimitiveFrontend {
         {
             return;
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return;
         };
         let capabilities = gal.capabilities();

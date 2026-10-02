@@ -6,6 +6,7 @@ pub(super) struct GuiItemRasterResources {
     pub(super) target: crate::render::guirender::items::raster::GuiItemRasterTarget,
     pub(super) composite: GuiMeshCompositeResources,
     pub(super) usage: TextureUsageState,
+    pub(super) lease: crate::render::vulkanic::commands::SubmissionUsage,
 }
 
 #[derive(Clone, Debug)]
@@ -152,7 +153,9 @@ impl GuiFrontend {
             ),
         >,
     > {
-        use crate::render::guirender::items::raster::{GuiItemRasterIdentity, GuiItemRasterTarget, MAX_ITEM_LAYERS};
+        use crate::render::guirender::items::raster::{
+            GuiItemRasterIdentity, GuiItemRasterTarget, MAX_ITEM_LAYERS,
+        };
         if items.is_empty() {
             return Ok(BTreeMap::new());
         }
@@ -239,17 +242,36 @@ impl GuiFrontend {
             depth_format: depth,
         };
         if !self.item_rasters.contains_key(&key) {
-            let pixels: u64 = self
-                .item_rasters
-                .keys()
-                .map(|key| u64::from(key.width) * u64::from(key.height))
-                .sum();
-            if self.item_rasters.len() >= 4
-                || pixels + u64::from(width) * u64::from(height) > 32 * 1024 * 1024
-            {
+            let requested_pixels = u64::from(width) * u64::from(height);
+            if requested_pixels > 32 * 1024 * 1024 {
                 return Err(GalError::invalid_argument(
-                    "item raster residency budget exhausted",
+                    "item raster exceeds pixel budget",
                 ));
+            }
+            loop {
+                let pixels: u64 = self
+                    .item_rasters
+                    .keys()
+                    .map(|key| u64::from(key.width) * u64::from(key.height))
+                    .sum();
+                if self.item_rasters.len() < 4 && pixels + requested_pixels <= 32 * 1024 * 1024 {
+                    break;
+                }
+                let oldest = self
+                    .item_rasters
+                    .iter()
+                    .filter(|(_, resources)| !resources.lease.has_pending_commands())
+                    .min_by_key(|(_, resources)| resources.lease.last_submission())
+                    .map(|(key, _)| key.clone())
+                    .ok_or_else(|| {
+                        GalError::invalid_argument(
+                            "item raster budget is pinned by prepared commands",
+                        )
+                    })?;
+                if let Some(resources) = self.item_rasters.remove(&oldest) {
+                    resources.composite.destroy(gal);
+                    resources.target.destroy(gal)?;
+                }
             }
             let target = GuiItemRasterTarget::create(
                 gal,
@@ -278,6 +300,7 @@ impl GuiFrontend {
                     target,
                     composite,
                     usage: TextureUsageState::Undefined,
+                    lease: Default::default(),
                 },
             );
         }
@@ -288,6 +311,7 @@ impl GuiFrontend {
             resource.target.view,
             resource.target.color,
         );
+        ops.push(CommandOp::TrackSubmission(resource.lease.clone()));
         let before = resource.usage;
         ops.push(CommandOp::Barrier(texture_barrier(
             image,

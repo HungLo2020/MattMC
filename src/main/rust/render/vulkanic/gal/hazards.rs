@@ -16,7 +16,9 @@ pub(super) enum AccessFamily {
     Storage,
     Sampled,
     Transfer,
+    MipGeneration,
     Attachment,
+    DepthAttachment,
     Host,
     Present,
     Indirect,
@@ -102,6 +104,7 @@ pub type AccessHashBuilder = hashing::BuildHasherDefault<AccessHasher>;
 #[derive(Default)]
 pub(super) struct AccessTracker {
     pub(super) resources: HashMap<AccessResourceKey, AccessBucket, AccessHashBuilder>,
+    destinations: Vec<(AccessTarget, TextureUsageState)>,
 }
 
 #[derive(Default)]
@@ -137,15 +140,25 @@ impl AccessTracker {
     pub(super) fn retain_non_overlapping(&mut self, target: AccessTarget) {
         let key = target.resource_key();
         if let Some(bucket) = self.resources.get_mut(&key) {
-            bucket
+            bucket.reads = bucket
                 .reads
-                .retain(|access| !targets_overlap(access.target, target));
-            bucket
-                .read_membership
-                .retain(|access| !targets_overlap(access.target, target));
-            bucket
+                .drain(..)
+                .flat_map(|event| {
+                    subtract_target(event.target, target)
+                        .into_iter()
+                        .map(move |target| AccessEvent { target, ..event })
+                })
+                .collect();
+            bucket.read_membership = bucket.reads.iter().copied().collect();
+            bucket.writes = bucket
                 .writes
-                .retain(|access| !targets_overlap(access.target, target));
+                .drain(..)
+                .flat_map(|event| {
+                    subtract_target(event.target, target)
+                        .into_iter()
+                        .map(move |target| AccessEvent { target, ..event })
+                })
+                .collect();
             if bucket.reads.is_empty() && bucket.writes.is_empty() {
                 self.resources.remove(&key);
             }
@@ -176,7 +189,44 @@ impl VulkanicGal {
         self.buffer_upload_capture.begin();
         let mut accesses = AccessTracker::default();
         for list in &batch.command_lists {
+            let mut bound_sets = BTreeMap::<(Handle, u32), Vec<AccessEvent>>::new();
+            let mut vertices = BTreeMap::<u32, AccessEvent>::new();
+            let mut indices = None;
+            let mut active_layout = None;
             for op in &list.operations {
+                let draw = matches!(
+                    op,
+                    CommandOp::Draw { .. }
+                        | CommandOp::DrawIndexed { .. }
+                        | CommandOp::DrawIndirect { .. }
+                        | CommandOp::DrawIndexedIndirect { .. }
+                );
+                let dispatch = matches!(
+                    op,
+                    CommandOp::Dispatch { .. } | CommandOp::DispatchIndirect { .. }
+                );
+                if draw || dispatch {
+                    for ((layout, _), events) in &bound_sets {
+                        if Some(*layout) == active_layout {
+                            for event in events {
+                                self.record_access(&mut accesses, *event, profile.as_deref_mut())?;
+                            }
+                        }
+                    }
+                    if draw {
+                        for event in vertices.values() {
+                            self.record_access(&mut accesses, *event, profile.as_deref_mut())?;
+                        }
+                        if matches!(
+                            op,
+                            CommandOp::DrawIndexed { .. } | CommandOp::DrawIndexedIndirect { .. }
+                        ) {
+                            if let Some(event) = indices {
+                                self.record_access(&mut accesses, event, profile.as_deref_mut())?;
+                            }
+                        }
+                    }
+                }
                 match op {
                     CommandOp::BeginPass {
                         colors,
@@ -232,7 +282,7 @@ impl VulkanicGal {
                             let event = AccessEvent {
                                 target,
                                 mode: AccessMode::Write,
-                                family: AccessFamily::Attachment,
+                                family: AccessFamily::DepthAttachment,
                                 attachment_load_op: Some(depth.load_op),
                                 attachment_store_op: Some(depth.store_op),
                             };
@@ -242,8 +292,10 @@ impl VulkanicGal {
                     CommandOp::BindResourceSet {
                         set,
                         dynamic_offsets,
-                        ..
+                        pipeline_layout,
+                        set_index,
                     } => {
+                        let mut events = Vec::new();
                         let binding_count = self.resource_sets.get(*set)?.desc.bindings.len();
                         let mut offset_index = 0;
                         for index in 0..binding_count {
@@ -265,38 +317,36 @@ impl VulkanicGal {
                                     };
                                     self.resource_binding_access(binding, offset)?
                                 };
-                                self.record_access(&mut accesses, event, profile.as_deref_mut())?;
+                                events.push(event);
                             }
                             offset_index += count;
                         }
+                        bound_sets.insert((*pipeline_layout, *set_index), events);
                     }
-                    CommandOp::SetVertexBuffer { buffer, offset, .. } => {
-                        let target = self.buffer_access_target(*buffer, *offset, None)?;
-                        self.record_access(
-                            &mut accesses,
+                    CommandOp::SetVertexBuffer {
+                        slot,
+                        buffer,
+                        offset,
+                    } => {
+                        vertices.insert(
+                            *slot,
                             AccessEvent {
-                                target,
+                                target: self.buffer_access_target(*buffer, *offset, None)?,
                                 mode: AccessMode::Read,
                                 family: AccessFamily::Vertex,
                                 attachment_load_op: None,
                                 attachment_store_op: None,
                             },
-                            profile.as_deref_mut(),
-                        )?;
+                        );
                     }
                     CommandOp::SetIndexBuffer { buffer, offset, .. } => {
-                        let target = self.buffer_access_target(*buffer, *offset, None)?;
-                        self.record_access(
-                            &mut accesses,
-                            AccessEvent {
-                                target,
-                                mode: AccessMode::Read,
-                                family: AccessFamily::Index,
-                                attachment_load_op: None,
-                                attachment_store_op: None,
-                            },
-                            profile.as_deref_mut(),
-                        )?;
+                        indices = Some(AccessEvent {
+                            target: self.buffer_access_target(*buffer, *offset, None)?,
+                            mode: AccessMode::Read,
+                            family: AccessFamily::Index,
+                            attachment_load_op: None,
+                            attachment_store_op: None,
+                        });
                     }
                     CommandOp::DrawIndirect {
                         buffer,
@@ -323,12 +373,7 @@ impl VulkanicGal {
                         )?;
                     }
                     CommandOp::CopyBuffer { src, dst, size }
-                    | CommandOp::CopyBufferRegion {
-                        src,
-                        dst,
-                        size,
-                        ..
-                    } => {
+                    | CommandOp::CopyBufferRegion { src, dst, size, .. } => {
                         let (src_offset, dst_offset) = match op {
                             CommandOp::CopyBufferRegion {
                                 src_offset,
@@ -337,8 +382,10 @@ impl VulkanicGal {
                             } => (*src_offset, *dst_offset),
                             _ => (0, 0),
                         };
-                        let src_target = self.buffer_access_target(*src, src_offset, Some(*size))?;
-                        let dst_target = self.buffer_access_target(*dst, dst_offset, Some(*size))?;
+                        let src_target =
+                            self.buffer_access_target(*src, src_offset, Some(*size))?;
+                        let dst_target =
+                            self.buffer_access_target(*dst, dst_offset, Some(*size))?;
                         self.record_access(
                             &mut accesses,
                             AccessEvent {
@@ -529,20 +576,49 @@ impl VulkanicGal {
                         texture,
                         subresources,
                     } => {
-                        self.record_access(
-                            &mut accesses,
-                            AccessEvent {
-                                target: AccessTarget::Texture {
-                                    texture: *texture,
-                                    range: *subresources,
+                        for mip in
+                            subresources.base_mip..subresources.base_mip + subresources.mip_count
+                        {
+                            let base = mip == subresources.base_mip;
+                            let range = TextureSubresourceRange {
+                                base_mip: mip,
+                                mip_count: 1,
+                                ..*subresources
+                            };
+                            self.record_access(
+                                &mut accesses,
+                                AccessEvent {
+                                    target: AccessTarget::Texture {
+                                        texture: *texture,
+                                        range,
+                                    },
+                                    mode: if base {
+                                        AccessMode::Read
+                                    } else {
+                                        AccessMode::Write
+                                    },
+                                    family: if base {
+                                        AccessFamily::Transfer
+                                    } else {
+                                        AccessFamily::MipGeneration
+                                    },
+                                    attachment_load_op: None,
+                                    attachment_store_op: None,
                                 },
-                                mode: AccessMode::Write,
-                                family: AccessFamily::Transfer,
-                                attachment_load_op: None,
-                                attachment_store_op: None,
-                            },
-                            profile.as_deref_mut(),
-                        )?;
+                                profile.as_deref_mut(),
+                            )?;
+                        }
+                        // The lowering publishes each generated level as a transfer source.
+                        let target = AccessTarget::Texture {
+                            texture: *texture,
+                            range: *subresources,
+                        };
+                        accesses
+                            .destinations
+                            .retain(|(prior, _)| !targets_overlap(*prior, target));
+                        accesses
+                            .destinations
+                            .push((target, TextureUsageState::TransferSrc));
                     }
                     CommandOp::HostWriteBuffer {
                         buffer,
@@ -604,15 +680,67 @@ impl VulkanicGal {
                     }
                     CommandOp::Barrier(barrier) => {
                         let barrier_target = self.barrier_target(barrier)?;
+                        if let Some(bucket) = accesses.bucket(barrier_target) {
+                            if let Some(prior) =
+                                bucket.reads.iter().chain(&bucket.writes).find(|event| {
+                                    targets_overlap(event.target, barrier_target)
+                                        && !access_matches_state(**event, barrier.before)
+                                })
+                            {
+                                let label = match barrier_target {
+                                    AccessTarget::Texture { texture, .. } => {
+                                        self.textures.get(texture)?.desc.label.as_str()
+                                    }
+                                    AccessTarget::Buffer { handle, .. } => {
+                                        self.buffers.get(handle)?.desc.label.as_str()
+                                    }
+                                    _ => "frame target",
+                                };
+                                return self.validation_error(GalError::submission(
+                                    StatusCode::InvalidArgument,
+                                    format!(
+                                        "barrier before {:?} on {:?} ({label}) does not cover prior {:?} {:?} access in {}",
+                                        barrier.before, barrier_target, prior.family, prior.mode, list.label
+                                    ),
+                                ));
+                            }
+                        }
+                        let published: Vec<_> = accesses
+                            .bucket(barrier_target)
+                            .into_iter()
+                            .flat_map(|bucket| bucket.reads.iter().chain(&bucket.writes))
+                            .filter(|event| targets_overlap(event.target, barrier_target))
+                            .map(|event| intersect_target(event.target, barrier_target))
+                            .collect();
                         accesses.retain_non_overlapping(barrier_target);
+                        accesses.destinations = accesses
+                            .destinations
+                            .drain(..)
+                            .flat_map(|(target, state)| {
+                                subtract_target(target, barrier_target)
+                                    .into_iter()
+                                    .map(move |target| (target, state))
+                            })
+                            .collect();
+                        if matches!(barrier_target, AccessTarget::Buffer { .. }) {
+                            accesses.destinations.extend(
+                                published.into_iter().map(|target| (target, barrier.after)),
+                            );
+                        } else {
+                            accesses.destinations.push((barrier_target, barrier.after));
+                        }
                         if let Some(profile) = profile.as_deref_mut() {
                             profile.gal_hazard_barriers_applied =
                                 profile.gal_hazard_barriers_applied.saturating_add(1);
                         }
                     }
-                    CommandOp::BindGraphicsPipeline(_)
-                    | CommandOp::BindComputePipeline(_)
-                    | CommandOp::Draw { .. }
+                    CommandOp::BindGraphicsPipeline(pipeline) => {
+                        active_layout = Some(self.graphics_pipelines.get(*pipeline)?.desc.layout);
+                    }
+                    CommandOp::BindComputePipeline(pipeline) => {
+                        active_layout = Some(self.compute_pipelines.get(*pipeline)?.desc.layout);
+                    }
+                    CommandOp::Draw { .. }
                     | CommandOp::DrawIndexed { .. }
                     | CommandOp::Dispatch { .. }
                     | CommandOp::TrackSubmission(_)
@@ -728,6 +856,23 @@ impl VulkanicGal {
         if event.target.is_zero_sized_sampler_marker() {
             return Ok(());
         }
+        if let Some((target, state)) = accesses.destinations.iter().find(|(target, state)| {
+            targets_overlap(*target, event.target) && !access_matches_state(event, *state)
+        }) {
+            return self.validation_error(GalError::submission(
+                StatusCode::InvalidArgument,
+                format!("barrier after {state:?} on {target:?} does not cover {event:?}"),
+            ));
+        }
+        accesses.destinations = accesses
+            .destinations
+            .drain(..)
+            .flat_map(|(target, state)| {
+                subtract_target(target, event.target)
+                    .into_iter()
+                    .map(move |target| (target, state))
+            })
+            .collect();
         if let Some(profile) = profile.as_deref_mut() {
             match event.mode {
                 AccessMode::Read => {
@@ -773,8 +918,10 @@ impl VulkanicGal {
                                 profile.gal_hazard_candidates_examined.saturating_add(1);
                         }
                         if targets_overlap(previous.target, event.target) {
-                            if previous.family == AccessFamily::Attachment
-                                && event.family == AccessFamily::Attachment
+                            if matches!(
+                                previous.family,
+                                AccessFamily::Attachment | AccessFamily::DepthAttachment
+                            ) && previous.family == event.family
                             {
                                 if event.attachment_load_op == Some(AttachmentLoadOp::Load)
                                     && previous.attachment_store_op
@@ -891,7 +1038,10 @@ impl VulkanicGal {
         })
     }
 
-    pub(super) fn texture_copy_target(&self, region: &BufferImageCopyRegion) -> GalResult<AccessTarget> {
+    pub(super) fn texture_copy_target(
+        &self,
+        region: &BufferImageCopyRegion,
+    ) -> GalResult<AccessTarget> {
         self.texture_image_copy_target(region.texture, region.texture_mip, region.texture_layer)
     }
 
@@ -969,13 +1119,21 @@ pub(super) fn targets_overlap(left: AccessTarget, right: AccessTarget) -> bool {
     }
 }
 
-pub(super) fn ranges_overlap(left_offset: u64, left_size: u64, right_offset: u64, right_size: u64) -> bool {
+pub(super) fn ranges_overlap(
+    left_offset: u64,
+    left_size: u64,
+    right_offset: u64,
+    right_size: u64,
+) -> bool {
     let left_end = left_offset.saturating_add(left_size);
     let right_end = right_offset.saturating_add(right_size);
     left_offset < right_end && right_offset < left_end
 }
 
-pub(super) fn texture_ranges_overlap(left: TextureSubresourceRange, right: TextureSubresourceRange) -> bool {
+pub(super) fn texture_ranges_overlap(
+    left: TextureSubresourceRange,
+    right: TextureSubresourceRange,
+) -> bool {
     ranges_overlap(
         left.base_mip as u64,
         left.mip_count as u64,
@@ -989,7 +1147,10 @@ pub(super) fn texture_ranges_overlap(left: TextureSubresourceRange, right: Textu
     )
 }
 
-pub(super) fn texture_range_contains(outer: TextureSubresourceRange, inner: TextureSubresourceRange) -> bool {
+pub(super) fn texture_range_contains(
+    outer: TextureSubresourceRange,
+    inner: TextureSubresourceRange,
+) -> bool {
     let outer_mip_end = outer.base_mip.saturating_add(outer.mip_count);
     let inner_mip_end = inner.base_mip.saturating_add(inner.mip_count);
     let outer_layer_end = outer.base_layer.saturating_add(outer.layer_count);
@@ -998,4 +1159,142 @@ pub(super) fn texture_range_contains(outer: TextureSubresourceRange, inner: Text
         && inner_mip_end <= outer_mip_end
         && outer.base_layer <= inner.base_layer
         && inner_layer_end <= outer_layer_end
+}
+
+fn access_matches_state(event: AccessEvent, state: TextureUsageState) -> bool {
+    use AccessFamily::*;
+    use TextureUsageState::*;
+    // HostReadBuffer executes only after the submission timeline has completed.
+    if event.family == Host && event.mode == AccessMode::Read {
+        return true;
+    }
+    match state {
+        Undefined => false,
+        ShaderRead => {
+            event.mode == AccessMode::Read
+                && matches!(event.family, Sampled | Uniform | Storage | Vertex)
+        }
+        ShaderStorageRead => event.mode == AccessMode::Read && event.family == Storage,
+        ShaderWrite => event.family == Storage,
+        ColorAttachment => event.family == Attachment,
+        DepthStencilAttachment => event.family == DepthAttachment,
+        TransferSrc => {
+            (event.mode == AccessMode::Read && matches!(event.family, Transfer | Host))
+                || event.family == MipGeneration
+        }
+        TransferDst => {
+            event.mode == AccessMode::Write
+                && matches!(event.family, Transfer | Host | MipGeneration)
+        }
+        TextureUsageState::Present => event.family == AccessFamily::Present,
+        IndexRead => event.family == Index,
+        IndirectRead => event.family == Indirect,
+    }
+}
+
+fn intersect_target(target: AccessTarget, cover: AccessTarget) -> AccessTarget {
+    match (target, cover) {
+        (AccessTarget::Texture { texture, range: a }, AccessTarget::Texture { range: b, .. }) => {
+            let mip = a.base_mip.max(b.base_mip);
+            let layer = a.base_layer.max(b.base_layer);
+            AccessTarget::Texture {
+                texture,
+                range: TextureSubresourceRange {
+                    base_mip: mip,
+                    mip_count: (a.base_mip + a.mip_count).min(b.base_mip + b.mip_count) - mip,
+                    base_layer: layer,
+                    layer_count: (a.base_layer + a.layer_count).min(b.base_layer + b.layer_count)
+                        - layer,
+                },
+            }
+        }
+        _ => target,
+    }
+}
+
+// A barrier on one mip/layer must not erase an access to the rest of a view.
+fn subtract_target(target: AccessTarget, cover: AccessTarget) -> Vec<AccessTarget> {
+    if !targets_overlap(target, cover) {
+        return vec![target];
+    }
+    match (target, intersect_target(target, cover)) {
+        (AccessTarget::Texture { texture, range: a }, AccessTarget::Texture { range: b, .. }) => {
+            let mut result = Vec::new();
+            let mut push = |mip, mips, layer, layers| {
+                if mips > 0 && layers > 0 {
+                    result.push(AccessTarget::Texture {
+                        texture,
+                        range: TextureSubresourceRange {
+                            base_mip: mip,
+                            mip_count: mips,
+                            base_layer: layer,
+                            layer_count: layers,
+                        },
+                    });
+                }
+            };
+            push(
+                a.base_mip,
+                b.base_mip - a.base_mip,
+                a.base_layer,
+                a.layer_count,
+            );
+            push(
+                b.base_mip + b.mip_count,
+                a.base_mip + a.mip_count - b.base_mip - b.mip_count,
+                a.base_layer,
+                a.layer_count,
+            );
+            push(
+                b.base_mip,
+                b.mip_count,
+                a.base_layer,
+                b.base_layer - a.base_layer,
+            );
+            push(
+                b.base_mip,
+                b.mip_count,
+                b.base_layer + b.layer_count,
+                a.base_layer + a.layer_count - b.base_layer - b.layer_count,
+            );
+            result
+        }
+        (
+            AccessTarget::Buffer {
+                handle,
+                offset,
+                size,
+            },
+            AccessTarget::Buffer { .. },
+        ) => {
+            let AccessTarget::Buffer {
+                offset: start,
+                size: count,
+                ..
+            } = cover
+            else {
+                return Vec::new();
+            };
+            let end = offset + size;
+            let cut_start = start.max(offset);
+            let cut_end = (start + count).min(end);
+            let mut result = Vec::new();
+            if cut_start > offset {
+                result.push(AccessTarget::Buffer {
+                    handle,
+                    offset,
+                    size: cut_start - offset,
+                });
+            }
+            if cut_end < end {
+                result.push(AccessTarget::Buffer {
+                    handle,
+                    offset: cut_end,
+                    size: end - cut_end,
+                });
+            }
+            result
+        }
+        _ => Vec::new(),
+    }
 }

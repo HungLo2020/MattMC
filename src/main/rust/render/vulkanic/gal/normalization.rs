@@ -200,7 +200,16 @@ pub(super) fn fuse_adjacent_identical_passes(original: Vec<CommandOp>) -> Vec<Co
             CommandOp::EndPass => {
                 let same_pass = active_begin
                     .as_ref()
-                    .is_some_and(|begin| source.peek().is_some_and(|next| next == begin));
+                    .is_some_and(|begin| {
+                        let preserves_contents = match begin {
+                            CommandOp::BeginPass { colors, depth_stencil, .. } => colors.iter()
+                                .chain(depth_stencil.iter())
+                                .all(|attachment| attachment.load_op == AttachmentLoadOp::Load
+                                    && attachment.store_op == AttachmentStoreOp::Store),
+                            _ => false,
+                        };
+                        preserves_contents && source.peek().is_some_and(|next| next == begin)
+                    });
                 if same_pass {
                     // The second pass has the exact same target, attachments,
                     // and load/store contract. Keep the first pass open so

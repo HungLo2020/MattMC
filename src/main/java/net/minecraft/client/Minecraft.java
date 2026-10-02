@@ -446,6 +446,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.gameThread = Thread.currentThread();
 		
 		
+		// Shader menus and key bindings are CPU configuration; Rust owns rendering.
+		if (!iris$initialized) {
+			new net.irisshaders.iris.Iris().onEarlyInitialize();
+			iris$initialized = true;
+		}
 		this.options = new Options(this, this.gameDirectory);
 		this.debugEntries = new DebugScreenEntryList(this.gameDirectory);
 		this.toastManager = new ToastManager(this, this.options);
@@ -1980,6 +1985,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		profilerFiller.pop();
 		
 		
+		profilerFiller.push("shader_pack_controls");
+		net.irisshaders.iris.Iris.handleKeybinds(this);
+		profilerFiller.pop();
+
 		// VoxelMap: Client tick hook
 		profilerFiller.push("voxelmap_tick");
 		try {

@@ -3269,3 +3269,40 @@ void main() {
     out_color = texture(tex0, v_uv) * vec4(1.0, 1.0, 1.0, 0.75);
 }
 "#;
+
+#[test]
+fn large_unaligned_host_writes_execute_in_command_order() {
+    let backend = match VulkanBackend::new("ordered host writes") {
+        Ok(backend) => backend,
+        Err(error) => { eprintln!("Vulkan setup unavailable: {error}"); return; }
+    };
+    let mut gal = VulkanicGal::new_with_backend(Box::new(backend));
+    let size = 65_539u64;
+    let buffer = gal.create_buffer(BufferDesc { label: "reused-upload".into(), size: size + 1,
+        memory: MemoryDomain::Upload, usages: vec![BufferUsage::HostWrite, BufferUsage::TransferSrc] }).unwrap();
+    let mut operations = Vec::new();
+    let mut outputs = Vec::new();
+    for value in [37u8, 91u8] {
+        let dst = gal.create_buffer(BufferDesc { label: "readback".into(), size,
+            memory: MemoryDomain::Readback, usages: vec![BufferUsage::TransferDst, BufferUsage::HostRead] }).unwrap();
+        outputs.push((dst, value));
+        if !operations.is_empty() {
+            operations.push(buffer_barrier(buffer, TextureUsageState::TransferSrc, TextureUsageState::TransferDst));
+        }
+        operations.extend([
+            CommandOp::HostWriteBuffer { buffer, offset: 1, data: vec![value; size as usize] },
+            buffer_barrier(buffer, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+            CommandOp::CopyBufferRegion { src: buffer, dst, src_offset: 1, dst_offset: 0, size },
+            buffer_barrier(dst, TextureUsageState::TransferDst, TextureUsageState::TransferSrc),
+            CommandOp::HostReadBuffer { buffer: dst, offset: 0, size },
+        ]);
+    }
+    let list = gal.create_command_list(CommandListDesc { label: "ordered-uploads".into(), operations }).unwrap();
+    let submission = gal.submit(SubmissionBatch { label: "ordered-uploads".into(), command_lists: vec![list] }).unwrap();
+    gal.retire_through(submission.submission).unwrap();
+    let reads = gal.completed_host_reads();
+    for (buffer, value) in outputs {
+        let read = reads.iter().find(|read| read.buffer == buffer).unwrap();
+        assert_eq!(read.bytes, vec![value; size as usize]);
+    }
+}

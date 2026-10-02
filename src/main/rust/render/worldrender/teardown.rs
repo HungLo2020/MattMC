@@ -35,6 +35,8 @@ impl WorldPrimitiveFrontend {
         self.latest_atlas_animation_texture = None;
         self.pending_atlas_animation = None;
         self.pending_atlas_animation_event = None;
+        self.pending_atlas_animation_failed = false;
+        self.retry_atlas_animation_events.clear();
         self.atlas_animation_patch_uploads = 0;
         self.atlas_animation_patch_bytes = 0;
         self.atlas_animation_empty_ticks = 0;

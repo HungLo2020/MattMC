@@ -1816,6 +1816,9 @@ impl VulkanObjects {
                     .map(texture_format)
                     .unwrap_or(vk::Format::UNDEFINED),
             );
+        if desc.depth_format == Some(TextureFormat::Depth24Stencil8) {
+            rendering = rendering.stencil_attachment_format(vk::Format::D24_UNORM_S8_UINT);
+        }
         let mut create_info = vk::GraphicsPipelineCreateInfo::default()
             .stages(&stages)
             .vertex_input_state(&vertex_input)

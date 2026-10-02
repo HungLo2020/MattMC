@@ -225,6 +225,14 @@ impl GuiFrontend {
                     .is_some_and(|asset_id| asset_ids.contains(&asset_id))
             })
             .collect();
+        let mesh_rasters = std::mem::take(&mut self.mesh_rasters);
+        for (key, resources) in mesh_rasters {
+            if asset_ids.contains(&key.asset_id) {
+                resources.destroy_asset_resources(gal);
+            } else {
+                self.mesh_rasters.insert(key, resources);
+            }
+        }
         let mut texture_keys = BTreeSet::new();
         for key in keys {
             if let Some(resource) = self.resources.remove(&key) {
@@ -239,14 +247,6 @@ impl GuiFrontend {
         // Partial image replacement has the same dependency order as full
         // teardown: mesh descriptor sets must release their sampled views
         // and samplers before the shared texture ownership records are removed.
-        let mesh_rasters = std::mem::take(&mut self.mesh_rasters);
-        for (key, resources) in mesh_rasters {
-            if asset_ids.contains(&key.asset_id) {
-                resources.destroy_asset_resources(gal);
-            } else {
-                self.mesh_rasters.insert(key, resources);
-            }
-        }
         for texture_key in texture_keys {
             if let Some(texture) = self.dynamic_textures.remove(&texture_key) {
                 for handle in [
@@ -260,9 +260,8 @@ impl GuiFrontend {
                 }
             }
         }
-        self.mesh_geometry_cache
-            .retain(|(key, _, _), _| !asset_ids.contains(&key.asset_id));
-        self.mesh_geometry_free_ranges
-            .retain(|key, _| !asset_ids.contains(&key.asset_id));
+        // Keep submitted leases until the shared allocator observes completion.
+        // Their transaction keys prevent reuse as a newly replaced asset.
+
     }
 }

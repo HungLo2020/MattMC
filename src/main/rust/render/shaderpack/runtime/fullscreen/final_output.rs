@@ -452,10 +452,10 @@ impl SourceFinalOutputPlan {
     }
 
     /// Same source copy with the actual prior semantic state of a cached
-    /// frame-slot overlay. Newly staged plans begin Undefined; confirmed
-    /// plans return from the prior present copy in ShaderRead. Keeping that
-    /// distinction explicit prevents an alternating swapchain slot from
-    /// being reattached through an invalid Undefined transition.
+    /// frame-slot overlay color. Newly staged colors begin Undefined;
+    /// confirmed colors return from the prior present copy in ShaderRead.
+    /// The borrowed main depth was already consumed by this frame's source
+    /// passes, independently of whether the overlay color is newly staged.
     pub(crate) fn append_source_copy_from_state(
         &self,
         operations: &mut Vec<CommandOp>,
@@ -468,7 +468,7 @@ impl SourceFinalOutputPlan {
         )));
         operations.push(CommandOp::Barrier(texture_barrier(
             self.overlay.depth_view(),
-            overlay_before,
+            TextureUsageState::ShaderRead,
             TextureUsageState::DepthStencilAttachment,
         )));
         self.source_copy.append_draw(operations);

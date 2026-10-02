@@ -105,6 +105,7 @@ pub struct GuiFrontend {
     cached_pass: Option<CachedPass>,
     mesh_targets: GuiMeshOffscreenTargetCache,
     mesh_rasters: BTreeMap<GuiMeshRasterKey, GuiMeshPassResources>,
+    mesh_geometry_streams: Option<(Handle, Handle)>,
     mesh_shared_programs: BTreeMap<GuiMeshSharedProgramKey, GuiMeshSharedProgram>,
     mesh_composites: BTreeMap<GuiMeshCompositeKey, GuiMeshCompositeResources>,
     item_rasters: BTreeMap<GuiMeshCompositeKey, GuiItemRasterResources>,
@@ -114,7 +115,7 @@ pub struct GuiFrontend {
     // alone is never evidence that their bytes reached the GPU.
     mesh_geometry_transaction: u64,
     mesh_geometry_cache: BTreeMap<(GuiMeshRasterKey, u64, u64), GuiMeshGeometryResidency>,
-    mesh_geometry_free_ranges: BTreeMap<GuiMeshRasterKey, Vec<GuiMeshGeometryResidency>>,
+    mesh_geometry_free_ranges: BTreeMap<(), Vec<GuiMeshGeometryResidency>>,
     mesh_composite_uniform_cursor: u64,
     blur_resources: Option<GuiBlurResources>,
     custom_post_effect_resources: Vec<CustomPostEffectResources>,
@@ -158,6 +159,14 @@ impl GuiFrontend {
         if let Some(pass) = self.cached_pass.take() {
             let _ = gal.destroy(pass.pass);
         }
+        let mesh_rasters = std::mem::take(&mut self.mesh_rasters);
+        for resources in mesh_rasters.into_values() {
+            resources.destroy_asset_resources(gal);
+        }
+        if let Some((vertices, indices)) = self.mesh_geometry_streams.take() {
+            let _ = gal.destroy(indices);
+            let _ = gal.destroy(vertices);
+        }
         let resources = std::mem::take(&mut self.resources);
         for resource in resources.values() {
             for handle in resource.handles_in_destroy_order() {
@@ -168,10 +177,6 @@ impl GuiFrontend {
             for handle in pipeline.handles_in_destroy_order() {
                 let _ = gal.destroy(handle);
             }
-        }
-        let mesh_rasters = std::mem::take(&mut self.mesh_rasters);
-        for resources in mesh_rasters.into_values() {
-            resources.destroy_asset_resources(gal);
         }
         // Mesh raster resource sets also reference these images/samplers.
         // Release every consuming set before its owned image: otherwise GAL

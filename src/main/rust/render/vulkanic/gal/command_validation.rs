@@ -81,7 +81,9 @@ impl VulkanicGal {
                         let target_record = self.render_targets.get(*target)?;
                         (
                             target_record.desc.color_views.clone(),
-                            target_record.desc.depth_stencil_view,
+                            if self.render_pass_desc(*pass)?.depth_format.is_some() {
+                                target_record.desc.depth_stencil_view
+                            } else { None },
                         )
                     };
                     if pass_target != *target {
@@ -104,7 +106,7 @@ impl VulkanicGal {
                             ));
                         }
                     }
-                    if depth_stencil.is_some() && expected_depth.is_none() {
+                    if depth_stencil.is_some() != expected_depth.is_some() {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
                             "pass depth attachment presence does not match target",
@@ -239,12 +241,18 @@ impl VulkanicGal {
                         };
                     }
                 }
-                CommandOp::SetVertexBuffer { buffer, .. } => {
+                CommandOp::SetVertexBuffer { buffer, offset, .. } => {
                     let record = self.buffers.get(*buffer)?;
                     if !record.desc.usages.contains(&BufferUsage::Vertex) {
                         return self.validation_error(GalError::command(
                             StatusCode::InvalidArgument,
                             "vertex buffer binding requires vertex buffer usage",
+                        ));
+                    }
+                    if *offset >= record.desc.size {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "vertex buffer offset is outside the buffer",
                         ));
                     }
                 }
@@ -429,7 +437,14 @@ impl VulkanicGal {
                             "indirect dispatch requires compute pipeline outside render pass",
                         ));
                     }
-                    self.validate_buffer_range(*buffer, *offset, 1, BufferUsage::Indirect)?;
+                    if *offset % 4 != 0 {
+                        return self.validation_error(GalError::command(
+                            StatusCode::InvalidArgument,
+                            "indirect dispatch offset must be four-byte aligned",
+                        ));
+                    }
+                    // One record: three u32 work-group counts.
+                    self.validate_buffer_range(*buffer, *offset, 12, BufferUsage::Indirect)?;
                 }
                 CommandOp::CopyBuffer { src, dst, size }
                 | CommandOp::CopyBufferRegion {
@@ -460,6 +475,16 @@ impl VulkanicGal {
                             "buffer copy requires transfer source and destination usages",
                         ));
                     }
+                    let (src_offset, dst_offset) = match op {
+                        CommandOp::CopyBufferRegion {
+                            src_offset,
+                            dst_offset,
+                            ..
+                        } => (*src_offset, *dst_offset),
+                        _ => (0, 0),
+                    };
+                    self.validate_buffer_range(*src, src_offset, *size, BufferUsage::TransferSrc)?;
+                    self.validate_buffer_range(*dst, dst_offset, *size, BufferUsage::TransferDst)?;
                 }
                 CommandOp::CopyBufferToTexture(region) => {
                     if in_pass {

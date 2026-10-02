@@ -20,7 +20,7 @@ pub(super) enum TerrainGraphIsolation {
 
 impl TerrainGraphIsolation {
     pub(super) fn from_env() -> Self {
-        match std::env::var("MATTMC_RUST_SHADER_GRAPH_ISOLATION")
+        match crate::core::environment::var("MATTMC_RUST_SHADER_GRAPH_ISOLATION")
             .unwrap_or_default()
             .trim()
         {
@@ -450,7 +450,10 @@ impl TerrainSourceColorPassPhase {
 
     pub(super) fn depth_before(self) -> TextureUsageState {
         match self {
-            Self::Bootstrap | Self::BootstrapAfterSky => TextureUsageState::Undefined,
+            Self::Bootstrap => TextureUsageState::Undefined,
+            // The sky can sample the previous main depth before terrain clears
+            // it. Clearing contents does not discard that read dependency.
+            Self::BootstrapAfterSky => TextureUsageState::ShaderRead,
             Self::TexturedMaterial
             | Self::Weather
             | Self::Clouds

@@ -94,7 +94,7 @@ impl ShaderPackRuntimeExecutor {
         history: TerrainDepthHistoryPlan,
     ) -> GalResult<()> {
         if matches!(
-            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             eprintln!(
@@ -1112,7 +1112,7 @@ pub(super) fn screen_texture_before(initialized: bool) -> TextureUsageState {
 }
 
 pub(super) fn write_contract_diagnostic(plan: &ShaderPackRuntimePlan) {
-    let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+    let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
         return;
     };
     let dir = Path::new(&dir);

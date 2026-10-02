@@ -121,7 +121,20 @@ thread_local! {
 }
 
 pub(crate) fn with_registry_mut<T>(f: impl FnOnce(&mut BridgeRegistry) -> T) -> T {
-    BRIDGE_REGISTRY.with(|registry| f(&mut registry.borrow_mut()))
+    let budget = memory::RequestBudget::begin();
+    BRIDGE_REGISTRY.with(|registry| {
+        let mut registry = registry.borrow_mut();
+        let before: Vec<_> = registry.contexts.iter().map(|(id, ctx)| (*id, ctx.ffi_calls, ctx.ffi_input_bytes)).collect();
+        let result = f(&mut registry);
+        for (id, calls, bytes) in before {
+            if let Some(context) = registry.contexts.get_mut(&id) {
+                if context.ffi_calls != calls {
+                    context.ffi_input_bytes = bytes.saturating_add(budget.bytes() as u64);
+                }
+            }
+        }
+        result
+    })
 }
 
 pub(crate) fn with_registry<T>(f: impl FnOnce(&BridgeRegistry) -> T) -> T {

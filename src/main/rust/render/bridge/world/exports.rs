@@ -338,7 +338,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_border_update_asset(
         let input_bytes = if request.is_null() {
             0
         } else {
-            input_bytes_for_world_border_asset_update(&*request)
+            read_struct(request, "input accounting").as_ref().map(input_bytes_for_world_border_asset_update).unwrap_or(0)
         };
         context.ffi_calls += 1;
         context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
@@ -386,7 +386,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_text_update_images(
             .saturating_add(if request.is_null() {
                 0
             } else {
-                input_bytes_for_world_text_image_update(&*request)
+                read_struct(request, "input accounting").as_ref().map(input_bytes_for_world_text_image_update).unwrap_or(0)
             });
         context.ffi_output_bytes = context
             .ffi_output_bytes
@@ -430,7 +430,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_crack_update_assets(
         let input_bytes = if request.is_null() {
             0
         } else {
-            input_bytes_for_world_crack_asset_update(&*request)
+            read_struct(request, "input accounting").as_ref().map(input_bytes_for_world_crack_asset_update).unwrap_or(0)
         };
         context.ffi_calls += 1;
         context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
@@ -476,7 +476,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_lod_update_assets(
         let input_bytes = if request.is_null() {
             0
         } else {
-            input_bytes_for_world_lod_asset_update(&*request)
+            read_struct(request, "input accounting").as_ref().map(input_bytes_for_world_lod_asset_update).unwrap_or(0)
         };
         context.ffi_calls += 1;
         context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);

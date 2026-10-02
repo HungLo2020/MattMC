@@ -77,7 +77,7 @@ pub(in crate::render::worldrender) fn assign_draw_ranges(
 }
 
 pub(in crate::render::worldrender) fn selected(identity: &str) -> bool {
-    std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
+    crate::core::environment::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
         .ok()
         .as_deref()
         == Some("vertex-storage")

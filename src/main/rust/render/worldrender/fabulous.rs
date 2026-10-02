@@ -1133,7 +1133,7 @@ impl WorldPrimitiveFrontend {
                     return Err(error);
                 }
             };
-            if let Err(error) = gal.retire_through(token.submission) {
+            if let Err(error) = gal.retire_completed() {
                 self.world_text.cancel_submission();
                 cleanup_fabulous_frame_blit_resources(gal, &mut final_blit_resources);
                 return Err(error);

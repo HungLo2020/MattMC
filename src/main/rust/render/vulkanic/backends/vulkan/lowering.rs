@@ -446,6 +446,7 @@ impl SubmissionLowerer {
         self.pending.push_back(EncodedSubmission {
             command_buffers,
             host_reads: state.host_reads,
+            uploads: state.uploads,
             timestamp_set,
             pipeline_statistics_set: state.pipeline_statistics_set,
             present_image_index,
@@ -500,7 +501,7 @@ impl SubmissionLowerer {
         let wait_info = acquire_wait_semaphore.map(|semaphore| {
             vk::SemaphoreSubmitInfo::default()
                 .semaphore(semaphore)
-                .stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+                .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
         });
         let wait_infos = wait_info.into_iter().collect::<Vec<_>>();
         let submit = vk::SubmitInfo2::default()
@@ -544,6 +545,7 @@ impl SubmissionLowerer {
             id,
             command_buffers: encoded.command_buffers,
             host_reads: encoded.host_reads,
+            uploads: encoded.uploads,
             timestamp_set: encoded.timestamp_set,
             pipeline_statistics_set: encoded.pipeline_statistics_set,
             publishes_frame_timestamps: encoded.present_image_index.is_some(),
@@ -1277,7 +1279,9 @@ impl SubmissionLowerer {
                                 let view = objects.texture_view(attachment.view)?;
                                 Ok(vk::RenderingAttachmentInfo::default()
                                     .image_view(view.view)
-                                    .image_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
+                                    .image_layout(if view.format == vk::Format::D24_UNORM_S8_UINT {
+                                        vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                    } else { vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL })
                                     .load_op(load_op(attachment.load_op))
                                     .store_op(store_op(attachment.store_op))
                                     .clear_value(vk::ClearValue {
@@ -1338,7 +1342,9 @@ impl SubmissionLowerer {
                                 let view = objects.texture_view(attachment.view)?;
                                 Ok(vk::RenderingAttachmentInfo::default()
                                     .image_view(view.view)
-                                    .image_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
+                                    .image_layout(if view.format == vk::Format::D24_UNORM_S8_UINT {
+                                        vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                    } else { vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL })
                                     .load_op(load_op(attachment.load_op))
                                     .store_op(store_op(attachment.store_op))
                                     .clear_value(vk::ClearValue {
@@ -1368,6 +1374,11 @@ impl SubmissionLowerer {
                         .color_attachments(&color_attachments);
                     if let Some(depth_attachment) = depth_attachment.as_ref() {
                         rendering = rendering.depth_attachment(depth_attachment);
+                        if let Some(attachment) = depth_stencil {
+                            if objects.texture_view(attachment.view)?.format == vk::Format::D24_UNORM_S8_UINT {
+                                rendering = rendering.stencil_attachment(depth_attachment);
+                            }
+                        }
                     }
                     self.context
                         .device
@@ -2058,61 +2069,37 @@ impl SubmissionLowerer {
                 } => {
                     let _zone = trace::Zone::new("vulkan.lowering.host-write");
                     let buffer = objects.buffer(*buffer)?;
-                    if !data.is_empty()
-                        && *offset % 4 == 0
-                        && data.len() % 4 == 0
-                        && data.len() <= 65_536
-                    {
-                        self.context.device.cmd_update_buffer(
-                            command_buffer,
-                            buffer.buffer,
-                            *offset,
-                            data,
-                        );
-                        // `cmd_update_buffer` is a transfer write. A following
-                        // explicit TransferDst -> ShaderRead barrier on this
-                        // buffer publishes it to the shader; the extra
-                        // transfer-read dependency is only needed for other
-                        // upload shapes, such as staging buffers copied to an
-                        // image. Mapped writes retain their host dependency.
-                        if !following_publication_barrier {
-                            let transfer_write = vk::BufferMemoryBarrier2::default()
-                                .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-                                .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-                                .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-                                .dst_access_mask(vk::AccessFlags2::TRANSFER_READ)
-                                .buffer(buffer.buffer)
-                                .offset(*offset)
-                                .size(data.len() as u64);
-                            self.context.device.cmd_pipeline_barrier2(
-                                command_buffer,
-                                &vk::DependencyInfo::default()
-                                    .buffer_memory_barriers(std::slice::from_ref(&transfer_write)),
-                            );
-                        }
+                    if data.is_empty() { return Ok(()); }
+                    // Order reuse against reads/writes in earlier submissions too.
+                    let before = vk::BufferMemoryBarrier2::default()
+                        .src_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+                        .src_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE)
+                        .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                        .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                        .buffer(buffer.buffer).offset(*offset).size(data.len() as u64);
+                    self.context.device.cmd_pipeline_barrier2(command_buffer,
+                        &vk::DependencyInfo::default().buffer_memory_barriers(std::slice::from_ref(&before)));
+                    if *offset % 4 == 0 && data.len() % 4 == 0 && data.len() <= 65_536 {
+                        self.context.device.cmd_update_buffer(command_buffer, buffer.buffer, *offset, data);
                     } else {
-                        let memory_offset =
-                            buffer.memory_offset.checked_add(*offset).ok_or_else(|| {
-                                GalError::backend("Vulkan host-write buffer offset overflow")
-                            })?;
-                        self.context
-                            .write_mapped_memory(buffer.memory, memory_offset, data)?;
-                        // Mapped writes happen on the host while the command
-                        // buffer is being recorded; they are not transfer
-                        // commands. Establish host-write availability before
-                        // the semantic TransferDst -> consumer barrier that
-                        // follows this operation. Without this dependency,
-                        // uniform/storage uploads could remain invisible to a
-                        // later shader read on a non-coherent execution path.
-                        let host_write =
-                            mapped_host_write_dependency(buffer.buffer, *offset, data.len() as u64);
-                        self.context.device.cmd_pipeline_barrier2(
-                            command_buffer,
-                            &vk::DependencyInfo::default()
-                                .buffer_memory_barriers(std::slice::from_ref(&host_write)),
-                        );
+                        let upload = SubmissionUpload::new(self.context.clone(), data)?;
+                        self.context.device.cmd_copy_buffer(command_buffer, upload.buffer, buffer.buffer,
+                            &[vk::BufferCopy::default().src_offset(0).dst_offset(*offset).size(data.len() as u64)]);
+                        // Ownership follows the submission until its timeline retires.
+                        state.uploads.push(upload);
+                    }
+                    if !following_publication_barrier {
+                        let after = vk::BufferMemoryBarrier2::default()
+                            .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                            .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                            .dst_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+                            .dst_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE)
+                            .buffer(buffer.buffer).offset(*offset).size(data.len() as u64);
+                        self.context.device.cmd_pipeline_barrier2(command_buffer,
+                            &vk::DependencyInfo::default().buffer_memory_barriers(std::slice::from_ref(&after)));
                     }
                 }
+
                 CommandOp::HostReadBuffer {
                     buffer,
                     offset,
@@ -2930,15 +2917,41 @@ mod timestamp_tests {
         );
     }
 
-    #[test]
-    fn mapped_host_writes_publish_to_the_transfer_consumer_stage() {
-        let barrier = mapped_host_write_dependency(vk::Buffer::null(), 12, 48);
-        assert!(vk::PipelineStageFlags2::HOST == barrier.src_stage_mask);
-        assert!(vk::AccessFlags2::HOST_WRITE == barrier.src_access_mask);
-        assert!(vk::PipelineStageFlags2::TRANSFER == barrier.dst_stage_mask);
-        assert!(vk::AccessFlags2::TRANSFER_WRITE == barrier.dst_access_mask);
-        assert_eq!(12, barrier.offset);
-        assert_eq!(48, barrier.size);
+
+}
+
+// RAII also releases staging allocations when encoding or submission fails.
+struct SubmissionUpload {
+    context: Arc<VulkanContext>,
+    buffer: vk::Buffer,
+    memory: vk::DeviceMemory,
+}
+
+impl SubmissionUpload {
+    fn new(context: Arc<VulkanContext>, bytes: &[u8]) -> GalResult<Self> {
+        let info = vk::BufferCreateInfo::default().size(bytes.len() as u64)
+            .usage(vk::BufferUsageFlags::TRANSFER_SRC).sharing_mode(vk::SharingMode::EXCLUSIVE);
+        let buffer = unsafe { context.device.create_buffer(&info, None) }
+            .map_err(|e| GalError::backend(format!("upload buffer creation failed: {e:?}")))?;
+        let mut upload = Self { context, buffer, memory: vk::DeviceMemory::null() };
+        let requirements = unsafe { upload.context.device.get_buffer_memory_requirements(buffer) };
+        upload.memory = upload.context.allocate_memory(requirements,
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT)?;
+        unsafe { upload.context.device.bind_buffer_memory(buffer, upload.memory, 0) }
+            .map_err(|e| GalError::backend(format!("upload buffer binding failed: {e:?}")))?;
+        upload.context.write_mapped_memory(upload.memory, 0, bytes)?;
+        Ok(upload)
+    }
+}
+
+impl Drop for SubmissionUpload {
+    fn drop(&mut self) {
+        unsafe {
+            self.context.device.destroy_buffer(self.buffer, None);
+            if self.memory != vk::DeviceMemory::null() {
+                self.context.device.free_memory(self.memory, None);
+            }
+        }
     }
 }
 
@@ -2956,6 +2969,7 @@ struct EncodingState {
     transfer_dst_textures: BTreeSet<Handle>,
     pending_frame_presents: BTreeMap<Handle, FramePresentTransition>,
     host_reads: Vec<HostReadRequest>,
+    uploads: Vec<SubmissionUpload>,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
     current_timestamp_pass: Option<TimingSpan>,
@@ -2974,6 +2988,7 @@ struct FramePresentTransition {
 struct EncodedSubmission {
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
+    uploads: Vec<SubmissionUpload>,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
     present_image_index: Option<u32>,
@@ -2983,6 +2998,7 @@ struct InFlightSubmission {
     id: SubmissionId,
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
+    uploads: Vec<SubmissionUpload>,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
     publishes_frame_timestamps: bool,
@@ -3085,21 +3101,6 @@ fn frame_layout_access_mask(layout: vk::ImageLayout) -> vk::AccessFlags2 {
     }
 }
 
-fn mapped_host_write_dependency(
-    buffer: vk::Buffer,
-    offset: u64,
-    size: u64,
-) -> vk::BufferMemoryBarrier2<'static> {
-    vk::BufferMemoryBarrier2::default()
-        .src_stage_mask(vk::PipelineStageFlags2::HOST)
-        .src_access_mask(vk::AccessFlags2::HOST_WRITE)
-        .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-        .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-        .buffer(buffer)
-        .offset(offset)
-        .size(size)
-}
-
 pub(super) fn stage_mask(state: TextureUsageState) -> vk::PipelineStageFlags2 {
     match state {
         TextureUsageState::Undefined => vk::PipelineStageFlags2::TOP_OF_PIPE,
@@ -3109,6 +3110,7 @@ pub(super) fn stage_mask(state: TextureUsageState) -> vk::PipelineStageFlags2 {
             vk::PipelineStageFlags2::COMPUTE_SHADER
                 | vk::PipelineStageFlags2::VERTEX_SHADER
                 | vk::PipelineStageFlags2::FRAGMENT_SHADER
+                | if state == TextureUsageState::ShaderRead { vk::PipelineStageFlags2::VERTEX_ATTRIBUTE_INPUT } else { vk::PipelineStageFlags2::empty() }
         }
         TextureUsageState::ColorAttachment => vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
         TextureUsageState::DepthStencilAttachment => {
@@ -3147,6 +3149,7 @@ pub(super) fn access_mask(state: TextureUsageState) -> vk::AccessFlags2 {
             vk::AccessFlags2::SHADER_SAMPLED_READ
                 | vk::AccessFlags2::UNIFORM_READ
                 | vk::AccessFlags2::SHADER_STORAGE_READ
+                | vk::AccessFlags2::VERTEX_ATTRIBUTE_READ
         }
         // Writable bindings may be read/modify/write (including atomics).
         // The coarse GAL shader-write state must make initial data visible

@@ -663,3 +663,33 @@ fn skips_unsupported_conditions_in_inactive_parents_and_rejects_invalid_branch_c
     })
     .is_err());
 }
+
+#[test]
+fn directive_tokens_and_continuations_select_the_correct_branch() {
+    let pack = source(vec![ShaderSourceFile::new("test.vsh", "# define\tON 1\n#if(ON) && \\\n1\nselected\n#else\nwrong\n#endif\n")]);
+    let output = preprocess(PreprocessInput { source: &pack, entry: "test.vsh", defines: &[] }).unwrap();
+    assert!(output.contains("selected"));
+    assert!(!output.contains("wrong"));
+}
+
+#[test]
+fn deep_includes_and_conditions_return_errors() {
+    let pack = source((0..66).map(|n| ShaderSourceFile::new(format!("{n}.vsh"),
+        if n == 65 { "done".into() } else { format!("#include \"{}.vsh\"", n + 1) })).collect());
+    assert!(preprocess(PreprocessInput { source: &pack, entry: "0.vsh", defines: &[] }).is_err());
+    assert!(evaluate_condition(&format!("{}1", "!".repeat(256)), &BTreeMap::new()).is_err());
+    let mut defines = BTreeMap::new();
+    for n in 0..256 { defines.insert(format!("A{n}"), format!("A{}", n + 1)); }
+    assert!(numeric_define_value("A0", &defines).is_err());
+}
+
+#[test]
+fn repeated_false_aliases_cannot_expand_condition_work_exponentially() {
+    let mut defines = BTreeMap::new();
+    for n in 0..32 {
+        defines.insert(format!("A{n}"), format!("A{}||A{}", n + 1, n + 1));
+    }
+    defines.insert("A32".into(), "0".into());
+    let error = evaluate_condition("A0", &defines).unwrap_err();
+    assert!(error.message.contains("work budget"));
+}

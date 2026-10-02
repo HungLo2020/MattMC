@@ -116,7 +116,7 @@ pub(crate) fn compact_static_direct_terrain_vertex_source(source: String) -> Str
     // this static shader source, so the A/B isolates the branch removal while
     // retaining the same geometry, resources, and draw schedule.
     if matches!(
-        std::env::var("MATTMC_RUST_DISABLE_STATIC_TERRAIN_LIGHT_BRANCH").as_deref(),
+        crate::core::environment::var("MATTMC_RUST_DISABLE_STATIC_TERRAIN_LIGHT_BRANCH").as_deref(),
         Ok("1") | Ok("true") | Ok("yes")
     ) {
         return source;
@@ -328,7 +328,7 @@ pub(crate) fn minimal_direct_terrain_fragment_source(kind: TerrainMaterialProgra
         terrain_fragment_source_with_pass_define(MINIMAL_TERRAIN_MATERIAL_FRAGMENT_DIRECT, kind);
     terrain_fragment_coordinate_probe(
         source,
-        std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
+        crate::core::environment::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
             .ok()
             .as_deref(),
     )
@@ -410,7 +410,7 @@ pub(crate) fn terrain_fragment_discard_define(kind: TerrainMaterialProgramKind) 
 pub(crate) fn minimal_direct_terrain_vertex_source() -> String {
     terrain_vertex_coordinate_probe(
         MINIMAL_TERRAIN_MATERIAL_VERTEX.to_string(),
-        std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
+        crate::core::environment::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
             .ok()
             .as_deref(),
     )
@@ -514,7 +514,7 @@ void main() {
 "#;
     terrain_vertex_coordinate_probe(
         source.to_string(),
-        std::env::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
+        crate::core::environment::var("MATTMC_RUST_TERRAIN_COORDINATE_PROBE")
             .ok()
             .as_deref(),
     )

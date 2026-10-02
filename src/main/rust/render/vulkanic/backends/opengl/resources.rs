@@ -1559,7 +1559,12 @@ fn parse_layout_bindings(source: &str) -> ShaderInterfaceBindings {
 }
 
 pub(super) fn min_filter(desc: &SamplerDesc) -> i32 {
-    filter(desc.min_filter)
+    match (desc.min_filter, desc.mip_filter) {
+        (SamplerFilter::Nearest, SamplerFilter::Nearest) => glow::NEAREST_MIPMAP_NEAREST as i32,
+        (SamplerFilter::Nearest, SamplerFilter::Linear) => glow::NEAREST_MIPMAP_LINEAR as i32,
+        (SamplerFilter::Linear, SamplerFilter::Nearest) => glow::LINEAR_MIPMAP_NEAREST as i32,
+        (SamplerFilter::Linear, SamplerFilter::Linear) => glow::LINEAR_MIPMAP_LINEAR as i32,
+    }
 }
 
 pub(super) fn address(mode: SamplerAddressMode) -> i32 {

@@ -555,7 +555,7 @@ impl WorldPrimitiveFrontend {
     }
 
     pub(in crate::render::worldrender) fn flush_pending_world_uploads(&mut self, gal: &mut VulkanicGal) -> GalResult<()> {
-        let operations = std::mem::take(&mut self.pending_world_upload_ops);
+        let operations = self.pending_world_upload_ops.clone();
         if operations.is_empty() {
             return Ok(());
         }
@@ -566,6 +566,7 @@ impl WorldPrimitiveFrontend {
                 operations,
             })],
         })?;
+        self.pending_world_upload_ops.clear();
         Ok(())
     }
 
@@ -625,10 +626,10 @@ impl WorldPrimitiveFrontend {
                 index_range,
             };
             if capture_layered_geometry
-                || self
+                || (crate::core::environment::var_os("MATTMC_GRAPHICS_AUDIT").is_some() && self
                     .mesh_assets
                     .get(&key.mesh_key)
-                    .is_some_and(|asset| asset.entity_identity == "minecraft:wolf")
+                    .is_some_and(|asset| asset.entity_identity == "minecraft:wolf"))
             {
                 // Diagnostic exhaustion must not alter resource creation or rendering.
                 // Missing watches cause capture verification to reject the evidence.
@@ -1488,40 +1489,7 @@ impl WorldPrimitiveFrontend {
             self.destroy_mesh_resources_for_keys(gal, matching_keys);
             return Ok(());
         }
-        let mut geometry_keys = BTreeSet::new();
-        for key in matching_keys {
-            if let Some(resources) = self.mesh_resources.get(&key) {
-                geometry_keys.insert(resources.geometry_key);
-            }
-        }
-        geometry_keys.extend(
-            self.source_mesh_resources
-                .iter()
-                .filter(|(key, _)| key.mesh.mesh_key == update.mesh_key)
-                .map(|(_, resources)| resources.geometry_key),
-        );
-        for geometry_key in geometry_keys {
-            if let Some(resources) = self.mesh_geometry_resources.get(&geometry_key) {
-                gal.submit(SubmissionBatch {
-                    label: "world-mesh.sorted-index-update".to_string(),
-                    command_lists: vec![CommandList::from(CommandListDesc {
-                        label: "world-mesh.sorted-index-update.commands".to_string(),
-                        operations: vec![
-                            CommandOp::HostWriteBuffer {
-                                buffer: resources.index_buffer,
-                                offset: resources.index_offset,
-                                data: update.index_bytes.clone(),
-                            },
-                            CommandOp::Barrier(buffer_barrier(
-                                resources.index_buffer,
-                                TextureUsageState::TransferDst,
-                                TextureUsageState::IndexRead,
-                            )),
-                        ],
-                    })],
-                })?;
-            }
-        }
+        // GPU updates were accepted as one transaction before publishing the asset generation.
         Ok(())
     }
 

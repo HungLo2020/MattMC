@@ -74,7 +74,7 @@ impl GuiFrontend {
         for (key, residency) in released {
             self.mesh_geometry_cache.remove(&key);
             self.mesh_geometry_free_ranges
-                .entry(key.0)
+                .entry(())
                 .or_default()
                 .push(residency);
         }
@@ -107,7 +107,7 @@ impl GuiFrontend {
         index_bytes: u64,
     ) -> GalResult<GuiMeshGeometryResidency> {
         self.mesh_geometry_free_ranges
-            .entry(raster_key)
+            .entry(())
             .or_insert_with(|| {
                 vec![GuiMeshGeometryResidency {
                     stream: GuiMeshStreamRange::default(),
@@ -116,21 +116,20 @@ impl GuiFrontend {
                     usage: crate::render::vulkanic::commands::SubmissionUsage::default(),
                 }]
             });
-        let index = self.mesh_geometry_free_ranges[&raster_key]
+        let index = self.mesh_geometry_free_ranges[&()]
             .iter()
             .position(|range| {
                 range.vertex_bytes >= vertex_bytes && range.index_bytes >= index_bytes
             });
         let range = if let Some(index) = index {
             self.mesh_geometry_free_ranges
-                .get_mut(&raster_key)
+                .get_mut(&())
                 .expect("range entry was initialized")
                 .remove(index)
         } else {
             let oldest = self
                 .mesh_geometry_cache
                 .iter()
-                .filter(|((key, _, _), _)| *key == raster_key)
                 .filter(|(_, residency)| !residency.usage.has_pending_commands())
                 .map(|(_, residency)| residency.usage.last_submission())
                 .min()
@@ -157,7 +156,7 @@ impl GuiFrontend {
         let remaining_index_bytes = range.index_bytes - index_bytes;
         if remaining_vertex_bytes != 0 || remaining_index_bytes != 0 {
             self.mesh_geometry_free_ranges
-                .get_mut(&raster_key)
+                .get_mut(&())
                 .expect("range entry remains initialized")
                 .push(GuiMeshGeometryResidency {
                     stream: GuiMeshStreamRange {

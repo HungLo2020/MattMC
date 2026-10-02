@@ -458,6 +458,8 @@ pub(super) unsafe fn section_builder_append_flat_quad_records_encoded(
                 let record = records[processed + index];
                 pending.quads[index] = record.quad;
                 pending.packed_normals[index] = record.packed_normal;
+                pending.primitive_kinds[index] = primitive_kind_override
+                    .unwrap_or_else(|| primitive_kind_for_quad(&record.quad));
             }
         }
 
@@ -485,7 +487,7 @@ pub(super) unsafe fn section_builder_append_flat_quad_records_encoded(
         };
 
         let primitive_kinds =
-            builder.pending[facing].primitive_kinds[processed..processed + chunk_count].to_vec();
+            builder.pending[facing].primitive_kinds[..chunk_count].to_vec();
         let chunk_committed = section_builder_append_batch_encoded_with_kind(
             builder,
             facing,
@@ -511,6 +513,21 @@ pub(super) unsafe fn section_builder_append_flat_quad_records_encoded(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flat_records_reset_kinds_and_cross_pending_batch_boundaries() {
+        let count = PENDING_BATCH_QUAD_CAPACITY + 17;
+        let mut builder = create_section_mesh_builder(count);
+        builder.pending[0].primitive_kinds.fill(TERRAIN_PRIMITIVE_BUILTIN_WATER);
+        let records = vec![FlatQuadRecord::default(); count];
+        let format = NativeFormat { vertex_stride: 32, block_id_offset: 0, normal_offset: 0,
+            tangent_offset: 0, mid_uv_offset: 0, mid_block_offset: 0, section_index: 0, separate_ao: false };
+        let result = unsafe { section_builder_append_flat_quad_records_encoded(&mut builder, 0,
+            records.as_ptr() as u64, count, std::mem::size_of::<FlatQuadRecord>(), None, format, true, None) }.unwrap();
+        assert_eq!((count as i32, count as i32), result);
+        assert!(builder.buffers[0].primitive_metadata[..count].iter()
+            .all(|item| item.primitive_kind == TERRAIN_PRIMITIVE_UNKNOWN));
+    }
 
     #[test]
     fn primitive_kind_uses_translucent_pass_not_cutout_pass() {

@@ -57,7 +57,7 @@ impl SelectedSourceFullscreenTraceCapture {
         consumers: &[PreparedNamedSourceFullscreenConsumer],
         extent: Extent3d,
     ) -> GalResult<Vec<Self>> {
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return Ok(Vec::new());
         };
         if !selected_source_output_capture_requested(frame)? {
@@ -138,7 +138,7 @@ impl SelectedSourceOutputCapture {
         {
             return Ok(None);
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return Ok(None);
         };
         if !selected_source_output_capture_requested(frame)?
@@ -173,7 +173,7 @@ impl SelectedSourceOutputCapture {
         {
             return Ok(None);
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return Ok(None);
         };
         if !selected_source_output_capture_requested(frame)?
@@ -208,7 +208,7 @@ impl SelectedSourceOutputCapture {
         {
             return Ok(None);
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return Ok(None);
         };
         if !selected_source_output_capture_requested(frame)?
@@ -242,7 +242,7 @@ impl SelectedSourceOutputCapture {
         {
             return Ok(None);
         }
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return Ok(None);
         };
         if !selected_source_output_capture_requested(frame)?
@@ -272,7 +272,7 @@ impl SelectedSourceOutputCapture {
         format: TextureFormat,
         extent: Extent3d,
     ) -> GalResult<Option<Self>> {
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return Ok(None);
         };
         if selected_source_fullscreen_stage_capture().is_some() {
@@ -309,7 +309,7 @@ impl SelectedSourceOutputCapture {
         format: TextureFormat,
         extent: Extent3d,
     ) -> GalResult<Option<Self>> {
-        let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
             return Ok(None);
         };
         if !selected_source_output_capture_requested(frame)?
@@ -513,7 +513,7 @@ impl SelectedSourceOutputCapture {
 }
 
 pub(in crate::render::worldrender) fn selected_source_capture_stage() -> &'static str {
-    match std::env::var("MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE")
+    match crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE")
         .ok()
         .as_deref()
         .map(str::trim)
@@ -537,7 +537,7 @@ pub(in crate::render::worldrender) fn selected_source_terrain_capture_before_sta
 /// complete Rust-owned fullscreen chain. The name remains a pack semantic
 /// identity, never a source attachment number or backend resource handle.
 pub(in crate::render::worldrender) fn selected_source_shader_pack_color_capture_name() -> Option<String> {
-    std::env::var("MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE")
+    crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE")
         .ok()
         .and_then(|value| {
             value
@@ -555,7 +555,7 @@ pub(in crate::render::worldrender) fn selected_source_shader_pack_color_capture_
 /// guesses a stage or attachment.
 pub(in crate::render::worldrender) fn selected_source_fullscreen_stage_capture() -> Option<SelectedSourceFullscreenStageCapture> {
     parse_selected_source_fullscreen_stage_capture(
-        std::env::var("MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE")
+        crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE")
             .ok()?
             .as_str(),
     )
@@ -563,7 +563,7 @@ pub(in crate::render::worldrender) fn selected_source_fullscreen_stage_capture()
 
 pub(in crate::render::worldrender) fn selected_source_fullscreen_stage_trace_enabled() -> bool {
     matches!(
-        std::env::var("MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE")
+        crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_CAPTURE_STAGE")
             .as_deref()
             .map(str::trim),
         Ok("shader-pack-trace")
@@ -589,14 +589,14 @@ pub(in crate::render::worldrender) fn parse_selected_source_fullscreen_stage_cap
 /// full-frame readback before the deterministic screenshot request exists.
 pub(in crate::render::worldrender) fn selected_source_output_capture_requested(frame: &WorldPrimitiveFrame) -> GalResult<bool> {
     if !matches!(
-        std::env::var("MATTMC_RUST_SELECTED_SOURCE_EXECUTION")
+        crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_EXECUTION")
             .as_deref()
             .map(str::trim),
         Ok("1") | Ok("true") | Ok("TRUE")
     ) {
         return Ok(false);
     }
-    let Some(request_path) = std::env::var_os("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST") else {
+    let Some(request_path) = crate::core::environment::var_os("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST") else {
         return Ok(false);
     };
     let request_path = PathBuf::from(request_path);
@@ -689,11 +689,11 @@ impl GameplayAttachmentCapture {
         conventions: ShaderConventions,
         source_selected: bool,
     ) -> GalResult<Option<Self>> {
-        let Some(dir) = std::env::var_os("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR") else {
+        let Some(dir) = crate::core::environment::var_os("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR") else {
             return Ok(None);
         };
         let request_path =
-            std::env::var_os("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST").map(PathBuf::from);
+            crate::core::environment::var_os("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_REQUEST").map(PathBuf::from);
         // Normal capture uses the Java deterministic selector.  The explicit
         // diagnostic-once mode is deliberately Rust-owned: it reads back one
         // eligible submitted frame to isolate a pass-local defect when that
@@ -702,7 +702,7 @@ impl GameplayAttachmentCapture {
         // execution, where correlation is part of source admission.
         let diagnostic_once = !source_selected
             && matches!(
-                std::env::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIAGNOSTIC_ONCE").as_deref(),
+                crate::core::environment::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIAGNOSTIC_ONCE").as_deref(),
                 Ok("1") | Ok("true") | Ok("TRUE")
             );
         let request =
@@ -744,7 +744,7 @@ impl GameplayAttachmentCapture {
             request
         };
         let min_mesh_instances =
-            std::env::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES")
+            crate::core::environment::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_MIN_MESH_INSTANCES")
                 .ok()
                 .and_then(|value| value.parse::<usize>().ok())
                 .unwrap_or(1);
@@ -786,7 +786,7 @@ impl GameplayAttachmentCapture {
             // A full attachment dump is intentionally expensive. Deterministic
             // multi-pose captures retain it for their selected diagnostic pose;
             // later poses need only the exact renderer-owned final image.
-            final_output_only: std::env::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY")
+            final_output_only: crate::core::environment::var("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_FINAL_ONLY")
                 .is_ok_and(|value| matches!(value.as_str(), "1" | "true" | "TRUE")),
             workload_fingerprint: format!(
                 "segments={} crack_quads={} border_quads={} material_quads={} mesh_instances={} lod_instances={} lod_route_selected={} background_enabled={}",

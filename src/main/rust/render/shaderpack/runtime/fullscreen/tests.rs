@@ -283,15 +283,36 @@ fn final_output_plan_copies_only_the_final_stage_named_output_to_a_frame_target(
     assert_eq!(TextureFormat::Rgba8Unorm, plan.overlay_color_format());
     assert_ne!(frame_target, plan.overlay_color_attachment());
     assert_eq!(depth_view, plan.overlay_depth_attachment());
+    // A final source pass samples main depth before the newly staged overlay
+    // borrows it. Only the overlay color is new; depth retains that read.
+    let source_render_target = gal.create_render_target(RenderTargetDesc {
+        label: "depth-consumer.target".into(),
+        color_views: vec![source_target.current_view],
+        depth_stencil_view: None,
+        extent: targets.identity.extent,
+    }).unwrap();
+    let depth_consumer = SourceColorCopyPlan::stage(
+        &mut gal, "depth-consumer", depth_view, source_render_target,
+        source_target.current_view, TextureFormat::Rgba8Unorm, None,
+    ).unwrap();
     let mut operations = vec![CommandOp::Barrier(ResourceBarrier {
         resource: source_target.current_texture,
         subresources: None,
         before: TextureUsageState::Undefined,
-        after: TextureUsageState::ShaderRead,
+        after: TextureUsageState::ColorAttachment,
         src_queue: QueueClass::Graphics,
         dst_queue: QueueClass::Graphics,
     })];
-    plan.append_source_copy(&mut operations);
+    depth_consumer.append_draw(&mut operations);
+    operations.push(CommandOp::Barrier(ResourceBarrier {
+        resource: source_target.current_texture,
+        subresources: None,
+        before: TextureUsageState::ColorAttachment,
+        after: TextureUsageState::ShaderRead,
+        src_queue: QueueClass::Graphics,
+        dst_queue: QueueClass::Graphics,
+    }));
+    plan.append_source_copy_from_state(&mut operations, TextureUsageState::Undefined);
     // Model a world overlay pass between the source copy and final
     // presentation. The color target must remain an attachment until the
     // last overlay writer has completed.
@@ -386,6 +407,8 @@ fn final_output_plan_copies_only_the_final_stage_named_output_to_a_frame_target(
         })],
     })
     .expect("the source final copy must be an ordinary explicit GAL submission");
+    depth_consumer.destroy(&mut gal);
+    gal.destroy(source_render_target).unwrap();
     presented_capture.destroy(&mut gal);
     plan.destroy(&mut gal);
     gal.destroy(depth_view).unwrap();

@@ -27,7 +27,9 @@ public class IrisFabricHelpers implements IrisPlatformHelpers {
 
 	@Override
 	public String getVersion() {
-		return FabricLoader.getInstance().getModContainer("iris").get().getMetadata().getVersion().getFriendlyString();
+		return FabricLoader.getInstance().getModContainer("iris")
+			.map(mod -> mod.getMetadata().getVersion().getFriendlyString())
+			.orElse("MattMC integrated");
 	}
 
 	@Override

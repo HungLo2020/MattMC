@@ -371,7 +371,7 @@ impl WorldPrimitiveFrontend {
             }
         }
         let resources = result?;
-        if standard_foil && std::env::var_os("MATTMC_STANDARD_FOIL_TRACE").is_some() {
+        if standard_foil && crate::core::environment::var_os("MATTMC_STANDARD_FOIL_TRACE").is_some() {
             eprintln!(
                 "standard-foil.pipeline-created program={} mode={} depth={} generation={}",
                 STANDARD_ITEM_FOIL_PROGRAM_ID, key.material_mode, key.depth_policy, self.generation

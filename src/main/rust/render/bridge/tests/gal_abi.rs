@@ -1158,3 +1158,18 @@ fn ffi_status_completion_and_retirement_results_are_structured() {
     assert_eq!(owned.len(), 2);
     assert_eq!(owned[0].kind(), Some(HandleKind::Buffer));
 }
+
+#[test]
+fn failed_resource_batch_releases_all_successful_creates() {
+    let mut context = BridgeContext {
+        gal: gal(), windowed_presenter: false, gui_frontend: Default::default(),
+        world_primitive_frontend: Default::default(), ffi_calls: 0, ffi_input_bytes: 0,
+        ffi_output_bytes: 0, last_error: String::new(), frame_targets: Default::default(),
+        stale_frame_targets: Vec::new(),
+    };
+    let make = |request_id, size| FfiOwnedCreate { request_id, desc: BufferDesc {
+        label: "batch-rollback".into(), size, memory: MemoryDomain::Upload, usages: vec![BufferUsage::Uniform] } };
+    let batch = FfiOwnedResourceBatch { buffers: vec![make(1, 64), make(2, 0)], ..Default::default() };
+    assert!(execute_resource_batch(&mut context, batch).is_err());
+    assert_eq!(context.gal.metrics().resource_creates, context.gal.metrics().resource_destroys);
+}

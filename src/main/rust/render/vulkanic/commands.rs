@@ -51,7 +51,7 @@ impl SubmissionUsage {
 pub enum TextureUsageState {
     /// Contents are not needed (first use or discard).
     Undefined = 1,
-    /// Sampled or read by shaders.
+    /// Sampled or read by shaders; for buffers, also vertex attribute input.
     ShaderRead = 2,
     /// Written by shaders through a storage binding.
     ShaderWrite = 3,

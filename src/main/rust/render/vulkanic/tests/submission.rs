@@ -113,7 +113,7 @@ fn large_supported_batches_validate_with_backend_limits() {
                         resource: dst,
                         subresources: None,
                         before: TextureUsageState::TransferDst,
-                        after: TextureUsageState::ShaderRead,
+                        after: TextureUsageState::TransferDst,
                         src_queue: QueueClass::Graphics,
                         dst_queue: QueueClass::Graphics,
                     }),

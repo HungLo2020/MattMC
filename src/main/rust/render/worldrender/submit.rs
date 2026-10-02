@@ -71,7 +71,7 @@ impl WorldPrimitiveFrontend {
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
-        let direction = match std::env::var("MATTMC_RUST_OWNED_WORLD_TARGET").as_deref() {
+        let direction = match crate::core::environment::var("MATTMC_RUST_OWNED_WORLD_TARGET").as_deref() {
             Ok("1") => Some(RasterYDirection::Up),
             Ok("down") => Some(RasterYDirection::Down),
             _ => self.vanilla_world_output_direction(gal, frame_target, &frame),
@@ -360,7 +360,7 @@ impl WorldPrimitiveFrontend {
         // of cloning every mesh instance and semantic vector each render.
         let preserve_world_text_receipt = !frame.text_quads.is_empty()
             && matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT")
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                     .as_deref()
                     .map(str::trim),
                 Ok("1") | Ok("true") | Ok("TRUE")
@@ -1036,7 +1036,9 @@ impl WorldPrimitiveFrontend {
                 .expect("attachment capture retains the complete semantic frame");
             capture.decal_inputs = diagnostics::decal_capture::observe(gal, self, frame, &ops);
             capture.equipment_inputs = diagnostics::equipment_capture::observe(gal, self, frame, &ops);
-            capture.wolf_inputs = diagnostics::equipment_capture::observe_wolf(gal, self, frame, &ops);
+            if crate::core::environment::var_os("MATTMC_GRAPHICS_AUDIT").is_some() {
+                capture.wolf_inputs = diagnostics::equipment_capture::observe_wolf(gal, self, frame, &ops);
+            }
         }
         whole_frame_phase_trace(
             "post-graph-compose",

@@ -415,6 +415,7 @@ impl OpenGlLowerer {
                     if let Some(depth) = depth_stencil {
                         if depth.load_op == AttachmentLoadOp::Clear {
                             self.gl.depth_mask(true);
+                            self.cache.depth_valid = false;
                             self.gl.clear_depth_f32(1.0);
                             mask |= glow::DEPTH_BUFFER_BIT;
                             if pass_object.depth_format == Some(TextureFormat::Depth24Stencil8) {
@@ -661,7 +662,8 @@ impl OpenGlLowerer {
             .map_err(|_| GalError::backend("texture mip exceeds i32"))?;
         let x = i32::try_from(region.texture_origin.x)
             .map_err(|_| GalError::backend("texture origin x exceeds i32"))?;
-        let y = gl_y_for_copy_region(texture, region)?;
+        let y = i32::try_from(region.texture_origin.y)
+            .map_err(|_| GalError::backend("texture origin y exceeds i32"))?;
         let z = i32::try_from(region.texture_origin.z)
             .map_err(|_| GalError::backend("texture origin z exceeds i32"))?;
         let width = i32::try_from(region.extent.width)
@@ -718,6 +720,7 @@ impl OpenGlLowerer {
             }
             self.gl.bind_buffer(glow::PIXEL_UNPACK_BUFFER, prior);
         }
+        self.cache.textures.clear();
         Ok(())
     }
 
@@ -1149,7 +1152,7 @@ impl OpenGlLowerer {
                 self.cache.blend = Some(blend);
                 self.cache.state_changes += 1;
             }
-            if self.cache.depth_compare != depth_compare || self.cache.depth_write != depth_write {
+            if !self.cache.depth_valid || self.cache.depth_compare != depth_compare || self.cache.depth_write != depth_write {
                 if let Some(compare) = depth_compare {
                     self.gl.enable(glow::DEPTH_TEST);
                     self.gl.depth_func(compare_op(compare));
@@ -1158,6 +1161,7 @@ impl OpenGlLowerer {
                     self.gl.disable(glow::DEPTH_TEST);
                     self.gl.depth_mask(false);
                 }
+                self.cache.depth_valid = true;
                 self.cache.depth_compare = depth_compare;
                 self.cache.depth_write = depth_write;
                 self.cache.state_changes += 1;
@@ -1299,7 +1303,7 @@ impl OpenGlLowerer {
     }
 
     fn bind_sampler_unit(&mut self, unit: u32, sampler: Option<glow::Sampler>) {
-        if self.cache.samplers.get(&unit).copied().flatten() == sampler {
+        if self.cache.samplers.get(&unit).copied() == Some(sampler) {
             return;
         }
         unsafe {
@@ -1420,6 +1424,7 @@ struct StateCache {
     blend: Option<BlendMode>,
     depth_compare: Option<CompareOp>,
     depth_write: bool,
+    depth_valid: bool,
     depth_bias: Option<crate::render::vulkanic::resources::DepthBias>,
     textures: BTreeMap<u32, (u32, Option<glow::Texture>)>,
     samplers: BTreeMap<u32, Option<glow::Sampler>>,

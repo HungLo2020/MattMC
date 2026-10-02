@@ -250,7 +250,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_gui_submit_frame(
         let input_bytes = if request.is_null() {
             0
         } else {
-            input_bytes_for_gui_frame(&*request)
+            read_struct(request, "input accounting").as_ref().map(input_bytes_for_gui_frame).unwrap_or(0)
         };
         context.ffi_calls += 1;
         context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);

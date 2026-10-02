@@ -8,6 +8,7 @@ impl WorldPrimitiveFrontend {
         update: ShaderPackSourceUpdate,
     ) -> GalResult<()> {
         self.shader_pack_sources.apply_update(update)?;
+        self.post_effect_source_cache.get_mut().clear();
         // Converted source streams embed the pack's block-state material
         // mapping; a new source generation must not reuse them.
         self.source_terrain_mesh_cache.clear();
@@ -30,6 +31,9 @@ impl WorldPrimitiveFrontend {
     /// callers with GAL ownership invoke this only after that success.
     pub fn retire_source_final_outputs_for_shader_reload(&mut self, gal: &mut VulkanicGal) {
         self.source_final_output_cache.destroy(gal);
+        // Mesh bindings borrow layouts/pipelines from the previous source generation.
+        self.destroy_mesh_resources(gal);
+        self.destroy_mesh_pipeline_resources(gal);
     }
 
     pub(crate) fn observe_shader_pack_source_candidate(&mut self) {
@@ -473,7 +477,7 @@ impl WorldPrimitiveFrontend {
     #[cfg(not(test))]
     pub(crate) fn source_execution_enabled(&self) -> bool {
         Self::source_execution_decision(
-            std::env::var("MATTMC_RUST_SELECTED_SOURCE_EXECUTION")
+            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_EXECUTION")
                 .ok()
                 .as_deref(),
             self.shader_pack_sources.active(),

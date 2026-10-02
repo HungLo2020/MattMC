@@ -12,13 +12,13 @@ pub(in crate::render::worldrender) static STATIC_TERRAIN_ATLAS_TRACE_WRITTEN: At
 
 pub(in crate::render::worldrender) fn graphics_audit_enabled() -> bool {
     matches!(
-        std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref().map(str::trim),
+        crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref().map(str::trim),
         Ok("1") | Ok("true") | Ok("TRUE")
     )
 }
 
 pub(in crate::render::worldrender) fn whole_frame_phase_trace(phase: &str, frame_id: u64, started: Option<std::time::Instant>) {
-    if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_none() {
+    if crate::core::environment::var_os("MATTMC_TRACE_WHOLE_FRAME").is_none() {
         return;
     }
     match started {
@@ -38,7 +38,7 @@ pub(in crate::render::worldrender) fn trace_static_terrain_appearance(
     mesh: &WorldMeshAsset,
     atlas: Option<&WorldMaterialTextureAsset>,
 ) {
-    let Some(root) = std::env::var_os("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_DIR") else {
+    let Some(root) = crate::core::environment::var_os("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_DIR") else {
         return;
     };
     // A test-only receipt distinguishes a missing native environment from a
@@ -55,7 +55,7 @@ pub(in crate::render::worldrender) fn trace_static_terrain_appearance(
                 .append(true)
                 .open(root.join("static_terrain_appearance_rust_frontend_receipts.jsonl"))
             {
-                let expected_key = std::env::var("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_MESH_KEY")
+                let expected_key = crate::core::environment::var("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_MESH_KEY")
                     .ok()
                     .and_then(|value| u64::from_str_radix(value.trim_start_matches("0x"), 16).ok());
                 let _ = writeln!(
@@ -68,7 +68,7 @@ pub(in crate::render::worldrender) fn trace_static_terrain_appearance(
             }
         }
     }
-    let expected_key = std::env::var("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_MESH_KEY")
+    let expected_key = crate::core::environment::var("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_MESH_KEY")
         .ok()
         .and_then(|value| u64::from_str_radix(value.trim_start_matches("0x"), 16).ok());
     // A selected mesh remains a one-record trace.  With no selector, retain a
@@ -247,7 +247,7 @@ pub(in crate::render::worldrender) fn trace_builtin_terrain_lightmap_receipt(
     frame: crate::render::shaderpack::vanilla::lightmap::VanillaLightmapFrame,
     rgba: &[u8],
 ) {
-    let Ok(root) = std::env::var("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_DIR") else {
+    let Ok(root) = crate::core::environment::var("MATTMC_STATIC_TERRAIN_APPEARANCE_TRACE_DIR") else {
         return;
     };
     let root = Path::new(&root);
@@ -346,14 +346,14 @@ pub(in crate::render::worldrender) fn trace_static_terrain_mesh_batch(
     batches: &[MeshBatch],
     sorted_indices: &[u8],
 ) {
-    let Some(root) = std::env::var_os("MATTMC_STATIC_TERRAIN_BATCH_TRACE_DIR") else {
+    let Some(root) = crate::core::environment::var_os("MATTMC_STATIC_TERRAIN_BATCH_TRACE_DIR") else {
         return;
     };
-    let requested_mesh_key = std::env::var("MATTMC_STATIC_TERRAIN_BATCH_TRACE_MESH_KEY")
+    let requested_mesh_key = crate::core::environment::var("MATTMC_STATIC_TERRAIN_BATCH_TRACE_MESH_KEY")
         .ok()
         .and_then(|value| u64::from_str_radix(value.trim_start_matches("0x"), 16).ok());
     let trace_all_materials = matches!(
-        std::env::var("MATTMC_STATIC_TERRAIN_BATCH_TRACE_ALL_MATERIALS").as_deref(),
+        crate::core::environment::var("MATTMC_STATIC_TERRAIN_BATCH_TRACE_ALL_MATERIALS").as_deref(),
         Ok("1") | Ok("true") | Ok("TRUE")
     );
     let translucent_batches = batches
@@ -676,14 +676,14 @@ pub(in crate::render::worldrender) fn static_terrain_batch_projected_bounds(
 /// to their exact final image, so later frames cannot overwrite its evidence.
 pub(in crate::render::worldrender) fn write_normal_route_fog_diagnostic(frame: &WorldPrimitiveFrame) {
     if !matches!(
-        std::env::var("MATTMC_GRAPHICS_AUDIT")
+        crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
             .as_deref()
             .map(str::trim),
         Ok("1") | Ok("true") | Ok("TRUE")
     ) {
         return;
     }
-    let Some(dir) = std::env::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
+    let Some(dir) = crate::core::environment::var_os("MATTMC_TERRAIN_PASS_CONTRACT_DIAGNOSTIC_DIR") else {
         return;
     };
     if std::fs::create_dir_all(&dir).is_ok() {

@@ -29,7 +29,11 @@ cargo doc --no-deps --open    # then open mattmc_rust::render::vulkanic
 4. **Hazards need explicit barriers.** The GAL tracks every access in a
    batch. Overlapping accesses that conflict (a write and any other access
    to the same range) must be separated by a `CommandOp::Barrier`, or the
-   submit is rejected. The GAL does not insert barriers for you.
+   submit is rejected. The barrier's `before` must cover the preceding access
+   and `after` must cover the next use. Clearing an attachment does not remove
+   a preceding sampled-read dependency: transition from `ShaderRead`, not
+   `Undefined`, when an earlier stage sampled it. The GAL does not insert
+   barriers for you.
 5. **Destroy is safe while in flight.** `destroy` fails while other
    resources depend on the handle. A resource still used by an incomplete
    submission is destroyed when that submission retires (`retire_completed`
@@ -41,6 +45,11 @@ Presentation follows its own cycle: `configure_frame_surface`, then per frame
 `acquire_frame`, `create_frame_target` for the acquired image, render, submit,
 and `present_frame` (or `cancel_frame`). Check `AcquiredFrame::status`:
 `Resized` and `Minimized` mean there is no image to render this time.
+
+Resource bindings describe state; draws and dispatches consume them. Hazard
+tracking must record each use even when the resource set was not rebound after
+a barrier. Pass fusion may combine attachment load/store passes, but must
+preserve repeated clears and discard boundaries.
 
 ## Changing the GAL
 
@@ -82,6 +91,7 @@ device.
 | `WrongHandleType` | A handle of another kind was passed (for example a texture where a view is expected). |
 | `DependencyViolation` | Destroying a resource that a view, set, pipeline or target still references; destroy dependents first. |
 | `overlapping ... access ... conflicts with prior ... access` | Two accesses to the same range in one batch with no barrier between them. |
+| `barrier before ... does not cover prior ... access` | The declared source state omits an earlier access. The error includes the resource label and command list; trace their stage order and correct the producer's barrier. |
 | `attachment load depends on a prior pass that did not store` | A pass loads an attachment that an earlier pass ended with `DontCare`. |
 | `UnsupportedFeature` | The backend lacks a feature or limit the request needs; check capabilities first. |
 | `GAL command-recording scope is not active` | `finish_command_recording` without a matching `begin_command_recording`. |

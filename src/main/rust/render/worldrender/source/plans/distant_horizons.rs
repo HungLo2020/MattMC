@@ -568,24 +568,24 @@ impl WorldPrimitiveFrontend {
                 // unavailable outside graphics-audit runs and never changes
                 // production route selection.
                 let exact_atlas_draw_limit = if matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT")
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                         .as_deref()
                         .map(str::trim),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
-                    std::env::var("MATTMC_RUST_DH_EXACT_ATLAS_MAX_DRAWS")
+                    crate::core::environment::var("MATTMC_RUST_DH_EXACT_ATLAS_MAX_DRAWS")
                         .ok()
                         .and_then(|value| value.trim().parse::<usize>().ok())
                 } else {
                     None
                 };
                 let exact_atlas_index_limit = if matches!(
-                    std::env::var("MATTMC_GRAPHICS_AUDIT")
+                    crate::core::environment::var("MATTMC_GRAPHICS_AUDIT")
                         .as_deref()
                         .map(str::trim),
                     Ok("1") | Ok("true") | Ok("TRUE")
                 ) {
-                    std::env::var("MATTMC_RUST_DH_EXACT_ATLAS_MAX_INDICES")
+                    crate::core::environment::var("MATTMC_RUST_DH_EXACT_ATLAS_MAX_INDICES")
                         .ok()
                         .and_then(|value| value.trim().parse::<u32>().ok())
                         .map(|indices| indices - indices % 3)
@@ -812,6 +812,7 @@ impl WorldPrimitiveFrontend {
             self.discard_distant_horizons_generic_source_buffers(gal);
             self.pending_distant_horizons_source_targets = None;
             self.lod_gpu_residency.discard_submission(gal);
+            self.lod_textured_gpu_residency.discard_submission(gal);
         }
         result.map(Some)
     }

@@ -28,7 +28,7 @@ pub(in crate::render::worldrender) fn mesh_pipeline_key(key: MeshResourceKey) ->
     let static_terrain_specialization = !key.texture_animated
         && !*SPECIALIZATION_DISABLED.get_or_init(|| {
             matches!(
-                std::env::var("MATTMC_RUST_DISABLE_STATIC_TERRAIN_SPECIALIZATION").as_deref(),
+                crate::core::environment::var("MATTMC_RUST_DISABLE_STATIC_TERRAIN_SPECIALIZATION").as_deref(),
                 Ok("1") | Ok("true") | Ok("yes")
             )
         });
@@ -170,7 +170,7 @@ pub(in crate::render::worldrender) enum SelectedSourceRasterProbe {
 
 pub(in crate::render::worldrender) fn selected_source_raster_probe() -> GalResult<SelectedSourceRasterProbe> {
     selected_source_raster_probe_from(
-        std::env::var("MATTMC_RUST_SELECTED_SOURCE_RASTER_PROBE")
+        crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_RASTER_PROBE")
             .ok()
             .as_deref(),
     )

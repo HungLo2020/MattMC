@@ -828,3 +828,32 @@ fn storage_binding_hazards_use_explicit_ranges_and_effective_dynamic_offsets() {
         }
     }
 }
+
+#[test]
+fn dispatch_accesses_are_tracked_without_rebinding_and_barriers_are_typed() {
+    let mut gal = gal();
+    let buffer = gal.create_buffer(buffer("storage", vec![BufferUsage::Storage])).unwrap();
+    let resource_layout = gal.create_resource_layout(ResourceLayoutDesc { label: "storage".into(),
+        bindings: vec![layout_binding(0, ResourceBindingKind::StorageBuffer, PipelineStageFlags::COMPUTE)] }).unwrap();
+    let layout = gal.create_pipeline_layout(PipelineLayoutDesc { label: "compute".into(), resource_layouts: vec![resource_layout] }).unwrap();
+    let shader = gal.create_shader_module(shader("compute", ShaderStage::Compute)).unwrap();
+    let pipeline = gal.create_compute_pipeline(ComputePipelineDesc { label: "compute".into(), layout, shader }).unwrap();
+    let set = gal.create_resource_set(ResourceSetDesc { label: "set".into(), layout: resource_layout,
+        bindings: vec![resource_binding(0, buffer, ResourceBindingKind::StorageBuffer, AccessFlags::WRITE)] }).unwrap();
+    let dispatch = CommandOp::Dispatch { groups_x: 1, groups_y: 1, groups_z: 1 };
+    let barrier = |before, after| CommandOp::Barrier(ResourceBarrier { resource: buffer, subresources: None,
+        before, after, src_queue: QueueClass::Compute, dst_queue: QueueClass::Compute });
+    let prefix = vec![CommandOp::BindComputePipeline(pipeline), CommandOp::BindResourceSet {
+        pipeline_layout: layout, set_index: 0, set, dynamic_offsets: vec![] }];
+    let mut submit = |middle: Vec<CommandOp>| {
+        let mut operations = prefix.clone();
+        operations.extend(middle);
+        gal.submit(SubmissionBatch { label: "hazard-regression".into(), command_lists: vec![CommandList::from(CommandListDesc { label: "compute".into(), operations })] })
+    };
+    // A bind is state, not a write.
+    submit(vec![]).unwrap();
+    assert!(submit(vec![dispatch.clone(), dispatch.clone()]).is_err());
+    assert!(submit(vec![dispatch.clone(), barrier(TextureUsageState::TransferDst, TextureUsageState::ShaderWrite), dispatch.clone()]).is_err());
+    assert!(submit(vec![dispatch.clone(), barrier(TextureUsageState::ShaderWrite, TextureUsageState::ShaderRead), dispatch.clone()]).is_err());
+    submit(vec![dispatch.clone(), barrier(TextureUsageState::ShaderWrite, TextureUsageState::ShaderWrite), dispatch]).unwrap();
+}

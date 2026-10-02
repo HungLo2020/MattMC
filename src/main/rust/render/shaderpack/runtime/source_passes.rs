@@ -15,7 +15,7 @@ impl ShaderPackRuntimeExecutor {
         draws: &[TerrainMeshDraw],
     ) -> GalResult<()> {
         if matches!(
-            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             eprintln!(
@@ -27,7 +27,7 @@ impl ShaderPackRuntimeExecutor {
             );
         }
         if matches!(
-            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             eprintln!(
@@ -97,7 +97,7 @@ impl ShaderPackRuntimeExecutor {
             .filter(|draw| targets.phase.accepts_material(draw.material_mode))
             .collect::<Vec<_>>();
         if matches!(
-            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             eprintln!(
@@ -309,7 +309,7 @@ impl ShaderPackRuntimeExecutor {
         hand_depth_loaded: bool,
     ) -> GalResult<()> {
         if matches!(
-            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             eprintln!(
@@ -420,7 +420,7 @@ impl ShaderPackRuntimeExecutor {
         writer: &str,
     ) -> GalResult<()> {
         if matches!(
-            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             eprintln!(

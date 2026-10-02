@@ -261,7 +261,7 @@ impl ShaderPackRuntimePlan {
             })
             .unwrap_or_else(|| "null".to_string());
         let selected_source_execution_requested = matches!(
-            std::env::var("MATTMC_RUST_SELECTED_SOURCE_EXECUTION")
+            crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_EXECUTION")
                 .as_deref()
                 .map(str::trim),
             Ok("1") | Ok("true") | Ok("TRUE")

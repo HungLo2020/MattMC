@@ -40,9 +40,70 @@ impl WorldPrimitiveFrontend {
         ))
     }
 
-    /// Returns false only for completion backpressure. A retry must carry the
-    /// identical semantic event; visibility cannot be replaced by a later frame.
+    /// Recover rejected uploads in semantic tick order. Retain later events
+    /// while retrying so repeated backend failures cannot skip a clock step.
     pub(crate) fn advance_atlas_animation(
+        &mut self,
+        gal: &mut VulkanicGal,
+        event: crate::render::shared::sprite_interpolation::AtlasAnimationTickEvent,
+    ) -> GalResult<bool> {
+        let recovering =
+            self.pending_atlas_animation_failed || !self.retry_atlas_animation_events.is_empty();
+        let pending = self.pending_atlas_animation_event.as_ref();
+        if recovering && pending != Some(&event) {
+            let previous = self.retry_atlas_animation_events.back().or(pending);
+            if let Some(previous) = previous {
+                if previous != &event {
+                    if previous.texture_id != event.texture_id
+                        || previous.generation != event.generation
+                        || previous.tick.checked_add(1) != Some(event.tick)
+                        || event.visible.len() > 16384
+                        || self.retry_atlas_animation_events.len() >= 64
+                    {
+                        return Err(GalError::invalid_argument("animation recovery requires bounded, consecutive events of the same incarnation"));
+                    }
+                    let animation = self
+                        .staged_atlas_animations
+                        .get(&event.texture_id)
+                        .ok_or_else(|| {
+                            GalError::invalid_argument("atlas animation is not staged")
+                        })?;
+                    let known: BTreeSet<_> = animation
+                        .sprites
+                        .iter()
+                        .map(|sprite| sprite.sprite_id)
+                        .collect();
+                    if !event.visible.is_subset(&known) {
+                        return Err(GalError::invalid_argument(
+                            "animation recovery names an unknown sprite",
+                        ));
+                    }
+                    self.retry_atlas_animation_events.push_back(event.clone());
+                }
+            }
+            if let Some(pending) = self.pending_atlas_animation_event.clone() {
+                let queued = self.retry_atlas_animation_events.front() == Some(&pending);
+                if !self.advance_atlas_animation_event(gal, pending)? {
+                    return Ok(false);
+                }
+                if queued {
+                    self.retry_atlas_animation_events.pop_front();
+                }
+            }
+            while let Some(next) = self.retry_atlas_animation_events.front().cloned() {
+                if !self.advance_atlas_animation_event(gal, next)? {
+                    return Ok(false);
+                }
+                self.retry_atlas_animation_events.pop_front();
+            }
+            return Ok(true);
+        }
+        self.advance_atlas_animation_event(gal, event)
+    }
+
+    /// Returns false only for completion backpressure. Retries preserve the
+    /// exact visibility and timing of the pending semantic event.
+    fn advance_atlas_animation_event(
         &mut self,
         gal: &mut VulkanicGal,
         event: crate::render::shared::sprite_interpolation::AtlasAnimationTickEvent,
@@ -77,6 +138,7 @@ impl WorldPrimitiveFrontend {
                 &event.visible,
                 event.animate_only_visible,
             )?;
+            self.pending_atlas_animation_failed = false;
             self.pending_atlas_animation_event = Some(event);
         }
         let pending_shape = self
@@ -92,7 +154,15 @@ impl WorldPrimitiveFrontend {
                 (prepared.patches().len() as u64, bytes)
             })
             .unwrap_or((0, 0));
-        match self.submit_atlas_animation_tick(gal)? {
+        let attempt = match self.submit_atlas_animation_tick(gal) {
+            Ok(attempt) => attempt,
+            Err(error) => {
+                // Preserve the candidate and retry it before later queued ticks.
+                self.pending_atlas_animation_failed = true;
+                return Err(error);
+            }
+        };
+        match attempt {
             assets::animation_upload::UploadAttempt::PendingCompletion => Ok(false),
             assets::animation_upload::UploadAttempt::Accepted(submission) => {
                 let (patch_count, patch_bytes) = pending_shape;
@@ -114,6 +184,7 @@ impl WorldPrimitiveFrontend {
                 );
                 self.trace_accepted_atlas_animation(gal, texture_id);
                 self.pending_atlas_animation_event = None;
+                self.pending_atlas_animation_failed = false;
                 Ok(true)
             }
         }
@@ -139,7 +210,7 @@ impl WorldPrimitiveFrontend {
         static LINES: AtomicUsize = AtomicUsize::new(0);
         if !*ENABLED.get_or_init(|| {
             matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true")
             )
         }) {
@@ -170,7 +241,11 @@ impl WorldPrimitiveFrontend {
     }
 
     /// Bounded, opt-in observation of accepted owned state; never drives uploads.
-    pub(in crate::render::worldrender) fn trace_accepted_atlas_animation(&mut self, gal: &VulkanicGal, texture_id: u32) {
+    pub(in crate::render::worldrender) fn trace_accepted_atlas_animation(
+        &mut self,
+        gal: &VulkanicGal,
+        texture_id: u32,
+    ) {
         use std::sync::{
             atomic::{AtomicUsize, Ordering},
             OnceLock,
@@ -179,16 +254,17 @@ impl WorldPrimitiveFrontend {
         static LINES: AtomicUsize = AtomicUsize::new(0);
         let selected = SELECTED.get_or_init(|| {
             if !matches!(
-                std::env::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
+                crate::core::environment::var("MATTMC_GRAPHICS_AUDIT").as_deref(),
                 Ok("1") | Ok("true")
             ) {
                 return None;
             }
             // Preserve the existing single-sprite spelling; comma-separated IDs
             // opt into a bounded snapshot of several sprites in the same atlas.
-            let sprites =
-                Self::parse_atlas_trace_sprites(&std::env::var("MATTMC_ATLAS_TRACE_SPRITE").ok()?)?;
-            let texture = match std::env::var("MATTMC_ATLAS_TRACE_TEXTURE") {
+            let sprites = Self::parse_atlas_trace_sprites(
+                &crate::core::environment::var("MATTMC_ATLAS_TRACE_SPRITE").ok()?,
+            )?;
+            let texture = match crate::core::environment::var("MATTMC_ATLAS_TRACE_TEXTURE") {
                 Ok(value) => value.parse::<u32>().ok()?,
                 Err(_) => WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
             };
@@ -216,7 +292,9 @@ impl WorldPrimitiveFrontend {
         }
     }
 
-    pub(in crate::render::worldrender) fn parse_atlas_trace_sprites(value: &str) -> Option<Vec<u32>> {
+    pub(in crate::render::worldrender) fn parse_atlas_trace_sprites(
+        value: &str,
+    ) -> Option<Vec<u32>> {
         let mut ids = Vec::new();
         for part in value.split(',') {
             if ids.len() == 16 {
@@ -472,10 +550,7 @@ impl WorldPrimitiveFrontend {
 impl GuiAtlasOwner for WorldPrimitiveFrontend {
     /// Accepted same-context texture metadata, never a backend/native image handle.
     /// Atlas interpolation changes pixels without changing this resource incarnation.
-    fn accepted_gui_atlas_incarnation(
-        &self,
-        texture_id: u32,
-    ) -> Option<AcceptedAtlasIncarnation> {
+    fn accepted_gui_atlas_incarnation(&self, texture_id: u32) -> Option<AcceptedAtlasIncarnation> {
         let asset = self.mesh_texture_assets.get(&texture_id)?;
         // Legacy independently animated image sheets are not stitched atlases.
         if asset.frame_count != 1

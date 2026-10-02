@@ -169,6 +169,7 @@ impl VulkanicGal {
             ));
         }
         let uniform_alignment = self.capabilities().limits.uniform_buffer_offset_alignment.max(1);
+        let offsets = if offsets.is_empty() { &[0][..] } else { offsets };
         for offset in offsets {
             if binding.kind == ResourceBindingKind::UniformBuffer {
                 let alignment = uniform_alignment;

@@ -163,7 +163,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_submit_batch(
         let input_bytes = if batch.is_null() {
             0
         } else {
-            input_bytes_for_submission(&*batch)
+            read_struct(batch, "input accounting").as_ref().map(input_bytes_for_submission).unwrap_or(0)
         };
         context.ffi_calls += 1;
         context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);

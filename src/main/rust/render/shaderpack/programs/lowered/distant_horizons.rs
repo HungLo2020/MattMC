@@ -386,7 +386,7 @@ vec4 vulkanic_source_dh_atlas_color() {
     lowered = lowered.replacen(anchor, "vec4 color = vulkanic_source_dh_atlas_color();", 1);
     apply_exact_atlas_distant_horizons_fragment_probe(
         &mut lowered,
-        std::env::var("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE")
+        crate::core::environment::var("MATTMC_RUST_SELECTED_SOURCE_FRAGMENT_PROBE")
             .ok()
             .as_deref(),
     )?;

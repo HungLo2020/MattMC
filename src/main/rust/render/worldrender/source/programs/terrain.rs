@@ -710,7 +710,7 @@ impl WorldPrimitiveFrontend {
         let (mut blend, mut depth_write) =
             source_terrain_pipeline_raster_state(program, material_mode)?;
         if matches!(
-            std::env::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
+            crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
             eprintln!(

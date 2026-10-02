@@ -234,6 +234,8 @@ pub struct WorldPrimitiveFrontend {
     last_dh_channel_receipt: Option<(PathBuf, u64)>,
     last_dh_transform_receipt: Option<(PathBuf, u64, String)>,
     last_dh_exact_atlas_status: Option<(PathBuf, u64)>,
+    pending_atlas_animation_failed: bool,
+    retry_atlas_animation_events: std::collections::VecDeque<crate::render::shared::sprite_interpolation::AtlasAnimationTickEvent>,
     pending_atlas_animation: Option<crate::render::shared::sprite_interpolation::PreparedAtlasTick>,
     pending_atlas_animation_event: Option<crate::render::shared::sprite_interpolation::AtlasAnimationTickEvent>,
     atlas_animation_uploads: assets::animation_upload::UploadQueue,
@@ -567,6 +569,7 @@ pub struct WorldPrimitiveFrontend {
     /// Complete source generations are owned and validated by Rust. Loading
     /// them alone cannot select source-derived shader execution.
     shader_pack_sources: ShaderPackSourceStore,
+    post_effect_source_cache: post_effects::PostEffectSourceCache,
     /// Immutable binary assets paired with a shader-pack source generation.
     /// They are not GPU objects and do not make selected-source execution
     /// available until every semantic resource is resolved by Rust.

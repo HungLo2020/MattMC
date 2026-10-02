@@ -580,7 +580,11 @@ fn shared_large_copy_lifecycle_conformance_reuses_and_retires_resources() {
                             dst,
                             size: 256,
                         },
-                        buffer_barrier(dst),
+                        CommandOp::Barrier(ResourceBarrier {
+                            resource: dst, subresources: None,
+                            before: TextureUsageState::TransferDst, after: TextureUsageState::TransferDst,
+                            src_queue: QueueClass::Graphics, dst_queue: QueueClass::Graphics,
+                        }),
                     ],
                 })
                 .unwrap(),
