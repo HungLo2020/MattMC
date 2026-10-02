@@ -1288,3 +1288,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Expanded Ghast, Hoglin, Zoglin and Zombified Piglin owners plus Ghast Tear and Tears music-disc items, linking biome/structure routes and relevant food/portal owners.
 - Checked fireball ownership and exact disc-loot conditions, Hoglin feeding/repellents/conversion and retained Peaceful flag, monster-versus-animal baby loot gates, and Zombified Piglin anger/equipment handling. Hoglin pacification wording preserves the successful-hit and living-attacker guards.
 - Independent review checked active source, 207 citation definitions, 268 rendered references, retained anchors, proposed crosslinks and decoded Bastion templates. Final documentation check/build and unchanged-source checks are required before promotion. No in-game encounter, reflection, breeding, conversion or drop test is claimed.
+
+## Batch 155: Potion, special-arrow and wind encounters
+
+- Expanded Witch, Bogged, Stray and Breeze owners with actual spawning/Trial configuration routes, combat controls, effects, shearing, immunities and conditional drops. Added four discovery/related-owner crosslinks.
+- Independent review traced connected Trial templates, active potion and arrow handling, projectile collision/deflection, loot gates and damage exceptions. Bogged Shears wear is qualified before modifiers; Breeze burst mechanism triggers need mobGriefing, while an eligible direct Bell hit can still ring through its separate callback.
+- Final unchanged-source, documentation check/build, local-anchor and actual rendered-citation checks are required before promotion. No runtime chamber, combat, potion-duration, shearing or mechanism-trigger test is claimed.
