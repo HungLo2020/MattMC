@@ -4,6 +4,7 @@ Blocks are the placed parts of the world: terrain, building materials, plants, l
 
 ## Workstations and storage
 
+- [Stonecutter](Stonecutter.md): single-input building conversions, output yields, menu handling, and Mason job sites
 - [Shulker Box](ShulkerBox.md): portable 27-slot storage, all colors, contents preservation, and nesting/hazard limits
 - [Cartography Table](CartographyTable.md): map enlargement, shared copies, locking, and crafting-route differences
 

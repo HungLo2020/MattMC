@@ -38,7 +38,7 @@ For the exact **Clay-block-to-Terracotta** recipe, use the [Terracotta guide](Te
 
 ## Brick slabs, stairs, and walls
 
-The checked shape recipes all use **Bricks blocks**, not loose Brick items. Craft them at a [Crafting Table](CraftingTable.md), or select the matching output in a [Stonecutter](../items/Stonecutter.md). [Stonecutter selection][cut-menu]
+The checked shape recipes all use **Bricks blocks**, not loose Brick items. Craft them at a [Crafting Table](CraftingTable.md), or select the matching output in a [Stonecutter](Stonecutter.md). [Stonecutter selection][cut-menu]
 
 | Result | Crafting Table recipe | Stonecutter recipe |
 | --- | --- | --- |

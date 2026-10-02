@@ -641,6 +641,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Dead Bush cross-link, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,188 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No mining, smelting, dripstone, potting, lighting, or growth gameplay test.
 
+## Eighty-fifth batch: Stonecutter workstation
+
+- Added canonical Stonecutter and rewrote its item with exact crafting/mining, single-input consumption, example yields, temporary-menu cleanup, Hopper isolation, and Mason job-site binding.
+- Independent review verified current menu/return callers, 9/16 collision and no saw-damage callback, plus all 254 stonecutting recipes for the scoped Limestone-input absence claim.
+- Updated Blocks, Clay/Bricks cross-link, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,189 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, cutting, collection, Hopper, collision, or villager gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
