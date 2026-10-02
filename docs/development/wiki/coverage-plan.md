@@ -1360,3 +1360,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Replaced Skeleton Horse and Zombie Horse generic owners with actual weather/egg/operator routes, taming interaction limits, rider equipment, passive and potion healing, foal behavior, persistence and loot. Added shared Horse and Transport discovery links.
 - Distinguished new lightning-trap creation from horse conversion, original and additional trap mounts, untamed ordinary eggs from explicitly tame command data, and underwater breathing from rider dismount/air rules. Preserved all eight original anchors.
 - Independent source and configured-render review passes on both canonical articles; all 44 cited files and 68 biome definitions remain unchanged through the concurrent native world-generation source update. Final documentation check and strict build are required before promotion. No commands or gameplay travel, trap, taming, healing or loot tests were executed.
+
+## Batch 166: Luminous block inventory routes
+
+- Replaced generic Shroomlight, Ochre Froglight, Verdant Froglight and Pearlescent Froglight item entries with exact acquisition, ordinary recovery and shared placed-block links. These four inventory routes supplement the existing substantive Luminous Blocks owner; no new block article or exhaustive completion is claimed.
+- Preserved all 20 original anchors and the already-authored Glowstone, Sea Lantern, Carmine Froglight and Luminous Blocks pages. Independent review corrected three mob-loot citations to the active inherited LivingEntity gate before publication; visible behavior claims were unchanged.
+- Checked active huge-fungus growth and Frog prey/loot callers, exact ordinary and TaCZ recipe-loader scopes, tool/drop rules and configured rendering. Final documentation check and strict build are required before promotion. No live growth, mining, Frog, lighting or farm-rate test is claimed.
