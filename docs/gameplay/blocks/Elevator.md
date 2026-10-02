@@ -37,6 +37,8 @@ The teleport routine places the player at the destination block's **X/Z center**
 
 **The destination test does not guarantee a safe landing.** It checks only whether the block immediately above the Elevator is suffocating. It does not require two empty blocks, inspect the player's full collision box or reject liquid, fire and other hazards. Build your own clear landing area rather than treating the destination check as a complete collision or hazard inspection. [Actual clearance check][clearance] · [Grounded clearance check][jump-search] · [Server acceptance checks][server] · [Teleport routine][landing]
 
+The source-reviewed travel-validation and arrival checks are tracked in [#797](https://github.com/HungLo2020/MattMC/issues/797). This is an open implementation issue, not a verified fix or a live teleport test.
+
 ## MattMC scope and verification
 
 These are MattMC's active registrations and callbacks. Comments referring to an imported Elevator mod do not establish extra features here: the inspected search uses hard-coded ranges, and this block supplies no color pairing, configurable range screen, precision-target toggle or right-click configuration. The guide does not infer upstream crafting or safety rules. [Client implementation][controls-search] · [Block implementation][implementation] · [Default interaction][use-default]

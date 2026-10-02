@@ -1024,6 +1024,12 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,321 pages / 37 indexes. All 17 authored paths are documentation; 1,896 local links/anchors and 351 tracked reference uses resolve, with zero rendered citation ambiguity or unresolved-bracket candidates. The alphabetical inventory retains 1,211 IDs, with 1,189 related-guide routes and 22 explicit article gaps; this does not establish complete variant coverage.
 
+## Batch 127: Coordinated source and issue review, 2026-10-02 11:45 UTC
+
+- Rechecked master at `b60d2986c5246e2eaade0dc8dd2bf5ff1cf0e3f0`; the latest game-source commit remains `cf8cd5371bd1de61411ae5e7e144aabe3edb1e54`. This review adds no gameplay changes or source-sync merge.
+- Linked the existing Elevator travel/landing caveat to [#797](https://github.com/HungLo2020/MattMC/issues/797), and Terrapin egg laying, item-mapping and parent-data limitations to [#798](https://github.com/HungLo2020/MattMC/issues/798). Both are open source-reviewed bugs, not completed fixes or runtime reproductions.
+- Pewen signs [#795](https://github.com/HungLo2020/MattMC/issues/795) and Composter rollback [#796](https://github.com/HungLo2020/MattMC/issues/796) remain open. Held-item light [PR #791](https://github.com/HungLo2020/MattMC/pull/791) and Building Wand [PR #794](https://github.com/HungLo2020/MattMC/pull/794) remain unmerged at this review; their proposed behavior is not promoted into current master guides.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or localized names change. A related family route is not a claim that every variant detail is complete.

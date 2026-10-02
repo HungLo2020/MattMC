@@ -42,6 +42,8 @@ Players can trample these eggs with the **1-in-100** footstep check. Other entit
 
 Parent-pattern inheritance is not established: the hatch path removes the block before trying to retrieve its egg block entity, and normal block replacement removes that block entity. Do not rely on the parent-color routine alone as proof that breeding or command-supplied parent data will reach hatchlings. [Hatch order][terrapin-hatch] · [Block-entity removal][state-dispatch] · [Parent-trait routine][terrapin-parents]
 
+The missing laying goal, collectible egg mapping and parent-data lookup order are tracked together in [#798](https://github.com/HungLo2020/MattMC/issues/798). The issue records source findings; no breeding or hatch fix has landed at this checkpoint.
+
 ## Turtle eggs
 
 **ID:** `minecraft:turtle_egg` · [Item](../items/TurtleEgg.md) · [Turtle](../mobs/Turtle.md)
