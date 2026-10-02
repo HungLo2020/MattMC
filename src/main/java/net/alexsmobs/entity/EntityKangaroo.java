@@ -1,5 +1,8 @@
 package net.alexsmobs.entity;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.alexsmobs.entity.ai.*;
 import net.alexsmobs.entity.ai.*;
 import net.alexsmobs.message.MessageKangarooEat;
@@ -54,6 +57,16 @@ import net.minecraft.world.phys.Vec3;
 import javax.annotation.Nullable;
 
 public class EntityKangaroo extends TamableAnimal implements ContainerListener, IAnimatedEntity, IFollower {
+
+    private static final int POUCH_SIZE = 9;
+    // Unlike the generic slot codec, malformed slots must not default or wrap to slot zero.
+    private static final Codec<ItemStackWithSlot> POUCH_ITEM_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+        Codec.DOUBLE.<Integer>comapFlatMap(slot -> slot >= 0 && slot < POUCH_SIZE && slot == Math.floor(slot)
+                ? DataResult.success(slot.intValue())
+                : DataResult.error(() -> "Invalid kangaroo pouch slot: " + slot), Integer::doubleValue)
+            .fieldOf("Slot").forGetter(ItemStackWithSlot::slot),
+        ItemStack.MAP_CODEC.forGetter(ItemStackWithSlot::stack)
+    ).apply(instance, ItemStackWithSlot::new));
 
     // Tag keys for kangaroo behavior
     private static final TagKey<Block> KANGAROO_SPAWNS = TagKey.create(Registries.BLOCK, ResourceLocation.withDefaultNamespace("kangaroo_spawns"));
@@ -177,8 +190,10 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
     }
 
     private void initKangarooInventory() {
-        SimpleContainer animalchest = this.kangarooInventory;
-        this.kangarooInventory = new SimpleContainer(9) {
+        if (this.kangarooInventory != null) {
+            return;
+        }
+        this.kangarooInventory = new SimpleContainer(POUCH_SIZE) {
             public void stopOpen(Player player) {
                 EntityKangaroo.this.entityData.set(POUCH_TICK, 10);
                 EntityKangaroo.this.resetKangarooSlots();
@@ -189,19 +204,14 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
             }
         };
         kangarooInventory.addListener(this);
-        if (animalchest != null) {
-            int i = Math.min(animalchest.getContainerSize(), this.kangarooInventory.getContainerSize());
-            for (int j = 0; j < i; ++j) {
-                ItemStack itemstack = animalchest.getItem(j);
-                if (!itemstack.isEmpty()) {
-                    this.kangarooInventory.setItem(j, itemstack.copy());
-                }
-            }
-            resetKangarooSlots();
-        }
-
     }
 
+
+    @Override
+    protected void dropCustomDeathLoot(ServerLevel serverLevel, DamageSource damageSource, boolean recentlyHit) {
+        // Mob's equipment-drop path clears its separate equipment object, not our pouch.
+        // All pouch stacks, including selected equipment, are dropped once by dropEquipment.
+    }
 
     protected void dropEquipment(ServerLevel serverLevel) {
         super.dropEquipment(serverLevel);
@@ -282,6 +292,7 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
         valueOutput.putInt("HelmetInvIndex", this.entityData.get(HELMET_INDEX));
         valueOutput.putInt("SwordInvIndex", this.entityData.get(SWORD_INDEX));
         valueOutput.putInt("ChestInvIndex", this.entityData.get(CHEST_INDEX));
+        ContainerHelper.saveAllItems(valueOutput, this.kangarooInventory.getItems());
     }
 
     public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
@@ -290,10 +301,13 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
         this.entityData.set(FORCED_SIT, valueInput.getBooleanOr("KangarooSittingForced", false));
         this.setStanding(valueInput.getBooleanOr("Standing", false));
         this.setCommand(valueInput.getIntOr("Command", 0));
-        this.entityData.set(HELMET_INDEX, valueInput.getIntOr("HelmetInvIndex", 0));
-        this.entityData.set(SWORD_INDEX, valueInput.getIntOr("SwordInvIndex", 0));
-        this.entityData.set(CHEST_INDEX, valueInput.getIntOr("ChestInvIndex", 0));
         this.initKangarooInventory();
+        // Replace even on repeated loads, without selecting equipment from a partial inventory.
+        this.kangarooInventory.getItems().clear();
+        for (ItemStackWithSlot entry : valueInput.listOrEmpty("Items", POUCH_ITEM_CODEC)) {
+            this.kangarooInventory.getItems().set(entry.slot(), entry.stack());
+        }
+        // Saved equipment indexes are legacy derived data; restored contents are authoritative.
         resetKangarooSlots();
     }
 

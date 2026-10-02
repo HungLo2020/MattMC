@@ -1,6 +1,6 @@
 # Kangaroo
 
-The **Kangaroo** is a tameable, neutral animal from bundled Alex's Mobs content. Carrots tame it, while Dead Bushes and Short Grass are its breeding foods. Adults have a nine-slot pouch and owner commands, but **the pouch's contents are not saved by the current implementation**. Keep valuables elsewhere. [Food interactions][interactions] · [Breeding tag][breedables] · [Save/load handling][saving]
+The **Kangaroo** is a tameable, neutral animal from bundled Alex's Mobs content. Carrots tame it, while Dead Bushes and Short Grass are its breeding foods. Adults have a nine-slot pouch, saved inventory, and owner commands. [Food interactions][interactions] · [Breeding tag][breedables] · [Save/load handling][saving]
 
 ## At a glance
 
@@ -30,9 +30,11 @@ Kangaroos are **not player-controlled mounts**: this class returns no controllin
 
 Sneak-interact with your adult Kangaroo to open its **nine-slot pouch**; no chest is needed. Opening it ejects any passenger, including a joey. The menu uses a three-by-three inventory layout. [Pouch interaction][interactions] · [Inventory][inventory] · [Menu][menu]
 
-**Do not use the pouch as permanent storage.** This source-identified persistence problem is tracked in [issue #780](https://github.com/HungLo2020/MattMC/issues/780); it is not documented as fixed. Its save/load methods record commands and equipment-slot indexes, but do not write or restore the nine item stacks. Contents can therefore be lost when the Kangaroo unloads and reloads or the world restarts. The parent entity saves its separate equipment object, not this custom pouch. This is a source-identified limitation, not a reproduced in-game loss test. [Save/load handling][saving] · [Parent equipment saving](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/LivingEntity.java#L755-L756)
+The pouch saves each occupied slot, including stack counts, durability, names, enchantments, and other item components. Empty slots keep their positions. This addresses the missing pouch data reported in [issue #780](https://github.com/HungLo2020/MattMC/issues/780). Older saves without pouch data load an empty pouch; items already lost by an older version cannot be recovered by this change. Invalid slot records are reported and skipped rather than placed in another slot. [Save/load handling][saving] · [Automated regression coverage][persistence-tests]
 
-The pouch also selects a held weapon, helmet, and chest equipment from its contents. Weapon selection compares attack-damage modifiers; helmet and chest selection check the relevant equipment slot and armor values. However, the custom inventory-sync sender is disabled in this integration, and equipment display and full combat effects have not been tested. Avoid handing over valuable gear until storage and equipment behavior are verified in your world. [Equipment selection][equipment] · [Disabled synchronization][sync]
+Save/new-entity/load round trips are covered by automated tests. **Real chunk unload/reload and server stop/restart have not yet been checked in-game**, so back up your world before relying on valuable stored items. See [verification scope](#verification-scope).
+
+After loading all pouch contents, the Kangaroo selects its held weapon, helmet, and chest equipment again. Weapon selection compares attack-damage modifiers; helmet and chest selection check the relevant equipment slot and armor values. However, the custom inventory-sync sender is disabled in this integration, and equipment display and full combat effects have not been tested. Avoid handing over valuable gear until storage and equipment behavior are verified in your world. [Equipment selection][equipment] · [Disabled synchronization][sync]
 
 An injured, tamed Kangaroo accepts food directly for healing. Hand-feeding heals the food's nutrition value in health points. It can also **eat food stored in the pouch automatically**, healing twice that value per item, with a 20–59 tick cooldown between checks. For example, a Carrot heals **3 points by hand** or **6 points from the pouch**. Stored food is a consumable supply, not protected cargo. [Hand healing][interactions] · [Pouch feeding][healing] · [Carrot nutrition][carrot]
 
@@ -48,7 +50,7 @@ Breeding creates another Kangaroo. The offspring method does not assign an owner
 
 Adults can retaliate and defend their owner. Their combat AI can seek water when fighting the creature that hurt them; at close range it pushes an attacker in water downward and reduces that attacker's air supply. Do not follow an angry Kangaroo into a pond. Babies clear their combat target. [Targeting goals][goals] · [Water combat][water-combat] · [Baby targeting][growing]
 
-No dedicated Kangaroo death-loot table was found in the bundled entity loot data. [Kangaroo Hide](../items/KangarooHide.md) and [Raw Kangaroo Meat](../items/RawKangarooMeat.md) are registered items, but registration does not establish them as drops. The verified custom equipment-drop path empties the pouch onto the ground when normal equipment dropping runs. [Loot data][loot] · [Item registration][items] · [Pouch drops][drops]
+No dedicated Kangaroo death-loot table was found in the bundled entity loot data. [Kangaroo Hide](../items/KangarooHide.md) and [Raw Kangaroo Meat](../items/RawKangarooMeat.md) are registered items, but registration does not establish them as drops. The pouch-drop path drops each stored stack once, including selected equipment, with its original durability and components. Pouch contents retain their existing guaranteed-drop behavior even with mob loot disabled or a Curse of Vanishing effect; they are not subjected to a second equipment-drop lottery. [Loot data][loot] · [Item registration][items] · [Pouch drops][drops]
 
 ## Related pages
 
@@ -59,7 +61,9 @@ No dedicated Kangaroo death-loot table was found in the bundled entity loot data
 
 ## Verification scope
 
-Source-reviewed against MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. Attributes, food tags, owner controls, pouch handling, breeding, spawning, and loot were checked separately. No in-game taming, breeding, save/reload, inventory, equipment, combat, or natural-spawning test was run.
+General mob behavior was source-reviewed against MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. Pouch persistence and death-drop handling were updated and automatically tested on 2026-10-02. The regression uses real entity construction, item codecs, and save/new-entity/load operations with mocked world I/O. It covers all nine slots and components, sparse/empty/legacy inventories, invalid slot records, repeated loading and initialization, menu close/reopen, post-load equipment selection, and both death-drop stages with mob loot enabled and disabled. Item spawning is captured at the world boundary. [Regression tests][persistence-tests]
+
+These tests are not an in-game chunk-unload, server-restart, taming, breeding, equipment-rendering, combat, or natural-spawning check. The persistence regression must remain covered during migration work tracked in [#770](https://github.com/HungLo2020/MattMC/issues/770) and [#774](https://github.com/HungLo2020/MattMC/issues/774).
 
 [attributes]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L112-L114
 [active-attributes]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/ai/attributes/DefaultAttributes.java#L188
@@ -72,12 +76,12 @@ Source-reviewed against MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2`
 [biomes]: https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/worldgen/biome
 [tameables]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/item/kangaroo_tameables.json
 [interactions]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L217-L274
-[saving]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L276-L298
+[saving]: https://github.com/HungLo2020/MattMC/blob/fix/issue-780-kangaroo-pouch/src/main/java/net/alexsmobs/entity/EntityKangaroo.java
 [defaults]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L348-L360
 [follow]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L913-L916
 [follow-goal]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/ai/TameableAIFollowOwner.java#L20-L34
 [passenger]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L116-L119
-[inventory]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L179-L203
+[inventory]: https://github.com/HungLo2020/MattMC/blob/fix/issue-780-kangaroo-pouch/src/main/java/net/alexsmobs/entity/EntityKangaroo.java
 [menu]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L300-L314
 [equipment]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L767-L818
 [sync]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L820-L827
@@ -93,4 +97,6 @@ Source-reviewed against MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2`
 [water-combat]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/ai/KangarooAIMelee.java#L29-L71
 [loot]: https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/entities
 [items]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/Items.java#L1756-L1759
-[drops]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexsmobs/entity/EntityKangaroo.java#L206-L215
+[drops]: https://github.com/HungLo2020/MattMC/blob/fix/issue-780-kangaroo-pouch/src/main/java/net/alexsmobs/entity/EntityKangaroo.java
+
+[persistence-tests]: https://github.com/HungLo2020/MattMC/blob/fix/issue-780-kangaroo-pouch/src/test/misc/net/alexsmobs/entity/EntityKangarooInventoryTest.java
