@@ -79,6 +79,7 @@ import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BlockItemStateProperties;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -2907,7 +2908,8 @@ public final class RustGalWorldPrimitiveRenderer {
 			return 0;
 		}
 		int emission = stack.getItem() instanceof net.minecraft.world.item.BlockItem blockItem
-			? blockItem.getBlock().defaultBlockState().getLightEmission()
+			? stack.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY)
+				.apply(blockItem.getBlock().defaultBlockState()).getLightEmission()
 			: 0;
 		return Mth.clamp(emission, 0, 15);
 	}
