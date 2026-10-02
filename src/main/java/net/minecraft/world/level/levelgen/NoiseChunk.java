@@ -136,18 +136,8 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		this.blendAlpha = new NoiseChunk.FlatCache(new NoiseChunk.BlendAlpha(), false);
 		this.blendOffset = new NoiseChunk.FlatCache(new NoiseChunk.BlendOffset(), false);
 		if (!blender.isEmpty()) {
-			for (int l = 0; l <= this.noiseSizeXZ; l++) {
-				int m = this.firstNoiseX + l;
-				int n = QuartPos.toBlock(m);
-
-				for (int o = 0; o <= this.noiseSizeXZ; o++) {
-					int p = this.firstNoiseZ + o;
-					int q = QuartPos.toBlock(p);
-					Blender.BlendingOutput blendingOutput = blender.blendOffsetAndFactor(n, q);
-					this.blendAlpha.values[l + o * this.blendAlpha.sizeXZ] = blendingOutput.alpha();
-					this.blendOffset.values[l + o * this.blendOffset.sizeXZ] = blendingOutput.blendingOffset();
-				}
-			}
+			blender.fillBlendingOutputs(this.firstNoiseX, this.firstNoiseZ, this.noiseSizeXZ + 1,
+				this.blendAlpha.values, this.blendOffset.values);
 		} else {
 			Arrays.fill(this.blendAlpha.values, 1.0);
 			Arrays.fill(this.blendOffset.values, 0.0);

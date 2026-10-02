@@ -158,6 +158,15 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 	@Override
 	public void getAll(Consumer<T> consumer) {
 		Palette<T> palette = this.data.palette();
+		if (this.getClass() == PalettedContainer.class && this.data.storage.getClass() == SimpleBitStorage.class) {
+			var ids = NativePaletteDistinct.scan(this.data.storage);
+			if (ids != null) {
+				try (ids) {
+					for (int i = 0; i < ids.size; i++) consumer.accept(palette.valueFor(ids.entry(i)));
+				}
+				return;
+			}
+		}
 		IntSet intSet = new IntArraySet();
 		this.data.storage.getAll(intSet::add);
 		intSet.forEach(i -> consumer.accept(palette.valueFor(i)));

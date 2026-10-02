@@ -70,6 +70,10 @@ pair and at its upper 95% bootstrap ratio bound. Evidence is written beneath
 source/library hashes and focused parity results. These measurements describe
 save packing on the measured machine, not complete chunk generation or disk I/O.
 
+The container source audit additionally permits only the separately pinned
+[ordered-value dispatch](RUST-PALETTE-DISTINCT.md); the original reference bodies
+remain unchanged.
+
 ## Verified status
 
 Release acceptance passed on 2026-10-01: Ryzen 5 5600G, Linux x86_64,

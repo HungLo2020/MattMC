@@ -1,5 +1,7 @@
 # Chunk storage
 
+- [Rust ordered palette values](RUST-PALETTE-DISTINCT.md): first-occurrence biome
+  and block scans, callback compatibility and complete caller verification.
 - [Rust global palette loading](RUST-PALETTE-UNPACKING.md): saved-data repacking,
   exact codec compatibility and complete caller performance verification.
 - [Rust palette resizing](RUST-PALETTE-RESIZE.md): bulk storage remapping during

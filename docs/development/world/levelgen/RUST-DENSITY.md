@@ -23,8 +23,10 @@ and preserves snapshot identity. See [module organization](RUST-WORLDGEN-ORGANIZ
 Java still owns graph construction, metadata bounds, serialization, seed/state
 construction, context traversal, caches and interpolation. Supported chunk-bound
 [terrain splines](RUST-SPLINE.md) use private Rust plans with fused coordinate
-transforms. Blending, Y-clamped gradients and unsupported spline contexts retain
-their Java implementations. Extension-owned functions retain their own behavior.
+transforms. Y-clamped gradients and unsupported spline contexts retain
+their Java implementations. Chunk alpha/offset initialization uses
+[batched height blending](blending/RUST-HEIGHT-BLENDING.md); density blending stays
+in Java. Extension-owned functions retain their own behavior.
 
 [Structure terrain adjustment](RUST-BEARDIFIER.md) evaluates factory-owned
 Beardifier geometry across a complete terrain cell in Rust. Java retains scalar

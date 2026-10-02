@@ -91,6 +91,17 @@ public abstract class WorldCarver<C extends CarverConfiguration> {
 			BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 			BlockPos.MutableBlockPos mutableBlockPos2 = new BlockPos.MutableBlockPos();
 
+			if (NativeCanyonGeometry.isCanyon(carveSkipChecker) && (long) r - p >= NativeCanyonGeometry.MIN_HEIGHT
+				&& ((long) r - p) * (o - n + 1L) * (t - s + 1L) >= NativeCanyonGeometry.MIN_VOLUME) {
+				try (var columns = NativeCanyonGeometry.prepare(carvingContext, carveSkipChecker, l, m, n, o, p, r, s, t, d, e, f, g, h)) {
+					if (columns != null) {
+						return this.carveCanyonColumns(carvingContext, carverConfiguration, chunkAccess, function, aquifer, carvingMask,
+							chunkPos, n, o, r, s, t, mutableBlockPos, mutableBlockPos2, columns);
+					}
+				}
+			}
+			carveSkipChecker = NativeCanyonGeometry.original(carveSkipChecker);
+
 			for (int u = n; u <= o; u++) {
 				int v = chunkPos.getBlockX(u);
 				double w = (v + 0.5 - d) / g;
@@ -119,6 +130,42 @@ public abstract class WorldCarver<C extends CarverConfiguration> {
 		} else {
 			return false;
 		}
+	}
+
+	private boolean carveCanyonColumns(
+		CarvingContext context, C config, ChunkAccess chunk, Function<BlockPos, Holder<Biome>> biomes,
+		Aquifer aquifer, CarvingMask mask, ChunkPos pos, int minX, int maxX, int upperY, int minZ, int maxZ,
+		BlockPos.MutableBlockPos block, BlockPos.MutableBlockPos below, NativeCanyonGeometry.Columns columns
+	) {
+		boolean carved = false;
+		int column = 0;
+		for (int x = minX; x <= maxX; x++) {
+			int worldX = pos.getBlockX(x);
+			for (int z = minZ; z <= maxZ; z++, column++) {
+				int worldZ = pos.getBlockZ(z);
+				int firstWord = 0;
+				while (firstWord < columns.words() && columns.word(column, firstWord) == 0) firstWord++;
+				if (firstWord == columns.words()) continue;
+				MutableBoolean surface = new MutableBoolean(false);
+				for (int word = firstWord; word < columns.words(); word++) {
+					long candidates = columns.word(column, word);
+					while (candidates != 0) {
+						int first = Long.numberOfTrailingZeros(candidates);
+						int end = first + Long.numberOfTrailingZeros(~(candidates >>> first));
+						candidates &= end == 64 ? 0 : -1L << end;
+						int lower = upperY - word * 64 - end;
+						for (int y = upperY - word * 64 - first; y > lower; y--) {
+							if (!mask.get(x, y, z) || isDebugEnabled(config)) {
+								mask.set(x, y, z);
+								block.set(worldX, y, worldZ);
+								carved |= this.carveBlock(context, config, chunk, biomes, mask, block, below, aquifer, surface);
+							}
+						}
+					}
+				}
+			}
+		}
+		return carved;
 	}
 
 	protected boolean carveBlock(

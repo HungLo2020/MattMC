@@ -146,6 +146,27 @@ public class Blender {
 		}
 	}
 
+	/** Fill the chunk's quart-grid alpha/offset arrays in their original layout. */
+	public void fillBlendingOutputs(int firstQuartX, int firstQuartZ, int size, double[] alpha, double[] offset) {
+		if (size < 1 || alpha == null || offset == null || alpha == offset
+			|| alpha.length < (long)size * size || offset.length < (long)size * size) {
+			throw new IllegalArgumentException("Invalid height blending grid");
+		}
+		if (this.getClass() == Blender.class && size >= 5
+			&& NativeBlending.fill(this, this.heightAndBiomeBlendingData, firstQuartX, firstQuartZ, size, alpha, offset)) return;
+		for (int x = 0; x < size; x++) {
+			for (int z = 0; z < size; z++) {
+				BlendingOutput result = this.blendOffsetAndFactor(QuartPos.toBlock(firstQuartX + x), QuartPos.toBlock(firstQuartZ + z));
+				alpha[x + z * size] = result.alpha();
+				offset[x + z * size] = result.blendingOffset();
+			}
+		}
+	}
+
+	double heightForNativeGrid(int x, int z) {
+		return this.getBlendingDataValue(x, 0, z, BlendingData::getHeight);
+	}
+
 	private static double heightToOffset(double d) {
 		double e = 1.0;
 		double f = d + 0.5;

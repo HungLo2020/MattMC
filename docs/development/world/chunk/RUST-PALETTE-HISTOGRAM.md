@@ -80,6 +80,10 @@ Raw rounds, checksums, source/library hashes and parity evidence are written to
 `build/palette-histogram-migration/acceptance/`. Measurements apply to this slice;
 loading, disk I/O, full lighting and world generation are outside that timing.
 
+The container source audit additionally permits only the separately pinned
+[ordered-value dispatch](RUST-PALETTE-DISTINCT.md); the original reference bodies
+remain unchanged.
+
 ## Verified status
 
 Release acceptance passed on 2026-10-01: Ryzen 5 5600G, Linux x86_64,

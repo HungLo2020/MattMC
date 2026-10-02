@@ -96,51 +96,62 @@ public class GeodeFeature extends Feature<GeodeConfiguration> {
 		List<BlockPos> list3 = Lists.<BlockPos>newArrayList();
 		Predicate<BlockState> predicate = isReplaceable(geodeConfiguration.geodeBlockSettings.cannotReplace);
 
-		for (BlockPos blockPos3 : BlockPos.betweenClosed(blockPos.offset(i, i, i), blockPos.offset(j, j, j))) {
-			double r = normalNoise.getValue(blockPos3.getX(), blockPos3.getY(), blockPos3.getZ()) * geodeConfiguration.noiseMultiplier;
-			double s = 0.0;
-			double t = 0.0;
+		try (var nativeFields = NativeGeodeGeometry.prepare(normalNoise, blockPos, i, j, list, list2, geodeCrackSettings.crackPointOffset, geodeConfiguration.noiseMultiplier)) {
+			int fieldIndex = 0;
+			for (BlockPos blockPos3 : BlockPos.betweenClosed(blockPos.offset(i, i, i), blockPos.offset(j, j, j))) {
+				double s;
+				double t;
+				if (nativeFields != null) {
+					s = nativeFields.body(fieldIndex);
+					t = nativeFields.crack(fieldIndex++);
+				} else {
+					double r = normalNoise.getValue(blockPos3.getX(), blockPos3.getY(), blockPos3.getZ()) * geodeConfiguration.noiseMultiplier;
+					s = 0.0;
+					t = 0.0;
 
-			for (Pair<BlockPos, Integer> pair : list) {
-				s += Mth.invSqrt(blockPos3.distSqr(pair.getFirst()) + pair.getSecond().intValue()) + r;
-			}
+					for (Pair<BlockPos, Integer> pair : list) {
+						s += Mth.invSqrt(blockPos3.distSqr(pair.getFirst()) + pair.getSecond().intValue()) + r;
+					}
 
-			for (BlockPos blockPos4 : list2) {
-				t += Mth.invSqrt(blockPos3.distSqr(blockPos4) + geodeCrackSettings.crackPointOffset) + r;
-			}
+					for (BlockPos blockPos4 : list2) {
+						t += Mth.invSqrt(blockPos3.distSqr(blockPos4) + geodeCrackSettings.crackPointOffset) + r;
+					}
 
-			if (!(s < h)) {
-				if (bl && t >= l && s < e) {
-					this.safeSetBlock(worldGenLevel, blockPos3, Blocks.AIR.defaultBlockState(), predicate);
+				}
 
-					for (Direction direction : DIRECTIONS) {
-						BlockPos blockPos5 = blockPos3.relative(direction);
-						FluidState fluidState = worldGenLevel.getFluidState(blockPos5);
-						if (!fluidState.isEmpty()) {
-							worldGenLevel.scheduleTick(blockPos5, fluidState.getType(), 0);
+				if (!(s < h)) {
+					if (bl && t >= l && s < e) {
+						this.safeSetBlock(worldGenLevel, blockPos3, Blocks.AIR.defaultBlockState(), predicate);
+
+						for (Direction direction : DIRECTIONS) {
+							BlockPos blockPos5 = blockPos3.relative(direction);
+							FluidState fluidState = worldGenLevel.getFluidState(blockPos5);
+							if (!fluidState.isEmpty()) {
+								worldGenLevel.scheduleTick(blockPos5, fluidState.getType(), 0);
+							}
 						}
-					}
-				} else if (s >= e) {
-					this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.fillingProvider.getState(randomSource, blockPos3), predicate);
-				} else if (s >= f) {
-					boolean bl2 = randomSource.nextFloat() < geodeConfiguration.useAlternateLayer0Chance;
-					if (bl2) {
-						this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.alternateInnerLayerProvider.getState(randomSource, blockPos3), predicate);
-					} else {
-						this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.innerLayerProvider.getState(randomSource, blockPos3), predicate);
-					}
+					} else if (s >= e) {
+						this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.fillingProvider.getState(randomSource, blockPos3), predicate);
+					} else if (s >= f) {
+						boolean bl2 = randomSource.nextFloat() < geodeConfiguration.useAlternateLayer0Chance;
+						if (bl2) {
+							this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.alternateInnerLayerProvider.getState(randomSource, blockPos3), predicate);
+						} else {
+							this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.innerLayerProvider.getState(randomSource, blockPos3), predicate);
+						}
 
-					if ((!geodeConfiguration.placementsRequireLayer0Alternate || bl2) && randomSource.nextFloat() < geodeConfiguration.usePotentialPlacementsChance) {
-						list3.add(blockPos3.immutable());
+						if ((!geodeConfiguration.placementsRequireLayer0Alternate || bl2) && randomSource.nextFloat() < geodeConfiguration.usePotentialPlacementsChance) {
+							list3.add(blockPos3.immutable());
+						}
+					} else if (s >= g) {
+						this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.middleLayerProvider.getState(randomSource, blockPos3), predicate);
+					} else if (s >= h) {
+						this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.outerLayerProvider.getState(randomSource, blockPos3), predicate);
 					}
-				} else if (s >= g) {
-					this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.middleLayerProvider.getState(randomSource, blockPos3), predicate);
-				} else if (s >= h) {
-					this.safeSetBlock(worldGenLevel, blockPos3, geodeBlockSettings.outerLayerProvider.getState(randomSource, blockPos3), predicate);
 				}
 			}
-		}
 
+		}
 		List<BlockState> list4 = geodeBlockSettings.innerPlacements;
 
 		for (BlockPos blockPos2 : list3) {

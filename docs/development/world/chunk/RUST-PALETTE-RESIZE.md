@@ -80,6 +80,10 @@ JIT compilation during measured rounds, matching output checksums, and at least
 workload. Evidence goes in `build/palette-resize-migration/acceptance/`.
 This measures palette growth, not complete world generation or all block writes.
 
+The container source audit additionally permits only the separately pinned
+[ordered-value dispatch](RUST-PALETTE-DISTINCT.md); the original reference bodies
+remain unchanged.
+
 ## Verified status
 
 Release acceptance passed on 2026-10-01: Ryzen 5 5600G, Linux x86_64,

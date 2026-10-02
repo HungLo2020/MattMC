@@ -315,6 +315,10 @@ public class BlendingData {
 		}
 	}
 
+	boolean hasNativeHeightLayout() {
+		return this.heights.length == CELL_COLUMN_COUNT;
+	}
+
 	protected void iterateDensities(int i, int j, int k, int l, BlendingData.DensityConsumer densityConsumer) {
 		int m = this.getColumnMinY();
 		int n = Math.max(0, k - m);

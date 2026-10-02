@@ -71,6 +71,10 @@ least 5% less time in every pair and at the upper 95% bootstrap ratio bound for
 every workload. Raw evidence belongs in
 `build/palette-unpacking-migration/acceptance/`.
 
+The container source audit additionally permits only the separately pinned
+[ordered-value dispatch](RUST-PALETTE-DISTINCT.md); the original reference bodies
+remain unchanged.
+
 ## Recorded verification
 
 Release acceptance passed on 2026-10-01 (Ryzen 5 5600G, Linux x86_64,

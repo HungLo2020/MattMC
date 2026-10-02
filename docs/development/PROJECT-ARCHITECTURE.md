@@ -85,6 +85,18 @@ counter reconstruction, and [palette resizing](world/chunk/RUST-PALETTE-RESIZE.m
 under `world/level/chunk/palette/resize/` for bulk remapping during block palette growth.
 [Global palette loading](world/chunk/RUST-PALETTE-UNPACKING.md) uses
 `world/level/chunk/palette/unpack/` and the existing encoder for saved-data repacking.
+[Ordered palette values](world/chunk/RUST-PALETTE-DISTINCT.md) use
+`world/level/chunk/palette/distinct/` for biome/block scans; Java retains palette
+resolution and callback delivery.
+[Geode density fields](world/levelgen/feature/RUST-GEODE.md) use
+`world/level/levelgen/feature/geode/` for one grid batch; Java retains ordered
+random draws, placement decisions and world callbacks.
+[Canyon ellipsoids](world/levelgen/carver/RUST-CANYON.md) use
+`world/level/levelgen/carver/canyon/` for pure canyon candidate geometry;
+Java retains tunnel randomness, live carving masks and block operations.
+[Old-terrain height blending](world/levelgen/blending/RUST-HEIGHT-BLENDING.md) uses
+`world/level/levelgen/blending/` for current chunk-grid evaluation; Java retains
+direct lookup precedence, sample traversal and scalar/custom compatibility.
 
 World collision geometry also uses [voxel Boolean joins](world/physics/RUST-VOXEL-JOIN.md)
 under `world/phys/shapes/boolean_join/`. Java keeps coordinate merging and

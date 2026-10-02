@@ -46,8 +46,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     original = subprocess.check_output(['git','show',REFERENCE+':src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java'],cwd=ROOT,text=True)
     source = ROOT/'src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java'
+    from VerifyRustPaletteDistinct import strip_distinct
     from VerifyRustPaletteResize import strip_resize
-    if strip_resize(strip_unpack(source.read_text())) != original:
+    if strip_resize(strip_unpack(strip_distinct(source.read_text()))) != original:
         raise RuntimeError('Container differs beyond the exact resize/unpack dispatches and constructor visibility')
     oracle = (ROOT/'src/test/java/net/minecraft/world/level/chunk/JavaPaletteUnpacking.java').read_text()
     a=original.index('\tpublic static <T> DataResult<PalettedContainer<T>> unpack('); b=original.index('\n\t@Override',a)
