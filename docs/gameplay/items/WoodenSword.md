@@ -1,18 +1,45 @@
-﻿# Wooden Sword
+# Wooden Sword
+
+**Wooden Sword** (`minecraft:wooden_sword`) has **59 durability**. Its unbroken main-hand defaults give a normal player **4 attack damage** and **1.6 attack speed**, before enchantments and other modifiers. See [Swords](../mechanics/Swords.md) for attack charge, criticals, sprint knockback, and sweeping. [Registration][registration] · [Material values][materials] · [Sword modifiers][sword-properties] · [Player damage base][player-base] · [Speed base][speed-base]
 
 ## Obtaining
 
-Wooden Sword can be crafted from sticks and planks. It can also be obtained from the Creative Menu.
+This ordinary listed sword also has the separate [inventory-browser](../mechanics/InventoryBrowser.md) insertion route in Survival and Creative. [Category entries](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1584-L1591)
 
-## Usage
+At a [Crafting Table](../blocks/CraftingTable.md), place **2 accepted planks** vertically above **1 [Stick](Stick.md)** in one three-slot column. This makes **1 Wooden Sword**. The three-row layout does not fit the inventory crafting grid. [Recipe][recipe] · [Accepted blade material][repair-wooden]
 
-Wooden Sword is an early-game sword used for harvesting, combat, or utility interactions depending on the tool type.
+The checked tag accepts Oak, Spruce, Birch, Jungle, Acacia, Dark Oak, Mangrove, Cherry, Pale Oak, Bamboo, Crimson, and Warped Planks. The two plank types may be mixed. Pewen Planks are absent. [Plank tag][planks] · [Slot matching][pattern]
 
-## Behavior
+<span id="usage"></span>
+<span id="behavior"></span>
 
-It has wooden-tier durability and mining or attack behavior.
+## Uses and upkeep
 
-## Notes
+It uses the shared [sword attack branches](../mechanics/Swords.md#attack-charge-and-movement) and [fixed mining rules](../mechanics/Swords.md#cobwebs-and-other-mining-uses). In particular, an unbroken ordinary sword can collect String from Cobwebs and instantly cut the tagged Bamboo blocks. Its material does not change those mining speeds. [Sword properties][sword-properties] · [Sweep membership][sword-tag]
 
-* This item is registered as `minecraft:wooden_sword`.
+For [Anvil material repair](../mechanics/Durability.md#choose-a-repair-method), use the same [accepted planks](#obtaining). Ordinary wear retains a fully damaged stack, but it loses normal sword combat/mining behavior and cannot sweep. See [sword upkeep](../mechanics/Swords.md#enchanting-and-upkeep), including the checked Mending route. [Repair material][repair-wooden] · [Assigned repair component][materials] · [Repair lookup][repair-check] · [Retention][broken] · [Mining guards][mine-guard] · [Sweep guard][sweep]
 
+It can be consumed as [furnace fuel](../mechanics/Swords.md#recycling-and-fuel), including after wear-out.
+
+Related: [Swords](../mechanics/Swords.md) · [Enchanting](../enchanting/Enchanting.md) · [Durability and repair](../mechanics/Durability.md) · [Items](Items.md)
+
+<span id="notes"></span>
+
+## Sources and verification
+
+Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. No in-game crafting, combat, mining, enchanting, or repair test was run. The creation recipe and shared behavior are source-checked; this page does not inventory trades, chest loot, or every acquisition route.
+
+[registration]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/Items.java#L1306
+[materials]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/ToolMaterial.java#L20-L59
+[sword-properties]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/ToolMaterial.java#L62-L90
+[player-base]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/player/Player.java#L220-L224
+[speed-base]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/ai/attributes/Attributes.java#L13-L17
+[recipe]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/recipe/crafting/wooden_sword.json
+[repair-wooden]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/tags/item/wooden_tool_materials.json
+[planks]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/tags/item/planks.json
+[pattern]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/crafting/ShapedRecipePattern.java#L158-L193
+[sword-tag]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/tags/item/swords.json
+[repair-check]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/ItemStack.java#L1106-L1108
+[broken]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/ItemStack.java#L429-L485
+[mine-guard]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/item/ItemStack.java#L546-L588
+[sweep]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/entity/player/Player.java#L1015-L1064

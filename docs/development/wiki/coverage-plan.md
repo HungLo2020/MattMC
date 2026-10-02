@@ -1077,11 +1077,20 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,339 pages / 37 indexes. All 18 authored paths are documentation; 888 local links/anchors and 349 tracked reference uses resolve, with zero rendered citation candidates. Two new mob owners and three substantive replacements are distinct from the nine item corrections; broader mob coverage remains incomplete.
 
+## Batch 133: Sword family and special weapons
+
+- Added the Swords family owner and corrected ten material/special-weapon item pages, preserving published item anchors. Shared attack-charge/critical/sprint prose links the current Combat owner; sword-specific sweep, fixed mining rules, seven material recipes and repair remain together.
+- Mace guidance verifies fall-distance bands, attack ordering, Density/Breach/Wind Burst, landing limits and retained-broken exceptions. Trident guidance separates Drowned equipment and normal Vault loot, thrown/return/Riptide controls, enchantment gates and the final-durability throw. Wind Charge guidance covers its exact recipe, reward entries, cooldown, block triggers and bounded fall allowance.
+- All ordinary listed weapon browser routes remain distinct from recipe/loot acquisition. New linked source notes qualify broken-state exceptions instead of promising every enchantment disables uniformly.
+- Source checkpoint: `1d6d726fd7ac529bef1649549bea8dde97819d92`; 138 distinct pinned source pairs match current source. Independent actual rendering found no special-weapon citation failures; held sword items received compatibility anchors before integration. No weapon, damage, fall, enchantment or repair gameplay tests were run.
+
+- Validation: required checker and strict build passed on 2,340 pages / 37 indexes. All 17 authored paths are documentation; 752 local links/anchors and 403 tracked reference uses resolve, with zero rendered citation candidates. One new family guide, ten substantive item corrections and existing-owner crosslinks are recorded separately.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.
 2. Continue the remaining generic mob/item families and source-reviewed expedition drafts. Preserve current citation repairs and source-revalidate every incoming draft.
-3. Revalidate the held Swords draft, replace remaining generic mob/item pages in coherent gameplay loops, and deepen practical expedition, biome, effect and enchantment references.
+3. Replace remaining generic mob/item pages in coherent gameplay loops, and deepen practical expedition, biome, effect and enchantment references.
 4. Continue checking acquisition through the actual inventory browser, recipe/loot, generation, permissions and active interaction callers separately. Keep incomplete imported systems explicit and link independently verified issues without claiming unmerged fixes.
 5. Broad catch-up remains incomplete. The prior audit's template candidates are a triage list, not a completion metric; use player decisions, registry ownership and source-grounded substance to assess progress.
 

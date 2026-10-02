@@ -52,6 +52,9 @@ A raised Shield does not cover every source. The bundled bypass tag includes env
 
 ## Equipment and further reading
 
+- [Swords](Swords.md): material choice, sweeping details, mining and upkeep
+- [Mace](../items/Mace.md): falling smash attacks; [Trident](../items/Trident.md): throws, returns and Riptide; [Wind Charge](../items/WindCharge.md): bursts, movement and block triggers
+
 - [Armor](Armor.md), [Shield](../items/Shield.md), and [defensive item choices](DefensiveItems.md)
 - [Bow](../items/Bow.md), [Crossbow](../items/Crossbow.md), and [Arrow](../items/Arrow.md)
 - [Durability and repair](Durability.md): MattMC's retained broken equipment and function guards

@@ -6,6 +6,8 @@ Breeze Rod can be obtained from the Creative Menu and from its normal survival s
 
 ## Usage
 
+Use Breeze Rods for [Mace crafting](Mace.md#obtaining), [Mace repair](Mace.md#durability-repair-and-a-broken-mace), or the [Wind Charge recipe](WindCharge.md#obtaining).
+
 Breeze Rod is used as a crafting ingredient or utility item in recipes and gameplay systems.
 
 ## Behavior

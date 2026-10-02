@@ -77,6 +77,8 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 
 ### Combat and mob resources
 
+- [Swords](mechanics/Swords.md), [Mace](items/Mace.md), [Trident](items/Trident.md), and [Wind Charge](items/WindCharge.md): material choice, attack-specific rules, acquisition, movement and upkeep
+
 - [Husk](mobs/Husk.md), [Drowned](mobs/Drowned.md), and [Zombie Villager](mobs/ZombieVillager.md): water conversions, underwater equipment and [curing](mobs/ZombieVillager.md#curing-step-by-step)
 - [Nautilus](mobs/Nautilus.md) and [Zombie Nautilus](mobs/ZombieNautilus.md): egg access, ownership, dispenser armor, rider hazards and incomplete natural-spawn/breathing integration
 
