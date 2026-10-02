@@ -6,6 +6,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Built defenders:** [Iron Golem](IronGolem.md) and [Snow Golem](SnowGolem.md), including creation, repair, targeting, and environmental limits
 - **Crocodile integration:** [Crocodile](Crocodile.md) and [Crocodile Scute](../items/CrocodileScute.md) distinguish active fish/egg behavior from imported placeholders
 
 - **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Axolotl](Axolotl.md), [Dolphin](Dolphin.md), [Frog](Frog.md), and [Tadpole](Tadpole.md)

@@ -613,6 +613,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Pistons, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,184 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, smelting, pattern placement, mining, piston, or sticky-block gameplay test.
 
+## Eighty-first batch: built golem defenders
+
+- Expanded Iron/Snow Golem guides and Carved Pumpkin, Snow Block, and Iron Block support items while preserving existing Pumpkin carving and Iron Ingot conversion ownership.
+- Traced exact construction patterns, player-created targeting, conditional villager/Outpost routes, repair, Snow Golem water/biome damage, snow trails, shearing, and death loot.
+- Updated Mobs, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,184 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No construction, village summoning, combat, repair, weather, shearing, or farm gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.

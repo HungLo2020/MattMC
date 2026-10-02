@@ -51,6 +51,7 @@ MattMC combines vanilla-derived Minecraft content with integrated additions. Use
 
 ### Combat and mob resources
 
+- [Iron Golem](mobs/IronGolem.md) and [Snow Golem](mobs/SnowGolem.md): construction, conditional village/outpost routes, defense, repair, environmental care, and drops
 - [Monster Spawner](blocks/MonsterSpawner.md): preserving found cages, activation and attempt rules, nearby limits, and spawn-egg configuration
 - [Ender Dragon](mobs/EnderDragon.md), [End Crystals](items/EndCrystal.md), and [Dragon Egg](blocks/DragonEgg.md): healing, fight phases, rewards, respawning, and trophy collection
 
