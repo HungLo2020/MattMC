@@ -10,7 +10,7 @@
         },
         "target": {
           "predicate_type": "minecraft:tag_match",
-          "tag": "minecraft:replaceable/stone_ores"
+          "tag": "minecraft:stone_ore_replaceables"
         }
       },
       {
@@ -19,7 +19,7 @@
         },
         "target": {
           "predicate_type": "minecraft:tag_match",
-          "tag": "minecraft:replaceable/deepslate_ores"
+          "tag": "minecraft:deepslate_ore_replaceables"
         }
       }
     ]
