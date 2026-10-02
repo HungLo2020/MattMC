@@ -10,6 +10,7 @@ Understand the systems behind everyday gameplay. Guides here explain current Mat
 - [Combat](Combat.md): attack charge, criticals, sweeps, Shields and projectile differences
 - [Raids](Raid.md): omen conversion, village recognition, waves, outcomes and stopping
 - [Swords](Swords.md): material values, sweeping, fixed mining rules, enchantments and repair
+- [Spears](Spears.md): all seven materials, release thrusts, moving contact, Lunge, target conditions, and upkeep
 - [Axes and Hoes](AxesAndHoes.md): all seven materials, combat values, wood/copper conversions, tilling, and crop harvesting
 - [Pickaxes and Shovels](PickaxesAndShovels.md): all seven materials, exact recipes, tool actions, upkeep, and recycling
 - [Mining tools and drops](Mining.md): tool families, material values, copper tier, and loot conditions

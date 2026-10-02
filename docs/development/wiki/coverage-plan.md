@@ -1139,6 +1139,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,347 pages / 37 indexes. All 29 authored paths are documentation; 2,711 local links/anchors and 464 tracked reference uses resolve, with zero rendered citation candidates. One shared Harness family owner and two substantive mob expansions are counted separately from exact color and support-item corrections.
 
+## Batch 140: Spear family and its three attack paths
+
+- Added one canonical Spears guide and corrected all seven material item pages with exact crafting/smithing, material values, repairs and links. Combat retains ordinary attack timing; the new guide owns held-contact and release-thrust differences, targeting, Lunge, equipment wear and enchantment eligibility.
+- Traced active input/use dispatch and registered components, including the material-independent held-contact damage calculation, eight-tick release threshold, contact cooldown, multi-target limits and the registered tool's absence of Sword mining rules. Broken-entry guards are not presented as proof of mid-loop interruption.
+- Source checkpoint: `53b55546fdf042588eea148e36f016234bedc0ed`; 55 distinct pinned source pairs match current source. Independent actual rendering retained all 35 existing item anchors with no citation misbindings. No in-game damage, timing, mounted combat, Lunge, enchantment or crafting test was run.
+
+- Validation: required checker and strict build passed on 2,348 pages / 37 indexes. All 13 authored paths are documentation; 693 local links/anchors and 291 tracked reference uses resolve, with zero rendered citation candidates. One shared attack-family owner is counted separately from seven exact material-item corrections.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.
