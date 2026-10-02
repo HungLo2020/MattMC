@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Turtles and Terrapins:** [Turtle](Turtle.md) and [Terrapin](Terrapin.md): home beaches, egg lifecycles, Scutes, air and bucket limitations
+
 - **Fish and squid care:** [Cod](Cod.md), [Salmon](Salmon.md), [Tropical Fish](TropicalFish.md), [Pufferfish](Pufferfish.md), [Squid](Squid.md), and [Glow Squid](GlowSquid.md): water conditions, capture/retention, variants, sting and ink routes
 
 - **Raid encounters:** [Pillager](Pillager.md), [Ravager](Ravager.md), [Outposts](../structures/PillagerOutpost.md), and [Raids](../mechanics/Raid.md): natural selection, omen gates and event behavior

@@ -1172,6 +1172,14 @@ The user requested an alphabetical Blocks main page like Items, with separate ca
 
 - Validation: required checker and strict build passed on 2,357 pages / 37 indexes. The four authored paths are documentation; 215 local links/anchors and 70 tracked reference uses resolve, with zero rendered citation candidates. Both new issue bodies were independently read back before adding their links.
 
+## Batch 144: Turtle and Terrapin care
+
+- Expanded Turtle and Terrapin, plus Turtle Scute and Turtle Shell. Existing AnimalEggs/TurtleEgg owners retain placed-egg details; the new care guides cover home assignment, feeding, growth rewards, habitat, capture and species limitations.
+- Traced Turtle baby-to-adult Scute loot separately from death loot; Terrapin air, spinning, persistence and unsaved bucket Age; and Turtle Shell armor, recipe, repair, brewing and separate Water Breathing refresh. The source-reviewed lifecycle limits remain linked to [#798](https://github.com/HungLo2020/MattMC/issues/798), and the broken-effect policy follow-up to [#800](https://github.com/HungLo2020/MattMC/issues/800). Neither issue is described as fixed.
+- Source checkpoint: `a24aecea45ed1b91bc5c3f8cf9fb89de728fffa1`; 57 immutable source pairs match current source. Independent rendering and old-anchor checks passed, and the narrow #800 addition was rerendered. No gameplay breeding, bucket round trip, wear-out, damage or diving test was run.
+
+- Validation: required checker and strict build passed on 2,357 pages / 37 indexes. All eight authored paths are documentation; 842 local links/anchors and 155 tracked reference uses resolve, with zero rendered citation candidates and all prior replacement anchors preserved. Two substantive mob replacements are counted separately from two resource/equipment corrections.
+
 ## Next batches, in priority order
 
 1. Maintain the full alphabetical Blocks directory and separate categories as registrations or names change. Audit related-family routes for actual variant behavior; the absence of an article-needed marker is not a completion certificate.
