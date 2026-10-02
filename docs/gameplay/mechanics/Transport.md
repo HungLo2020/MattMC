@@ -67,6 +67,7 @@ If a ride fails, first check the simple causes: rail support, a missed track con
 - [Strider](../mobs/Strider.md) and [Happy Ghast](../mobs/HappyGhast.md): Lava riding and harnessed flight
 - [Llamas](../mobs/Llama.md), [Trader Llamas](../mobs/TraderLlama.md), and [Camels](../mobs/Camel.md): caravans, retention, and two-player travel
 - [Horses](../mobs/Horse.md), [Donkeys](../mobs/Donkey.md), and [Mules](../mobs/Mule.md): land mounts and animal cargo
+- [Skeleton Horses](../mobs/SkeletonHorse.md) and [Zombie Horses](../mobs/ZombieHorse.md): undead mount acquisition and care
 - [Rails](../blocks/Rails.md): placed-track support, special rails, and vehicle-specific activation
 - [Oak Boat](../items/OakBoat.md)
 - [Minecart](../items/Minecart.md)

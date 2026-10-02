@@ -1354,3 +1354,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Corrected Copper, Oxidized Copper and Pewen Trapdoors from two-block-door descriptions to single-block panels, retaining actual hand/power/oxidation controls, Copper tool-tier requirements and Pewen recipe/tag limits. Other authored trapdoor variants and shared owners are preserved.
 - These are six existing-page corrections with all 30 old anchors retained. Exact registration, recipe/loot, tool and food callers, source/render checks and final strict documentation build are required before promotion; no gameplay placement, mining, crafting, eating or brewing test is claimed.
 - Before publication, fast-forwarded from batch 163 to concurrent master `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, preserving all eight draft files and incoming source/development documentation. This source change adds native palette/world-generation work; its code tests were not rerun by the wiki pass. The six item-page source dependencies remain independently checked.
+
+## Batch 165: Undead horse acquisition and care
+
+- Replaced Skeleton Horse and Zombie Horse generic owners with actual weather/egg/operator routes, taming interaction limits, rider equipment, passive and potion healing, foal behavior, persistence and loot. Added shared Horse and Transport discovery links.
+- Distinguished new lightning-trap creation from horse conversion, original and additional trap mounts, untamed ordinary eggs from explicitly tame command data, and underwater breathing from rider dismount/air rules. Preserved all eight original anchors.
+- Independent source and configured-render review passes on both canonical articles; all 44 cited files and 68 biome definitions remain unchanged through the concurrent native world-generation source update. Final documentation check and strict build are required before promotion. No commands or gameplay travel, trap, taming, healing or loot tests were executed.

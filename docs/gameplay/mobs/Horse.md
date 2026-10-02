@@ -85,6 +85,7 @@ With normal mob loot enabled, an adult's base death loot is **0–2 Leather**, w
 
 - [Donkey](Donkey.md): naturally spawning cargo mount
 - [Mule](Mule.md): bred cargo mount
+- [Skeleton Horse](SkeletonHorse.md) and [Zombie Horse](ZombieHorse.md): undead mounts with distinct acquisition and care rules
 - [Horse Spawn Egg](../items/HorseSpawnEgg.md)
 - [Saddle](../items/Saddle.md)
 - [Transport](../mechanics/Transport.md)
