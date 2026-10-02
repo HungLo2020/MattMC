@@ -1,17 +1,29 @@
 # Blue Glazed Terracotta
 
-## Obtaining
+**Blue Glazed Terracotta** (`minecraft:blue_glazed_terracotta`) is the directional, glazed form made from [Blue Terracotta](BlueTerracotta.md). It shares the [Terracotta family's](../blocks/Terracotta.md) pickaxe collection rules but has distinct placement and piston behavior. [Block registration][block] · [Item registration][item]
 
-Blue Glazed Terracotta can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Smelting
 
-## Usage
+Smelt **one [Blue Terracotta](BlueTerracotta.md)** in a fueled [Furnace](../blocks/Furnace.md) to make **one blue glazed terracotta**. The recipe takes **200 game ticks**, approximately **10 seconds at 20 ticks per second**. Its input must be the matching dyed form; uncolored Terracotta and other colors are not accepted. [Exact recipe][recipe]
 
-Blue Glazed Terracotta is a patterned decorative block used in floors, walls, and ornamental builds.
+See [shared crafting and smelting](../blocks/Terracotta.md#crafting-and-smelting) for the prior dye step, recipe experience, and conversion limits.
 
-## Behavior
+## Placement and collection
 
-Its pattern orientation depends on placement direction.
+The block has four horizontal facings, set **opposite your horizontal facing when placed**. Change your facing before placement to choose its orientation. See [placement and facing](../blocks/Terracotta.md#placement-and-facing) for a directional example. [Placement callback][facing]
 
-## Notes
+Use an **unbroken pickaxe** to collect **one blue glazed terracotta**. It stays glazed; the loot has no Silk Touch requirement or Fortune count bonus and has an explosion-survival condition. [Correct-tool registration][block] · [Block loot][loot]
 
-* This item is the item form of the `minecraft:blue_glazed_terracotta` block.
+It is **push-only** for pistons. Follow the [shared piston rules](../blocks/Terracotta.md#pistons-and-sticky-blocks) for Sticky Pistons and Slime/Honey movement; the decorative facing does not change those rules.
+
+Related: [Blue Terracotta](BlueTerracotta.md) · [All family colors](../blocks/Terracotta.md#forms-and-colors) · [Items](Items.md)
+
+## Sources and verification
+
+Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. These are selected crafting, smelting, and collection routes, not a survey of structures or trades. No gameplay test was run. Data packs can change recipes, tags, and loot.
+
+[block]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L4430-L4589
+[item]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java#L823-L838
+[recipe]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/recipe/smelting/blue_glazed_terracotta.json
+[facing]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/GlazedTerracottaBlock.java
+[loot]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/blocks/blue_glazed_terracotta.json

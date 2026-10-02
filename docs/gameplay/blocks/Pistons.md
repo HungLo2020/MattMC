@@ -36,7 +36,7 @@ Pistons queue **block events** and recheck power when those events run. They do 
 - Extended Pistons cannot be moved. Retracted Pistons can be moved when the other rules allow it
 - Ordinary block-entity containers such as Chests, Hoppers, Dispensers, and Droppers are not movable storage here
 - Some blocks are destroyed instead of moved. Torch and Sugar Cane registrations use this behavior; the destruction path runs their normal resource-drop rules
-- Glazed Terracotta is push-only: an ordinary push can move it, but a Sticky Piston cannot directly pull it back
+- [Glazed Terracotta](Terracotta.md#pistons-and-sticky-blocks) is push-only: an ordinary push can move it, but a Sticky Piston cannot directly pull it back
 
 World borders and vertical build limits also restrict movement. Do not use the list as a complete catalog of every integrated block's behavior.
 

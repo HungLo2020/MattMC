@@ -1,17 +1,29 @@
-﻿# Yellow Glazed Terracotta
+# Yellow Glazed Terracotta
 
-## Obtaining
+**Yellow Glazed Terracotta** (`minecraft:yellow_glazed_terracotta`) is the directional, glazed form made from [Yellow Terracotta](YellowTerracotta.md). It shares the [Terracotta family's](../blocks/Terracotta.md) pickaxe collection rules but has distinct placement and piston behavior. [Block registration][block] · [Item registration][item]
 
-Yellow Glazed Terracotta can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+## Smelting
 
-## Usage
+Smelt **one [Yellow Terracotta](YellowTerracotta.md)** in a fueled [Furnace](../blocks/Furnace.md) to make **one yellow glazed terracotta**. The recipe takes **200 game ticks**, approximately **10 seconds at 20 ticks per second**. Its input must be the matching dyed form; uncolored Terracotta and other colors are not accepted. [Exact recipe][recipe]
 
-Yellow Glazed Terracotta is a yellow-colored block item used for building, decoration, storage, lighting, or furnishing depending on its block type.
+See [shared crafting and smelting](../blocks/Terracotta.md#crafting-and-smelting) for the prior dye step, recipe experience, and conversion limits.
 
-## Behavior
+## Placement and collection
 
-When placed, it creates the `minecraft:yellow_glazed_terracotta` block and follows the normal behavior for that yellow variant.
+The block has four horizontal facings, set **opposite your horizontal facing when placed**. Change your facing before placement to choose its orientation. See [placement and facing](../blocks/Terracotta.md#placement-and-facing) for a directional example. [Placement callback][facing]
 
-## Notes
+Use an **unbroken pickaxe** to collect **one yellow glazed terracotta**. It stays glazed; the loot has no Silk Touch requirement or Fortune count bonus and has an explosion-survival condition. [Correct-tool registration][block] · [Block loot][loot]
 
-* This item is the item form of the `minecraft:yellow_glazed_terracotta` block.
+It is **push-only** for pistons. Follow the [shared piston rules](../blocks/Terracotta.md#pistons-and-sticky-blocks) for Sticky Pistons and Slime/Honey movement; the decorative facing does not change those rules.
+
+Related: [Yellow Terracotta](YellowTerracotta.md) · [All family colors](../blocks/Terracotta.md#forms-and-colors) · [Items](Items.md)
+
+## Sources and verification
+
+Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. These are selected crafting, smelting, and collection routes, not a survey of structures or trades. No gameplay test was run. Data packs can change recipes, tags, and loot.
+
+[block]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L4430-L4589
+[item]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/Items.java#L823-L838
+[recipe]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/recipe/smelting/yellow_glazed_terracotta.json
+[facing]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/GlazedTerracottaBlock.java
+[loot]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/blocks/yellow_glazed_terracotta.json

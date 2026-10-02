@@ -606,6 +606,13 @@ Reconcile missing August and September 2026 coverage against actual history befo
 - Updated Blocks, Mobs, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
 - Validation: checker and strict build passed on 2,183 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No feeding, breeding, clearing, grooming, combat, generation, or harvesting gameplay test.
 
+## Eightieth batch: Terracotta and glazed colors
+
+- Added canonical Terracotta and expanded uncolored, all 16 dyed, and all 16 glazed item pages with exact recipes, loot, mining tags, facing, and piston rules.
+- Distinguished uncolored-only dye inputs, matching-color glazing, no bundled recolor/unglaze recipes, and direct pushing versus Slime/Honey adhesion.
+- Updated Blocks, Pistons, Content Guide, this checkpoint, and October log. Gameplay source remains `3e85592c4c78ebb420302360667a6c230dc0318d`; this is subsequent wiki-branch work.
+- Validation: checker and strict build passed on 2,184 pages / 36 indexes; source paths, local links/anchors, and whitespace checked. No crafting, smelting, pattern placement, mining, piston, or sticky-block gameplay test.
+
 ## Next batches, in priority order
 
 1. Continue animal resource clusters beyond completed Grizzly/cod/honeycomb, Trilocaris bucket, Subterranodon/egg, Blobfish and Roadrunner coverage. Prioritize practical player interactions and active availability.
