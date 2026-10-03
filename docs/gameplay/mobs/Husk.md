@@ -20,6 +20,8 @@ Husks inherit the Zombie family's melee targeting, baby variants, equipment, and
 
 Hunger applies only after a **successful melee hit while the Husk's main hand is empty**. The duration is **140 game ticks multiplied by the integer part of local effective difficulty**, so it is not one fixed duration per world difficulty. The effect is Hunger I and increases food exhaustion rather than acting like Poison. Stay out of melee reach instead of waiting for sunrise to remove the threat. [Hit callback][husk] · [Local difficulty][difficulty] · [Hunger and healing](../mechanics/Hunger.md)
 
+The [Hunger effect guide](../effects/HungerAndSaturation.md#hunger) explains its player-only exhaustion, difficulty limits, and clearing.
+
 Husks also inherit the Zombie kill callback that can turn a Villager into a [Zombie Villager](ZombieVillager.md): the conversion roll succeeds 50% of the time on Normal and always on Hard, while Easy does not use that infection route. [Inherited infection][zombie]
 
 ## Water conversion

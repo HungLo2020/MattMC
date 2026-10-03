@@ -16,6 +16,8 @@ Eating a serving supplies **6 hunger points and 7.2 saturation points before cap
 
 The [flower effect table](../blocks/Flowers.md#small-flower-variants) is the practical way to choose a serving: Dandelion and Blue Orchid use Saturation, Poppy uses Night Vision, and other flowers include both beneficial and harmful choices. **Wither Rose stew applies Wither; Lily of the Valley stew applies Poison.** Eating applies the stored effect at level I, subject to ordinary effect handling. The listed duration is not a promise of a fixed amount of healing, hunger gain from the effect, or damage. [Stew effect application] · [Stew wither_rose] · [Stew lily_of_the_valley]
 
+See [Saturation](../effects/HungerAndSaturation.md#saturation) for how the short effect duration replenishes food separately from the stew itself, including the checked trade and loot variants.
+
 The component’s effect tooltip is shown through its **Creative tooltip path**. Keep track of which flower you used instead of expecting the ordinary food tooltip to identify an unfamiliar serving. [Stew effect application]
 
 ## Notes

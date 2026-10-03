@@ -8,6 +8,8 @@ Bread and Baked Potato both supply **5 hunger and 6 saturation** before caps; Co
 
 **Hunger** is the item's nutrition in points. **Saturation** is its contribution before the shared caps; the displayed decimals are the intended values calculated from the registered nutrition and modifier. These are food values, not the extra hunger, healing or damage that a status effect might later cause. [Food construction][food-builder] · [Calculation][formula] · [Stew helper][stew-values]
 
+The [Hunger and Saturation effect guide](../effects/HungerAndSaturation.md) explains the separate status effects and how their active ticks change player food reserves.
+
 Unless the exceptions below say otherwise, a food uses **32 use ticks** (a configured `consumeSeconds` value of 1.6), stacks to **64**, has no registered returned container or additional consumption effect, and does not set the **always-eat** flag. The flag permits the ordinary hunger check to pass even at full hunger; the player check has its own invulnerable-player exception. Use ticks and configured seconds are source values, not measured elapsed eating time. [Food component][food-component] · [Default use][default-use] · [Tick conversion and food gate][consume-ticks] · [Player check][food-gate] · [Default stack][stack-default]
 
 ## Other registered foods

@@ -46,6 +46,8 @@ Carry food before exploring or fighting rather than waiting until you can no lon
 
 ## Related pages
 
+- [Hunger and Saturation effects](../effects/HungerAndSaturation.md): effect sources, tick behavior, and clearing
+
 - [Health, damage, and recovery](Health.md)
 
 - [Survival](../gamemodes/Survival.md)

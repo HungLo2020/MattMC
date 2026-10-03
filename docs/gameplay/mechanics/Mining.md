@@ -4,6 +4,8 @@ Breaking a block, breaking it quickly, and receiving its expected drop are separ
 
 Use [Pickaxes and Shovels](PickaxesAndShovels.md) for exact per-item recipes, material repair, path/campfire actions, and recycling.
 
+Use [Haste and Mining Fatigue](../effects/MiningEffects.md) for effect multipliers, their interaction with Conduit Power, and separate attack-recharge changes.
+
 ## Choose the tool family first
 
 Tools have rules for their intended block groups, such as pickaxe-mineable stone or axe-mineable wood. A block that requires a correct tool can fail its drop check even when its loot table names an item. If no matching correct-for-drops rule is found, the tool rule returns false.

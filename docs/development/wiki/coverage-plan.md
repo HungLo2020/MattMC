@@ -1523,3 +1523,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Linked the existing Skelewag rendering warning to [#803](https://github.com/HungLo2020/MattMC/issues/803), the verified shared Citadel geometry transport/admission issue. The visible ordinary-body, readable-texture and valid-transform scope is explicit; no runtime failure, universal imported-mob defect or gameplay fix is claimed. The separate breathing lead remains outside that ticket.
 - Source remains `8b9173b399a629578a7bf0168e4d3ea32b10e8a6` at the batch-190 article cutoff. The review adds one tracked limitation; it does not close issues or represent new gameplay implementation. Existing monthly entries and their links are preserved.
 - Documentation hierarchy, changed local links, rendered citations and strict build are checked. No gameplay or optional browser validation is claimed. Broader player-wiki catch-up remains incomplete.
+
+## Batch 192: Mining and food status effects
+
+- Added two shared practical owners covering Haste, Mining Fatigue, Hunger and Saturation. The alphabetical Effects index preserves its existing entries and now links 27 reviewed effects; narrow Mining, Hunger, Food Reference, Suspicious Stew and Husk discovery links retain existing owner content.
+- Traced mining multipliers separately from attack recharge and swing timing, with Conduit interaction, Beacon and Elder Guardian sources and actual removal rules. Food effects are separate from item nutrition: Hunger uses player exhaustion, while stored Saturation duration can apply repeatedly; stew trade/loot durations and conditional Husk hits are qualified.
+- Exact canonical hashes, guarded insertions, independent source and configured-render review, preserved old anchors, the integrated hierarchy check and strict build apply. No gameplay mining, attack, food, stew, loot, trade or timing tests were run. This adds four reviewed effects, not complete status-effect coverage.

@@ -11,15 +11,19 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Darkness](VisionEffects.md#darkness): blended fog, pulsing light, and source refresh rules
 - [Dolphin's Grace](MovementEffects.md#dolphins-grace): horizontal water-momentum retention
 - [Fire Resistance](WaterAndFireEffects.md#fire-resistance): fire-tagged damage rejection and lava-fog behavior
+- [Haste](MiningEffects.md#haste): mining-speed bonus, attack recharge, and Conduit interaction
 - [Health Boost](CombatEffects.md#health-boost): maximum ordinary health without immediate healing
+- [Hunger](HungerAndSaturation.md#hunger): player exhaustion, food sources, and Husk-hit conditions
 - [Instant Damage](InstantEffects.md#instant-damage): instant magic damage, inverted healing, and delivery limits
 - [Instant Health](InstantEffects.md#instant-health): immediate healing, inverted damage, and delivery limits
 - [Jump Boost](MovementEffects.md#jump-boost): ground-jump power and safe-fall-distance contributions
 - [Levitation](MovementEffects.md#levitation): upward air movement and the Elytra restriction
+- [Mining Fatigue](MiningEffects.md#mining-fatigue): level-specific mining penalties, attack recharge, and removal
 - [Night Vision](VisionEffects.md#night-vision): rendered brightness, sources, and near-expiry flicker
 - [Poison](Poison.md): periodic damage with a low-health cutoff
 - [Regeneration](Regeneration.md): periodic healing, separate from food-based healing
 - [Resistance](CombatEffects.md#resistance): eligible damage reduction and bypasses
+- [Saturation](HungerAndSaturation.md#saturation): repeated food replenishment and stew-duration limits
 - [Slow Falling](MovementEffects.md#slow-falling): descending gravity and fall-distance handling
 - [Slowness](MovementEffects.md#slowness): reduced movement-speed attribute
 - [Speed](MovementEffects.md#speed): increased movement-speed attribute
@@ -37,6 +41,10 @@ The [water and fire effects reference](WaterAndFireEffects.md) compares fire dam
 The [vision effects reference](VisionEffects.md) compares Night Vision, Blindness, Darkness, and their rendering and player-action limits.
 
 The [instant effects reference](InstantEffects.md) compares Healing and Harming, recipient inversion, and drinking, splash, cloud, and arrow delivery.
+
+The [Hunger and Saturation effect guide](HungerAndSaturation.md) separates status-effect ticks from food values and compares their sources.
+
+The [mining effects reference](MiningEffects.md) compares Haste and Mining Fatigue, their combined mining factors, and separate attack and swing timing.
 
 This is a growing reference, not a complete list of all registered effects. The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
 
