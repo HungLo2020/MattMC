@@ -4,6 +4,7 @@ Find inventory objects here, including block items, food, equipment, and spawn e
 
 The 24 Copper Bars, Chain and Lantern variants have exact entries below and a shared [inventory guide](CopperFixtures.md), with recipes, acquisition and links to placed-block behavior.
 
+- [TaCZ firearms](../mechanics/TaCZFirearms.md): shared controls, ammunition, reloading, refitting and current limits
 - [Dyes](Dyes.md): compare all 16 color recipes and shared recoloring methods
 - [Food reference](FoodReference.md): compare all 59 registered handheld foods, special consumption behavior, and drinks without food values
 
@@ -32,7 +33,7 @@ The 24 Copper Bars, Chain and Lantern variants have exact entries below and a sh
 - [5.56x45mm Bullet](556x45mmBullet.md)
 - [5.7x28mm AP Bullet](57x28mmAPBullet.md)
 - [5.8mm DBP87 Bullet](58mmDBP87Bullet.md)
-- [6.8A'Aaa51mm Fury Bullet](68AAaa51mmFuryBullet.md)
+- [6.8×51mm Fury Bullet](68AAaa51mmFuryBullet.md)
 - [6H3 Bayonet](6H3Bayonet.md)
 - [7.62x25mm Tokarev Bullet](762x25mmTokarevBullet.md)
 - [7.62x39mm Bullet](762x39mmBullet.md)

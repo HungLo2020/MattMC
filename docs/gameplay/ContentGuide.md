@@ -310,6 +310,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [TNT](blocks/TNT.md) and [Trapped Chest](blocks/TrappedChest.md): priming/fuse rules, counted opening signals and storage automation
 - [Iron fixtures](blocks/IronFixtures.md) and [Ladders](blocks/Ladder.md): distinct collection, support, power, water and climbing rules
 - [Slime and Honey Blocks](blocks/SlimeAndHoneyBlocks.md): crafting remainders, landing/slide behavior and piston groups
+- [TaCZ firearms](mechanics/TaCZFirearms.md): gun controls, magazine and reserve ammunition, partial reloads, refitting and current limits
 - [TaCZ Workbenches](blocks/TaCZWorkbenches.md): firearm, ammunition and attachment menus, exact table recipes and inventory transactions
 - [Bamboo blocks](blocks/BambooBlocks.md), [Bone Block](blocks/BoneBlock.md), [Netherrack](blocks/Netherrack.md) and [Petrified Oak Slab](blocks/PetrifiedOakSlab.md): material conversions, harvesting and current acquisition limits
 - [Resin](blocks/Resin.md) and [Creaking Heart](blocks/CreakingHeart.md): renewable material production, masonry and exact operating conditions

@@ -67,6 +67,7 @@ Recipes are listed without a recipe-book unlock or discovery check. Choosing an 
 
 ## Related pages
 
+- [TaCZ firearms](../mechanics/TaCZFirearms.md): gun controls, ammunition, reloading and attachment installation
 - [All blocks](Blocks.md)
 - [Workstation catalog](catalog/workstations.md)
 - [Crafting Table](CraftingTable.md)
