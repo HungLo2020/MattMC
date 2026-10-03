@@ -4,7 +4,7 @@ A **Bucket of Salmon** transports a living [Salmon](../mobs/Salmon.md) with wate
 
 ## Obtaining
 
-Use a **Water Bucket** on the living fish; an empty Bucket is not enough. The filled item is also ordinarily listed in the [inventory item browser](../mechanics/InventoryBrowser.md), which allows insertion in Survival and Creative. Browser insertion is a separate route from natural capture. [Capture][bucket-capture] · [Listing][bucket-list] · [Client request][browser-client] · [Server handling][browser-server]
+Use a **Water Bucket** on the living fish; an empty Bucket is not enough. The filled item is also ordinarily listed in the [inventory item browser](../mechanics/InventoryBrowser.md), which allows insertion in Creative. Browser insertion is a separate route from natural capture. [Capture][bucket-capture] · [Listing][bucket-list] · [Client request][browser-client] · [Server handling][browser-server]
 
 ## Usage
 

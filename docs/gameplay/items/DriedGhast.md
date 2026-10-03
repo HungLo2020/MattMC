@@ -6,7 +6,7 @@ Dried Ghast is the ordinary block item for `minecraft:dried_ghast`. The [Dried G
 
 Craft **1 Dried Ghast** from **8 Ghast Tears around 1 Soul Sand**, recover a placed block by ordinary mining, or use the verified adult-Piglin barter and Nether-Fossil routes in [Obtaining](../blocks/DriedGhast.md#obtaining). Silk Touch is unnecessary for its one-item block drop. [Recipe][ghast-recipe] · [Block loot][ghast-loot] · [Block properties][ghast-block]
 
-It is listed in **Natural Blocks** and can also be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. The browser entry is separate from the crafting, barter and generation routes. [Category][natural-category] · [Entry][ghast-category]
+It is listed in **Natural Blocks** and can also be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. The browser entry is separate from the crafting, barter and generation routes. [Category][natural-category] · [Entry][ghast-category]
 
 ## Usage
 

@@ -6,7 +6,7 @@ A Stone Spear raises the Wooden Spear’s starting damage to 6 points and has 13
 
 Craft one with **one Cobblestone, Blackstone, or Cobbled Deepslate and two Sticks**, using the [shared Spear crafting pattern](../mechanics/Spears.md#craft-or-request-a-spear). [Recipe][stone-recipe] · [Accepted material][stone-repair]
 
-It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Survival as well as Creative. [Tab entry][tab]
+It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Creative. [Tab entry][tab]
 
 ## Usage
 

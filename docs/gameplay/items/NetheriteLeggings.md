@@ -14,7 +14,7 @@ Take the **Netherite Leggings** result. Completing the upgrade consumes one of e
 
 The upgrade preserves the base item’s saved changes, including its damage value, enchantments, name and trim. It applies them to the Netherite item’s defaults; **it does not reset damage to zero**. See [Smithing](../smithing/Smithing.md) for component preservation and template duplication. [Transform result][transform] · [Result application][transmute] · [Saved changes][copy]
 
-This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Survival and Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
+This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
 
 ## Usage
 

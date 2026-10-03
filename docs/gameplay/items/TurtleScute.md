@@ -8,7 +8,7 @@ A baby Turtle normally drops **one Scute when it becomes an adult**, provided **
 
 Killing an adult Turtle does not provide Scutes: its death table has Seagrass and a conditional lightning-death Bowl. Terrapin is not a substitute Scute-producing animal. [Turtle death table][turtle-loot] · [Terrapin implementation][terrapin]
 
-Scutes are also ordinary category-listed items in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Survival and Creative. This is separate from raising a baby. [Listing][scute-list] · [Client][browser-client] · [Server][browser-server]
+Scutes are also ordinary category-listed items in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Creative. This is separate from raising a baby. [Listing][scute-list] · [Client][browser-client] · [Server][browser-server]
 
 ## Usage
 

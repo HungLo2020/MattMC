@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-It is an ordinary category entry that the [inventory item browser](../mechanics/InventoryBrowser.md) can insert in **Survival and Creative**. [Category entry][categories]
+It is an ordinary category entry that the [inventory item browser](../mechanics/InventoryBrowser.md) can insert in **Creative**. [Category entry][categories]
 
 No bundled crafting recipe or loot entry supplies it. [Tarantula Hawk Wings](TarantulaHawkWing.md) and [Wing Fragments](TarantulaHawkWingFragment.md) do not form a checked recipe for these wings. [Bundled recipes][recipe-data] · [Entity loot][loot-data]
 

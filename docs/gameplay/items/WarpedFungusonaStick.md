@@ -6,7 +6,7 @@
 
 Place **1 [Fishing Rod](FishingRod.md) diagonally above-left of 1 [Warped Fungus](WarpedFungus.md)** to craft **1 Warped Fungus on a Stick**. The two-by-two shaped recipe fits the inventory crafting grid. Its bundled recipe ID is `minecraft:crafting/warped_fungus_on_a_stick`. This ordinary shaped recipe copies its defined output; it does not transfer a rod's enchantments or damage into the new tool. [Exact recipe][tool-recipe] · [Recipe loading][recipe-load] · [Result assembly][shaped-result]
 
-The item is also listed in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), which provides an independent insertion route in Survival and Creative. A Strider's conditional Zombified Piglin jockey also receives this item as held equipment; this is not a guaranteed drop from an ordinary Strider. [Category entry][equipment-category] · [Jockey equipment][strider-jockey] · [Equipment-drop conditions][equipment-drops]
+The item is also listed in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), which provides an independent insertion route in Creative. A Strider's conditional Zombified Piglin jockey also receives this item as held equipment; this is not a guaranteed drop from an ordinary Strider. [Category entry][equipment-category] · [Jockey equipment][strider-jockey] · [Equipment-drop conditions][equipment-drops]
 
 ## Usage
 

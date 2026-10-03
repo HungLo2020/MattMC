@@ -6,7 +6,7 @@ A **Bucket of Cosmic Cod** (`minecraft:cosmic_cod_bucket`) carries a [Cosmic Cod
 
 Use an **empty Bucket** on a living Cosmic Cod. Its interaction creates the filled item, saves supported entity data and removes the captured mob. A Water Bucket is not accepted by this capture route. [Capture interaction][capture]
 
-The filled bucket is also an ordinary category-listed item, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in **Survival as well as Creative**. This does not establish a crafting recipe, loot source or natural Cosmic Cod habitat. [Category entry][category]
+The filled bucket is also an ordinary category-listed item, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in **Creative**. This does not establish a crafting recipe, loot source or natural Cosmic Cod habitat. [Category entry][category]
 
 ## Usage
 

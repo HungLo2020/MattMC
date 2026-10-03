@@ -6,7 +6,7 @@
 
 Craft **1 Pink Harness** with **3 Leather, 2 Glass and 1 Pink Wool**. Put Leather–Leather–Leather above Glass–Pink Wool–Glass in a Crafting Table. Alternatively, combine **1 Pink Dye** with **1 Harness of any other color** in a shapeless recipe. A Pink Harness is excluded as the input to its own recoloring recipe. [Exact crafting recipe][craft-pink] · [Exact recoloring recipe][dye-pink]
 
-It is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md), including MattMC's Survival insertion route. [Category entries][equipment-category]
+It is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md), including MattMC's Creative insertion route. [Category entries][equipment-category]
 
 ## Usage
 

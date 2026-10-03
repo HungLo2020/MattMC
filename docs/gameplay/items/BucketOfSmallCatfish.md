@@ -6,7 +6,7 @@ The **Bucket of Small Catfish** (`minecraft:small_catfish_bucket`) can be filled
 
 Use a **Water Bucket** on a living small Catfish. Capture removes the creature and produces the bucket matching its size; an empty Bucket does not perform this interaction. Read the release limitation before capturing a fish you want to keep. [Species interaction][c-use] · [Capture caller][bucket-capture] · [Bucket selection][c-bucket-save] · [Active item aliases][c-bucket-alias]
 
-This filled bucket is also listed in the ordinary Tools and Utilities category. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. A browser bucket has no captured fish's cargo data. [Category entries][c-bucket-list] · [Item components][c-buckets]
+This filled bucket is also listed in the ordinary Tools and Utilities category. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. A browser bucket has no captured fish's cargo data. [Category entries][c-bucket-list] · [Item components][c-buckets]
 
 ## Usage
 

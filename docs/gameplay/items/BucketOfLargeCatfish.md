@@ -6,7 +6,7 @@ The **Bucket of Large Catfish** (`minecraft:large_catfish_bucket`) is the regist
 
 Use a **Water Bucket** on a living large Catfish to capture it and remove it from the world. The fish selects this item from its current size. An empty Bucket does not capture it. Read the release limitation before collecting a fish or cargo you want back. [Capture interaction][c-use] · [Shared capture][bucket-capture] · [Size-based item selection][c-bucket-save]
 
-The item is also an ordinary category entry available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. This route is separate from finding a wild fish. [Category entries][c-bucket-list]
+The item is also an ordinary category entry available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. This route is separate from finding a wild fish. [Category entries][c-bucket-list]
 
 ## Usage
 

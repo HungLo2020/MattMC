@@ -6,7 +6,7 @@
 
 Put **one Bundle and one [Yellow Dye](YellowDye.md)** in any two crafting-grid slots to make **one Yellow Bundle**. You can use an uncolored Bundle or another color, with contents still inside. The recipe accepts the full Bundle item tag; it copies the input's stored items and other saved components. An already yellow Bundle combined with Yellow Dye produces no result. [Exact recipe][yellow-recipe] · [Accepted variants][bundles-tag] · [Recipe matching][transmute] · [Copied result][transmute-result] · [Component preservation][component-copy]
 
-Get the first uncolored Bundle through [its crafting and village-loot routes](Bundle.md#obtaining). Yellow Bundle is also directly listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), available in **Survival and Creative**. [Category entries][category] · [Browser list][browser] · [Server access][browser-server]
+Get the first uncolored Bundle through [its crafting and village-loot routes](Bundle.md#obtaining). Yellow Bundle is also directly listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), visible in **Survival and Creative**; insertion requires **Creative**. [Category entries][category] · [Browser list][browser] · [Server access][browser-server]
 
 ## Usage
 

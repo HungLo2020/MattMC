@@ -6,7 +6,7 @@
 
 Craft **1 Red Harness** with **3 Leather, 2 Glass and 1 Red Wool**. Put Leather–Leather–Leather above Glass–Red Wool–Glass in a Crafting Table. Alternatively, combine **1 Red Dye** with **1 Harness of any other color** in a shapeless recipe. A Red Harness is excluded as the input to its own recoloring recipe. [Exact crafting recipe][craft-red] · [Exact recoloring recipe][dye-red]
 
-It is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md), including MattMC's Survival insertion route. [Category entries][equipment-category]
+It is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md), including MattMC's Creative insertion route. [Category entries][equipment-category]
 
 ## Usage
 

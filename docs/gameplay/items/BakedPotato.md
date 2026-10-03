@@ -16,7 +16,7 @@ Cook **one ordinary Potato into one Baked Potato** using one of these bundled re
 
 For a checked ready-cooked loot option, the **Ancient City ice-box chest** table includes an entry supplying **1–10 Baked Potatoes when selected**. This does not guarantee that a chest contains them. [Ice-box entry][loot]
 
-The ordinary listed item is also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**, separately from recipes, crops and chest loot. [Food listing][browser-list] · [Client request][browser-client] · [Server check][browser-server]
+The ordinary listed item is also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**, separately from recipes, crops and chest loot. [Food listing][browser-list] · [Client request][browser-client] · [Server check][browser-server]
 
 ## Usage
 

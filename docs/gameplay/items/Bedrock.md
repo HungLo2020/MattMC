@@ -2,7 +2,7 @@
 
 ## Obtaining
 
-Available through MattMC’s ordinary inventory browser, including in Survival, because its item belongs to Natural Blocks. No bundled crafting recipe or natural mining-drop route was found. See [the inventory browser](../mechanics/InventoryBrowser.md) for its current access rules. [Item registry][items]
+Available through MattMC’s ordinary inventory browser, in Creative, because its item belongs to Natural Blocks. No bundled crafting recipe or natural mining-drop route was found. See [the inventory browser](../mechanics/InventoryBrowser.md) for its current access rules. [Item registry][items]
 
 ## Usage
 

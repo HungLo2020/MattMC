@@ -6,7 +6,7 @@ A **Centipede Leg** is both food and the crafting material for [Centipede Leggin
 
 A [Cave Centipede](../mobs/CaveCentipede.md) head drops **1–3 legs**, with **up to one extra leg per Looting level** (up to **6 total with Looting III**). Its death-loot table has no player-kill condition or fire-cooking conversion; body and tail tables are empty. Mob-loot rules still apply. Natural centipede spawning is not wired into the checked bundled spawn lists, so the mob guide explains the egg route. [Head loot][head-loot] · [Body loot][body-loot] · [Tail loot][tail-loot] · [Death-loot caller][death-loot] · [Looting count calculation][looting]
 
-The leg is also an ordinary category entry available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. Browser insertion is separate from a mob drop or recipe. [Category entry][categories]
+The leg is also an ordinary category entry available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. Browser insertion is separate from a mob drop or recipe. [Category entry][categories]
 
 ## Usage
 

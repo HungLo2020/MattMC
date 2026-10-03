@@ -4,7 +4,7 @@ The **Strider Spawn Egg** (`minecraft:strider_spawn_egg`) places a [Strider](../
 
 ## Obtaining
 
-This egg is listed in the [inventory item browser](../mechanics/InventoryBrowser.md), which provides an insertion route in **Survival as well as Creative** in MattMC. That listing is separate from [natural Nether spawning and breeding](../mobs/Strider.md#obtaining); it is not evidence of a natural egg drop. [Category entry][strider-egg-category]
+This egg is listed in the [inventory item browser](../mechanics/InventoryBrowser.md), which provides an insertion route in **Creative** in MattMC. That listing is separate from [natural Nether spawning and breeding](../mobs/Strider.md#obtaining); it is not evidence of a natural egg drop. [Category entry][strider-egg-category]
 
 ## Usage
 

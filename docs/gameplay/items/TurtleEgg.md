@@ -4,7 +4,7 @@ A **Turtle Egg** is the placeable item for `minecraft:turtle_egg`. Place it to h
 
 ## Obtaining
 
-Turtles lay clusters through their Seagrass breeding route. Collect placed eggs with Silk Touch, or request its ordinary category entry through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. The [Turtle Egg guide](../blocks/AnimalEggs.md#turtle-eggs) explains the parent’s home requirement and one-egg-at-a-time collection. No bundled crafting recipe was found. [Laying][turtle-lay] · [Silk Touch loot][turtle-loot] · [Creative listing][creative]
+Turtles lay clusters through their Seagrass breeding route. Collect placed eggs with Silk Touch, or request its ordinary category entry through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. The [Turtle Egg guide](../blocks/AnimalEggs.md#turtle-eggs) explains the parent’s home requirement and one-egg-at-a-time collection. No bundled crafting recipe was found. [Laying][turtle-lay] · [Silk Touch loot][turtle-loot] · [Creative listing][creative]
 
 ## Usage
 

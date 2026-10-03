@@ -8,7 +8,7 @@ Craft **one [Breeze Rod](BreezeRod.md) into four Wind Charges**. This is a shape
 
 Both normal and ominous [Vaults](../blocks/Vault.md#normal-versus-ominous-rewards) can also award charges. A normal common-table selection can produce **1–3 or 4–12**, depending on which entry is chosen; an ominous common-table selection produces **8–12**. An opening makes multiple loot selections, so these are counts for selected entries, not guaranteed totals per key. [Normal rewards][normal-reward] · [Normal common entries][normal-common] · [Ominous rewards][ominous-reward] · [Ominous common entry][ominous-common] · [Reward resolution][vault-use]
 
-The item is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), whose insertion route is available in Survival. Browser insertion is separate from gathering rods and opening Vaults. [Category entries][creative]
+The item is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), whose insertion route is available in Creative. Browser insertion is separate from gathering rods and opening Vaults. [Category entries][creative]
 
 ## Usage
 

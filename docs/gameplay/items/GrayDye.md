@@ -13,7 +13,7 @@ The crafting rows are shapeless: put one ingredient in each occupied slot, with 
 
 The [Eyeblossom guide](../blocks/Eyeblossoms.md) explains open and closed flowers. The ingredient here is the **closed** item.
 
-This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), available in Survival and Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
+This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), visible in Survival and Creative; insertion requires Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
 
 ## Usage
 

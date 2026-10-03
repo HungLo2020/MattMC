@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-The ordinary food-category listing makes it available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. [Category entry][l-food-list]
+The ordinary food-category listing makes it available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. [Category entry][l-food-list]
 
 The checked [Lobster](../mobs/Lobster.md#drops) has no bundled `entities/lobster` loot table, so it does not have a configured Lobster Tail death drop. No separate recipe or loot source for the raw tail was found in the bundled inventory. [Entity loot files][loot-data] · [Missing-table fallback][loot-fallback] · [Recipe data][recipe-data]
 

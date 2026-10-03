@@ -6,7 +6,7 @@ Copper Nugget (`minecraft:copper_nugget`) is a crafting ingredient. It is regist
 
 Craft **one Copper Ingot into nine Copper Nuggets**, with no required arrangement. See [Copper Ingot](CopperIngot.md#obtaining) for metal processing and storage conversions. [Nugget recipe][nuggets]
 
-The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Survival and Creative, subject to its cursor, space, and feature checks. [Listing][listing]
+The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Creative, subject to its cursor, space, and feature checks. [Listing][listing]
 
 ## Usage
 

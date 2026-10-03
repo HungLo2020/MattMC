@@ -4,7 +4,7 @@ The **Zombie Nautilus Spawn Egg** creates a [Zombie Nautilus](../mobs/ZombieNaut
 
 ## Obtaining
 
-It is listed in the ordinary Spawn Eggs category, so use the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. No bundled recipe or natural loot route was found for this egg. Browser availability does not mean the mob naturally spawns. [Zombie Nautilus egg listing][egg-list-zombie]
+It is listed in the ordinary Spawn Eggs category, so use the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. No bundled recipe or natural loot route was found for this egg. Browser availability does not mean the mob naturally spawns. [Zombie Nautilus egg listing][egg-list-zombie]
 
 ## Usage
 

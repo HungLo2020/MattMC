@@ -11,7 +11,7 @@ Two checked loot routes provide Tridents:
 
 A Drowned's thrown projectiles are **not collectible Survival Tridents**; killing an armed Drowned for its equipment and picking up its shots are different routes. [Drowned projectile creation][drowned] · [Non-player pickup rules][arrow]
 
-No bundled crafting recipe for a Trident was found in the active recipe resources. It is an ordinary category-listed item in the [inventory item browser](../mechanics/InventoryBrowser.md), which also allows insertion in Survival. That is separate from the loot routes above. [Active recipe loader][recipe-loader] · [Category entry][creative]
+No bundled crafting recipe for a Trident was found in the active recipe resources. It is an ordinary category-listed item in the [inventory item browser](../mechanics/InventoryBrowser.md), which also allows insertion in Creative. That is separate from the loot routes above. [Active recipe loader][recipe-loader] · [Category entry][creative]
 
 ## Usage
 

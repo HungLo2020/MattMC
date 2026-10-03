@@ -1596,3 +1596,9 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Preserved real recipes, loot, normal item-use/consumption and operator-category permissions. Corrected replacement-supply advice in Death and Respawn and related equipment/mode summaries. Broader explicit per-item and per-mob acquisition claims are a separately reviewed continuation of this correction.
 - Added durable authoring/continuation checks so a permissive downstream handler cannot again stand in for protocol admission. Existing historical monthly entries and batch descriptions are retained with the current correction clearly identified.
 - Source proof was independently reproduced. Exact before/after guards, unchanged-source verification, preserved headings, rendered citations, the required documentation check and strict build apply. No game, browser-click or network runtime test was run.
+
+## Batch 202: Item browser acquisition wording
+
+- Applied 362 guarded paragraph replacements across 361 existing item pages: 292 acquisition-correction files and 69 clarification-only files. Ambiguous listing wording retains true Survival catalog visibility while distinguishing Creative insertion. Fifteen other inventory candidates remain unchanged.
+- Preserved normal Survival egg use, consumption, recovery, recipe/loot routes and operator conditions. Knowledge Book and Mule wording were checked as mixed cases; Spawn Eggs' separate no-mode-change supply inference was corrected. No item registry, recipe, gameplay or packet code changed.
+- Independent review checked all 98 distinct wording pairs and the remaining browser/mode contexts across 1,880 item pages. Exact baseline/output guards, all 1,992 original anchors and 8,682 outgoing links are preserved; configured local-link checks, actual hierarchy/citation checks and strict build apply. No runtime inventory test was performed.

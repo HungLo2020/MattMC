@@ -15,7 +15,7 @@ The crafting rows are shapeless: put one ingredient in each occupied slot, with 
 
 See [Flowers](../blocks/Flowers.md) for the three flower ingredients and [root crops](../blocks/RootCrops.md) for Beetroot production.
 
-This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), available in Survival and Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
+This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), visible in Survival and Creative; insertion requires Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
 
 ## Usage
 

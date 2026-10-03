@@ -6,7 +6,7 @@ The **Bucket of Lobster** (`minecraft:lobster_bucket`) captures and releases a [
 
 Use a **Water Bucket** on a living Lobster. Capture replaces the ordinary Survival Water Bucket with the filled item and removes the mob. An empty Bucket does not work. Common health/name data is captured, but do not collect a rare color expecting it to survive release unchanged. [Interaction][l-bucket-data] · [Capture caller][bucket-capture] · [Common data][bucket-common-data]
 
-A plain filled bucket is also available from MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**, because it is an ordinary category entry. [Category entry][l-bucket-list]
+A plain filled bucket is also available from MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**, because it is an ordinary category entry. [Category entry][l-bucket-list]
 
 ## Usage
 

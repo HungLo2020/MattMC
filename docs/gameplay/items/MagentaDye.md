@@ -16,7 +16,7 @@ The crafting rows are shapeless: put one ingredient in each occupied slot, with 
 
 A collected [Lilac](../blocks/Flowers.md#lilac) gives twice the dye of one [Allium](../blocks/Flowers.md#allium). The Flowers guide explains how a planted Lilac can supply more flower items.
 
-This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), available in Survival and Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
+This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), visible in Survival and Creative; insertion requires Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
 
 ## Usage
 

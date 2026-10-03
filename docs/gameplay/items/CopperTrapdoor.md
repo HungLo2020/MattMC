@@ -6,7 +6,7 @@
 
 Craft **four Copper Ingots in a 2 × 2 square into one Copper Trapdoor**. This recipe produces the unaffected, unwaxed form. [Recipe][recipe]
 
-The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Survival and Creative, subject to its cursor, space, and feature checks. [Listing][listing]
+The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Creative, subject to its cursor, space, and feature checks. [Listing][listing]
 
 ## Usage
 

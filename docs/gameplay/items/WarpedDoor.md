@@ -6,7 +6,7 @@
 
 Craft **6 [Warped Planks](WarpedPlanks.md) into 3 Warped Doors** using the [door layout](../blocks/WoodConstruction.md#crafting-construction-shapes): two columns of three in a Crafting Table. Every plank must be this exact material. [Recipe][recipe]
 
-The ordinary [inventory-browser entry](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) also supplies this item in Survival and Creative, subject to the browser's limits. [Category listing][listing]
+The ordinary [inventory-browser entry](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) also supplies this item in Creative, subject to the browser's limits. [Category listing][listing]
 
 ## Usage
 

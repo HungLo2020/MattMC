@@ -6,7 +6,7 @@
 
 Let an unwaxed [Copper Trapdoor](CopperTrapdoor.md) progress through Exposed and Weathered to **Oxidized**, then collect it with the tool described below. The checked ordinary recipe set has no direct crafting output for this unwaxed stage. See [oxidation and spacing](../blocks/CopperConstruction.md#oxidation-and-spacing). [Stage map][weather]
 
-The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Survival and Creative, subject to its cursor, space, and feature checks. [Listing][listing]
+The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Creative, subject to its cursor, space, and feature checks. [Listing][listing]
 
 ## Usage
 

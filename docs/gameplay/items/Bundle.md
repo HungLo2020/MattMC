@@ -8,7 +8,7 @@ Craft **one String directly above one Leather**, in the same column, to make **o
 
 The uncolored item also appears in bundled village chest loot: [cartographer][village_cartographer], [tannery][village_tannery], [weaponsmith][village_weaponsmith], and [plains][village_plains_house], [desert][village_desert_house], [savanna][village_savanna_house], [snowy][village_snowy_house] and [taiga][village_taiga_house] house tables. These tables include an empty alternative, so a matching chest does not guarantee a Bundle. Chest loot is filled when its stored loot table is unpacked. [Container opening][loot-menu] · [Loot resolution][loot-unpack]
 
-All 17 variants are also listed in Tools & Utilities and available through MattMC's ordinary [Inventory Browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. That is a separate acquisition route from crafting and village loot. [Category entries][category] · [Browser list][browser] · [Server handling][browser-server]
+All 17 variants are also listed in Tools & Utilities and available through MattMC's ordinary [Inventory Browser](../mechanics/InventoryBrowser.md) in **Creative**. That is a separate acquisition route from crafting and village loot. [Category entries][category] · [Browser list][browser] · [Server handling][browser-server]
 
 ## Usage
 

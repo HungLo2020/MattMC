@@ -14,7 +14,7 @@ X . X
 
 An ordinary **level-1 Armorer** can offer one piece for a base **4 Emeralds**. Only selected offers are added from the level’s pool, and the displayed price can change. The optional Trade Rebalance experiment has a separate table. [Armorer offers][armorer-trades] · [Trade selection][trade-selection] · [Random offers][random-offers] See [Trading](../trading/Trading.md).
 
-This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Survival and Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
+This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
 
 ## Usage
 

@@ -4,7 +4,7 @@ A **Soul Heart** (`minecraft:soul_heart`) is an inventory lure for Spectres. It 
 
 ## Obtaining
 
-Soul Heart is an ordinary category-listed item, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can request it in **Survival as well as Creative** through the checked insertion route. No bundled recipe or loot-table source was found; natural/crafting acquisition remains separate and unverified here. Do not assume an upstream mod's drop or recipe exists. [Category entry][creative]
+Soul Heart is an ordinary category-listed item, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can request it in **Creative** through the checked insertion route. No bundled recipe or loot-table source was found; natural/crafting acquisition remains separate and unverified here. Do not assume an upstream mod's drop or recipe exists. [Category entry][creative]
 
 ## Usage
 

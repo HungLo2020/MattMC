@@ -6,7 +6,7 @@
 
 Put **one Bundle and one [Light Gray Dye](LightGrayDye.md)** in any two crafting-grid slots to make **one Light Gray Bundle**. You can use an uncolored Bundle or another color, with contents still inside. The recipe accepts the full Bundle item tag; it copies the input's stored items and other saved components. An already light gray Bundle combined with Light Gray Dye produces no result. [Exact recipe][light_gray-recipe] · [Accepted variants][bundles-tag] · [Recipe matching][transmute] · [Copied result][transmute-result] · [Component preservation][component-copy]
 
-Get the first uncolored Bundle through [its crafting and village-loot routes](Bundle.md#obtaining). Light Gray Bundle is also directly listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), available in **Survival and Creative**. [Category entries][category] · [Browser list][browser] · [Server access][browser-server]
+Get the first uncolored Bundle through [its crafting and village-loot routes](Bundle.md#obtaining). Light Gray Bundle is also directly listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), visible in **Survival and Creative**; insertion requires **Creative**. [Category entries][category] · [Browser list][browser] · [Server access][browser-server]
 
 ## Usage
 

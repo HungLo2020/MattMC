@@ -8,7 +8,7 @@ Recover it by **shattering a Trial Chamber pot decorated with the Flow pattern**
 
 Use a tagged breaking tool, such as a pickaxe **without Silk Touch**, to recover those ingredients. Breaking with an empty hand or a Silk Touch tool keeps the decorated pot instead. See the [exact shattering and recovery rules](../blocks/DecoratedPot.md#breaking-keep-the-pot-or-recover-ingredients). [Break check][shatter] · [Loot branches][loot]
 
-The sherd is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item), which supplies ordinary listed items in Survival and Creative when inventory space is available. [Category entry][creative]
+The sherd is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item), which supplies ordinary listed items in Creative when inventory space is available. [Category entry][creative]
 
 ## Usage
 

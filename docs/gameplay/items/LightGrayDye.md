@@ -16,7 +16,7 @@ The crafting rows are shapeless: put one ingredient in each occupied slot, with 
 
 [Flowers](../blocks/Flowers.md#small-flower-variants) covers the three direct plant ingredients and their collection. All three output Light Gray, including **White Tulip**.
 
-This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), available in Survival and Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
+This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), visible in Survival and Creative; insertion requires Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
 
 ## Usage
 

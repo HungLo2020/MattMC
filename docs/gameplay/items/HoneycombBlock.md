@@ -6,7 +6,7 @@ Honeycomb Block is the placeable item for `minecraft:honeycomb_block`. Use the [
 
 Craft **four [Honeycomb](Honeycomb.md) in a 2 × 2 square into one block**, or recover one from a placed Honeycomb Block by hand. [Recipe][recipe] · [Block loot][loot] · [Drop gate][gate]
 
-Its ordinary Natural Blocks entry also supplies the separate [Survival/Creative inventory item-browser route](../mechanics/InventoryBrowser.md). [Entry][entry]
+Its ordinary Natural Blocks entry also supplies the separate [Creative inventory item-browser route](../mechanics/InventoryBrowser.md). [Entry][entry]
 
 ## Usage
 

@@ -10,7 +10,7 @@ A successful dispenser action requests **one point of Shears wear**, before dama
 
 The Bison guide explains the current **lack of an ordinary hand-shearing hookup** and the **five completed Grass Block grazings** needed to regrow a coat. Holding or feeding Wheat is not an instant Fur-restoration shortcut. [Bison interaction][interaction] · [Shears item implementation][shears-item] · [Grazing][grazing] · [Regrowth][regrowth]
 
-Fur is also in the ordinary Ingredients category and can be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival or Creative**, independently of shearing. [Category entry][tab] · [Browser list][browser-list] · [Client request][browser-client] · [Server check][browser-server]
+Fur is also in the ordinary Ingredients category and can be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**, independently of shearing. [Category entry][tab] · [Browser list][browser-list] · [Client request][browser-client] · [Server check][browser-server]
 
 ## Usage
 

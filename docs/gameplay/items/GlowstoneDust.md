@@ -6,7 +6,7 @@ Glowstone Dust (`minecraft:glowstone_dust`) is a crafting and brewing ingredient
 
 Mine a Glowstone block without Silk Touch for **2–4 Dust before Fortune**. Fortune can raise the result, capped at four; Silk Touch selects the intact block instead. See [Glowstone harvesting](../blocks/LuminousBlocks.md#glowstone) and [finding Glowstone](../blocks/LuminousBlocks.md#finding-glowstone). [Loot][loot]
 
-The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Survival and Creative, subject to its cursor, space, and feature checks. [Listing][listing]
+The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Creative, subject to its cursor, space, and feature checks. [Listing][listing]
 
 ## Usage
 

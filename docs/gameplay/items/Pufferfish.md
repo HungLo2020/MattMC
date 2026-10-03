@@ -6,7 +6,7 @@ The loose **Pufferfish item** is a brewing ingredient and Nautilus taming food. 
 
 A [Pufferfish](../mobs/Pufferfish.md#drops) drops one with mob loot enabled. [Fishing](../mechanics/Fishing.md) also has Pufferfish in its fish-loot subtable; use that guide for fishing conditions rather than treating the subtable weight as an overall catch probability. [Death table][loot-pufferfish] · [Fish subtable][fishing-fish]
 
-It is also an ordinary item in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Survival and Creative. [Listing][food-list] · [Client][browser-client] · [Server][browser-server]
+It is also an ordinary item in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Creative. [Listing][food-list] · [Client][browser-client] · [Server][browser-server]
 
 ## Usage
 

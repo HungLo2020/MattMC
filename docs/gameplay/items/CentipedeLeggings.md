@@ -14,7 +14,7 @@ Leg   ·   Leg
 
 The dot is an empty slot. [Exact recipe][leggings-recipe]
 
-Legs come from [Cave Centipede head loot](../mobs/CaveCentipede.md#drops). The finished leggings are also an ordinary category entry that the [inventory item browser](../mechanics/InventoryBrowser.md) can insert in **Survival and Creative**, independently of crafting. [Category entry][categories]
+Legs come from [Cave Centipede head loot](../mobs/CaveCentipede.md#drops). The finished leggings are also an ordinary category entry that the [inventory item browser](../mechanics/InventoryBrowser.md) can insert in **Creative**, independently of crafting. [Category entry][categories]
 
 ## Usage
 

@@ -2,7 +2,7 @@
 
 ## Obtaining
 
-The Ravager Spawn Egg is an ordinary listed item available from the Creative category and MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. This inventory route is separate from the mob's natural or event spawning. [Entity/egg registration][eggs-register] · [Category entries][eggs-list] · [List assembly][browser-list] · [Request][browser-client] · [Server handling][browser-server]
+The Ravager Spawn Egg is an ordinary listed item available from the Creative category and MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. This inventory route is separate from the mob's natural or event spawning. [Entity/egg registration][eggs-register] · [Category entries][eggs-list] · [List assembly][browser-list] · [Request][browser-client] · [Server handling][browser-server]
 
 ## Usage
 

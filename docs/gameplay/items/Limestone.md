@@ -4,7 +4,7 @@ Limestone is the placeable item for the [Limestone building family](../blocks/Li
 
 ## Obtaining and use
 
-Request **Limestone** through the [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) in **Survival or Creative**. It is an ordinary listed item. No crafting, smelting or stonecutting recipe, or naturally generated supply, was found in the checked bundled data; see [acquisition and recipe limits](../blocks/Limestone.md#inventory-access-and-recipe-limits). [Listed item][listed] · [Browser assembly][browser] · [Client request][client] · [Server request][server]
+Request **Limestone** through the [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) in **Creative**. It is an ordinary listed item. No crafting, smelting or stonecutting recipe, or naturally generated supply, was found in the checked bundled data; see [acquisition and recipe limits](../blocks/Limestone.md#inventory-access-and-recipe-limits). [Listed item][listed] · [Browser assembly][browser] · [Client request][client] · [Server request][server]
 
 Normal tools cannot recover it through the bundled mining tags. The old assumption that any stone-like block can simply be mined with a pickaxe does not substitute for this block's missing tool-tag wiring. Read the [standard-tool mining warning](../blocks/Limestone.md#standard-tool-mining) before placing it.
 

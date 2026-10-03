@@ -6,7 +6,7 @@
 
 Use Acacia Planks in the [shared trapdoor crafting layout](../blocks/WoodConstruction.md#crafting-construction-shapes); the recipe requires this exact plank material. [Recipe][recipe]
 
-This ordinary [inventory-browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) entry is also available in Survival as well as Creative, subject to the browser's limits. [Category listing][listing]
+This ordinary [inventory-browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) entry is visible in Survival as well as Creative; insertion is available in Creative, subject to the browser's limits. [Category listing][listing]
 
 ## Usage
 

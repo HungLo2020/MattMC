@@ -4,7 +4,7 @@ The **Spectre Spawn Egg** creates a [Spectre](../mobs/Spectre.md). It is registe
 
 ## Obtaining
 
-This egg is an ordinary category-listed item. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. No bundled recipe or loot source was found in this review; browser access is separate from natural mob spawning. [Category entry][category]
+This egg is an ordinary category-listed item. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. No bundled recipe or loot source was found in this review; browser access is separate from natural mob spawning. [Category entry][category]
 
 ## Usage
 

@@ -6,7 +6,7 @@
 
 Craft **6 [Acacia Planks](AcaciaPlanks.md) into 3 Acacia Doors** using the [door layout](../blocks/WoodConstruction.md#crafting-construction-shapes): two columns of three in a Crafting Table. Other plank materials cannot fill this recipe. [Recipe][recipe]
 
-MattMC's JEI-style [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) also supplies this ordinary listed item in Survival and Creative, subject to the browser's limits. [Category listing][listing]
+MattMC's JEI-style [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) also supplies this ordinary listed item in Creative, subject to the browser's limits. [Category listing][listing]
 
 ## Usage
 

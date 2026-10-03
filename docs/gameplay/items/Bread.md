@@ -8,7 +8,7 @@ Arrange **three Wheat in one horizontal row** at a [Crafting Table](../blocks/Cr
 
 Bread also appears in the checked **Plains Village house chest** loot table: its entry supplies **1–4 Bread when selected**. That is one verified loot option, not a guaranteed chest reward or a complete list of Bread sources. [Chest entry][loot]
 
-The ordinary listed item is also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**, separately from crafting and loot. [Food listing][browser-list] · [Client request][browser-client] · [Server check][browser-server]
+The ordinary listed item is also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**, separately from crafting and loot. [Food listing][browser-list] · [Client request][browser-client] · [Server check][browser-server]
 
 ## Usage
 

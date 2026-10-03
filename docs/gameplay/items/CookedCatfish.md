@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-It is an ordinary food-category item, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) provides it in **Survival as well as Creative**. No bundled recipe or loot table directly supplies it in the checked inventory. Browser access is the verified item-acquisition route here. [Category listing][c-food-list] · [Recipe data][recipe-data] · [Bundled data][bundled-data]
+It is an ordinary food-category item, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) provides it in **Creative**. No bundled recipe or loot table directly supplies it in the checked inventory. Browser access is the verified item-acquisition route here. [Category listing][c-food-list] · [Recipe data][recipe-data] · [Bundled data][bundled-data]
 
 ## Usage
 

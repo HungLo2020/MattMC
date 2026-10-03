@@ -6,7 +6,7 @@ A Diamond Spear combines 8-point starting damage with 1,561 durability. Keep it 
 
 Craft one with **one Diamond and two Sticks**, using the [shared Spear crafting pattern](../mechanics/Spears.md#craft-or-request-a-spear). [Recipe][diamond-recipe] · [Accepted material][diamond-repair]
 
-It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Survival as well as Creative. [Tab entry][tab]
+It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Creative. [Tab entry][tab]
 
 ## Usage
 

@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Its ordinary Natural Blocks entry is available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative; that insertion route is separate from the harvesting rules below.
+Its ordinary Natural Blocks entry is available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative; that insertion route is separate from the harvesting rules below.
 
 [Harvest a flower directly before cutting the stems](../blocks/Chorus.md#harvest-flowers-before-stems). Direct Survival breaking gives one flower, including by hand; allowed impact projectiles can also collect it. Flowers destroyed by ordinary support loss do not supply that drop. The bundled loot does not require Silk Touch and does not increase with Fortune. [Flower loot][loot] · [Projectile callback][hit] · [Support-loss callback][tick]
 

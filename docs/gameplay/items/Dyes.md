@@ -33,7 +33,7 @@ For repeated supplies, use the existing [Flowers](../blocks/Flowers.md#harvestin
 
 ## Browser and trading
 
-All sixteen dyes appear in an ordinary category used by the [inventory item browser](../mechanics/InventoryBrowser.md). The checked MattMC browser can insert listed items in **Survival and Creative**, subject to its cursor, inventory-space and enabled-item checks. This is a separate route from processing ingredients. [Dye category entries] · [Browser list construction] · [Client request] · [Server insertion]
+All sixteen dyes appear in an ordinary category used by the [inventory item browser](../mechanics/InventoryBrowser.md). The checked MattMC browser can insert listed items in **Creative**, subject to its cursor, inventory-space and enabled-item checks. This is a separate route from processing ingredients. [Dye category entries] · [Browser list construction] · [Client request] · [Server insertion]
 
 A [Wandering Trader](../mobs/WanderingTrader.md)'s offer pool includes **three of any one dye color for one Emerald**, with **12 uses** when that offer is selected. Each color is a separate possible offer. Traders randomly choose from their pools, so a particular trader need not sell your target color. See [Trading](../trading/Trading.md) for using offers. [All dye offers] · [Offer construction] · [Trader offer dispatch] · [Random offer selection]
 

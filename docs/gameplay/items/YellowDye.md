@@ -14,7 +14,7 @@ The crafting rows are shapeless: put one ingredient in each occupied slot, with 
 
 [Flowers](../blocks/Flowers.md) covers Dandelions and Sunflowers; [flowerbeds](../blocks/FlowerbedsAndLeafLitter.md#wildflowers) covers Wildflowers. A planted Sunflower can supply more flower items through the Flowers guide's tall-flower route.
 
-This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), available in Survival and Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
+This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), visible in Survival and Creative; insertion requires Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
 
 ## Usage
 

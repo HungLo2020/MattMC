@@ -2,7 +2,7 @@
 
 ## Obtaining
 
-The Tiger Spawn Egg is listed in the ordinary Spawn Eggs category. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. See [Spawn eggs](SpawnEggs.md#obtaining) for the shared acquisition rules. [Registration](https://github.com/HungLo2020/MattMC/blob/aaeea0b263d995334061e562cd5b71a853540f7f/src/main/java/net/minecraft/world/item/Items.java#L1973) · [Category entry](https://github.com/HungLo2020/MattMC/blob/aaeea0b263d995334061e562cd5b71a853540f7f/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L2102)
+The Tiger Spawn Egg is listed in the ordinary Spawn Eggs category. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. See [Spawn eggs](SpawnEggs.md#obtaining) for the shared acquisition rules. [Registration](https://github.com/HungLo2020/MattMC/blob/aaeea0b263d995334061e562cd5b71a853540f7f/src/main/java/net/minecraft/world/item/Items.java#L1973) · [Category entry](https://github.com/HungLo2020/MattMC/blob/aaeea0b263d995334061e562cd5b71a853540f7f/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L2102)
 
 ## Usage
 

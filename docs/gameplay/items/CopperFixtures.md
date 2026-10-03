@@ -4,7 +4,7 @@ This inventory family contains **24 items**: Copper Bars, Copper Chain, and Copp
 
 ## Find or craft a variant
 
-Search the displayed name in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), such as “Weathered Copper Chain” or “Waxed Copper Lantern”. All 24 have ordinary category entries, so this insertion route is available in Survival as well as Creative, subject to the browser's feature, cursor, and inventory-capacity checks. [Building entries][building] · [Functional entries][functional]
+Search the displayed name in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), such as “Weathered Copper Chain” or “Waxed Copper Lantern”. All 24 have ordinary category entries, so this insertion route is available in Creative, subject to the browser's feature, cursor, and inventory-capacity checks. [Building entries][building] · [Functional entries][functional]
 
 For exact item IDs and resource routes, use the family tables:
 

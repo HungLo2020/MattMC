@@ -6,7 +6,7 @@ The **Turtle Shell** is a helmet that grants **2 armor points** and prepares a s
 
 Craft **five [Turtle Scutes](TurtleScute.md)** at a Crafting Table: fill all three slots of the top row, then the left and right slots of the next row. The recipe returns **one Turtle Shell**. [Exact recipe][helmet-recipe]
 
-It is also an ordinary category-listed item in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Survival and Creative. This is a separate route from raising Turtles for Scutes and crafting. [Listing][helmet-list] · [Client][browser-client] · [Server][browser-server]
+It is also an ordinary category-listed item in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Creative. This is a separate route from raising Turtles for Scutes and crafting. [Listing][helmet-list] · [Client][browser-client] · [Server][browser-server]
 
 ## Usage
 

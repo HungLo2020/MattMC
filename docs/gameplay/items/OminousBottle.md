@@ -6,7 +6,7 @@ An **Ominous Bottle** (`minecraft:ominous_bottle`) applies Bad Omen when drunk. 
 
 - **Pillager captains:** the conditional [captain drop](../mobs/Pillager.md#captains-and-ominous-bottles) gives one bottle with amplifier 0–4, displayed as levels I–V, when the captain-without-raid predicate passes. The pool has no player-kill or Looting-count condition; normal mob-loot rules apply. [Drop table][pillager-loot] · [Predicate defaults][captain-predicate]
 - **Vault rewards:** both normal and ominous [Vault reward tables](../blocks/Vault.md#normal-versus-ominous-rewards) include possible bottles. Opening and key conditions remain on the Vault guide
-- **Inventory item browser:** all five level variants are ordinary food/drink category entries and can be inserted in Survival as well as Creative through MattMC's [browser](../mechanics/InventoryBrowser.md). This is separate from mob or Vault acquisition. [Category call][bottle-list] · [Five variants][bottle-variants] · [List assembly][browser-list] · [Request][browser-client] · [Server handling][browser-server]
+- **Inventory item browser:** all five level variants are ordinary food/drink category entries and can be inserted in Creative through MattMC's [browser](../mechanics/InventoryBrowser.md). This is separate from mob or Vault acquisition. [Category call][bottle-list] · [Five variants][bottle-variants] · [List assembly][browser-list] · [Request][browser-client] · [Server handling][browser-server]
 
 ## Usage
 

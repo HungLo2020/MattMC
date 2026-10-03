@@ -2,7 +2,7 @@
 
 ## Obtaining
 
-Craft **three Pewen Fences** from two rows of **Pewen Plank–Stick–Pewen Plank**, using four planks and two sticks. Its ordinary category entry also supports the separate [inventory-browser](../mechanics/InventoryBrowser.md) route in Survival and Creative. [Recipe](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/resources/data/minecraft/recipe/pewen_fence.json) · [Category entry](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L244)
+Craft **three Pewen Fences** from two rows of **Pewen Plank–Stick–Pewen Plank**, using four planks and two sticks. Its ordinary category entry also supports the separate [inventory-browser](../mechanics/InventoryBrowser.md) route in Creative. [Recipe](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/resources/data/minecraft/recipe/pewen_fence.json) · [Category entry](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L244)
 
 ## Usage
 

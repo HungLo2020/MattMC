@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Its ordinary Natural Blocks entry is available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative; that insertion route is separate from the harvesting rules below.
+Its ordinary Natural Blocks entry is available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative; that insertion route is separate from the harvesting rules below.
 
 For Survival, [find wild Chorus in End Highlands](../blocks/Chorus.md#finding-wild-chorus), collect flowers directly, then [plant a flower on End Stone to grow stems](../blocks/Chorus.md#planting-and-growth). The checked recipe bundle has no recipe producing Chorus Plant, and its ordinary loot has no stem self-drop. [Stem loot][loot] · [Flower growth][growth]
 

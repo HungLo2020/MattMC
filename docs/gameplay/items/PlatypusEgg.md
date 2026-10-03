@@ -4,7 +4,7 @@ A **Platypus Egg** is the placeable item for `minecraft:platypus_egg`. It is sep
 
 ## Obtaining
 
-Its ordinary category entry is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative. Reliable breeding production is not established: the custom laying call is disabled, despite the block already being registered. See the [Platypus guide](../mobs/Platypus.md#fish-breeding-and-eggs) for the competing breeding goals. [Creative listing][creative] · [Disabled laying][platypus-lay]
+Its ordinary category entry is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. Reliable breeding production is not established: the custom laying call is disabled, despite the block already being registered. See the [Platypus guide](../mobs/Platypus.md#fish-breeding-and-eggs) for the competing breeding goals. [Creative listing][creative] · [Disabled laying][platypus-lay]
 
 ## Usage
 

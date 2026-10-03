@@ -4,7 +4,7 @@ The **Redstone Randomizer item** (`minecraft:redstone_randomizer`) places the [t
 
 ## Obtaining
 
-Its **Redstone Blocks** category entry can be requested through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative. No recipe was found in the inspected bundled recipe data. An existing Randomizer normally drops one item when broken in Survival, with no special tool or enchantment needed; this block-recovery behavior is separate from that browser insertion route. See [support and drops](../blocks/RedstoneRandomizer.md#obtaining-support-and-drops) for the exact limits. [Creative entry][creative] · [Recipes][recipes] · [Loot][loot] · [Block properties][registration]
+Its **Redstone Blocks** category entry can be requested through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. No recipe was found in the inspected bundled recipe data. An existing Randomizer normally drops one item when broken in Survival, with no special tool or enchantment needed; this block-recovery behavior is separate from that browser insertion route. See [support and drops](../blocks/RedstoneRandomizer.md#obtaining-support-and-drops) for the exact limits. [Creative entry][creative] · [Recipes][recipes] · [Loot][loot] · [Block properties][registration]
 
 ## Usage
 

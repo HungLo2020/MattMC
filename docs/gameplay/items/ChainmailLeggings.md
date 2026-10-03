@@ -10,7 +10,7 @@ An **adult Armorer** can also throw this piece to a nearby player with **Hero of
 
 There is no ordinary ingredient recipe creating new Chainmail armor in the checked base recipe data. Iron Ingots are its repair material; this does not make an Iron-armor crafting pattern produce Chainmail. Combining two existing matching pieces is a separate repair route.
 
-This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Survival and Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
+This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
 
 ## Usage
 

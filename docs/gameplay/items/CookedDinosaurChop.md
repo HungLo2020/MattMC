@@ -1,6 +1,6 @@
 # Cooked Dinosaur Chop
 
-Cooked Dinosaur Chop (`minecraft:cooked_dinosaur_chop`) is a **non-stackable, placeable food block item**, not a directly consumable inventory food. Its ordinary category entry supports the [inventory-browser](../mechanics/InventoryBrowser.md) route in Survival and Creative, and it can be made by cooking an existing [Dinosaur Chop](DinosaurChop.md).
+Cooked Dinosaur Chop (`minecraft:cooked_dinosaur_chop`) is a **non-stackable, placeable food block item**, not a directly consumable inventory food. Its ordinary category entry supports the [inventory-browser](../mechanics/InventoryBrowser.md) route in Creative, and it can be made by cooking an existing [Dinosaur Chop](DinosaurChop.md).
 
 ## Cooking and eating
 

@@ -17,7 +17,7 @@ This does not include every wood-looking block or every ore variant. Use the Goa
 
 Ordinary Goats choose from **Ponder, Sing, Seek and Feel**. Screaming Goats choose **Admire, Call, Yearn and Dream**. The choice is seeded from the Goat's UUID, so its two horns normally have the same instrument when the tag data and screaming state stay unchanged. Adult feeding does not regrow lost horns; kids receive horns when they grow up. [Instrument choice][goat-horn-choice] · [Regular choices][regular-horns] · [Screaming choices][screaming-horns] · [Age/horn transition][goat-health]
 
-A [Pillager Outpost chest](../structures/PillagerOutpost.md#chest-rewards) is another checked source, using the regular horn pool. The ordinary category list also generates all eight tagged horn variants for the [inventory item browser](../mechanics/InventoryBrowser.md), available in Survival and Creative. These are separate loot and insertion routes. [Category generation][horn-entry] [Variant entries][horn-variants] · [Combined horn tag][all-horns]
+A [Pillager Outpost chest](../structures/PillagerOutpost.md#chest-rewards) is another checked source, using the regular horn pool. The ordinary category list also generates all eight tagged horn variants for the [inventory item browser](../mechanics/InventoryBrowser.md), visible in Survival and Creative; insertion requires Creative. These are separate loot and insertion routes. [Category generation][horn-entry] [Variant entries][horn-variants] · [Combined horn tag][all-horns]
 
 ## Usage
 

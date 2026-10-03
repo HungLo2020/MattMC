@@ -31,7 +31,7 @@ Wool and Dye IDs in this table use the `minecraft:` namespace. Each Craft link p
 | [Red Harness](RedHarness.md) | `minecraft:red_harness` | `red_wool` | `red_dye` | [Craft][craft-red] · [Recolor][dye-red] |
 | [Black Harness](BlackHarness.md) | `minecraft:black_harness` | `black_wool` | `black_dye` | [Craft][craft-black] · [Recolor][dye-black] |
 
-All sixteen are ordinary listed items in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), which permits insertion in Survival and Creative. This browser route is separate from the material recipes. [Category entries][equipment-category] · [Registered Harness family][harness-tag]
+All sixteen are ordinary listed items in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), which permits insertion in Creative. This browser route is separate from the material recipes. [Category entries][equipment-category] · [Registered Harness family][harness-tag]
 
 ## Equipping and riding
 

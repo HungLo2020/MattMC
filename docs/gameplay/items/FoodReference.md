@@ -139,7 +139,7 @@ A food-category listing alone does not make an ingredient directly edible. For e
 
 ## Getting a supply
 
-The ordinary food-category listings are available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. Suspicious Stew, Potion and Ominous Bottle have generated component-bearing variants in that category. Browser insertion is an acquisition route of its own; it does not establish a recipe, crop, animal drop or natural source. [Food listings][food-category] · [Stew variants][listed-stews] · [Potion variants][potion-listing] · [Ominous variants][ominous-listing] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server check][browser-server]
+The ordinary food-category listings are available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. Suspicious Stew, Potion and Ominous Bottle have generated component-bearing variants in that category. Browser insertion is an acquisition route of its own; it does not establish a recipe, crop, animal drop or natural source. [Food listings][food-category] · [Stew variants][listed-stews] · [Potion variants][potion-listing] · [Ominous variants][ominous-listing] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server check][browser-server]
 
 For a produced supply, follow [Wheat](../blocks/Wheat.md), [Root crops](../blocks/RootCrops.md), [Fishing](../mechanics/Fishing.md), and the individual food or mob guide. [Smelting and cooking](../smelting/Smelting.md) compares the cooking devices; each food still needs a recipe of that device's type.
 

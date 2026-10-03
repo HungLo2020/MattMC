@@ -6,7 +6,7 @@
 
 Adult [Glow Squid](../mobs/GlowSquid.md#drops) drop **1–3**, with Looting bonuses; babies do not supply normal death loot. See the mob guide for the dark-water spawn conditions and exact loot rules. [Loot][loot-glow_squid] · [Baby gate][baby-loot]
 
-They are also ordinary listed items in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Survival and Creative. [Listing][ink-list] · [Client][browser-client] · [Server][browser-server]
+They are also ordinary listed items in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Creative. [Listing][ink-list] · [Client][browser-client] · [Server][browser-server]
 
 ## Usage
 

@@ -11,7 +11,7 @@ Craft **8 Echo Shards + 1 Compass → 1 Recovery Compass** in a 3 × 3 Crafting 
 
 See [Deep Dark](../biomes/CaveBiomes.md#deep-dark) for Ancient City eligibility and [Sculk Shriekers](../blocks/SculkShrieker.md) for the hazard while searching. A Deep Dark patch does not guarantee a city, and finding a city does not guarantee enough shards.
 
-Recovery Compass is also an ordinary category-listed item. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) provides a separate item-request route, including Survival under the checked browser rules. [Category entry][creative]
+Recovery Compass is also an ordinary category-listed item. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) provides a separate item-request route, available in Creative under the checked browser rules. [Category entry][creative]
 
 ## Usage
 

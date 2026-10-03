@@ -6,7 +6,7 @@ A Copper Spear has the same 6-point starting damage as Stone, with 190 durabilit
 
 Craft one with **one Copper Ingot and two Sticks**, using the [shared Spear crafting pattern](../mechanics/Spears.md#craft-or-request-a-spear). [Recipe][copper-recipe] · [Accepted material][copper-repair]
 
-It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Survival as well as Creative. [Tab entry][tab]
+It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Creative. [Tab entry][tab]
 
 ## Usage
 

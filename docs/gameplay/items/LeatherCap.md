@@ -14,7 +14,7 @@ X . X
 
 A **Leatherworker** can offer a dyed version at **level 2**, with a base price of **5 Emeralds**. The Cap also appears in the level-5 pool. Offers are selected from the level’s pool and the displayed price can change. [Leatherworker offers][leather-trades] · [Dyed result][dyed-trade] · [Offer selection][random-offers] See [Trading](../trading/Trading.md).
 
-This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Survival and Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
+This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
 
 ## Usage
 

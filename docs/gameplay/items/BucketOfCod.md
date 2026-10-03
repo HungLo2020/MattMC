@@ -6,7 +6,7 @@ A **Bucket of Cod** carries one living [Cod](../mobs/Cod.md) and water. Its ID i
 
 Use a **Water Bucket** directly on a living Cod. An empty Bucket does not capture it. The captured fish is removed from the world and becomes the bucket's saved animal; this is not a death or a source of fish loot. [Interaction][fish] · [Capture][bucket-capture]
 
-The filled bucket is an ordinary category-listed item, so the [inventory item browser](../mechanics/InventoryBrowser.md) can also supply it in Survival and Creative. Browser insertion is separate from finding and capturing a natural fish. [Listing][bucket-list] · [List construction][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
+The filled bucket is an ordinary category-listed item, so the [inventory item browser](../mechanics/InventoryBrowser.md) can also supply it in Creative. Browser insertion is separate from finding and capturing a natural fish. [Listing][bucket-list] · [List construction][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
 
 ## Usage
 

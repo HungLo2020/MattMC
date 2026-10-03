@@ -2,7 +2,7 @@
 
 ## Obtaining
 
-Brew a Splash Potion with **Dragon's Breath** to make a Lingering Potion of the same type; see [Brewing](../brewing/Brewing.md). Enabled potion types are also listed in the [Inventory Browser](../mechanics/InventoryBrowser.md), whose ordinary item insertion works in Survival and Creative. Browser access is separate from brewing. [Container recipe][lingering-brew] · [Potion listings][lingering-list] · [Enabled types][lingering-list-types]
+Brew a Splash Potion with **Dragon's Breath** to make a Lingering Potion of the same type; see [Brewing](../brewing/Brewing.md). Enabled potion types are also listed in the [Inventory Browser](../mechanics/InventoryBrowser.md), whose ordinary item insertion works in Creative. Browser access is separate from brewing. [Container recipe][lingering-brew] · [Potion listings][lingering-list] · [Enabled types][lingering-list-types]
 
 ## Usage
 

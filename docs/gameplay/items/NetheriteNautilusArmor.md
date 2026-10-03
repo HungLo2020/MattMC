@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-It appears in an ordinary equipment category, making it available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative. [Category listing][armor-list]
+It appears in an ordinary equipment category, making it available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. [Category listing][armor-list]
 
 At a [Smithing Table](../blocks/SmithingTable.md), combine **Diamond Nautilus Armor + a Netherite Upgrade template + one Netherite Ingot** to make one Netherite Nautilus Armor. The addition tag currently contains Netherite Ingot. See [Smithing](../smithing/Smithing.md) for ingredient consumption and retained item data. [Recipe][netherite-recipe] · [Addition tag][netherite-material]
 

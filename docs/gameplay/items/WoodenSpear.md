@@ -6,7 +6,7 @@ A Wooden Spear gives you the family’s release thrust and moving-contact attack
 
 Craft one with **one plank accepted by the wooden-tool-material tag and two Sticks**, using the [shared Spear crafting pattern](../mechanics/Spears.md#craft-or-request-a-spear). [Recipe][wooden-recipe] · [Accepted material][wooden-repair]
 
-It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Survival as well as Creative. [Tab entry][tab]
+It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Creative. [Tab entry][tab]
 
 ## Usage
 

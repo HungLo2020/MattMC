@@ -8,7 +8,7 @@ Combine **one Brown Mushroom, one Red Mushroom and one Bowl** in any arrangement
 
 Use a Bowl on an **adult [Mooshroom](../mobs/Mooshroom.md#bowls-milk-and-flower-servings)** for another serving. If it has a stored flower effect, that next Bowl produces Suspicious Stew instead. The animal interaction does not use up a mushroom from your inventory. [Bowl callback][moosh-bowl]
 
-The item is also ordinarily listed in the [inventory item browser](../mechanics/InventoryBrowser.md), whose insertion route works in Survival and Creative independently of crafting and livestock. [Category entry][stew-entry]
+The item is also ordinarily listed in the [inventory item browser](../mechanics/InventoryBrowser.md), whose insertion route works in Creative independently of crafting and livestock. [Category entry][stew-entry]
 
 ## Usage
 

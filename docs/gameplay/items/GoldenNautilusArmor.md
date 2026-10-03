@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-It appears in an ordinary equipment category, making it available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative. [Category listing][armor-list]
+It appears in an ordinary equipment category, making it available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. [Category listing][armor-list]
 
 No bundled crafting recipe, chest loot, entity loot or merchant offer was found for this armor. Its verified acquisition route is the ordinary inventory browser; its material name does not imply a recipe from ingots or gems.
 

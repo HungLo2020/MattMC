@@ -4,7 +4,7 @@ The **Happy Ghast Spawn Egg** (`minecraft:happy_ghast_spawn_egg`) places a [Happ
 
 ## Obtaining
 
-This egg is listed in the [inventory item browser](../mechanics/InventoryBrowser.md), which provides an insertion route in **Survival as well as Creative** in MattMC. That listing is separate from [Dried Ghast hatching](../blocks/DriedGhast.md) and [ghastling growth](../mobs/HappyGhast.md#growing-and-feeding-a-ghastling); it is not evidence of a natural egg drop. [Category entry][happy-egg-category]
+This egg is listed in the [inventory item browser](../mechanics/InventoryBrowser.md), which provides an insertion route in **Creative** in MattMC. That listing is separate from [Dried Ghast hatching](../blocks/DriedGhast.md) and [ghastling growth](../mobs/HappyGhast.md#growing-and-feeding-a-ghastling); it is not evidence of a natural egg drop. [Category entry][happy-egg-category]
 
 ## Usage
 

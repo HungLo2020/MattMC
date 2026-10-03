@@ -6,7 +6,7 @@
 
 Put **one Bundle and one [White Dye](WhiteDye.md)** in any two crafting-grid slots to make **one White Bundle**. You can use an uncolored Bundle or another color, with contents still inside. The recipe accepts the full Bundle item tag; it copies the input's stored items and other saved components. An already white Bundle combined with White Dye produces no result. [Exact recipe][white-recipe] · [Accepted variants][bundles-tag] · [Recipe matching][transmute] · [Copied result][transmute-result] · [Component preservation][component-copy]
 
-Get the first uncolored Bundle through [its crafting and village-loot routes](Bundle.md#obtaining). White Bundle is also directly listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), available in **Survival and Creative**. [Category entries][category] · [Browser list][browser] · [Server access][browser-server]
+Get the first uncolored Bundle through [its crafting and village-loot routes](Bundle.md#obtaining). White Bundle is also directly listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), visible in **Survival and Creative**; insertion requires **Creative**. [Category entries][category] · [Browser list][browser] · [Server access][browser-server]
 
 ## Usage
 

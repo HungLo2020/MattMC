@@ -6,7 +6,7 @@ Cobweb is the ordinary block item for `minecraft:cobweb`. The [Cobweb block guid
 
 Use **Shears** to collect **1 Cobweb** from a placed web. An ordinary sword produces **1 String** instead; mining by hand does not pass the correct-tool gate. Silk Touch is a conditional loot branch, not a substitute for that gate. See [collecting Cobwebs](../blocks/Cobweb.md#collecting-cobwebs) and [verified placed sources](../blocks/Cobweb.md#finding-and-making-placed-cobwebs). [Loot][web-loot] · [Tool gate][tool-gate] · [Shears rule][shears] · [Sword rule][sword]
 
-It is listed in **Natural Blocks** and can be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. This is separate from harvesting; the bundled recipe data has no crafting recipe producing Cobweb. [Category][natural-category] · [Entry][web-category]
+It is listed in **Natural Blocks** and can be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. This is separate from harvesting; the bundled recipe data has no crafting recipe producing Cobweb. [Category][natural-category] · [Entry][web-category]
 
 ## Usage
 

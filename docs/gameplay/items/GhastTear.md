@@ -6,7 +6,7 @@ A **Ghast Tear** (`minecraft:ghast_tear`) is an ingredient for Regeneration brew
 
 With mob loot enabled, a Ghast's bundled loot rolls **0–1 Tear**. Looting increases the possible maximum by one per level, up to **4 with Looting III**; the Tear pool does not require a player-attributed kill. Follow [Ghast drops](../mobs/Ghast.md#drops) for combat and loot conditions, including the separate Tears music disc. [Loot table][ghast-loot] · [Looting calculation][looting-count] · [Loot gate][animal-loot]
 
-Ghast Tears are also ordinary category-listed ingredients in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), available through its **Survival and Creative** insertion route. Browser insertion is separate from mob drops. [Category entry][ghast-tear-category]
+Ghast Tears are also ordinary category-listed ingredients in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), available through its **Creative** insertion route. Browser insertion is separate from mob drops. [Category entry][ghast-tear-category]
 
 ## Usage
 

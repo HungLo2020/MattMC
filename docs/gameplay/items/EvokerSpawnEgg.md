@@ -4,7 +4,7 @@ The Evoker Spawn Egg (`minecraft:evoker_spawn_egg`) places a [Evoker](../mobs/Ev
 
 ## Obtaining
 
-This egg is listed in the ordinary Spawn Eggs category. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert ordinary listed items in **Survival and Creative**; follow that guide for search, cursor and inventory-space requirements. This route is separate from natural mob encounters, recipes and loot. [Category][eggs-tab] · [Egg entry][evoker-entry]
+This egg is listed in the ordinary Spawn Eggs category. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert ordinary listed items in **Creative**; follow that guide for search, cursor and inventory-space requirements. This route is separate from natural mob encounters, recipes and loot. [Category][eggs-tab] · [Egg entry][evoker-entry]
 
 ## Usage
 

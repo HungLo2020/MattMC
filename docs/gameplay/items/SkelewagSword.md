@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Search for **Skelewag Sword** in the [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item). It is listed in the Combat category, and MattMC's browser can insert ordinary listed items in Survival and Creative when inventory space is available. [Category entry][creative]
+Search for **Skelewag Sword** in the [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item). It is listed in the Combat category, and MattMC's browser can insert ordinary listed items in Creative when inventory space is available. [Category entry][creative]
 
 The checked bundled recipes, loot tables and structure data contain no Skelewag Sword acquisition entry, and no named mob-drop caller was found. A crafting recipe or Skelewag drop should therefore not be assumed from the item's name.
 

@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Use a **Water Bucket** on a living Frilled Shark. An empty Bucket does not qualify. Capture makes the filled item and discards the original creature. You can also request the listed item through MattMC's [inventory browser](../mechanics/InventoryBrowser.md) in Survival or Creative. [Species interaction][shark-bucket] · [Shared capture][bucket-capture] · [Listed bucket][shark-bucket-list] · [Browser entries][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
+Use a **Water Bucket** on a living Frilled Shark. An empty Bucket does not qualify. Capture makes the filled item and discards the original creature. You can also request the listed item through MattMC's [inventory browser](../mechanics/InventoryBrowser.md) in Creative. [Species interaction][shark-bucket] · [Shared capture][bucket-capture] · [Listed bucket][shark-bucket-list] · [Browser entries][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
 
 No crafting recipe or loot-table supply was found for this bucket in the checked bundled data. Capture and inventory access are distinct acquisition routes. [Recipe loader][recipe-loader] · [Bundled data][bundled-data]
 

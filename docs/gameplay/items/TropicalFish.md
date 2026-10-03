@@ -6,7 +6,7 @@ The loose **Tropical Fish item** is food. It does not retain the colors of a liv
 
 A Tropical Fish mob drops **one** with mob loot enabled. The item also appears in the [Fishing](../mechanics/Fishing.md) fish-loot subtable. [Death table][loot-tropical_fish] · [Fishing subtable][fishing-fish]
 
-It is ordinarily listed in the [inventory browser](../mechanics/InventoryBrowser.md), allowing insertion in Survival and Creative separately from those loot routes. [Listing][food-list] · [Client][browser-client] · [Server][browser-server]
+It is ordinarily listed in the [inventory browser](../mechanics/InventoryBrowser.md), allowing insertion in Creative separately from those loot routes. [Listing][food-list] · [Client][browser-client] · [Server][browser-server]
 
 ## Usage
 

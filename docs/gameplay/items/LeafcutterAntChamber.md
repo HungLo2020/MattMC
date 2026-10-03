@@ -2,7 +2,7 @@
 
 ## Obtaining
 
-Leafcutter Ant Chamber has a registered block item and an ordinary **Functional Blocks** category entry. Request it through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. No bundled crafting, natural-generation, or mining-drop route was found; see [nest acquisition and recovery](../blocks/LeafcutterNests.md#obtaining-and-recovering-the-blocks). [Item registration][item] · [Category entry][category]
+Leafcutter Ant Chamber has a registered block item and an ordinary **Functional Blocks** category entry. Request it through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. No bundled crafting, natural-generation, or mining-drop route was found; see [nest acquisition and recovery](../blocks/LeafcutterNests.md#obtaining-and-recovering-the-blocks). [Item registration][item] · [Category entry][category]
 
 ## Usage
 

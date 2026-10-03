@@ -4,7 +4,7 @@ A **Caiman Egg** is the placeable item for `minecraft:caiman_egg`. It is separat
 
 ## Obtaining
 
-Its ordinary category entry is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative. A normal Survival egg-producing loop is not established because the Caiman breeding-food tag has no bundled definition. See the [Caiman Egg obtaining and hatching guide](../blocks/AnimalEggs.md#caiman-eggs) for the conditional laying route and collection limits. [Creative listing][creative]
+Its ordinary category entry is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. A normal Survival egg-producing loop is not established because the Caiman breeding-food tag has no bundled definition. See the [Caiman Egg obtaining and hatching guide](../blocks/AnimalEggs.md#caiman-eggs) for the conditional laying route and collection limits. [Creative listing][creative]
 
 ## Usage
 

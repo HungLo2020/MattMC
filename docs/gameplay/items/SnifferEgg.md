@@ -4,7 +4,7 @@ A **Sniffer Egg** is the placeable item for `minecraft:sniffer_egg`. A placed eg
 
 ## Obtaining
 
-Brush warm ocean-ruin Suspicious Sand for a chance at an egg, breed ready adult Sniffers with Torchflower Seeds, or request its ordinary category entry through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. Ordinary mining can recover a placed egg without Silk Touch. See the [Sniffer Egg guide](../blocks/AnimalEggs.md#sniffer-eggs) for the active acquisition routes. No bundled crafting recipe was found. [Archaeology loot][ruin-loot] · [Breeding result][sniffer-mate] · [Block loot][sniffer-loot] · [Creative listing][creative]
+Brush warm ocean-ruin Suspicious Sand for a chance at an egg, breed ready adult Sniffers with Torchflower Seeds, or request its ordinary category entry through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. Ordinary mining can recover a placed egg without Silk Touch. See the [Sniffer Egg guide](../blocks/AnimalEggs.md#sniffer-eggs) for the active acquisition routes. No bundled crafting recipe was found. [Archaeology loot][ruin-loot] · [Breeding result][sniffer-mate] · [Block loot][sniffer-loot] · [Creative listing][creative]
 
 ## Usage
 

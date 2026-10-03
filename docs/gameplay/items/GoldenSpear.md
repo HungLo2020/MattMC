@@ -6,7 +6,7 @@ A Golden Spear has only 32 durability and the same 5-point starting damage as Wo
 
 Craft one with **one Gold Ingot and two Sticks**, using the [shared Spear crafting pattern](../mechanics/Spears.md#craft-or-request-a-spear). [Recipe][golden-recipe] · [Accepted material][gold-repair]
 
-It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Survival as well as Creative. [Tab entry][tab]
+It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Creative. [Tab entry][tab]
 
 ## Usage
 

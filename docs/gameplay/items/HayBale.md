@@ -6,7 +6,7 @@ Hay Bale is the item form of `minecraft:hay_block`. The [Hay Bale block guide](.
 
 Craft **nine Wheat into one Hay Bale** with the shapeless nine-ingredient recipe, or recover one from a placed bale by hand. The block guide documents a Plains-village pile source. [Packing][pack] · [Block loot][loot] · [Hand-harvest gate][gate]
 
-It is also an ordinary Natural Blocks entry available through MattMC's [Survival/Creative inventory item browser](../mechanics/InventoryBrowser.md), separately from crafting and generated sources. [Entry][entry]
+It is also an ordinary Natural Blocks entry available through MattMC's [Creative inventory item browser](../mechanics/InventoryBrowser.md), separately from crafting and generated sources. [Entry][entry]
 
 ## Usage
 

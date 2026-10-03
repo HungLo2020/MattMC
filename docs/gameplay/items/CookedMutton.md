@@ -14,7 +14,7 @@ Cook **one [Raw Mutton](RawMutton.md) into one Cooked Mutton** with one of these
 
 The checked Sheep meat loot starts with **1–2 Raw Mutton before Looting** and requests smelting when the sheep is burning or the direct attacker's main-hand item has an enchantment in the bundled smelts-loot tag. That tag contains **Fire Aspect**. The loot function looks up the loaded smelting recipe, which supplies Cooked Mutton here. See [Sheep death drops](../mobs/Sheep.md#death-drops-and-experience) for mob-loot and adult-animal conditions. [Sheep meat loot][loot] · [Smelts-loot tag][fire-aspect] · [Recipe lookup][loot-smelt] · [Mutton recipe][smelt]
 
-The ordinary listed item is also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**, separately from the cooking and mob-loot routes. [Food listing][browser-list] · [Client request][browser-client] · [Server check][browser-server]
+The ordinary listed item is also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**, separately from the cooking and mob-loot routes. [Food listing][browser-list] · [Client request][browser-client] · [Server check][browser-server]
 
 ## Usage
 

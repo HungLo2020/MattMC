@@ -4,7 +4,7 @@ The **Tarantula Hawk Wing Fragment** is a registered material. Its checked defau
 
 ## Obtaining
 
-The fragment is an ordinary category entry, available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. [Category entry][categories]
+The fragment is an ordinary category entry, available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. [Category entry][categories]
 
 The bundled data has no fragment recipe or loot entry, and the [Tarantula Hawk](../mobs/TarantulaHawk.md) implementation has no growth reward producing it. Do not assume that breeding, raising or killing hawks supplies fragments. [Bundled recipes][recipe-data] · [Entity loot][loot-data] · [Hawk implementation][hawk]
 

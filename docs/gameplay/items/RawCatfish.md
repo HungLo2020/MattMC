@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**; it is an ordinary food-category entry. [Category listing][c-food-list]
+Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**; it is an ordinary food-category entry. [Category listing][c-food-list]
 
 No bundled recipe or loot table supplies Raw Catfish in the checked data. In particular, the Catfish mob's default and size-specific loot tables are missing, so its name does not establish a configured Raw Catfish death drop. Items previously carried by a Catfish are a separate recovery case. [Bundled recipes][recipe-data] · [Entity loot files][loot-data] · [Missing-table fallback][loot-fallback] · [Catfish stored-content drops][c-inventory]
 

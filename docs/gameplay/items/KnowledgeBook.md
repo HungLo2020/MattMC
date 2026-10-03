@@ -6,7 +6,7 @@
 
 One verified way to obtain the ordinary empty book is `/give @s minecraft:knowledge_book 1`, when run as a player with **permission level 2 or higher**. The command resolves the registered item and creates its default stack; this example does not add recipe data. For targeting and permission context, see [Commands](../commands/Commands.md). [Give permission and arguments][give] · [Registry lookup][item-parser] · [Stack creation][give-item] · [Empty default list][registration]
 
-Knowledge Book has **no entry in the checked Creative category listings**. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) assembles those category entries rather than every registered item, so its registry ID alone does not make it a normal browser choice in either Survival or Creative. Ordinary listed items remain available through that browser in both modes; this book is a listing exception. This review does not establish a natural drop or crafting route. [Complete category definitions][tabs] · [Browser list construction][browser]
+Knowledge Book has **no entry in the checked Creative category listings**. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) assembles those category entries rather than every registered item, so its registry ID alone does not make it a normal browser choice in either Survival or Creative. Ordinary listed items remain visible in both modes, but browser insertion requires Creative; this book is a listing exception. This review does not establish a natural drop or crafting route. [Complete category definitions][tabs] · [Browser list construction][browser]
 
 ## Usage
 

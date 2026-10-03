@@ -12,7 +12,7 @@ The crafting rows are shapeless: put one ingredient in each occupied slot, with 
 
 The [Cocoa guide](../blocks/Cocoa.md) owns planting, support, growth and bean harvesting. Reserve beans for replanting before converting the rest.
 
-This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), available in Survival and Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
+This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), visible in Survival and Creative; insertion requires Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
 
 ## Usage
 

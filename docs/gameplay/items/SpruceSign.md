@@ -6,7 +6,7 @@
 
 Use Spruce Planks and a Stick in [this variant’s sign recipe](../blocks/Signs.md#ordinary-sign-variants); the guide gives the exact layout and yield. [Recipe][recipe]
 
-It is also an ordinary [inventory-browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) entry, available in Survival as well as Creative. [Category listing][listing]
+It is also an ordinary [inventory-browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) entry, visible in Survival as well as Creative; insertion requires Creative. [Category listing][listing]
 
 ## Usage
 

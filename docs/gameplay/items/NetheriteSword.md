@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-This ordinary listed sword also has the separate [inventory-browser](../mechanics/InventoryBrowser.md) insertion route in Survival and Creative. [Category entries](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1584-L1591)
+This ordinary listed sword also has the separate [inventory-browser](../mechanics/InventoryBrowser.md) insertion route in Creative. [Category entries](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1584-L1591)
 
 At a [Smithing Table](../blocks/SmithingTable.md), combine **1 [Netherite Upgrade Template](SmithingTemplateNetheriteUpgrade.md) + 1 [Diamond Sword](DiamondSword.md) + 1 [Netherite Ingot](NetheriteIngot.md)** to receive **1 Netherite Sword**. Taking the result consumes one of each input. The addition tag contains only Netherite Ingot in the checked data. [Recipe][recipe] · [Addition tag][repair-netherite] · [Consumption][smith-menu] · [Output count][smith-result]
 

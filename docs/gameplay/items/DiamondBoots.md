@@ -14,7 +14,7 @@ X . X
 
 An ordinary **level-4 Armorer** offers an enchanted version. Its generated price before demand, reputation and discounts is **13–27 Emeralds**, because the offer adds a random enchantment power from 5 to 19 to a base price of 8. This is not a guarantee of a particular enchantment. The optional Trade Rebalance experiment uses different offers. [Armorer offers][armorer-trades] · [Price generation][enchanted-trade] · [Feature choice][trade-selection] See [Trading](../trading/Trading.md).
 
-This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Survival and Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
+This item is also an ordinary category entry in MattMC’s [inventory item browser](../mechanics/InventoryBrowser.md), which supports requesting listed items in Creative subject to its cursor, capacity and feature checks. [Armor entries][category] · [Browser list][browser-list] · [Client request][browser-client] · [Server insertion][browser-server]
 
 ## Usage
 

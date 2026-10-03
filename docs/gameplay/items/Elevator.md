@@ -4,7 +4,7 @@ The **Elevator item** (`minecraft:elevator`) places MattMC's [Elevator block](..
 
 ## Obtaining
 
-It is listed in **Functional Blocks**, so the [inventory item browser](../mechanics/InventoryBrowser.md) can request it in Survival as well as Creative. No Elevator recipe or matching block loot table was found in the inspected bundled data. Do not assume that breaking an existing Elevator returns the item; see the block guide's [acquisition and harvest limits](../blocks/Elevator.md#obtaining-and-breaking). [Creative tab][creative-tab] · [Creative entry][creative-entry] · [Recipes][recipes] · [Block loot inventory][loot]
+It is listed in **Functional Blocks**, so the [inventory item browser](../mechanics/InventoryBrowser.md) can request it in Creative. No Elevator recipe or matching block loot table was found in the inspected bundled data. Do not assume that breaking an existing Elevator returns the item; see the block guide's [acquisition and harvest limits](../blocks/Elevator.md#obtaining-and-breaking). [Creative tab][creative-tab] · [Creative entry][creative-entry] · [Recipes][recipes] · [Block loot inventory][loot]
 
 ## Usage
 

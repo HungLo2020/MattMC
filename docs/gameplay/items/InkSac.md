@@ -6,7 +6,7 @@
 
 Adult [Squid](../mobs/Squid.md#drops) drop **1–3**, with Looting bonuses; babies do not supply normal death loot. See that mob guide for conditions. The [Fishing guide](../mechanics/Fishing.md) covers the separate fishing-loot route. [Squid table][loot-squid] · [Age and mob-loot gates][baby-loot] · [Fishing junk entry][fishing-junk]
 
-Ink Sacs are also ordinary listed items in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Survival and Creative. [Listing][ink-list] · [Client][browser-client] · [Server][browser-server]
+Ink Sacs are also ordinary listed items in the [inventory browser](../mechanics/InventoryBrowser.md), available through insertion in Creative. [Listing][ink-list] · [Client][browser-client] · [Server][browser-server]
 
 ## Usage
 

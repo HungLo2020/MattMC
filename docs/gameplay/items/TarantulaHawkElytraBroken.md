@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-The broken-named item is listed in an ordinary category, so the [inventory item browser](../mechanics/InventoryBrowser.md) can insert it in **Survival and Creative**. [Category entry][categories]
+The broken-named item is listed in an ordinary category, so the [inventory item browser](../mechanics/InventoryBrowser.md) can insert it in **Creative**. [Category entry][categories]
 
 No bundled crafting recipe, loot entry or active break conversion supplies it through ordinary resource play. Damaging a Tarantula Hawk Elytra stack to its limit retains that original item ID. [Bundled recipes][recipe-data] · [Entity loot][loot-data] · [Stack damage path][stack] · [Item handler][hawk-elytra]
 

@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-The ordinary Food & Drinks listing is a verified supply through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. [Category entry][tab] · [Browser list][browser-list] · [Client request][browser-client] · [Server check][browser-server]
+The ordinary Food & Drinks listing is a verified supply through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. [Category entry][tab] · [Browser list][browser-list] · [Client request][browser-client] · [Server check][browser-server]
 
 **No bundled cooking recipe for Moose Ribs was found** in the active furnace, smoker, campfire or other recipe files. A “cooked” item registration does not make a raw counterpart cookable. The active loot set also provides no default Moose entity table establishing cooked ribs from a burning animal. Use the [Moose guide](../mobs/Moose.md) for its actual resources and current supply limits. [Registered items][items] · [Bundled recipes][recipes] · [Default loot key][loot-key] · [Missing-table fallback][loot-missing] · [Bundled loot][loot-tables]
 

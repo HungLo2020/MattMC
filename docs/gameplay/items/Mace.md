@@ -6,7 +6,7 @@
 
 Craft a Mace from a [Heavy Core](HeavyCore.md#usage) and a [Breeze Rod](BreezeRod.md), following the linked core page's exact pattern. The [Heavy Core block guide](../blocks/HeavyCore.md) covers the ominous Vault route for the rare ingredient; a core in a Vault's preview is not a promised reward. [Mace recipe][recipe]
 
-Mace is also an ordinary category-listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose insertion route is available in Survival. That route is separate from collecting the crafting ingredients. [Category entry][creative]
+Mace is also an ordinary category-listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose insertion route is available in Creative. That route is separate from collecting the crafting ingredients. [Category entry][creative]
 
 ## Usage
 

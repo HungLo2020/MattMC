@@ -6,7 +6,7 @@ Pumpkin Pie (`minecraft:pumpkin_pie`) is a **handheld food**. Its ordinary item 
 
 Combine **one Pumpkin, one Sugar, and one egg from the egg tag** in any arrangement to make **one Pumpkin Pie**. The bundled tag accepts Egg, Blue Egg, and Brown Egg. No furnace step is part of this recipe. [Recipe][recipe] · [Egg tag][eggs]
 
-The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Survival and Creative, subject to its cursor, space, and feature checks. [Listing][listing]
+The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Creative, subject to its cursor, space, and feature checks. [Listing][listing]
 
 ## Usage
 

@@ -2,7 +2,7 @@
 
 ## Obtaining
 
-Leafcutter Ant Pupa is a real item listed in the **Functional Blocks** category alongside the nest blocks. It can be requested through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. No bundled recipe or loot source was found for it; being listed does not establish natural colony production. [Registration][item] · [Category entry][category] · [Bundled data][data]
+Leafcutter Ant Pupa is a real item listed in the **Functional Blocks** category alongside the nest blocks. It can be requested through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. No bundled recipe or loot source was found for it; being listed does not establish natural colony production. [Registration][item] · [Category entry][category] · [Bundled data][data]
 
 ## Usage
 

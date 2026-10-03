@@ -6,7 +6,7 @@
 
 Craft **1 Magenta Harness** with **3 Leather, 2 Glass and 1 Magenta Wool**. Put Leather–Leather–Leather above Glass–Magenta Wool–Glass in a Crafting Table. Alternatively, combine **1 Magenta Dye** with **1 Harness of any other color** in a shapeless recipe. A Magenta Harness is excluded as the input to its own recoloring recipe. [Exact crafting recipe][craft-magenta] · [Exact recoloring recipe][dye-magenta]
 
-It is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md), including MattMC's Survival insertion route. [Category entries][equipment-category]
+It is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md), including MattMC's Creative insertion route. [Category entries][equipment-category]
 
 ## Usage
 

@@ -6,7 +6,7 @@ A Netherite Spear has the highest starting damage and durability of the seven ma
 
 Use a **Diamond Spear, Netherite Ingot, and Netherite Upgrade Smithing Template** at a Smithing Table to make one. The transformation carries the base stack's changed components into the result; inspect existing damage and enchantments rather than assuming the upgrade wipes them. [Recipe][smithing] · [Netherite material][netherite-repair] · [Smithing result][smithing-copy] · [Transformation][transmute] · [Component copy][component-copy]
 
-It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Survival as well as Creative. [Tab entry][tab]
+It is also an ordinary listed item in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), whose item-request route works in Creative. [Tab entry][tab]
 
 ## Usage
 

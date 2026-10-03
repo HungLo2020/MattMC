@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Request **Smooth Limestone** in MattMC's [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item), in **Survival or Creative**. This is an ordinary listed item. No crafting, smelting or stonecutting recipe, or natural supply, was found for the family in the checked bundled data; request each form separately. See [acquisition and recipe limits](../blocks/Limestone.md#inventory-access-and-recipe-limits). [Listing][listed] · [Browser entries][browser] · [Client request][client] · [Server handling][server]
+Request **Smooth Limestone** in MattMC's [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item), in **Creative**. This is an ordinary listed item. No crafting, smelting or stonecutting recipe, or natural supply, was found for the family in the checked bundled data; request each form separately. See [acquisition and recipe limits](../blocks/Limestone.md#inventory-access-and-recipe-limits). [Listing][listed] · [Browser entries][browser] · [Client request][client] · [Server handling][server]
 
 **Normal tools cannot recover placed Limestone through the bundled mining tags.** Read the [mining warning](../blocks/Limestone.md#standard-tool-mining) before placing a valuable supply; Silk Touch does not bypass that gate.
 

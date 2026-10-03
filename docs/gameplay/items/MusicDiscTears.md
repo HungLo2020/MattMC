@@ -6,7 +6,7 @@
 
 With mob loot enabled, the Ghast table gives **one disc** when the killing damage is tagged as a projectile, its direct entity is `minecraft:fireball`, and the death has player attribution. **Return an incoming fireball for a direct hit** to use this route. An ordinary weapon kill, or merely seeing a Ghast die in an explosion, does not establish those conditions. Follow [returning a fireball](../mobs/Ghast.md#returning-a-fireball) for the actual deflection controls and limits. [Exact loot conditions][ghast-disc] · [Projectile damage tag][projectile-tag] · [Player-attribution condition][player-kill] · [Mob-loot gate][animal-loot]
 
-The disc is category-listed, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) provides a separate **Survival and Creative** insertion route. [Category entry][disc-category]
+The disc is category-listed, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) provides a separate **Creative** insertion route. [Category entry][disc-category]
 
 ## Usage
 

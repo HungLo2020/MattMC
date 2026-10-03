@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Cook a Lobster Tail using one of the three recipes below. The cooked item is also an ordinary food-category entry in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), available in **Survival as well as Creative**. That browser route supplies the item without requiring the raw ingredient. [Category listing][l-food-list] · [Smelting recipe][tail-smelt] [Smoking recipe][tail-smoke] [Campfire recipe][tail-campfire]
+Cook a Lobster Tail using one of the three recipes below. The cooked item is also an ordinary food-category entry in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), visible in **Survival as well as Creative**; insertion requires **Creative**. That browser route supplies the item without requiring the raw ingredient. [Category listing][l-food-list] · [Smelting recipe][tail-smelt] [Smoking recipe][tail-smoke] [Campfire recipe][tail-campfire]
 
 ## Cooking
 

@@ -10,7 +10,7 @@ Checked routes include:
 - **Fishing treasure:** Nautilus Shell is one of six equally weighted entries in the treasure subtable. Treasure needs the current open-water condition; this is not a one-in-six chance on every cast. See [Fishing](../mechanics/Fishing.md#open-water-for-treasure) for pool eligibility and luck
 - **Wandering Trader:** the active offer pool includes **one Shell for five Emeralds**, with five uses in that selected offer. Not every trader selects it
 
-- **Inventory item browser:** the Shell is an ordinary category-listed item, so the [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Survival as well as Creative. This is separate from natural collection. [Shell listing][nautilus-shell-list]
+- **Inventory item browser:** the Shell is an ordinary category-listed item, so the [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Creative. This is separate from natural collection. [Shell listing][nautilus-shell-list]
 - **Nautilus death loot:** an eligible adult player-credit kill has a **5% chance** to drop one Shell, rising to **6%, 7% and 8%** with Looting I, II and III. The current bundled biome tables do not naturally spawn Nautiluses, so this is not a verified natural farming route. A Zombie Nautilus's own loot table has no Shell. [Nautilus availability](../mobs/Nautilus.md#where-to-find-one) · [Nautilus loot][nautilus-shell-loot] · [Zombie Nautilus loot][zombie-nautilus-shell-loot]
 
 [Drowned shell roll][drowned] · [Equipment drop gate][mob] [monster] · [Preserved drop chance][drop-chances] · [Fishing parent table][fishing-loot] · [Treasure table][treasure] · [Fishing loot dispatch][hook] · [Trader offer][trades] · [Active offer selection][trader]

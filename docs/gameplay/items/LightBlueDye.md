@@ -13,7 +13,7 @@ The crafting rows are shapeless: put one ingredient in each occupied slot, with 
 
 See [Flowers](../blocks/Flowers.md#bone-meal-on-grass-block) for the checked Swamp Blue Orchid route, or follow the linked dye pages for mixing supplies.
 
-This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), available in Survival and Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
+This color is also listed in the ordinary [inventory item browser](../mechanics/InventoryBrowser.md), visible in Survival and Creative; insertion requires Creative. For the selected Wandering Trader offer and shared acquisition notes, see [Dyes](Dyes.md#browser-and-trading). [Ordinary dye entries]
 
 ## Usage
 

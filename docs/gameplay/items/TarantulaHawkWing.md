@@ -4,7 +4,7 @@ The **Tarantula Hawk Wing** is a registered material item with no verified craft
 
 ## Obtaining
 
-It appears in an ordinary item category, so the [inventory item browser](../mechanics/InventoryBrowser.md) can insert it in **Survival and Creative**. [Category entry][categories]
+It appears in an ordinary item category, so the [inventory item browser](../mechanics/InventoryBrowser.md) can insert it in **Creative**. [Category entry][categories]
 
 No bundled recipe, death-loot entry or hawk growth/interaction reward supplies a wing in the checked sources. Do not build a hawk farm around this item until that resource route is supplied by your server's data or a later implementation. [Bundled recipes][recipe-data] · [Entity loot][loot-data] · [Hawk behavior][hawk]
 

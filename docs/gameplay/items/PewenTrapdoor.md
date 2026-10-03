@@ -8,7 +8,7 @@ Two full rows of **three Pewen Planks** craft **two Pewen Trapdoors**. This reci
 
 Getting the planks is a separate step: the [Pewen recipe caveats](../blocks/Pewen.md#recipes-and-tools-that-need-caution) explain the incompatible log-to-plank definition. The trapdoor recipe alone does not establish an end-to-end natural acquisition route.
 
-The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Survival and Creative, subject to its cursor, space, and feature checks. [Listing][listing]
+The ordinary [inventory browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item) can also provide this item in Creative, subject to its cursor, space, and feature checks. [Listing][listing]
 
 ## Usage
 

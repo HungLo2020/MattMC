@@ -6,7 +6,7 @@ Heavy Core is the epic-rarity item form of `minecraft:heavy_core` and an ingredi
 
 A successful eligible **ominous Vault** opening has a **7.5% bundled chance to eject one Heavy Core**. The block guide explains the 75% unique-roll condition and weight 1/10 calculation; a display preview is not a promised reward. [Parent reward table][ominous] · [Unique selection][unique] · [Vault guide](../blocks/Vault.md#normal-versus-ominous-rewards)
 
-There is no bundled recipe producing a Heavy Core. Its ordinary Ingredients entry separately provides the [Survival/Creative inventory item-browser route](../mechanics/InventoryBrowser.md). [Entry][entry]
+There is no bundled recipe producing a Heavy Core. Its ordinary Ingredients entry separately provides the [Creative inventory item-browser route](../mechanics/InventoryBrowser.md). [Entry][entry]
 
 ## Usage
 

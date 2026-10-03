@@ -6,7 +6,7 @@
 
 Craft **1 Light Blue Harness** with **3 Leather, 2 Glass and 1 Light Blue Wool**. Put Leather–Leather–Leather above Glass–Light Blue Wool–Glass in a Crafting Table. Alternatively, combine **1 Light Blue Dye** with **1 Harness of any other color** in a shapeless recipe. A Light Blue Harness is excluded as the input to its own recoloring recipe. [Exact crafting recipe][craft-light_blue] · [Exact recoloring recipe][dye-light_blue]
 
-It is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md), including MattMC's Survival insertion route. [Category entries][equipment-category]
+It is also listed in the [inventory item browser](../mechanics/InventoryBrowser.md), including MattMC's Creative insertion route. [Category entries][equipment-category]
 
 ## Usage
 

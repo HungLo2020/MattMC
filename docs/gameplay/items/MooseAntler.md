@@ -8,7 +8,7 @@ The Moose's saved antler counter supplies the verified produced route. When the 
 
 The initial antlered period uses **168,000, 192,000 or 216,000 ticking game ticks**. The following antlerless period uses **48,000, 72,000 or 96,000 ticks**; the regrowth transition restores antlers but drops no item, then starts another longer counter. See [Moose antler shedding](../mobs/Moose.md#antler-shedding) for the complete cycle and its lack of an adult-only guard. These counter values are not a wall-clock or production-rate promise. [Initialization][initial] · [Tick transitions][cycle]
 
-Moose Antler is also an ordinary Ingredients-category entry in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), available in **Survival and Creative**. Browser insertion is separate from waiting for a Moose to shed. [Category entry][tab] · [List assembly][browser-list] · [Client request][browser-client] · [Server check][browser-server]
+Moose Antler is also an ordinary Ingredients-category entry in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), visible in **Survival and Creative**; insertion requires **Creative**. Browser insertion is separate from waiting for a Moose to shed. [Category entry][tab] · [List assembly][browser-list] · [Client request][browser-client] · [Server check][browser-server]
 
 ## Usage
 

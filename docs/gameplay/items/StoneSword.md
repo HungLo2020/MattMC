@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-This ordinary listed sword also has the separate [inventory-browser](../mechanics/InventoryBrowser.md) insertion route in Survival and Creative. [Category entries](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1584-L1591)
+This ordinary listed sword also has the separate [inventory-browser](../mechanics/InventoryBrowser.md) insertion route in Creative. [Category entries](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1584-L1591)
 
 At a [Crafting Table](../blocks/CraftingTable.md), place **2 blocks chosen from Cobblestone, Blackstone, and Cobbled Deepslate** vertically above **1 [Stick](Stick.md)** in one three-slot column. This makes **1 Stone Sword**. The three-row layout does not fit the inventory crafting grid. [Recipe][recipe] · [Accepted blade material][repair-stone]
 

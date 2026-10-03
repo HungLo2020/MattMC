@@ -6,7 +6,7 @@
 
 Put **one Bundle and one [Orange Dye](OrangeDye.md)** in any two crafting-grid slots to make **one Orange Bundle**. You can use an uncolored Bundle or another color, with contents still inside. The recipe accepts the full Bundle item tag; it copies the input's stored items and other saved components. An already orange Bundle combined with Orange Dye produces no result. [Exact recipe][orange-recipe] · [Accepted variants][bundles-tag] · [Recipe matching][transmute] · [Copied result][transmute-result] · [Component preservation][component-copy]
 
-Get the first uncolored Bundle through [its crafting and village-loot routes](Bundle.md#obtaining). Orange Bundle is also directly listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), available in **Survival and Creative**. [Category entries][category] · [Browser list][browser] · [Server access][browser-server]
+Get the first uncolored Bundle through [its crafting and village-loot routes](Bundle.md#obtaining). Orange Bundle is also directly listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), visible in **Survival and Creative**; insertion requires **Creative**. [Category entries][category] · [Browser list][browser] · [Server access][browser-server]
 
 ## Usage
 

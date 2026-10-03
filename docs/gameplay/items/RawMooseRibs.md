@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Raw Moose Ribs is listed in the ordinary Food & Drinks category. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. [Category entry][tab] · [Browser construction][browser-list] · [Client request][browser-client] · [Server check][browser-server]
+Raw Moose Ribs is listed in the ordinary Food & Drinks category. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. [Category entry][tab] · [Browser construction][browser-list] · [Client request][browser-client] · [Server check][browser-server]
 
 **A bundled Moose death-drop source is not established.** The entity's default loot key would use `entities/moose`, but the checked active loot data contains no table at that location. Missing tables resolve to the empty table. This is separate from Antlers, which a [living Moose sheds](../mobs/Moose.md#antler-shedding) directly. [Default loot key][loot-key] · [Loot lookup][loot-read] · [Missing-table fallback][loot-missing] · [Bundled loot][loot-tables]
 
