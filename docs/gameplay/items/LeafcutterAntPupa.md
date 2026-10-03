@@ -15,7 +15,7 @@ Using the Pupa on a Chamber or an unrelated block does not activate this action.
 ## Notes
 
 * This item is registered as `minecraft:leafcutter_ant_pupa`.
-* The bundled insect-item tag names Pupa, but also requires unregistered Maggot and Mosquito Larva items. The loader rejects that whole tag in these defaults, so the entry does not establish active insect-food membership. It supplies no recipe or drop. [Insect-item tag][insects-current] · [Item registrations][insect-items-current] · [Required entries][insect-required-current] · [Whole-tag rejection][insect-loader-current]
+* The bundled insect-item tag names Pupa, but also requires unregistered Maggot and Mosquito Larva items. The loader rejects that whole tag in these defaults, so the entry does not establish active insect-food membership. It supplies no recipe or drop. This bundled-data limitation is tracked in [issue #804](https://github.com/HungLo2020/MattMC/issues/804). [Insect-item tag][insects-current] · [Item registrations][insect-items-current] · [Required entries][insect-required-current] · [Whole-tag rejection][insect-loader-current]
 * Source-reviewed at `b823010659d7b5095ed021b1c99cf85627e2082a` on 2026-10-02; no in-game spawning or inventory-consumption test was run.
 
 [item]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/item/Items.java#L1900-L1901

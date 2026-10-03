@@ -52,6 +52,8 @@ Closing and reopening the menu, removing and reinserting the same unchanged item
 
 ## Related pages
 
+- [Power, Punch, Flame and Infinity](BowEnchantments.md): Bow support, damage and knockback scaling, burning arrows, ammunition limits and acquisition
+
 - [Depth Strider, Frost Walker, Soul Speed and Swift Sneak](MobilityEnchantments.md): equipment choices, active movement conditions, broken gear and acquisition
 
 - [Sharpness, Smite and Bane](MeleeDamageEnchantments.md): damage bonuses, exact targets, slowing, support and exclusions

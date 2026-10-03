@@ -12,6 +12,8 @@ Tipped Arrow is ammunition for bows, crossbows, dispensers, and other arrow-firi
 
 Fired arrows can damage entities and follow their configured projectile behavior.
 
+When fired from a Bow, this ammunition can benefit from Power, Punch and Flame, but Infinity does not save it. See [Bow enchantments](../enchanting/BowEnchantments.md#infinity-which-ammunition-is-saved) for consumption and pickup limits.
+
 ## Notes
 
 * This item is registered as `minecraft:tipped_arrow`.

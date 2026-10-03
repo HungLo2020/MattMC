@@ -12,6 +12,8 @@ Spectral Arrow is ammunition for bows, crossbows, dispensers, and other arrow-fi
 
 Fired arrows can damage entities and follow their configured projectile behavior. See [Glowing sources](../effects/VisibilityEffects.md#glowing-sources) for the Spectral Arrow recipe, effect duration, and accepted-hit limitation.
 
+When fired from a Bow, this ammunition can benefit from Power, Punch and Flame, but Infinity does not save it. See [Bow enchantments](../enchanting/BowEnchantments.md#infinity-which-ammunition-is-saved) for consumption and pickup limits.
+
 ## Notes
 
 * This item is registered as `minecraft:spectral_arrow`.
