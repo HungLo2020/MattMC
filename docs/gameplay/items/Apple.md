@@ -6,7 +6,7 @@ Apples can drop from oak leaves and dark oak leaves, appear in loot, and be obta
 
 ## Usage
 
-The Apple is a basic food item.
+The Apple is a basic food item. Apples also attract and feed [Sugar Gliders](../mobs/SugarGlider.md#apples-taming-and-healing); see the guide for taming, healing, breeding, and feeding-order limits.
 
 ## Behavior
 
