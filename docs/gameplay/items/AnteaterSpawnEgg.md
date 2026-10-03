@@ -6,7 +6,7 @@ The Anteater Spawn Egg is available from the Creative Menu.
 
 ## Usage
 
-Use the Anteater Spawn Egg on a block to spawn an Anteater.
+Use the Anteater Spawn Egg on a block to spawn an [Anteater](../mobs/Anteater.md). Its guide covers breeding, keeping it around Leafcutter Ants and current integration limits.
 
 ## Behavior
 

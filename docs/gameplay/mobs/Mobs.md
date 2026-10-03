@@ -6,6 +6,8 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Anteater care:** [Anteater](Anteater.md): honey breeding, baby riding, live-ant predation, Dirt/Sugar actions and current feeding/rendering limits
+
 - **Rain Frog care:** [Rain Frog](RainFrog.md): browser eggs, sand burrowing, Shovel persistence, baby offspring, and current food/weather/rendering limits
 - **Comb Jelly and Frilled Shark:** [Comb Jelly](CombJelly.md), [Frilled Shark](FrilledShark.md), and [Bucket of Frilled Shark](../items/BucketOfFrilledShark.md): aquatic care, predation, pressure appearance and distinct bucket-release limits
 

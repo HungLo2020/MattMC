@@ -208,6 +208,8 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 
 ## Alex's Mobs additions
 
+- [Anteater](mobs/Anteater.md): honey breeding, baby riding, live-ant predation, Dirt/Sugar actions and current feeding/rendering limits
+
 - [Rain Frog](mobs/RainFrog.md): browser eggs, sand burrowing, Shovel persistence, baby offspring, and current food/weather/rendering limits
 - [Comb Jelly](mobs/CombJelly.md), [Frilled Shark](mobs/FrilledShark.md), and [Bucket of Frilled Shark](items/BucketOfFrilledShark.md): actual acquisition, water care, prey and pressure behavior, with separate capture/release limits
 

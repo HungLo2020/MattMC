@@ -14,6 +14,8 @@ Leafcutter Ant is classified as neutral here: it is not treated as always hostil
 
 See [Leafcutter ant nests](../blocks/LeafcutterNests.md) for the Anthill, Chamber, and Pupa interaction. The checked anthill implementation does not complete home discovery, ant storage, or fungus production; placing nest blocks beside ants does not establish a working colony. The guide distinguishes those limits from the active Pupa-spawning action.
 
+See the [Anteater guide](Anteater.md#live-ants-and-healing) for live-ant predation, including the different pursuit and tongue-capture checks. Its [Dirt actions](Anteater.md#digging-dirt) are separate from the nest behavior described above.
+
 ## Notes
 
 * This mob is registered as `minecraft:leafcutter_ant`.
