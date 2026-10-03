@@ -1,18 +1,46 @@
-﻿# Warped Button
+# Warped Button
+
+**Warped Button** (`minecraft:warped_button`) is the item form of a wooden redstone button. Its exact material entry is in [Buttons](../blocks/Buttons.md#warped-button). [Registration][item] · [English name][name]
 
 ## Obtaining
 
-Warped Button can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Put **1 [Warped Planks](WarpedPlanks.md) in any crafting slot → 1 Warped Button**. This shapeless recipe fits the inventory grid; other plank materials do not substitute. [Recipe][recipe]
+
+Ordinary Survival mining returns **1 Warped Button, even by hand**; no special tool or Silk Touch is required. An unbroken axe is efficient. See [collecting rules](../blocks/Buttons.md#mining-water-and-pistons) for mining and explosion distinctions. [Block properties][block] · [Loot][loot]
+
+It is also listed in Creative's **Building Blocks** tab. [Creative entry][creative]
 
 ## Usage
 
-Warped Button is a warped wood or Nether vegetation block item used for building and decoration.
+Stacks hold **64** by default. [Default block items][defaults] · [Stack limit][stack]
+
+Attach it to a **sturdy floor, wall, or ceiling face**, then use the unpressed button. Losing valid support breaks it. See [placement and operation](../blocks/Buttons.md#placement-and-operation). [Support checks][support]
 
 ## Behavior
 
-When placed, it creates the `minecraft:warped_button` block and follows the normal placement rules for that warped block type.
+A normal press supplies **signal 15 for 30 game ticks** (1.5 seconds at 20 game ticks per second). Pressing it again while powered does not restart the timer. [Material timing][block] · [Press and output][button]
+
+An eligible arrow overlapping the button can activate it or keep it powered. This does not apply to every projectile. The shared [arrow detail](../blocks/Buttons.md#arrow-detail) explains eligible projectiles, repeat checks, release, and the separate Wind Charge route. [Arrow-enabled material][sets] · [Detection][button]
 
 ## Notes
 
-* This item is the item form of the `minecraft:warped_button` block.
+**Warped Button is not furnace fuel**: the default fuel list removes it through the non-flammable-wood tag. [Wooden-control tag][fuel-tag] · [Exclusion][fuel-exclusion] · [Fuel rules][fuel]
 
+Related: [Warped Pressure Plate](WarpedPressurePlate.md) · [Water and piston behavior](../blocks/Buttons.md#mining-water-and-pistons) · [Items](Items.md)
+
+Source-reviewed on **2026-10-03** at `2fff1ef19106350f806ddedd4fb3c3b4fbc44716`. No in-game crafting, mining, placement, or circuit test was run.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/item/Items.java#L1051
+[name]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/assets/minecraft/lang/en_us.json#L2339
+[recipe]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/recipe/crafting/warped_button.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/loot_table/blocks/warped_button.json
+[block]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/Blocks.java#L5681
+[creative]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L235
+[defaults]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/item/Items.java#L2750-L2781
+[stack]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/core/component/DataComponents.java#L383-L390
+[fuel-tag]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/tags/item/wooden_buttons.json
+[fuel]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/entity/FuelValues.java#L38-L108
+[fuel-exclusion]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/resources/data/minecraft/tags/item/non_flammable_wood.json
+[support]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/FaceAttachedHorizontalDirectionalBlock.java#L27-L82
+[button]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/ButtonBlock.java#L86-L181
+[sets]: https://github.com/HungLo2020/MattMC/blob/2fff1ef19106350f806ddedd4fb3c3b4fbc44716/src/main/java/net/minecraft/world/level/block/state/properties/BlockSetType.java#L119-L219
