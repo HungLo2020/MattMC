@@ -65,7 +65,7 @@ Equipment dyeing **blends RGB color**, including any color already saved on the 
 
 ### Firework colors
 
-A basic **Firework Star** uses one Gunpowder and one or more dyes in separate crafting slots. Its saved explosion lists those dye colors. Combining one existing Firework Star with one or more dyes sets its fade-color list instead, returning one star and preserving its other components. These are active special crafting recipes; follow [Firework Star](FireworkStar.md) and [Firework Rocket](FireworkRocket.md) for the item entries. [Star recipe resource] · [Star matching and colors] · [Fade recipe resource] · [Fade matching and result]
+A basic **Firework Star** uses one Gunpowder and one or more dyes in separate crafting slots. Its saved explosion lists those dye colors. Combining one existing Firework Star with one or more dyes sets its fade-color list instead, returning one star and preserving its other components. These are active special crafting recipes; see [Fireworks](../mechanics/Fireworks.md) for recipes, effect choices, data preservation, and display limits, or [Firework Star](FireworkStar.md) and [Firework Rocket](FireworkRocket.md) for the item entries. [Star recipe resource] · [Star matching and colors] · [Fade recipe resource] · [Fade matching and result]
 
 ## Sources and verification
 

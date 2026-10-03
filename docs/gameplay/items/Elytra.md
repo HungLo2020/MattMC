@@ -37,11 +37,13 @@ The [Grindstone and crafting repair comparison](../mechanics/Durability.md#choos
 
 ## Firework boosts
 
-Use a **Firework Rocket while already gliding** to attach a rocket and accelerate in your look direction. Ordinary Survival use consumes one rocket. Launching a rocket from the ground does not start Elytra flight. [Rocket use][rocket-item] · [Attached boost][rocket]
+Use a **[Firework Rocket](FireworkRocket.md) while already gliding** to attach a rocket and accelerate in your look direction. Ordinary Survival use consumes one rocket. Launching a rocket from the ground does not start Elytra flight. [Rocket use][rocket-item] · [Attached boost][rocket]
 
 For travel, craft **one Paper plus one, two, or three Gunpowder**, with each Gunpowder in its own crafting slot, and **no Firework Stars**. The shapeless special recipe returns **three rockets**, with Flight Duration 1, 2, or 3 respectively. More Gunpowder lengthens the rocket's lifetime. [Active recipe][rocket-data] · [Recipe inputs and output][rocket-recipe] · [Lifetime][rocket]
 
 Stars add explosion effects. When a boosting rocket with such effects explodes, it can damage the attached flyer and nearby entities. Rockets crafted without stars have no explosion-damage payload. This removes that particular damage source, not the risk of flying into a wall or exhausting your Elytra. [Explosion damage][rocket]
+
+See [Fireworks](../mechanics/Fireworks.md) for exact flight-duration timings, star effects, launch restrictions, and explosion-damage conditions.
 
 The separately named [Tarantula Hawk Elytra](TarantulaHawkElytra.md) lacks the current default glider/equipment wiring; its name does not grant the ordinary flight behavior described here.
 

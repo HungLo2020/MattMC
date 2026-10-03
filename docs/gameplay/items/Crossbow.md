@@ -24,9 +24,11 @@ Use a loaded Crossbow again to fire its stored ammunition. You can switch away a
 
 ## Choosing ammunition
 
-The inventory search accepts the arrow tag: ordinary [Arrows](Arrow.md), Tipped Arrows, and Spectral Arrows. The held-ammunition search additionally accepts **Firework Rockets**. With a Crossbow in the main hand, put a rocket in the **offhand** to choose it; a rocket only sitting in the ordinary inventory is not selected by that fallback search. Held ammunition is checked before inventory arrows. [Supported predicates][crossbow] · [Arrow tag][arrows] · [Held selection][weapon] · [Inventory selection][player]
+The inventory search accepts the arrow tag: ordinary [Arrows](Arrow.md), Tipped Arrows, and Spectral Arrows. The held-ammunition search additionally accepts **[Firework Rockets](FireworkRocket.md)**. With a Crossbow in the main hand, put a rocket in the **offhand** to choose it; a rocket only sitting in the ordinary inventory is not selected by that fallback search. Held ammunition is checked before inventory arrows. [Supported predicates][crossbow] · [Arrow tag][arrows] · [Held selection][weapon] · [Inventory selection][player]
 
 Rockets and arrows use different projectile behavior. A firework's explosion damage requires explosion data; a plain rocket without explosions does not become a damaging blast merely because the Crossbow fires it. Explosive rockets can harm nearby living entities, so do not fire them point-blank near yourself, pets, or other players. This page does not claim a universal rocket damage value or radius of guaranteed harm. [Rocket creation][crossbow] · [Rocket explosion handling][rocket]
+
+See [Fireworks](../mechanics/Fireworks.md) for rocket recipes, payload choices, flight duration, collision behavior, and damage conditions.
 
 ## Multishot and Piercing
 
