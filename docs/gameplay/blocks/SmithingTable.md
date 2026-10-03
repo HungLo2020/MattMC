@@ -25,6 +25,7 @@ The working slots are not permanent storage: closing the menu clears the input c
 ## Related pages
 
 - [Smithing guide](../smithing/Smithing.md)
+- [Armor trims: patterns, acquisition, and copying](../mechanics/ArmorTrims.md)
 - [Smithing Table item](../items/SmithingTable.md)
 - [Netherite Upgrade Smithing Template](../items/SmithingTemplateNetheriteUpgrade.md)
 - [Blocks](Blocks.md)

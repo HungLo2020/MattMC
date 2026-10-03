@@ -30,6 +30,8 @@ Because using the template consumes it, consider making copies first. The [Nethe
 
 ## Example: apply an armor trim
 
+See [Armor trims](../mechanics/ArmorTrims.md) for all patterns, first-template sources, exact copying ingredients, and appearance-verification limits.
+
 A verified combination is **Sentry Armor Trim Smithing Template + Diamond Chestplate + Redstone Dust**. It returns the same chestplate with the Sentry pattern and redstone trim material.
 
 The template selects the pattern; the addition selects the trim material. The bundled trim-material tag contains Amethyst Shard, Copper Ingot, Diamond, Emerald, Gold Ingot, Iron Ingot, Lapis Lazuli, Netherite Ingot, Nether Quartz, Redstone Dust, and Resin Brick. The armor must belong to the `minecraft:trimmable_armor` tag; an integrated item being called “armor” is not enough.

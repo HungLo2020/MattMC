@@ -18,6 +18,7 @@ Understand the systems behind everyday gameplay. Guides here explain current Mat
 - [Anvil operations](AnvilMechanics.md): repairs, names, combining, prior work, and MattMC's 40-level payment cap
 - [Shields and death protection](DefensiveItems.md): active blocking, cooldowns, held Totems, and exclusions
 - [Armor and damage reduction](Armor.md): Copper-inclusive material values, toughness, durability, and repairs
+- [Armor trims](ArmorTrims.md): pattern acquisition, template copying, accepted materials, and smithing conditions
 - [Durability and repair](Durability.md): retained broken items, function guards, and repair-method data retention
 - [Fishing](Fishing.md): bite timing, open-water treasure, loot weights, and rod wear
 - [Boats and rail transport](Transport.md): passengers, chest storage, rail construction, powered launches, and braking
