@@ -19,6 +19,8 @@ In Creative, use the [Slime Spawn Egg](../items/SlimeSpawnEgg.md). Custom spawne
 
 ## Sizes, attacks, and splitting
 
+See [Oozing](../effects/TriggeredEffects.md#oozing) for effect-created medium Slimes and the nearby-Slime count limit.
+
 Ordinary spawn initialization chooses sizes **1, 2, or 4**; local difficulty can shift the roll toward a larger size. These are size categories, not ages. [Spawn initialization and size attributes][slime] · [Active default attributes][defaults]
 
 | Size | Default health | Width and height | Ordinary contact damage on Normal, before defenses |

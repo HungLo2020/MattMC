@@ -49,6 +49,8 @@ The checked **ordinary spreading-fire** registry does not give Cobweb a flammabi
 
 ## Brewing use
 
+See [Weaving](../effects/TriggeredEffects.md#weaving) for the status effect, its death-triggered placement, and removal limits.
+
 Cobweb is the ingredient that turns an **Awkward Potion into a Potion of Weaving**. The same start-mix helper maps a Water Bottle plus Cobweb to a **Mundane Potion**, so begin with Awkward Potion for Weaving. Follow the [Brewing guide](../brewing/Brewing.md) and [Brewing Stand](BrewingStand.md) for the brewing workflow. [Active mix setup][brewing] · [Start-mix inputs][start-mix]
 
 Related: [Cobweb item](../items/Cobweb.md) · [String](../items/String.md) · [Spider](../mobs/Spider.md) · [Cave Spider](../mobs/CaveSpider.md) · [Blocks](Blocks.md)

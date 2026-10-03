@@ -28,6 +28,8 @@ A [Dispenser](../blocks/DispenserAndDropper.md) has a registered Wind Charge pro
 
 ## Behavior
 
+For the separate death-triggered status, see [Wind Charged](../effects/TriggeredEffects.md#wind-charged).
+
 ### Direct hits and the burst
 
 A direct entity hit attempts **1 damage point** before defenses, then bursts. The burst itself is configured to **push without explosion damage**. Being pushed off a ledge or into a hazard can still cause harm, and the push can affect nearby players and animals as well as the intended target. [Direct hit][abstract-charge] · [Burst configuration][charge] · [Damage and knockback separation][calculator] · [Affected entities][explosion]

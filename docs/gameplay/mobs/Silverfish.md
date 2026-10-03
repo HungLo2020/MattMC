@@ -19,6 +19,8 @@ Spawner and Trial Spawner reasons skip the species predicate's non-spawner check
 
 ### Infested effect and supplied eggs
 
+See [Infested](../effects/TriggeredEffects.md#infested) for damage gates, lethal-hit ordering, launch positions, and effect clearing.
+
 When a living entity with **Infested** reaches the effect's hurt callback, the bundled effect has a **10% chance** to create **1–2 Silverfish** around that entity. The effect does not scale this count or chance with its amplifier. Silverfish themselves are in the Infested-immunity tag, so the ordinary effect application cannot create a self-repeating chain on them. This route does not require breaking an infested block. [Effect registration][infested-effect] · [Hurt callback and creation][effect-create] · [Damage dispatch][effect-hurt] · [Immunity gate][effect-immunity] · [Immunity tag][immune-tag]
 
 The brewing registration uses **Stone with an Awkward Potion** for the Infested potion; starting with a Water Bottle instead makes a Mundane Potion. See [Brewing](../brewing/Brewing.md) for the brewing stand process. [Ingredient registration][infested-brew] · [Starting-potion selection][brew-start]

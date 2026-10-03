@@ -16,6 +16,7 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Haste](MiningEffects.md#haste): mining-speed bonus, attack recharge, and Conduit interaction
 - [Health Boost](CombatEffects.md#health-boost): maximum ordinary health without immediate healing
 - [Hunger](HungerAndSaturation.md#hunger): player exhaustion, food sources, and Husk-hit conditions
+- [Infested](TriggeredEffects.md#infested): hurt-triggered Silverfish, damage gates, and spawn limits
 - [Instant Damage](InstantEffects.md#instant-damage): instant magic damage, inverted healing, and delivery limits
 - [Instant Health](InstantEffects.md#instant-health): immediate healing, inverted damage, and delivery limits
 - [Invisibility](VisibilityEffects.md#invisibility): AI detection, armor coverage, and selected body rendering
@@ -25,6 +26,7 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Mining Fatigue](MiningEffects.md#mining-fatigue): level-specific mining penalties, attack recharge, and removal
 - [Nausea](VisibilityEffects.md#nausea): food and mob sources, overlay settings, and the current distortion limitation
 - [Night Vision](VisionEffects.md#night-vision): rendered brightness, sources, and near-expiry flicker
+- [Oozing](TriggeredEffects.md#oozing): death-triggered Slimes and the nearby-Slime count limit
 - [Orca's Might](../mobs/Orca.md#swimming-together-and-orcas-might): companion-granted attack speed and refresh rules
 - [Poison](Poison.md): periodic damage with a low-health cutoff
 - [Regeneration](Regeneration.md): periodic healing, separate from food-based healing
@@ -40,6 +42,8 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Unluck](LuckAndUnluck.md#unluck): reduced player luck, commands, and loot-context limits
 - [Water Breathing](WaterAndFireEffects.md#water-breathing): ordinary underwater air protection and recovery
 - [Weakness](CombatEffects.md#weakness): reduced attack-damage attribute, curing, and other sources
+- [Weaving](TriggeredEffects.md#weaving): death-triggered Cobweb placement and easier web movement
+- [Wind Charged](TriggeredEffects.md#wind-charged): death-triggered wind burst, block reactions, and fall limits
 - [Wither](Wither.md): periodic damage without Poison's low-health cutoff
 
 The [movement effects reference](MovementEffects.md) compares acquisition, movement rules, and effect interactions.
@@ -61,6 +65,8 @@ The [mining effects reference](MiningEffects.md) compares Haste and Mining Fatig
 The [Luck and Unluck reference](LuckAndUnluck.md) separates player luck, fishing enchantments, loot-table arithmetic, and acquisition routes.
 
 The five mob-granted entries above, **Orca's Might, Debilitating Sting, Tiger's Blessing, Sunbird Blessing, and Sunbird Curse**, use distinct registered effect IDs. Their encounter routes and integration limits belong to the linked mob guides. The checked ordinary potion types and brewing recipes do not include these five; an effect registration alone is not a brewing recipe. [Distinct registrations][custom-effect-registry] · [Potion types][custom-effect-potions] · [Brewing registrations][custom-effect-brewing]
+
+The [Wind Charged, Weaving, Oozing, and Infested guide](TriggeredEffects.md) compares damage/death triggers, creation limits, brewing, and ominous-trial delivery.
 
 This is a growing reference, not a complete list of all registered effects. The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
 
