@@ -13,4 +13,5 @@ and link to source for implementation details. Follow the
 - [Developer Tooling](tooling/index.md)
 - [Rendering](rendering/index.md)
 - [World Systems](world/index.md)
+- [Network Systems](network/index.md)
 - [Wiki Expansion Maintenance](wiki/index.md)

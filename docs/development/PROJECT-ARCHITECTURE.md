@@ -15,6 +15,8 @@ src/main/rust/
 ├── core/
 ├── gameplay/
 ├── network/
+│   └── codec/
+│       └── long_array/
 ├── platform/
 ├── render/
 │   ├── chunk/
@@ -42,7 +44,9 @@ src/main/rust/
     │   └── shapes/
     │       ├── boolean_join/
     │       ├── box_extract/
-    │       └── rotation/
+    │       ├── rotation/
+    │       ├── closest_point/
+    │       └── raycast/
     └── level/
         ├── biome/
         │   └── climate/
@@ -106,6 +110,13 @@ Ordered [merged voxel boxes](world/physics/RUST-VOXEL-BOXES.md) use
 [Voxel rotation](world/physics/RUST-VOXEL-ROTATION.md) uses
 `world/phys/shapes/rotation/` for packed axis transforms while Java retains
 floating coordinates and shape ownership.
+[Closest collision points](world/physics/RUST-VOXEL-CLOSEST-POINT.md) use
+`world/phys/shapes/closest_point/` to combine the established box traversal
+with clamping and ordered distance reduction in one call. Java retains input
+ownership, custom compatibility and result construction.
+[Ray/shape intersection](world/physics/RUST-VOXEL-RAYCAST.md) uses
+`world/phys/shapes/raycast/` for ordered outside-ray hits without exporting a
+box list. Java retains public ray prechecks and immediate inside-hit behavior.
 
 ### `gameplay/`
 
@@ -138,7 +149,10 @@ Asset loading, decoding, caching, and resource processing belong here. Future Ru
 
 ### `network/`
 
-Networking code belongs here. This is the future home for protocol, packet encoding/decoding, synchronization, and multiplayer transport work if those systems move into Rust.
+Network protocols and wire codecs belong here. Current
+[bulk long-array conversion](network/codec/RUST-LONG-ARRAY.md) uses
+`network/codec/long_array/` for exact big-endian conversion. Java retains Netty
+buffer ownership, length prefixes, cursor updates and compatibility behavior.
 
 ### `platform/`
 

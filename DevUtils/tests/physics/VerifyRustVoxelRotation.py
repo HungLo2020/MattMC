@@ -49,7 +49,9 @@ def audit(out):
         raise RuntimeError('Original complete public rotation caller differs from Git')
     for name in ['Shapes.java','BitSetDiscreteVoxelShape.java','VoxelShape.java','ArrayVoxelShape.java',
                  'CubeVoxelShape.java','NativeVoxelJoin.java','NativeVoxelBoxes.java']:
-        if (ROOT/(folder+name)).read_text() != original(name):
+        from VerifyRustVoxelClosestPoint import strip_closest_point
+        current = (ROOT/(folder+name)).read_text()
+        if (strip_closest_point(current) if name == 'VoxelShape.java' else current) != original(name):
             raise RuntimeError('Shape semantics changed: '+name)
     (out/'OriginalDiscreteVoxelShape.java').write_text(original('DiscreteVoxelShape.java'))
     (out/'OriginalShapes.java').write_text(original('Shapes.java'))

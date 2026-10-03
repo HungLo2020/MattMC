@@ -115,3 +115,9 @@ matching source/library hashes, checksums and zero measured compiler time.
 Earlier failed confidence checks and interrupted runs are labeled historical
 and excluded. These numbers describe the warmed migration caller, not cold
 initialization, compatibility paths, total world generation or FPS.
+
+The source audit also permits the separately pinned
+[closest-point dispatch](RUST-VOXEL-CLOSEST-POINT.md). Its Java reference caller
+and the established extraction/rotation algorithms remain unchanged.
+[Ray-intersection verification](RUST-VOXEL-RAYCAST.md) also permits only its
+exact public dispatch when auditing shared shape sources.

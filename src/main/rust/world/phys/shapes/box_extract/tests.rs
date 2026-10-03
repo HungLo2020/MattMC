@@ -87,3 +87,24 @@ fn ffi_rejects_invalid_metadata_before_any_buffer_mutation() {
     assert_eq!(unsafe { mattmc_voxel_boxes(unaligned,8,8,8,8,output.as_mut_ptr(),3072) }, -1);
     assert_eq!(words, saved); assert!(output.iter().all(|&n| n == -77));
 }
+
+#[test]
+fn full_and_interior_cavities_match_original_order_and_reject_changed_cells() {
+    for dims in [[4,16,4], [8,8,8], [16,16,16], [5,6,32], [5,7,64]] {
+        let [nx,ny,nz]=dims;
+        let cells=nx*ny*nz;
+        for low in [[1,1,1],[1,2,1],[2,1,2]] {
+            for high in [[nx-1,ny-1,nz-1],[nx-1,ny-2,nz-1],[nx-2,ny-1,nz-2]] {
+                if (0..3).any(|a| low[a]>=high[a]) {continue;}
+                let mut words=vec![u64::MAX;(cells+63)/64];
+                for x in low[0]..high[0] { for y in low[1]..high[1] { for z in low[2]..high[2] {
+                    let i=(x*ny+y)*nz+z; words[i/64]&=!(1u64<<(i%64));
+                } } }
+                check(&words,dims);
+                for i in [0,(low[0]*ny+low[1])*nz+low[2],cells/2,cells-1] {
+                    words[i/64]^=1u64<<(i%64);check(&words,dims);words[i/64]^=1u64<<(i%64);
+                }
+            }
+        }
+    }
+}

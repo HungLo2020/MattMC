@@ -5,7 +5,7 @@ fn mask(n: usize) -> u64 {
 
 // Both searches stop at the exclusive row/range limit, including partial words.
 #[inline(always)]
-fn next(words: &[u64], mut at: usize, end: usize, set: bool) -> usize {
+pub(super) fn next(words: &[u64], mut at: usize, end: usize, set: bool) -> usize {
     while at < end {
         let shift = at & 63;
         let count = (64 - shift).min(end - at);
@@ -41,7 +41,7 @@ fn strip_full(words: &[u64], mut at: usize, end: usize) -> bool {
 
 #[inline(always)]
 fn emit_run(words: &mut [u64], dims: [usize; 3], x: usize, y: usize,
-    start: usize, end: usize, output: &mut [i32], count: usize) {
+    start: usize, end: usize) -> [i32; 6] {
     let [nx, ny, nz] = dims;
     let base = (x * ny + y) * nz;
     clear(words, base + start, base + end);
@@ -64,9 +64,7 @@ fn emit_run(words: &mut [u64], dims: [usize; 3], x: usize, y: usize,
         }
         y_end += 1;
     }
-    output[count * 6..count * 6 + 6].copy_from_slice(&[
-        x as i32, y as i32, start as i32, x_end as i32, y_end as i32, end as i32,
-    ]);
+    [x as i32, y as i32, start as i32, x_end as i32, y_end as i32, end as i32]
 }
 
 #[inline(always)]
@@ -77,11 +75,26 @@ pub(super) fn row_bits(words: &[u64], base: usize, nz: usize) -> u64 {
     bits & mask(nz)
 }
 
-/// Same y/x/z traversal, then Z run, X expansion, Y expansion as Java.
-/// `words` is a private snapshot; output contains six ordered endpoints per box.
+/// Ordered endpoints retain the existing public box ABI.
 pub(super) fn extract(words: &mut [u64], dims: [usize; 3], output: &mut [i32]) -> usize {
+    let mut at = 0;
+    visit(words, dims, |b| {
+        output[at..at + 6].copy_from_slice(&b);
+        at += 6;
+    })
+}
+
+/// Same y/x/z traversal, then Z run, X expansion, Y expansion as Java.
+/// The consumer is a monomorphized Rust closure, never a foreign callback.
+/// `words` is a private snapshot; the visitor consumes ordered endpoints.
+#[inline]
+pub(crate) fn visit<F: FnMut([i32; 6])>(words: &mut [u64], dims: [usize; 3], mut emit: F) -> usize {
     let [nx, ny, nz] = dims;
-    if let Some(count) = super::isolated::extract(words, dims, output) {
+    if let Some(count) = super::cavity::visit(words, dims, &mut emit) {
+        clear(words, 0, nx * ny * nz);
+        return count;
+    }
+    if let Some(count) = super::isolated::visit(words, dims, &mut emit) {
         clear(words, 0, nx * ny * nz);
         return count;
     }
@@ -96,7 +109,7 @@ pub(super) fn extract(words: &mut [u64], dims: [usize; 3], output: &mut [i32]) -
                 while bits != 0 {
                     let start = bits.trailing_zeros() as usize;
                     let end = start + (bits >> start).trailing_ones() as usize;
-                    emit_run(words, dims, x, y, start, end, output, count);
+                    emit(emit_run(words, dims, x, y, start, end));
                     count += 1;
                     bits &= !(mask(end - start) << start);
                 }
@@ -106,7 +119,7 @@ pub(super) fn extract(words: &mut [u64], dims: [usize; 3], output: &mut [i32]) -
                     let start = next(words, base + z, base + nz, true) - base;
                     if start == nz { break; }
                     let end = next(words, base + start, base + nz, false) - base;
-                    emit_run(words, dims, x, y, start, end, output, count);
+                    emit(emit_run(words, dims, x, y, start, end));
                     count += 1;
                     z = end;
                 }

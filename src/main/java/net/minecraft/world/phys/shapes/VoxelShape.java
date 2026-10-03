@@ -168,6 +168,10 @@ public abstract class VoxelShape {
 				return null;
 			} else {
 				Vec3 vec34 = vec3.add(vec33.scale(0.001));
+				if (this.shape != null && (long)this.shape.xSize * this.shape.ySize * this.shape.zSize >= NativeVoxelRaycast.MIN_CELLS) {
+					var nativeHit = NativeVoxelRaycast.clipFromProbe(this, vec3, vec32, blockPos, vec34);
+					if (nativeHit != null) return nativeHit.orElse(null);
+				}
 				return this.shape
 						.isFullWide(
 							this.findIndex(Direction.Axis.X, vec34.x - blockPos.getX()),
@@ -175,15 +179,28 @@ public abstract class VoxelShape {
 							this.findIndex(Direction.Axis.Z, vec34.z - blockPos.getZ())
 						)
 					? new BlockHitResult(vec34, Direction.getApproximateNearest(vec33.x, vec33.y, vec33.z).getOpposite(), blockPos, true)
-					: AABB.clip(this.toAabbs(), vec3, vec32, blockPos);
+					: this.clipOutside(vec3, vec32, blockPos);
 			}
 		}
+	}
+
+	@Nullable
+	private BlockHitResult clipOutside(Vec3 start, Vec3 end, BlockPos position) {
+		if (this.shape != null && (long)this.shape.xSize * this.shape.ySize * this.shape.zSize >= NativeVoxelRaycast.MIN_CELLS) {
+			var nativeHit = NativeVoxelRaycast.clip(this, start, end, position);
+			if (nativeHit != null) return nativeHit.orElse(null);
+		}
+		return AABB.clip(this.toAabbs(), start, end, position);
 	}
 
 	public Optional<Vec3> closestPointTo(Vec3 vec3) {
 		if (this.isEmpty()) {
 			return Optional.empty();
 		} else {
+			if (this.shape != null && (long)this.shape.xSize * this.shape.ySize * this.shape.zSize >= NativeVoxelClosestPoint.MIN_CELLS) {
+				var nativePoint = NativeVoxelClosestPoint.find(this, vec3);
+				if (nativePoint != null) return nativePoint;
+			}
 			Vec3[] vec3s = new Vec3[1];
 			this.forAllBoxes((d, e, f, g, h, i) -> {
 				double j = Mth.clamp(vec3.x(), d, g);

@@ -349,6 +349,7 @@ public class FriendlyByteBuf extends ByteBuf {
 	}
 
 	public static void writeFixedSizeLongArray(ByteBuf byteBuf, long[] ls) {
+		if (ls != null && ls.length >= NativeLongArray.MIN_VALUES && NativeLongArray.write(byteBuf, ls)) return;
 		for (long l : ls) {
 			byteBuf.writeLong(l);
 		}
@@ -373,6 +374,7 @@ public class FriendlyByteBuf extends ByteBuf {
 	}
 
 	public static long[] readFixedSizeLongArray(ByteBuf byteBuf, long[] ls) {
+		if (ls != null && ls.length >= NativeLongArray.MIN_VALUES && NativeLongArray.read(byteBuf, ls)) return ls;
 		for (int i = 0; i < ls.length; i++) {
 			ls[i] = byteBuf.readLong();
 		}
