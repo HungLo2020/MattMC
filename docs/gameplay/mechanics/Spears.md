@@ -32,7 +32,7 @@ For Wooden through Diamond, use a **3 × 3 crafting grid**: put the material in 
 
 Accepted materials are [planks][wooden-repair], [the three stone materials][stone-repair], [Copper Ingot][copper-repair], [Iron Ingot][iron-repair], [Gold Ingot][gold-repair], and [Diamond][diamond-repair]. Netherite uses a **Diamond Spear + Netherite Ingot + Netherite Upgrade Smithing Template** at a Smithing Table. Its transformation copies the base stack's changed components, so an upgrade should not be treated as a blanket reset of damage or custom data. Inspect the output. [Smithing recipe][smithing] · [Netherite material][netherite-repair] · [Transformation][smithing-copy] · [Result copy][transmute] · [Component patch copy][component-copy]
 
-All seven Spears are ordinary combat-tab entries. MattMC's [inventory item browser](InventoryBrowser.md) can request ordinary listed items in Survival as well as Creative. This route is separate from collecting crafting ingredients or finding loot. [Tab entries][tab]
+All seven Spears are ordinary combat-tab entries. MattMC's [inventory item browser](InventoryBrowser.md) can request ordinary listed items in Creative. This route is separate from collecting crafting ingredients or finding loot. [Tab entries][tab]
 
 ## Aim beyond close contact
 

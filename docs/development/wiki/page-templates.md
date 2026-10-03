@@ -11,6 +11,7 @@ These are authoring templates, not claims about unfinished content. Follow [docu
 5. Omit invented values. State specific unknowns that affect player decisions. A Creative entry is not a Survival acquisition route.
 6. Keep each topic canonical: placed behavior on the block page, item-only behavior on the item page, with reciprocal links. Shared recipes should live on one page and be linked elsewhere.
 7. Every new directory gets one `index.md`; preserve existing indexes such as `Items.md`, `Mobs.md`, and `Gameplay.md`. Link every immediate page and child index.
+8. For network-backed behavior, trace the client sender, active codec/admission gates, live server context and final handler. Catalog visibility and a permissive handler alone do not prove server-accepted acquisition. Use the current [inventory-browser mode boundary](../../gameplay/mechanics/InventoryBrowser.md#mode-and-permission-limits), including integrated-server transport; do not regenerate the superseded Survival-insertion assumption.
 
 ## Mob article
 

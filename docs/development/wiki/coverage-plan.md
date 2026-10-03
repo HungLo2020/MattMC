@@ -1,5 +1,10 @@
 # Coverage plan and checkpoint
 
+## Current inventory-browser correction
+
+At source `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`, the browser catalog is visible in Survival but the live server protocol skips ordinary Survival insertion requests before the permissive handler. Both dedicated and integrated transports use that gate. Earlier batch descriptions below that claimed Survival insertion are superseded by [the corrected shared guide](../../gameplay/mechanics/InventoryBrowser.md#mode-and-permission-limits). Historical work and links remain preserved; this is a documentation correction, not a gameplay fix. All affected explicit acquisition claims are being reconciled under one publisher.
+
+
 ## Branch and source checkpoint
 
 - Working branch: `docs/wiki-expansion`
@@ -1584,3 +1589,10 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Traced active water and input attributes separately from location effects, Frosted Ice placement/timers, terrain predicates and Soul Speed wear. Attribute inputs are not measured travel-speed guarantees; optional trade-rebalance pools remain separate from ordinary routes.
 - Verified immediate break cleanup and normal broken-equipment rejection alongside the later location iterator that can re-enter Frost Walker/Soul Speed. This is source-described behavior under the unresolved [#800 policy review](https://github.com/HungLo2020/MattMC/issues/800), not an implemented fix or a blanket passive-effect contract.
 - Exact canonical/baseline guards, independent source/render review, preserved anchors, active caller and source-range checks, actual hierarchy check and strict build apply. No gameplay movement, frost, damage, wear, fishing, barter, trade or chest-opening tests were run.
+
+## Batch 201: Browser protocol admission correction
+
+- Corrected the shared inventory-browser owner and its mode/navigation guidance after tracing the actual client and server contexts, active codec modifier, both transports and skip handling. Visibility remains available in Survival; ordinary insertion requires infinite materials, normally Creative. No runtime failure or disconnect is claimed.
+- Preserved real recipes, loot, normal item-use/consumption and operator-category permissions. Corrected replacement-supply advice in Death and Respawn and related equipment/mode summaries. Broader explicit per-item and per-mob acquisition claims are a separately reviewed continuation of this correction.
+- Added durable authoring/continuation checks so a permissive downstream handler cannot again stand in for protocol admission. Existing historical monthly entries and batch descriptions are retained with the current correction clearly identified.
+- Source proof was independently reproduced. Exact before/after guards, unchanged-source verification, preserved headings, rendered citations, the required documentation check and strict build apply. No game, browser-click or network runtime test was run.

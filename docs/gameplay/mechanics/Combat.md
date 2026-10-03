@@ -60,7 +60,7 @@ A raised Shield does not cover every source. The bundled bypass tag includes env
 - [Bow](../items/Bow.md), [Crossbow](../items/Crossbow.md), and [Arrow](../items/Arrow.md)
 - [Durability and repair](Durability.md): MattMC's retained broken equipment and function guards
 - [Enchanting](../enchanting/Enchanting.md) and [status effects](../effects/Effects.md)
-- [Inventory item browser](InventoryBrowser.md): ordinary item requests are available in Survival as documented there
+- [Inventory item browser](InventoryBrowser.md): catalog browsing and Creative insertion; ordinary Survival requests are skipped
 - [Mechanics](Mechanics.md)
 
 ## Sources and verification

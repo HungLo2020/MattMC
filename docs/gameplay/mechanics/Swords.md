@@ -18,7 +18,7 @@ These attack values are the default player's **main-hand attributes with an unbr
 
 The variant pages define the accepted ingredient tags. [Durability and repair](Durability.md) owns the repair-method formulas and data-preservation warnings, and [Armor](Armor.md) explains damage reduction.
 
-All seven ordinary swords are category-listed and can be requested through the [inventory browser](InventoryBrowser.md) in Survival and Creative. This route is separate from crafting, upgrading and loot. [Category entries](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1584-L1591)
+All seven ordinary swords are category-listed and can be requested through the [inventory browser](InventoryBrowser.md) in Creative. This route is separate from crafting, upgrading and loot. [Category entries](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1584-L1591)
 
 ## Attack charge and movement
 

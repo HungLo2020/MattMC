@@ -2,7 +2,7 @@
 
 Creative grants flight, instant-build, and invulnerable player abilities. It is useful for construction, inspection, and trying registered MattMC content without first establishing a Survival acquisition route.
 
-MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) supports requesting ordinary listed items in Survival as well as Creative. Browser insertion is separate from crafting/loot acquisition and from the additional permissions needed for operator entries.
+Creative players can request ordinary listed items through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), subject to its capacity, feature and server checks. The catalog is also visible in Survival, but ordinary Survival insertion is blocked by the earlier packet gate. Operator-category entries have additional permissions.
 
 ## Using Creative for integrated content
 

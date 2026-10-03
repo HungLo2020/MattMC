@@ -300,7 +300,7 @@ Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directo
 - [Grass and Ferns](blocks/GrassAndFerns.md), [flowerbeds/Leaf Litter](blocks/FlowerbedsAndLeafLitter.md) and [Eyeblossoms](blocks/Eyeblossoms.md): exact collection, propagation, coverage and day/night behavior
 - [Torchflower](blocks/Torchflower.md) and [Pitcher Plant](blocks/PitcherPlant.md): actual Sniffer acquisition, crop-to-flower lifecycles and separate harvest rules
 - [Note Block](blocks/NoteBlock.md): tuning, all instrument types, head sounds and timed redstone examples
-- [Inventory item browser](mechanics/InventoryBrowser.md): current Survival/Creative insertion, search/capacity controls and operator-category limits
+- [Inventory item browser](mechanics/InventoryBrowser.md): catalog browsing, Creative insertion, protocol admission and operator-category limits
 - [Spawn eggs](items/SpawnEggs.md): ordinary browser access, two unlisted boss exceptions, placement/spawner controls and conditional offspring interactions
 - [Placed animal eggs](blocks/AnimalEggs.md): species-specific hatching, collection, trampling and current acquisition gaps
 - [Elevator](blocks/Elevator.md) and [Redstone Randomizer](blocks/RedstoneRandomizer.md): actual controls, search/output behavior, collection and limits

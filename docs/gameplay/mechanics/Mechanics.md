@@ -2,7 +2,7 @@
 
 Understand the systems behind everyday gameplay. Guides here explain current MattMC rules and point out which conditions depend on game rules, difficulty, or incomplete integration.
 
-- [Inventory item browser](InventoryBrowser.md): item requests in Survival/Creative, category visibility and operator gates
+- [Inventory item browser](InventoryBrowser.md): catalog visibility, Creative insertion and protocol/operator gates
 - [Hunger, saturation, and healing](Hunger.md): food values, exhaustion, sprinting, healing, and starvation
 - [Health, damage, and recovery](Health.md): health units, defenses, difficulty and recovery
 - [Death and respawn](DeathAndRespawn.md): inventory/experience loss, recovery and saved-point fallback
