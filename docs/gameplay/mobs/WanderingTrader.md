@@ -16,7 +16,7 @@ The candidate needs valid ground and empty spawn space within the world border, 
 
 ### Spawn Egg and commands
 
-The [Wandering Trader Spawn Egg](../items/WanderingTraderSpawnEgg.md) is an ordinary listed item, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in **Survival as well as Creative**. Egg placement creates the merchant directly. This bypasses the natural visit scheduler and does **not** add the two companion Llamas or the natural visit's countdown. [Egg registration][egg-item] · [Category listing][egg-category] · [Egg creation][egg-spawn] · [Default delay][default-delay] · [Event-only setup][site]
+The [Wandering Trader Spawn Egg](../items/WanderingTraderSpawnEgg.md) is an ordinary listed item, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in **Creative**. Egg placement creates the merchant directly. This bypasses the natural visit scheduler and does **not** add the two companion Llamas or the natural visit's countdown. [Egg registration][egg-item] · [Category listing][egg-category] · [Egg creation][egg-spawn] · [Default delay][default-delay] · [Event-only setup][site]
 
 With command permission level **2 or higher**, `/summon minecraft:wandering_trader ~ ~ ~` creates an ordinary trader at the chosen position. With no custom entity data, its despawn delay remains zero and it has no event-created companions. Commands or modified egg data can explicitly change that state. The command is source-checked here; it was not executed. [Command syntax and permission][summon] · [Creation][summon-create] · [Loaded delay default][saved-delay]
 

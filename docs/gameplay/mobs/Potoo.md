@@ -4,7 +4,7 @@ A **Potoo** is a small flying animal that can be attracted with **Beetroot Seeds
 
 ## Obtaining
 
-The [Potoo Spawn Egg](../items/PotooSpawnEgg.md) is the verified ordinary creation route. It appears in the ordinary item list and can be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. Egg placement creates the registered `minecraft:potoo` directly. [Egg registration][potoo-egg] · [Listing][potoo-list] · [Egg placement][egg-place] · [Entity registration][potoo-id]
+The [Potoo Spawn Egg](../items/PotooSpawnEgg.md) is the verified ordinary creation route. It appears in the ordinary item list and can be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. Egg placement creates the registered `minecraft:potoo` directly. [Egg registration][potoo-egg] · [Listing][potoo-list] · [Egg placement][egg-place] · [Entity registration][potoo-id]
 
 No Potoo entry was found in the checked active biome spawn lists, and no separate natural creation caller was found. A bright-spawn helper and a Leaves-or-Logs obstruction check exist, but they do not put Potoos into a biome's population. Do not assume searching a jungle at night is a verified acquisition route. [Ordinary spawn-list dispatch][natural-list] · [Chunk-generation list][chunk-list] · [Species checks][potoo-spawn]
 

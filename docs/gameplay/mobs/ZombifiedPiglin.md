@@ -14,7 +14,7 @@ Other checked routes are:
 - **Lightning striking a Pig** outside Peaceful. The Pig's callback converts it and marks the result persistent. See [Pig](Pig.md) for the animal's separate care and transport rules. [Lightning callback][pig-lightning]
 - **Nether Portal random ticks** in a natural dimension, when monster spawning is enabled, a player is close enough, the difficulty-based roll passes, and a valid base position is found. This creates a mob at the portal; it does not require an existing Piglin to walk through. Follow the [portal guide](../blocks/NetherPortals.md#nether-portal) for portal construction and travel. [Portal spawn callback][portal-spawn]
 
-The listed [Zombified Piglin Spawn Egg](../items/ZombifiedPiglinSpawnEgg.md) is separately obtainable through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. [Egg listing][zombified-egg]
+The listed [Zombified Piglin Spawn Egg](../items/ZombifiedPiglinSpawnEgg.md) is separately obtainable through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. [Egg listing][zombified-egg]
 
 ## Behavior
 

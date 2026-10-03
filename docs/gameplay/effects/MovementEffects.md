@@ -90,7 +90,7 @@ Use the [Brewing guide](../brewing/Brewing.md) for bottles, fuel, Awkward Potion
 
 Extended Swiftness or Leaping can also be corrupted directly into extended Slowness. The registered list has no such fermentation from Swiftness II or Leaping II, and no recipe combining the extended and strengthened forms above. Follow the actual input state instead of treating modifier ingredients as universally interchangeable. [Movement mixes][brew-movement] · [Slow Falling mixes][brew-fall] · [Awkward start handling][start-mix] · [Leaping durations][potion-jump] · [Other durations][potion-speed-slow] · [Slow Falling durations][potion-fall]
 
-The ordinary potion variants are also category-listed, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can supply them in **Survival and Creative**. That insertion route is separate from collecting ingredients and brewing. It lists enabled registered potion types, which does not add missing Levitation or Dolphin's Grace potion types. [Potion category generation][browser-potions] · [Enabled-type enumeration][browser-types]
+The ordinary potion variants are also category-listed, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can supply them in **Creative**. That insertion route is separate from collecting ingredients and brewing. It lists enabled registered potion types, which does not add missing Levitation or Dolphin's Grace potion types. [Potion category generation][browser-potions] · [Enabled-type enumeration][browser-types]
 
 ### Delivery changes duration
 

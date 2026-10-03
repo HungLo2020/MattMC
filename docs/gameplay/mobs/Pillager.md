@@ -16,7 +16,7 @@ A successful patrol starts with a designated captain and attempts followers acco
 
 ### Spawn egg and item browser
 
-The ordinary [Pillager Spawn Egg](../items/PillagerSpawnEgg.md) is listed in the item category, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert it in Survival as well as Creative. Using it creates a hostile Pillager, subject to the egg's placement and difficulty checks; this does not establish a natural spawn route. [Egg listing][eggs-list] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server handling][browser-server] · [Egg use][egg-use]
+The ordinary [Pillager Spawn Egg](../items/PillagerSpawnEgg.md) is listed in the item category, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert it in Creative. Using it creates a hostile Pillager, subject to the egg's placement and difficulty checks; this does not establish a natural spawn route. [Egg listing][eggs-list] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server handling][browser-server] · [Egg use][egg-use]
 
 ## Behavior
 

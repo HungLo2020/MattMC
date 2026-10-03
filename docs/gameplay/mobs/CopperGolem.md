@@ -8,7 +8,7 @@ Place a **Carved Pumpkin or Jack o'Lantern last on top of one full Copper Block*
 
 An **unwaxed, Unaffected statue** can also be revived with a normal axe interaction. The statue guide owns the [scraping and final revival steps](../blocks/CopperGolemStatues.md#bring-the-statue-back-to-life), including secondary-use and broken-axe distinctions. Revival creates a new golem with the saved name and facing; the statue does not store its old sorting cargo. [Revival handler][statue-revive] · [Transferred data][statue-name] · [Cargo release at conversion][weather]
 
-Copper Golems have no entries in the 68 bundled biome spawn tables reviewed for this guide. Their registered `MISC` category is also excluded from the ordinary natural-mob spawning route. Build or revive one instead of searching a biome for a wild herd. The [Copper Golem Spawn Egg](../items/CopperGolemSpawnEgg.md) provides another creation route; ordinary listed items are available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. [Entity registration][copper-reg] · [Natural-spawn exclusion][misc-spawn]
+Copper Golems have no entries in the 68 bundled biome spawn tables reviewed for this guide. Their registered `MISC` category is also excluded from the ordinary natural-mob spawning route. Build or revive one instead of searching a biome for a wild herd. The [Copper Golem Spawn Egg](../items/CopperGolemSpawnEgg.md) provides another creation route; ordinary listed items are available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. [Entity registration][copper-reg] · [Natural-spawn exclusion][misc-spawn]
 
 ## Behavior
 

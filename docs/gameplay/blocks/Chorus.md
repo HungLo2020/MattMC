@@ -11,7 +11,7 @@
 | [Chorus Fruit](../items/ChorusFruit.md) | `minecraft:chorus_fruit` | Edible fruit with a random-teleport effect |
 | [Popped Chorus Fruit](../items/PoppedChorusFruit.md) | `minecraft:popped_chorus_fruit` | Smelted, inedible building ingredient |
 
-Both plant items are ordinary Natural Blocks category entries, so the [inventory item browser](../mechanics/InventoryBrowser.md) can request them in Survival as well as Creative. This is separate from harvesting a stem or growing a flower. [Category entries][creative]
+Both plant items are ordinary Natural Blocks category entries, so the [inventory item browser](../mechanics/InventoryBrowser.md) can request them in Creative. This is separate from harvesting a stem or growing a flower. [Category entries][creative]
 
 Both plant blocks have hardness and blast resistance **0.4**, and neither requires a correct tool to drop its applicable loot. Both have registered block items and Creative entries, but the stem's existence as an item does **not** mean ordinary harvesting returns the stem. [Block properties][blocks] · [Strength meaning][strength] · [Tool gate][tool-gate] · [Block items][block-items] · [Creative entries][creative] · [Stem loot][stem-loot] · [Fruit registrations][fruit-items]
 

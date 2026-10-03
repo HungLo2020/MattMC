@@ -4,7 +4,7 @@ The **Tarantula Hawk** flies, hunts spiders and retaliates when hurt. Its sting 
 
 ## Obtaining
 
-The [Tarantula Hawk Spawn Egg](../items/TarantulaHawkSpawnEgg.md) creates this mob. It is category-listed, so the [inventory item browser](../mechanics/InventoryBrowser.md) can insert the egg in **Survival as well as Creative**. Use it on a block with room for the mob; ordinary Survival use consumes the egg. [Item registration][hawk-items] · [Category entries][categories] · [Egg use][egg-use]
+The [Tarantula Hawk Spawn Egg](../items/TarantulaHawkSpawnEgg.md) creates this mob. It is category-listed, so the [inventory item browser](../mechanics/InventoryBrowser.md) can insert the egg in **Creative**. Use it on a block with room for the mob; ordinary Survival use consumes the egg. [Item registration][hawk-items] · [Category entries][categories] · [Egg use][egg-use]
 
 The checked biome JSON and structure spawn lists contain no Tarantula Hawk entry. Natural spawning draws from those loaded lists, and the hawk's separate spawn predicate is absent from the checked spawn-placement registrations. A desert, badlands or Nether location is therefore **not a verified natural source** here. The Nether-variant biome tag is declared but has no bundled membership. [World data loading][world-load] · [Resource loader][biome-load] · [Biome data][biome-data] · [Structure data][structure-data] · [Spawn selection][spawn-pick] · [Spawn lists][spawn-list] · [Placement table][spawn-placement] · [Variant code][hawk] · [Biome tags][biome-tags]
 

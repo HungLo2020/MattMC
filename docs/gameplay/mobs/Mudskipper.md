@@ -4,7 +4,7 @@ The **Mudskipper** (`minecraft:mudskipper`) is a tameable animal with land/water
 
 ## Obtaining
 
-The [Mudskipper Spawn Egg](../items/MudskipperSpawnEgg.md) is registered and listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), available in **Survival and Creative**. Its factory creates the actual Mudskipper entity. [Egg][mud-egg] · [Category entry][egg-list] · [Browser list][browser] · [Server access][browser-server] · [Egg use][egg-use]
+The [Mudskipper Spawn Egg](../items/MudskipperSpawnEgg.md) is registered and listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), available in **Creative**. Its factory creates the actual Mudskipper entity. [Egg][mud-egg] · [Category entry][egg-list] · [Browser list][browser] · [Server access][browser-server] · [Egg use][egg-use]
 
 **Natural spawning is not established by the reviewed active source.** A static Mud/Muddy Mangrove Roots predicate exists, but has no active caller or placement registration, and no bundled biome spawn list names Mudskipper. Do not infer a mangrove-swamp finding route from that unused predicate or the `CREATURE` category. [Species predicates][mud-spawn] · [Placement registrations][placements] · [Spawn-list selection][natural-list] · [Bundled biomes][biomes]
 

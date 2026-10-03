@@ -4,7 +4,7 @@ The **Spectre** is a passive flying creature that can pass through blocks and is
 
 ## Obtaining
 
-Use the [Spectre Spawn Egg](../items/SpectreSpawnEgg.md), an ordinary category-listed item available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. [Egg registration][egg] · [Category entry][category]
+Use the [Spectre Spawn Egg](../items/SpectreSpawnEgg.md), an ordinary category-listed item available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. [Egg registration][egg] · [Category entry][category]
 
 No natural encounter route was found in the checked biome spawn lists, structure spawn overrides, or active spawning references. The bundled End biome lists contain Endermen, and the End biome builder does not add Spectres. A Spectre's permissive spawn method and spawn-roll setting do not themselves add it to those lists. Do not plan an End trip around finding one naturally in this snapshot. [Spawn-list selection][spawn-selection] · [Bundled End list][end-spawns] · [End builder][end-builder] · [Entity spawn checks][spawn-checks]
 

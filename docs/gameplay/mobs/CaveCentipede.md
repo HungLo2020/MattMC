@@ -4,7 +4,7 @@ The **Cave Centipede** is a long, hostile mob whose head can poison you and drop
 
 ## Obtaining
 
-Use the [Cave Centipede Spawn Egg](../items/CaveCentipedeSpawnEgg.md) to create one. The egg is in an ordinary category, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert it in **Survival as well as Creative**. Use the egg on a block with space for the mob, and expect ordinary Survival egg use to consume it. This is separate from finding naturally spawned centipedes. [Egg registration][centipede-egg] · [Category entries][categories] · [Egg use][egg-use]
+Use the [Cave Centipede Spawn Egg](../items/CaveCentipedeSpawnEgg.md) to create one. The egg is in an ordinary category, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert it in **Creative**. Use the egg on a block with space for the mob, and expect ordinary Survival egg use to consume it. This is separate from finding naturally spawned centipedes. [Egg registration][centipede-egg] · [Category entries][categories] · [Egg use][egg-use]
 
 The checked biome JSON and structure spawn lists do not include this mob. Natural spawning selects from those loaded lists; a method describing a dark location at or below Y=0 does not add the mob to them, and that centipede predicate is not registered in the checked spawn-placement table. There is no verified biome or depth to search for a natural encounter in this snapshot. Server data packs can change these lists. [Loaded data][world-load] · [Biome resource loading][biome-load] · [Biome data][biome-data] · [Structure data][structure-data] · [Spawn selection][spawn-pick] · [Spawn lists][spawn-list] · [Placement registrations][spawn-placement]
 

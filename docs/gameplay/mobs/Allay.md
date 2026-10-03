@@ -11,7 +11,7 @@ Two checked structure routes can provide Allays:
 
 [Outpost cage][outpost-template] · [Feature choice][outpost-pool] · [Pool placement][pool-place] · [Stored-entity placement][entity-place] · [Mansion room][mansion-template] · [Room selection][mansion-select] · [Marker creation][mansion-markers]
 
-Neither structure promises that cage room in every generated example. Clear nearby hostiles before opening a cage. For deliberate placement, the ordinary listed [Allay Spawn Egg](../items/AllaySpawnEgg.md) is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival and Creative; this is separate from finding a structure resident. [Egg category entry][egg]
+Neither structure promises that cage room in every generated example. Clear nearby hostiles before opening a cage. For deliberate placement, the ordinary listed [Allay Spawn Egg](../items/AllaySpawnEgg.md) is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative; this is separate from finding a structure resident. [Egg category entry][egg]
 
 ## Behavior
 

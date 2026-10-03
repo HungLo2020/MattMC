@@ -8,7 +8,7 @@ Look in **Ocean, Deep Ocean, Cold Ocean, Deep Cold Ocean, Lukewarm Ocean and Dee
 
 The registered natural-spawn checks require water at the spawn position and below it, a Water block above, and a height from **sea level minus 13 through sea level**, inclusive. With the bundled Overworld sea level of 63, that is **Y 50–63**. The usual population, distance and collision checks still apply. [Placement registration][placements] · [Water placement][in-water] · [Surface rule][water] · [Sea level][sea-level] · [Natural checks][natural-check]
 
-The [Cod Spawn Egg](../items/CodSpawnEgg.md) is an ordinary listed item. The [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Survival as well as Creative; placing an egg is a separate route from natural spawning. [Listing][egg-list-cod] · [Egg use][egg-use] · [Browser list][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
+The [Cod Spawn Egg](../items/CodSpawnEgg.md) is an ordinary listed item. The [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Creative; placing an egg is a separate route from natural spawning. [Listing][egg-list-cod] · [Egg use][egg-use] · [Browser list][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
 
 ## Behavior
 

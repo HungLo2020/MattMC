@@ -25,7 +25,7 @@ When a living entity with **Infested** reaches the effect's hurt callback, the b
 
 The brewing registration uses **Stone with an Awkward Potion** for the Infested potion; starting with a Water Bottle instead makes a Mundane Potion. See [Brewing](../brewing/Brewing.md) for the brewing stand process. [Ingredient registration][infested-brew] · [Starting-potion selection][brew-start]
 
-The listed [Silverfish Spawn Egg](../items/SilverfishSpawnEgg.md) is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. That insertion/placement route is separate from the encounter systems above. [Egg category entry][silver-egg]
+The listed [Silverfish Spawn Egg](../items/SilverfishSpawnEgg.md) is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. That insertion/placement route is separate from the encounter systems above. [Egg category entry][silver-egg]
 
 ## Behavior
 

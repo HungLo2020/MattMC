@@ -6,7 +6,7 @@ A **Zombie Horse** is a passive undead mount with **15 health points (7.5 hearts
 
 ### Eggs and natural-spawn limits
 
-The **[Zombie Horse Spawn Egg](../items/ZombieHorseSpawnEgg.md)** is the ordinary item route. It is available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. Read the [spawn-egg guide](../items/SpawnEggs.md) for placement, supported babies and spawner use. Egg placement initializes a creature directly; item availability does not make it tame. [Egg registration][zombie-egg] · [Egg caller][egg-create] · [Initialization][type-create] · [Default tame flag][horse-flags]
+The **[Zombie Horse Spawn Egg](../items/ZombieHorseSpawnEgg.md)** is the ordinary item route. It is available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. Read the [spawn-egg guide](../items/SpawnEggs.md) for placement, supported babies and spawner use. Egg placement initializes a creature directly; item availability does not make it tame. [Egg registration][zombie-egg] · [Egg caller][egg-create] · [Initialization][type-create] · [Default tame flag][horse-flags]
 
 There is **no Zombie Horse entry in any of the 68 bundled biome spawn definitions** reviewed here. Its registered placement predicate is not an active biome population by itself. The thunderstorm horse event specifically creates a **[Skeleton Horse](SkeletonHorse.md#lightning-traps)**, not a Zombie Horse. No ordinary natural or conversion route for Zombie Horses was found in the active source paths reviewed for this guide. [Placement registration][placement-zombie] · [Species predicate][zombie-stats] · [Natural candidate lookup][natural-candidates] · [Weather event's actual species][weather-trap]
 

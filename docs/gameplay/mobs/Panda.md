@@ -10,7 +10,7 @@ Search [Jungle or Bamboo Jungle](../biomes/JunglesAndSwamps.md). Both bundled cr
 
 Ordinary natural spawning uses the animal check: **Grass Block below and raw brightness at least 9**, plus the caller's space and obstruction checks. The Panda placement registration uses no additional ground-placement restriction, but still calls that animal predicate. Walking into a dark Bamboo thicket does not override these conditions. [Registered predicate][panda-placement] · [Ground and light][animal-spawn] · [Ground tag][animal-ground] · [Natural caller][spawn-rules]
 
-The [Panda Spawn Egg](../items/PandaSpawnEgg.md) is another route. Ordinary listed items can be inserted through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative; that is separate from wild spawning.
+The [Panda Spawn Egg](../items/PandaSpawnEgg.md) is another route. Ordinary listed items can be inserted through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative; that is separate from wild spawning.
 
 ## Behavior
 

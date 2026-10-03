@@ -6,7 +6,7 @@
 
 The bundled natural spawn entry is in **Beach** (`minecraft:beach`), not Snowy Beach or Stony Shore. Its registered ground-spawn predicate requires a sand-tag block below, **raw brightness greater than 8**, and a position **below sea level plus 4**. With the normal Overworld sea level of 63, the height condition is **Y below 67**. Sand, Red Sand and Suspicious Sand are the bundled sand-tag members; ordinary ground-placement and collision checks also apply. [Beach entry][beach] · [Registered predicate][spawn-reg] · [Turtle predicate][turtle-goals] · [Brightness][bright] · [Sand lookup][turtle-egg] · [Sand tag][sand] · [Sea level][sea-level] · [Placement][placement] · [Spawn checks][spawn-check]
 
-The [Turtle Spawn Egg](../items/TurtleSpawnEgg.md) is an ordinary listed item, so the [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Survival and Creative. This is separate from finding a natural Turtle or hatching a placed egg. [Listing][egg-list] · [Egg use][egg-use] · [Browser list][browser-list] · [Client][browser-client] · [Server][browser-server]
+The [Turtle Spawn Egg](../items/TurtleSpawnEgg.md) is an ordinary listed item, so the [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Creative. This is separate from finding a natural Turtle or hatching a placed egg. [Listing][egg-list] · [Egg use][egg-use] · [Browser list][browser-list] · [Client][browser-client] · [Server][browser-server]
 
 ## Behavior
 

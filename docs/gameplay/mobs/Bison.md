@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-The [Bison Spawn Egg](../items/BisonSpawnEgg.md) is an ordinary category-listed item, available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. Use the [Spawn eggs guide](../items/SpawnEggs.md) for placement, consumption and supported offspring interactions. [Egg registration][egg] · [Category listing][egg-tab] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server checks][browser-server]
+The [Bison Spawn Egg](../items/BisonSpawnEgg.md) is an ordinary category-listed item, available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. Use the [Spawn eggs guide](../items/SpawnEggs.md) for placement, consumption and supported offspring interactions. [Egg registration][egg] · [Category listing][egg-tab] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server checks][browser-server]
 
 **A natural biome-spawn route is not established in the checked build.** Bison is registered, and its instance spawn check reads whether the configured Bison weight is positive, but that condition does not add it to a biome's creature list. The checked spawn-placement registry and bundled biome data do not list Bison. Do not treat an imported habitat description as a verified place to find one. [Entity registration][entity] · [Instance check][spawn-check] · [Spawn placements][placement-registry] · [Bundled biomes][biomes]
 

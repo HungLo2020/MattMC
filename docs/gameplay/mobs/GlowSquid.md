@@ -8,7 +8,7 @@ Loaded biome tables include Glow Squid in the underground-water category beneath
 
 The active spawn predicate requires a **Water block**, **raw brightness 0**, and a height at or below **sea level minus 33**: **Y 30 or lower** with the bundled Overworld sea level of 63. In-water placement additionally requires room above that is not a redstone-conducting block; collision, population and distance checks also remain. No additional stone-floor requirement appears in this registered predicate. [Registration][glow-placement] · [Predicate][GlowSquid] · [In-water placement][in-water] · [Sea level][sea-level] · [Natural checks][natural-check]
 
-The [Glow Squid Spawn Egg](../items/GlowSquidSpawnEgg.md) is an ordinary listed item. The [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Survival as well as Creative; placing an egg is a separate route from natural spawning. [Listing][egg-list-glow] · [Egg use][egg-use] · [Browser list][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
+The [Glow Squid Spawn Egg](../items/GlowSquidSpawnEgg.md) is an ordinary listed item. The [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Creative; placing an egg is a separate route from natural spawning. [Listing][egg-list-glow] · [Egg use][egg-use] · [Browser list][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
 
 ## Behavior
 

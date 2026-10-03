@@ -4,7 +4,7 @@
 
 ## Obtaining and recovering the blocks
 
-Both blocks have real item forms, and both appear in the **Functional Blocks** category alongside [Leafcutter Ant Pupa](../items/LeafcutterAntPupa.md). They can therefore be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative. This insertion route supplies an item; it does not populate an anthill with ants or a queen. [Block items][items] · [Category identity][category] · [Category entries][listing] · [Initial nest data][storage]
+Both blocks have real item forms, and both appear in the **Functional Blocks** category alongside [Leafcutter Ant Pupa](../items/LeafcutterAntPupa.md). They can therefore be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. This insertion route supplies an item; it does not populate an anthill with ants or a queen. [Block items][items] · [Category identity][category] · [Category entries][listing] · [Initial nest data][storage]
 
 No crafting recipe, natural nest-generation reference, or block loot table for either ID was found in the bundled data or generation code at the reviewed revision. Their default loot lookup therefore has no bundled table to return these items: **do not expect mining or Silk Touch to recover them**. Neither registration adds a correct-tool requirement; that is separate from the missing loot. [Bundled data][data] · [Generation code][worldgen] · [Registration][registration] · [Loot lookup][loot] · [Missing-table fallback][missing-loot]
 

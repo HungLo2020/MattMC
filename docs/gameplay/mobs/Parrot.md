@@ -10,7 +10,7 @@ The bundled [Jungle and Bamboo Jungle](../biomes/JunglesAndSwamps.md) creature l
 
 Their registered natural placement calls a Parrot-specific predicate requiring **raw brightness at least 9** and a block from the Parrot support tag below. The tag includes Grass Block, Leaves, Logs and Air; the caller still applies its ground-placement and obstruction checks, so the Air tag entry is not a promise of free-floating spawns. [Placement registration][parrot-placement] · [Parrot check][parrot-spawn] · [Support tag][parrot-ground] · [Light threshold][animal-spawn] · [Natural checks][spawn-rules]
 
-A newly finalized spawn chooses among **five color variants**: red-blue, blue, green, yellow-blue and gray. The variant is saved. A [Parrot Spawn Egg](../items/ParrotSpawnEgg.md) provides another creation route; the [inventory item browser](../mechanics/InventoryBrowser.md) supplies ordinary listed items in Survival or Creative. [Spawn selection][parrot-init] · [Variant list][parrot-color] · [Save/load][parrot-save]
+A newly finalized spawn chooses among **five color variants**: red-blue, blue, green, yellow-blue and gray. The variant is saved. A [Parrot Spawn Egg](../items/ParrotSpawnEgg.md) provides another creation route; the [inventory item browser](../mechanics/InventoryBrowser.md) supplies ordinary listed items in Creative. [Spawn selection][parrot-init] · [Variant list][parrot-color] · [Save/load][parrot-save]
 
 ## Behavior
 

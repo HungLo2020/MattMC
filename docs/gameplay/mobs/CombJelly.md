@@ -6,7 +6,7 @@ The **Comb Jelly** (`minecraft:comb_jelly`) is a small, passive water creature w
 
 ### Spawn-egg access
 
-Use the registered [Comb Jelly Spawn Egg](../items/CombJellySpawnEgg.md) in a prepared water enclosure. It is an ordinary listed egg, available through MattMC's [inventory browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative. The egg's water-use path creates and adds the creature; this is separate from the broken bucket release. [Item registration][items] · [Listed egg][egg-list] · [Browser entries][browser-list] · [Client request][browser-client] · [Server handling][browser-server] · [Egg use][egg-use] · [Creation and addition][entity-create]
+Use the registered [Comb Jelly Spawn Egg](../items/CombJellySpawnEgg.md) in a prepared water enclosure. It is an ordinary listed egg, available through MattMC's [inventory browser](../mechanics/InventoryBrowser.md) in Creative. The egg's water-use path creates and adds the creature; this is separate from the broken bucket release. [Item registration][items] · [Listed egg][egg-list] · [Browser entries][browser-list] · [Client request][browser-client] · [Server handling][browser-server] · [Egg use][egg-use] · [Creation and addition][entity-create]
 
 ### Natural-spawn limit
 

@@ -8,7 +8,7 @@ Natural candidates occur in **all nine normal Overworld ocean variants**, plus *
 
 The registered natural-spawn predicate uses the **surface water band**, from sea level minus 13 through sea level, inclusive: **Y 50–63** with the bundled Overworld sea level of 63. It requires water at and below the spawn position and a Water block above. Collision, population and distance checks still apply. [Registration][placements] · [Water placement][in-water] · [Surface rule][ageable-water] · [Sea level][sea-level] · [Natural checks][natural-check]
 
-The [Squid Spawn Egg](../items/SquidSpawnEgg.md) is an ordinary listed item. The [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Survival as well as Creative; placing an egg is a separate route from natural spawning. [Listing][egg-list-squid] · [Egg use][egg-use] · [Browser list][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
+The [Squid Spawn Egg](../items/SquidSpawnEgg.md) is an ordinary listed item. The [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Creative; placing an egg is a separate route from natural spawning. [Listing][egg-list-squid] · [Egg use][egg-use] · [Browser list][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
 
 ## Behavior
 

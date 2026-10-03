@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-Both the [Lobster Spawn Egg](../items/LobsterSpawnEgg.md) and [Bucket of Lobster](../items/BucketOfLobster.md) are ordinary category-listed items. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can supply them in **Survival as well as Creative**. Egg and bucket release both reach active entity-creation paths. [Egg registration][l-egg] · [Egg category][l-category] · [Bucket registration][l-bucket] · [Bucket category][l-bucket-list] · [Egg creation][egg-placement] · [Bucket creation][standard-release]
+Both the [Lobster Spawn Egg](../items/LobsterSpawnEgg.md) and [Bucket of Lobster](../items/BucketOfLobster.md) are ordinary category-listed items. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can supply them in **Creative**. Egg and bucket release both reach active entity-creation paths. [Egg registration][l-egg] · [Egg category][l-category] · [Bucket registration][l-bucket] · [Bucket category][l-bucket-list] · [Egg creation][egg-placement] · [Bucket creation][standard-release]
 
 **No natural biome or structure spawn route was found** in the checked 68 biome definitions, 34 structure definitions and 1,202 templates. The class's sand-or-water predicate is not installed in SpawnPlacements; its permissive spawn-rule method and group-size limits do not create a natural population. [Bundled data][bundled-data] · [Placement table][spawn-rules] · [Standalone predicate][l-water] · [Rule and group methods][l-stats]
 

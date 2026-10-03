@@ -6,7 +6,7 @@ A Vex (`minecraft:vex`) is a small flying hostile mob with **14 health points (7
 
 [Evokers](Evoker.md#vex-summons) summon Vexes in groups of three attempts, including when fighting Evokers found in a [Woodland Mansion](../structures/WoodlandMansion.md) or [raid](../mechanics/Raid.md). The summon code directly creates them, assigns an owner and adds them to the world; Vexes are not a separate entry in the raid's wave roster. [Summon caller][summon] · [Raid roster][raid-types]
 
-For deliberate placement, use the ordinary listed [Vex Spawn Egg](../items/VexSpawnEgg.md), available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival and Creative. Egg-created Vexes do not automatically receive the Evoker summon code's limited-life timer. Vexes are not allowed in Peaceful. [Egg listing][vex-entry] · [Egg spawn path][egg-use] · [Spawn initialization][vex-gear] · [Summon-only timer assignment][summon] · [Registration][vex-type] · [Peaceful removal][peaceful]
+For deliberate placement, use the ordinary listed [Vex Spawn Egg](../items/VexSpawnEgg.md), available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. Egg-created Vexes do not automatically receive the Evoker summon code's limited-life timer. Vexes are not allowed in Peaceful. [Egg listing][vex-entry] · [Egg spawn path][egg-use] · [Spawn initialization][vex-gear] · [Summon-only timer assignment][summon] · [Registration][vex-type] · [Peaceful removal][peaceful]
 
 ## Behavior
 

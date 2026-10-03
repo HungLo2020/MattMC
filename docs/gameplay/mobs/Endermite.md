@@ -12,7 +12,7 @@ The eligible **player-owner impact branch** of a thrown Pearl makes a **5% Ender
 
 No Endermite entry was found in the checked bundled biome lists or structure spawn overrides. Its registered ground-spawn predicate alone does not add it to those lists. That predicate uses an any-light monster check and excludes a nearby eligible player within 5 blocks for non-spawner attempts, but **the Pearl's direct creation path does not call it**. [Placement registration][mite-placement] · [Species predicate][mite-spawn] · [Any-light gate][monster-gate] · [Direct creation][pearl]
 
-The listed [Endermite Spawn Egg](../items/EndermiteSpawnEgg.md) offers a separate placement route through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), available in **Survival and Creative**. [Egg category entry][mite-egg]
+The listed [Endermite Spawn Egg](../items/EndermiteSpawnEgg.md) offers a separate placement route through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), available in **Creative**. [Egg category entry][mite-egg]
 
 ## Behavior
 

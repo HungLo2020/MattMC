@@ -8,7 +8,7 @@ In the bundled normal Overworld, search **[Snowy Slopes, Frozen Peaks and Jagged
 
 The normal preset's Overworld source selects these cold slopes/peaks, and the creature lists are consumed by the active generation and natural-spawn paths. [Normal preset][normal] · [Parameter provider][parameters] [Biome-source mapping][biome-provider] · [Peak selection][biome-peaks] · [Generation][worldgen-caller] [Creature population][worldgen-spawn] · [Natural selection][natural-select]
 
-For deliberate placement, use the ordinary listed [Goat Spawn Egg](../items/GoatSpawnEgg.md) through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. This does not establish a natural herd. [Egg listing][goat-egg]
+For deliberate placement, use the ordinary listed [Goat Spawn Egg](../items/GoatSpawnEgg.md) through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. This does not establish a natural herd. [Egg listing][goat-egg]
 
 ## Behavior
 

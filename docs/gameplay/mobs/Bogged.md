@@ -10,7 +10,7 @@ Natural Bogged candidates are listed in **Swamp and Mangrove Swamp**, with weigh
 
 The Trial Spawner reason bypasses ordinary monster light requirements. Lighting a chamber therefore does not establish that this configured encounter has been disabled. Follow [Trial Spawner activation and waves](../blocks/TrialSpawner.md#activation-and-participants) for the actual controls, participants and rewards. [Spawn-reason exception][spawner-reason] · [Species predicate][monster-spawn] · [Spawner checks][trial-spawn]
 
-The listed [Bogged Spawn Egg](../items/BoggedSpawnEgg.md) offers another placement route through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), in **Survival and Creative**. [Egg listing][bogged-egg]
+The listed [Bogged Spawn Egg](../items/BoggedSpawnEgg.md) offers another placement route through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), in **Creative**. [Egg listing][bogged-egg]
 
 ## Behavior
 

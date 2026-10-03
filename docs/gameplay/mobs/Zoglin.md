@@ -8,7 +8,7 @@ The checked ordinary route is to let a Hoglin convert in a dimension whose type 
 
 No Zoglin entry was found in the bundled biome monster lists or structure spawn overrides at this snapshot. It has a registered ground-placement predicate, but that alone does not put it in the natural-spawn selector. Returning a Zoglin to the Nether does not trigger a reverse-conversion path in its checked implementation. [Placement registration][zoglin-placement] · [List selection][spawn-selection] · [Biome/structure lookup][spawn-tables] · [Zoglin server tick][zoglin-tick]
 
-The listed [Zoglin Spawn Egg](../items/ZoglinSpawnEgg.md) is a separate placement option through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), which supports **Survival and Creative**. Egg availability does not establish a natural Zoglin population. [Egg listing][zoglin-egg]
+The listed [Zoglin Spawn Egg](../items/ZoglinSpawnEgg.md) is a separate placement option through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), which supplies it in **Creative**. Egg availability does not establish a natural Zoglin population. [Egg listing][zoglin-egg]
 
 ## Behavior
 

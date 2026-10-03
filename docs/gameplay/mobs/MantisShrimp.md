@@ -4,7 +4,7 @@ The **Mantis Shrimp** (`minecraft:mantis_shrimp`) is a tameable, fish-fed animal
 
 ## Obtaining
 
-Use the [Mantis Shrimp Spawn Egg](../items/MantisShrimpSpawnEgg.md). It is listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), available in **Survival and Creative**. Egg placement creates the actual Mantis Shrimp class. [Egg registration][shrimp-egg] · [Category entry][egg-list] · [Browser list][browser] · [Server access][browser-server] · [Egg use][egg-use]
+Use the [Mantis Shrimp Spawn Egg](../items/MantisShrimpSpawnEgg.md). It is listed in the ordinary [Inventory Browser](../mechanics/InventoryBrowser.md), available in **Creative**. Egg placement creates the actual Mantis Shrimp class. [Egg registration][shrimp-egg] · [Category entry][egg-list] · [Browser list][browser] · [Server access][browser-server] · [Egg use][egg-use]
 
 **A natural spawning route is not established in the reviewed active source.** The class has a sea-level-related static spawn predicate, but that predicate has no active caller or placement registration, and no bundled biome spawn list names this species. `WATER_CREATURE` classification alone does not add it to a biome. Do not use an upstream ocean-biome claim as a finding location in this version. [Species predicates][shrimp-spawn] · [Placement registrations][placements] · [Spawn-list selection][natural-list] · [Bundled biomes][biomes]
 

@@ -10,7 +10,7 @@ Ground requirements differ. In the two frozen-ocean biomes, the alternate spawn 
 
 The normal source selects those biomes, and the loaded creature tables reach both generation and later natural-spawn callers. [Normal preset][normal] · [Parameter source][parameters] [Biome-source mapping][biome-provider] · [Cold biome selection][biome-cold] · [Generation][worldgen-caller] [Creature population][worldgen-spawn] · [Natural selection and creation][natural-select] [Natural spawn creation][natural-finalize]
 
-The ordinary listed [Polar Bear Spawn Egg](../items/PolarBearSpawnEgg.md) is another placement route through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival and Creative. Egg placement is separate from natural spawning or breeding. [Egg entry][bear-egg]
+The ordinary listed [Polar Bear Spawn Egg](../items/PolarBearSpawnEgg.md) is another placement route through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. Egg placement is separate from natural spawning or breeding. [Egg entry][bear-egg]
 
 ## Behavior
 

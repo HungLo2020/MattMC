@@ -4,7 +4,7 @@ The **Rain Frog** is a small passive mob with **6 health points (3 hearts)**. It
 
 ## Obtaining
 
-Request a [Rain Frog Spawn Egg](../items/RainFrogSpawnEgg.md) through the [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item), in **Survival as well as Creative**, then use it on a block with suitable space. The egg is registered and listed in the ordinary Spawn Eggs category. See [Spawn eggs](../items/SpawnEggs.md) for placement, consumption, Dispensers and spawner configuration. [Egg registration][egg] · [Category entry][category] · [Browser list][browser] · [Server request handling][browser-server]
+Request a [Rain Frog Spawn Egg](../items/RainFrogSpawnEgg.md) through the [inventory item browser](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item), in **Creative**, then use it on a block with suitable space. The egg is registered and listed in the ordinary Spawn Eggs category. See [Spawn eggs](../items/SpawnEggs.md) for placement, consumption, Dispensers and spawner configuration. [Egg registration][egg] · [Category entry][category] · [Browser list][browser] · [Server request handling][browser-server]
 
 **No natural Rain Frog encounter route was found in the bundled biome, structure or spawner data.** The source contains a rain/thunder-and-ground spawn helper, but no active caller or spawn-placement registration was found for it; its ground tag is also absent from the bundled data. Waiting for rain in a particular biome is therefore not an established acquisition method. Its active per-mob spawn-rule override returns true, which does not add it to a biome's spawn list. [Bundled data][data] · [Spawn helper and override][frog-spawn] · [Spawn placements][placements] · [Natural selection][natural]
 

@@ -8,7 +8,7 @@ Arrange **four [Honeycomb](../items/Honeycomb.md) in a 2 × 2 square to make one
 
 The bundled recipe scan found no Honeycomb Block unpacking recipe and no recipe using Honeycomb Block as an ingredient. Keep loose Honeycomb for waxing, Candles and Beehives rather than treating this as reversible resource storage. See [Honeycomb uses](../items/Honeycomb.md#waxing-and-crafting) for those recipes and interactions. [Exact block recipe][recipe] · [Waxing item][wax] · [Candle recipe][candle] · [Beehive recipe][beehive]
 
-**Separate inventory route:** this is an ordinary **Natural Blocks** category entry. The [inventory item browser](../mechanics/InventoryBrowser.md) provides its checked Survival and Creative insertion route independently of crafting. The checked natural-resource route here is harvesting the ingredient and crafting the block; this page does not claim a naturally generated Honeycomb Block source. [Category][category] · [Entry][entry]
+**Separate inventory route:** this is an ordinary **Natural Blocks** category entry. The [inventory item browser](../mechanics/InventoryBrowser.md) provides its checked Creative insertion route independently of crafting. The checked natural-resource route here is harvesting the ingredient and crafting the block; this page does not claim a naturally generated Honeycomb Block source. [Category][category] · [Entry][entry]
 
 ## Placing and recovering
 

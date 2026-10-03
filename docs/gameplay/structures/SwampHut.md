@@ -46,7 +46,7 @@ Secure the area before approaching the Cat or using the furnishings. The Witch c
 
 The hut's renewable resource opportunity comes from **mob drops under suitable spawning conditions**, not a chest refill. With normal mob loot enabled, the bundled Witch table includes a separate **4–8 Redstone Dust** base pool plus weighted rolls for Glowstone Dust, Sugar, Spider Eyes, Glass Bottles, Gunpowder or Sticks; Looting can affect those counts. These are death-loot rules, not an output-per-hour prediction or a tested farm design. [Mob-loot gate][mob-loot] · [Loaded death-loot dispatch][death-loot] · [Witch loot table][witch-loot]
 
-Ordinary listed item entries can also be requested through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. That is a separate acquisition route from a naturally generated hut, taming a resident, or collecting mob drops.
+Ordinary listed item entries can also be requested through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. That is a separate acquisition route from a naturally generated hut, taming a resident, or collecting mob drops.
 
 ## Related pages
 

@@ -22,7 +22,7 @@ An **untriggered** trap horse discards itself when its trap timer passes the **1
 
 ### Spawn eggs and operator-created mounts
 
-The [Skeleton Horse Spawn Egg](../items/SkeletonHorseSpawnEgg.md) is available through the ordinary [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. A normal egg creates an **untamed, non-trap horse**. Its interaction refuses ordinary mounting until it is already tame, so repeated empty-hand clicks do not start the standard [Horse taming routine](Horse.md#taming-and-feeding). [Egg registration][skeleton-egg] · [Egg initialization][egg-create] · [Creation callback][type-create] · [Default tame state][horse-flags] · [Default trap state][skeleton-timeout] · [Species interaction][skeleton-interact]
+The [Skeleton Horse Spawn Egg](../items/SkeletonHorseSpawnEgg.md) is available through the ordinary [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. A normal egg creates an **untamed, non-trap horse**. Its interaction refuses ordinary mounting until it is already tame, so repeated empty-hand clicks do not start the standard [Horse taming routine](Horse.md#taming-and-feeding). [Egg registration][skeleton-egg] · [Egg initialization][egg-create] · [Creation callback][type-create] · [Default tame state][horse-flags] · [Default trap state][skeleton-timeout] · [Species interaction][skeleton-interact]
 
 With **permission level 2**, an operator can create an already-tame adult:
 

@@ -12,7 +12,7 @@ Other checked routes are:
 - **Raids.** Witches are part of the raid roster; the active wave caller creates the selected raiders. Follow [Raid waves and difficulty](../mechanics/Raid.md#waves-and-difficulty) for counts, random additions and event conditions. [Roster][raid-witch] · [Wave creation][raid-spawn]
 - **Lightning striking a Villager** outside Peaceful. The callback converts the Villager to a persistent Witch. This is a transformation, not a trading interaction. [Lightning conversion][witch-lightning]
 
-The category-listed [Witch Spawn Egg](../items/WitchSpawnEgg.md) is separately available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. [Egg listing][witch-egg]
+The category-listed [Witch Spawn Egg](../items/WitchSpawnEgg.md) is separately available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. [Egg listing][witch-egg]
 
 ## Behavior
 

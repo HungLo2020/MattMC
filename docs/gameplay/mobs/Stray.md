@@ -13,7 +13,7 @@ Two further routes matter:
 - **Powder Snow conversion of an ordinary Skeleton.** With AI enabled, sustained exposure starts a conversion counter and eventually creates a Stray. Leaving Powder Snow cancels the conversion. Follow [Skeleton conversion](Skeleton.md#powder-snow-conversion) for the roughly 7-second exposure plus 15-second conversion stages and equipment preservation. [Exposure and reset][skeleton-convert] · [Conversion result][skeleton-convert-result] · [Equipment transfer][conversion-equipment]
 - **Trial Chamber spawners.** A ranged alias group can select Stray templates, with both normal and ominous configurations. The checked connected template stores those resource IDs. This route works underground because the spawn reason bypasses the sky and ordinary light requirements, while the Trial Spawner's other conditions still apply. [Aliases][trial-aliases] · [Alias construction][alias-build] · [Active alias lookup][alias-lookup] · [Pool][stray-trial-pool] · [Template][stray-trial-template] · [Normal][stray-trial-normal] · [Ominous][stray-trial-ominous] · [Spawn-reason handling][spawner-reason]
 
-A category-listed [Stray Spawn Egg](../items/StraySpawnEgg.md) is a separate option in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), including **Survival and Creative** insertion. [Egg listing][stray-egg]
+A category-listed [Stray Spawn Egg](../items/StraySpawnEgg.md) is a separate option in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), including **Creative** insertion. [Egg listing][stray-egg]
 
 ## Behavior
 

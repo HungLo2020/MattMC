@@ -17,7 +17,7 @@ Two checked structure routes are:
 
 A Zombie-family attacker can also infect a Villager it kills: the conversion roll succeeds **50% on Normal**, **100% on Hard**, and is not used on Easy. The conversion carries Villager data, saved offers, gossip, and Villager experience into the Zombie Villager. An unsuccessful conversion means that Villager is lost. [Kill callback and conversion data][zombie]
 
-The ordinary listed [Zombie Villager Spawn Egg](../items/ZombieVillagerSpawnEgg.md) supplies a separate spawning route through MattMC's [inventory browser](../mechanics/InventoryBrowser.md), including in Survival. [Egg category](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L2124) [Egg registration][items]
+The ordinary listed [Zombie Villager Spawn Egg](../items/ZombieVillagerSpawnEgg.md) supplies a separate spawning route through MattMC's [inventory browser](../mechanics/InventoryBrowser.md), in Creative. [Egg category](https://github.com/HungLo2020/MattMC/blob/b153e7232bbb43920a8694afbdb0053c2e219d77/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L2124) [Egg registration][items]
 
 <span id="behavior"></span>
 

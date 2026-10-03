@@ -1,6 +1,6 @@
 # Bedrock
 
-**`minecraft:bedrock`** is a solid world-boundary block. Ordinary Survival mining cannot remove it or obtain an item from it, including with Silk Touch. MattMC does, however, expose its item through the current inventory browser, including in Survival. Plan before placing it in a Survival build: access to the item does not grant the ability to mine it back. [Registration][bedrock-reg] · [Mining rule][defaults] · [Browser requests][client-add] · [Server acceptance][server-add]
+**`minecraft:bedrock`** is a solid world-boundary block. Ordinary Survival mining cannot remove it or obtain an item from it, including with Silk Touch. Creative players can request its item through the current [inventory browser](../mechanics/InventoryBrowser.md). Plan before placing it in a Survival build: access to the item does not grant the ability to mine it back. [Registration][bedrock-reg] · [Mining rule][defaults] · [Browser requests][client-add] · [Server acceptance][server-add]
 
 ## Finding natural Bedrock
 
@@ -8,9 +8,9 @@ The normal world preset uses the bundled Overworld and Nether noise settings. Th
 
 ## Obtaining an inventory item
 
-The registered Bedrock item belongs to **Natural Blocks**, without the operator-category gate. MattMC's current [inventory browser](../mechanics/InventoryBrowser.md) exposes it in Survival as well as Creative. Search for Bedrock in the ordinary inventory's right-hand panel and follow that guide for cursor, capacity, and screen-layout limits. [Item registration][items] · [Category][natural-title] [natural-tab] · [Active item list][jei]
+The registered Bedrock item belongs to **Natural Blocks**, without the operator-category gate. MattMC's current [inventory browser](../mechanics/InventoryBrowser.md) lists it in both Survival and Creative, but insertion is a Creative acquisition route. Search for Bedrock in the ordinary inventory's right-hand panel and follow that guide for cursor, capacity, and screen-layout limits. [Item registration][items] · [Category][natural-title] [natural-tab] · [Active item list][jei]
 
-This is a **MattMC inventory-spawning route**, not natural harvesting: both the client request method and server acceptance path explicitly allow Survival additions. The route does not give a Survival player the ability to mine placed Bedrock back. [Client request][client-add] · [Server acceptance][server-add]
+This **Creative inventory-spawning route** is separate from natural harvesting. The route does not give a Survival player the ability to mine placed Bedrock back. [Client request][client-add] · [Server acceptance][server-add]
 
 With permission level 2, `/give @s minecraft:bedrock 1` is another player-inventory route. No Bedrock crafting recipe was found in the checked bundled recipe tree. [Give command][give]
 

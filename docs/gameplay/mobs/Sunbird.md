@@ -4,7 +4,7 @@ Stay near a **Sunbird** to receive its timed blessing; damaging it can replace t
 
 ## Obtaining
 
-Use the [Sunbird Spawn Egg](../items/SunbirdSpawnEgg.md), which is listed in the Spawn Eggs category and available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. [Egg registration][sun-egg] · [Category listing][sun-category]
+Use the [Sunbird Spawn Egg](../items/SunbirdSpawnEgg.md), which is listed in the Spawn Eggs category and available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. [Egg registration][sun-egg] · [Category listing][sun-category]
 
 **Natural spawning is not established in this snapshot.** No Sunbird entry appears in the checked bundled biome/structure spawn data, biome-building code, or spawn-placement registrations. Its always-true spawn helper is not a confirmed route to a wild encounter. The effects below apply when a Sunbird is present. [Biome data][sun-biomes] · [Structure data][sun-structures] · [Biome-building code][sun-biome-code] · [Spawn placements][sun-placements] · [Spawn helper][sun-spawn-helper]
 

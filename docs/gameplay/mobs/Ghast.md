@@ -8,7 +8,7 @@ The bundled biome monster lists include Ghasts in **[Nether Wastes](../biomes/Ne
 
 Natural spawning still needs the registered ground placement, suitable support and clearance for the Ghast's large body. Its own predicate rejects Peaceful and applies a **1-in-20 random check**; that is one condition on a spawn attempt, not a 5% chance per chunk or minute. The species also limits its spawn cluster to one even where a biome entry requests a larger group. [Placement registration][ghast-placement] · [Species checks][ghast-spawn] · [Cluster-limit caller][cluster-call] · [Support and obstruction][base-spawn] · [Natural placement and collision][spawn-checks]
 
-The category-listed [Ghast Spawn Egg](../items/GhastSpawnEgg.md) is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. This insertion/placement route is separate from finding a naturally spawned Ghast. [Egg listing][ghast-egg]
+The category-listed [Ghast Spawn Egg](../items/GhastSpawnEgg.md) is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. This insertion/placement route is separate from finding a naturally spawned Ghast. [Egg listing][ghast-egg]
 
 ## Behavior
 

@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-The [Moose Spawn Egg](../items/MooseSpawnEgg.md) is listed in the ordinary Spawn Eggs category. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) supplies ordinary listed items in **Survival and Creative**. Use the shared [Spawn eggs guide](../items/SpawnEggs.md) for placement and consumption. [Egg registration][egg] · [Category listing][egg-tab] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server check][browser-server]
+The [Moose Spawn Egg](../items/MooseSpawnEgg.md) is listed in the ordinary Spawn Eggs category. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) supplies ordinary listed items in **Creative**. Use the shared [Spawn eggs guide](../items/SpawnEggs.md) for placement and consumption. [Egg registration][egg] · [Category listing][egg-tab] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server check][browser-server]
 
 **A natural biome-spawn route is not established in this build.** The class contains a terrain/light predicate named `canMooseSpawn`, but the checked spawn-placement registry does not register it, and the bundled biome definitions do not list Moose. Its instance spawn check returning true is not a biome-spawn entry. The presence of snow-related code therefore does not establish a snowy habitat where Moose will generate. [Predicates][spawn-check] · [Spawn-placement registry][placement-registry] · [Bundled biomes][biomes]
 

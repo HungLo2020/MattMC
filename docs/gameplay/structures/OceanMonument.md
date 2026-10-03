@@ -51,7 +51,7 @@ For repeat ingredient collection, ordinary Guardians have a continuing natural-s
 
 ## MattMC inventory access
 
-These expedition rewards also include ordinary category-listed items, such as Prismarine, Sponges, Shards, Crystals, and the Tide template. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) intentionally permits listed ordinary items in Survival as well as Creative. Both Guardian spawn eggs are listed too. That is a separate way to obtain an item; it does not create a naturally generated Monument or establish a natural Elder respawn route. [Material and reward listings][inventory-items] · [Egg listings][eggs]
+These expedition rewards also include ordinary category-listed items, such as Prismarine, Sponges, Shards, Crystals, and the Tide template. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can supply ordinary listed items in Creative. Both Guardian spawn eggs are listed too. That is a separate way to obtain an item; it does not create a naturally generated Monument or establish a natural Elder respawn route. [Material and reward listings][inventory-items] · [Egg listings][eggs]
 
 ## Sources and verification
 

@@ -8,7 +8,7 @@ Use the [Dried Ghast guide](../blocks/DriedGhast.md) for crafting, Piglin barter
 
 No Happy Ghast entry was found in the bundled biome spawn lists or structure spawn overrides inspected for this snapshot. Its registered ground-spawn predicate alone does **not** establish a natural grassland or Nether population. Use hatching or the listed egg instead of searching a biome on that assumption. The active biome registry is loaded from resource data, and the natural-spawn caller selects those loaded biome/structure lists. [Placement registration][spawn-registration] · [Loaded biome registry][registry-list] · [Resource loader][registry-load] · [Spawn-list selection][spawn-selection] · [Biome/structure lookup][spawn-tables]
 
-The [Happy Ghast Spawn Egg](../items/HappyGhastSpawnEgg.md) is listed in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), including its Survival insertion route. Egg placement is separate from hatching and does not prove natural spawning. [Egg registration][happy-egg-item] · [Category entry][happy-egg-category]
+The [Happy Ghast Spawn Egg](../items/HappyGhastSpawnEgg.md) is listed in MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), where Creative players can request it. Egg placement is separate from hatching and does not prove natural spawning. [Egg registration][happy-egg-item] · [Category entry][happy-egg-category]
 
 ## Behavior
 

@@ -14,7 +14,7 @@ The three base recipes use a Crafting Table. Ingredients name specific items, so
 
 For the torch ingredient, follow [Copper Torches](CopperLighting.md#copper-torches). Each of the twelve waxed forms has its own shapeless recipe: **one matching unwaxed item plus one Honeycomb makes one waxed item at the same oxidation stage**. The [variant tables](#exact-variants-and-resource-evidence) link these recipes. Exposed, Weathered, and Oxidized unwaxed pieces can result from the [placed aging process](#aging-and-preserving-a-finish); the reviewed recipes do not directly craft those nine unwaxed variants. [Weathering map][weather]
 
-All 24 are ordinary category-listed inventory entries. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert them in **Survival as well as Creative**, subject to enabled features, an empty cursor, and available inventory space. This browser route does not establish a natural source or make an unsupported placement valid. See the [inventory family page](../items/CopperFixtures.md) for the item names. [Building-category entries][building-list] · [Functional-category entries][functional-list]
+All 24 are ordinary category-listed inventory entries. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert them in **Creative**, subject to enabled features, an empty cursor, and available inventory space. This browser route does not establish a natural source or make an unsupported placement valid. See the [inventory family page](../items/CopperFixtures.md) for the item names. [Building-category entries][building-list] · [Functional-category entries][functional-list]
 
 ## Copper Bars: connections and support
 

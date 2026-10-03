@@ -4,7 +4,7 @@
 
 ## Obtaining
 
-The [Catfish Spawn Egg](../items/CatfishSpawnEgg.md) and all three named Catfish buckets are ordinary category-listed items, available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. The egg provides working entity placement; the bucket items have the separate release limitation below. [Egg registration][c-egg] · [Egg category][c-category] · [Bucket registrations][c-buckets] · [Bucket category][c-bucket-list] · [Egg placement][egg-placement]
+The [Catfish Spawn Egg](../items/CatfishSpawnEgg.md) and all three named Catfish buckets are ordinary category-listed items, available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. The egg provides working entity placement; the bucket items have the separate release limitation below. [Egg registration][c-egg] · [Egg category][c-category] · [Bucket registrations][c-buckets] · [Bucket category][c-bucket-list] · [Egg placement][egg-placement]
 
 No Catfish entry was found in the checked 68 biome definitions, 34 structure definitions or 1,202 structure templates. Its standalone water predicate has no active SpawnPlacements registration. The separate spawn-roll method also does not create a population without a spawn route. Do not assume a river, swamp or cave habitat from the imported class alone. [Bundled data][bundled-data] · [Active placement registrations][spawn-rules] · [Species predicate and roll][c-spawn-predicate]
 

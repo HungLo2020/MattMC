@@ -6,7 +6,7 @@ An Evoker (`minecraft:evoker`) is a hostile spellcaster with **24 health points 
 
 The checked encounter routes are **[Woodland Mansion](../structures/WoodlandMansion.md) room markers** and **[raid waves](../mechanics/Raid.md#waves-and-difficulty)**. Mansion Evokers are created as persistent structure residents; raid Evokers are created by the event, including eligible Ravager riders. Use the mansion guide for generation and the raid guide for wave availability. [Mansion creation][markers] · [Raid creation][raid-call] · [Raid types][raid-types]
 
-For deliberate placement, its ordinary listed [spawn egg](../items/EvokerSpawnEgg.md) can be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival or Creative. This is separate from finding a generated resident. Evokers are not allowed in Peaceful. [Egg listing][evoker-entry] · [Entity registration][evoker-type] · [Peaceful removal][peaceful]
+For deliberate placement, its ordinary listed [spawn egg](../items/EvokerSpawnEgg.md) can be requested through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. This is separate from finding a generated resident. Evokers are not allowed in Peaceful. [Egg listing][evoker-entry] · [Entity registration][evoker-type] · [Peaceful removal][peaceful]
 
 ## Behavior
 

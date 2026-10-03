@@ -4,7 +4,7 @@ The **Cosmaw** is a flying predator of [Cosmic Cod](CosmicCod.md), with **20 hea
 
 ## Obtaining
 
-The [Cosmaw Spawn Egg](../items/CosmawSpawnEgg.md) is an ordinary category-listed item, available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. This route does not establish natural spawning. [Egg registration][egg] · [Category entry][category]
+The [Cosmaw Spawn Egg](../items/CosmawSpawnEgg.md) is an ordinary category-listed item, available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. This route does not establish natural spawning. [Egg registration][egg] · [Category entry][category]
 
 No Cosmaw entry was found in the checked loaded biome spawn lists, structure spawn overrides, or other active natural-spawning references. End biome resources and their builder do not add it. The separate method checking for a non-air block underneath is not registered as a spawn-placement predicate in this snapshot; it is not evidence of an End habitat. [Spawn-list selection][spawn-selection] · [Bundled End list][end-spawns] · [End builder][end-builder] · [Standalone spawn methods][spawn-checks]
 

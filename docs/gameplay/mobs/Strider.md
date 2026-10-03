@@ -10,7 +10,7 @@ The live spawn path reads loaded biome/structure lists and applies normal spawn 
 
 An adult's spawn initialization can attempt a **Zombified Piglin rider on a 1-in-30 roll**, equipping the Strider with a Saddle and the rider with a Warped Fungus on a Stick. If that roll fails, a separate **1-in-10 roll** attempts a baby Strider rider. These are conditional initialization branches, not independent percentages of all animals seen, and a rider occupies the mount's seat. [Jockey initialization][strider-jockey] · [Seat limit][strider-seats]
 
-The listed [Strider Spawn Egg](../items/StriderSpawnEgg.md) is also obtainable through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival and Creative. This is a separate insertion route from natural spawning and breeding. [Egg registration][strider-egg-item] · [Category entry][strider-egg-category]
+The listed [Strider Spawn Egg](../items/StriderSpawnEgg.md) is also obtainable through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. This is a separate insertion route from natural spawning and breeding. [Egg registration][strider-egg-item] · [Category entry][strider-egg-category]
 
 ## Behavior
 

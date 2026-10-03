@@ -8,7 +8,7 @@ Find natural Hoglin candidates in **[Crimson Forest](../biomes/NetherBiomes.md#c
 
 **[Bastion Remnants](../structures/BastionRemnant.md#layouts-and-residents)** have another route: stable connectors can choose a Hoglin resident template or an empty piece. The checked Hoglin template stores **40 health**, persistence, and `CannotBeHunted`; this stops the ordinary Piglin hunt selection for that resident, not all possible combat. It is a placed resident, not evidence that every cleared stable continuously generates replacements. [Stable connector][hoglin-connector] · [Resident pool][hoglin-pool] · [Resident template][hoglin-template] · [Placement caller][pool-place] · [Entity placement][entity-place] · [Hunt eligibility][hoglin-conversion-gate] · [Piglin hunt sensor][hunt-sensor] · [Hunt activity][hunt-activity]
 
-The listed [Hoglin Spawn Egg](../items/HoglinSpawnEgg.md) provides a separate placement route through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), in **Survival as well as Creative**. [Egg category entry][hoglin-egg]
+The listed [Hoglin Spawn Egg](../items/HoglinSpawnEgg.md) provides a separate placement route through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), in **Creative**. [Egg category entry][hoglin-egg]
 
 ## Behavior
 

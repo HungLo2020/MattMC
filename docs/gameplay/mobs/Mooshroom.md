@@ -8,7 +8,7 @@ Search **[Mushroom Fields](../biomes/TemperateForests.md#mushroom-fields)** in t
 
 The normal preset uses the Overworld biome parameter source, whose selector includes Mushroom Fields. Chunk generation and later natural spawning both call the active creature-selection paths. [Normal preset][normal] · [Parameters][parameters] · [Provider][biome-provider] · [Mushroom Fields selection][biome-fungal] · [Generation caller][worldgen-caller] [Creature population][worldgen-spawn] · [Natural selection and creation][natural-select] [Natural spawn creation][natural-finalize]
 
-The ordinary listed [Mooshroom Spawn Egg](../items/MooshroomSpawnEgg.md) also has a [Survival/Creative inventory-browser](../mechanics/InventoryBrowser.md) route. That is separate from natural spawning. Ordinary newly created Mooshrooms start **red**; brown is a separate variant, not a different mob ID. [Egg entry][moosh-egg] · [Variant default][moosh-breed]
+The ordinary listed [Mooshroom Spawn Egg](../items/MooshroomSpawnEgg.md) also has a [Creative inventory-browser](../mechanics/InventoryBrowser.md) route. That is separate from natural spawning. Ordinary newly created Mooshrooms start **red**; brown is a separate variant, not a different mob ID. [Egg entry][moosh-egg] · [Variant default][moosh-breed]
 
 ## Behavior
 

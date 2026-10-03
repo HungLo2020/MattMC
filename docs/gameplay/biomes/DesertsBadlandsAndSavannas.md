@@ -85,7 +85,7 @@ The bundled **Normal** preset uses the Overworld multi-noise selection and Overw
 
 A **feature entry is an attempt**, and a **spawn entry is a candidate**. Decoration dispatches the biome's placed features through their placement filters and configured generators. The biome filter checks the actual biome at each candidate position; support, height, water and space checks can still reject it. A listed mob also needs the active spawning system's placement, rule and obstruction checks. [Decoration][feature-call] · [Placement pipeline][placed-call] · [Configured dispatch][configured-call] · [Biome filter][biome-filter] · [Natural spawning][spawn-call]
 
-For direct item access, see the [Inventory item browser](../mechanics/InventoryBrowser.md). Its ordinary-item insertion route works separately from exploring, harvesting or finding mobs, including when playing Survival; possession through the browser does not verify natural availability.
+For direct item access, see the [Inventory item browser](../mechanics/InventoryBrowser.md). Its Creative item-insertion route works separately from exploring, harvesting or finding mobs; possession through the browser does not verify natural availability.
 
 ## Sources and verification
 

@@ -13,7 +13,7 @@ Two other source-verified routes are:
 
 The fossil route is connected to the normal chunk structure-start and structure-piece placement chain. It requires structure generation, eligible terrain and successful placement; it does not establish that a fossil exists near any particular player. [Generation gate][structure-starts] · [Selection][structure-selection] · [Creation][structure-generation] · [Decoration][structure-decorate] · [Piece dispatch][piece-dispatch]
 
-The registered item is an ordinary block item in the **Natural Blocks** category. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) also provides a separate insertion route in Survival and Creative. This listing is independent of crafting, bartering and world generation. [Item registration][ghast-item] · [Block-item helper][item-helper] · [Category owner][natural-category] · [Category entry][ghast-category]
+The registered item is an ordinary block item in the **Natural Blocks** category. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) also provides a separate insertion route in Creative. This listing is independent of crafting, bartering and world generation. [Item registration][ghast-item] · [Block-item helper][item-helper] · [Category owner][natural-category] · [Category entry][ghast-category]
 
 ## Placing and adding water
 

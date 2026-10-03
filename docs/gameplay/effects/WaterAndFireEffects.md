@@ -85,7 +85,7 @@ The registered list has **no Glowstone upgrade** for either effect and no ordina
 
 Gunpowder converts a drinkable potion to splash, and Dragon's Breath converts splash to lingering. Splash duration depends on impact distance, so the whole table duration is not guaranteed to every nearby target. Ordinary lingering and tipped-arrow items apply shorter durations through their item scales. See [movement-effect delivery](MovementEffects.md#delivery-changes-duration) for the shared delivery rules. [Container mixes][brew-all] · [Splash handler][splash] · [Item scales][scales]
 
-The ordinary listed potion variants and source items are also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. That insertion route is separate from collecting ingredients, bartering, chest loot, or brewing. Potion category entries enumerate enabled registered types; a registered effect alone does not create a Conduit Power or Nautilus-breath bottle. [Potion listing][browser-potions] · [Type enumeration][browser-types] · [Registered potions][potion-types]
+The ordinary listed potion variants and source items are also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. That insertion route is separate from collecting ingredients, bartering, chest loot, or brewing. Potion category entries enumerate enabled registered types; a registered effect alone does not create a Conduit Power or Nautilus-breath bottle. [Potion listing][browser-potions] · [Type enumeration][browser-types] · [Registered potions][potion-types]
 
 ## Refresh, removal, and commands
 

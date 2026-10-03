@@ -4,7 +4,7 @@ The **Alligator Snapping Turtle** (`minecraft:alligator_snapping_turtle`) is a l
 
 ## Obtaining
 
-The [Alligator Snapping Turtle Spawn Egg](../items/AlligatorSnappingTurtleSpawnEgg.md) is an ordinary category-listed item. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**, then place the creature with room around it. [Egg registration][a-egg] · [Category entry][a-category] · [Egg placement][egg-placement]
+The [Alligator Snapping Turtle Spawn Egg](../items/AlligatorSnappingTurtleSpawnEgg.md) is an ordinary category-listed item. Request it through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**, then place the creature with room around it. [Egg registration][a-egg] · [Category entry][a-category] · [Egg placement][egg-placement]
 
 **No natural population or structure-supplied turtle was found in the checked bundled data.** The review covered all 68 biome definitions, 34 structure definitions and 1,202 structure templates. Its sand-and-height helper is not registered in the active spawn-placement table; that standalone method does not establish a beach or swamp habitat. [Bundled data][bundled-data] · [Placement registrations][spawn-rules] · [Standalone predicate][a-stats]
 

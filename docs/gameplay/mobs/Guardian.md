@@ -17,7 +17,7 @@ The predicate does not use the ordinary monster darkness test, so lighting the b
 
 Defeating the [Elder Guardians](ElderGuardian.md) does not disable the ordinary Guardian override. Elders are separately placed structure residents; the normal Monument monster list contains only Guardians. [Spawn data][definition]
 
-The [Guardian Spawn Egg](../items/GuardianSpawnEgg.md) is an ordinary category-listed item. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) intentionally provides listed ordinary items in Survival as well as Creative; this is separate from natural spawning. [Egg listing][eggs]
+The [Guardian Spawn Egg](../items/GuardianSpawnEgg.md) is an ordinary category-listed item. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can provide listed ordinary items in Creative; this is separate from natural spawning. [Egg listing][eggs]
 
 ## Behavior
 

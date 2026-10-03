@@ -77,7 +77,7 @@ For tipped arrows, place the appropriate **Lingering Potion in the center of a c
 
 An adult Fletcher's [Hero of the Village](../mechanics/Raid.md) gift path also has eligible Healing and Harming Tipped Arrow entries. Each such selected entry requests 0–1 arrow, among other possible gifts; it is not a guaranteed free potion or arrow. [Installed gift behavior][gift-active] · [Profession mapping][gift-profession] · [Gift caller and hero check][gift-route] · [Eligible arrow entries][gift-list]
 
-The inventory browser lists enabled Healing/Harming potion types in drinkable, splash, and lingering forms. Ordinary listed-item insertion is available in Survival and Creative as described in [Inventory Browser](../mechanics/InventoryBrowser.md). That access is separate from brewing, crafting, trades, and gifts. [Potion listings][browser] · [Enabled-type generation][browser-types]
+The inventory browser lists enabled Healing/Harming potion types in drinkable, splash, and lingering forms. Ordinary listed-item insertion is available in Creative as described in [Inventory Browser](../mechanics/InventoryBrowser.md). That access is separate from brewing, crafting, trades, and gifts. [Potion listings][browser] · [Enabled-type generation][browser-types]
 
 ## Mob sources and food distinctions
 

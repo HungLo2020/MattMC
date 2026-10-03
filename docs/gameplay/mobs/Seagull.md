@@ -4,7 +4,7 @@ A **Seagull** is an untamed bird that can breed with raw fish, pick up dropped f
 
 ## Obtaining
 
-Use the [Seagull Spawn Egg](../items/SeagullSpawnEgg.md) for the verified ordinary creation route. It is listed in the item browser, which can supply ordinary listed items in **Survival as well as Creative**; follow [Inventory item browser](../mechanics/InventoryBrowser.md). This is separate from natural spawning. [Egg registration][seagull-egg] · [Listing][seagull-list] · [Egg placement][egg-place]
+Use the [Seagull Spawn Egg](../items/SeagullSpawnEgg.md) for the verified ordinary creation route. It is listed in the item browser, which can supply ordinary listed items in **Creative**; follow [Inventory item browser](../mechanics/InventoryBrowser.md). This is separate from natural spawning. [Egg registration][seagull-egg] · [Listing][seagull-list] · [Egg placement][egg-place]
 
 The checked bundle has **no Seagull entries in its active biome spawn lists**, and no separate natural creation caller was found. Its additional spawn-roll setting is zero; the helper therefore rejects ordinary natural and chunk-generation checks. A configured spawn weight or a standalone bright-ground predicate does not establish a working wild population. Do not assume a beach visit will produce Seagulls in this build. [Biome-list dispatch][natural-list] · [Chunk-generation selection][chunk-list] · [Natural check][natural-rules] · [Chunk-generation check][chunk-rules] · [Species rules][seagull-spawn] · [Default configuration][seagull-config] · [Roll helper][spawn-roll]
 

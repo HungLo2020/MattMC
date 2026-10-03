@@ -8,7 +8,7 @@ The verified encounter route is the [raid wave controller](../mechanics/Raid.md#
 
 The bundled biome spawn lists reviewed for this guide do not select Ravagers. Its registered ground-spawn predicate alone is not proof of ordinary biome spawning, and the [Pillager Outpost](../structures/PillagerOutpost.md) monster override selects Pillagers. [Outpost selection][outpost]
 
-The listed [Ravager Spawn Egg](../items/RavagerSpawnEgg.md) is also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative. This creates a hostile mob and is separate from starting a raid or finding natural wildlife. [Ordinary egg listing][eggs-list] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server insertion][browser-server] · [Egg use][egg-use]
+The listed [Ravager Spawn Egg](../items/RavagerSpawnEgg.md) is also available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. This creates a hostile mob and is separate from starting a raid or finding natural wildlife. [Ordinary egg listing][eggs-list] · [Browser assembly][browser-list] · [Client request][browser-client] · [Server insertion][browser-server] · [Egg use][egg-use]
 
 ## Behavior
 

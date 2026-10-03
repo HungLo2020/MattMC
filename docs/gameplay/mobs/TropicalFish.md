@@ -8,7 +8,7 @@ The loaded water-ambient lists include Tropical Fish in **Warm Ocean, Lukewarm O
 
 Natural spawning needs water at and below the fish, and a Water block above it. In these oceans and Mangrove Swamp, the height range is **sea level minus 13 through sea level**, or **Y 50–63** with the bundled Overworld settings. **Lush Caves alone** is in the bundled any-height exception tag, so suitable cave water can spawn Tropical Fish below that surface band. Population and collision checks still apply. [Registered predicate][placements] · [Water placement][in-water] · [Fish predicate][tropical-colors] · [Any-height tag][tropical-height] · [Surface band][water] · [Sea level][sea-level] · [Natural checks][natural-check]
 
-The [Tropical Fish Spawn Egg](../items/TropicalFishSpawnEgg.md) is an ordinary listed item. The [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Survival as well as Creative; placing an egg is a separate route from natural spawning. [Listing][egg-list-tropical] · [Egg use][egg-use] · [Browser list][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
+The [Tropical Fish Spawn Egg](../items/TropicalFishSpawnEgg.md) is an ordinary listed item. The [inventory item browser](../mechanics/InventoryBrowser.md) can supply it in Creative; placing an egg is a separate route from natural spawning. [Listing][egg-list-tropical] · [Egg use][egg-use] · [Browser list][browser-list] · [Client request][browser-client] · [Server handling][browser-server]
 
 ## Behavior
 

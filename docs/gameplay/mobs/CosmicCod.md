@@ -4,7 +4,7 @@ The **Cosmic Cod** is a small, passive fish that flies through the air, groups w
 
 ## Obtaining
 
-The [Cosmic Cod Spawn Egg](../items/CosmicCodSpawnEgg.md) and [Bucket of Cosmic Cod](../items/BucketOfCosmicCod.md) are ordinary category-listed items available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival as well as Creative**. An egg used in dry space avoids the bucket's water-placement conflict. [Registered items][items] · [Egg category][egg-category] · [Bucket category][bucket-category]
+The [Cosmic Cod Spawn Egg](../items/CosmicCodSpawnEgg.md) and [Bucket of Cosmic Cod](../items/BucketOfCosmicCod.md) are ordinary category-listed items available through the [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. An egg used in dry space avoids the bucket's water-placement conflict. [Registered items][items] · [Egg category][egg-category] · [Bucket category][bucket-category]
 
 No natural spawning route was found in the checked biome lists, structure spawn overrides or other active spawning references. Bundled End biome lists and their builder do not add Cosmic Cod. Its permissive spawn check and natural-spawn positioning method only govern an attempted spawn; they do not arrange one. [Spawn-list selection][spawn-selection] · [Bundled End list][end-spawns] · [End builder][end-builder] · [Spawn callback][spawn-callback]
 

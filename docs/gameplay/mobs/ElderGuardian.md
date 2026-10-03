@@ -8,7 +8,7 @@ A newly generated Monument includes **two wing rooms and one top penthouse**, ea
 
 The constructor makes Elders persistent against ordinary distance despawning. **Peaceful still removes them** through the shared despawn path. The Monument's renewable monster list supplies Guardians, not replacement Elders; do not treat leaving the area or changing difficulty as an established way to replenish the three residents. [Persistence][elder] · [Peaceful removal][despawn] · [Monument spawn list][definition]
 
-An Elder shares the registered water-spawn predicate with Guardians, but that predicate alone is not a natural spawn entry. Its [Elder Guardian Spawn Egg](../items/ElderGuardianSpawnEgg.md) is an ordinary category-listed item and is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Survival as well as Creative. That item-access route is separate from Monument generation. [Placement registration][placement] · [Egg listing][eggs]
+An Elder shares the registered water-spawn predicate with Guardians, but that predicate alone is not a natural spawn entry. Its [Elder Guardian Spawn Egg](../items/ElderGuardianSpawnEgg.md) is an ordinary category-listed item and is available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in Creative. That item-access route is separate from Monument generation. [Placement registration][placement] · [Egg listing][eggs]
 
 ## Behavior
 

@@ -8,7 +8,7 @@ Craft **nine Wheat into one Hay Bale**. The bundled recipe is **shapeless**, but
 
 A verified generated source is **Hay Bale piles in Plains village decoration**. The village's town-center and street connections can reach the decor pool, which can select the Hay pile feature. Its randomized placement checks mean a village does not promise a particular bale count. This is one checked source, not a complete survey of every village style or template. [Village structure][village] · [Structure set][village-set] · [Jigsaw dispatch][jigsaw] · [Start pool][town-pool] · [Town-center connector][town-nbt] · [Street pool][street-pool] · [Street connector][street-nbt] · [Decor choice][decor] · [Placed feature][placed] · [Hay configuration][configured] · [Active feature placement][feature-call] [pile]
 
-**Separate inventory route:** Hay Bale is an ordinary **Natural Blocks** category entry. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert listed items in Survival as well as Creative; that does not consume Wheat or establish a crafting/world-generation source. [Category][category] · [Hay entry][entry]
+**Separate inventory route:** Hay Bale is an ordinary **Natural Blocks** category entry. MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can insert listed items in Creative; that does not consume Wheat or establish a crafting/world-generation source. [Category][category] · [Hay entry][entry]
 
 ## Placement and recovery
 

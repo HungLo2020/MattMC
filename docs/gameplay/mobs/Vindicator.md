@@ -6,7 +6,7 @@ A Vindicator (`minecraft:vindicator`) is a hostile illager with **24 health poin
 
 The checked encounter routes are **[Woodland Mansion](../structures/WoodlandMansion.md) Warrior markers** and **[raid waves](../mechanics/Raid.md#waves-and-difficulty)**. Mansion residents are made persistent when placed. Raids create their own Vindicators and can add mounted riders; the raid guide owns wave counts and difficulty rules. [Mansion creation][markers] · [Raid creation][raid-call] · [Raid types][raid-types]
 
-Its ordinary listed [spawn egg](../items/VindicatorSpawnEgg.md) is also available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Survival and Creative, independently of structure/event encounters. Vindicators are not allowed in Peaceful. [Egg listing][vindicator-entry] · [Registration][vindicator-type] · [Peaceful removal][peaceful]
+Its ordinary listed [spawn egg](../items/VindicatorSpawnEgg.md) is also available through the [inventory item browser](../mechanics/InventoryBrowser.md) in Creative, independently of structure/event encounters. Vindicators are not allowed in Peaceful. [Egg listing][vindicator-entry] · [Registration][vindicator-type] · [Peaceful removal][peaceful]
 
 ## Behavior
 

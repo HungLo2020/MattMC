@@ -10,7 +10,7 @@ No Breeze entry was found in the **68 bundled biome definitions or 34 structure 
 
 Follow [Trial Spawner activation](../blocks/TrialSpawner.md#activation-and-participants), [wave scaling](../blocks/TrialSpawner.md#wave-size-and-spawning) and [clearing/rewards](../blocks/TrialSpawner.md#clearing-rewards-and-cooldown) before beginning. The normal and ominous configurations differ; neither is an endless unrestricted mob stream. Ordinary Trial Spawner gates include non-Peaceful difficulty and the relevant spawning rules. [Spawner gates][trial-gate] · [Active configuration][trial-active]
 
-The listed [Breeze Spawn Egg](../items/BreezeSpawnEgg.md) is separately available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Survival and Creative**. [Egg listing][breeze-egg]
+The listed [Breeze Spawn Egg](../items/BreezeSpawnEgg.md) is separately available through MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) in **Creative**. [Egg listing][breeze-egg]
 
 ## Behavior
 

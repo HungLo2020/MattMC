@@ -12,7 +12,7 @@ The active natural-spawn path checks the biome/structure list, a valid on-ground
 
 [Bastion Remnants](../structures/BastionRemnant.md) also place resident Piglins through their connected templates, including in Bastion-eligible biomes without an ambient Piglin entry. Those templates store sword or crossbow equipment and persistence; the structure-spawn path does not reroll the ordinary baby/weapon choice. This is separate from ambient spawning. [Resident pool][piglin-pool] · [Sword resident][sword-template] · [Crossbow resident][crossbow-template] · [Entity placement][entity-place] · [Spawn initialization][piglin-spawn]
 
-For a placed encounter, use a [Piglin Spawn Egg](../items/PiglinSpawnEgg.md). The egg and Gold Ingot are ordinary category-listed items, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) provides a separate Survival/Creative insertion route; that listing is not a natural spawn or gold-production route. [Egg category][category-eggs] · [Gold category][category-gold]
+For a placed encounter, use a [Piglin Spawn Egg](../items/PiglinSpawnEgg.md). The egg and Gold Ingot are ordinary category-listed items, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) provides a separate Creative insertion route; that listing is not a natural spawn or gold-production route. [Egg category][category-eggs] · [Gold category][category-gold]
 
 ## Behavior
 

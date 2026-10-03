@@ -10,7 +10,7 @@ This is an active generation route: the connected [bridge start template][bridge
 
 No bundled biome spawn-list entry for Piglin Brutes was found, and Bastions define no monster-spawn override. Removing a placed Brute therefore does not establish a renewable Brute spawn point. Ordinary biome monsters may still spawn in the area; see [Bastion residents](../structures/BastionRemnant.md#layouts-and-residents). [Bastion definition][bastion] · [Biome fallback][spawn-overrides]
 
-For a placed encounter, use a [Piglin Brute Spawn Egg](../items/PiglinBruteSpawnEgg.md). It is category-listed, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can provide the egg in Survival as well as Creative. This is separate from natural generation. [Egg listing][category-eggs]
+For a placed encounter, use a [Piglin Brute Spawn Egg](../items/PiglinBruteSpawnEgg.md). It is category-listed, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) can provide the egg in Creative. This is separate from natural generation. [Egg listing][category-eggs]
 
 ## Behavior
 

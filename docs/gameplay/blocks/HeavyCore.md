@@ -10,7 +10,7 @@ Under the bundled tables, each eligible opening has a **7.5% chance to yield one
 
 The core is **ejected into the world** with the other rewards; collect it after unlocking. A core visible in the Vault's display is a separate preview roll and does not reserve that result. The normal Vault reward tables contain no Heavy Core. [Ejection][eject] · [Preview][preview] · [Normal tables][normal] [normal-common][] [normal-rare][] [normal-unique]
 
-No bundled crafting recipe produces a Heavy Core. **Separate inventory route:** Heavy Core is an ordinary **Ingredients** category entry, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) provides an insertion route in Survival and Creative independently of Vault rewards. Its epic rarity does not make that category an operator-only entry. [Item rarity][item] · [Category][category] · [Entry][entry]
+No bundled crafting recipe produces a Heavy Core. **Separate inventory route:** Heavy Core is an ordinary **Ingredients** category entry, so MattMC's [inventory item browser](../mechanics/InventoryBrowser.md) provides an insertion route in Creative independently of Vault rewards. Its epic rarity does not make that category an operator-only entry. [Item rarity][item] · [Category][category] · [Entry][entry]
 
 ## Placement, water and shape
 

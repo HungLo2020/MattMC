@@ -41,7 +41,7 @@ Each unchanged table has a separate **1-in-12** roll for **1 Snout Armor Trim Sm
 
 For collecting the building itself, follow [Blackstone and Gilded Blackstone mining](../blocks/BlackstoneAndBasalt.md#mining-and-ordinary-drops) and [Gold Block harvesting](../blocks/ResourceStorageBlocks.md#recovering-a-placed-block); a gold-colored tool is not proof that it can collect gold.
 
-Looting chests and collecting placed gold are separate from MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), which can insert ordinary listed items in Survival as well as Creative. Browser availability does not establish a natural source or make a Bastion safer.
+Looting chests and collecting placed gold are separate from MattMC's [inventory item browser](../mechanics/InventoryBrowser.md), which can insert ordinary listed items in Creative. Browser availability does not establish a natural source or make a Bastion safer.
 
 Related: [Structures](Structures.md) · [Nether Fortress](NetherFortress.md) · [Piglin](../mobs/Piglin.md) · [Piglin Brute](../mobs/PiglinBrute.md)
 
