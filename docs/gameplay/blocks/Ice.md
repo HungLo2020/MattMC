@@ -51,6 +51,8 @@ World generation is separate: the cold-biome `freeze_top_layer` feature calls th
 
 ## Frosted Ice and Frost Walker
 
+For supported equipment, acquisition and retained broken Boots, see the [Frost Walker guide](../enchanting/MobilityEnchantments.md#frost-walker-temporary-water-crossings).
+
 The active **Frost Walker** enchantment replaces eligible surface water beneath an on-ground wearer who is **not riding another entity**. At the ordinary enchantment levels, its disk radius is **3 blocks at level I** and **4 at level II**. It requires air above, an actual water block with source-water fluid, and an unobstructed replacement. The effect is attached to the feet slot and runs through the living entity's location-change enchantment path. See [Enchanting](../enchanting/Enchanting.md) for equipment enchantments. [Enchantment data][frost-walker] · [Active dispatch][living] [enchant-helper][] [enchant][] [enchant-effects][] [replace-disk][]
 
 Frosted Ice starts at age **0** and schedules its first update **60–120 game ticks** after placement. Further checks are generally scheduled **20–40 game ticks** apart. At 20 ticks per second these intervals are nominally **3–6 seconds**, then **1–2 seconds**, but they are **not a guaranteed lifetime**. [Placement and tick callback][frosted] · [Scheduled dispatch][scheduled-tick]

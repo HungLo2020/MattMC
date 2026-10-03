@@ -113,6 +113,8 @@ Ordinary application still passes through the recipient's effect checks. The bas
 
 ## Related pages
 
+- [Mobility enchantments](../enchanting/MobilityEnchantments.md): Depth Strider, Frost Walker, Soul Speed and Swift Sneak equipment choices
+
 - [Status effects](Effects.md)
 - [Brewing](../brewing/Brewing.md)
 - [Beacon](../blocks/Beacon.md)

@@ -26,6 +26,8 @@ There is also a conversion route from Soul Sand to Soul Soil: craft a **Soul Cam
 
 ## Walking and Soul Speed
 
+The [Soul Speed guide](../enchanting/MobilityEnchantments.md#soul-speed-terrain-boost-and-wear) covers levels, equipment conditions, wear and acquisition.
+
 Ordinary Soul Sand movement applies its **0.4 speed factor to horizontal motion**. That is a factor in the active movement calculation, not a promise of a particular walking speed or a fixed percentage change under every effect. Soul Soil has no corresponding custom factor. Living entities blend this block factor toward 1 using their movement-efficiency attribute. [Movement application][entity] · [Living movement efficiency][living]
 
 Both blocks belong to **`soul_speed_blocks`**. The feet-slot Soul Speed enchantment adds movement speed and movement efficiency through its location-change effect, subject to the enchantment's movement and riding conditions. It also has a conditional durability-cost roll; the boost is not free permanent terrain. This guide does not derive a blocks-per-second promise from the attribute values. [Block tag][speed-tag] · [Enchantment definition][speed] · [Active enchantment handling][enchant]
