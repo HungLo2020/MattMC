@@ -21,6 +21,7 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Invisibility](VisibilityEffects.md#invisibility): AI detection, armor coverage, and selected body rendering
 - [Jump Boost](MovementEffects.md#jump-boost): ground-jump power and safe-fall-distance contributions
 - [Levitation](MovementEffects.md#levitation): upward air movement and the Elytra restriction
+- [Luck](LuckAndUnluck.md#luck): player luck, fishing weights, and potion/browser access
 - [Mining Fatigue](MiningEffects.md#mining-fatigue): level-specific mining penalties, attack recharge, and removal
 - [Nausea](VisibilityEffects.md#nausea): food and mob sources, overlay settings, and the current distortion limitation
 - [Night Vision](VisionEffects.md#night-vision): rendered brightness, sources, and near-expiry flicker
@@ -36,6 +37,7 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Sunbird Blessing](../mobs/Sunbird.md#sunbird-blessing): nearby-player grant, fall-distance reset, and motion limits
 - [Sunbird Curse](../mobs/Sunbird.md#sunbird-curse): retaliation, Phantom scorching, and player glide interruption
 - [Tiger's Blessing](../mobs/Tiger.md#feeding-and-tigers-blessing): dropped-food chances and Tiger target protection
+- [Unluck](LuckAndUnluck.md#unluck): reduced player luck, commands, and loot-context limits
 - [Water Breathing](WaterAndFireEffects.md#water-breathing): ordinary underwater air protection and recovery
 - [Weakness](CombatEffects.md#weakness): reduced attack-damage attribute, curing, and other sources
 - [Wither](Wither.md): periodic damage without Poison's low-health cutoff
@@ -55,6 +57,8 @@ The [instant effects reference](InstantEffects.md) compares Healing and Harming,
 The [Hunger and Saturation effect guide](HungerAndSaturation.md) separates status-effect ticks from food values and compares their sources.
 
 The [mining effects reference](MiningEffects.md) compares Haste and Mining Fatigue, their combined mining factors, and separate attack and swing timing.
+
+The [Luck and Unluck reference](LuckAndUnluck.md) separates player luck, fishing enchantments, loot-table arithmetic, and acquisition routes.
 
 The five mob-granted entries above, **Orca's Might, Debilitating Sting, Tiger's Blessing, Sunbird Blessing, and Sunbird Curse**, use distinct registered effect IDs. Their encounter routes and integration limits belong to the linked mob guides. The checked ordinary potion types and brewing recipes do not include these five; an effect registration alone is not a brewing recipe. [Distinct registrations][custom-effect-registry] · [Potion types][custom-effect-potions] · [Brewing registrations][custom-effect-brewing]
 

@@ -22,6 +22,8 @@ On each fishing update, rain at the position above the bobber has a 25% chance t
 
 Neither enchantment bypasses treasure's open-water condition. [Lure][lure] · [Luck of the Sea][luck] · [Effect evaluation][enchant-helper] · [Loot weights][fishing-loot]
 
+See [Luck and Unluck](../effects/LuckAndUnluck.md) for the separate status effects, combined fishing weights, and the limits of luck in other loot contexts.
+
 ## Open water for treasure
 
 The bobber checks a **5 × 5 horizontal area**, centered on its block, across four layers from **one block below through two blocks above**. Every layer must be uniform under this classification:
