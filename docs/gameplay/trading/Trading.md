@@ -42,7 +42,7 @@ An offer has a base price, but the displayed first input can change with:
 
 - **Demand:** heavy use can increase the required amount; lower use and later restocks can reduce accumulated demand
 - **Player reputation:** the villager's reputation information about the trading player can change the price
-- **Hero of the Village:** this effect supplies an additional discount
+- **[Hero of the Village](../effects/OmenEffects.md#trade-discount):** this effect supplies an additional discount; its guide explains the level factors and rounding
 
 The first input is constrained to at least one item and no more than that item's stack limit. A required second input still has to be supplied. Use the current displayed amounts rather than assuming a permanently fixed exchange rate or discount.
 

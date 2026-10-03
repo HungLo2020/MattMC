@@ -11,7 +11,7 @@ A raid sends successive groups of hostile raiders toward a recognized village. P
 
 **A generated village building is not the trigger by itself.** The village check uses occupied village points of interest and nearby sections. These points include homes, meeting places and acquirable job sites. A player-built settlement can therefore qualify, while an abandoned-looking group of houses is not sufficient evidence. The initial raid center averages occupied village points within 64 blocks of the saved omen position, falling back to that position if none are found. [Village distance][village-check] · [Occupied points][village-poi] · [Point types][village-tag] · [Center choice][raid-create]
 
-Bad Omen also has a separate [Trial Spawner conversion](../blocks/TrialSpawner.md#becoming-ominous). Plan which encounter you want before drinking; the Trial Spawner guide owns Trial Omen and ominous-trial rewards.
+Bad Omen also has a separate [Trial Spawner conversion](../blocks/TrialSpawner.md#becoming-ominous). Plan which encounter you want before drinking; the [omen effect guide](../effects/OmenEffects.md) compares the statuses and cancellation timing, while the Trial Spawner guide covers the ominous encounter and rewards.
 
 ## Waves and difficulty
 

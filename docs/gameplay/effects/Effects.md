@@ -5,6 +5,7 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 ## Reviewed effects
 
 - [Absorption](CombatEffects.md#absorption): temporary damage buffer and refill/expiry limits
+- [Bad Omen](OmenEffects.md#bad-omen): bottle levels, village conversion, and trial conversion
 - [Blindness](VisionEffects.md#blindness): restricted fog, sprinting, and ordinary critical hits
 - [Breath of the Nautilus](WaterAndFireEffects.md#breath-of-the-nautilus): mount-applied status and its current air limitation
 - [Conduit Power](WaterAndFireEffects.md#conduit-power): air protection, mining assistance, and lighting inputs
@@ -15,6 +16,7 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Glowing](VisibilityEffects.md#glowing): team-colored outlines, Spectral Arrows, and native rendering limits
 - [Haste](MiningEffects.md#haste): mining-speed bonus, attack recharge, and Conduit interaction
 - [Health Boost](CombatEffects.md#health-boost): maximum ordinary health without immediate healing
+- [Hero of the Village](OmenEffects.md#hero-of-the-village): raid eligibility, first-input discounts, and villager gifts
 - [Hunger](HungerAndSaturation.md#hunger): player exhaustion, food sources, and Husk-hit conditions
 - [Infested](TriggeredEffects.md#infested): hurt-triggered Silverfish, damage gates, and spawn limits
 - [Instant Damage](InstantEffects.md#instant-damage): instant magic damage, inverted healing, and delivery limits
@@ -29,6 +31,7 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Oozing](TriggeredEffects.md#oozing): death-triggered Slimes and the nearby-Slime count limit
 - [Orca's Might](../mobs/Orca.md#swimming-together-and-orcas-might): companion-granted attack speed and refresh rules
 - [Poison](Poison.md): periodic damage with a low-health cutoff
+- [Raid Omen](OmenEffects.md#raid-omen): saved-position countdown, raid permission gates, and cancellation
 - [Regeneration](Regeneration.md): periodic healing, separate from food-based healing
 - [Resistance](CombatEffects.md#resistance): eligible damage reduction and bypasses
 - [Saturation](HungerAndSaturation.md#saturation): repeated food replenishment and stew-duration limits
@@ -39,6 +42,7 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 - [Sunbird Blessing](../mobs/Sunbird.md#sunbird-blessing): nearby-player grant, fall-distance reset, and motion limits
 - [Sunbird Curse](../mobs/Sunbird.md#sunbird-curse): retaliation, Phantom scorching, and player glide interruption
 - [Tiger's Blessing](../mobs/Tiger.md#feeding-and-tigers-blessing): dropped-food chances and Tiger target protection
+- [Trial Omen](OmenEffects.md#trial-omen): duration by bottle level, player detection, and spawner cooldown limits
 - [Unluck](LuckAndUnluck.md#unluck): reduced player luck, commands, and loot-context limits
 - [Water Breathing](WaterAndFireEffects.md#water-breathing): ordinary underwater air protection and recovery
 - [Weakness](CombatEffects.md#weakness): reduced attack-damage attribute, curing, and other sources
@@ -68,7 +72,9 @@ The five mob-granted entries above, **Orca's Might, Debilitating Sting, Tiger's 
 
 The [Wind Charged, Weaving, Oozing, and Infested guide](TriggeredEffects.md) compares damage/death triggers, creation limits, brewing, and ominous-trial delivery.
 
-This is a growing reference, not a complete list of all registered effects. The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
+This directory links guides for all **45 direct effect registrations** in the reviewed source snapshot; the guides describe checked behavior, not every possible interaction or custom-data variant. [Direct effect registrations](https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/effect/MobEffects.java) The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
+
+The [omen and Hero of the Village guide](OmenEffects.md) compares the bottle effect chain, encounter triggers, removal timing, and villager rewards.
 
 ## Clearing effects
 

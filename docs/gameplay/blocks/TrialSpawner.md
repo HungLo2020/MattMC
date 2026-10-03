@@ -57,6 +57,8 @@ For keys and their separate reward destination, see [Trial Key](../items/TrialKe
 
 ## Becoming ominous
 
+The [Trial Omen effect guide](../effects/OmenEffects.md#trial-omen) compares the player's effect duration, conversion conditions, and this block's separate cooldown.
+
 The [Wind Charged, Weaving, Oozing, and Infested guide](../effects/TriggeredEffects.md#ominous-trials) explains four of the lingering-potion hazards and the creatures or Cobwebs they can leave behind.
 
 A visible detected player with **Trial Omen**, or with **Bad Omen that can be converted**, can turn a non-ominous spawner ominous. Drinking an [Ominous Bottle](../items/OminousBottle.md) supplies Bad Omen; merely carrying the bottle is not the checked condition. Conversion removes Bad Omen and grants Trial Omen for **18,000 ticks per Bad Omen level**, nominally 15 minutes per level at 20 TPS. [Detection and effect choice][omen-detection] · [Conversion][omen-reset] · [Bottle effect][bottle]

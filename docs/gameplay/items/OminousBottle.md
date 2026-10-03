@@ -14,6 +14,8 @@ Finish drinking to apply **120,000 ticks of Bad Omen**, nominally 100 minutes at
 
 ## Behavior
 
+See [omen effects](../effects/OmenEffects.md) for the four statuses' levels, conversion gates, cancellation timing, and Hero of the Village benefits.
+
 Bad Omen can become **Raid Omen** on entering a recognized village, starting a 600-tick countdown before the saved-position raid-start attempt. It can instead be converted by a qualifying **Trial Spawner** into Trial Omen. Follow the relevant encounter guide for preparation, conversion conditions and rewards; those are distinct systems. [Raid conversion and cancellation](../mechanics/Raid.md#starting-or-avoiding-a-raid) · [Trial conversion](../blocks/TrialSpawner.md#becoming-ominous)
 
 [Milk](MilkBucket.md) removes omen effects along with other effects. Removing Raid Omen before its final tick prevents that effect's pending start call; drinking Milk after a raid begins does not stop the existing raid. [Clear effects][clear-effects] · [Final-tick start][raid-omen]

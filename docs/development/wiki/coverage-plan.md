@@ -1570,3 +1570,10 @@ Every batch must record its source sync, exact changed paths, published commit, 
 - Traced admitted hurt/Totem ordering, ordinary killed-removal timing and effect expiry, Creeper's explicit extra dispatch and non-guaranteed ordering of simultaneous death effects. Direct effect-created mobs, natural spawn gates, Peaceful removal, nearby-Slime counting and Weaving block-placement rules remain distinct.
 - Verified the living-bearer wind burst's no-damage and trigger-block behavior without copying projectile-specific fall protection or Breeze griefing rules. Brewing, durations, delivery and ominous cached potion selection/timing are checked through active consumers.
 - Exact canonical/index guards, independent source/render review, pinned citations, preserved owner anchors, actual hierarchy check and strict build apply. No gameplay brewing, damage, death, spawning, block-placement, cloud, farm-output or timing tests were run.
+
+## Batch 199: Omens, Hero rewards and effect directory inventory
+
+- Added one shared owner for Bad Omen, Raid Omen, Trial Omen and Hero of the Village, with guarded links in five existing owners. Preserved the prior 41 effect entries and Triggered's Trial Spawner discovery paragraph.
+- Traced bottle and complete reward-table acquisition, village/raid and trial state transitions, stored-position timing, separate player/block cooldowns, permission and gamerule gates, actual trade rounding/clamps and eligible gift checks. Nearby active raids exclude the Pillager captain bottle route; gifts have no guaranteed wall-clock interval.
+- Independently reconciled all 45 direct MobEffects.java registrations with distinct directory routes and corrected the current directory qualifier accordingly. This is checked source registration-route coverage, not every interaction, a runtime registry inventory or broad wiki completion.
+- Exact frozen owner/navigation guards, source/render review, two comparison tables, preserved anchors and index rows, actual hierarchy check and strict build apply. No gameplay bottle, raid, trial, Milk, multiplayer, trade or gift tests were run.

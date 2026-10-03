@@ -44,6 +44,8 @@ The entity ID is `minecraft:villager`. For Creative testing and mapmaking, use t
 
 ## Related pages
 
+- [Hero of the Village gifts and discounts](../effects/OmenEffects.md#hero-of-the-village)
+
 - [Raid preparation and village recognition](../mechanics/Raid.md#starting-or-avoiding-a-raid)
 
 - [Trading](../trading/Trading.md)
